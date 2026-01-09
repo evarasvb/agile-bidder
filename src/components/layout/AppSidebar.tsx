@@ -4,6 +4,7 @@ import {
   Settings, 
   History, 
   FileText,
+  FileSearch,
   Zap,
   LogOut
 } from "lucide-react";
@@ -12,6 +13,7 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Licitaciones", url: "/licitaciones", icon: FileSearch },
   { title: "Inventario", url: "/inventory", icon: Package },
   { title: "Historial", url: "/history", icon: History },
   { title: "Logs", url: "/logs", icon: FileText },

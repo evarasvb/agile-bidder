@@ -9,6 +9,7 @@ import Inventory from "./pages/Inventory";
 import History from "./pages/History";
 import Settings from "./pages/Settings";
 import Logs from "./pages/Logs";
+import Licitaciones from "./pages/Licitaciones";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/inventory" element={<Inventory />} />
             <Route path="/history" element={<History />} />
+            <Route path="/licitaciones" element={<Licitaciones />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/logs" element={<Logs />} />
             <Route path="*" element={<NotFound />} />
