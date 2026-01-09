@@ -14,7 +14,74 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      licitacion_items: {
+        Row: {
+          cantidad: number | null
+          descripcion: string | null
+          id: number
+          licitacion_id: string
+          nombre_producto: string
+          unidad: string | null
+        }
+        Insert: {
+          cantidad?: number | null
+          descripcion?: string | null
+          id?: number
+          licitacion_id: string
+          nombre_producto: string
+          unidad?: string | null
+        }
+        Update: {
+          cantidad?: number | null
+          descripcion?: string | null
+          id?: number
+          licitacion_id?: string
+          nombre_producto?: string
+          unidad?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "licitacion_items_licitacion_id_fkey"
+            columns: ["licitacion_id"]
+            isOneToOne: false
+            referencedRelation: "licitaciones"
+            referencedColumns: ["id_licitacion"]
+          },
+        ]
+      }
+      licitaciones: {
+        Row: {
+          created_at: string
+          estado: string | null
+          fecha_cierre: string | null
+          id_licitacion: string
+          link_oficial: string | null
+          organismo: string
+          presupuesto: number | null
+          titulo: string
+        }
+        Insert: {
+          created_at?: string
+          estado?: string | null
+          fecha_cierre?: string | null
+          id_licitacion: string
+          link_oficial?: string | null
+          organismo: string
+          presupuesto?: number | null
+          titulo: string
+        }
+        Update: {
+          created_at?: string
+          estado?: string | null
+          fecha_cierre?: string | null
+          id_licitacion?: string
+          link_oficial?: string | null
+          organismo?: string
+          presupuesto?: number | null
+          titulo?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
