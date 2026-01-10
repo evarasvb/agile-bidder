@@ -1,7 +1,10 @@
 import { FileSearch, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { LicitacionesNuevas } from '@/components/licitaciones/LicitacionesNuevas';
+import { LicitacionesConMatch } from '@/components/licitaciones/LicitacionesConMatch';
 import { LicitacionesTable } from '@/components/licitaciones/LicitacionesTable';
 import { useQueryClient } from '@tanstack/react-query';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function Licitaciones() {
   const queryClient = useQueryClient();
@@ -28,7 +31,19 @@ export default function Licitaciones() {
         </Button>
       </div>
 
-      <LicitacionesTable />
+      <div className="space-y-6">
+        <LicitacionesNuevas />
+        <LicitacionesConMatch />
+      </div>
+
+      <Tabs defaultValue="todas" className="w-full">
+        <TabsList>
+          <TabsTrigger value="todas">Todas las Licitaciones</TabsTrigger>
+        </TabsList>
+        <TabsContent value="todas">
+          <LicitacionesTable />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
