@@ -9,12 +9,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Loader2 } from "lucide-react";
-import { ClienteInventario } from "@/hooks/useCliente";
+import { InventoryItem } from "@/hooks/useInventory";
 
 interface DeleteProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  product: ClienteInventario | null;
+  product: InventoryItem | null;
   onConfirm: () => Promise<void>;
   isLoading?: boolean;
 }
@@ -32,7 +32,7 @@ export function DeleteProductDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>¿Eliminar producto?</AlertDialogTitle>
           <AlertDialogDescription>
-            Estás a punto de eliminar <strong>{product?.nombre}</strong> (SKU: {product?.sku}).
+            Estás a punto de eliminar <strong>{product?.nombre_producto}</strong> (SKU: {product?.sku}).
             Esta acción no se puede deshacer y el producto dejará de estar disponible para el matching de licitaciones.
           </AlertDialogDescription>
         </AlertDialogHeader>
