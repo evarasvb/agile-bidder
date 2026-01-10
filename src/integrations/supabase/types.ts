@@ -14,6 +14,242 @@ export type Database = {
   }
   public: {
     Tables: {
+      cliente_exclusiones: {
+        Row: {
+          cliente_id: string
+          created_at: string
+          id: string
+          tipo_exclusion: string
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string
+          id?: string
+          tipo_exclusion: string
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string
+          id?: string
+          tipo_exclusion?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cliente_exclusiones_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cliente_inventario: {
+        Row: {
+          activo: boolean | null
+          categoria: string | null
+          cliente_id: string
+          created_at: string
+          descripcion: string | null
+          id: string
+          margen_minimo: number | null
+          nombre: string
+          palabras_clave: string[] | null
+          precio_unitario: number
+          sku: string
+          stock: number | null
+          tiempo_entrega_dias: number | null
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean | null
+          categoria?: string | null
+          cliente_id: string
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          margen_minimo?: number | null
+          nombre: string
+          palabras_clave?: string[] | null
+          precio_unitario?: number
+          sku: string
+          stock?: number | null
+          tiempo_entrega_dias?: number | null
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean | null
+          categoria?: string | null
+          cliente_id?: string
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          margen_minimo?: number | null
+          nombre?: string
+          palabras_clave?: string[] | null
+          precio_unitario?: number
+          sku?: string
+          stock?: number | null
+          tiempo_entrega_dias?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cliente_inventario_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cliente_notificaciones: {
+        Row: {
+          cliente_id: string
+          created_at: string
+          email_instantaneo: boolean | null
+          id: string
+          presupuesto_minimo: number | null
+          push_notifications: boolean | null
+          resumen_diario: boolean | null
+          resumen_semanal: boolean | null
+          updated_at: string
+          webhook_url: string | null
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string
+          email_instantaneo?: boolean | null
+          id?: string
+          presupuesto_minimo?: number | null
+          push_notifications?: boolean | null
+          resumen_diario?: boolean | null
+          resumen_semanal?: boolean | null
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string
+          email_instantaneo?: boolean | null
+          id?: string
+          presupuesto_minimo?: number | null
+          push_notifications?: boolean | null
+          resumen_diario?: boolean | null
+          resumen_semanal?: boolean | null
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cliente_notificaciones_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: true
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cliente_ofertas: {
+        Row: {
+          cliente_id: string
+          created_at: string
+          estado: string | null
+          id: string
+          licitacion_id: string
+          margen_total: number | null
+          match_score: number | null
+          notas: string | null
+          productos_ofertados: Json | null
+          updated_at: string
+          valor_total: number | null
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string
+          estado?: string | null
+          id?: string
+          licitacion_id: string
+          margen_total?: number | null
+          match_score?: number | null
+          notas?: string | null
+          productos_ofertados?: Json | null
+          updated_at?: string
+          valor_total?: number | null
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string
+          estado?: string | null
+          id?: string
+          licitacion_id?: string
+          margen_total?: number | null
+          match_score?: number | null
+          notas?: string | null
+          productos_ofertados?: Json | null
+          updated_at?: string
+          valor_total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cliente_ofertas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clientes: {
+        Row: {
+          activo: boolean | null
+          categoria_negocio: string | null
+          created_at: string
+          email: string
+          empresa_nombre: string
+          id: string
+          nombre_responsable: string
+          onboarding_completado: boolean | null
+          onboarding_step: number | null
+          plan: string | null
+          region: string
+          rut: string
+          telefono: string | null
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean | null
+          categoria_negocio?: string | null
+          created_at?: string
+          email: string
+          empresa_nombre: string
+          id?: string
+          nombre_responsable: string
+          onboarding_completado?: boolean | null
+          onboarding_step?: number | null
+          plan?: string | null
+          region: string
+          rut: string
+          telefono?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean | null
+          categoria_negocio?: string | null
+          created_at?: string
+          email?: string
+          empresa_nombre?: string
+          id?: string
+          nombre_responsable?: string
+          onboarding_completado?: boolean | null
+          onboarding_step?: number | null
+          plan?: string | null
+          region?: string
+          rut?: string
+          telefono?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       inventory: {
         Row: {
           activo: boolean
