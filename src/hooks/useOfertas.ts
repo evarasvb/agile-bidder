@@ -169,7 +169,7 @@ export function useActualizarProductosOferta() {
       const { error } = await supabase
         .from('ofertas')
         .update({
-          productos_ofertados: productos as unknown as Record<string, unknown>,
+          productos_ofertados: JSON.parse(JSON.stringify(productos)),
           valor_total_oferta: valorTotal,
           margen_total: margenTotal
         })
