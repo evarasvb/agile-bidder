@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Loader2, Sparkles, AlertCircle, Database } from 'lucide-react';
+import { Loader2, Sparkles, AlertCircle, RefreshCw, Inbox } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -14,7 +14,6 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useLicitacionesNuevas, useAnalizarMatch, type Licitacion } from '@/hooks/useLicitaciones';
-import { mockLicitaciones } from '@/data/mockLicitaciones';
 import { toast } from 'sonner';
 
 function formatCurrency(value: number | null): string {
@@ -26,21 +25,11 @@ function formatCurrency(value: number | null): string {
   }).format(value);
 }
 
-function LicitacionNuevaRow({ licitacion, isMock = false }: { licitacion: Licitacion; isMock?: boolean }) {
+function LicitacionNuevaRow({ licitacion }: { licitacion: Licitacion }) {
   const analizarMatch = useAnalizarMatch();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const handleAnalizar = async () => {
-    if (isMock) {
-      setIsAnalyzing(true);
-      // Simulate API call for mock data
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      const mockScore = Math.floor(Math.random() * 40) + 60; // 60-99
-      toast.success(`¡Match encontrado! Score: ${mockScore}%`);
-      setIsAnalyzing(false);
-      return;
-    }
-    
     setIsAnalyzing(true);
     try {
       const result = await analizarMatch.mutateAsync(licitacion.id_licitacion);
@@ -106,12 +95,12 @@ function LicitacionNuevaRow({ licitacion, isMock = false }: { licitacion: Licita
 }
 
 export function LicitacionesNuevas() {
-  const { data: licitaciones, isLoading, error } = useLicitacionesNuevas();
+  const { data: licitaciones, isLoading, error, refetch, isFetching } = useLicitacionesNuevas();
   
-  // Use mock data if no real data is available
-  const hasRealData = licitaciones && licitaciones.length > 0;
-  const displayData = hasRealData ? licitaciones : mockLicitaciones;
-  const isMockData = !hasRealData;
+  const handleRefresh = () => {
+    refetch();
+    toast.info('Actualizando licitaciones...');
+  };
 
   return (
     <Card>
@@ -121,17 +110,26 @@ export function LicitacionesNuevas() {
             <CardTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-orange-500" />
               Licitaciones Nuevas
+              {licitaciones && licitaciones.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {licitaciones.length} pendientes
+                </Badge>
+              )}
             </CardTitle>
             <CardDescription>
               Licitaciones sin procesar que requieren análisis de match
             </CardDescription>
           </div>
-          {isMockData && !isLoading && (
-            <Badge variant="secondary" className="gap-1">
-              <Database className="h-3 w-3" />
-              Datos de prueba
-            </Badge>
-          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isFetching}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+            Actualizar
+          </Button>
         </div>
       </CardHeader>
       <CardContent>
@@ -142,6 +140,12 @@ export function LicitacionesNuevas() {
         ) : error ? (
           <div className="py-8 text-center text-destructive">
             Error al cargar: {error.message}
+          </div>
+        ) : !licitaciones || licitaciones.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+            <Inbox className="h-12 w-12 mb-4 opacity-50" />
+            <p className="text-lg font-medium">No hay licitaciones nuevas</p>
+            <p className="text-sm">Las licitaciones del scraper aparecerán aquí</p>
           </div>
         ) : (
           <div className="rounded-lg border border-border">
@@ -159,11 +163,10 @@ export function LicitacionesNuevas() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {displayData.map((licitacion) => (
+                {licitaciones.map((licitacion) => (
                   <LicitacionNuevaRow 
                     key={licitacion.id_licitacion} 
                     licitacion={licitacion}
-                    isMock={isMockData}
                   />
                 ))}
               </TableBody>
