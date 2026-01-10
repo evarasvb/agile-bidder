@@ -12,13 +12,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Loader2 } from "lucide-react";
-import { ClienteInventario } from "@/hooks/useCliente";
+import { InventoryItem } from "@/hooks/useInventory";
 
 interface EditProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  product: ClienteInventario | null;
-  onSave: (data: Partial<ClienteInventario> & { id: string }) => Promise<void>;
+  product: InventoryItem | null;
+  onSave: (data: Partial<InventoryItem> & { id: string }) => Promise<void>;
   isLoading?: boolean;
 }
 
@@ -31,14 +31,14 @@ export function EditProductDialog({
 }: EditProductDialogProps) {
   const [formData, setFormData] = useState({
     sku: "",
-    nombre: "",
+    nombre_producto: "",
     descripcion: "",
     categoria: "",
     precio_unitario: 0,
     margen_minimo: 10,
-    stock: 0,
+    stock_disponible: 0,
     tiempo_entrega_dias: 5,
-    palabras_clave: "",
+    keywords: "",
     activo: true,
   });
 
@@ -46,14 +46,14 @@ export function EditProductDialog({
     if (product) {
       setFormData({
         sku: product.sku || "",
-        nombre: product.nombre || "",
+        nombre_producto: product.nombre_producto || "",
         descripcion: product.descripcion || "",
         categoria: product.categoria || "",
         precio_unitario: product.precio_unitario || 0,
         margen_minimo: product.margen_minimo || 10,
-        stock: product.stock || 0,
+        stock_disponible: product.stock_disponible || 0,
         tiempo_entrega_dias: product.tiempo_entrega_dias || 5,
-        palabras_clave: product.palabras_clave?.join(", ") || "",
+        keywords: product.keywords?.join(", ") || "",
         activo: product.activo ?? true,
       });
     }
@@ -66,16 +66,16 @@ export function EditProductDialog({
     await onSave({
       id: product.id,
       sku: formData.sku,
-      nombre: formData.nombre,
+      nombre_producto: formData.nombre_producto,
       descripcion: formData.descripcion || null,
-      categoria: formData.categoria || null,
+      categoria: formData.categoria,
       precio_unitario: formData.precio_unitario,
       margen_minimo: formData.margen_minimo,
-      stock: formData.stock,
+      stock_disponible: formData.stock_disponible,
       tiempo_entrega_dias: formData.tiempo_entrega_dias,
-      palabras_clave: formData.palabras_clave
-        ? formData.palabras_clave.split(",").map((k) => k.trim()).filter(Boolean)
-        : null,
+      keywords: formData.keywords
+        ? formData.keywords.split(",").map((k) => k.trim()).filter(Boolean)
+        : [],
       activo: formData.activo,
     });
   };
@@ -111,8 +111,8 @@ export function EditProductDialog({
             <Label htmlFor="nombre">Nombre del Producto</Label>
             <Input
               id="nombre"
-              value={formData.nombre}
-              onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+              value={formData.nombre_producto}
+              onChange={(e) => setFormData({ ...formData, nombre_producto: e.target.value })}
               required
             />
           </div>
@@ -154,13 +154,13 @@ export function EditProductDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="stock">Stock</Label>
+              <Label htmlFor="stock">Stock Disponible</Label>
               <Input
                 id="stock"
                 type="number"
                 min="0"
-                value={formData.stock}
-                onChange={(e) => setFormData({ ...formData, stock: Number(e.target.value) })}
+                value={formData.stock_disponible}
+                onChange={(e) => setFormData({ ...formData, stock_disponible: Number(e.target.value) })}
               />
             </div>
             <div className="space-y-2">
@@ -179,8 +179,8 @@ export function EditProductDialog({
             <Label htmlFor="keywords">Palabras Clave (separadas por coma)</Label>
             <Input
               id="keywords"
-              value={formData.palabras_clave}
-              onChange={(e) => setFormData({ ...formData, palabras_clave: e.target.value })}
+              value={formData.keywords}
+              onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
               placeholder="papel, oficina, resma"
             />
           </div>

@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Save, Building2, MapPin, Clock, DollarSign, Shield } from "lucide-react";
+import { Save, Building2, MapPin, Clock, DollarSign, Shield, Key, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 import {
   Select,
   SelectContent,
@@ -40,6 +42,9 @@ export default function Settings() {
   ]);
   const [autoMatch, setAutoMatch] = useState(true);
   const [autoBid, setAutoBid] = useState(false);
+  const [apiKey, setApiKey] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [apiKeyConnected, setApiKeyConnected] = useState(false);
 
   const toggleRegion = (region: string) => {
     setSelectedRegions((prev) =>
@@ -47,6 +52,16 @@ export default function Settings() {
         ? prev.filter((r) => r !== region)
         : [...prev, region]
     );
+  };
+
+  const handleSaveApiKey = () => {
+    if (apiKey.length < 10) {
+      toast.error("La API Key debe tener al menos 10 caracteres");
+      return;
+    }
+    // Simular guardado
+    setApiKeyConnected(true);
+    toast.success("API Key de Mercado Público guardada correctamente");
   };
 
   return (
@@ -65,6 +80,73 @@ export default function Settings() {
         </Button>
       </div>
 
+      {/* API Key Section */}
+      <SettingsSection
+        icon={Key}
+        title="Conexión Mercado Público"
+        description="Configura tu API Key para enviar ofertas automáticamente"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Badge 
+              variant={apiKeyConnected ? "default" : "secondary"}
+              className={apiKeyConnected ? "bg-success hover:bg-success" : ""}
+            >
+              {apiKeyConnected ? (
+                <>
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  Conectado
+                </>
+              ) : (
+                "No conectado"
+              )}
+            </Badge>
+          </div>
+          <div className="space-y-2">
+            <Label>API Key de Mercado Público</Label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Input 
+                  type={showApiKey ? "text" : "password"}
+                  placeholder="Ingresa tu API Key..."
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  className="pr-10 font-mono"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                >
+                  {showApiKey ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </Button>
+              </div>
+              <Button onClick={handleSaveApiKey}>
+                Guardar
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Obtén tu API Key en{" "}
+              <a 
+                href="https://www.mercadopublico.cl" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                Mercado Público
+              </a>
+              {" "}→ Mi Cuenta → Integraciones
+            </p>
+          </div>
+        </div>
+      </SettingsSection>
+
       {/* Company Info */}
       <SettingsSection
         icon={Building2}
@@ -78,7 +160,7 @@ export default function Settings() {
           </div>
           <div className="space-y-2">
             <Label>Razón Social</Label>
-            <Input placeholder="Empresa SpA" defaultValue="FirminVB SpA" />
+            <Input placeholder="Empresa SpA" defaultValue="FirmaVB SpA" />
           </div>
           <div className="space-y-2">
             <Label>Código Organismo (Mercado Público)</Label>

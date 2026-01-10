@@ -19,25 +19,25 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { useTodoElInventario, useActualizarProducto, useEliminarProducto, ClienteInventario } from "@/hooks/useCliente";
+import { useInventory, useUpdateInventoryItem, useDeleteInventoryItem, InventoryItem } from "@/hooks/useInventory";
 import { EditProductDialog } from "@/components/inventory/EditProductDialog";
 import { DeleteProductDialog } from "@/components/inventory/DeleteProductDialog";
 
 export default function Inventory() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [editingProduct, setEditingProduct] = useState<ClienteInventario | null>(null);
-  const [deletingProduct, setDeletingProduct] = useState<ClienteInventario | null>(null);
+  const [editingProduct, setEditingProduct] = useState<InventoryItem | null>(null);
+  const [deletingProduct, setDeletingProduct] = useState<InventoryItem | null>(null);
   
-  const { data: inventario = [], isLoading, refetch } = useTodoElInventario();
-  const actualizarProducto = useActualizarProducto();
-  const eliminarProducto = useEliminarProducto();
+  const { data: inventario = [], isLoading, refetch } = useInventory();
+  const actualizarProducto = useUpdateInventoryItem();
+  const eliminarProducto = useDeleteInventoryItem();
 
   const handleRefresh = () => {
     toast.info('Actualizando inventario...');
     refetch();
   };
 
-  const handleEdit = async (data: Partial<ClienteInventario> & { id: string }) => {
+  const handleEdit = async (data: Partial<InventoryItem> & { id: string }) => {
     await actualizarProducto.mutateAsync(data);
     setEditingProduct(null);
     toast.success('Producto actualizado correctamente');
@@ -53,7 +53,7 @@ export default function Inventory() {
 
   const filteredInventory = inventario.filter(
     (item) =>
-      item.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.nombre_producto.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.sku.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -151,13 +151,13 @@ export default function Inventory() {
                   <TableCell className="font-mono text-sm font-medium">
                     {item.sku}
                   </TableCell>
-                  <TableCell className="font-medium">{item.nombre}</TableCell>
+                  <TableCell className="font-medium">{item.nombre_producto}</TableCell>
                   <TableCell className="text-muted-foreground">
                     {item.categoria || '-'}
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1 max-w-[200px]">
-                      {item.palabras_clave?.slice(0, 3).map((keyword) => (
+                      {item.keywords?.slice(0, 3).map((keyword) => (
                         <span
                           key={keyword}
                           className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground"
@@ -165,9 +165,9 @@ export default function Inventory() {
                           {keyword}
                         </span>
                       ))}
-                      {item.palabras_clave && item.palabras_clave.length > 3 && (
+                      {item.keywords && item.keywords.length > 3 && (
                         <span className="text-xs text-muted-foreground">
-                          +{item.palabras_clave.length - 3}
+                          +{item.keywords.length - 3}
                         </span>
                       )}
                     </div>
@@ -180,12 +180,12 @@ export default function Inventory() {
                   </TableCell>
                   <TableCell className={cn(
                     "text-right font-mono font-medium",
-                    item.stock === 0 && "text-destructive",
-                    item.stock && item.stock > 0 && item.stock < 50 && "text-warning"
+                    item.stock_disponible === 0 && "text-destructive",
+                    item.stock_disponible > 0 && item.stock_disponible < 50 && "text-warning"
                   )}>
-                    {(item.stock || 0).toLocaleString("es-CL")}
+                    {item.stock_disponible.toLocaleString("es-CL")}
                   </TableCell>
-                  <TableCell>{getStatusBadge(item.stock || 0, item.activo)}</TableCell>
+                  <TableCell>{getStatusBadge(item.stock_disponible, item.activo)}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
