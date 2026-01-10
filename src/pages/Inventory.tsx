@@ -19,44 +19,34 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-
-interface InventoryItem {
-  id: string;
-  sku: string;
-  name: string;
-  keywords: string[];
-  baseCost: number;
-  minMargin: number;
-  stock: number;
-  status: "active" | "low_stock" | "out_of_stock";
-}
+import { useTodoElInventario } from "@/hooks/useCliente";
 
 export default function Inventory() {
   const [searchQuery, setSearchQuery] = useState("");
-  
-  // Empty state - no mock data, waiting for real inventory table
-  const inventory: InventoryItem[] = [];
-  const isLoading = false;
+  const { data: inventario = [], isLoading, refetch } = useTodoElInventario();
 
   const handleRefresh = () => {
     toast.info('Actualizando inventario...');
+    refetch();
   };
 
-  const filteredInventory = inventory.filter(
+  const filteredInventory = inventario.filter(
     (item) =>
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.sku.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const getStatusBadge = (status: InventoryItem["status"]) => {
-    switch (status) {
-      case "active":
-        return <Badge className="bg-success/10 text-success border-0">Activo</Badge>;
-      case "low_stock":
-        return <Badge className="bg-warning/10 text-warning border-0">Stock Bajo</Badge>;
-      case "out_of_stock":
-        return <Badge className="bg-destructive/10 text-destructive border-0">Sin Stock</Badge>;
+  const getStatusBadge = (stock: number, activo: boolean | null) => {
+    if (!activo) {
+      return <Badge className="bg-muted text-muted-foreground border-0">Inactivo</Badge>;
     }
+    if (stock === 0) {
+      return <Badge className="bg-destructive/10 text-destructive border-0">Sin Stock</Badge>;
+    }
+    if (stock < 50) {
+      return <Badge className="bg-warning/10 text-warning border-0">Stock Bajo</Badge>;
+    }
+    return <Badge className="bg-success/10 text-success border-0">Activo</Badge>;
   };
 
   return (
@@ -125,8 +115,9 @@ export default function Inventory() {
               <TableRow className="bg-muted/30 hover:bg-muted/30">
                 <TableHead className="font-semibold">SKU</TableHead>
                 <TableHead className="font-semibold">Producto</TableHead>
+                <TableHead className="font-semibold">Categoría</TableHead>
                 <TableHead className="font-semibold">Keywords</TableHead>
-                <TableHead className="font-semibold text-right">Costo Base</TableHead>
+                <TableHead className="font-semibold text-right">Precio</TableHead>
                 <TableHead className="font-semibold text-right">Margen Mín.</TableHead>
                 <TableHead className="font-semibold text-right">Stock</TableHead>
                 <TableHead className="font-semibold">Estado</TableHead>
@@ -139,10 +130,13 @@ export default function Inventory() {
                   <TableCell className="font-mono text-sm font-medium">
                     {item.sku}
                   </TableCell>
-                  <TableCell className="font-medium">{item.name}</TableCell>
+                  <TableCell className="font-medium">{item.nombre}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {item.categoria || '-'}
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1 max-w-[200px]">
-                      {item.keywords.slice(0, 3).map((keyword) => (
+                      {item.palabras_clave?.slice(0, 3).map((keyword) => (
                         <span
                           key={keyword}
                           className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground"
@@ -150,27 +144,27 @@ export default function Inventory() {
                           {keyword}
                         </span>
                       ))}
-                      {item.keywords.length > 3 && (
+                      {item.palabras_clave && item.palabras_clave.length > 3 && (
                         <span className="text-xs text-muted-foreground">
-                          +{item.keywords.length - 3}
+                          +{item.palabras_clave.length - 3}
                         </span>
                       )}
                     </div>
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    ${item.baseCost.toLocaleString("es-CL")}
+                    ${item.precio_unitario.toLocaleString("es-CL")}
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {item.minMargin}%
+                    {item.margen_minimo || 10}%
                   </TableCell>
                   <TableCell className={cn(
                     "text-right font-mono font-medium",
                     item.stock === 0 && "text-destructive",
-                    item.stock > 0 && item.stock < 50 && "text-warning"
+                    item.stock && item.stock > 0 && item.stock < 50 && "text-warning"
                   )}>
-                    {item.stock.toLocaleString("es-CL")}
+                    {(item.stock || 0).toLocaleString("es-CL")}
                   </TableCell>
-                  <TableCell>{getStatusBadge(item.status)}</TableCell>
+                  <TableCell>{getStatusBadge(item.stock || 0, item.activo)}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
