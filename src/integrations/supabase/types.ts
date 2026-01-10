@@ -91,6 +91,114 @@ export type Database = {
         }
         Relationships: []
       }
+      user_categories: {
+        Row: {
+          category_id: string
+          category_name: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          category_id: string
+          category_name: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          category_id?: string
+          category_name?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_notifications: {
+        Row: {
+          created_at: string
+          email_notifications: boolean
+          id: string
+          notification_frequency: Database["public"]["Enums"]["notification_frequency"]
+          push_notifications: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email_notifications?: boolean
+          id?: string
+          notification_frequency?: Database["public"]["Enums"]["notification_frequency"]
+          push_notifications?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email_notifications?: boolean
+          id?: string
+          notification_frequency?: Database["public"]["Enums"]["notification_frequency"]
+          push_notifications?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_preferences: {
+        Row: {
+          company_name: string | null
+          created_at: string
+          id: string
+          onboarding_completed: boolean
+          onboarding_step: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_name?: string | null
+          created_at?: string
+          id?: string
+          onboarding_completed?: boolean
+          onboarding_step?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_name?: string | null
+          created_at?: string
+          id?: string
+          onboarding_completed?: boolean
+          onboarding_step?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_regions: {
+        Row: {
+          created_at: string
+          id: string
+          region_code: string
+          region_name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          region_code: string
+          region_name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          region_code?: string
+          region_name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -99,7 +207,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      notification_frequency: "immediate" | "daily" | "weekly"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -226,6 +334,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      notification_frequency: ["immediate", "daily", "weekly"],
+    },
   },
 } as const
