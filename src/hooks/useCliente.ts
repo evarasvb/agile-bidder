@@ -190,6 +190,22 @@ export function useClienteInventario() {
   });
 }
 
+// Hook para cargar TODOS los productos del inventario (sin filtro de cliente)
+export function useTodoElInventario() {
+  return useQuery({
+    queryKey: ['todo-inventario'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('cliente_inventario')
+        .select('*')
+        .order('nombre');
+      
+      if (error) throw error;
+      return data as ClienteInventario[];
+    },
+  });
+}
+
 // Hook para agregar producto al inventario
 export function useAgregarProducto() {
   const queryClient = useQueryClient();
