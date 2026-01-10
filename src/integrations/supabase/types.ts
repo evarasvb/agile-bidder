@@ -56,8 +56,11 @@ export type Database = {
           fecha_cierre: string | null
           id_licitacion: string
           link_oficial: string | null
+          match_encontrado: boolean
+          match_score: number | null
           organismo: string
           presupuesto: number | null
+          procesada: boolean
           titulo: string
         }
         Insert: {
@@ -66,8 +69,11 @@ export type Database = {
           fecha_cierre?: string | null
           id_licitacion: string
           link_oficial?: string | null
+          match_encontrado?: boolean
+          match_score?: number | null
           organismo: string
           presupuesto?: number | null
+          procesada?: boolean
           titulo: string
         }
         Update: {
@@ -76,8 +82,11 @@ export type Database = {
           fecha_cierre?: string | null
           id_licitacion?: string
           link_oficial?: string | null
+          match_encontrado?: boolean
+          match_score?: number | null
           organismo?: string
           presupuesto?: number | null
+          procesada?: boolean
           titulo?: string
         }
         Relationships: []
