@@ -7,7 +7,10 @@ import {
   Target,
   ArrowRight,
   Trophy,
-  FileCheck
+  FileCheck,
+  Play,
+  Loader2,
+  Sparkles
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +20,7 @@ import {
   useWeeklyMatchData, 
   useLicitacionesUrgentes 
 } from "@/hooks/useDashboard";
+import { useMatchingAI } from "@/hooks/useMatching";
 import { 
   AreaChart, 
   Area, 
@@ -35,6 +39,7 @@ export default function Dashboard() {
   const { data: metrics, isLoading: metricsLoading } = useDashboardMetrics();
   const { data: weeklyData, isLoading: chartLoading } = useWeeklyMatchData();
   const { data: urgentes, isLoading: urgentesLoading } = useLicitacionesUrgentes();
+  const { mutate: runMatching, isPending: isMatching } = useMatchingAI();
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-CL', {
@@ -48,17 +53,36 @@ export default function Dashboard() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
           <p className="text-muted-foreground">
             Resumen de oportunidades y rendimiento
           </p>
         </div>
-        <Badge variant="outline" className="gap-1.5 px-3 py-1.5">
-          <span className="h-2 w-2 rounded-full bg-[hsl(var(--firmavb-blue))] animate-pulse" />
-          Actualizado en vivo
-        </Badge>
+        <div className="flex items-center gap-3">
+          <Button 
+            onClick={() => runMatching()}
+            disabled={isMatching}
+            className="bg-gradient-to-r from-[hsl(var(--firmavb-blue))] to-[hsl(217,91%,40%)] hover:from-[hsl(var(--firmavb-blue))]/90 hover:to-[hsl(217,91%,35%)] shadow-lg shadow-[hsl(var(--firmavb-blue))]/25"
+          >
+            {isMatching ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Procesando...
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4 mr-2" />
+                Ejecutar Matching IA
+              </>
+            )}
+          </Button>
+          <Badge variant="outline" className="gap-1.5 px-3 py-1.5">
+            <span className="h-2 w-2 rounded-full bg-[hsl(var(--firmavb-blue))] animate-pulse" />
+            Actualizado en vivo
+          </Badge>
+        </div>
       </div>
 
       {/* Metrics Grid */}
