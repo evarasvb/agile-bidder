@@ -14,6 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
+      inventory: {
+        Row: {
+          activo: boolean
+          categoria: string
+          created_at: string
+          descripcion: string | null
+          id: string
+          keywords: string[] | null
+          margen_minimo: number
+          margen_objetivo: number
+          nombre_producto: string
+          precio_unitario: number
+          proveedor: string | null
+          sku: string
+          stock_disponible: number
+          tiempo_entrega_dias: number
+          unidad_medida: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          categoria: string
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          keywords?: string[] | null
+          margen_minimo?: number
+          margen_objetivo?: number
+          nombre_producto: string
+          precio_unitario?: number
+          proveedor?: string | null
+          sku: string
+          stock_disponible?: number
+          tiempo_entrega_dias?: number
+          unidad_medida?: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          categoria?: string
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          keywords?: string[] | null
+          margen_minimo?: number
+          margen_objetivo?: number
+          nombre_producto?: string
+          precio_unitario?: number
+          proveedor?: string | null
+          sku?: string
+          stock_disponible?: number
+          tiempo_entrega_dias?: number
+          unidad_medida?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       licitacion_items: {
         Row: {
           cantidad: number | null
@@ -90,6 +147,106 @@ export type Database = {
           titulo?: string
         }
         Relationships: []
+      }
+      ofertas: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          documento_oferta_url: string | null
+          estado: string
+          fecha_envio: string | null
+          id: string
+          licitacion_id: string
+          margen_total: number
+          match_score: number | null
+          notas_internas: string | null
+          productos_ofertados: Json
+          respuesta_mp: Json | null
+          updated_at: string
+          valor_total_oferta: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          documento_oferta_url?: string | null
+          estado?: string
+          fecha_envio?: string | null
+          id?: string
+          licitacion_id: string
+          margen_total?: number
+          match_score?: number | null
+          notas_internas?: string | null
+          productos_ofertados?: Json
+          respuesta_mp?: Json | null
+          updated_at?: string
+          valor_total_oferta?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          documento_oferta_url?: string | null
+          estado?: string
+          fecha_envio?: string | null
+          id?: string
+          licitacion_id?: string
+          margen_total?: number
+          match_score?: number | null
+          notas_internas?: string | null
+          productos_ofertados?: Json
+          respuesta_mp?: Json | null
+          updated_at?: string
+          valor_total_oferta?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ofertas_licitacion_id_fkey"
+            columns: ["licitacion_id"]
+            isOneToOne: false
+            referencedRelation: "licitaciones"
+            referencedColumns: ["id_licitacion"]
+          },
+        ]
+      }
+      system_logs: {
+        Row: {
+          created_at: string
+          detalles: Json | null
+          id: string
+          licitacion_id: string | null
+          mensaje: string
+          oferta_id: string | null
+          severidad: string
+          tipo: string
+        }
+        Insert: {
+          created_at?: string
+          detalles?: Json | null
+          id?: string
+          licitacion_id?: string | null
+          mensaje: string
+          oferta_id?: string | null
+          severidad?: string
+          tipo: string
+        }
+        Update: {
+          created_at?: string
+          detalles?: Json | null
+          id?: string
+          licitacion_id?: string | null
+          mensaje?: string
+          oferta_id?: string | null
+          severidad?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "system_logs_oferta_id_fkey"
+            columns: ["oferta_id"]
+            isOneToOne: false
+            referencedRelation: "ofertas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_categories: {
         Row: {
