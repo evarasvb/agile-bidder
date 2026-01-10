@@ -19,14 +19,35 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { useTodoElInventario } from "@/hooks/useCliente";
+import { useTodoElInventario, useActualizarProducto, useEliminarProducto, ClienteInventario } from "@/hooks/useCliente";
+import { EditProductDialog } from "@/components/inventory/EditProductDialog";
+import { DeleteProductDialog } from "@/components/inventory/DeleteProductDialog";
 
 export default function Inventory() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [editingProduct, setEditingProduct] = useState<ClienteInventario | null>(null);
+  const [deletingProduct, setDeletingProduct] = useState<ClienteInventario | null>(null);
+  
   const { data: inventario = [], isLoading, refetch } = useTodoElInventario();
+  const actualizarProducto = useActualizarProducto();
+  const eliminarProducto = useEliminarProducto();
 
   const handleRefresh = () => {
     toast.info('Actualizando inventario...');
+    refetch();
+  };
+
+  const handleEdit = async (data: Partial<ClienteInventario> & { id: string }) => {
+    await actualizarProducto.mutateAsync(data);
+    setEditingProduct(null);
+    toast.success('Producto actualizado correctamente');
+    refetch();
+  };
+
+  const handleDelete = async () => {
+    if (!deletingProduct) return;
+    await eliminarProducto.mutateAsync(deletingProduct.id);
+    setDeletingProduct(null);
     refetch();
   };
 
@@ -172,16 +193,22 @@ export default function Inventory() {
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem className="gap-2">
-                          <Edit2 className="h-4 w-4" />
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="gap-2 text-destructive">
-                          <Trash2 className="h-4 w-4" />
-                          Eliminar
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
+                        <DropdownMenuContent align="end" className="bg-popover">
+                          <DropdownMenuItem 
+                            className="gap-2 cursor-pointer"
+                            onClick={() => setEditingProduct(item)}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="gap-2 text-destructive cursor-pointer"
+                            onClick={() => setDeletingProduct(item)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Eliminar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
@@ -190,6 +217,24 @@ export default function Inventory() {
           </Table>
         )}
       </div>
+
+      {/* Edit Dialog */}
+      <EditProductDialog
+        open={!!editingProduct}
+        onOpenChange={(open) => !open && setEditingProduct(null)}
+        product={editingProduct}
+        onSave={handleEdit}
+        isLoading={actualizarProducto.isPending}
+      />
+
+      {/* Delete Dialog */}
+      <DeleteProductDialog
+        open={!!deletingProduct}
+        onOpenChange={(open) => !open && setDeletingProduct(null)}
+        product={deletingProduct}
+        onConfirm={handleDelete}
+        isLoading={eliminarProducto.isPending}
+      />
     </div>
   );
 }

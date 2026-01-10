@@ -251,6 +251,7 @@ export function useActualizarProducto() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cliente-inventario'] });
+      queryClient.invalidateQueries({ queryKey: ['todo-inventario'] });
     },
   });
 }
@@ -258,7 +259,6 @@ export function useActualizarProducto() {
 // Hook para eliminar producto
 export function useEliminarProducto() {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -271,9 +271,7 @@ export function useEliminarProducto() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cliente-inventario'] });
-      toast({
-        title: 'Producto eliminado',
-      });
+      queryClient.invalidateQueries({ queryKey: ['todo-inventario'] });
     },
   });
 }
