@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Terminal, Filter, Download, Pause, Play, Trash2 } from "lucide-react";
+import { Terminal, Filter, Download, Pause, Play, Trash2, Inbox } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 interface LogEntry {
   id: string;
@@ -20,99 +22,44 @@ interface LogEntry {
   message: string;
 }
 
-const generateMockLogs = (): LogEntry[] => [
-  {
-    id: "1",
-    timestamp: new Date(Date.now() - 5000),
-    level: "success",
-    source: "BidEngine",
-    message: 'Oferta enviada exitosamente: Licitación 2024-01-2847 → $213.600',
-  },
-  {
-    id: "2",
-    timestamp: new Date(Date.now() - 15000),
-    level: "info",
-    source: "MatchEngine",
-    message: 'Match encontrado: "Detergente Industrial 5L" ↔ SKU-DET-5L-IND (95% confianza)',
-  },
-  {
-    id: "3",
-    timestamp: new Date(Date.now() - 30000),
-    level: "info",
-    source: "Scanner",
-    message: "Escaneando oportunidades en Región Metropolitana... 12 nuevas encontradas",
-  },
-  {
-    id: "4",
-    timestamp: new Date(Date.now() - 45000),
-    level: "warn",
-    source: "StockValidator",
-    message: 'Stock bajo detectado: SKU-JAB-LIQ-5L tiene solo 25 unidades disponibles',
-  },
-  {
-    id: "5",
-    timestamp: new Date(Date.now() - 60000),
-    level: "error",
-    source: "SessionManager",
-    message: "Token de sesión expiró. Intentando reconexión automática...",
-  },
-  {
-    id: "6",
-    timestamp: new Date(Date.now() - 75000),
-    level: "success",
-    source: "SessionManager",
-    message: "Sesión restaurada exitosamente vía extensión de navegador",
-  },
-  {
-    id: "7",
-    timestamp: new Date(Date.now() - 90000),
-    level: "info",
-    source: "PriceCalculator",
-    message: "Calculando precio óptimo para oportunidad 2024-01-2851: Base $6.500 + 18% = $7.670",
-  },
-  {
-    id: "8",
-    timestamp: new Date(Date.now() - 120000),
-    level: "info",
-    source: "Scanner",
-    message: "Ciclo de escaneo completado. Próximo ciclo en 5 minutos.",
-  },
-];
+function useLicitacionesLogs() {
+  return useQuery({
+    queryKey: ['licitaciones_logs'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('licitaciones')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      
+      if (error) throw error;
+      
+      // Transform licitaciones into log entries
+      return (data || []).map((lic): LogEntry => ({
+        id: lic.id_licitacion,
+        timestamp: new Date(lic.created_at),
+        level: lic.match_encontrado ? "success" : lic.procesada ? "info" : "warn",
+        source: "Scanner",
+        message: `Licitación ${lic.id_licitacion}: ${lic.titulo} - ${lic.organismo}`,
+      }));
+    },
+    refetchInterval: 30000,
+  });
+}
 
 export default function Logs() {
-  const [logs, setLogs] = useState<LogEntry[]>(generateMockLogs());
+  const { data: dbLogs = [], isLoading } = useLicitacionesLogs();
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [levelFilter, setLevelFilter] = useState<string>("all");
   const [isPaused, setIsPaused] = useState(false);
 
-  // Simulate real-time log additions
+  // Update logs when data changes
   useEffect(() => {
-    if (isPaused) return;
-
-    const interval = setInterval(() => {
-      const sources = ["Scanner", "MatchEngine", "BidEngine", "SessionManager", "StockValidator"];
-      const levels: LogEntry["level"][] = ["info", "success", "warn"];
-      const messages = [
-        "Procesando nueva oportunidad detectada...",
-        "Validando disponibilidad de stock...",
-        "Calculando margen de ganancia...",
-        "Conexión con Mercado Público estable",
-        "Heartbeat recibido de extensión",
-      ];
-
-      const newLog: LogEntry = {
-        id: Date.now().toString(),
-        timestamp: new Date(),
-        level: levels[Math.floor(Math.random() * levels.length)],
-        source: sources[Math.floor(Math.random() * sources.length)],
-        message: messages[Math.floor(Math.random() * messages.length)],
-      };
-
-      setLogs((prev) => [newLog, ...prev.slice(0, 99)]);
-    }, 8000);
-
-    return () => clearInterval(interval);
-  }, [isPaused]);
+    if (dbLogs.length > 0) {
+      setLogs(dbLogs);
+    }
+  }, [dbLogs]);
 
   const filteredLogs = logs.filter((log) => {
     const matchesSearch =
@@ -157,7 +104,7 @@ export default function Logs() {
           <div>
             <h1 className="text-2xl font-semibold text-foreground">Logs del Sistema</h1>
             <p className="text-sm text-muted-foreground">
-              Monitoreo en tiempo real de actividades
+              Registro de licitaciones procesadas
             </p>
           </div>
         </div>
@@ -236,37 +183,44 @@ export default function Logs() {
           </span>
         </div>
         <div className="live-feed max-h-[500px] divide-y divide-border/20 font-mono text-sm">
-          {filteredLogs.map((log, index) => (
-            <div
-              key={log.id}
-              className={cn(
-                "flex items-start gap-3 px-4 py-2.5 hover:bg-[hsl(220_30%_12%)] transition-colors",
-                index === 0 && !isPaused && "animate-slide-in bg-[hsl(220_30%_12%)]"
-              )}
-            >
-              <span className="text-muted-foreground min-w-[70px] text-xs">
-                {formatTime(log.timestamp)}
-              </span>
-              <Badge
+          {isLoading ? (
+            <div className="px-4 py-8 text-center text-muted-foreground text-sm">
+              Cargando logs...
+            </div>
+          ) : filteredLogs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <Inbox className="h-10 w-10 mb-3 opacity-50" />
+              <p className="text-sm">No hay logs disponibles</p>
+              <p className="text-xs">Los logs de licitaciones aparecerán aquí</p>
+            </div>
+          ) : (
+            filteredLogs.map((log, index) => (
+              <div
+                key={log.id}
                 className={cn(
-                  "text-[10px] px-1.5 py-0 h-5 min-w-[60px] justify-center font-semibold uppercase border-0",
-                  getLevelStyles(log.level)
+                  "flex items-start gap-3 px-4 py-2.5 hover:bg-[hsl(220_30%_12%)] transition-colors",
+                  index === 0 && !isPaused && "animate-slide-in bg-[hsl(220_30%_12%)]"
                 )}
               >
-                {log.level}
-              </Badge>
-              <span className="text-primary min-w-[120px] text-xs">
-                [{log.source}]
-              </span>
-              <span className="text-[hsl(220_15%_75%)] flex-1 text-xs">
-                {log.message}
-              </span>
-            </div>
-          ))}
-          {filteredLogs.length === 0 && (
-            <div className="px-4 py-8 text-center text-muted-foreground text-sm">
-              No hay logs que coincidan con los filtros
-            </div>
+                <span className="text-muted-foreground min-w-[70px] text-xs">
+                  {formatTime(log.timestamp)}
+                </span>
+                <Badge
+                  className={cn(
+                    "text-[10px] px-1.5 py-0 h-5 min-w-[60px] justify-center font-semibold uppercase border-0",
+                    getLevelStyles(log.level)
+                  )}
+                >
+                  {log.level}
+                </Badge>
+                <span className="text-primary min-w-[120px] text-xs">
+                  [{log.source}]
+                </span>
+                <span className="text-[hsl(220_15%_75%)] flex-1 text-xs">
+                  {log.message}
+                </span>
+              </div>
+            ))
           )}
         </div>
       </div>

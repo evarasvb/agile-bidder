@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLink, Download, Search, Filter, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { ExternalLink, Download, Search, Filter, CheckCircle2, Clock, XCircle, Inbox, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { toast } from "sonner";
 
 interface BidRecord {
   id: string;
@@ -29,64 +30,23 @@ interface BidRecord {
   status: "accepted" | "pending" | "rejected";
 }
 
-const mockHistory: BidRecord[] = [
-  {
-    id: "1",
-    licitacionId: "2024-01-2847",
-    organism: "Municipalidad de Santiago",
-    item: "Detergente Industrial 5L x 24 unidades",
-    priceOffered: 213600,
-    date: new Date(2024, 0, 15, 14, 32),
-    status: "accepted",
-  },
-  {
-    id: "2",
-    licitacionId: "2024-01-2851",
-    organism: "Hospital San José",
-    item: "Jabón Líquido Antibacterial 5L x 12 unidades",
-    priceOffered: 89400,
-    date: new Date(2024, 0, 15, 11, 15),
-    status: "accepted",
-  },
-  {
-    id: "3",
-    licitacionId: "2024-01-2856",
-    organism: "SENAME Región Metropolitana",
-    item: "Papel Toalla 250m x 48 rollos",
-    priceOffered: 182400,
-    date: new Date(2024, 0, 14, 16, 45),
-    status: "pending",
-  },
-  {
-    id: "4",
-    licitacionId: "2024-01-2862",
-    organism: "Ministerio de Salud",
-    item: "Cloro Concentrado 2L x 36 unidades",
-    priceOffered: 108000,
-    date: new Date(2024, 0, 14, 9, 20),
-    status: "rejected",
-  },
-  {
-    id: "5",
-    licitacionId: "2024-01-2870",
-    organism: "Carabineros de Chile",
-    item: "Kit Limpieza Completo x 10 sets",
-    priceOffered: 450000,
-    date: new Date(2024, 0, 13, 15, 10),
-    status: "accepted",
-  },
-];
-
 export default function History() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [history] = useState<BidRecord[]>(mockHistory);
+  
+  // Empty state - no mock data, waiting for real ofertas table
+  const history: BidRecord[] = [];
+  const isLoading = false;
+
+  const handleRefresh = () => {
+    toast.info('Actualizando historial...');
+  };
 
   const filteredHistory = history.filter((record) => {
     const matchesSearch =
-      record.organism.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      record.item.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      record.licitacionId.toLowerCase().includes(searchQuery.toLowerCase());
+      record.organism?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      record.item?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      record.licitacionId?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || record.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -130,7 +90,7 @@ export default function History() {
   const totalAccepted = history.filter((r) => r.status === "accepted").length;
   const totalAmount = history
     .filter((r) => r.status === "accepted")
-    .reduce((acc, r) => acc + r.priceOffered, 0);
+    .reduce((acc, r) => acc + (r.priceOffered || 0), 0);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -142,10 +102,21 @@ export default function History() {
             Registro de todas las ofertas enviadas a Mercado Público
           </p>
         </div>
-        <Button variant="outline" className="gap-2">
-          <Download className="h-4 w-4" />
-          Exportar
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            className="gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Actualizar
+          </Button>
+          <Button variant="outline" className="gap-2">
+            <Download className="h-4 w-4" />
+            Exportar
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -195,46 +166,58 @@ export default function History() {
 
       {/* Table */}
       <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/30 hover:bg-muted/30">
-              <TableHead className="font-semibold">ID Licitación</TableHead>
-              <TableHead className="font-semibold">Organismo</TableHead>
-              <TableHead className="font-semibold">Ítem</TableHead>
-              <TableHead className="font-semibold text-right">Precio Ofertado</TableHead>
-              <TableHead className="font-semibold">Fecha</TableHead>
-              <TableHead className="font-semibold">Estado</TableHead>
-              <TableHead className="w-[50px]"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredHistory.map((record) => (
-              <TableRow key={record.id} className="data-row">
-                <TableCell className="font-mono text-sm font-medium text-primary">
-                  {record.licitacionId}
-                </TableCell>
-                <TableCell className="font-medium max-w-[200px] truncate">
-                  {record.organism}
-                </TableCell>
-                <TableCell className="max-w-[250px] truncate text-muted-foreground">
-                  {record.item}
-                </TableCell>
-                <TableCell className="text-right font-mono font-semibold">
-                  ${record.priceOffered.toLocaleString("es-CL")}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {formatDate(record.date)}
-                </TableCell>
-                <TableCell>{getStatusBadge(record.status)}</TableCell>
-                <TableCell>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <ExternalLink className="h-4 w-4 text-muted-foreground" />
-                  </Button>
-                </TableCell>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : filteredHistory.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+            <Inbox className="h-12 w-12 mb-4 opacity-50" />
+            <p className="text-lg font-medium">No hay ofertas registradas</p>
+            <p className="text-sm">Las ofertas enviadas aparecerán aquí cuando se implemente el sistema de ofertas</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30 hover:bg-muted/30">
+                <TableHead className="font-semibold">ID Licitación</TableHead>
+                <TableHead className="font-semibold">Organismo</TableHead>
+                <TableHead className="font-semibold">Ítem</TableHead>
+                <TableHead className="font-semibold text-right">Precio Ofertado</TableHead>
+                <TableHead className="font-semibold">Fecha</TableHead>
+                <TableHead className="font-semibold">Estado</TableHead>
+                <TableHead className="w-[50px]"></TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {filteredHistory.map((record) => (
+                <TableRow key={record.id} className="data-row">
+                  <TableCell className="font-mono text-sm font-medium text-primary">
+                    {record.licitacionId}
+                  </TableCell>
+                  <TableCell className="font-medium max-w-[200px] truncate">
+                    {record.organism}
+                  </TableCell>
+                  <TableCell className="max-w-[250px] truncate text-muted-foreground">
+                    {record.item}
+                  </TableCell>
+                  <TableCell className="text-right font-mono font-semibold">
+                    ${(record.priceOffered || 0).toLocaleString("es-CL")}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {formatDate(record.date)}
+                  </TableCell>
+                  <TableCell>{getStatusBadge(record.status)}</TableCell>
+                  <TableCell>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </div>
     </div>
   );

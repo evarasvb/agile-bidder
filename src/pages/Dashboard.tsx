@@ -1,47 +1,73 @@
-import { Search, Gavel, Clock, TrendingUp } from "lucide-react";
+import { Search, Gavel, Clock, TrendingUp, Inbox } from "lucide-react";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { LiveFeed } from "@/components/dashboard/LiveFeed";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
-const metrics = [
-  {
-    title: "Oportunidades Escaneadas Hoy",
-    value: 247,
-    subtitle: "Última actualización: hace 2 min",
-    icon: Search,
-    trend: { value: 12, isPositive: true },
-    variant: "primary" as const,
-  },
-  {
-    title: "Ofertas Enviadas",
-    value: 18,
-    subtitle: "8 aceptadas, 6 pendientes",
-    icon: Gavel,
-    trend: { value: 25, isPositive: true },
-    variant: "success" as const,
-  },
-  {
-    title: "Matches Pendientes",
-    value: 5,
-    subtitle: "Requieren revisión manual",
-    icon: Clock,
-    variant: "warning" as const,
-  },
-  {
-    title: "Total Ganado (Est.)",
-    value: "$2.450.000",
-    subtitle: "Últimos 30 días",
-    icon: TrendingUp,
-    trend: { value: 18, isPositive: true },
-    variant: "success" as const,
-  },
-];
+function useDashboardMetrics() {
+  return useQuery({
+    queryKey: ['dashboard_metrics'],
+    queryFn: async () => {
+      // Get licitaciones stats
+      const { data: licitaciones, error: licError } = await supabase
+        .from('licitaciones')
+        .select('*');
+      
+      if (licError) throw licError;
+
+      const total = licitaciones?.length || 0;
+      const conMatch = licitaciones?.filter(l => l.match_encontrado)?.length || 0;
+      const pendientes = licitaciones?.filter(l => !l.procesada)?.length || 0;
+
+      return {
+        oportunidadesEscaneadas: total,
+        ofertasEnviadas: 0, // Will come from ofertas table when created
+        matchesPendientes: pendientes,
+        licitacionesConMatch: conMatch,
+      };
+    },
+  });
+}
 
 export default function Dashboard() {
+  const { data: metrics, isLoading: metricsLoading } = useDashboardMetrics();
+
+  const dashboardMetrics = [
+    {
+      title: "Licitaciones Escaneadas",
+      value: metricsLoading ? "..." : metrics?.oportunidadesEscaneadas || 0,
+      subtitle: "Total en base de datos",
+      icon: Search,
+      variant: "primary" as const,
+    },
+    {
+      title: "Ofertas Enviadas",
+      value: metricsLoading ? "..." : metrics?.ofertasEnviadas || 0,
+      subtitle: "Pendiente de implementar",
+      icon: Gavel,
+      variant: "success" as const,
+    },
+    {
+      title: "Licitaciones Nuevas",
+      value: metricsLoading ? "..." : metrics?.matchesPendientes || 0,
+      subtitle: "Sin procesar",
+      icon: Clock,
+      variant: "warning" as const,
+    },
+    {
+      title: "Con Match",
+      value: metricsLoading ? "..." : metrics?.licitacionesConMatch || 0,
+      subtitle: "Licitaciones con productos compatibles",
+      icon: TrendingUp,
+      variant: "success" as const,
+    },
+  ];
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {metrics.map((metric) => (
+        {dashboardMetrics.map((metric) => (
           <MetricCard key={metric.title} {...metric} />
         ))}
       </div>
@@ -57,33 +83,27 @@ export default function Dashboard() {
         <div className="space-y-4">
           {/* Today's Performance */}
           <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            <h3 className="text-sm font-semibold text-foreground mb-4">Rendimiento Hoy</h3>
+            <h3 className="text-sm font-semibold text-foreground mb-4">Estado del Sistema</h3>
             <div className="space-y-4">
-              <ProgressStat label="Tasa de Match" value={78} color="success" />
-              <ProgressStat label="Ofertas Aceptadas" value={65} color="primary" />
-              <ProgressStat label="Cobertura de Stock" value={92} color="success" />
+              <ProgressStat 
+                label="Licitaciones Procesadas" 
+                value={metrics?.oportunidadesEscaneadas ? Math.round(((metrics.oportunidadesEscaneadas - (metrics.matchesPendientes || 0)) / metrics.oportunidadesEscaneadas) * 100) : 0} 
+                color="success" 
+              />
+              <ProgressStat 
+                label="Tasa de Match" 
+                value={metrics?.oportunidadesEscaneadas ? Math.round(((metrics.licitacionesConMatch || 0) / metrics.oportunidadesEscaneadas) * 100) : 0} 
+                color="primary" 
+              />
             </div>
           </div>
 
           {/* Recent Wins */}
           <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <h3 className="text-sm font-semibold text-foreground mb-4">Últimas Adjudicaciones</h3>
-            <div className="space-y-3">
-              <WinItem 
-                title="Detergente Industrial 5L" 
-                amount={150000} 
-                organism="Municipalidad de Santiago" 
-              />
-              <WinItem 
-                title="Jabón Líquido Antibacterial" 
-                amount={89500} 
-                organism="Hospital San José" 
-              />
-              <WinItem 
-                title="Papel Toalla 250m" 
-                amount={67800} 
-                organism="SENAME" 
-              />
+            <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+              <Inbox className="h-8 w-8 mb-2 opacity-50" />
+              <p className="text-sm">Sin adjudicaciones aún</p>
             </div>
           </div>
         </div>
@@ -119,28 +139,6 @@ function ProgressStat({
           style={{ width: `${value}%` }}
         />
       </div>
-    </div>
-  );
-}
-
-function WinItem({ 
-  title, 
-  amount, 
-  organism 
-}: { 
-  title: string; 
-  amount: number; 
-  organism: string;
-}) {
-  return (
-    <div className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
-      <div className="space-y-0.5">
-        <p className="text-sm font-medium text-foreground">{title}</p>
-        <p className="text-xs text-muted-foreground">{organism}</p>
-      </div>
-      <span className="font-mono text-sm font-semibold text-success">
-        ${amount.toLocaleString("es-CL")}
-      </span>
     </div>
   );
 }

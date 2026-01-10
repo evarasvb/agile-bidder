@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Upload, Search, MoreHorizontal, Edit2, Trash2, Package } from "lucide-react";
+import { Plus, Upload, Search, MoreHorizontal, Edit2, Trash2, Package, Inbox, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface InventoryItem {
   id: string;
@@ -30,62 +31,16 @@ interface InventoryItem {
   status: "active" | "low_stock" | "out_of_stock";
 }
 
-const mockInventory: InventoryItem[] = [
-  {
-    id: "1",
-    sku: "CLX-2L-01",
-    name: "Cloro Concentrado 2L",
-    keywords: ["clorox", "cloro", "desinfectante", "blanqueador"],
-    baseCost: 2500,
-    minMargin: 15,
-    stock: 450,
-    status: "active",
-  },
-  {
-    id: "2",
-    sku: "DET-5L-IND",
-    name: "Detergente Industrial 5L",
-    keywords: ["detergente", "lavado", "limpieza", "industrial"],
-    baseCost: 8900,
-    minMargin: 12,
-    stock: 180,
-    status: "active",
-  },
-  {
-    id: "3",
-    sku: "JAB-LIQ-5L",
-    name: "Jabón Líquido Antibacterial 5L",
-    keywords: ["jabón", "antibacterial", "manos", "higiene"],
-    baseCost: 6500,
-    minMargin: 18,
-    stock: 25,
-    status: "low_stock",
-  },
-  {
-    id: "4",
-    sku: "PAP-HIG-400",
-    name: "Papel Higiénico Industrial 400m",
-    keywords: ["papel", "higiénico", "baño", "industrial"],
-    baseCost: 4200,
-    minMargin: 10,
-    stock: 0,
-    status: "out_of_stock",
-  },
-  {
-    id: "5",
-    sku: "TOA-250M",
-    name: "Papel Toalla 250m",
-    keywords: ["toalla", "papel", "secado", "manos"],
-    baseCost: 3800,
-    minMargin: 14,
-    stock: 320,
-    status: "active",
-  },
-];
-
 export default function Inventory() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [inventory] = useState<InventoryItem[]>(mockInventory);
+  
+  // Empty state - no mock data, waiting for real inventory table
+  const inventory: InventoryItem[] = [];
+  const isLoading = false;
+
+  const handleRefresh = () => {
+    toast.info('Actualizando inventario...');
+  };
 
   const filteredInventory = inventory.filter(
     (item) =>
@@ -115,6 +70,15 @@ export default function Inventory() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            className="gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Actualizar
+          </Button>
           <Button variant="outline" className="gap-2">
             <Upload className="h-4 w-4" />
             Importar CSV
@@ -145,80 +109,92 @@ export default function Inventory() {
 
       {/* Table */}
       <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/30 hover:bg-muted/30">
-              <TableHead className="font-semibold">SKU</TableHead>
-              <TableHead className="font-semibold">Producto</TableHead>
-              <TableHead className="font-semibold">Keywords</TableHead>
-              <TableHead className="font-semibold text-right">Costo Base</TableHead>
-              <TableHead className="font-semibold text-right">Margen Mín.</TableHead>
-              <TableHead className="font-semibold text-right">Stock</TableHead>
-              <TableHead className="font-semibold">Estado</TableHead>
-              <TableHead className="w-[50px]"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredInventory.map((item) => (
-              <TableRow key={item.id} className="data-row">
-                <TableCell className="font-mono text-sm font-medium">
-                  {item.sku}
-                </TableCell>
-                <TableCell className="font-medium">{item.name}</TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-1 max-w-[200px]">
-                    {item.keywords.slice(0, 3).map((keyword) => (
-                      <span
-                        key={keyword}
-                        className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground"
-                      >
-                        {keyword}
-                      </span>
-                    ))}
-                    {item.keywords.length > 3 && (
-                      <span className="text-xs text-muted-foreground">
-                        +{item.keywords.length - 3}
-                      </span>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="text-right font-mono">
-                  ${item.baseCost.toLocaleString("es-CL")}
-                </TableCell>
-                <TableCell className="text-right font-mono">
-                  {item.minMargin}%
-                </TableCell>
-                <TableCell className={cn(
-                  "text-right font-mono font-medium",
-                  item.stock === 0 && "text-destructive",
-                  item.stock > 0 && item.stock < 50 && "text-warning"
-                )}>
-                  {item.stock.toLocaleString("es-CL")}
-                </TableCell>
-                <TableCell>{getStatusBadge(item.status)}</TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem className="gap-2">
-                        <Edit2 className="h-4 w-4" />
-                        Editar
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2 text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                        Eliminar
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : filteredInventory.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+            <Inbox className="h-12 w-12 mb-4 opacity-50" />
+            <p className="text-lg font-medium">No hay productos en el inventario</p>
+            <p className="text-sm">Agrega productos para comenzar el matching con licitaciones</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30 hover:bg-muted/30">
+                <TableHead className="font-semibold">SKU</TableHead>
+                <TableHead className="font-semibold">Producto</TableHead>
+                <TableHead className="font-semibold">Keywords</TableHead>
+                <TableHead className="font-semibold text-right">Costo Base</TableHead>
+                <TableHead className="font-semibold text-right">Margen Mín.</TableHead>
+                <TableHead className="font-semibold text-right">Stock</TableHead>
+                <TableHead className="font-semibold">Estado</TableHead>
+                <TableHead className="w-[50px]"></TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {filteredInventory.map((item) => (
+                <TableRow key={item.id} className="data-row">
+                  <TableCell className="font-mono text-sm font-medium">
+                    {item.sku}
+                  </TableCell>
+                  <TableCell className="font-medium">{item.name}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1 max-w-[200px]">
+                      {item.keywords.slice(0, 3).map((keyword) => (
+                        <span
+                          key={keyword}
+                          className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                        >
+                          {keyword}
+                        </span>
+                      ))}
+                      {item.keywords.length > 3 && (
+                        <span className="text-xs text-muted-foreground">
+                          +{item.keywords.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    ${item.baseCost.toLocaleString("es-CL")}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    {item.minMargin}%
+                  </TableCell>
+                  <TableCell className={cn(
+                    "text-right font-mono font-medium",
+                    item.stock === 0 && "text-destructive",
+                    item.stock > 0 && item.stock < 50 && "text-warning"
+                  )}>
+                    {item.stock.toLocaleString("es-CL")}
+                  </TableCell>
+                  <TableCell>{getStatusBadge(item.status)}</TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem className="gap-2">
+                          <Edit2 className="h-4 w-4" />
+                          Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="gap-2 text-destructive">
+                          <Trash2 className="h-4 w-4" />
+                          Eliminar
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </div>
     </div>
   );
