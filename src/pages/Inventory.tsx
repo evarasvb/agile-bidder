@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Upload, Search, MoreHorizontal, Edit2, Trash2, Package, Inbox, Loader2, RefreshCw } from "lucide-react";
+import { Plus, Upload, Search, MoreHorizontal, Edit2, Trash2, Package, Inbox, Loader2, RefreshCw, FileJson } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -22,11 +22,13 @@ import { toast } from "sonner";
 import { useInventory, useUpdateInventoryItem, useDeleteInventoryItem, InventoryItem } from "@/hooks/useInventory";
 import { EditProductDialog } from "@/components/inventory/EditProductDialog";
 import { DeleteProductDialog } from "@/components/inventory/DeleteProductDialog";
+import { ImportScriptDialog } from "@/components/inventory/ImportScriptDialog";
 
 export default function Inventory() {
   const [searchQuery, setSearchQuery] = useState("");
   const [editingProduct, setEditingProduct] = useState<InventoryItem | null>(null);
   const [deletingProduct, setDeletingProduct] = useState<InventoryItem | null>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   
   const { data: inventario = [], isLoading, refetch } = useInventory();
   const actualizarProducto = useUpdateInventoryItem();
@@ -93,6 +95,14 @@ export default function Inventory() {
           <Button variant="outline" className="gap-2">
             <Upload className="h-4 w-4" />
             Importar CSV
+          </Button>
+          <Button 
+            variant="outline" 
+            className="gap-2 border-firmavb-blue text-firmavb-blue hover:bg-firmavb-blue/10"
+            onClick={() => setImportDialogOpen(true)}
+          >
+            <FileJson className="h-4 w-4" />
+            Cargar desde Script
           </Button>
           <Button className="gap-2 bg-primary hover:bg-primary/90">
             <Plus className="h-4 w-4" />
@@ -234,6 +244,13 @@ export default function Inventory() {
         product={deletingProduct}
         onConfirm={handleDelete}
         isLoading={eliminarProducto.isPending}
+      />
+
+      {/* Import from Script Dialog */}
+      <ImportScriptDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onSuccess={refetch}
       />
     </div>
   );
