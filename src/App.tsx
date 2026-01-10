@@ -10,9 +10,25 @@ import History from "./pages/History";
 import Settings from "./pages/Settings";
 import Logs from "./pages/Logs";
 import Licitaciones from "./pages/Licitaciones";
+import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
+
+// Wrapper component for routes with AppLayout
+const AppRoutes = () => (
+  <AppLayout>
+    <Routes>
+      <Route path="/" element={<Index />} />
+      <Route path="/inventory" element={<Inventory />} />
+      <Route path="/history" element={<History />} />
+      <Route path="/licitaciones" element={<Licitaciones />} />
+      <Route path="/settings" element={<Settings />} />
+      <Route path="/logs" element={<Logs />} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  </AppLayout>
+);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -20,17 +36,13 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <AppLayout>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/inventory" element={<Inventory />} />
-            <Route path="/history" element={<History />} />
-            <Route path="/licitaciones" element={<Licitaciones />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/logs" element={<Logs />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AppLayout>
+        <Routes>
+          {/* Onboarding route - standalone without AppLayout */}
+          <Route path="/onboarding" element={<Onboarding />} />
+          
+          {/* All other routes with AppLayout */}
+          <Route path="/*" element={<AppRoutes />} />
+        </Routes>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
