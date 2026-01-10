@@ -11,6 +11,9 @@ import Settings from "./pages/Settings";
 import Logs from "./pages/Logs";
 import Licitaciones from "./pages/Licitaciones";
 import Onboarding from "./pages/Onboarding";
+import Clientes from "./pages/Clientes";
+import ClienteOnboarding from "./pages/ClienteOnboarding";
+import ClienteDashboard from "./pages/ClienteDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +32,11 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
+          {/* Cliente routes - standalone */}
+          <Route path="/clientes" element={<Clientes />} />
+          <Route path="/clientes/onboarding" element={<ClienteOnboarding />} />
+          <Route path="/clientes/dashboard" element={<ClienteDashboard />} />
+          
           {/* Onboarding route - standalone without AppLayout */}
           <Route path="/onboarding" element={<Onboarding />} />
           
