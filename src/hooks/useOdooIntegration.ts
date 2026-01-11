@@ -1,7 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import type { Oferta, ProductoOfertado } from './useOfertas';
+
+// Local ProductoOfertado type that's compatible with both useOfertas and useClienteOfertas
+interface ProductoOfertadoOdoo {
+  inventory_id: string;
+  sku: string;
+  nombre_producto: string;
+  descripcion?: string;
+  cantidad: number;
+  unidad_medida: string;
+  precio_unitario: number;
+  precio_total: number;
+  margen_aplicado: number;
+}
 
 interface LicitacionData {
   id_licitacion: string;
@@ -17,7 +29,7 @@ interface OfertaData {
   id: string;
   valor_total_oferta: number;
   margen_total: number;
-  productos_ofertados: ProductoOfertado[];
+  productos_ofertados: ProductoOfertadoOdoo[];
 }
 
 interface SendToOdooRequest {
@@ -82,19 +94,12 @@ export function useSendLicitacionToOdoo() {
       oferta,
     }: {
       licitacion: LicitacionData;
-      oferta?: Oferta;
+      oferta?: OfertaData;
     }) => {
-      const ofertaData: OfertaData | undefined = oferta ? {
-        id: oferta.id,
-        valor_total_oferta: oferta.valor_total_oferta,
-        margen_total: oferta.margen_total,
-        productos_ofertados: oferta.productos_ofertados,
-      } : undefined;
-
       return sendToOdoo.mutateAsync({
         action: 'create_opportunity',
         licitacion,
-        oferta: ofertaData,
+        oferta,
       });
     },
   });
@@ -114,19 +119,12 @@ export function useUpdateOdooOpportunity() {
     }: {
       odooOpportunityId: number;
       licitacion: LicitacionData;
-      oferta?: Oferta;
+      oferta?: OfertaData;
     }) => {
-      const ofertaData: OfertaData | undefined = oferta ? {
-        id: oferta.id,
-        valor_total_oferta: oferta.valor_total_oferta,
-        margen_total: oferta.margen_total,
-        productos_ofertados: oferta.productos_ofertados,
-      } : undefined;
-
       return sendToOdoo.mutateAsync({
         action: 'update_opportunity',
         licitacion,
-        oferta: ofertaData,
+        oferta,
         odoo_opportunity_id: odooOpportunityId,
       });
     },
@@ -147,17 +145,12 @@ export function useSyncProductsToOdoo() {
     }: {
       odooOpportunityId: number;
       licitacion: LicitacionData;
-      oferta: Oferta;
+      oferta: OfertaData;
     }) => {
       return sendToOdoo.mutateAsync({
         action: 'sync_products',
         licitacion,
-        oferta: {
-          id: oferta.id,
-          valor_total_oferta: oferta.valor_total_oferta,
-          margen_total: oferta.margen_total,
-          productos_ofertados: oferta.productos_ofertados,
-        },
+        oferta,
         odoo_opportunity_id: odooOpportunityId,
       });
     },
