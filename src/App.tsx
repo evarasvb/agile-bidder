@@ -17,6 +17,7 @@ import ClienteOnboarding from "./pages/ClienteOnboarding";
 import ClienteDashboard from "./pages/ClienteDashboard";
 import ClienteOfertasDashboard from "./pages/ClienteOfertasDashboard";
 import NotFound from "./pages/NotFound";
+import OdooDashboard from "./pages/OdooDashboard";
 
 const queryClient = new QueryClient();
 
@@ -45,6 +46,9 @@ const App = () => (
           
           {/* Onboarding route - standalone without AppLayout */}
           <Route path="/onboarding" element={<Onboarding />} />
+          
+          {/* Odoo Dashboard - standalone */}
+          <Route path="/odoo/dashboard" element={<OdooDashboard />} />
           
           {/* All other routes with AppLayout using nested routing */}
           <Route element={<LayoutWrapper />}>
