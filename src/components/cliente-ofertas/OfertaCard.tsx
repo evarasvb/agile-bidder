@@ -1,10 +1,13 @@
-import { AlertTriangle, Building2, Calendar, Clock, DollarSign, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, Building2, Clock, DollarSign, CheckCircle2, Send, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { ClienteOferta } from '@/hooks/useClienteOfertas';
+import { useSendLicitacionToOdoo } from '@/hooks/useOdooIntegration';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { toast } from 'sonner';
 
 interface OfertaCardProps {
   oferta: ClienteOferta;
@@ -26,6 +29,41 @@ export function OfertaCard({ oferta, onClick }: OfertaCardProps) {
   const matchScore = oferta.match_score || 0;
 
   const estadoInfo = estadoConfig[oferta.estado] || estadoConfig.borrador;
+  
+  const sendToOdoo = useSendLicitacionToOdoo();
+
+  const handleSendToOdoo = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click
+    
+    if (!oferta.licitacion) {
+      toast.error('No hay datos de licitación disponibles');
+      return;
+    }
+
+    try {
+      await sendToOdoo.mutateAsync({
+        licitacion: {
+          id_licitacion: oferta.licitacion.id_licitacion,
+          titulo: oferta.licitacion.titulo,
+          organismo: oferta.licitacion.organismo,
+          presupuesto: oferta.licitacion.presupuesto,
+          fecha_cierre: oferta.licitacion.fecha_cierre,
+          link_oficial: null,
+          match_score: oferta.match_score,
+        },
+        oferta: {
+          id: oferta.id,
+          valor_total_oferta: oferta.valor_total || 0,
+          margen_total: oferta.margen_total || 0,
+          productos_ofertados: oferta.productos_ofertados || [],
+        },
+      });
+      toast.success('Licitación enviada a Odoo exitosamente');
+    } catch (error) {
+      // Error toast is handled by the hook
+      console.error('Error sending to Odoo:', error);
+    }
+  };
 
   return (
     <Card
@@ -79,10 +117,10 @@ export function OfertaCard({ oferta, onClick }: OfertaCardProps) {
             </div>
           </div>
 
-          {/* Valores */}
-          <div className="text-right shrink-0">
+          {/* Valores y Botón Odoo */}
+          <div className="text-right shrink-0 flex flex-col items-end gap-2">
             {presupuesto > 0 && (
-              <div className="text-xs text-muted-foreground mb-1">
+              <div className="text-xs text-muted-foreground">
                 Presupuesto: ${presupuesto.toLocaleString('es-CL')}
               </div>
             )}
@@ -90,9 +128,25 @@ export function OfertaCard({ oferta, onClick }: OfertaCardProps) {
               <DollarSign className="w-4 h-4 inline" />
               ${valorOferta.toLocaleString('es-CL')}
             </div>
-            <div className="text-xs text-muted-foreground mt-1">
+            <div className="text-xs text-muted-foreground">
               {format(new Date(oferta.created_at), 'dd/MM/yyyy HH:mm', { locale: es })}
             </div>
+            
+            {/* Botón Enviar a Odoo */}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleSendToOdoo}
+              disabled={sendToOdoo.isPending}
+              className="mt-1 text-xs gap-1.5 border-orange-300 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
+            >
+              {sendToOdoo.isPending ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <Send className="w-3 h-3" />
+              )}
+              Enviar a Odoo
+            </Button>
           </div>
         </div>
 
