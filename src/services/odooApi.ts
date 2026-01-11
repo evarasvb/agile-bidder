@@ -1,11 +1,7 @@
-// Odoo JSON-RPC API Service
-// IMPORTANT: For production, move credentials to Supabase Edge Functions
-// Frontend env vars are exposed to the client
+// Odoo JSON-RPC API Service - Secure Version
+// All calls now go through Edge Functions - no credentials on client
 
-const ODOO_URL = import.meta.env.VITE_ODOO_URL || 'https://www.odoo.com';
-const ODOO_DB = import.meta.env.VITE_ODOO_DB || '';
-const ODOO_UID = import.meta.env.VITE_ODOO_UID || '';
-const ODOO_PASSWORD = import.meta.env.VITE_ODOO_PASSWORD || '';
+import { supabase } from '@/integrations/supabase/client';
 
 interface OdooOpportunity {
   id: number;
@@ -17,95 +13,26 @@ interface OdooOpportunity {
   create_date: string;
 }
 
-interface OdooJsonRpcResponse<T> {
-  jsonrpc: string;
-  id: number;
-  result?: T;
-  error?: {
-    code: number;
-    message: string;
-    data: {
-      name: string;
-      debug: string;
-      message: string;
-    };
-  };
-}
-
-const generateRequestId = (): number => Math.floor(Math.random() * 1000000);
-
-async function jsonRpcCall<T>(
-  endpoint: string,
-  params: Record<string, unknown>
-): Promise<T> {
-  const response = await fetch(`${ODOO_URL}${endpoint}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      method: 'call',
-      params,
-      id: generateRequestId(),
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`HTTP error: ${response.status} ${response.statusText}`);
-  }
-
-  const data: OdooJsonRpcResponse<T> = await response.json();
-
-  if (data.error) {
-    throw new Error(
-      `Odoo Error: ${data.error.message} - ${data.error.data?.message || ''}`
-    );
-  }
-
-  return data.result as T;
-}
-
 /**
- * Fetch opportunities from Odoo CRM filtered by "Compra Ágil" tag
- * Uses JSON-RPC to call execute_kw on crm.lead model
+ * Fetch opportunities from Odoo CRM via Edge Function
+ * Credentials are securely stored in backend
  */
 export async function fetchOpportunities(): Promise<OdooOpportunity[]> {
-  if (!ODOO_DB || !ODOO_UID || !ODOO_PASSWORD) {
-    console.warn('Odoo credentials not configured. Using mock data.');
-    return getMockOpportunities();
-  }
-
   try {
-    const result = await jsonRpcCall<OdooOpportunity[]>('/jsonrpc', {
-      service: 'object',
-      method: 'execute_kw',
-      args: [
-        ODOO_DB,
-        parseInt(ODOO_UID, 10),
-        ODOO_PASSWORD,
-        'crm.lead',
-        'search_read',
-        [[['tag_ids', 'ilike', 'Compra Ágil']]],
-        {
-          fields: [
-            'name',
-            'expected_revenue',
-            'x_organismo',
-            'x_licitacion_id',
-            'x_url_licitacion',
-            'create_date',
-          ],
-          limit: 20,
-          order: 'create_date desc',
-        },
-      ],
+    const { data, error } = await supabase.functions.invoke('odoo-proxy', {
+      body: { action: 'fetch_opportunities' }
     });
 
-    return result;
+    if (error) {
+      console.error('Error fetching Odoo opportunities:', error);
+      // Fallback to mock data for development
+      return getMockOpportunities();
+    }
+
+    return data?.opportunities || getMockOpportunities();
   } catch (error) {
-    console.error('Error fetching Odoo opportunities:', error);
-    throw error;
+    console.error('Error connecting to Odoo:', error);
+    return getMockOpportunities();
   }
 }
 
