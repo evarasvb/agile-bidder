@@ -6,7 +6,8 @@ import {
   FileText,
   FileSearch,
   Zap,
-  LogOut
+  LogOut,
+  Link2
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,7 @@ const navItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Licitaciones", url: "/licitaciones", icon: FileSearch },
   { title: "Inventario", url: "/inventory", icon: Package },
+  { title: "Odoo CRM", url: "/odoo/dashboard", icon: Link2 },
   { title: "Historial", url: "/history", icon: History },
   { title: "Logs", url: "/logs", icon: FileText },
   { title: "Configuración", url: "/settings", icon: Settings },
