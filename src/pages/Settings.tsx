@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Save, Building2, MapPin, Clock, DollarSign, Shield, Key, Eye, EyeOff, CheckCircle2 } from "lucide-react";
+import { Save, Building2, MapPin, Clock, DollarSign, Shield, Key, Eye, EyeOff, CheckCircle2, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import NotificacionesSettings from "@/components/settings/NotificacionesSettings";
+import { getClienteId } from "@/hooks/useCliente";
 
 const regions = [
   "Metropolitana",
@@ -36,6 +38,7 @@ const regions = [
 ];
 
 export default function Settings() {
+  const clienteId = getClienteId();
   const [selectedRegions, setSelectedRegions] = useState<string[]>([
     "Metropolitana",
     "Valparaíso",
@@ -79,6 +82,15 @@ export default function Settings() {
           Guardar Cambios
         </Button>
       </div>
+
+      {/* Notificaciones Section */}
+      <SettingsSection
+        icon={Bell}
+        title="Notificaciones"
+        description="Configura tus preferencias de alertas por email"
+      >
+        <NotificacionesSettings clienteId={clienteId} />
+      </SettingsSection>
 
       {/* API Key Section */}
       <SettingsSection
