@@ -214,7 +214,7 @@ export async function validarOferta(ofertaId: string): Promise<{
     return { valid: false, errores: ['Oferta no encontrada'], advertencias: [] };
   }
   
-  const productos = (oferta.productos_ofertados as unknown) as ProductoOfertado[];
+  const productos = oferta.productos_ofertados as unknown as ProductoOfertado[];
   
   // Validar que hay productos
   if (!productos || productos.length === 0) {

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { generarOferta, actualizarEstadoOferta, validarOferta, eliminarOferta } from '@/services/ofertaGenerator';
 import type { MatchResult } from '@/services/matchingEngine';
+import type { Json } from '@/integrations/supabase/types';
 
 export interface ProductoOfertado {
   inventory_id: string;
@@ -169,7 +170,7 @@ export function useActualizarProductosOferta() {
       const { error } = await supabase
         .from('ofertas')
         .update({
-          productos_ofertados: JSON.parse(JSON.stringify(productos)),
+          productos_ofertados: productos as unknown as Json,
           valor_total_oferta: valorTotal,
           margen_total: margenTotal
         })
