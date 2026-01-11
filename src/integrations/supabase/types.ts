@@ -104,38 +104,53 @@ export type Database = {
       }
       cliente_notificaciones: {
         Row: {
+          alerta_cambios_guardadas: boolean | null
+          alerta_cierre_proximo: boolean | null
+          alerta_nuevos_matches: boolean | null
           cliente_id: string
           created_at: string
           email_instantaneo: boolean | null
+          horas_antes_cierre: number | null
           id: string
           presupuesto_minimo: number | null
           push_notifications: boolean | null
           resumen_diario: boolean | null
           resumen_semanal: boolean | null
+          score_minimo_alerta: number | null
           updated_at: string
           webhook_url: string | null
         }
         Insert: {
+          alerta_cambios_guardadas?: boolean | null
+          alerta_cierre_proximo?: boolean | null
+          alerta_nuevos_matches?: boolean | null
           cliente_id: string
           created_at?: string
           email_instantaneo?: boolean | null
+          horas_antes_cierre?: number | null
           id?: string
           presupuesto_minimo?: number | null
           push_notifications?: boolean | null
           resumen_diario?: boolean | null
           resumen_semanal?: boolean | null
+          score_minimo_alerta?: number | null
           updated_at?: string
           webhook_url?: string | null
         }
         Update: {
+          alerta_cambios_guardadas?: boolean | null
+          alerta_cierre_proximo?: boolean | null
+          alerta_nuevos_matches?: boolean | null
           cliente_id?: string
           created_at?: string
           email_instantaneo?: boolean | null
+          horas_antes_cierre?: number | null
           id?: string
           presupuesto_minimo?: number | null
           push_notifications?: boolean | null
           resumen_diario?: boolean | null
           resumen_semanal?: boolean | null
+          score_minimo_alerta?: number | null
           updated_at?: string
           webhook_url?: string | null
         }
@@ -383,6 +398,44 @@ export type Database = {
           titulo?: string
         }
         Relationships: []
+      }
+      notificaciones_log: {
+        Row: {
+          cliente_id: string | null
+          created_at: string | null
+          datos: Json | null
+          email_enviado: boolean | null
+          id: string
+          licitacion_id: string | null
+          tipo: string
+        }
+        Insert: {
+          cliente_id?: string | null
+          created_at?: string | null
+          datos?: Json | null
+          email_enviado?: boolean | null
+          id?: string
+          licitacion_id?: string | null
+          tipo: string
+        }
+        Update: {
+          cliente_id?: string | null
+          created_at?: string | null
+          datos?: Json | null
+          email_enviado?: boolean | null
+          id?: string
+          licitacion_id?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notificaciones_log_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ofertas: {
         Row: {
