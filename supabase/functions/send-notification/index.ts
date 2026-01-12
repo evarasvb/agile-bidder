@@ -414,24 +414,61 @@ serve(async (req) => {
     let webhookSent = false;
     if (shouldSend && webhookUrl) {
       try {
-        // Basic URL validation
+        // Validate webhook URL to prevent SSRF attacks
         const url = new URL(webhookUrl);
-        if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-          console.warn("Invalid webhook URL protocol");
+        const hostname = url.hostname.toLowerCase();
+        
+        // Only allow HTTPS
+        if (url.protocol !== 'https:') {
+          console.warn("Webhook rejected: Only HTTPS URLs allowed");
+        } else if (
+          // Block localhost and local addresses
+          hostname === 'localhost' ||
+          hostname === '127.0.0.1' ||
+          hostname === '::1' ||
+          hostname.endsWith('.local') ||
+          hostname.endsWith('.internal')
+        ) {
+          console.warn("Webhook rejected: Localhost not allowed");
         } else {
-          await fetch(webhookUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              tipo,
-              cliente_id,
-              empresa: cliente.empresa_nombre,
-              data,
-              timestamp: new Date().toISOString()
-            }),
-          });
-          console.log("Webhook sent successfully");
-          webhookSent = true;
+          // Block private IP ranges
+          const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
+          let isPrivateIp = false;
+          
+          if (ipv4Regex.test(hostname)) {
+            const parts = hostname.split('.').map(Number);
+            isPrivateIp = (
+              parts[0] === 10 || // 10.0.0.0/8
+              (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) || // 172.16.0.0/12
+              (parts[0] === 192 && parts[1] === 168) || // 192.168.0.0/16
+              (parts[0] === 169 && parts[1] === 254) || // Cloud metadata
+              parts[0] === 127 // Loopback
+            );
+          }
+          
+          if (isPrivateIp) {
+            console.warn("Webhook rejected: Private IP not allowed");
+          } else {
+            // Send webhook with timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            
+            await fetch(webhookUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                tipo,
+                cliente_id,
+                empresa: cliente.empresa_nombre,
+                data,
+                timestamp: new Date().toISOString()
+              }),
+              signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            console.log("Webhook sent successfully");
+            webhookSent = true;
+          }
         }
       } catch (webhookError) {
         console.error("Webhook error:", webhookError);
