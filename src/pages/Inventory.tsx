@@ -19,20 +19,23 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { useInventory, useUpdateInventoryItem, useDeleteInventoryItem, InventoryItem } from "@/hooks/useInventory";
+import { useInventory, useUpdateInventoryItem, useDeleteInventoryItem, useCreateInventoryItem, InventoryItem, InventoryInput } from "@/hooks/useInventory";
 import { EditProductDialog } from "@/components/inventory/EditProductDialog";
 import { DeleteProductDialog } from "@/components/inventory/DeleteProductDialog";
 import { ImportScriptDialog } from "@/components/inventory/ImportScriptDialog";
+import { AddProductDialog } from "@/components/inventory/AddProductDialog";
 
 export default function Inventory() {
   const [searchQuery, setSearchQuery] = useState("");
   const [editingProduct, setEditingProduct] = useState<InventoryItem | null>(null);
   const [deletingProduct, setDeletingProduct] = useState<InventoryItem | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
   
   const { data: inventario = [], isLoading, refetch } = useInventory();
   const actualizarProducto = useUpdateInventoryItem();
   const eliminarProducto = useDeleteInventoryItem();
+  const crearProducto = useCreateInventoryItem();
 
   const handleRefresh = () => {
     toast.info('Actualizando inventario...');
@@ -43,6 +46,13 @@ export default function Inventory() {
     await actualizarProducto.mutateAsync(data);
     setEditingProduct(null);
     toast.success('Producto actualizado correctamente');
+    refetch();
+  };
+
+  const handleAddProduct = async (data: InventoryInput) => {
+    await crearProducto.mutateAsync(data);
+    setAddDialogOpen(false);
+    toast.success('Producto agregado correctamente');
     refetch();
   };
 
@@ -104,7 +114,10 @@ export default function Inventory() {
             <FileJson className="h-4 w-4" />
             Cargar desde Script
           </Button>
-          <Button className="gap-2 bg-primary hover:bg-primary/90">
+          <Button 
+            className="gap-2 bg-primary hover:bg-primary/90"
+            onClick={() => setAddDialogOpen(true)}
+          >
             <Plus className="h-4 w-4" />
             Agregar Producto
           </Button>
@@ -251,6 +264,14 @@ export default function Inventory() {
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
         onSuccess={refetch}
+      />
+
+      {/* Add Product Dialog */}
+      <AddProductDialog
+        open={addDialogOpen}
+        onOpenChange={setAddDialogOpen}
+        onSave={handleAddProduct}
+        isLoading={crearProducto.isPending}
       />
     </div>
   );

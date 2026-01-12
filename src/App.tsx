@@ -21,6 +21,7 @@ import ClienteOfertasDashboard from "./pages/ClienteOfertasDashboard";
 import NotFound from "./pages/NotFound";
 import OdooDashboard from "./pages/OdooDashboard";
 import ExtensionConfig from "./pages/ExtensionConfig";
+import AdminOdoo from "./pages/AdminOdoo";
 
 const queryClient = new QueryClient();
 
@@ -53,6 +54,9 @@ const App = () => (
           
           {/* Odoo Dashboard - standalone */}
           <Route path="/odoo/dashboard" element={<OdooDashboard />} />
+          
+          {/* Admin Routes - standalone */}
+          <Route path="/admin" element={<AdminOdoo />} />
           
           {/* All other routes with AppLayout using nested routing */}
           <Route element={<LayoutWrapper />}>

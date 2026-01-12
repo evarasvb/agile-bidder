@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Save, Building2, MapPin, Clock, DollarSign, Shield, Key, Eye, EyeOff, CheckCircle2, Bell } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Save, Building2, MapPin, Clock, DollarSign, Shield, Key, Eye, EyeOff, CheckCircle2, Bell, Loader2, Settings as SettingsIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import NotificacionesSettings from "@/components/settings/NotificacionesSettings";
 import { getClienteId } from "@/hooks/useCliente";
+import { Link } from "react-router-dom";
 
 const regions = [
   "Metropolitana",
@@ -37,34 +38,159 @@ const regions = [
   "Aysén",
 ];
 
+// Types for settings
+interface CompanySettings {
+  rut: string;
+  razonSocial: string;
+  codigoOrganismo: string;
+  emailContacto: string;
+}
+
+interface BiddingSettings {
+  montoMaximoUTM: number;
+  margenMinimoGlobal: number;
+}
+
+interface DeliverySettings {
+  plazoEntrega: string;
+  tipoDespacho: string;
+}
+
+interface AutomationSettings {
+  autoMatch: boolean;
+  autoBid: boolean;
+}
+
+interface AllSettings {
+  company: CompanySettings;
+  bidding: BiddingSettings;
+  delivery: DeliverySettings;
+  automation: AutomationSettings;
+  regions: string[];
+  apiKey: string;
+  apiKeyConnected: boolean;
+}
+
+const DEFAULT_SETTINGS: AllSettings = {
+  company: {
+    rut: "76.123.456-7",
+    razonSocial: "FirmaVB SpA",
+    codigoOrganismo: "123456",
+    emailContacto: "ventas@firmavb.cl",
+  },
+  bidding: {
+    montoMaximoUTM: 30,
+    margenMinimoGlobal: 10,
+  },
+  delivery: {
+    plazoEntrega: "24",
+    tipoDespacho: "delivery",
+  },
+  automation: {
+    autoMatch: true,
+    autoBid: false,
+  },
+  regions: ["Metropolitana", "Valparaíso"],
+  apiKey: "",
+  apiKeyConnected: false,
+};
+
 export default function Settings() {
   const clienteId = getClienteId();
-  const [selectedRegions, setSelectedRegions] = useState<string[]>([
-    "Metropolitana",
-    "Valparaíso",
-  ]);
-  const [autoMatch, setAutoMatch] = useState(true);
-  const [autoBid, setAutoBid] = useState(false);
-  const [apiKey, setApiKey] = useState("");
+  const [settings, setSettings] = useState<AllSettings>(DEFAULT_SETTINGS);
+  const [isSaving, setIsSaving] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
-  const [apiKeyConnected, setApiKeyConnected] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  // Load settings from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('firmavb_settings');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setSettings({ ...DEFAULT_SETTINGS, ...parsed });
+      } catch (e) {
+        console.error('Error loading settings:', e);
+      }
+    }
+  }, []);
+
+  // Track changes
+  const updateSettings = <K extends keyof AllSettings>(
+    key: K,
+    value: AllSettings[K]
+  ) => {
+    setSettings((prev) => ({ ...prev, [key]: value }));
+    setHasChanges(true);
+  };
+
+  const updateCompany = (field: keyof CompanySettings, value: string) => {
+    setSettings((prev) => ({
+      ...prev,
+      company: { ...prev.company, [field]: value },
+    }));
+    setHasChanges(true);
+  };
+
+  const updateBidding = (field: keyof BiddingSettings, value: number) => {
+    setSettings((prev) => ({
+      ...prev,
+      bidding: { ...prev.bidding, [field]: value },
+    }));
+    setHasChanges(true);
+  };
+
+  const updateDelivery = (field: keyof DeliverySettings, value: string) => {
+    setSettings((prev) => ({
+      ...prev,
+      delivery: { ...prev.delivery, [field]: value },
+    }));
+    setHasChanges(true);
+  };
+
+  const updateAutomation = (field: keyof AutomationSettings, value: boolean) => {
+    setSettings((prev) => ({
+      ...prev,
+      automation: { ...prev.automation, [field]: value },
+    }));
+    setHasChanges(true);
+  };
 
   const toggleRegion = (region: string) => {
-    setSelectedRegions((prev) =>
-      prev.includes(region)
-        ? prev.filter((r) => r !== region)
-        : [...prev, region]
-    );
+    setSettings((prev) => ({
+      ...prev,
+      regions: prev.regions.includes(region)
+        ? prev.regions.filter((r) => r !== region)
+        : [...prev.regions, region],
+    }));
+    setHasChanges(true);
   };
 
   const handleSaveApiKey = () => {
-    if (apiKey.length < 10) {
+    if (settings.apiKey.length < 10) {
       toast.error("La API Key debe tener al menos 10 caracteres");
       return;
     }
-    // Simular guardado
-    setApiKeyConnected(true);
+    updateSettings('apiKeyConnected', true);
     toast.success("API Key de Mercado Público guardada correctamente");
+  };
+
+  const handleSaveAllChanges = async () => {
+    setIsSaving(true);
+    try {
+      // Save to localStorage
+      localStorage.setItem('firmavb_settings', JSON.stringify(settings));
+      
+      // Simulate API call delay
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      
+      toast.success("Cambios guardados correctamente");
+      setHasChanges(false);
+    } catch (error) {
+      toast.error("Error al guardar los cambios");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -77,10 +203,27 @@ export default function Settings() {
             Ajusta los parámetros globales del sistema
           </p>
         </div>
-        <Button className="gap-2 bg-primary hover:bg-primary/90">
-          <Save className="h-4 w-4" />
-          Guardar Cambios
-        </Button>
+        <div className="flex items-center gap-3">
+          <Link to="/admin">
+            <Button variant="outline" className="gap-2">
+              <SettingsIcon className="h-4 w-4" />
+              Configurar Odoo
+            </Button>
+          </Link>
+          <Button 
+            className="gap-2 bg-primary hover:bg-primary/90"
+            onClick={handleSaveAllChanges}
+            disabled={isSaving || !hasChanges}
+          >
+            {isSaving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            Guardar Cambios
+            {hasChanges && <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">•</Badge>}
+          </Button>
+        </div>
       </div>
 
       {/* Notificaciones Section */}
@@ -101,10 +244,10 @@ export default function Settings() {
         <div className="space-y-4">
           <div className="flex items-center gap-2 mb-4">
             <Badge 
-              variant={apiKeyConnected ? "default" : "secondary"}
-              className={apiKeyConnected ? "bg-success hover:bg-success" : ""}
+              variant={settings.apiKeyConnected ? "default" : "secondary"}
+              className={settings.apiKeyConnected ? "bg-success hover:bg-success" : ""}
             >
-              {apiKeyConnected ? (
+              {settings.apiKeyConnected ? (
                 <>
                   <CheckCircle2 className="h-3 w-3 mr-1" />
                   Conectado
@@ -121,8 +264,10 @@ export default function Settings() {
                 <Input 
                   type={showApiKey ? "text" : "password"}
                   placeholder="Ingresa tu API Key..."
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
+                  value={settings.apiKey}
+                  onChange={(e) => {
+                    updateSettings('apiKey', e.target.value);
+                  }}
                   className="pr-10 font-mono"
                 />
                 <Button
@@ -168,19 +313,36 @@ export default function Settings() {
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>RUT Empresa</Label>
-            <Input placeholder="76.XXX.XXX-X" defaultValue="76.123.456-7" />
+            <Input 
+              placeholder="76.XXX.XXX-X" 
+              value={settings.company.rut}
+              onChange={(e) => updateCompany('rut', e.target.value)}
+            />
           </div>
           <div className="space-y-2">
             <Label>Razón Social</Label>
-            <Input placeholder="Empresa SpA" defaultValue="FirmaVB SpA" />
+            <Input 
+              placeholder="Empresa SpA" 
+              value={settings.company.razonSocial}
+              onChange={(e) => updateCompany('razonSocial', e.target.value)}
+            />
           </div>
           <div className="space-y-2">
             <Label>Código Organismo (Mercado Público)</Label>
-            <Input placeholder="XXXXXX" defaultValue="123456" />
+            <Input 
+              placeholder="XXXXXX" 
+              value={settings.company.codigoOrganismo}
+              onChange={(e) => updateCompany('codigoOrganismo', e.target.value)}
+            />
           </div>
           <div className="space-y-2">
             <Label>Email de Contacto</Label>
-            <Input type="email" placeholder="contacto@empresa.cl" defaultValue="ventas@firmavb.cl" />
+            <Input 
+              type="email" 
+              placeholder="contacto@empresa.cl" 
+              value={settings.company.emailContacto}
+              onChange={(e) => updateCompany('emailContacto', e.target.value)}
+            />
           </div>
         </div>
       </SettingsSection>
@@ -198,7 +360,8 @@ export default function Settings() {
               <Input 
                 type="number" 
                 placeholder="30" 
-                defaultValue="30" 
+                value={settings.bidding.montoMaximoUTM}
+                onChange={(e) => updateBidding('montoMaximoUTM', Number(e.target.value))}
                 className="font-mono"
               />
               <span className="text-sm text-muted-foreground whitespace-nowrap">UTM</span>
@@ -213,7 +376,8 @@ export default function Settings() {
               <Input 
                 type="number" 
                 placeholder="10" 
-                defaultValue="10" 
+                value={settings.bidding.margenMinimoGlobal}
+                onChange={(e) => updateBidding('margenMinimoGlobal', Number(e.target.value))}
                 className="font-mono"
               />
               <span className="text-sm text-muted-foreground">%</span>
@@ -231,7 +395,10 @@ export default function Settings() {
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Plazo de Entrega</Label>
-            <Select defaultValue="24">
+            <Select 
+              value={settings.delivery.plazoEntrega}
+              onValueChange={(value) => updateDelivery('plazoEntrega', value)}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Seleccionar plazo" />
               </SelectTrigger>
@@ -245,7 +412,10 @@ export default function Settings() {
           </div>
           <div className="space-y-2">
             <Label>Tipo de Despacho</Label>
-            <Select defaultValue="delivery">
+            <Select 
+              value={settings.delivery.tipoDespacho}
+              onValueChange={(value) => updateDelivery('tipoDespacho', value)}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Seleccionar tipo" />
               </SelectTrigger>
@@ -269,7 +439,7 @@ export default function Settings() {
             <div key={region} className="flex items-center space-x-2">
               <Checkbox
                 id={region}
-                checked={selectedRegions.includes(region)}
+                checked={settings.regions.includes(region)}
                 onCheckedChange={() => toggleRegion(region)}
               />
               <label
@@ -297,7 +467,10 @@ export default function Settings() {
                 Buscar coincidencias automáticamente cuando se detecten nuevas oportunidades
               </p>
             </div>
-            <Switch checked={autoMatch} onCheckedChange={setAutoMatch} />
+            <Switch 
+              checked={settings.automation.autoMatch} 
+              onCheckedChange={(checked) => updateAutomation('autoMatch', checked)} 
+            />
           </div>
           <div className="flex items-center justify-between rounded-lg border border-border p-4">
             <div className="space-y-0.5">
@@ -307,8 +480,8 @@ export default function Settings() {
               </p>
             </div>
             <Switch 
-              checked={autoBid} 
-              onCheckedChange={setAutoBid}
+              checked={settings.automation.autoBid} 
+              onCheckedChange={(checked) => updateAutomation('autoBid', checked)}
               className="data-[state=checked]:bg-success"
             />
           </div>
