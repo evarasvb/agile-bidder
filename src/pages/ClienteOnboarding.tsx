@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check, Building2, Package, Ban, Bell } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Building2, Package, Ban, Bell, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { useCliente, useActualizarCliente, getClienteId } from '@/hooks/useCliente';
+import { useCliente, useActualizarCliente } from '@/hooks/useCliente';
 import OnboardingStep1 from '@/components/cliente-onboarding/OnboardingStep1';
 import OnboardingStep2 from '@/components/cliente-onboarding/OnboardingStep2';
 import OnboardingStep3 from '@/components/cliente-onboarding/OnboardingStep3';
@@ -18,18 +18,10 @@ const STEPS = [
 
 export default function ClienteOnboarding() {
   const navigate = useNavigate();
-  const clienteId = getClienteId();
   const { data: cliente, isLoading } = useCliente();
   const actualizarCliente = useActualizarCliente();
   
   const [currentStep, setCurrentStep] = useState(1);
-
-  useEffect(() => {
-    if (!clienteId) {
-      navigate('/clientes');
-      return;
-    }
-  }, [clienteId, navigate]);
 
   useEffect(() => {
     if (cliente) {
@@ -42,19 +34,19 @@ export default function ClienteOnboarding() {
   }, [cliente, navigate]);
 
   const handleNext = async () => {
-    if (!clienteId) return;
+    if (!cliente?.id) return;
 
     if (currentStep < 4) {
       const nextStep = currentStep + 1;
       await actualizarCliente.mutateAsync({
-        id: clienteId,
+        id: cliente.id,
         onboarding_step: nextStep,
       });
       setCurrentStep(nextStep);
     } else {
       // Completar onboarding
       await actualizarCliente.mutateAsync({
-        id: clienteId,
+        id: cliente.id,
         onboarding_completado: true,
       });
       navigate('/clientes/dashboard');
@@ -62,11 +54,11 @@ export default function ClienteOnboarding() {
   };
 
   const handleBack = async () => {
-    if (!clienteId || currentStep <= 1) return;
+    if (!cliente?.id || currentStep <= 1) return;
     
     const prevStep = currentStep - 1;
     await actualizarCliente.mutateAsync({
-      id: clienteId,
+      id: cliente.id,
       onboarding_step: prevStep,
     });
     setCurrentStep(prevStep);
