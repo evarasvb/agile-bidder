@@ -1,19 +1,8 @@
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-
-// Helper para obtener/crear cliente ID en localStorage
-export function getClienteId(): string | null {
-  return localStorage.getItem('cliente_id');
-}
-
-export function setClienteId(id: string): void {
-  localStorage.setItem('cliente_id', id);
-}
-
-export function clearClienteId(): void {
-  localStorage.removeItem('cliente_id');
-}
+import { User } from '@supabase/supabase-js';
 
 // Tipos
 export interface Cliente {
@@ -70,25 +59,52 @@ export interface ClienteNotificaciones {
   updated_at: string;
 }
 
-// Hook para el cliente actual
+// Hook for current authenticated user
+export function useAuthUser() {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user ?? null);
+        setLoading(false);
+      }
+    );
+
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  return { user, loading, isAuthenticated: !!user };
+}
+
+// Hook para el cliente actual basado en autenticación
 export function useCliente() {
-  const clienteId = getClienteId();
+  const { user, loading: authLoading } = useAuthUser();
 
   return useQuery({
-    queryKey: ['cliente', clienteId],
+    queryKey: ['cliente', user?.id],
     queryFn: async () => {
-      if (!clienteId) return null;
+      if (!user) return null;
       
+      // Find cliente by user email
       const { data, error } = await supabase
         .from('clientes')
         .select('*')
-        .eq('id', clienteId)
-        .single();
+        .eq('email', user.email)
+        .maybeSingle();
       
       if (error) throw error;
-      return data as Cliente;
+      return data as Cliente | null;
     },
-    enabled: !!clienteId,
+    enabled: !authLoading && !!user,
   });
 }
 
@@ -96,6 +112,7 @@ export function useCliente() {
 export function useRegistrarCliente() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuthUser();
 
   return useMutation({
     mutationFn: async (data: {
@@ -106,16 +123,16 @@ export function useRegistrarCliente() {
       region: string;
       telefono?: string;
     }) => {
+      // Use the authenticated user's email if available
+      const emailToUse = user?.email || data.email;
+      
       const { data: cliente, error } = await supabase
         .from('clientes')
-        .insert(data)
+        .insert({ ...data, email: emailToUse })
         .select()
         .single();
       
       if (error) throw error;
-      
-      // Guardar ID en localStorage
-      setClienteId(cliente.id);
       
       // Crear registro de notificaciones por defecto
       await supabase
@@ -170,23 +187,23 @@ export function useActualizarCliente() {
 
 // Hook para inventario del cliente
 export function useClienteInventario() {
-  const clienteId = getClienteId();
+  const { data: cliente } = useCliente();
 
   return useQuery({
-    queryKey: ['cliente-inventario', clienteId],
+    queryKey: ['cliente-inventario', cliente?.id],
     queryFn: async () => {
-      if (!clienteId) return [];
+      if (!cliente?.id) return [];
       
       const { data, error } = await supabase
         .from('cliente_inventario')
         .select('*')
-        .eq('cliente_id', clienteId)
+        .eq('cliente_id', cliente.id)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
       return data as ClienteInventario[];
     },
-    enabled: !!clienteId,
+    enabled: !!cliente?.id,
   });
 }
 
@@ -278,39 +295,39 @@ export function useEliminarProducto() {
 
 // Hook para exclusiones
 export function useClienteExclusiones() {
-  const clienteId = getClienteId();
+  const { data: cliente } = useCliente();
 
   return useQuery({
-    queryKey: ['cliente-exclusiones', clienteId],
+    queryKey: ['cliente-exclusiones', cliente?.id],
     queryFn: async () => {
-      if (!clienteId) return [];
+      if (!cliente?.id) return [];
       
       const { data, error } = await supabase
         .from('cliente_exclusiones')
         .select('*')
-        .eq('cliente_id', clienteId);
+        .eq('cliente_id', cliente.id);
       
       if (error) throw error;
       return data as ClienteExclusion[];
     },
-    enabled: !!clienteId,
+    enabled: !!cliente?.id,
   });
 }
 
 // Hook para toggle exclusión
 export function useToggleExclusion() {
   const queryClient = useQueryClient();
-  const clienteId = getClienteId();
+  const { data: cliente } = useCliente();
 
   return useMutation({
     mutationFn: async (tipoExclusion: string) => {
-      if (!clienteId) throw new Error('No hay cliente');
+      if (!cliente?.id) throw new Error('No hay cliente');
 
       // Verificar si existe
       const { data: existing } = await supabase
         .from('cliente_exclusiones')
         .select('id')
-        .eq('cliente_id', clienteId)
+        .eq('cliente_id', cliente.id)
         .eq('tipo_exclusion', tipoExclusion)
         .single();
 
@@ -324,7 +341,7 @@ export function useToggleExclusion() {
         // Agregar
         await supabase
           .from('cliente_exclusiones')
-          .insert({ cliente_id: clienteId, tipo_exclusion: tipoExclusion });
+          .insert({ cliente_id: cliente.id, tipo_exclusion: tipoExclusion });
       }
     },
     onSuccess: () => {
@@ -335,39 +352,39 @@ export function useToggleExclusion() {
 
 // Hook para notificaciones
 export function useClienteNotificaciones() {
-  const clienteId = getClienteId();
+  const { data: cliente } = useCliente();
 
   return useQuery({
-    queryKey: ['cliente-notificaciones', clienteId],
+    queryKey: ['cliente-notificaciones', cliente?.id],
     queryFn: async () => {
-      if (!clienteId) return null;
+      if (!cliente?.id) return null;
       
       const { data, error } = await supabase
         .from('cliente_notificaciones')
         .select('*')
-        .eq('cliente_id', clienteId)
+        .eq('cliente_id', cliente.id)
         .single();
       
       if (error && error.code !== 'PGRST116') throw error;
       return data as ClienteNotificaciones | null;
     },
-    enabled: !!clienteId,
+    enabled: !!cliente?.id,
   });
 }
 
 // Hook para actualizar notificaciones
 export function useActualizarNotificaciones() {
   const queryClient = useQueryClient();
-  const clienteId = getClienteId();
+  const { data: cliente } = useCliente();
 
   return useMutation({
     mutationFn: async (data: Partial<ClienteNotificaciones>) => {
-      if (!clienteId) throw new Error('No hay cliente');
+      if (!cliente?.id) throw new Error('No hay cliente');
 
       const { error } = await supabase
         .from('cliente_notificaciones')
         .update(data)
-        .eq('cliente_id', clienteId);
+        .eq('cliente_id', cliente.id);
       
       if (error) throw error;
     },
@@ -414,4 +431,21 @@ export function formatearRUT(rut: string): string {
   const formatted = body.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   
   return `${formatted}-${dv}`;
+}
+
+// Legacy functions for backwards compatibility - will be deprecated
+// These should eventually be removed as components are updated to use auth
+export function getClienteId(): string | null {
+  console.warn('getClienteId() is deprecated. Use useCliente() hook instead.');
+  return localStorage.getItem('cliente_id');
+}
+
+export function setClienteId(id: string): void {
+  console.warn('setClienteId() is deprecated. Use Supabase auth instead.');
+  localStorage.setItem('cliente_id', id);
+}
+
+export function clearClienteId(): void {
+  console.warn('clearClienteId() is deprecated. Use Supabase auth signOut instead.');
+  localStorage.removeItem('cliente_id');
 }
