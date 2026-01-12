@@ -311,6 +311,14 @@ Deno.serve(async (req) => {
       }
 
       case 'sync-licitacion': {
+        // Require API key authentication
+        if (!clienteId) {
+          return new Response(
+            JSON.stringify({ error: 'API key requerida' }),
+            { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
         // Sync licitacion and its items from MercadoPúblico (via extension scraping)
         const body = await req.json();
         const { licitacion, items } = body;
