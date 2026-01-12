@@ -1,0 +1,17 @@
+/* FirmaVB Content Script Styles */
+/* Estilos mínimos ya que la mayoría se inyectan inline */
+
+#firmavb-postular-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4), 0 4px 20px rgba(59, 130, 246, 0.4);
+}
+
+#firmavb-postular-btn:active {
+  transform: scale(0.98);
+}
+
+#firmavb-postular-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}

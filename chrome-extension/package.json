@@ -1,27 +1,19 @@
 {
-  "name": "firmavb-postulador",
+  "name": "firmavb-postulador-extension",
   "version": "1.0.0",
-  "description": "Chrome Extension para automatizar postulaciones a Compras Ágiles en MercadoPúblico",
+  "description": "Chrome Extension para automatizar postulaciones a Compras Ágiles en MercadoPúblico - Conectado con FirmaVB",
+  "private": true,
   "scripts": {
-    "build": "webpack --mode production",
-    "dev": "webpack --mode development --watch",
-    "clean": "rm -rf dist"
+    "build": "echo 'La extensión está lista para usar. Carga el directorio chrome-extension/ en Chrome.'",
+    "package": "zip -r firmavb-extension.zip manifest.json *.js *.css *.html icons/ -x '*.ts' -x '*.tsx' -x 'node_modules/*' -x 'src/*'",
+    "clean": "rm -f firmavb-extension.zip"
   },
-  "devDependencies": {
-    "@types/chrome": "^0.0.260",
-    "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0",
-    "copy-webpack-plugin": "^12.0.2",
-    "css-loader": "^6.10.0",
-    "style-loader": "^3.3.4",
-    "ts-loader": "^9.5.1",
-    "typescript": "^5.3.3",
-    "webpack": "^5.90.3",
-    "webpack-cli": "^5.1.4"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.39.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
-  }
+  "keywords": [
+    "chrome-extension",
+    "mercadopublico",
+    "firmavb",
+    "licitaciones"
+  ],
+  "author": "FirmaVB",
+  "license": "UNLICENSED"
 }
