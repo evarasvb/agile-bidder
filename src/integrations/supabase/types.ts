@@ -230,6 +230,7 @@ export type Database = {
           rut: string
           telefono: string | null
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           activo?: boolean | null
@@ -246,6 +247,7 @@ export type Database = {
           rut: string
           telefono?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           activo?: boolean | null
@@ -262,6 +264,7 @@ export type Database = {
           rut?: string
           telefono?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }

@@ -7,6 +7,7 @@ import { User } from '@supabase/supabase-js';
 // Tipos
 export interface Cliente {
   id: string;
+  user_id: string;
   email: string;
   empresa_nombre: string;
   rut: string;
@@ -94,11 +95,11 @@ export function useCliente() {
     queryFn: async () => {
       if (!user) return null;
       
-      // Find cliente by user email
+      // Find cliente by user_id (auth.uid())
       const { data, error } = await supabase
         .from('clientes')
         .select('*')
-        .eq('email', user.email)
+        .eq('user_id', user.id)
         .maybeSingle();
       
       if (error) throw error;
@@ -123,12 +124,16 @@ export function useRegistrarCliente() {
       region: string;
       telefono?: string;
     }) => {
-      // Use the authenticated user's email if available
-      const emailToUse = user?.email || data.email;
+      if (!user) throw new Error('Usuario no autenticado');
       
+      // Use the authenticated user's email and ID
       const { data: cliente, error } = await supabase
         .from('clientes')
-        .insert({ ...data, email: emailToUse })
+        .insert({ 
+          ...data, 
+          email: user.email || data.email,
+          user_id: user.id 
+        })
         .select()
         .single();
       
