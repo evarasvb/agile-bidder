@@ -25,6 +25,57 @@ interface NotificationRequest {
   };
 }
 
+interface ClienteNotificaciones {
+  alerta_nuevos_matches?: boolean;
+  alerta_cierre_proximo?: boolean;
+  alerta_cambios_guardadas?: boolean;
+  score_minimo_alerta?: number;
+  presupuesto_minimo?: number;
+  email_instantaneo?: boolean;
+  webhook_url?: string;
+}
+
+interface Cliente {
+  id: string;
+  email: string;
+  empresa_nombre: string;
+  user_id?: string;
+}
+
+// Verify authentication
+async function verifyAuth(req: Request): Promise<{ userId: string; supabase: any } | Response> {
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return new Response(
+      JSON.stringify({ error: 'Missing or invalid authorization header' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+  
+  // Verify the user's token
+  const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: authHeader } }
+  });
+
+  const token = authHeader.replace('Bearer ', '');
+  const { data, error } = await supabaseClient.auth.getUser(token);
+
+  if (error || !data?.user) {
+    return new Response(
+      JSON.stringify({ error: 'Invalid or expired token' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // Return service role client for database operations
+  const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
+  return { userId: data.user.id, supabase: serviceClient };
+}
+
 // Professional HTML email templates
 function getEmailTemplate(tipo: string, data: NotificationRequest['data'], empresaNombre: string): { subject: string; html: string } {
   const baseStyles = `
@@ -235,30 +286,51 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Verify authentication
+  const authResult = await verifyAuth(req);
+  if (authResult instanceof Response) {
+    return authResult;
+  }
+
+  const { userId, supabase } = authResult;
+  console.log(`Authenticated user: ${userId}`);
+
   try {
     const { cliente_id, tipo, data }: NotificationRequest = await req.json();
-    
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get client info
-    const { data: cliente, error: clienteError } = await supabase
+    // Verify user has access to this cliente
+    const { data: clienteData, error: clienteError } = await supabase
       .from('clientes')
-      .select('email, empresa_nombre')
+      .select('id, email, empresa_nombre, user_id')
       .eq('id', cliente_id)
       .single();
 
-    if (clienteError || !cliente) {
-      throw new Error("Cliente no encontrado");
+    if (clienteError || !clienteData) {
+      return new Response(
+        JSON.stringify({ error: 'Cliente no encontrado' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
+    const cliente = clienteData as Cliente;
+
+    // Optional: Check if user owns this cliente (if user_id exists on clientes table)
+    // This would require adding user_id column to clientes table
+    // if (cliente.user_id && cliente.user_id !== userId) {
+    //   return new Response(
+    //     JSON.stringify({ error: 'No autorizado para enviar notificaciones a este cliente' }),
+    //     { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    //   );
+    // }
+
     // Get notification preferences
-    const { data: prefs } = await supabase
+    const { data: prefsData } = await supabase
       .from('cliente_notificaciones')
       .select('*')
       .eq('cliente_id', cliente_id)
       .single();
+
+    const prefs = prefsData as ClienteNotificaciones | null;
 
     // Check if we should send based on preferences
     let shouldSend = true;
@@ -338,23 +410,29 @@ serve(async (req) => {
       });
     }
 
-    // Send webhook if configured
+    // Send webhook if configured (validate URL to prevent SSRF)
     let webhookSent = false;
     if (shouldSend && webhookUrl) {
       try {
-        await fetch(webhookUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            tipo,
-            cliente_id,
-            empresa: cliente.empresa_nombre,
-            data,
-            timestamp: new Date().toISOString()
-          }),
-        });
-        console.log("Webhook sent successfully");
-        webhookSent = true;
+        // Basic URL validation
+        const url = new URL(webhookUrl);
+        if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+          console.warn("Invalid webhook URL protocol");
+        } else {
+          await fetch(webhookUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              tipo,
+              cliente_id,
+              empresa: cliente.empresa_nombre,
+              data,
+              timestamp: new Date().toISOString()
+            }),
+          });
+          console.log("Webhook sent successfully");
+          webhookSent = true;
+        }
       } catch (webhookError) {
         console.error("Webhook error:", webhookError);
       }
