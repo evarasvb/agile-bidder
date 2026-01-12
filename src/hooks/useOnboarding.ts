@@ -1,16 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-
-// Generate or retrieve user ID from localStorage
-const getUserId = (): string => {
-  const stored = localStorage.getItem('onboarding_user_id');
-  if (stored) return stored;
-  
-  const newId = crypto.randomUUID();
-  localStorage.setItem('onboarding_user_id', newId);
-  return newId;
-};
+import { User } from '@supabase/supabase-js';
 
 export interface UserPreferences {
   id?: string;
@@ -77,9 +68,9 @@ export const CHILE_REGIONS = [
 ];
 
 export function useOnboarding() {
-  const userId = getUserId();
   const { toast } = useToast();
   
+  const [user, setUser] = useState<User | null>(null);
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [categories, setCategories] = useState<UserCategory[]>([]);
   const [regions, setRegions] = useState<UserRegion[]>([]);
@@ -87,12 +78,36 @@ export function useOnboarding() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Load initial data
+  // Listen for auth state changes
   useEffect(() => {
-    loadOnboardingData();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
+
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const loadOnboardingData = async () => {
+  // Load onboarding data when user is authenticated
+  useEffect(() => {
+    if (user) {
+      loadOnboardingData(user.id);
+    } else {
+      setLoading(false);
+      setPreferences(null);
+      setCategories([]);
+      setRegions([]);
+      setNotifications(null);
+    }
+  }, [user]);
+
+  const loadOnboardingData = async (userId: string) => {
     setLoading(true);
     try {
       // Load preferences
@@ -150,12 +165,13 @@ export function useOnboarding() {
   };
 
   const updateStep = useCallback(async (step: number) => {
+    if (!user) return;
     setSaving(true);
     try {
       const { error } = await supabase
         .from('user_preferences')
         .update({ onboarding_step: step })
-        .eq('user_id', userId);
+        .eq('user_id', user.id);
       
       if (!error) {
         setPreferences(prev => prev ? { ...prev, onboarding_step: step } : null);
@@ -163,15 +179,16 @@ export function useOnboarding() {
     } finally {
       setSaving(false);
     }
-  }, [userId]);
+  }, [user]);
 
   const updateCompanyName = useCallback(async (companyName: string) => {
+    if (!user) return;
     setSaving(true);
     try {
       const { error } = await supabase
         .from('user_preferences')
         .update({ company_name: companyName })
-        .eq('user_id', userId);
+        .eq('user_id', user.id);
       
       if (!error) {
         setPreferences(prev => prev ? { ...prev, company_name: companyName } : null);
@@ -179,9 +196,10 @@ export function useOnboarding() {
     } finally {
       setSaving(false);
     }
-  }, [userId]);
+  }, [user]);
 
   const toggleCategory = useCallback(async (categoryId: string, categoryName: string) => {
+    if (!user) return;
     setSaving(true);
     const exists = categories.find(c => c.category_id === categoryId);
     
@@ -190,13 +208,13 @@ export function useOnboarding() {
         await supabase
           .from('user_categories')
           .delete()
-          .eq('user_id', userId)
+          .eq('user_id', user.id)
           .eq('category_id', categoryId);
         setCategories(prev => prev.filter(c => c.category_id !== categoryId));
       } else {
         const { data } = await supabase
           .from('user_categories')
-          .insert({ user_id: userId, category_id: categoryId, category_name: categoryName })
+          .insert({ user_id: user.id, category_id: categoryId, category_name: categoryName })
           .select()
           .single();
         if (data) setCategories(prev => [...prev, data as UserCategory]);
@@ -204,9 +222,10 @@ export function useOnboarding() {
     } finally {
       setSaving(false);
     }
-  }, [userId, categories]);
+  }, [user, categories]);
 
   const toggleRegion = useCallback(async (regionCode: string, regionName: string) => {
+    if (!user) return;
     setSaving(true);
     const exists = regions.find(r => r.region_code === regionCode);
     
@@ -215,13 +234,13 @@ export function useOnboarding() {
         await supabase
           .from('user_regions')
           .delete()
-          .eq('user_id', userId)
+          .eq('user_id', user.id)
           .eq('region_code', regionCode);
         setRegions(prev => prev.filter(r => r.region_code !== regionCode));
       } else {
         const { data } = await supabase
           .from('user_regions')
-          .insert({ user_id: userId, region_code: regionCode, region_name: regionName })
+          .insert({ user_id: user.id, region_code: regionCode, region_name: regionName })
           .select()
           .single();
         if (data) setRegions(prev => [...prev, data as UserRegion]);
@@ -229,20 +248,21 @@ export function useOnboarding() {
     } finally {
       setSaving(false);
     }
-  }, [userId, regions]);
+  }, [user, regions]);
 
   const selectAllRegions = useCallback(async () => {
+    if (!user) return;
     setSaving(true);
     try {
       // Delete existing
       await supabase
         .from('user_regions')
         .delete()
-        .eq('user_id', userId);
+        .eq('user_id', user.id);
       
       // Insert all
       const allRegions = CHILE_REGIONS.map(r => ({
-        user_id: userId,
+        user_id: user.id,
         region_code: r.code,
         region_name: r.name,
       }));
@@ -256,35 +276,37 @@ export function useOnboarding() {
     } finally {
       setSaving(false);
     }
-  }, [userId]);
+  }, [user]);
 
   const clearAllRegions = useCallback(async () => {
+    if (!user) return;
     setSaving(true);
     try {
       await supabase
         .from('user_regions')
         .delete()
-        .eq('user_id', userId);
+        .eq('user_id', user.id);
       setRegions([]);
     } finally {
       setSaving(false);
     }
-  }, [userId]);
+  }, [user]);
 
   const updateNotifications = useCallback(async (notifSettings: Partial<UserNotifications>) => {
+    if (!user) return;
     setSaving(true);
     try {
       if (notifications) {
         const { error } = await supabase
           .from('user_notifications')
           .update(notifSettings)
-          .eq('user_id', userId);
+          .eq('user_id', user.id);
         if (!error) {
           setNotifications(prev => prev ? { ...prev, ...notifSettings } : null);
         }
       } else {
         const newNotif = {
-          user_id: userId,
+          user_id: user.id,
           email_notifications: true,
           push_notifications: false,
           notification_frequency: 'daily' as const,
@@ -300,15 +322,16 @@ export function useOnboarding() {
     } finally {
       setSaving(false);
     }
-  }, [userId, notifications]);
+  }, [user, notifications]);
 
   const completeOnboarding = useCallback(async () => {
+    if (!user) return false;
     setSaving(true);
     try {
       const { error } = await supabase
         .from('user_preferences')
         .update({ onboarding_completed: true })
-        .eq('user_id', userId);
+        .eq('user_id', user.id);
       
       if (!error) {
         setPreferences(prev => prev ? { ...prev, onboarding_completed: true } : null);
@@ -322,10 +345,12 @@ export function useOnboarding() {
     } finally {
       setSaving(false);
     }
-  }, [userId, toast]);
+  }, [user, toast]);
 
   return {
-    userId,
+    user,
+    userId: user?.id,
+    isAuthenticated: !!user,
     preferences,
     categories,
     regions,
