@@ -17,7 +17,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useCliente, clearClienteId, getClienteId } from '@/hooks/useCliente';
+import { useCliente, getClienteId } from '@/hooks/useCliente';
+import { useAuth } from '@/hooks/useAuth';
 import {
   useClienteOfertas,
   useClienteOfertasConMatch,
@@ -234,9 +235,11 @@ export default function ClienteOfertasDashboard() {
     };
   }, [dbStats]);
 
-  const handleLogout = () => {
-    clearClienteId();
-    navigate('/clientes');
+  const { signOut } = useAuth();
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/auth');
   };
 
   // Permitir ver la página sin clienteId para demostración
