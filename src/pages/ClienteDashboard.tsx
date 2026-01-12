@@ -111,7 +111,24 @@ export default function ClienteDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Sidebar */}
+      {/* Mobile Header */}
+      <div className="lg:hidden sticky top-0 z-50 flex items-center justify-between p-4 border-b bg-card">
+        <div className="flex items-center gap-2">
+          <div className="p-2 bg-primary rounded-lg">
+            <Sparkles className="w-4 h-4 text-primary-foreground" />
+          </div>
+          <span className="font-bold">LicitaBot</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground hidden sm:inline">{cliente.email}</span>
+          <Button variant="outline" size="sm" onClick={handleLogout}>
+            <LogOut className="w-4 h-4 mr-1" />
+            Salir
+          </Button>
+        </div>
+      </div>
+
+      {/* Sidebar - Desktop */}
       <div className="fixed left-0 top-0 h-full w-64 border-r bg-card p-4 hidden lg:block">
         <div className="flex items-center gap-2 mb-8">
           <div className="p-2 bg-primary rounded-lg">
