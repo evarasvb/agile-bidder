@@ -54,10 +54,10 @@ export default function Landing() {
           </div>
           <div className="flex items-center gap-3">
             <Button variant="ghost" asChild>
-              <Link to="/dashboard">Ir al Dashboard</Link>
+              <Link to="/auth">Iniciar Sesión</Link>
             </Button>
             <Button asChild className="bg-[hsl(var(--firmavb-blue))] hover:bg-[hsl(var(--firmavb-blue))]/90">
-              <Link to="/onboarding">
+              <Link to="/auth">
                 Comenzar Gratis
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
@@ -116,7 +116,7 @@ export default function Landing() {
                 asChild
                 className="bg-[hsl(var(--firmavb-blue))] hover:bg-[hsl(var(--firmavb-blue))]/90 shadow-lg shadow-[hsl(var(--firmavb-blue))]/25 text-base h-12 px-8"
               >
-                <Link to="/onboarding">
+                <Link to="/auth">
                   Configurar mi empresa
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
@@ -394,7 +394,7 @@ export default function Landing() {
                 asChild
                 className="bg-white text-[hsl(var(--firmavb-blue))] hover:bg-white/90 shadow-lg text-base h-12 px-8"
               >
-                <Link to="/onboarding">
+                <Link to="/auth">
                   Comenzar Configuración
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>

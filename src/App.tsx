@@ -4,7 +4,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
+import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Inventory from "./pages/Inventory";
 import History from "./pages/History";
@@ -36,14 +38,15 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          {/* Landing page - standalone */}
+          {/* Public routes */}
           <Route path="/" element={<Index />} />
+          <Route path="/auth" element={<Auth />} />
           
-          {/* Cliente routes - standalone */}
-          <Route path="/clientes" element={<Clientes />} />
-          <Route path="/clientes/onboarding" element={<ClienteOnboarding />} />
-          <Route path="/clientes/dashboard" element={<ClienteDashboard />} />
-          <Route path="/clientes/ofertas" element={<ClienteOfertasDashboard />} />
+          {/* Protected cliente routes */}
+          <Route path="/clientes" element={<ProtectedRoute><Clientes /></ProtectedRoute>} />
+          <Route path="/clientes/onboarding" element={<ProtectedRoute><ClienteOnboarding /></ProtectedRoute>} />
+          <Route path="/clientes/dashboard" element={<ProtectedRoute><ClienteDashboard /></ProtectedRoute>} />
+          <Route path="/clientes/ofertas" element={<ProtectedRoute><ClienteOfertasDashboard /></ProtectedRoute>} />
           
           {/* Onboarding route - standalone without AppLayout */}
           <Route path="/onboarding" element={<Onboarding />} />

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, Search, FileText, Package, Settings, LogOut,
@@ -11,9 +11,9 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useCliente, useClienteInventario, clearClienteId, getClienteId } from '@/hooks/useCliente';
+import { useCliente, useClienteInventario } from '@/hooks/useCliente';
+import { useAuth } from '@/hooks/useAuth';
 import { useLicitaciones } from '@/hooks/useLicitaciones';
-import { useEffect, useMemo } from 'react';
 
 // Función de scoring simplificada
 function calcularScore(licitacion: any, inventario: any[], categoriaNegocio: string | null): number {
@@ -63,23 +63,16 @@ function calcularScore(licitacion: any, inventario: any[], categoriaNegocio: str
 
 export default function ClienteDashboard() {
   const navigate = useNavigate();
-  const clienteId = getClienteId();
+  const { signOut } = useAuth();
   const { data: cliente, isLoading: loadingCliente } = useCliente();
   const { data: inventario = [] } = useClienteInventario();
   const { data: licitaciones = [], isLoading: loadingLicitaciones } = useLicitaciones();
 
   useEffect(() => {
-    if (!clienteId) {
-      navigate('/clientes');
-      return;
-    }
-  }, [clienteId, navigate]);
-
-  useEffect(() => {
-    if (cliente && !cliente.onboarding_completado) {
+    if (!loadingCliente && cliente && !cliente.onboarding_completado) {
       navigate('/clientes/onboarding');
     }
-  }, [cliente, navigate]);
+  }, [cliente, loadingCliente, navigate]);
 
   // Calcular scores para cada licitación
   const licitacionesConScore = useMemo(() => {
@@ -103,9 +96,9 @@ export default function ClienteDashboard() {
     valorPotencial: licitacionesMatch.reduce((sum, l) => sum + (l.presupuesto || 0), 0),
   }), [licitaciones, licitacionesMatch]);
 
-  const handleLogout = () => {
-    clearClienteId();
-    navigate('/clientes');
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/auth');
   };
 
   if (loadingCliente || !cliente) {
