@@ -18,6 +18,7 @@ import ClienteDashboard from "./pages/ClienteDashboard";
 import ClienteOfertasDashboard from "./pages/ClienteOfertasDashboard";
 import NotFound from "./pages/NotFound";
 import OdooDashboard from "./pages/OdooDashboard";
+import ExtensionConfig from "./pages/ExtensionConfig";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +58,7 @@ const App = () => (
             <Route path="/history" element={<History />} />
             <Route path="/licitaciones" element={<Licitaciones />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/extension" element={<ExtensionConfig />} />
             <Route path="/logs" element={<Logs />} />
             <Route path="*" element={<NotFound />} />
           </Route>
