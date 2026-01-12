@@ -9,29 +9,43 @@ import {
   LogOut,
   Link2,
   Chrome,
-  CalendarDays
+  CalendarDays,
+  User
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useClienteConfig } from "@/hooks/useClienteConfig";
+import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-const navItems = [
+interface NavItem {
+  title: string;
+  url: string;
+  icon: React.ComponentType<{ className?: string }>;
+  requiresOdoo?: boolean;
+  adminOnly?: boolean;
+}
+
+const navItems: NavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Licitaciones", url: "/licitaciones", icon: FileSearch },
   { title: "Calendario", url: "/calendar", icon: CalendarDays },
   { title: "Inventario", url: "/inventory", icon: Package },
-  { title: "Odoo CRM", url: "/odoo/dashboard", icon: Link2 },
+  { title: "Odoo CRM", url: "/odoo/dashboard", icon: Link2, requiresOdoo: true },
   { title: "Extensión Chrome", url: "/extension", icon: Chrome },
   { title: "Historial", url: "/history", icon: History },
-  { title: "Logs", url: "/logs", icon: FileText },
+  { title: "Logs", url: "/logs", icon: FileText, adminOnly: true },
   { title: "Configuración", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
+  const { hasOdoo } = useClienteConfig();
+  const { profile, isAdmin } = useProfile();
 
   const handleLogout = async () => {
     try {
@@ -45,8 +59,19 @@ export function AppSidebar() {
     }
   };
 
+  // Filtrar items de navegación según permisos
+  const filteredNavItems = navItems.filter(item => {
+    if (item.requiresOdoo && !hasOdoo) return false;
+    if (item.adminOnly && !isAdmin) return false;
+    return true;
+  });
+
+  const userInitials = profile?.full_name
+    ? profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : user?.email?.slice(0, 2).toUpperCase() || 'U';
+
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-sidebar border-r border-sidebar-border">
+    <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
       {/* Logo */}
       <div className="flex h-16 items-center gap-3 px-6 border-b border-sidebar-border">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary">
@@ -58,10 +83,30 @@ export function AppSidebar() {
         </div>
       </div>
 
+      {/* User Profile */}
+      <div className="px-4 py-3 border-b border-sidebar-border">
+        <div className="flex items-center gap-3">
+          <Avatar className="h-9 w-9">
+            <AvatarImage src={profile?.avatar_url || undefined} />
+            <AvatarFallback className="bg-sidebar-accent text-sidebar-foreground text-sm">
+              {userInitials}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-sidebar-foreground truncate">
+              {profile?.full_name || user?.email || 'Usuario'}
+            </p>
+            <p className="text-xs text-sidebar-muted truncate">
+              {isAdmin ? 'Administrador' : 'Usuario'}
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4">
+      <nav className="flex-1 px-3 py-4 overflow-y-auto">
         <ul className="space-y-1">
-          {navItems.map((item) => {
+          {filteredNavItems.map((item) => {
             const isActive = location.pathname === item.url;
             return (
               <li key={item.title}>
