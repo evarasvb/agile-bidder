@@ -13,12 +13,14 @@ export interface ExtensionApiKey {
   updated_at: string;
 }
 
-// Generate a secure API key
+// Generate a cryptographically secure API key
 function generateApiKey(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
   let result = 'fvb_ext_';
   for (let i = 0; i < 32; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+    result += chars.charAt(array[i] % chars.length);
   }
   return result;
 }
