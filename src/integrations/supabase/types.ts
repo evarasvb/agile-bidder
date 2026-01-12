@@ -268,6 +268,101 @@ export type Database = {
         }
         Relationships: []
       }
+      extension_activity_log: {
+        Row: {
+          action: string
+          api_key_id: string | null
+          cliente_id: string
+          created_at: string
+          detalles: Json | null
+          id: string
+          ip_address: string | null
+          licitacion_id: string | null
+          oferta_id: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          api_key_id?: string | null
+          cliente_id: string
+          created_at?: string
+          detalles?: Json | null
+          id?: string
+          ip_address?: string | null
+          licitacion_id?: string | null
+          oferta_id?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          api_key_id?: string | null
+          cliente_id?: string
+          created_at?: string
+          detalles?: Json | null
+          id?: string
+          ip_address?: string | null
+          licitacion_id?: string | null
+          oferta_id?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extension_activity_log_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "extension_api_keys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extension_activity_log_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      extension_api_keys: {
+        Row: {
+          activa: boolean
+          api_key: string
+          cliente_id: string
+          created_at: string
+          id: string
+          last_used: string | null
+          nombre: string
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          api_key: string
+          cliente_id: string
+          created_at?: string
+          id?: string
+          last_used?: string | null
+          nombre?: string
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          api_key?: string
+          cliente_id?: string
+          created_at?: string
+          id?: string
+          last_used?: string | null
+          nombre?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extension_api_keys_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory: {
         Row: {
           activo: boolean
