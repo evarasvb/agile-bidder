@@ -8,11 +8,10 @@ import {
   ToggleLeft, 
   ToggleRight,
   Chrome,
-  Clock,
   Shield,
   Download,
-  ExternalLink,
-  Activity
+  Activity,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,6 +56,8 @@ import {
 import { useCliente } from '@/hooks/useCliente';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { downloadExtension } from '@/utils/extensionDownload';
+import { toast } from 'sonner';
 
 export default function ExtensionConfig() {
   const { data: cliente } = useCliente();
@@ -72,6 +73,20 @@ export default function ExtensionConfig() {
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownloadExtension = async () => {
+    setIsDownloading(true);
+    try {
+      await downloadExtension();
+      toast.success('Extensión descargada correctamente');
+    } catch (error) {
+      console.error('Error downloading extension:', error);
+      toast.error('Error al descargar la extensión');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const handleCreateKey = async () => {
     if (!clienteId) return;
@@ -245,9 +260,18 @@ export default function ExtensionConfig() {
                 Descarga FirmaVB Postulador para automatizar tus postulaciones en MercadoPúblico.cl
               </p>
             </div>
-            <Button variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-100">
-              <Download className="h-4 w-4 mr-2" />
-              Descargar Extensión
+            <Button 
+              variant="outline" 
+              className="border-blue-300 text-blue-700 hover:bg-blue-100"
+              onClick={handleDownloadExtension}
+              disabled={isDownloading}
+            >
+              {isDownloading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              {isDownloading ? 'Descargando...' : 'Descargar Extensión (.zip)'}
             </Button>
           </div>
         </CardContent>
