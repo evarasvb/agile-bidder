@@ -1,12 +1,23 @@
 import { useState } from "react";
-import { Wifi, WifiOff, Shield, ShieldOff, Power, AlertTriangle } from "lucide-react";
+import { Wifi, WifiOff, Shield, ShieldOff, Power, AlertTriangle, RefreshCw } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { OdooSyncErrorNotification } from "@/components/odoo/OdooSyncErrorNotification";
+import { useExtensionStatus } from "@/hooks/useExtensionStatus";
+import { formatDistanceToNow } from "date-fns";
+import { es } from "date-fns/locale";
+
 export function StatusBar() {
   const [autoBidEnabled, setAutoBidEnabled] = useState(false);
-  const extensionConnected = true; // Mock state
-  const sessionActive = true; // Mock state
+  const { isConnected, lastActivity, lastAction, isLoading, refetch } = useExtensionStatus();
+  const sessionActive = true; // Mock state for MP session
+
+  const formatLastActivity = () => {
+    if (!lastActivity) return "Sin actividad";
+    return formatDistanceToNow(lastActivity, { addSuffix: true, locale: es });
+  };
 
   return (
     <header className="sticky top-0 z-30 h-16 border-b border-border bg-card/80 backdrop-blur-sm">
@@ -18,15 +29,49 @@ export function StatusBar() {
 
         {/* Right: Status Indicators */}
         <div className="flex items-center gap-6">
-          {/* Extension Status */}
-          <StatusIndicator
-            label="Extensión"
-            isActive={extensionConnected}
-            activeIcon={Wifi}
-            inactiveIcon={WifiOff}
-            activeText="Conectada"
-            inactiveText="Desconectada"
-          />
+          {/* Extension Status with Realtime */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-2 cursor-help">
+                <div className="flex items-center gap-1.5">
+                  <div className={cn(
+                    "h-2 w-2 rounded-full transition-colors",
+                    isLoading ? "bg-muted-foreground animate-pulse" :
+                    isConnected ? "bg-online animate-pulse-soft" : "bg-offline"
+                  )} />
+                  <span className="text-xs text-muted-foreground">Extensión:</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  {isConnected ? (
+                    <Wifi className="h-4 w-4 text-online" />
+                  ) : (
+                    <WifiOff className="h-4 w-4 text-offline" />
+                  )}
+                  <span className={cn(
+                    "text-sm font-medium",
+                    isConnected ? "text-online" : "text-offline"
+                  )}>
+                    {isLoading ? "Verificando..." : isConnected ? "Conectada" : "Desconectada"}
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => refetch()}
+                >
+                  <RefreshCw className={cn("h-3 w-3", isLoading && "animate-spin")} />
+                </Button>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-xs">
+              <div className="space-y-1 text-xs">
+                <p><strong>Última actividad:</strong> {formatLastActivity()}</p>
+                {lastAction && <p><strong>Acción:</strong> {lastAction.replace(/-/g, ' ')}</p>}
+                <p className="text-muted-foreground">Se actualiza en tiempo real</p>
+              </div>
+            </TooltipContent>
+          </Tooltip>
 
           {/* Session Status */}
           <StatusIndicator
@@ -66,7 +111,7 @@ export function StatusBar() {
       </div>
 
       {/* Alert Banner */}
-      {!extensionConnected && (
+      {!isLoading && !isConnected && (
         <div className="bg-warning/10 border-b border-warning/20 px-6 py-2 flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-warning" />
           <span className="text-sm text-warning font-medium">
