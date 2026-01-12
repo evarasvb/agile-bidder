@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Wifi, WifiOff, Shield, ShieldOff, Power, AlertTriangle } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-
+import { OdooSyncErrorNotification } from "@/components/odoo/OdooSyncErrorNotification";
 export function StatusBar() {
   const [autoBidEnabled, setAutoBidEnabled] = useState(false);
   const extensionConnected = true; // Mock state
@@ -37,6 +37,9 @@ export function StatusBar() {
             activeText="Activa"
             inactiveText="Expirada"
           />
+
+          {/* Odoo Sync Error Notifications */}
+          <OdooSyncErrorNotification />
 
           {/* Auto-Bid Toggle */}
           <div className="flex items-center gap-3 pl-4 border-l border-border">
