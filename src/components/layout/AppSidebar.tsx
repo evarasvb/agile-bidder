@@ -13,6 +13,7 @@ import {
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -31,8 +32,15 @@ export function AppSidebar() {
   const { signOut } = useAuth();
 
   const handleLogout = async () => {
-    await signOut();
-    navigate('/auth');
+    try {
+      console.log('Attempting to sign out...');
+      await signOut();
+      console.log('Sign out successful, navigating to /auth');
+      navigate('/auth', { replace: true });
+    } catch (error) {
+      console.error('Error during sign out:', error);
+      toast.error('Error al cerrar sesión');
+    }
   };
 
   return (
