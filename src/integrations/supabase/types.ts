@@ -223,6 +223,9 @@ export type Database = {
           empresa_nombre: string
           id: string
           nombre_responsable: string
+          odoo_db: string | null
+          odoo_enabled: boolean | null
+          odoo_url: string | null
           onboarding_completado: boolean | null
           onboarding_step: number | null
           plan: string | null
@@ -240,6 +243,9 @@ export type Database = {
           empresa_nombre: string
           id?: string
           nombre_responsable: string
+          odoo_db?: string | null
+          odoo_enabled?: boolean | null
+          odoo_url?: string | null
           onboarding_completado?: boolean | null
           onboarding_step?: number | null
           plan?: string | null
@@ -257,6 +263,9 @@ export type Database = {
           empresa_nombre?: string
           id?: string
           nombre_responsable?: string
+          odoo_db?: string | null
+          odoo_enabled?: boolean | null
+          odoo_url?: string | null
           onboarding_completado?: boolean | null
           onboarding_step?: number | null
           plan?: string | null
@@ -593,6 +602,36 @@ export type Database = {
             referencedColumns: ["id_licitacion"]
           },
         ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       system_logs: {
         Row: {
