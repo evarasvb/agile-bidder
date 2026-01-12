@@ -394,6 +394,97 @@
     }, 4000);
   }
 
+  // Extraer información completa de la licitación
+  function extractLicitacionInfo() {
+    const pageInfo = detectPageInfo();
+    
+    // Extraer título
+    const tituloSelectors = [
+      '.titulo-licitacion', 
+      '#titulo', 
+      'h1', 
+      '.detalle-titulo',
+      '[id*="TituloLicitacion"]'
+    ];
+    let titulo = '';
+    for (const sel of tituloSelectors) {
+      const el = document.querySelector(sel);
+      if (el && el.textContent.trim().length > 10) {
+        titulo = el.textContent.trim().slice(0, 500);
+        break;
+      }
+    }
+
+    // Extraer organismo
+    const organismoSelectors = [
+      '.organismo', 
+      '[id*="Organismo"]', 
+      '.entidad-compradora',
+      'span:contains("Organismo")'
+    ];
+    let organismo = '';
+    for (const sel of organismoSelectors) {
+      const el = document.querySelector(sel);
+      if (el) {
+        organismo = el.textContent.replace(/Organismo:?/i, '').trim().slice(0, 200);
+        if (organismo) break;
+      }
+    }
+
+    // Extraer presupuesto
+    let presupuesto = null;
+    const presupuestoMatch = document.body.textContent.match(/\$\s*([\d.,]+)/);
+    if (presupuestoMatch) {
+      presupuesto = parseFloat(presupuestoMatch[1].replace(/\./g, '').replace(',', '.'));
+    }
+
+    // Extraer fecha de cierre
+    let fechaCierre = null;
+    const fechaMatch = document.body.textContent.match(/(\d{2}[-/]\d{2}[-/]\d{4})\s*(\d{2}:\d{2})?/);
+    if (fechaMatch) {
+      const [, fecha, hora] = fechaMatch;
+      fechaCierre = new Date(fecha.replace(/[-/]/g, '/')).toISOString();
+    }
+
+    return {
+      id_licitacion: pageInfo.codigoLicitacion,
+      titulo: titulo || `Licitación ${pageInfo.codigoLicitacion}`,
+      organismo: organismo || 'MercadoPúblico',
+      presupuesto,
+      fecha_cierre: fechaCierre,
+      link_oficial: window.location.href,
+      estado: 'publicada'
+    };
+  }
+
+  // Sincronizar licitación con el backend
+  async function syncLicitacion() {
+    const licitacion = extractLicitacionInfo();
+    const items = extractItems();
+    
+    if (!licitacion.id_licitacion) {
+      console.log('FirmaVB: No se pudo detectar código de licitación');
+      return;
+    }
+
+    console.log('FirmaVB: Sincronizando licitación', licitacion.id_licitacion, 'con', items.length, 'items');
+
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'SYNC_LICITACION',
+        data: { licitacion, items }
+      });
+      
+      if (response?.success) {
+        console.log('FirmaVB: Licitación sincronizada exitosamente');
+      } else {
+        console.warn('FirmaVB: Error sincronizando:', response?.error);
+      }
+    } catch (error) {
+      console.error('FirmaVB: Error en sync:', error);
+    }
+  }
+
   // Inicialización
   function init() {
     const pageInfo = detectPageInfo();
@@ -401,6 +492,9 @@
     
     if (pageInfo.codigoLicitacion && (pageInfo.isCompraAgil || pageInfo.isDetalle)) {
       injectButton(pageInfo.codigoLicitacion);
+      
+      // Auto-sync licitación al detectar la página
+      setTimeout(() => syncLicitacion(), 1500);
     }
   }
 
