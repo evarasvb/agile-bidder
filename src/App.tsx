@@ -18,6 +18,7 @@ import Clientes from "./pages/Clientes";
 import ClienteOnboarding from "./pages/ClienteOnboarding";
 import ClienteDashboard from "./pages/ClienteDashboard";
 import ClienteOfertasDashboard from "./pages/ClienteOfertasDashboard";
+import ClienteRegistro from "./pages/ClienteRegistro";
 import NotFound from "./pages/NotFound";
 import OdooDashboard from "./pages/OdooDashboard";
 import ExtensionConfig from "./pages/ExtensionConfig";
@@ -45,6 +46,7 @@ const App = () => (
           
           {/* Protected cliente routes */}
           <Route path="/clientes" element={<ProtectedRoute><Clientes /></ProtectedRoute>} />
+          <Route path="/clientes/registro" element={<ProtectedRoute><ClienteRegistro /></ProtectedRoute>} />
           <Route path="/clientes/onboarding" element={<ProtectedRoute><ClienteOnboarding /></ProtectedRoute>} />
           <Route path="/clientes/dashboard" element={<ProtectedRoute><ClienteDashboard /></ProtectedRoute>} />
           <Route path="/clientes/ofertas" element={<ProtectedRoute><ClienteOfertasDashboard /></ProtectedRoute>} />
