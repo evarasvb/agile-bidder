@@ -23,6 +23,7 @@ import NotFound from "./pages/NotFound";
 import OdooDashboard from "./pages/OdooDashboard";
 import ExtensionConfig from "./pages/ExtensionConfig";
 import AdminOdoo from "./pages/AdminOdoo";
+import Calendar from "./pages/Calendar";
 
 const queryClient = new QueryClient();
 
@@ -64,6 +65,7 @@ const App = () => (
           <Route element={<LayoutWrapper />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/inventory" element={<Inventory />} />
+            <Route path="/calendar" element={<Calendar />} />
             <Route path="/history" element={<History />} />
             <Route path="/licitaciones" element={<Licitaciones />} />
             <Route path="/settings" element={<Settings />} />

@@ -8,7 +8,8 @@ import {
   Zap,
   LogOut,
   Link2,
-  Chrome
+  Chrome,
+  CalendarDays
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -18,6 +19,7 @@ import { toast } from "sonner";
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Licitaciones", url: "/licitaciones", icon: FileSearch },
+  { title: "Calendario", url: "/calendar", icon: CalendarDays },
   { title: "Inventario", url: "/inventory", icon: Package },
   { title: "Odoo CRM", url: "/odoo/dashboard", icon: Link2 },
   { title: "Extensión Chrome", url: "/extension", icon: Chrome },
