@@ -179,7 +179,7 @@ export default function Logs() {
           <span className="h-3 w-3 rounded-full bg-warning/80" />
           <span className="h-3 w-3 rounded-full bg-success/80" />
           <span className="ml-2 text-xs text-muted-foreground font-mono">
-            FirminVB Console — {filteredLogs.length} entries
+            FirmaVB Console — {filteredLogs.length} entries
           </span>
         </div>
         <div className="live-feed max-h-[500px] divide-y divide-border/20 font-mono text-sm">

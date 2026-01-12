@@ -217,7 +217,7 @@ export function OnboardingNotifications({
           size="lg"
         >
           <Rocket className="h-5 w-5" />
-          ¡Comenzar a usar FirminVB!
+          ¡Comenzar a usar FirmaVB!
         </Button>
       </div>
     </div>

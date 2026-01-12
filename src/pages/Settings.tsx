@@ -180,7 +180,7 @@ export default function Settings() {
           </div>
           <div className="space-y-2">
             <Label>Email de Contacto</Label>
-            <Input type="email" placeholder="contacto@empresa.cl" defaultValue="ventas@firminvb.cl" />
+            <Input type="email" placeholder="contacto@empresa.cl" defaultValue="ventas@firmavb.cl" />
           </div>
         </div>
       </SettingsSection>

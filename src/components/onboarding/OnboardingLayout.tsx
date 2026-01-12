@@ -49,7 +49,7 @@ export function OnboardingLayout({ children, loading = false }: OnboardingLayout
             <span className="text-primary-foreground font-bold text-sm">FV</span>
           </div>
           <div>
-            <span className="font-bold text-foreground">FirminVB</span>
+            <span className="font-bold text-foreground">FirmaVB</span>
             <p className="text-xs text-muted-foreground">Licitaciones Inteligentes</p>
           </div>
         </div>

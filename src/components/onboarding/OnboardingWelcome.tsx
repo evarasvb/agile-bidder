@@ -69,7 +69,7 @@ export function OnboardingWelcome({
           <Sparkles className="h-10 w-10 text-primary-foreground" />
         </div>
         <h1 className="text-4xl font-bold text-foreground tracking-tight">
-          ¡Bienvenido a FirminVB!
+          ¡Bienvenido a FirmaVB!
         </h1>
         <p className="text-lg text-muted-foreground max-w-md mx-auto leading-relaxed">
           Configura tus preferencias y comienza a recibir alertas de licitaciones 
