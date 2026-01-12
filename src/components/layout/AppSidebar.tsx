@@ -7,7 +7,8 @@ import {
   FileSearch,
   Zap,
   LogOut,
-  Link2
+  Link2,
+  Chrome
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,7 @@ const navItems = [
   { title: "Licitaciones", url: "/licitaciones", icon: FileSearch },
   { title: "Inventario", url: "/inventory", icon: Package },
   { title: "Odoo CRM", url: "/odoo/dashboard", icon: Link2 },
+  { title: "Extensión Chrome", url: "/extension", icon: Chrome },
   { title: "Historial", url: "/history", icon: History },
   { title: "Logs", url: "/logs", icon: FileText },
   { title: "Configuración", url: "/settings", icon: Settings },
