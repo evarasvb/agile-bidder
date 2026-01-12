@@ -1,4 +1,4 @@
-import { AlertTriangle, Building2, Clock, DollarSign, CheckCircle2, Send, Loader2, Link2, CheckCheck } from 'lucide-react';
+import { AlertTriangle, Building2, Clock, DollarSign, CheckCircle2, Send, Loader2, Link2, CheckCheck, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -6,6 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ClienteOferta } from '@/hooks/useClienteOfertas';
 import { useSendLicitacionToOdoo } from '@/hooks/useOdooIntegration';
+import { useOdooSyncErrors, useLogOdooSyncError } from '@/hooks/useOdooNotifications';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -51,8 +52,10 @@ export function OfertaCard({ oferta, onClick }: OfertaCardProps) {
   const estadoInfo = estadoConfig[oferta.estado] || estadoConfig.borrador;
   
   const sendToOdoo = useSendLicitacionToOdoo();
+  const { addError } = useOdooSyncErrors();
+  const logOdooError = useLogOdooSyncError();
   
-  const [odooSyncStatus, setOdooSyncStatus] = useState<{ synced: boolean; syncedAt?: string; odooId?: number }>({ synced: false });
+  const [odooSyncStatus, setOdooSyncStatus] = useState<{ synced: boolean; syncedAt?: string; odooId?: number; hasError?: boolean }>({ synced: false });
 
   // Check if already synced on mount
   useEffect(() => {
@@ -105,12 +108,34 @@ export function OfertaCard({ oferta, onClick }: OfertaCardProps) {
       setOdooSyncStatus({ 
         synced: true, 
         syncedAt: new Date().toISOString(),
-        odooId: result.odoo_opportunity_id
+        odooId: result.odoo_opportunity_id,
+        hasError: false
       });
       
       toast.success('Licitación enviada a Odoo exitosamente');
     } catch (error) {
-      // Error toast is handled by the hook
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      
+      // Add to local notification system
+      addError({
+        oferta_id: oferta.id,
+        licitacion_id: oferta.licitacion.id_licitacion,
+        licitacion_titulo: oferta.licitacion.titulo,
+        error_message: errorMessage,
+      });
+      
+      // Log to database for persistence
+      logOdooError.mutate({
+        ofertaId: oferta.id,
+        licitacionId: oferta.licitacion.id_licitacion,
+        licitacionTitulo: oferta.licitacion.titulo,
+        errorMessage: errorMessage,
+        clienteId: oferta.cliente_id,
+      });
+      
+      // Mark as having an error
+      setOdooSyncStatus(prev => ({ ...prev, hasError: true }));
+      
       console.error('Error sending to Odoo:', error);
     }
   };
@@ -194,6 +219,15 @@ export function OfertaCard({ oferta, onClick }: OfertaCardProps) {
                       <CheckCheck className="w-3 h-3" />
                       Sincronizado
                     </Badge>
+                  ) : odooSyncStatus.hasError ? (
+                    <Badge 
+                      variant="outline" 
+                      className="mt-1 text-xs gap-1.5 bg-red-50 border-red-300 text-red-700 cursor-pointer hover:bg-red-100"
+                      onClick={handleSendToOdoo}
+                    >
+                      <AlertCircle className="w-3 h-3" />
+                      Error - Reintentar
+                    </Badge>
                   ) : (
                     <Button
                       size="sm"
@@ -217,6 +251,8 @@ export function OfertaCard({ oferta, onClick }: OfertaCardProps) {
                       Sincronizado el {odooSyncStatus.syncedAt && format(new Date(odooSyncStatus.syncedAt), 'dd/MM/yyyy HH:mm', { locale: es })}
                       {odooSyncStatus.odooId && ` (ID: ${odooSyncStatus.odooId})`}
                     </p>
+                  ) : odooSyncStatus.hasError ? (
+                    <p>Error en sincronización. Haz clic para reintentar.</p>
                   ) : (
                     <p>Enviar esta oferta a Odoo CRM</p>
                   )}
