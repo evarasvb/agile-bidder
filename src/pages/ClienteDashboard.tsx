@@ -69,6 +69,12 @@ export default function ClienteDashboard() {
   const { data: licitaciones = [], isLoading: loadingLicitaciones } = useLicitaciones();
 
   useEffect(() => {
+    // If loading is done and there's no client record, redirect to registration
+    if (!loadingCliente && cliente === null) {
+      navigate('/clientes/registro');
+      return;
+    }
+    // If client exists but onboarding not completed, redirect to onboarding
     if (!loadingCliente && cliente && !cliente.onboarding_completado) {
       navigate('/clientes/onboarding');
     }
@@ -101,7 +107,17 @@ export default function ClienteDashboard() {
     navigate('/auth');
   };
 
-  if (loadingCliente || !cliente) {
+  // Show loading while checking
+  if (loadingCliente) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  // If no client, the useEffect will redirect - show loading in the meantime
+  if (!cliente) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
