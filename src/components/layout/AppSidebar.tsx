@@ -10,7 +10,7 @@ import {
   Link2,
   Chrome,
   CalendarDays,
-  User
+  Users
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -36,6 +36,7 @@ const navItems: NavItem[] = [
   { title: "Odoo CRM", url: "/odoo/dashboard", icon: Link2, requiresOdoo: true },
   { title: "Extensión Chrome", url: "/extension", icon: Chrome },
   { title: "Historial", url: "/history", icon: History },
+  { title: "Usuarios", url: "/users", icon: Users, adminOnly: true },
   { title: "Logs", url: "/logs", icon: FileText, adminOnly: true },
   { title: "Configuración", url: "/settings", icon: Settings },
 ];

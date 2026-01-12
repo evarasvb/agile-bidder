@@ -24,14 +24,17 @@ import OdooDashboard from "./pages/OdooDashboard";
 import ExtensionConfig from "./pages/ExtensionConfig";
 import AdminOdoo from "./pages/AdminOdoo";
 import Calendar from "./pages/Calendar";
+import Users from "./pages/Users";
 
 const queryClient = new QueryClient();
 
-// Layout wrapper that uses Outlet for nested routes
-const LayoutWrapper = () => (
-  <AppLayout>
-    <Outlet />
-  </AppLayout>
+// Layout wrapper that uses Outlet for nested routes with protection
+const ProtectedLayoutWrapper = () => (
+  <ProtectedRoute>
+    <AppLayout>
+      <Outlet />
+    </AppLayout>
+  </ProtectedRoute>
 );
 
 const App = () => (
@@ -53,16 +56,16 @@ const App = () => (
           <Route path="/clientes/ofertas" element={<ProtectedRoute><ClienteOfertasDashboard /></ProtectedRoute>} />
           
           {/* Onboarding route - standalone without AppLayout */}
-          <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
           
-          {/* Odoo Dashboard - standalone */}
-          <Route path="/odoo/dashboard" element={<OdooDashboard />} />
+          {/* Odoo Dashboard - protected */}
+          <Route path="/odoo/dashboard" element={<ProtectedRoute><OdooDashboard /></ProtectedRoute>} />
           
-          {/* Admin Routes - standalone */}
-          <Route path="/admin" element={<AdminOdoo />} />
+          {/* Admin Routes - protected */}
+          <Route path="/admin" element={<ProtectedRoute><AdminOdoo /></ProtectedRoute>} />
           
-          {/* All other routes with AppLayout using nested routing */}
-          <Route element={<LayoutWrapper />}>
+          {/* All other routes with AppLayout using nested routing - ALL PROTECTED */}
+          <Route element={<ProtectedLayoutWrapper />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/inventory" element={<Inventory />} />
             <Route path="/calendar" element={<Calendar />} />
@@ -71,6 +74,7 @@ const App = () => (
             <Route path="/settings" element={<Settings />} />
             <Route path="/extension" element={<ExtensionConfig />} />
             <Route path="/logs" element={<Logs />} />
+            <Route path="/users" element={<Users />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>
