@@ -57,10 +57,10 @@ export function useMatchingAI() {
         })
       );
 
-      // 3. Cargar inventario del cliente
+      // 3. Cargar inventario (tabla inventory que tiene los productos)
       const { data: inventario, error: invError } = await supabase
-        .from('cliente_inventario')
-        .select('id, sku, nombre, descripcion, categoria, palabras_clave, precio_unitario, stock')
+        .from('inventory')
+        .select('id, sku, nombre_producto, descripcion, categoria, keywords, precio_unitario, stock_disponible')
         .eq('activo', true);
 
       if (invError) throw invError;
@@ -75,12 +75,12 @@ export function useMatchingAI() {
           inventario: inventario.map(p => ({
             id: p.id,
             sku: p.sku,
-            nombre: p.nombre,
+            nombre: p.nombre_producto,
             descripcion: p.descripcion,
             categoria: p.categoria,
-            palabras_clave: p.palabras_clave,
+            palabras_clave: p.keywords || [],
             precio_unitario: p.precio_unitario,
-            stock: p.stock || 0
+            stock: p.stock_disponible || 0
           }))
         }
       });
