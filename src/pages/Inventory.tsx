@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Upload, Search, MoreHorizontal, Edit2, Trash2, Package, Inbox, Loader2, RefreshCw, FileJson } from "lucide-react";
+import { Plus, Upload, Search, MoreHorizontal, Edit2, Trash2, Package, Inbox, Loader2, RefreshCw, FileJson, Download, Trash, Image, FileText, CheckSquare, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useInventory, useUpdateInventoryItem, useDeleteInventoryItem, useCreateInventoryItem, InventoryItem, InventoryInput } from "@/hooks/useInventory";
@@ -24,6 +25,8 @@ import { EditProductDialog } from "@/components/inventory/EditProductDialog";
 import { DeleteProductDialog } from "@/components/inventory/DeleteProductDialog";
 import { ImportScriptDialog } from "@/components/inventory/ImportScriptDialog";
 import { AddProductDialog } from "@/components/inventory/AddProductDialog";
+import { BulkDeleteDialog } from "@/components/inventory/BulkDeleteDialog";
+import * as XLSX from 'xlsx';
 
 export default function Inventory() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -31,6 +34,8 @@ export default function Inventory() {
   const [deletingProduct, setDeletingProduct] = useState<InventoryItem | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   
   const { data: inventario = [], isLoading, refetch } = useInventory();
   const actualizarProducto = useUpdateInventoryItem();
@@ -63,11 +68,136 @@ export default function Inventory() {
     refetch();
   };
 
+  const handleBulkDelete = async () => {
+    const idsToDelete = Array.from(selectedIds);
+    for (const id of idsToDelete) {
+      await eliminarProducto.mutateAsync(id);
+    }
+    setSelectedIds(new Set());
+    setBulkDeleteOpen(false);
+    toast.success(`${idsToDelete.length} productos eliminados`);
+    refetch();
+  };
+
   const filteredInventory = inventario.filter(
     (item) =>
       item.nombre_producto.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.sku.toLowerCase().includes(searchQuery.toLowerCase())
+      item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.proveedor && item.proveedor.toLowerCase().includes(searchQuery.toLowerCase()))
   );
+
+  const toggleSelect = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredInventory.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredInventory.map(item => item.id)));
+    }
+  };
+
+  const handleExportExcel = () => {
+    if (inventario.length === 0) {
+      toast.error('No hay productos para exportar');
+      return;
+    }
+
+    const exportData = inventario.map(item => ({
+      'SKU': item.sku,
+      'Producto': item.nombre_producto,
+      'Descripción': item.descripcion || '',
+      'Categoría': item.categoria,
+      'Proveedor': item.proveedor || '',
+      'Precio Unitario': item.precio_unitario,
+      'Margen Mínimo (%)': item.margen_minimo,
+      'Margen Objetivo (%)': item.margen_objetivo,
+      'Stock': item.stock_disponible,
+      'Unidad': item.unidad_medida,
+      'Tiempo Entrega (días)': item.tiempo_entrega_dias,
+      'Keywords': item.keywords?.join(', ') || '',
+      'Activo': item.activo ? 'Sí' : 'No'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
+    
+    // Set column widths
+    ws['!cols'] = [
+      { wch: 15 }, // SKU
+      { wch: 30 }, // Producto
+      { wch: 40 }, // Descripción
+      { wch: 15 }, // Categoría
+      { wch: 20 }, // Proveedor
+      { wch: 12 }, // Precio
+      { wch: 12 }, // Margen Min
+      { wch: 12 }, // Margen Obj
+      { wch: 10 }, // Stock
+      { wch: 10 }, // Unidad
+      { wch: 15 }, // Tiempo
+      { wch: 30 }, // Keywords
+      { wch: 8 },  // Activo
+    ];
+
+    XLSX.writeFile(wb, `inventario_firmavb_${new Date().toISOString().split('T')[0]}.xlsx`);
+    toast.success('Inventario exportado a Excel');
+  };
+
+  const handleImportExcel = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+        let importedCount = 0;
+        for (const row of jsonData as any[]) {
+          const productData: InventoryInput = {
+            sku: row['SKU'] || `SKU-${Date.now()}`,
+            nombre_producto: row['Producto'] || row['Nombre'] || 'Sin nombre',
+            descripcion: row['Descripción'] || row['Descripcion'] || '',
+            categoria: row['Categoría'] || row['Categoria'] || 'General',
+            proveedor: row['Proveedor'] || '',
+            precio_unitario: Number(row['Precio Unitario'] || row['Precio'] || 0),
+            margen_minimo: Number(row['Margen Mínimo (%)'] || row['Margen'] || 10),
+            margen_objetivo: Number(row['Margen Objetivo (%)'] || 15),
+            stock_disponible: Number(row['Stock'] || 0),
+            unidad_medida: row['Unidad'] || 'unidad',
+            tiempo_entrega_dias: Number(row['Tiempo Entrega (días)'] || row['Tiempo Entrega'] || 5),
+            keywords: row['Keywords'] ? String(row['Keywords']).split(',').map(k => k.trim()) : [],
+            activo: row['Activo'] === 'Sí' || row['Activo'] === 'Si' || row['Activo'] === true
+          };
+
+          await crearProducto.mutateAsync(productData);
+          importedCount++;
+        }
+
+        toast.success(`${importedCount} productos importados correctamente`);
+        refetch();
+      } catch (error) {
+        console.error('Error importing Excel:', error);
+        toast.error('Error al importar el archivo Excel');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    
+    // Reset input
+    event.target.value = '';
+  };
 
   const getStatusBadge = (stock: number, activo: boolean | null) => {
     if (!activo) {
@@ -81,6 +211,11 @@ export default function Inventory() {
     }
     return <Badge className="bg-success/10 text-success border-0">Activo</Badge>;
   };
+
+  const totalProducts = inventario.length;
+  const activeProducts = inventario.filter(p => p.activo).length;
+  const lowStockProducts = inventario.filter(p => p.stock_disponible > 0 && p.stock_disponible < 50).length;
+  const outOfStockProducts = inventario.filter(p => p.stock_disponible === 0).length;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -102,10 +237,31 @@ export default function Inventory() {
             <RefreshCw className="h-4 w-4" />
             Actualizar
           </Button>
-          <Button variant="outline" className="gap-2">
-            <Upload className="h-4 w-4" />
-            Importar CSV
+          
+          {/* Import Excel */}
+          <div className="relative">
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleImportExcel}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+            <Button variant="outline" className="gap-2">
+              <Upload className="h-4 w-4" />
+              Importar Excel
+            </Button>
+          </div>
+          
+          {/* Export Excel */}
+          <Button 
+            variant="outline" 
+            className="gap-2"
+            onClick={handleExportExcel}
+          >
+            <Download className="h-4 w-4" />
+            Exportar Excel
           </Button>
+          
           <Button 
             variant="outline" 
             className="gap-2 border-firmavb-blue text-firmavb-blue hover:bg-firmavb-blue/10"
@@ -114,6 +270,7 @@ export default function Inventory() {
             <FileJson className="h-4 w-4" />
             Cargar desde Script
           </Button>
+          
           <Button 
             className="gap-2 bg-primary hover:bg-primary/90"
             onClick={() => setAddDialogOpen(true)}
@@ -124,12 +281,60 @@ export default function Inventory() {
         </div>
       </div>
 
+      {/* Stats Cards */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="rounded-lg border border-border bg-card p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Package className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-foreground">{totalProducts}</p>
+              <p className="text-sm text-muted-foreground">Total Productos</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-success/10">
+              <CheckSquare className="h-5 w-5 text-success" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-foreground">{activeProducts}</p>
+              <p className="text-sm text-muted-foreground">Activos</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-warning/10">
+              <Package className="h-5 w-5 text-warning" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-foreground">{lowStockProducts}</p>
+              <p className="text-sm text-muted-foreground">Stock Bajo</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-destructive/10">
+              <Inbox className="h-5 w-5 text-destructive" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-foreground">{outOfStockProducts}</p>
+              <p className="text-sm text-muted-foreground">Sin Stock</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Search and Filters */}
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nombre o SKU..."
+            placeholder="Buscar por nombre, SKU o proveedor..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -137,8 +342,20 @@ export default function Inventory() {
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Package className="h-4 w-4" />
-          <span>{filteredInventory.length} productos</span>
+          <span>{filteredInventory.length} de {totalProducts} productos</span>
         </div>
+        
+        {selectedIds.size > 0 && (
+          <Button 
+            variant="destructive" 
+            size="sm"
+            className="gap-2"
+            onClick={() => setBulkDeleteOpen(true)}
+          >
+            <Trash className="h-4 w-4" />
+            Eliminar ({selectedIds.size})
+          </Button>
+        )}
       </div>
 
       {/* Table */}
@@ -157,13 +374,21 @@ export default function Inventory() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/30 hover:bg-muted/30">
+                <TableHead className="w-[40px]">
+                  <Checkbox
+                    checked={selectedIds.size === filteredInventory.length && filteredInventory.length > 0}
+                    onCheckedChange={toggleSelectAll}
+                  />
+                </TableHead>
+                <TableHead className="font-semibold w-[60px]">Imagen</TableHead>
                 <TableHead className="font-semibold">SKU</TableHead>
                 <TableHead className="font-semibold">Producto</TableHead>
+                <TableHead className="font-semibold">Proveedor</TableHead>
                 <TableHead className="font-semibold">Categoría</TableHead>
-                <TableHead className="font-semibold">Keywords</TableHead>
                 <TableHead className="font-semibold text-right">Precio</TableHead>
-                <TableHead className="font-semibold text-right">Margen Mín.</TableHead>
+                <TableHead className="font-semibold text-right">Margen</TableHead>
                 <TableHead className="font-semibold text-right">Stock</TableHead>
+                <TableHead className="font-semibold">Ficha</TableHead>
                 <TableHead className="font-semibold">Estado</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
@@ -171,29 +396,35 @@ export default function Inventory() {
             <TableBody>
               {filteredInventory.map((item) => (
                 <TableRow key={item.id} className="data-row">
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedIds.has(item.id)}
+                      onCheckedChange={() => toggleSelect(item.id)}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
+                      <Image className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </TableCell>
                   <TableCell className="font-mono text-sm font-medium">
                     {item.sku}
                   </TableCell>
-                  <TableCell className="font-medium">{item.nombre_producto}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {item.categoria || '-'}
-                  </TableCell>
                   <TableCell>
-                    <div className="flex flex-wrap gap-1 max-w-[200px]">
-                      {item.keywords?.slice(0, 3).map((keyword) => (
-                        <span
-                          key={keyword}
-                          className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground"
-                        >
-                          {keyword}
-                        </span>
-                      ))}
-                      {item.keywords && item.keywords.length > 3 && (
-                        <span className="text-xs text-muted-foreground">
-                          +{item.keywords.length - 3}
-                        </span>
+                    <div>
+                      <p className="font-medium">{item.nombre_producto}</p>
+                      {item.descripcion && (
+                        <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                          {item.descripcion}
+                        </p>
                       )}
                     </div>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {item.proveedor || '-'}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {item.categoria || '-'}
                   </TableCell>
                   <TableCell className="text-right font-mono">
                     ${item.precio_unitario.toLocaleString("es-CL")}
@@ -207,6 +438,11 @@ export default function Inventory() {
                     item.stock_disponible > 0 && item.stock_disponible < 50 && "text-warning"
                   )}>
                     {item.stock_disponible.toLocaleString("es-CL")}
+                  </TableCell>
+                  <TableCell>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                    </Button>
                   </TableCell>
                   <TableCell>{getStatusBadge(item.stock_disponible, item.activo)}</TableCell>
                   <TableCell>
@@ -272,6 +508,15 @@ export default function Inventory() {
         onOpenChange={setAddDialogOpen}
         onSave={handleAddProduct}
         isLoading={crearProducto.isPending}
+      />
+
+      {/* Bulk Delete Dialog */}
+      <BulkDeleteDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        count={selectedIds.size}
+        onConfirm={handleBulkDelete}
+        isLoading={eliminarProducto.isPending}
       />
     </div>
   );
