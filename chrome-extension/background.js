@@ -54,6 +54,9 @@ async function handleMessage(message) {
     case 'SUBMIT_RESULT':
       return await submitResult(data);
     
+    case 'SYNC_LICITACION':
+      return await syncLicitacion(data);
+    
     default:
       throw new Error(`Unknown action: ${action}`);
   }
@@ -181,6 +184,30 @@ async function submitResult(data) {
   }
   
   throw new Error(response.error || 'Failed to submit result');
+}
+
+// Sync licitacion from MercadoPúblico page
+async function syncLicitacion(data) {
+  const { apiKey } = await chrome.storage.local.get('apiKey');
+  
+  if (!apiKey) {
+    console.log('No API key, skipping licitacion sync');
+    return { success: false, error: 'No API key configured' };
+  }
+  
+  const { licitacion, items } = data;
+  
+  console.log('Syncing licitacion:', licitacion?.id_licitacion, 'items:', items?.length);
+  
+  const response = await apiRequest(apiKey, 'sync-licitacion', { licitacion, items });
+  
+  if (response.success) {
+    console.log('Licitacion synced successfully');
+    return { success: true, message: response.message };
+  }
+  
+  console.warn('Licitacion sync failed:', response.error);
+  return { success: false, error: response.error };
 }
 
 // API Request helper

@@ -310,9 +310,121 @@ Deno.serve(async (req) => {
         );
       }
 
+      case 'sync-licitacion': {
+        // Sync licitacion and its items from MercadoPúblico (via extension scraping)
+        const body = await req.json();
+        const { licitacion, items } = body;
+
+        if (!licitacion?.id_licitacion) {
+          return new Response(
+            JSON.stringify({ error: 'id_licitacion requerido' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        console.log(`Syncing licitacion ${licitacion.id_licitacion} with ${items?.length || 0} items`);
+
+        // Upsert licitacion
+        const { error: licError } = await supabase
+          .from('licitaciones')
+          .upsert({
+            id_licitacion: licitacion.id_licitacion,
+            titulo: licitacion.titulo || `Licitación ${licitacion.id_licitacion}`,
+            organismo: licitacion.organismo || 'Organismo no especificado',
+            presupuesto: licitacion.presupuesto || null,
+            fecha_cierre: licitacion.fecha_cierre || null,
+            link_oficial: licitacion.link_oficial || null,
+            estado: licitacion.estado || 'publicada',
+            procesada: false,
+            match_encontrado: false
+          }, { onConflict: 'id_licitacion' });
+
+        if (licError) {
+          console.error('Error upserting licitacion:', licError);
+          return new Response(
+            JSON.stringify({ error: 'Error guardando licitación', details: licError.message }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Delete existing items and insert new ones
+        if (items && items.length > 0) {
+          await supabase
+            .from('licitacion_items')
+            .delete()
+            .eq('licitacion_id', licitacion.id_licitacion);
+
+          const itemsToInsert = items.map((item: any) => ({
+            licitacion_id: licitacion.id_licitacion,
+            nombre_producto: item.nombre || item.nombre_producto || 'Producto sin nombre',
+            descripcion: item.descripcion || null,
+            cantidad: parseFloat(item.cantidad) || 1,
+            unidad: item.unidad || 'UN'
+          }));
+
+          const { error: itemsError } = await supabase
+            .from('licitacion_items')
+            .insert(itemsToInsert);
+
+          if (itemsError) {
+            console.error('Error inserting items:', itemsError);
+          }
+        }
+
+        // Log activity
+        if (clienteId && apiKeyId) {
+          await logActivity(supabase, apiKeyId, clienteId, 'sync-licitacion', licitacion.id_licitacion, null, {
+            items_count: items?.length || 0,
+            titulo: licitacion.titulo
+          }, req);
+        }
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: `Licitación sincronizada con ${items?.length || 0} items`,
+            licitacion_id: licitacion.id_licitacion
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'get-licitaciones': {
+        // Get recent licitaciones for the extension to show
+        const limit = parseInt(url.searchParams.get('limit') || '20');
+        
+        const { data: licitaciones, error } = await supabase
+          .from('licitaciones')
+          .select(`
+            id_licitacion,
+            titulo,
+            organismo,
+            presupuesto,
+            fecha_cierre,
+            link_oficial,
+            estado,
+            match_encontrado,
+            match_score
+          `)
+          .order('created_at', { ascending: false })
+          .limit(limit);
+
+        if (error) {
+          return new Response(
+            JSON.stringify({ error: 'Error obteniendo licitaciones' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, licitaciones }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       default:
         return new Response(
-          JSON.stringify({ error: 'Acción no válida. Acciones: verify, get-matches, get-offer, submit-result' }),
+          JSON.stringify({ error: 'Acción no válida. Acciones: verify, get-matches, get-offer, submit-result, sync-licitacion, get-licitaciones' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
     }
