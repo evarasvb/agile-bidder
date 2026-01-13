@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Upload, Search, MoreHorizontal, Edit2, Trash2, Package, Inbox, Loader2, RefreshCw, FileJson, Download, Trash, Image, FileText, CheckSquare, Square } from "lucide-react";
+import { Plus, Upload, Search, MoreHorizontal, Edit2, Trash2, Package, Inbox, Loader2, RefreshCw, FileJson, Download, Trash, Image, FileText, CheckSquare, Square, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -26,6 +26,8 @@ import { DeleteProductDialog } from "@/components/inventory/DeleteProductDialog"
 import { ImportScriptDialog } from "@/components/inventory/ImportScriptDialog";
 import { AddProductDialog } from "@/components/inventory/AddProductDialog";
 import { BulkDeleteDialog } from "@/components/inventory/BulkDeleteDialog";
+import { BulkUploadDialog } from "@/components/inventory/BulkUploadDialog";
+import { DownloadTemplateButton } from "@/components/inventory/DownloadTemplateButton";
 import * as XLSX from 'xlsx';
 
 export default function Inventory() {
@@ -36,6 +38,7 @@ export default function Inventory() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
   
   const { data: inventario = [], isLoading, refetch } = useInventory();
   const actualizarProducto = useUpdateInventoryItem();
@@ -238,19 +241,18 @@ export default function Inventory() {
             Actualizar
           </Button>
           
-          {/* Import Excel */}
-          <div className="relative">
-            <input
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleImportExcel}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            />
-            <Button variant="outline" className="gap-2">
-              <Upload className="h-4 w-4" />
-              Importar Excel
-            </Button>
-          </div>
+          {/* Download Template */}
+          <DownloadTemplateButton />
+          
+          {/* Bulk Upload */}
+          <Button 
+            variant="default" 
+            className="gap-2 bg-primary hover:bg-primary/90"
+            onClick={() => setBulkUploadOpen(true)}
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Cargar desde Excel
+          </Button>
           
           {/* Export Excel */}
           <Button 
@@ -259,10 +261,10 @@ export default function Inventory() {
             onClick={handleExportExcel}
           >
             <Download className="h-4 w-4" />
-            Exportar Excel
+            Exportar
           </Button>
           
-          <Button 
+          <Button
             variant="outline" 
             className="gap-2 border-firmavb-blue text-firmavb-blue hover:bg-firmavb-blue/10"
             onClick={() => setImportDialogOpen(true)}
@@ -517,6 +519,13 @@ export default function Inventory() {
         count={selectedIds.size}
         onConfirm={handleBulkDelete}
         isLoading={eliminarProducto.isPending}
+      />
+
+      {/* Bulk Upload Dialog */}
+      <BulkUploadDialog
+        open={bulkUploadOpen}
+        onOpenChange={setBulkUploadOpen}
+        onSuccess={refetch}
       />
     </div>
   );
