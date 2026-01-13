@@ -1,0 +1,39 @@
+{
+  "name": "FirmaVB - Inteligencia para Licitaciones",
+  "short_name": "FirmaVB",
+  "description": "Plataforma de inteligencia comercial para ganar más licitaciones en Mercado Público Chile",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0A0F1C",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity", "finance"],
+  "lang": "es-CL",
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Ver Licitaciones",
+      "url": "/licitaciones",
+      "description": "Ver oportunidades de licitación"
+    },
+    {
+      "name": "Mi Dashboard",
+      "url": "/clientes/dashboard",
+      "description": "Ver mi panel de control"
+    }
+  ]
+}
