@@ -85,6 +85,12 @@ export default {
           "4": "hsl(var(--chart-4))",
           "5": "hsl(var(--chart-5))",
         },
+        firmavb: {
+          blue: "hsl(var(--firmavb-blue))",
+          red: "hsl(var(--firmavb-red))",
+          gray: "hsl(var(--firmavb-gray))",
+          black: "hsl(var(--firmavb-black))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

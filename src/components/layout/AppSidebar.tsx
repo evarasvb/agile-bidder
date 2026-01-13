@@ -39,6 +39,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, sectionKey: "dashboard" },
   { title: "Licitaciones", url: "/licitaciones", icon: FileSearch, sectionKey: "licitaciones" },
+  { title: "Mis Ofertas", url: "/ofertas", icon: FileText, sectionKey: "ofertas" },
   { title: "Gestión Vendedores", url: "/vendedores", icon: Users, sectionKey: "vendedores" },
   { title: "MercadoPúblico", url: "/mercadopublico", icon: Globe, sectionKey: "mercadopublico" },
   { title: "BI Dashboard", url: "/bi-dashboard", icon: BarChart3, sectionKey: "bi_dashboard" },

@@ -26,6 +26,8 @@ import BIDashboard from "./pages/BIDashboard";
 import BIAdvanced from "./pages/BIAdvanced";
 import GestionVendedores from "./pages/GestionVendedores";
 import RoleConfig from "./pages/RoleConfig";
+import Ofertas from "./pages/Ofertas";
+import OfertaDetalle from "./pages/OfertaDetalle";
 
 const queryClient = new QueryClient();
 
@@ -69,6 +71,8 @@ const App = () => (
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/history" element={<History />} />
             <Route path="/licitaciones" element={<Licitaciones />} />
+            <Route path="/ofertas" element={<Ofertas />} />
+            <Route path="/ofertas/:id" element={<OfertaDetalle />} />
             <Route path="/vendedores" element={<GestionVendedores />} />
             <Route path="/mercadopublico" element={<MercadoPublico />} />
             <Route path="/bi-dashboard" element={<BIDashboard />} />
