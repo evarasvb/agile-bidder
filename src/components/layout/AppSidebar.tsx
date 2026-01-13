@@ -13,49 +13,62 @@ import {
   Users,
   Globe,
   BarChart3,
-  Lightbulb
+  Lightbulb,
+  Shield
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useClienteConfig } from "@/hooks/useClienteConfig";
 import { useProfile } from "@/hooks/useProfile";
+import { useRolePermissions } from "@/hooks/useRolePermissions";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { useCliente } from "@/hooks/useCliente";
+import { Badge } from "@/components/ui/badge";
 
 interface NavItem {
   title: string;
   url: string;
   icon: React.ComponentType<{ className?: string }>;
+  sectionKey: string;
   requiresOdoo?: boolean;
-  adminOnly?: boolean;
 }
 
 const navItems: NavItem[] = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Licitaciones", url: "/licitaciones", icon: FileSearch },
-  { title: "Gestión Vendedores", url: "/vendedores", icon: Users },
-  { title: "MercadoPúblico", url: "/mercadopublico", icon: Globe },
-  { title: "BI Dashboard", url: "/bi-dashboard", icon: BarChart3 },
-  { title: "BI Avanzado", url: "/bi-advanced", icon: Lightbulb },
-  { title: "Calendario", url: "/calendar", icon: CalendarDays },
-  { title: "Inventario", url: "/inventory", icon: Package },
-  { title: "Odoo CRM", url: "/odoo/dashboard", icon: Link2, requiresOdoo: true },
-  { title: "Extensión Chrome", url: "/extension", icon: Chrome },
-  { title: "Historial", url: "/history", icon: History },
-  { title: "Configuración", url: "/settings", icon: Settings },
-  { title: "Usuarios", url: "/users", icon: Users, adminOnly: true },
-  { title: "Logs", url: "/logs", icon: FileText, adminOnly: true },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, sectionKey: "dashboard" },
+  { title: "Licitaciones", url: "/licitaciones", icon: FileSearch, sectionKey: "licitaciones" },
+  { title: "Gestión Vendedores", url: "/vendedores", icon: Users, sectionKey: "vendedores" },
+  { title: "MercadoPúblico", url: "/mercadopublico", icon: Globe, sectionKey: "mercadopublico" },
+  { title: "BI Dashboard", url: "/bi-dashboard", icon: BarChart3, sectionKey: "bi_dashboard" },
+  { title: "BI Avanzado", url: "/bi-advanced", icon: Lightbulb, sectionKey: "bi_advanced" },
+  { title: "Calendario", url: "/calendar", icon: CalendarDays, sectionKey: "calendar" },
+  { title: "Inventario", url: "/inventory", icon: Package, sectionKey: "inventory" },
+  { title: "Odoo CRM", url: "/odoo/dashboard", icon: Link2, sectionKey: "odoo", requiresOdoo: true },
+  { title: "Extensión Chrome", url: "/extension", icon: Chrome, sectionKey: "extension" },
+  { title: "Historial", url: "/history", icon: History, sectionKey: "history" },
+  { title: "Configuración", url: "/settings", icon: Settings, sectionKey: "settings" },
+  { title: "Usuarios", url: "/users", icon: Users, sectionKey: "users" },
+  { title: "Logs", url: "/logs", icon: FileText, sectionKey: "logs" },
+  { title: "Configurar Roles", url: "/role-config", icon: Shield, sectionKey: "role_config" },
 ];
+
+const roleLabels: Record<string, string> = {
+  super_admin: 'Super Admin',
+  admin: 'Administrador',
+  user: 'Usuario',
+  vendedor: 'Vendedor',
+  visor: 'Visor',
+};
 
 export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
   const { hasOdoo } = useClienteConfig();
-  const { profile, isAdmin } = useProfile();
+  const { profile, primaryRole } = useProfile();
+  const { canViewSection, loading: permissionsLoading } = useRolePermissions();
   const { data: cliente } = useCliente();
 
   const handleLogout = async () => {
@@ -73,13 +86,17 @@ export function AppSidebar() {
   // Filtrar items de navegación según permisos
   const filteredNavItems = navItems.filter(item => {
     if (item.requiresOdoo && !hasOdoo) return false;
-    if (item.adminOnly && !isAdmin) return false;
-    return true;
+    // Si los permisos están cargando, mostrar items básicos
+    if (permissionsLoading) return ['dashboard', 'licitaciones'].includes(item.sectionKey);
+    // Verificar si el usuario puede ver esta sección
+    return canViewSection(item.sectionKey);
   });
 
   const userInitials = profile?.full_name
     ? profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     : user?.email?.slice(0, 2).toUpperCase() || 'U';
+
+  const roleLabel = primaryRole ? roleLabels[primaryRole] : 'Usuario';
 
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
@@ -107,9 +124,9 @@ export function AppSidebar() {
             <p className="text-sm font-medium text-sidebar-foreground truncate">
               {profile?.full_name || user?.email || 'Usuario'}
             </p>
-            <p className="text-xs text-sidebar-muted truncate">
-              {isAdmin ? 'Administrador' : 'Usuario'}
-            </p>
+            <Badge variant="secondary" className="text-xs mt-0.5">
+              {roleLabel}
+            </Badge>
           </div>
           <NotificationBell clienteId={cliente?.id} />
         </div>

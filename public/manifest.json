@@ -32,7 +32,7 @@
     },
     {
       "name": "Mi Dashboard",
-      "url": "/clientes/dashboard",
+      "url": "/dashboard",
       "description": "Ver mi panel de control"
     }
   ]

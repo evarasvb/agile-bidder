@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Outlet, Navigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ChatWidget } from "@/components/support/ChatWidget";
@@ -15,11 +15,6 @@ import Settings from "./pages/Settings";
 import Logs from "./pages/Logs";
 import Licitaciones from "./pages/Licitaciones";
 import Onboarding from "./pages/Onboarding";
-import Clientes from "./pages/Clientes";
-import ClienteOnboarding from "./pages/ClienteOnboarding";
-import ClienteDashboard from "./pages/ClienteDashboard";
-import ClienteOfertasDashboard from "./pages/ClienteOfertasDashboard";
-import ClienteRegistro from "./pages/ClienteRegistro";
 import NotFound from "./pages/NotFound";
 import OdooDashboard from "./pages/OdooDashboard";
 import ExtensionConfig from "./pages/ExtensionConfig";
@@ -30,6 +25,7 @@ import MercadoPublico from "./pages/MercadoPublico";
 import BIDashboard from "./pages/BIDashboard";
 import BIAdvanced from "./pages/BIAdvanced";
 import GestionVendedores from "./pages/GestionVendedores";
+import RoleConfig from "./pages/RoleConfig";
 
 const queryClient = new QueryClient();
 
@@ -54,17 +50,13 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
           
-          {/* Protected cliente routes */}
-          <Route path="/clientes" element={<ProtectedRoute><Clientes /></ProtectedRoute>} />
-          <Route path="/clientes/registro" element={<ProtectedRoute><ClienteRegistro /></ProtectedRoute>} />
-          <Route path="/clientes/onboarding" element={<ProtectedRoute><ClienteOnboarding /></ProtectedRoute>} />
-          <Route path="/clientes/dashboard" element={<ProtectedRoute><ClienteDashboard /></ProtectedRoute>} />
-          <Route path="/clientes/ofertas" element={<ProtectedRoute><ClienteOfertasDashboard /></ProtectedRoute>} />
+          {/* Redirect old cliente routes to dashboard */}
+          <Route path="/clientes/*" element={<Navigate to="/dashboard" replace />} />
           
           {/* Onboarding route - standalone without AppLayout */}
           <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
           
-          {/* Odoo Dashboard - protected */}
+          {/* Odoo Dashboard - protected but without sidebar layout for now */}
           <Route path="/odoo/dashboard" element={<ProtectedRoute><OdooDashboard /></ProtectedRoute>} />
           
           {/* Admin Routes - protected */}
@@ -85,6 +77,7 @@ const App = () => (
             <Route path="/extension" element={<ExtensionConfig />} />
             <Route path="/logs" element={<Logs />} />
             <Route path="/users" element={<Users />} />
+            <Route path="/role-config" element={<RoleConfig />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>
