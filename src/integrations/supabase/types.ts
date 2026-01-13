@@ -417,6 +417,57 @@ export type Database = {
         }
         Relationships: []
       }
+      instituciones: {
+        Row: {
+          codigo: string | null
+          comuna: string | null
+          created_at: string
+          direccion: string | null
+          id: string
+          monto_total_compras: number | null
+          nombre: string
+          region: string | null
+          rut: string
+          sector: string | null
+          tipo: string | null
+          total_licitaciones: number | null
+          total_ordenes: number | null
+          updated_at: string
+        }
+        Insert: {
+          codigo?: string | null
+          comuna?: string | null
+          created_at?: string
+          direccion?: string | null
+          id?: string
+          monto_total_compras?: number | null
+          nombre: string
+          region?: string | null
+          rut: string
+          sector?: string | null
+          tipo?: string | null
+          total_licitaciones?: number | null
+          total_ordenes?: number | null
+          updated_at?: string
+        }
+        Update: {
+          codigo?: string | null
+          comuna?: string | null
+          created_at?: string
+          direccion?: string | null
+          id?: string
+          monto_total_compras?: number | null
+          nombre?: string
+          region?: string | null
+          rut?: string
+          sector?: string | null
+          tipo?: string | null
+          total_licitaciones?: number | null
+          total_ordenes?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       inventory: {
         Row: {
           activo: boolean
@@ -554,6 +605,190 @@ export type Database = {
         }
         Relationships: []
       }
+      licitaciones_adjudicaciones: {
+        Row: {
+          created_at: string
+          fecha_adjudicacion: string | null
+          id: string
+          licitacion_id: string
+          moneda: string | null
+          monto_adjudicado: number | null
+          proveedor_codigo: string | null
+          proveedor_nombre: string | null
+          proveedor_rut: string | null
+        }
+        Insert: {
+          created_at?: string
+          fecha_adjudicacion?: string | null
+          id?: string
+          licitacion_id: string
+          moneda?: string | null
+          monto_adjudicado?: number | null
+          proveedor_codigo?: string | null
+          proveedor_nombre?: string | null
+          proveedor_rut?: string | null
+        }
+        Update: {
+          created_at?: string
+          fecha_adjudicacion?: string | null
+          id?: string
+          licitacion_id?: string
+          moneda?: string | null
+          monto_adjudicado?: number | null
+          proveedor_codigo?: string | null
+          proveedor_nombre?: string | null
+          proveedor_rut?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "licitaciones_adjudicaciones_licitacion_id_fkey"
+            columns: ["licitacion_id"]
+            isOneToOne: false
+            referencedRelation: "licitaciones_bi"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      licitaciones_bi: {
+        Row: {
+          codigo: string
+          codigo_estado: number | null
+          codigo_tipo: number | null
+          created_at: string
+          descripcion: string | null
+          estado: string | null
+          etapas: number | null
+          fecha_adjudicacion: string | null
+          fecha_cierre: string | null
+          fecha_cierre_documentos: string | null
+          fecha_creacion: string | null
+          fecha_publicacion: string | null
+          id: string
+          institucion_codigo: string | null
+          institucion_nombre: string | null
+          institucion_rut: string | null
+          moneda: string | null
+          nombre: string
+          presupuesto_estimado: number | null
+          raw_data: Json | null
+          tiempo_evaluacion_dias: number | null
+          tipo: string | null
+          unidad_compra: string | null
+          unidad_compra_comuna: string | null
+          unidad_compra_direccion: string | null
+          unidad_compra_region: string | null
+          updated_at: string
+        }
+        Insert: {
+          codigo: string
+          codigo_estado?: number | null
+          codigo_tipo?: number | null
+          created_at?: string
+          descripcion?: string | null
+          estado?: string | null
+          etapas?: number | null
+          fecha_adjudicacion?: string | null
+          fecha_cierre?: string | null
+          fecha_cierre_documentos?: string | null
+          fecha_creacion?: string | null
+          fecha_publicacion?: string | null
+          id?: string
+          institucion_codigo?: string | null
+          institucion_nombre?: string | null
+          institucion_rut?: string | null
+          moneda?: string | null
+          nombre: string
+          presupuesto_estimado?: number | null
+          raw_data?: Json | null
+          tiempo_evaluacion_dias?: number | null
+          tipo?: string | null
+          unidad_compra?: string | null
+          unidad_compra_comuna?: string | null
+          unidad_compra_direccion?: string | null
+          unidad_compra_region?: string | null
+          updated_at?: string
+        }
+        Update: {
+          codigo?: string
+          codigo_estado?: number | null
+          codigo_tipo?: number | null
+          created_at?: string
+          descripcion?: string | null
+          estado?: string | null
+          etapas?: number | null
+          fecha_adjudicacion?: string | null
+          fecha_cierre?: string | null
+          fecha_cierre_documentos?: string | null
+          fecha_creacion?: string | null
+          fecha_publicacion?: string | null
+          id?: string
+          institucion_codigo?: string | null
+          institucion_nombre?: string | null
+          institucion_rut?: string | null
+          moneda?: string | null
+          nombre?: string
+          presupuesto_estimado?: number | null
+          raw_data?: Json | null
+          tiempo_evaluacion_dias?: number | null
+          tipo?: string | null
+          unidad_compra?: string | null
+          unidad_compra_comuna?: string | null
+          unidad_compra_direccion?: string | null
+          unidad_compra_region?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      licitaciones_bi_items: {
+        Row: {
+          cantidad: number
+          categoria: string | null
+          codigo_categoria: string | null
+          codigo_producto: string | null
+          correlativo: number | null
+          created_at: string
+          descripcion: string | null
+          id: string
+          licitacion_id: string
+          nombre_producto: string
+          unidad: string | null
+        }
+        Insert: {
+          cantidad?: number
+          categoria?: string | null
+          codigo_categoria?: string | null
+          codigo_producto?: string | null
+          correlativo?: number | null
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          licitacion_id: string
+          nombre_producto: string
+          unidad?: string | null
+        }
+        Update: {
+          cantidad?: number
+          categoria?: string | null
+          codigo_categoria?: string | null
+          codigo_producto?: string | null
+          correlativo?: number | null
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          licitacion_id?: string
+          nombre_producto?: string
+          unidad?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "licitaciones_bi_items_licitacion_id_fkey"
+            columns: ["licitacion_id"]
+            isOneToOne: false
+            referencedRelation: "licitaciones_bi"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notificaciones_log: {
         Row: {
           cliente_id: string | null
@@ -651,6 +886,155 @@ export type Database = {
           },
         ]
       }
+      ordenes_compra: {
+        Row: {
+          codigo: string
+          created_at: string
+          descripcion: string | null
+          estado: string | null
+          fecha_aceptacion: string | null
+          fecha_creacion: string | null
+          fecha_envio: string | null
+          id: string
+          institucion_codigo: string | null
+          institucion_nombre: string | null
+          institucion_rut: string | null
+          licitacion_codigo: string | null
+          moneda: string | null
+          nombre: string
+          proveedor_codigo: string | null
+          proveedor_comuna: string | null
+          proveedor_direccion: string | null
+          proveedor_nombre: string | null
+          proveedor_region: string | null
+          proveedor_rut: string | null
+          raw_data: Json | null
+          tipo: string | null
+          total: number | null
+          total_iva: number | null
+          total_neto: number | null
+          updated_at: string
+        }
+        Insert: {
+          codigo: string
+          created_at?: string
+          descripcion?: string | null
+          estado?: string | null
+          fecha_aceptacion?: string | null
+          fecha_creacion?: string | null
+          fecha_envio?: string | null
+          id?: string
+          institucion_codigo?: string | null
+          institucion_nombre?: string | null
+          institucion_rut?: string | null
+          licitacion_codigo?: string | null
+          moneda?: string | null
+          nombre: string
+          proveedor_codigo?: string | null
+          proveedor_comuna?: string | null
+          proveedor_direccion?: string | null
+          proveedor_nombre?: string | null
+          proveedor_region?: string | null
+          proveedor_rut?: string | null
+          raw_data?: Json | null
+          tipo?: string | null
+          total?: number | null
+          total_iva?: number | null
+          total_neto?: number | null
+          updated_at?: string
+        }
+        Update: {
+          codigo?: string
+          created_at?: string
+          descripcion?: string | null
+          estado?: string | null
+          fecha_aceptacion?: string | null
+          fecha_creacion?: string | null
+          fecha_envio?: string | null
+          id?: string
+          institucion_codigo?: string | null
+          institucion_nombre?: string | null
+          institucion_rut?: string | null
+          licitacion_codigo?: string | null
+          moneda?: string | null
+          nombre?: string
+          proveedor_codigo?: string | null
+          proveedor_comuna?: string | null
+          proveedor_direccion?: string | null
+          proveedor_nombre?: string | null
+          proveedor_region?: string | null
+          proveedor_rut?: string | null
+          raw_data?: Json | null
+          tipo?: string | null
+          total?: number | null
+          total_iva?: number | null
+          total_neto?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ordenes_compra_items: {
+        Row: {
+          cantidad: number
+          categoria: string | null
+          codigo_categoria: string | null
+          codigo_producto: string | null
+          correlativo: number | null
+          created_at: string
+          descripcion: string | null
+          especificacion_comprador: string | null
+          especificacion_proveedor: string | null
+          id: string
+          nombre_producto: string
+          orden_compra_id: string
+          precio_unitario_neto: number | null
+          total_neto: number | null
+          unidad: string | null
+        }
+        Insert: {
+          cantidad?: number
+          categoria?: string | null
+          codigo_categoria?: string | null
+          codigo_producto?: string | null
+          correlativo?: number | null
+          created_at?: string
+          descripcion?: string | null
+          especificacion_comprador?: string | null
+          especificacion_proveedor?: string | null
+          id?: string
+          nombre_producto: string
+          orden_compra_id: string
+          precio_unitario_neto?: number | null
+          total_neto?: number | null
+          unidad?: string | null
+        }
+        Update: {
+          cantidad?: number
+          categoria?: string | null
+          codigo_categoria?: string | null
+          codigo_producto?: string | null
+          correlativo?: number | null
+          created_at?: string
+          descripcion?: string | null
+          especificacion_comprador?: string | null
+          especificacion_proveedor?: string | null
+          id?: string
+          nombre_producto?: string
+          orden_compra_id?: string
+          precio_unitario_neto?: number | null
+          total_neto?: number | null
+          unidad?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordenes_compra_items_orden_compra_id_fkey"
+            columns: ["orden_compra_id"]
+            isOneToOne: false
+            referencedRelation: "ordenes_compra"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_images: {
         Row: {
           created_at: string
@@ -711,6 +1095,66 @@ export type Database = {
           id?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      proveedores: {
+        Row: {
+          actividad_economica: string | null
+          comuna: string | null
+          created_at: string
+          direccion: string | null
+          email: string | null
+          id: string
+          monto_total_ordenes: number | null
+          nombre: string
+          razon_social: string | null
+          region: string | null
+          rubro: string | null
+          rut: string
+          tamanio_empresa: string | null
+          telefono: string | null
+          total_ordenes: number | null
+          ultima_orden_fecha: string | null
+          updated_at: string
+        }
+        Insert: {
+          actividad_economica?: string | null
+          comuna?: string | null
+          created_at?: string
+          direccion?: string | null
+          email?: string | null
+          id?: string
+          monto_total_ordenes?: number | null
+          nombre: string
+          razon_social?: string | null
+          region?: string | null
+          rubro?: string | null
+          rut: string
+          tamanio_empresa?: string | null
+          telefono?: string | null
+          total_ordenes?: number | null
+          ultima_orden_fecha?: string | null
+          updated_at?: string
+        }
+        Update: {
+          actividad_economica?: string | null
+          comuna?: string | null
+          created_at?: string
+          direccion?: string | null
+          email?: string | null
+          id?: string
+          monto_total_ordenes?: number | null
+          nombre?: string
+          razon_social?: string | null
+          region?: string | null
+          rubro?: string | null
+          rut?: string
+          tamanio_empresa?: string | null
+          telefono?: string | null
+          total_ordenes?: number | null
+          ultima_orden_fecha?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
