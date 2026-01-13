@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { LicitacionesNuevas } from '@/components/licitaciones/LicitacionesNuevas';
 import { LicitacionesConMatch } from '@/components/licitaciones/LicitacionesConMatch';
 import { LicitacionesTable } from '@/components/licitaciones/LicitacionesTable';
+import { ResumidorBases } from '@/components/licitaciones/ResumidorBases';
 import { useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAutoMatching } from '@/hooks/useMatching';
@@ -68,9 +69,13 @@ export default function Licitaciones() {
       <Tabs defaultValue="todas" className="w-full">
         <TabsList>
           <TabsTrigger value="todas">Todas las Licitaciones</TabsTrigger>
+          <TabsTrigger value="resumidor">Resumidor IA</TabsTrigger>
         </TabsList>
         <TabsContent value="todas">
           <LicitacionesTable />
+        </TabsContent>
+        <TabsContent value="resumidor">
+          <ResumidorBases />
         </TabsContent>
       </Tabs>
     </div>

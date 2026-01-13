@@ -49,6 +49,7 @@ export function AppSidebar() {
   const { signOut, user } = useAuth();
   const { hasOdoo } = useClienteConfig();
   const { profile, isAdmin } = useProfile();
+  const { data: cliente } = useCliente();
 
   const handleLogout = async () => {
     try {
@@ -86,7 +87,7 @@ export function AppSidebar() {
         </div>
       </div>
 
-      {/* User Profile */}
+      {/* User Profile with Notification Bell */}
       <div className="px-4 py-3 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
           <Avatar className="h-9 w-9">
@@ -103,6 +104,7 @@ export function AppSidebar() {
               {isAdmin ? 'Administrador' : 'Usuario'}
             </p>
           </div>
+          <NotificationBell clienteId={cliente?.id} />
         </div>
       </div>
 
