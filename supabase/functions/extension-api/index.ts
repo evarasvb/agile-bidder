@@ -6,6 +6,212 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
+// Input validation schemas and helpers
+const MAX_STRING_LENGTH = {
+  id_licitacion: 100,
+  titulo: 500,
+  organismo: 200,
+  link_oficial: 2000,
+  estado: 50,
+  item_nombre: 500,
+  item_descripcion: 2000,
+  item_unidad: 50,
+};
+
+const VALID_ESTADOS = ['publicada', 'cerrada', 'desierta', 'adjudicada', 'en_evaluacion'];
+
+interface ValidationError {
+  field: string;
+  message: string;
+}
+
+function validateString(value: any, maxLength: number, fieldName: string, required: boolean = false): ValidationError | null {
+  if (value === null || value === undefined || value === '') {
+    if (required) {
+      return { field: fieldName, message: `${fieldName} es requerido` };
+    }
+    return null;
+  }
+  if (typeof value !== 'string') {
+    return { field: fieldName, message: `${fieldName} debe ser texto` };
+  }
+  if (value.length > maxLength) {
+    return { field: fieldName, message: `${fieldName} excede el límite de ${maxLength} caracteres` };
+  }
+  return null;
+}
+
+function validateNumber(value: any, fieldName: string, options: { min?: number; max?: number; required?: boolean } = {}): ValidationError | null {
+  if (value === null || value === undefined || value === '') {
+    if (options.required) {
+      return { field: fieldName, message: `${fieldName} es requerido` };
+    }
+    return null;
+  }
+  const num = Number(value);
+  if (isNaN(num)) {
+    return { field: fieldName, message: `${fieldName} debe ser un número válido` };
+  }
+  if (options.min !== undefined && num < options.min) {
+    return { field: fieldName, message: `${fieldName} debe ser mayor o igual a ${options.min}` };
+  }
+  if (options.max !== undefined && num > options.max) {
+    return { field: fieldName, message: `${fieldName} debe ser menor o igual a ${options.max}` };
+  }
+  return null;
+}
+
+function validateUrl(value: any, fieldName: string): ValidationError | null {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  if (typeof value !== 'string') {
+    return { field: fieldName, message: `${fieldName} debe ser texto` };
+  }
+  if (value.length > MAX_STRING_LENGTH.link_oficial) {
+    return { field: fieldName, message: `${fieldName} excede el límite de ${MAX_STRING_LENGTH.link_oficial} caracteres` };
+  }
+  try {
+    new URL(value);
+  } catch {
+    return { field: fieldName, message: `${fieldName} debe ser una URL válida` };
+  }
+  return null;
+}
+
+function validateDate(value: any, fieldName: string): ValidationError | null {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  if (typeof value !== 'string') {
+    return { field: fieldName, message: `${fieldName} debe ser texto` };
+  }
+  const date = new Date(value);
+  if (isNaN(date.getTime())) {
+    return { field: fieldName, message: `${fieldName} debe ser una fecha válida` };
+  }
+  return null;
+}
+
+interface LicitacionInput {
+  id_licitacion: string;
+  titulo?: string;
+  organismo?: string;
+  presupuesto?: number | null;
+  fecha_cierre?: string | null;
+  link_oficial?: string | null;
+  estado?: string;
+}
+
+interface ItemInput {
+  nombre?: string;
+  nombre_producto?: string;
+  descripcion?: string | null;
+  cantidad?: number;
+  unidad?: string;
+}
+
+function validateLicitacionInput(licitacion: any): { valid: boolean; errors: ValidationError[]; sanitized: LicitacionInput | null } {
+  const errors: ValidationError[] = [];
+  
+  if (!licitacion || typeof licitacion !== 'object') {
+    errors.push({ field: 'licitacion', message: 'Objeto licitacion inválido' });
+    return { valid: false, errors, sanitized: null };
+  }
+
+  // Required field
+  const idError = validateString(licitacion.id_licitacion, MAX_STRING_LENGTH.id_licitacion, 'id_licitacion', true);
+  if (idError) errors.push(idError);
+
+  // Optional fields with validation
+  const tituloError = validateString(licitacion.titulo, MAX_STRING_LENGTH.titulo, 'titulo');
+  if (tituloError) errors.push(tituloError);
+
+  const organismoError = validateString(licitacion.organismo, MAX_STRING_LENGTH.organismo, 'organismo');
+  if (organismoError) errors.push(organismoError);
+
+  const presupuestoError = validateNumber(licitacion.presupuesto, 'presupuesto', { min: 0, max: 999999999999 });
+  if (presupuestoError) errors.push(presupuestoError);
+
+  const fechaError = validateDate(licitacion.fecha_cierre, 'fecha_cierre');
+  if (fechaError) errors.push(fechaError);
+
+  const linkError = validateUrl(licitacion.link_oficial, 'link_oficial');
+  if (linkError) errors.push(linkError);
+
+  if (licitacion.estado && !VALID_ESTADOS.includes(licitacion.estado)) {
+    errors.push({ field: 'estado', message: `estado debe ser uno de: ${VALID_ESTADOS.join(', ')}` });
+  }
+
+  if (errors.length > 0) {
+    return { valid: false, errors, sanitized: null };
+  }
+
+  return {
+    valid: true,
+    errors: [],
+    sanitized: {
+      id_licitacion: String(licitacion.id_licitacion).trim().substring(0, MAX_STRING_LENGTH.id_licitacion),
+      titulo: licitacion.titulo ? String(licitacion.titulo).trim().substring(0, MAX_STRING_LENGTH.titulo) : undefined,
+      organismo: licitacion.organismo ? String(licitacion.organismo).trim().substring(0, MAX_STRING_LENGTH.organismo) : undefined,
+      presupuesto: licitacion.presupuesto !== null && licitacion.presupuesto !== undefined ? Number(licitacion.presupuesto) : null,
+      fecha_cierre: licitacion.fecha_cierre || null,
+      link_oficial: licitacion.link_oficial ? String(licitacion.link_oficial).trim().substring(0, MAX_STRING_LENGTH.link_oficial) : null,
+      estado: licitacion.estado || undefined,
+    }
+  };
+}
+
+function validateItemsInput(items: any): { valid: boolean; errors: ValidationError[]; sanitized: ItemInput[] } {
+  const errors: ValidationError[] = [];
+  const sanitized: ItemInput[] = [];
+
+  if (!items) {
+    return { valid: true, errors: [], sanitized: [] };
+  }
+
+  if (!Array.isArray(items)) {
+    errors.push({ field: 'items', message: 'items debe ser un array' });
+    return { valid: false, errors, sanitized: [] };
+  }
+
+  if (items.length > 1000) {
+    errors.push({ field: 'items', message: 'Máximo 1000 items permitidos' });
+    return { valid: false, errors, sanitized: [] };
+  }
+
+  items.forEach((item: any, index: number) => {
+    if (!item || typeof item !== 'object') {
+      errors.push({ field: `items[${index}]`, message: 'Item inválido' });
+      return;
+    }
+
+    const nombre = item.nombre || item.nombre_producto;
+    const nombreError = validateString(nombre, MAX_STRING_LENGTH.item_nombre, `items[${index}].nombre`);
+    if (nombreError) errors.push(nombreError);
+
+    const descripcionError = validateString(item.descripcion, MAX_STRING_LENGTH.item_descripcion, `items[${index}].descripcion`);
+    if (descripcionError) errors.push(descripcionError);
+
+    const cantidadError = validateNumber(item.cantidad, `items[${index}].cantidad`, { min: 0.001, max: 999999999 });
+    if (cantidadError) errors.push(cantidadError);
+
+    const unidadError = validateString(item.unidad, MAX_STRING_LENGTH.item_unidad, `items[${index}].unidad`);
+    if (unidadError) errors.push(unidadError);
+
+    if (errors.filter(e => e.field.startsWith(`items[${index}]`)).length === 0) {
+      sanitized.push({
+        nombre: nombre ? String(nombre).trim().substring(0, MAX_STRING_LENGTH.item_nombre) : undefined,
+        descripcion: item.descripcion ? String(item.descripcion).trim().substring(0, MAX_STRING_LENGTH.item_descripcion) : null,
+        cantidad: item.cantidad !== undefined ? Number(item.cantidad) : undefined,
+        unidad: item.unidad ? String(item.unidad).trim().substring(0, MAX_STRING_LENGTH.item_unidad) : undefined,
+      });
+    }
+  });
+
+  return { valid: errors.length === 0, errors, sanitized };
+}
+
 interface ApiKeyData {
   id: string;
   cliente_id: string;
@@ -319,30 +525,61 @@ Deno.serve(async (req) => {
           );
         }
 
-        // Sync licitacion and its items from MercadoPúblico (via extension scraping)
-        const body = await req.json();
-        const { licitacion, items } = body;
-
-        if (!licitacion?.id_licitacion) {
+        // Parse and validate input
+        let body: any;
+        try {
+          body = await req.json();
+        } catch (parseError) {
           return new Response(
-            JSON.stringify({ error: 'id_licitacion requerido' }),
+            JSON.stringify({ error: 'JSON inválido en el cuerpo de la solicitud' }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
 
-        console.log(`Syncing licitacion ${licitacion.id_licitacion} with ${items?.length || 0} items`);
+        const { licitacion, items } = body;
 
-        // Upsert licitacion
+        // Validate licitacion input
+        const licitacionValidation = validateLicitacionInput(licitacion);
+        if (!licitacionValidation.valid) {
+          console.log('Licitacion validation errors:', licitacionValidation.errors);
+          return new Response(
+            JSON.stringify({ 
+              error: 'Datos de licitación inválidos', 
+              validation_errors: licitacionValidation.errors 
+            }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Validate items input
+        const itemsValidation = validateItemsInput(items);
+        if (!itemsValidation.valid) {
+          console.log('Items validation errors:', itemsValidation.errors);
+          return new Response(
+            JSON.stringify({ 
+              error: 'Datos de items inválidos', 
+              validation_errors: itemsValidation.errors 
+            }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const sanitizedLicitacion = licitacionValidation.sanitized!;
+        const sanitizedItems = itemsValidation.sanitized;
+
+        console.log(`Syncing licitacion ${sanitizedLicitacion.id_licitacion} with ${sanitizedItems.length} items`);
+
+        // Upsert licitacion with sanitized data
         const { error: licError } = await supabase
           .from('licitaciones')
           .upsert({
-            id_licitacion: licitacion.id_licitacion,
-            titulo: licitacion.titulo || `Licitación ${licitacion.id_licitacion}`,
-            organismo: licitacion.organismo || 'Organismo no especificado',
-            presupuesto: licitacion.presupuesto || null,
-            fecha_cierre: licitacion.fecha_cierre || null,
-            link_oficial: licitacion.link_oficial || null,
-            estado: licitacion.estado || 'publicada',
+            id_licitacion: sanitizedLicitacion.id_licitacion,
+            titulo: sanitizedLicitacion.titulo || `Licitación ${sanitizedLicitacion.id_licitacion}`,
+            organismo: sanitizedLicitacion.organismo || 'Organismo no especificado',
+            presupuesto: sanitizedLicitacion.presupuesto,
+            fecha_cierre: sanitizedLicitacion.fecha_cierre,
+            link_oficial: sanitizedLicitacion.link_oficial,
+            estado: sanitizedLicitacion.estado || 'publicada',
             procesada: false,
             match_encontrado: false
           }, { onConflict: 'id_licitacion' });
@@ -356,17 +593,17 @@ Deno.serve(async (req) => {
         }
 
         // Delete existing items and insert new ones
-        if (items && items.length > 0) {
+        if (sanitizedItems.length > 0) {
           await supabase
             .from('licitacion_items')
             .delete()
-            .eq('licitacion_id', licitacion.id_licitacion);
+            .eq('licitacion_id', sanitizedLicitacion.id_licitacion);
 
-          const itemsToInsert = items.map((item: any) => ({
-            licitacion_id: licitacion.id_licitacion,
-            nombre_producto: item.nombre || item.nombre_producto || 'Producto sin nombre',
+          const itemsToInsert = sanitizedItems.map((item) => ({
+            licitacion_id: sanitizedLicitacion.id_licitacion,
+            nombre_producto: item.nombre || 'Producto sin nombre',
             descripcion: item.descripcion || null,
-            cantidad: parseFloat(item.cantidad) || 1,
+            cantidad: item.cantidad !== undefined ? item.cantidad : 1,
             unidad: item.unidad || 'UN'
           }));
 
@@ -381,17 +618,17 @@ Deno.serve(async (req) => {
 
         // Log activity
         if (clienteId && apiKeyId) {
-          await logActivity(supabase, apiKeyId, clienteId, 'sync-licitacion', licitacion.id_licitacion, null, {
-            items_count: items?.length || 0,
-            titulo: licitacion.titulo
+          await logActivity(supabase, apiKeyId, clienteId, 'sync-licitacion', sanitizedLicitacion.id_licitacion, null, {
+            items_count: sanitizedItems.length,
+            titulo: sanitizedLicitacion.titulo
           }, req);
         }
 
         return new Response(
           JSON.stringify({ 
             success: true, 
-            message: `Licitación sincronizada con ${items?.length || 0} items`,
-            licitacion_id: licitacion.id_licitacion
+            message: `Licitación sincronizada con ${sanitizedItems.length} items`,
+            licitacion_id: sanitizedLicitacion.id_licitacion
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
