@@ -1163,6 +1163,7 @@ export type Database = {
       }
       role_permissions: {
         Row: {
+          can_delete: boolean | null
           can_edit: boolean | null
           can_view: boolean | null
           created_at: string | null
@@ -1173,6 +1174,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          can_delete?: boolean | null
           can_edit?: boolean | null
           can_view?: boolean | null
           created_at?: string | null
@@ -1183,6 +1185,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          can_delete?: boolean | null
           can_edit?: boolean | null
           can_view?: boolean | null
           created_at?: string | null

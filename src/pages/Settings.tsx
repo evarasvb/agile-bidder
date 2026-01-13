@@ -15,7 +15,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import NotificacionesSettings from "@/components/settings/NotificacionesSettings";
+import PermisosRolConfig from "@/components/settings/PermisosRolConfig";
 import { getClienteId } from "@/hooks/useCliente";
 import { Link } from "react-router-dom";
 import { 
@@ -29,6 +31,7 @@ import {
   UserSettings
 } from "@/hooks/useUserSettings";
 import { useAuth } from "@/hooks/useAuth";
+import { useRolePermissions } from "@/hooks/useRolePermissions";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const regions = [
@@ -53,8 +56,10 @@ const regions = [
 export default function Settings() {
   const clienteId = getClienteId();
   const { user } = useAuth();
+  const { isSuperAdmin } = useRolePermissions();
   const { data: savedSettings, isLoading: isLoadingSettings, error: settingsError } = useUserSettings();
   const saveSettingsMutation = useSaveUserSettings();
+  const [activeTab, setActiveTab] = useState("general");
   
   const [settings, setSettings] = useState<Omit<UserSettings, 'id' | 'user_id'>>({
     ...DEFAULT_SETTINGS,
@@ -169,7 +174,7 @@ export default function Settings() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-4xl">
+    <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -178,291 +183,319 @@ export default function Settings() {
             Ajusta los parámetros globales del sistema
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Link to="/admin">
-            <Button variant="outline" className="gap-2">
-              <SettingsIcon className="h-4 w-4" />
-              Configurar Odoo
+        {activeTab === 'general' && (
+          <div className="flex items-center gap-3">
+            <Link to="/admin">
+              <Button variant="outline" className="gap-2">
+                <SettingsIcon className="h-4 w-4" />
+                Configurar Odoo
+              </Button>
+            </Link>
+            <Button 
+              className="gap-2 bg-primary hover:bg-primary/90"
+              onClick={handleSaveAllChanges}
+              disabled={saveSettingsMutation.isPending || !hasChanges}
+            >
+              {saveSettingsMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              Guardar Cambios
+              {hasChanges && <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">•</Badge>}
             </Button>
-          </Link>
-          <Button 
-            className="gap-2 bg-primary hover:bg-primary/90"
-            onClick={handleSaveAllChanges}
-            disabled={saveSettingsMutation.isPending || !hasChanges}
-          >
-            {saveSettingsMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-            Guardar Cambios
-            {hasChanges && <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">•</Badge>}
-          </Button>
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* Notificaciones Section */}
-      <SettingsSection
-        icon={Bell}
-        title="Notificaciones"
-        description="Configura tus preferencias de alertas por email"
-      >
-        <NotificacionesSettings clienteId={clienteId} />
-      </SettingsSection>
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="general" className="gap-2">
+            <SettingsIcon className="h-4 w-4" />
+            General
+          </TabsTrigger>
+          {isSuperAdmin && (
+            <TabsTrigger value="permisos" className="gap-2">
+              <Shield className="h-4 w-4" />
+              Permisos por Rol
+            </TabsTrigger>
+          )}
+        </TabsList>
 
-      {/* API Key Section */}
-      <SettingsSection
-        icon={Key}
-        title="Conexión Mercado Público"
-        description="Configura tu API Key para enviar ofertas automáticamente"
-      >
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 mb-4">
-          <Badge 
-              variant={settings.api_key_connected ? "default" : "secondary"}
-              className={settings.api_key_connected ? "bg-success hover:bg-success" : ""}
-            >
-              {settings.api_key_connected ? (
-                <>
-                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                  Conectado
-                </>
-              ) : (
-                "No conectado"
-              )}
-            </Badge>
-          </div>
-          <div className="space-y-2">
-            <Label>API Key de Mercado Público</Label>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Input 
-                  type={showApiKey ? "text" : "password"}
-                  placeholder="Ingresa tu API Key..."
-                  value={settings.api_key_encrypted || ''}
-                  onChange={(e) => {
-                    setSettings(prev => ({ ...prev, api_key_encrypted: e.target.value }));
-                    setHasChanges(true);
-                  }}
-                  className="pr-10 font-mono"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-                  onClick={() => setShowApiKey(!showApiKey)}
+        {/* Tab: General Settings */}
+        <TabsContent value="general" className="mt-6 max-w-4xl space-y-6">
+          {/* Notificaciones Section */}
+          <SettingsSection
+            icon={Bell}
+            title="Notificaciones"
+            description="Configura tus preferencias de alertas por email"
+          >
+            <NotificacionesSettings clienteId={clienteId} />
+          </SettingsSection>
+
+          {/* API Key Section */}
+          <SettingsSection
+            icon={Key}
+            title="Conexión Mercado Público"
+            description="Configura tu API Key para enviar ofertas automáticamente"
+          >
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-4">
+              <Badge 
+                  variant={settings.api_key_connected ? "default" : "secondary"}
+                  className={settings.api_key_connected ? "bg-success hover:bg-success" : ""}
                 >
-                  {showApiKey ? (
-                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  {settings.api_key_connected ? (
+                    <>
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      Conectado
+                    </>
                   ) : (
-                    <Eye className="h-4 w-4 text-muted-foreground" />
+                    "No conectado"
                   )}
-                </Button>
+                </Badge>
               </div>
-              <Button onClick={handleSaveApiKey}>
-                Guardar
-              </Button>
+              <div className="space-y-2">
+                <Label>API Key de Mercado Público</Label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Input 
+                      type={showApiKey ? "text" : "password"}
+                      placeholder="Ingresa tu API Key..."
+                      value={settings.api_key_encrypted || ''}
+                      onChange={(e) => {
+                        setSettings(prev => ({ ...prev, api_key_encrypted: e.target.value }));
+                        setHasChanges(true);
+                      }}
+                      className="pr-10 font-mono"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                      onClick={() => setShowApiKey(!showApiKey)}
+                    >
+                      {showApiKey ? (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </div>
+                  <Button onClick={handleSaveApiKey}>
+                    Guardar
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Obtén tu API Key en{" "}
+                  <a 
+                    href="https://www.mercadopublico.cl" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    Mercado Público
+                  </a>
+                  {" "}→ Mi Cuenta → Integraciones
+                </p>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Obtén tu API Key en{" "}
-              <a 
-                href="https://www.mercadopublico.cl" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                Mercado Público
-              </a>
-              {" "}→ Mi Cuenta → Integraciones
-            </p>
-          </div>
-        </div>
-      </SettingsSection>
+          </SettingsSection>
 
-      {/* Company Info */}
-      <SettingsSection
-        icon={Building2}
-        title="Información de Empresa"
-        description="Datos de tu empresa para la licitación"
-      >
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>RUT Empresa</Label>
-            <Input 
-              placeholder="76.XXX.XXX-X" 
-              value={settings.company_settings.rut}
-              onChange={(e) => updateCompany('rut', e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Razón Social</Label>
-            <Input 
-              placeholder="Empresa SpA" 
-              value={settings.company_settings.razonSocial}
-              onChange={(e) => updateCompany('razonSocial', e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Código Organismo (Mercado Público)</Label>
-            <Input 
-              placeholder="XXXXXX" 
-              value={settings.company_settings.codigoOrganismo}
-              onChange={(e) => updateCompany('codigoOrganismo', e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Email de Contacto</Label>
-            <Input 
-              type="email" 
-              placeholder="contacto@empresa.cl" 
-              value={settings.company_settings.emailContacto}
-              onChange={(e) => updateCompany('emailContacto', e.target.value)}
-            />
-          </div>
-        </div>
-      </SettingsSection>
+          {/* Company Info */}
+          <SettingsSection
+            icon={Building2}
+            title="Información de Empresa"
+            description="Datos de tu empresa para la licitación"
+          >
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>RUT Empresa</Label>
+                <Input 
+                  placeholder="76.XXX.XXX-X" 
+                  value={settings.company_settings.rut}
+                  onChange={(e) => updateCompany('rut', e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Razón Social</Label>
+                <Input 
+                  placeholder="Empresa SpA" 
+                  value={settings.company_settings.razonSocial}
+                  onChange={(e) => updateCompany('razonSocial', e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Código Organismo (Mercado Público)</Label>
+                <Input 
+                  placeholder="XXXXXX" 
+                  value={settings.company_settings.codigoOrganismo}
+                  onChange={(e) => updateCompany('codigoOrganismo', e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Email de Contacto</Label>
+                <Input 
+                  type="email" 
+                  placeholder="contacto@empresa.cl" 
+                  value={settings.company_settings.emailContacto}
+                  onChange={(e) => updateCompany('emailContacto', e.target.value)}
+                />
+              </div>
+            </div>
+          </SettingsSection>
 
-      {/* Bidding Parameters */}
-      <SettingsSection
-        icon={DollarSign}
-        title="Parámetros de Oferta"
-        description="Límites y reglas para las ofertas automáticas"
-      >
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Monto Máximo por Oferta</Label>
-            <div className="flex items-center gap-2">
-              <Input 
-                type="number" 
-                placeholder="30" 
-                value={settings.bidding_settings.montoMaximoUTM}
-                onChange={(e) => updateBidding('montoMaximoUTM', Number(e.target.value))}
-                className="font-mono"
-              />
-              <span className="text-sm text-muted-foreground whitespace-nowrap">UTM</span>
+          {/* Bidding Parameters */}
+          <SettingsSection
+            icon={DollarSign}
+            title="Parámetros de Oferta"
+            description="Límites y reglas para las ofertas automáticas"
+          >
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Monto Máximo por Oferta</Label>
+                <div className="flex items-center gap-2">
+                  <Input 
+                    type="number" 
+                    placeholder="30" 
+                    value={settings.bidding_settings.montoMaximoUTM}
+                    onChange={(e) => updateBidding('montoMaximoUTM', Number(e.target.value))}
+                    className="font-mono"
+                  />
+                  <span className="text-sm text-muted-foreground whitespace-nowrap">UTM</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Solo participar en Compra Ágil (máx. 30 UTM)
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>Margen Mínimo Global</Label>
+                <div className="flex items-center gap-2">
+                  <Input 
+                    type="number" 
+                    placeholder="10" 
+                    value={settings.bidding_settings.margenMinimoGlobal}
+                    onChange={(e) => updateBidding('margenMinimoGlobal', Number(e.target.value))}
+                    className="font-mono"
+                  />
+                  <span className="text-sm text-muted-foreground">%</span>
+                </div>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Solo participar en Compra Ágil (máx. 30 UTM)
-            </p>
-          </div>
-          <div className="space-y-2">
-            <Label>Margen Mínimo Global</Label>
-            <div className="flex items-center gap-2">
-              <Input 
-                type="number" 
-                placeholder="10" 
-                value={settings.bidding_settings.margenMinimoGlobal}
-                onChange={(e) => updateBidding('margenMinimoGlobal', Number(e.target.value))}
-                className="font-mono"
-              />
-              <span className="text-sm text-muted-foreground">%</span>
-            </div>
-          </div>
-        </div>
-      </SettingsSection>
+          </SettingsSection>
 
-      {/* Delivery */}
-      <SettingsSection
-        icon={Clock}
-        title="Tiempo de Entrega"
-        description="Promesa de entrega para las ofertas"
-      >
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Plazo de Entrega</Label>
-            <Select 
-              value={settings.delivery_settings.plazoEntrega}
-              onValueChange={(value) => updateDelivery('plazoEntrega', value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar plazo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="12">12 horas</SelectItem>
-                <SelectItem value="24">24 horas</SelectItem>
-                <SelectItem value="48">48 horas</SelectItem>
-                <SelectItem value="72">72 horas</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Tipo de Despacho</Label>
-            <Select 
-              value={settings.delivery_settings.tipoDespacho}
-              onValueChange={(value) => updateDelivery('tipoDespacho', value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="delivery">Despacho a Domicilio</SelectItem>
-                <SelectItem value="pickup">Retiro en Bodega</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </SettingsSection>
+          {/* Delivery */}
+          <SettingsSection
+            icon={Clock}
+            title="Tiempo de Entrega"
+            description="Promesa de entrega para las ofertas"
+          >
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Plazo de Entrega</Label>
+                <Select 
+                  value={settings.delivery_settings.plazoEntrega}
+                  onValueChange={(value) => updateDelivery('plazoEntrega', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar plazo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="12">12 horas</SelectItem>
+                    <SelectItem value="24">24 horas</SelectItem>
+                    <SelectItem value="48">48 horas</SelectItem>
+                    <SelectItem value="72">72 horas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Tipo de Despacho</Label>
+                <Select 
+                  value={settings.delivery_settings.tipoDespacho}
+                  onValueChange={(value) => updateDelivery('tipoDespacho', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="delivery">Despacho a Domicilio</SelectItem>
+                    <SelectItem value="pickup">Retiro en Bodega</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </SettingsSection>
 
-      {/* Regions */}
-      <SettingsSection
-        icon={MapPin}
-        title="Cobertura Regional"
-        description="Regiones donde puedes despachar"
-      >
-        <div className="grid grid-cols-4 gap-3">
-          {regions.map((region) => (
-            <div key={region} className="flex items-center space-x-2">
-              <Checkbox
-                id={region}
-                checked={settings.regions.includes(region)}
-                onCheckedChange={() => toggleRegion(region)}
-              />
-              <label
-                htmlFor={region}
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-              >
-                {region}
-              </label>
+          {/* Regions */}
+          <SettingsSection
+            icon={MapPin}
+            title="Cobertura Regional"
+            description="Regiones donde puedes despachar"
+          >
+            <div className="grid grid-cols-4 gap-3">
+              {regions.map((region) => (
+                <div key={region} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={region}
+                    checked={settings.regions.includes(region)}
+                    onCheckedChange={() => toggleRegion(region)}
+                  />
+                  <label
+                    htmlFor={region}
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    {region}
+                  </label>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </SettingsSection>
+          </SettingsSection>
 
-      {/* Automation */}
-      <SettingsSection
-        icon={Shield}
-        title="Automatización"
-        description="Controla el comportamiento automático del sistema"
-      >
-        <div className="space-y-4">
-          <div className="flex items-center justify-between rounded-lg border border-border p-4">
-            <div className="space-y-0.5">
-              <p className="text-sm font-medium">Auto-Matching</p>
-              <p className="text-xs text-muted-foreground">
-                Buscar coincidencias automáticamente cuando se detecten nuevas oportunidades
-              </p>
+          {/* Automation */}
+          <SettingsSection
+            icon={Shield}
+            title="Automatización"
+            description="Controla el comportamiento automático del sistema"
+          >
+            <div className="space-y-4">
+              <div className="flex items-center justify-between rounded-lg border border-border p-4">
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium">Auto-Matching</p>
+                  <p className="text-xs text-muted-foreground">
+                    Buscar coincidencias automáticamente cuando se detecten nuevas oportunidades
+                  </p>
+                </div>
+                <Switch 
+                  checked={settings.automation_settings.autoMatch} 
+                  onCheckedChange={(checked) => updateAutomation('autoMatch', checked)} 
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-border p-4">
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium">Auto-Bid (Ofertas Automáticas)</p>
+                  <p className="text-xs text-muted-foreground">
+                    Enviar ofertas automáticamente cuando el match supere el 90% de confianza
+                  </p>
+                </div>
+                <Switch 
+                  checked={settings.automation_settings.autoBid} 
+                  onCheckedChange={(checked) => updateAutomation('autoBid', checked)}
+                  className="data-[state=checked]:bg-success"
+                />
+              </div>
             </div>
-            <Switch 
-              checked={settings.automation_settings.autoMatch} 
-              onCheckedChange={(checked) => updateAutomation('autoMatch', checked)} 
-            />
-          </div>
-          <div className="flex items-center justify-between rounded-lg border border-border p-4">
-            <div className="space-y-0.5">
-              <p className="text-sm font-medium">Auto-Bid (Ofertas Automáticas)</p>
-              <p className="text-xs text-muted-foreground">
-                Enviar ofertas automáticamente cuando el match supere el 90% de confianza
-              </p>
-            </div>
-            <Switch 
-              checked={settings.automation_settings.autoBid} 
-              onCheckedChange={(checked) => updateAutomation('autoBid', checked)}
-              className="data-[state=checked]:bg-success"
-            />
-          </div>
-        </div>
-      </SettingsSection>
+          </SettingsSection>
+        </TabsContent>
+
+        {/* Tab: Permisos por Rol (Solo Super Admin) */}
+        {isSuperAdmin && (
+          <TabsContent value="permisos" className="mt-6">
+            <PermisosRolConfig />
+          </TabsContent>
+        )}
+      </Tabs>
     </div>
   );
 }
