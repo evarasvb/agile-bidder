@@ -28,6 +28,7 @@ import Calendar from "./pages/Calendar";
 import Users from "./pages/Users";
 import MercadoPublico from "./pages/MercadoPublico";
 import BIDashboard from "./pages/BIDashboard";
+import BIAdvanced from "./pages/BIAdvanced";
 
 const queryClient = new QueryClient();
 
@@ -77,6 +78,7 @@ const App = () => (
             <Route path="/licitaciones" element={<Licitaciones />} />
             <Route path="/mercadopublico" element={<MercadoPublico />} />
             <Route path="/bi-dashboard" element={<BIDashboard />} />
+            <Route path="/bi-advanced" element={<BIAdvanced />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/extension" element={<ExtensionConfig />} />
             <Route path="/logs" element={<Logs />} />
