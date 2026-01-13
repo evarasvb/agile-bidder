@@ -16,6 +16,7 @@ export interface InventoryItem {
   tiempo_entrega_dias: number;
   proveedor: string | null;
   activo: boolean;
+  imagen_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -34,6 +35,7 @@ export interface InventoryInput {
   tiempo_entrega_dias?: number;
   proveedor?: string;
   activo?: boolean;
+  imagen_url?: string;
 }
 
 export function useInventory() {

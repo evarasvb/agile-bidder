@@ -406,7 +406,18 @@ export default function Inventory() {
                   </TableCell>
                   <TableCell>
                     <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
-                      <Image className="h-5 w-5 text-muted-foreground" />
+                      {item.imagen_url ? (
+                        <img 
+                          src={item.imagen_url} 
+                          alt={item.nombre_producto}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                      ) : null}
+                      <Image className={cn("h-5 w-5 text-muted-foreground", item.imagen_url && "hidden")} />
                     </div>
                   </TableCell>
                   <TableCell className="font-mono text-sm font-medium">

@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2, X, FileUp } from 'lucide-react';
+import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2, X, FileUp, ImageIcon } from 'lucide-react';
 import { useClienteInventarioBulk, BulkProductRow, ValidationError } from '@/hooks/useClienteInventarioBulk';
+import { validateImageUrl } from '@/hooks/useProductImageUpload';
 import * as XLSX from 'xlsx';
 import { cn } from '@/lib/utils';
 
@@ -91,6 +92,13 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
         if (!row.nombre || row.nombre.trim() === '') {
           errors.push(`Fila ${rowNum}: Nombre del Producto es obligatorio`);
         }
+        
+        // Validate image URL
+        if (row.imagen_url && row.imagen_url.trim() !== '') {
+          if (!validateImageUrl(row.imagen_url)) {
+            errors.push(`Fila ${rowNum}: URL de imagen inválida (debe ser https://)`);
+          }
+        }
       });
 
       setParseErrors(errors);
@@ -152,6 +160,10 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
 
   const validRows = previewData?.rows.filter(row => 
     row.sku && row.sku.trim() !== '' && row.nombre && row.nombre.trim() !== ''
+  ).length || 0;
+  
+  const rowsWithImages = previewData?.rows.filter(row => 
+    row.imagen_url && row.imagen_url.trim() !== '' && validateImageUrl(row.imagen_url)
   ).length || 0;
 
   return (
@@ -237,6 +249,11 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
                     <p className="font-medium">{previewData.fileName}</p>
                     <p className="text-sm text-muted-foreground">
                       {previewData.totalRows} productos encontrados
+                      {rowsWithImages > 0 && (
+                        <span className="text-primary ml-2">
+                          ({rowsWithImages} con imagen)
+                        </span>
+                      )}
                       {parseErrors.length > 0 && (
                         <span className="text-destructive ml-2">
                           ({parseErrors.length} con errores)
@@ -284,6 +301,7 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
                   <TableHeader>
                     <TableRow className="bg-muted/30">
                       <TableHead className="w-[60px]">#</TableHead>
+                      <TableHead className="w-[50px]">Img</TableHead>
                       <TableHead>SKU</TableHead>
                       <TableHead>Nombre</TableHead>
                       <TableHead>Categoría</TableHead>
@@ -294,9 +312,28 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
                   <TableBody>
                     {previewData.rows.slice(0, 10).map((row, index) => {
                       const hasError = !row.sku || !row.nombre;
+                      const hasValidImage = row.imagen_url && validateImageUrl(row.imagen_url);
                       return (
                         <TableRow key={index} className={hasError ? 'bg-destructive/5' : ''}>
                           <TableCell className="text-muted-foreground">{index + 1}</TableCell>
+                          <TableCell>
+                            {hasValidImage ? (
+                              <div className="w-8 h-8 rounded overflow-hidden bg-muted">
+                                <img 
+                                  src={row.imagen_url} 
+                                  alt="" 
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                  }}
+                                />
+                              </div>
+                            ) : (
+                              <div className="w-8 h-8 rounded bg-muted flex items-center justify-center">
+                                <ImageIcon className="h-4 w-4 text-muted-foreground/50" />
+                              </div>
+                            )}
+                          </TableCell>
                           <TableCell className={cn("font-mono", !row.sku && "text-destructive")}>
                             {row.sku || '⚠️ Vacío'}
                           </TableCell>
@@ -315,7 +352,7 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
                     })}
                     {previewData.totalRows > 10 && (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center text-muted-foreground py-4">
+                        <TableCell colSpan={7} className="text-center text-muted-foreground py-4">
                           ... y {previewData.totalRows - 10} productos más
                         </TableCell>
                       </TableRow>
@@ -326,11 +363,17 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
 
               {/* Summary */}
               <div className="flex items-center justify-between pt-2 border-t">
-                <div className="flex items-center gap-2 text-sm">
-                  <CheckCircle2 className="h-4 w-4 text-success" />
-                  <span>
-                    <strong>{validRows}</strong> productos listos para importar
-                  </span>
+                <div className="flex items-center gap-4 text-sm">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-success" />
+                    <span><strong>{validRows}</strong> productos listos</span>
+                  </div>
+                  {rowsWithImages > 0 && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <ImageIcon className="h-4 w-4" />
+                      <span>{rowsWithImages} con imagen</span>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex gap-2">

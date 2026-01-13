@@ -382,6 +382,7 @@ export type Database = {
           created_at: string
           descripcion: string | null
           id: string
+          imagen_url: string | null
           keywords: string[] | null
           margen_minimo: number
           margen_objetivo: number
@@ -400,6 +401,7 @@ export type Database = {
           created_at?: string
           descripcion?: string | null
           id?: string
+          imagen_url?: string | null
           keywords?: string[] | null
           margen_minimo?: number
           margen_objetivo?: number
@@ -418,6 +420,7 @@ export type Database = {
           created_at?: string
           descripcion?: string | null
           id?: string
+          imagen_url?: string | null
           keywords?: string[] | null
           margen_minimo?: number
           margen_objetivo?: number

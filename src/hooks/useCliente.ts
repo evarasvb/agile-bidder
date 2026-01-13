@@ -36,6 +36,7 @@ export interface ClienteInventario {
   tiempo_entrega_dias: number;
   palabras_clave?: string[];
   activo: boolean;
+  imagen_url?: string;
   created_at: string;
   updated_at: string;
 }
