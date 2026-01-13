@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Upload, Search, MoreHorizontal, Edit2, Trash2, Package, Inbox, Loader2, RefreshCw, FileJson, Download, Trash, Image, FileText, CheckSquare, Square, FileSpreadsheet } from "lucide-react";
+import { Plus, Upload, Search, MoreHorizontal, Edit2, Trash2, Package, Inbox, Loader2, RefreshCw, FileJson, Download, Trash, Image, FileText, CheckSquare, Square, FileSpreadsheet, Images } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -28,9 +28,12 @@ import { AddProductDialog } from "@/components/inventory/AddProductDialog";
 import { BulkDeleteDialog } from "@/components/inventory/BulkDeleteDialog";
 import { BulkUploadDialog } from "@/components/inventory/BulkUploadDialog";
 import { DownloadTemplateButton } from "@/components/inventory/DownloadTemplateButton";
+import { ProductGallery } from "@/components/inventory/ProductGallery";
+import { useAuthUser } from "@/hooks/useCliente";
 import * as XLSX from 'xlsx';
 
 export default function Inventory() {
+  const { user } = useAuthUser();
   const [searchQuery, setSearchQuery] = useState("");
   const [editingProduct, setEditingProduct] = useState<InventoryItem | null>(null);
   const [deletingProduct, setDeletingProduct] = useState<InventoryItem | null>(null);
@@ -39,6 +42,7 @@ export default function Inventory() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
+  const [galleryProduct, setGalleryProduct] = useState<InventoryItem | null>(null);
   
   const { data: inventario = [], isLoading, refetch } = useInventory();
   const actualizarProducto = useUpdateInventoryItem();
@@ -405,7 +409,10 @@ export default function Inventory() {
                     />
                   </TableCell>
                   <TableCell>
-                    <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
+                    <button 
+                      onClick={() => setGalleryProduct(item)}
+                      className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden relative group hover:ring-2 hover:ring-primary/50 transition-all"
+                    >
                       {item.imagen_url ? (
                         <img 
                           src={item.imagen_url} 
@@ -417,8 +424,11 @@ export default function Inventory() {
                           }}
                         />
                       ) : null}
-                      <Image className={cn("h-5 w-5 text-muted-foreground", item.imagen_url && "hidden")} />
-                    </div>
+                      <Images className={cn("h-5 w-5 text-muted-foreground", item.imagen_url && "hidden")} />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Images className="h-4 w-4 text-white" />
+                      </div>
+                    </button>
                   </TableCell>
                   <TableCell className="font-mono text-sm font-medium">
                     {item.sku}
@@ -538,6 +548,18 @@ export default function Inventory() {
         onOpenChange={setBulkUploadOpen}
         onSuccess={refetch}
       />
+
+      {/* Product Gallery Dialog */}
+      {galleryProduct && user && (
+        <ProductGallery
+          productId={galleryProduct.id}
+          productType="inventory"
+          userId={user.id}
+          productName={galleryProduct.nombre_producto}
+          open={!!galleryProduct}
+          onOpenChange={(open) => !open && setGalleryProduct(null)}
+        />
+      )}
     </div>
   );
 }

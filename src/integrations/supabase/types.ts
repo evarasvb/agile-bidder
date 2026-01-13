@@ -609,6 +609,39 @@ export type Database = {
           },
         ]
       }
+      product_images: {
+        Row: {
+          created_at: string
+          es_principal: boolean | null
+          id: string
+          image_url: string
+          orden: number | null
+          product_id: string
+          product_type: string
+          storage_path: string | null
+        }
+        Insert: {
+          created_at?: string
+          es_principal?: boolean | null
+          id?: string
+          image_url: string
+          orden?: number | null
+          product_id: string
+          product_type: string
+          storage_path?: string | null
+        }
+        Update: {
+          created_at?: string
+          es_principal?: boolean | null
+          id?: string
+          image_url?: string
+          orden?: number | null
+          product_id?: string
+          product_type?: string
+          storage_path?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
