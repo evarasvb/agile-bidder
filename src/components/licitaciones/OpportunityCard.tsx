@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ExternalLink, FileText, TrendingUp, Shield, Clock, Building2 } from 'lucide-react';
+import { ExternalLink, FileText, TrendingUp, Shield, Clock, Building2, UserPlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { Licitacion } from '@/hooks/useLicitaciones';
 import { GenerarCotizacionModal } from './GenerarCotizacionModal';
-
+import { AsignarVendedorModal } from '@/components/vendedores/AsignarVendedorModal';
+import { useLicitacionAsignacion } from '@/hooks/useVendedores';
 // Simulated financial health data (in real app, this would come from backend)
 function getFinancialHealth(organismo: string) {
   const hash = organismo.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
@@ -53,6 +54,8 @@ interface OpportunityCardProps {
 
 export function OpportunityCard({ licitacion, onGenerarOferta }: OpportunityCardProps) {
   const [showCotizacionModal, setShowCotizacionModal] = useState(false);
+  const [showAsignarModal, setShowAsignarModal] = useState(false);
+  const { data: asignacion } = useLicitacionAsignacion(licitacion.id_licitacion);
   const financialHealth = getFinancialHealth(licitacion.organismo);
   const winScore = licitacion.match_score ?? Math.floor(Math.random() * 40) + 60;
   
@@ -145,14 +148,30 @@ export function OpportunityCard({ licitacion, onGenerarOferta }: OpportunityCard
             </div>
           </div>
 
+          {/* Asignación actual */}
+          {asignacion && (
+            <div className="flex items-center gap-2 text-xs bg-primary/10 rounded px-2 py-1">
+              <UserPlus className="h-3 w-3 text-primary" />
+              <span className="text-muted-foreground">Asignado a:</span>
+              <span className="font-medium">{asignacion.vendedor_nombre}</span>
+              <Badge variant="outline" className="text-[10px] px-1">{asignacion.estado}</Badge>
+            </div>
+          )}
+
           <div className="flex items-center justify-between pt-2">
             <div className="font-mono text-lg font-bold text-foreground">
               {formatCurrency(licitacion.presupuesto)}
             </div>
-            <Button onClick={handleGenerarOferta} size="sm" className="gap-2">
-              <FileText className="h-4 w-4" />
-              Generar Oferta
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={() => setShowAsignarModal(true)} size="sm" variant="outline" className="gap-1">
+                <UserPlus className="h-4 w-4" />
+                {asignacion ? 'Reasignar' : 'Asignar'}
+              </Button>
+              <Button onClick={handleGenerarOferta} size="sm" className="gap-2">
+                <FileText className="h-4 w-4" />
+                Generar Oferta
+              </Button>
+            </div>
           </div>
 
           {/* Good Payer Panel */}
@@ -181,6 +200,13 @@ export function OpportunityCard({ licitacion, onGenerarOferta }: OpportunityCard
       <GenerarCotizacionModal
         open={showCotizacionModal}
         onOpenChange={setShowCotizacionModal}
+        licitacion={licitacion}
+      />
+
+      {/* Modal para asignar vendedor */}
+      <AsignarVendedorModal
+        open={showAsignarModal}
+        onOpenChange={setShowAsignarModal}
         licitacion={licitacion}
       />
     </Card>

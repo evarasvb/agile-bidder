@@ -36,6 +36,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Licitaciones", url: "/licitaciones", icon: FileSearch },
+  { title: "Gestión Vendedores", url: "/vendedores", icon: Users },
   { title: "MercadoPúblico", url: "/mercadopublico", icon: Globe },
   { title: "BI Dashboard", url: "/bi-dashboard", icon: BarChart3 },
   { title: "BI Avanzado", url: "/bi-advanced", icon: Lightbulb },
@@ -44,9 +45,9 @@ const navItems: NavItem[] = [
   { title: "Odoo CRM", url: "/odoo/dashboard", icon: Link2, requiresOdoo: true },
   { title: "Extensión Chrome", url: "/extension", icon: Chrome },
   { title: "Historial", url: "/history", icon: History },
+  { title: "Configuración", url: "/settings", icon: Settings },
   { title: "Usuarios", url: "/users", icon: Users, adminOnly: true },
   { title: "Logs", url: "/logs", icon: FileText, adminOnly: true },
-  { title: "Configuración", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {

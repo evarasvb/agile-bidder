@@ -29,6 +29,7 @@ import Users from "./pages/Users";
 import MercadoPublico from "./pages/MercadoPublico";
 import BIDashboard from "./pages/BIDashboard";
 import BIAdvanced from "./pages/BIAdvanced";
+import GestionVendedores from "./pages/GestionVendedores";
 
 const queryClient = new QueryClient();
 
@@ -76,6 +77,7 @@ const App = () => (
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/history" element={<History />} />
             <Route path="/licitaciones" element={<Licitaciones />} />
+            <Route path="/vendedores" element={<GestionVendedores />} />
             <Route path="/mercadopublico" element={<MercadoPublico />} />
             <Route path="/bi-dashboard" element={<BIDashboard />} />
             <Route path="/bi-advanced" element={<BIAdvanced />} />
