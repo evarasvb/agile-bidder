@@ -111,13 +111,8 @@ export default function Inventory() {
     }
   };
 
-  const handleExportExcel = () => {
-    if (inventario.length === 0) {
-      toast.error('No hay productos para exportar');
-      return;
-    }
-
-    const exportData = inventario.map(item => ({
+  const getExportData = () => {
+    return inventario.map(item => ({
       'SKU': item.sku,
       'Producto': item.nombre_producto,
       'Descripción': item.descripcion || '',
@@ -130,9 +125,18 @@ export default function Inventory() {
       'Unidad': item.unidad_medida,
       'Tiempo Entrega (días)': item.tiempo_entrega_dias,
       'Keywords': item.keywords?.join(', ') || '',
-      'Activo': item.activo ? 'Sí' : 'No'
+      'Activo': item.activo ? 'Sí' : 'No',
+      'URL Imagen': item.imagen_url || ''
     }));
+  };
 
+  const handleExportExcel = () => {
+    if (inventario.length === 0) {
+      toast.error('No hay productos para exportar');
+      return;
+    }
+
+    const exportData = getExportData();
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
@@ -152,10 +156,47 @@ export default function Inventory() {
       { wch: 15 }, // Tiempo
       { wch: 30 }, // Keywords
       { wch: 8 },  // Activo
+      { wch: 50 }, // URL Imagen
     ];
 
     XLSX.writeFile(wb, `inventario_firmavb_${new Date().toISOString().split('T')[0]}.xlsx`);
     toast.success('Inventario exportado a Excel');
+  };
+
+  const handleExportCSV = () => {
+    if (inventario.length === 0) {
+      toast.error('No hay productos para exportar');
+      return;
+    }
+
+    const exportData = getExportData();
+    const headers = Object.keys(exportData[0]);
+    
+    // Escape CSV values properly
+    const escapeCSV = (value: any): string => {
+      const str = String(value ?? '');
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const csvContent = [
+      headers.join(','),
+      ...exportData.map(row => headers.map(h => escapeCSV(row[h as keyof typeof row])).join(','))
+    ].join('\n');
+
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `inventario_firmavb_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    toast.success('Inventario exportado a CSV');
   };
 
   const handleImportExcel = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -258,15 +299,25 @@ export default function Inventory() {
             Cargar desde Excel
           </Button>
           
-          {/* Export Excel */}
-          <Button 
-            variant="outline" 
-            className="gap-2"
-            onClick={handleExportExcel}
-          >
-            <Download className="h-4 w-4" />
-            Exportar
-          </Button>
+          {/* Export Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <Download className="h-4 w-4" />
+                Exportar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-popover">
+              <DropdownMenuItem onClick={handleExportExcel} className="gap-2 cursor-pointer">
+                <FileSpreadsheet className="h-4 w-4" />
+                Exportar a Excel (.xlsx)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportCSV} className="gap-2 cursor-pointer">
+                <FileText className="h-4 w-4" />
+                Exportar a CSV (.csv)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           
           <Button
             variant="outline" 
