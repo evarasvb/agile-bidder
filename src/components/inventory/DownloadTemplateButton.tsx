@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { generateTemplateData, generateInstructionsData } from '@/hooks/useClienteInventarioBulk';
+import { generateInventoryTemplateData, generateInventoryInstructions } from '@/hooks/useInventoryBulk';
 import { toast } from 'sonner';
 
 export function DownloadTemplateButton() {
@@ -11,32 +11,36 @@ export function DownloadTemplateButton() {
       const wb = XLSX.utils.book_new();
       
       // Products sheet with template data
-      const templateData = generateTemplateData();
+      const templateData = generateInventoryTemplateData();
       const wsProducts = XLSX.utils.json_to_sheet(templateData);
       
       // Set column widths for products sheet
       wsProducts['!cols'] = [
         { wch: 15 },  // SKU
-        { wch: 35 },  // Nombre del Producto
+        { wch: 35 },  // Nombre
         { wch: 50 },  // Descripción
         { wch: 20 },  // Categoría
-        { wch: 15 },  // Precio Unitario
-        { wch: 15 },  // Unidad de Medida
-        { wch: 40 },  // Keywords para Matching
-        { wch: 45 },  // URL Imagen
+        { wch: 12 },  // Precio
+        { wch: 10 },  // Unidad
+        { wch: 10 },  // Stock
+        { wch: 15 },  // Margen Mínimo
+        { wch: 15 },  // Margen Objetivo
+        { wch: 18 },  // Tiempo Entrega
+        { wch: 20 },  // Proveedor
+        { wch: 40 },  // Keywords
       ];
       
       XLSX.utils.book_append_sheet(wb, wsProducts, 'Productos');
       
       // Instructions sheet
-      const instructionsData = generateInstructionsData();
+      const instructionsData = generateInventoryInstructions();
       const wsInstructions = XLSX.utils.json_to_sheet(instructionsData);
       wsInstructions['!cols'] = [{ wch: 80 }];
       
       XLSX.utils.book_append_sheet(wb, wsInstructions, 'Instrucciones');
       
       // Download file
-      XLSX.writeFile(wb, 'plantilla_productos_firmavb.xlsx');
+      XLSX.writeFile(wb, 'plantilla_inventario.xlsx');
       
       toast.success('📥 Plantilla descargada correctamente');
     } catch (error) {
