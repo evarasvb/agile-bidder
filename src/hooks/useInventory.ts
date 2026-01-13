@@ -24,18 +24,19 @@ export interface InventoryItem {
 export interface InventoryInput {
   sku: string;
   nombre_producto: string;
-  descripcion?: string;
+  descripcion?: string | null;
   categoria: string;
-  keywords?: string[];
+  keywords?: string[] | null;
   precio_unitario: number;
   margen_minimo?: number;
   margen_objetivo?: number;
   stock_disponible?: number;
   unidad_medida?: string;
   tiempo_entrega_dias?: number;
-  proveedor?: string;
+  proveedor?: string | null;
   activo?: boolean;
-  imagen_url?: string;
+  imagen_url?: string | null;
+  user_id?: string; // Required for RLS - will be set automatically
 }
 
 export function useInventory() {
@@ -93,9 +94,21 @@ export function useCreateInventoryItem() {
   
   return useMutation({
     mutationFn: async (item: InventoryInput) => {
+      // Get current user to set user_id
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        throw new Error('Debes iniciar sesión para agregar productos');
+      }
+
+      const itemWithUserId = {
+        ...item,
+        user_id: item.user_id || user.id, // Use provided user_id or current user
+      };
+
       const { data, error } = await supabase
         .from('inventory')
-        .insert(item)
+        .insert(itemWithUserId)
         .select()
         .single();
       
