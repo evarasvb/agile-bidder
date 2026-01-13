@@ -325,26 +325,31 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
         <div className="flex-1 overflow-hidden flex flex-col gap-4">
           {/* Progress Indicator */}
           {importProgress && bulkImport.isPending && (
-            <div className="space-y-2 p-4 bg-muted/30 rounded-lg border">
+            <div className="space-y-3 p-4 bg-muted/30 rounded-lg border">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   {importProgress.message}
                 </span>
-                <span className="text-muted-foreground">{progressPercentage}%</span>
+                <span className="text-muted-foreground font-mono">{progressPercentage}%</span>
               </div>
-              <Progress value={progressPercentage} className="h-2" />
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>
-                  {importProgress.phase === 'validating' && 'Validando datos...'}
-                  {importProgress.phase === 'inserting' && 'Insertando nuevos productos...'}
-                  {importProgress.phase === 'updating' && 'Actualizando productos existentes...'}
-                  {importProgress.phase === 'complete' && '¡Completado!'}
+              <Progress value={progressPercentage} className="h-3" />
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">
+                  {importProgress.phase === 'validating' && '📋 Validando datos del archivo...'}
+                  {importProgress.phase === 'inserting' && '➕ Insertando nuevos productos...'}
+                  {importProgress.phase === 'updating' && '🔄 Actualizando productos existentes...'}
+                  {importProgress.phase === 'complete' && '✅ ¡Importación completada!'}
                 </span>
-                <span>
-                  {importProgress.current} de {importProgress.total}
+                <span className="font-mono font-semibold text-primary">
+                  {importProgress.current.toLocaleString()} / {importProgress.total.toLocaleString()}
                 </span>
               </div>
+              {importProgress.phase !== 'complete' && importProgress.total > 100 && (
+                <p className="text-xs text-muted-foreground">
+                  Procesando en lotes de 500 productos para mayor eficiencia...
+                </p>
+              )}
             </div>
           )}
 

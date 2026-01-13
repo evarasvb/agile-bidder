@@ -50,6 +50,9 @@ export default function Dashboard() {
     }).format(value);
   };
 
+  // Debug log
+  console.log('[Dashboard] Render - metrics:', metrics, 'loading:', metricsLoading);
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -58,6 +61,11 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
           <p className="text-muted-foreground">
             Resumen de oportunidades y rendimiento
+            {metrics && metrics.totalLicitaciones > 0 && (
+              <span className="ml-2 text-primary">
+                ({metrics.totalLicitaciones} licitaciones en sistema)
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-3">

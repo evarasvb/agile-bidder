@@ -487,6 +487,7 @@ export type Database = {
           tiempo_entrega_dias: number
           unidad_medida: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           activo?: boolean
@@ -506,6 +507,7 @@ export type Database = {
           tiempo_entrega_dias?: number
           unidad_medida?: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           activo?: boolean
@@ -525,6 +527,7 @@ export type Database = {
           tiempo_entrega_dias?: number
           unidad_medida?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -1324,6 +1327,48 @@ export type Database = {
           created_at?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_settings: {
+        Row: {
+          api_key_connected: boolean | null
+          api_key_encrypted: string | null
+          automation_settings: Json | null
+          bidding_settings: Json | null
+          company_settings: Json | null
+          created_at: string | null
+          delivery_settings: Json | null
+          id: string
+          regions: string[] | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          api_key_connected?: boolean | null
+          api_key_encrypted?: string | null
+          automation_settings?: Json | null
+          bidding_settings?: Json | null
+          company_settings?: Json | null
+          created_at?: string | null
+          delivery_settings?: Json | null
+          id?: string
+          regions?: string[] | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          api_key_connected?: boolean | null
+          api_key_encrypted?: string | null
+          automation_settings?: Json | null
+          bidding_settings?: Json | null
+          company_settings?: Json | null
+          created_at?: string | null
+          delivery_settings?: Json | null
+          id?: string
+          regions?: string[] | null
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []
