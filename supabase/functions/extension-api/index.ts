@@ -635,9 +635,25 @@ Deno.serve(async (req) => {
       }
 
       case 'get-licitaciones': {
+        // Require API key authentication
+        if (!clienteId) {
+          return new Response(
+            JSON.stringify({ error: 'API key requerida para acceder a licitaciones' }),
+            { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
         // Get recent licitaciones for the extension to show
-        const limit = parseInt(url.searchParams.get('limit') || '20');
+        const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 100);
         
+        // Get licitaciones that have matches for this client
+        const { data: clienteOfertas } = await supabase
+          .from('cliente_ofertas')
+          .select('licitacion_id')
+          .eq('cliente_id', clienteId);
+
+        const matchedLicitacionIds = clienteOfertas?.map(o => o.licitacion_id) || [];
+
         const { data: licitaciones, error } = await supabase
           .from('licitaciones')
           .select(`
@@ -651,18 +667,26 @@ Deno.serve(async (req) => {
             match_encontrado,
             match_score
           `)
+          .in('id_licitacion', matchedLicitacionIds.length > 0 ? matchedLicitacionIds : ['__none__'])
           .order('created_at', { ascending: false })
           .limit(limit);
 
         if (error) {
+          console.error('Error fetching licitaciones:', error);
           return new Response(
             JSON.stringify({ error: 'Error obteniendo licitaciones' }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
 
+        // Log activity
+        await logActivity(supabase, apiKeyId, clienteId, 'get-licitaciones', null, null, {
+          count: licitaciones?.length || 0,
+          limit
+        }, req);
+
         return new Response(
-          JSON.stringify({ success: true, licitaciones }),
+          JSON.stringify({ success: true, licitaciones: licitaciones || [] }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -675,9 +699,10 @@ Deno.serve(async (req) => {
     }
   } catch (error) {
     console.error('Extension API error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    // Don't expose internal error details to clients
+    console.error('Extension API internal error:', error instanceof Error ? error.message : 'Unknown error');
     return new Response(
-      JSON.stringify({ error: 'Error interno del servidor', details: errorMessage }),
+      JSON.stringify({ error: 'Error interno del servidor' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

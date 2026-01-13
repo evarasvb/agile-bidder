@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,11 +30,49 @@ interface ResumenResponse {
   criterios_evaluacion?: string[];
 }
 
+// Verify authentication
+async function verifyAuth(req: Request): Promise<{ userId: string } | Response> {
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return new Response(
+      JSON.stringify({ error: 'Missing or invalid authorization header' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: authHeader } }
+  });
+
+  const token = authHeader.replace('Bearer ', '');
+  const { data, error } = await supabase.auth.getUser(token);
+
+  if (error || !data?.user) {
+    return new Response(
+      JSON.stringify({ error: 'Invalid or expired token' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  return { userId: data.user.id };
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  // Verify authentication
+  const authResult = await verifyAuth(req);
+  if (authResult instanceof Response) {
+    return authResult;
+  }
+
+  const { userId } = authResult;
+  console.log(`Authenticated user: ${userId} - Processing resumir-bases request`);
 
   try {
     const { texto, tipo = 'bases' } = await req.json() as ResumenRequest;
@@ -72,7 +111,7 @@ DEBES responder SOLO con un JSON válido sin ningún texto adicional. El JSON de
       ? `Extrae SOLO los productos o servicios solicitados de este documento:\n\n${textoTruncado}`
       : `Analiza completamente este documento de bases de licitación:\n\n${textoTruncado}`;
 
-    console.log('Calling Lovable AI to summarize bases...');
+    console.log(`User ${userId} calling Lovable AI to summarize bases (${texto.length} chars)`);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -104,8 +143,7 @@ DEBES responder SOLO con un JSON válido sin ningún texto adicional. El JSON de
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
+      console.error("AI gateway error:", response.status);
       throw new Error(`AI gateway error: ${response.status}`);
     }
 
@@ -116,7 +154,7 @@ DEBES responder SOLO con un JSON válido sin ningún texto adicional. El JSON de
       throw new Error('No content in AI response');
     }
 
-    console.log('AI response received, parsing JSON...');
+    console.log(`User ${userId} - AI response received, parsing JSON...`);
 
     // Try to parse the JSON response
     let parsedResponse: ResumenResponse;
@@ -150,7 +188,7 @@ DEBES responder SOLO con un JSON válido sin ningún texto adicional. El JSON de
     console.error('Error in resumir-bases:', error);
     return new Response(
       JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Error procesando el documento',
+        error: 'Error procesando el documento',
         resumen: '',
         requisitos: [],
         productos: [],
