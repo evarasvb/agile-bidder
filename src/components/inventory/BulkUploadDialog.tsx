@@ -1,14 +1,15 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2, X, FileUp, ImageIcon } from 'lucide-react';
-import { useClienteInventarioBulk, BulkProductRow, ValidationError } from '@/hooks/useClienteInventarioBulk';
+import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2, X, FileUp, ImageIcon, Download } from 'lucide-react';
+import { useInventoryBulk, BulkProductRow, generateInventoryTemplateData, generateInventoryInstructions } from '@/hooks/useInventoryBulk';
 import { validateImageUrl } from '@/hooks/useProductImageUpload';
 import * as XLSX from 'xlsx';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface BulkUploadDialogProps {
   open: boolean;
@@ -25,10 +26,11 @@ interface PreviewData {
 export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDialogProps) {
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [parseErrors, setParseErrors] = useState<string[]>([]);
-  const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
+  const [validationErrors, setValidationErrors] = useState<{ row: number; field: string; message: string }[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const bulkImport = useClienteInventarioBulk();
+  const bulkImport = useInventoryBulk();
 
   const resetState = () => {
     setPreviewData(null);
@@ -39,6 +41,47 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
   const handleClose = () => {
     resetState();
     onOpenChange(false);
+  };
+
+  const handleDownloadTemplate = () => {
+    try {
+      const wb = XLSX.utils.book_new();
+      
+      // Products sheet with template data
+      const templateData = generateInventoryTemplateData();
+      const wsProducts = XLSX.utils.json_to_sheet(templateData);
+      
+      // Set column widths
+      wsProducts['!cols'] = [
+        { wch: 15 },  // SKU
+        { wch: 35 },  // Nombre
+        { wch: 50 },  // Descripción
+        { wch: 20 },  // Categoría
+        { wch: 12 },  // Precio
+        { wch: 10 },  // Unidad
+        { wch: 10 },  // Stock
+        { wch: 15 },  // Margen Mínimo
+        { wch: 15 },  // Margen Objetivo
+        { wch: 18 },  // Tiempo Entrega
+        { wch: 20 },  // Proveedor
+        { wch: 40 },  // Keywords
+      ];
+      
+      XLSX.utils.book_append_sheet(wb, wsProducts, 'Productos');
+      
+      // Instructions sheet
+      const instructionsData = generateInventoryInstructions();
+      const wsInstructions = XLSX.utils.json_to_sheet(instructionsData);
+      wsInstructions['!cols'] = [{ wch: 80 }];
+      
+      XLSX.utils.book_append_sheet(wb, wsInstructions, 'Instrucciones');
+      
+      XLSX.writeFile(wb, 'plantilla_inventario.xlsx');
+      toast.success('📥 Plantilla descargada');
+    } catch (error) {
+      console.error('Error downloading template:', error);
+      toast.error('Error al descargar la plantilla');
+    }
   };
 
   const parseFile = async (file: File) => {
@@ -62,15 +105,20 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
         return;
       }
 
-      // Map columns to expected format
+      // Map columns to expected format - flexible column matching
       const rows: BulkProductRow[] = jsonData.map((row: any) => ({
-        sku: row['SKU'] || row['sku'] || row['Sku'] || '',
-        nombre: row['Nombre del Producto'] || row['Nombre'] || row['nombre'] || row['Producto'] || '',
+        sku: row['SKU'] || row['sku'] || row['Sku'] || row['Código'] || row['Codigo'] || '',
+        nombre: row['Nombre'] || row['nombre'] || row['Nombre del Producto'] || row['Producto'] || '',
         descripcion: row['Descripción'] || row['Descripcion'] || row['descripcion'] || '',
         categoria: row['Categoría'] || row['Categoria'] || row['categoria'] || '',
-        precio_unitario: Number(row['Precio Unitario'] || row['Precio'] || row['precio_unitario'] || 0),
-        unidad_medida: row['Unidad de Medida'] || row['Unidad'] || row['unidad_medida'] || 'UN',
-        keywords: row['Keywords para Matching'] || row['Keywords'] || row['keywords'] || row['palabras_clave'] || '',
+        precio_unitario: Number(row['Precio'] || row['Precio Unitario'] || row['precio'] || row['precio_unitario'] || 0),
+        unidad_medida: row['Unidad'] || row['Unidad de Medida'] || row['unidad'] || row['unidad_medida'] || 'UN',
+        stock: Number(row['Stock'] || row['stock'] || row['Stock Disponible'] || 0),
+        margen_minimo: Number(row['Margen Mínimo (%)'] || row['Margen Minimo'] || row['margen_minimo'] || 10),
+        margen_objetivo: Number(row['Margen Objetivo (%)'] || row['Margen Objetivo'] || row['margen_objetivo'] || 15),
+        tiempo_entrega_dias: Number(row['Tiempo Entrega (días)'] || row['Tiempo Entrega'] || row['tiempo_entrega'] || 5),
+        proveedor: row['Proveedor'] || row['proveedor'] || '',
+        keywords: row['Keywords'] || row['keywords'] || row['Palabras Clave'] || row['palabras_clave'] || '',
         imagen_url: row['URL Imagen'] || row['Imagen'] || row['imagen_url'] || row['Image URL'] || '',
       }));
 
@@ -93,7 +141,7 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
           errors.push(`Fila ${rowNum}: Nombre del Producto es obligatorio`);
         }
         
-        // Validate image URL
+        // Validate image URL if provided
         if (row.imagen_url && row.imagen_url.trim() !== '') {
           if (!validateImageUrl(row.imagen_url)) {
             errors.push(`Fila ${rowNum}: URL de imagen inválida (debe ser https://)`);
@@ -133,11 +181,16 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
     setIsDragging(false);
   }, []);
 
+  const handleFileInputClick = () => {
+    fileInputRef.current?.click();
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       parseFile(file);
     }
+    // Reset input to allow selecting the same file again
     e.target.value = '';
   };
 
@@ -182,43 +235,54 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
         <div className="flex-1 overflow-hidden flex flex-col gap-4">
           {/* Drop Zone */}
           {!previewData && (
-            <div
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              className={cn(
-                "border-2 border-dashed rounded-lg p-8 text-center transition-colors",
-                isDragging 
-                  ? "border-primary bg-primary/5" 
-                  : "border-muted-foreground/25 hover:border-primary/50"
-              )}
-            >
-              <FileUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-lg font-medium mb-2">
-                Arrastra tu archivo aquí
-              </p>
-              <p className="text-sm text-muted-foreground mb-4">
-                o haz clic para seleccionar
-              </p>
-              <input
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                onChange={handleFileSelect}
-                className="hidden"
-                id="file-upload"
-              />
-              <label htmlFor="file-upload">
-                <Button variant="outline" className="cursor-pointer" asChild>
-                  <span>
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    Seleccionar Archivo
-                  </span>
+            <>
+              <div
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onClick={handleFileInputClick}
+                className={cn(
+                  "border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer",
+                  isDragging 
+                    ? "border-primary bg-primary/5" 
+                    : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50"
+                )}
+              >
+                <FileUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-lg font-medium mb-2">
+                  Arrastra tu archivo aquí
+                </p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  o haz clic para seleccionar
+                </p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                <Button variant="outline" className="pointer-events-none">
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Seleccionar Archivo
                 </Button>
-              </label>
-              <p className="text-xs text-muted-foreground mt-4">
-                Formatos soportados: .xlsx, .xls, .csv (máximo 10,000 productos)
-              </p>
-            </div>
+                <p className="text-xs text-muted-foreground mt-4">
+                  Formatos soportados: .xlsx, .xls, .csv (máximo 10,000 productos)
+                </p>
+              </div>
+              
+              {/* Download Template Button */}
+              <div className="flex justify-center">
+                <Button 
+                  variant="outline" 
+                  className="gap-2"
+                  onClick={handleDownloadTemplate}
+                >
+                  <Download className="h-4 w-4" />
+                  Descargar Plantilla de Ejemplo
+                </Button>
+              </div>
+            </>
           )}
 
           {/* Parse Errors */}
@@ -306,6 +370,7 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
                       <TableHead>Nombre</TableHead>
                       <TableHead>Categoría</TableHead>
                       <TableHead className="text-right">Precio</TableHead>
+                      <TableHead className="text-right">Stock</TableHead>
                       <TableHead>Unidad</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -346,13 +411,16 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
                           <TableCell className="text-right font-mono">
                             {row.precio_unitario ? `$${row.precio_unitario.toLocaleString('es-CL')}` : '-'}
                           </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {row.stock !== undefined ? row.stock : '-'}
+                          </TableCell>
                           <TableCell>{row.unidad_medida || 'UN'}</TableCell>
                         </TableRow>
                       );
                     })}
                     {previewData.totalRows > 10 && (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center text-muted-foreground py-4">
+                        <TableCell colSpan={8} className="text-center text-muted-foreground py-4">
                           ... y {previewData.totalRows - 10} productos más
                         </TableCell>
                       </TableRow>
