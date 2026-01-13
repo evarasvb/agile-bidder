@@ -19,6 +19,8 @@ import { useClienteConfig } from "@/hooks/useClienteConfig";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { useCliente } from "@/hooks/useCliente";
 
 interface NavItem {
   title: string;
