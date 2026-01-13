@@ -70,9 +70,11 @@
     --chart-4: 280 60% 50%;
     --chart-5: 0 72% 51%;
 
-    /* FirmaVB Brand Colors */
-    --firmavb-blue: 217 91% 53%;
-    --firmavb-red: 0 79% 51%;
+    /* FirmaVB Brand Colors - Pantone 2728 C & 1805 */
+    --firmavb-blue: 227 40% 45%;
+    --firmavb-red: 351 66% 59%;
+    --firmavb-gray: 240 5% 94%;
+    --firmavb-black: 0 0% 6%;
 
     /* Financial Health Colors */
     --risk-low: 142 76% 36%;
