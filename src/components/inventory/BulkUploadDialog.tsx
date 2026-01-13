@@ -7,6 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2, X, FileUp, ImageIcon, Download, ImageOff } from 'lucide-react';
 import { useInventoryBulk, BulkProductRow, ImportProgress, generateInventoryTemplateData, generateInventoryInstructions } from '@/hooks/useInventoryBulk';
+import { useCreateImportHistory } from '@/hooks/useImportHistory';
 import { validateImageUrl } from '@/hooks/useProductImageUpload';
 import * as XLSX from 'xlsx';
 import { cn } from '@/lib/utils';
@@ -66,6 +67,7 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
   const bulkImport = useInventoryBulk((progress) => {
     setImportProgress(progress);
   });
+  const createImportHistory = useCreateImportHistory();
 
   const resetState = () => {
     setPreviewData(null);
@@ -246,8 +248,26 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
   const handleImport = async () => {
     if (!previewData) return;
 
+    const extension = previewData.fileName.split('.').pop()?.toLowerCase() as 'xlsx' | 'xls' | 'csv';
+
     try {
       const result = await bulkImport.mutateAsync(previewData.rows);
+      
+      // Log import to history
+      const status = result.errors.length > 0 
+        ? (result.inserted + result.updated > 0 ? 'partial' : 'failed')
+        : 'completed';
+      
+      await createImportHistory.mutateAsync({
+        file_name: previewData.fileName,
+        file_type: extension || 'xlsx',
+        total_rows: previewData.totalRows,
+        inserted_count: result.inserted,
+        updated_count: result.updated,
+        error_count: result.errors.length,
+        status,
+        errors: result.errors.slice(0, 50) // Limit stored errors
+      });
       
       if (result.errors.length > 0) {
         setValidationErrors(result.errors);
@@ -257,6 +277,18 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
       }
     } catch (error) {
       console.error('Import error:', error);
+      
+      // Log failed import
+      await createImportHistory.mutateAsync({
+        file_name: previewData.fileName,
+        file_type: extension || 'xlsx',
+        total_rows: previewData.totalRows,
+        inserted_count: 0,
+        updated_count: 0,
+        error_count: 1,
+        status: 'failed',
+        errors: [{ message: error instanceof Error ? error.message : 'Error desconocido' }]
+      });
     }
   };
 
