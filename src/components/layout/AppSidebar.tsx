@@ -12,7 +12,8 @@ import {
   CalendarDays,
   Users,
   Globe,
-  BarChart3
+  BarChart3,
+  Lightbulb
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -37,6 +38,7 @@ const navItems: NavItem[] = [
   { title: "Licitaciones", url: "/licitaciones", icon: FileSearch },
   { title: "MercadoPúblico", url: "/mercadopublico", icon: Globe },
   { title: "BI Dashboard", url: "/bi-dashboard", icon: BarChart3 },
+  { title: "BI Avanzado", url: "/bi-advanced", icon: Lightbulb },
   { title: "Calendario", url: "/calendar", icon: CalendarDays },
   { title: "Inventario", url: "/inventory", icon: Package },
   { title: "Odoo CRM", url: "/odoo/dashboard", icon: Link2, requiresOdoo: true },
