@@ -132,10 +132,10 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
         }
       }
 
-      // Perform bulk insert with progress
+      // Perform bulk insert with progress - increased batch size to 500
       let insertedCount = 0;
       if (toInsert.length > 0) {
-        const batchSize = 100;
+        const batchSize = 500;
         const totalBatches = Math.ceil(toInsert.length / batchSize);
         
         for (let i = 0; i < toInsert.length; i += batchSize) {
@@ -146,7 +146,7 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
             current: insertedCount, 
             total: toInsert.length, 
             phase: 'inserting', 
-            message: `Insertando lote ${batchNum} de ${totalBatches}...` 
+            message: `Insertando ${insertedCount + 1}-${Math.min(insertedCount + batch.length, toInsert.length)} de ${toInsert.length} productos...` 
           });
           
           const { error } = await supabase
@@ -165,20 +165,20 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
         }
       }
 
-      // Perform updates with progress
+      // Perform updates with progress - improved progress messages
       let updatedCount = 0;
       if (toUpdate.length > 0) {
-        const batchSize = 50;
+        const batchSize = 100;
         
         for (let i = 0; i < toUpdate.length; i++) {
           const item = toUpdate[i];
           
-          if (i % batchSize === 0) {
+          if (i % batchSize === 0 || i === 0) {
             onProgress?.({ 
               current: updatedCount, 
               total: toUpdate.length, 
               phase: 'updating', 
-              message: `Actualizando ${i + 1} de ${toUpdate.length}...` 
+              message: `Actualizando ${updatedCount + 1} de ${toUpdate.length} productos existentes...` 
             });
           }
           

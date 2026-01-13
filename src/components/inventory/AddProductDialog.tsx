@@ -85,28 +85,33 @@ export function AddProductDialog({
       .map((k) => k.trim().toLowerCase())
       .filter((k) => k.length > 0);
 
-    await onSave({
-      ...formData,
-      keywords,
-    });
+    try {
+      await onSave({
+        ...formData,
+        keywords,
+      });
 
-    // Reset form
-    setFormData({
-      sku: '',
-      nombre_producto: '',
-      descripcion: '',
-      categoria: '',
-      keywords: [],
-      precio_unitario: 0,
-      margen_minimo: 15,
-      margen_objetivo: 30,
-      stock_disponible: 0,
-      unidad_medida: 'unidad',
-      tiempo_entrega_dias: 3,
-      proveedor: '',
-      activo: true,
-    });
-    setKeywordsInput('');
+      // Reset form only on success
+      setFormData({
+        sku: '',
+        nombre_producto: '',
+        descripcion: '',
+        categoria: '',
+        keywords: [],
+        precio_unitario: 0,
+        margen_minimo: 15,
+        margen_objetivo: 30,
+        stock_disponible: 0,
+        unidad_medida: 'unidad',
+        tiempo_entrega_dias: 3,
+        proveedor: '',
+        activo: true,
+      });
+      setKeywordsInput('');
+    } catch (error) {
+      // Error is handled by the parent component
+      console.error('Error saving product:', error);
+    }
   };
 
   return (

@@ -35,19 +35,31 @@ export function useDashboardMetrics() {
   return useQuery({
     queryKey: ['dashboard', 'metrics'],
     queryFn: async (): Promise<DashboardMetrics> => {
-      // Fetch licitaciones
-      const { data: licitaciones, error: licError } = await supabase
-        .from('licitaciones')
-        .select('*');
+      console.log('[Dashboard] Fetching metrics...');
       
-      if (licError) throw licError;
+      // Fetch licitaciones - use count for efficiency
+      const { data: licitaciones, error: licError, count: licCount } = await supabase
+        .from('licitaciones')
+        .select('id_licitacion, estado, procesada, match_encontrado, presupuesto', { count: 'exact' });
+      
+      if (licError) {
+        console.error('[Dashboard] Error fetching licitaciones:', licError);
+        throw licError;
+      }
+      
+      console.log(`[Dashboard] Found ${licitaciones?.length || 0} licitaciones`);
 
       // Fetch ofertas
       const { data: ofertas, error: ofError } = await supabase
         .from('ofertas')
-        .select('*');
+        .select('estado');
       
-      if (ofError) throw ofError;
+      if (ofError) {
+        console.error('[Dashboard] Error fetching ofertas:', ofError);
+        throw ofError;
+      }
+      
+      console.log(`[Dashboard] Found ${ofertas?.length || 0} ofertas`);
 
       const total = licitaciones?.length || 0;
       const activas = licitaciones?.filter(l => 
@@ -68,7 +80,7 @@ export function useDashboardMetrics() {
         ?.filter(l => l.match_encontrado && l.presupuesto)
         ?.reduce((sum, l) => sum + (l.presupuesto || 0), 0) || 0;
 
-      return {
+      const metrics = {
         totalLicitaciones: total,
         licitacionesActivas: activas,
         matchesEncontrados: conMatch,
@@ -79,8 +91,12 @@ export function useDashboardMetrics() {
         tasaExito: enviadas > 0 ? Math.round((ganadas / enviadas) * 100) : 0,
         valorPotencial,
       };
+      
+      console.log('[Dashboard] Metrics calculated:', metrics);
+      return metrics;
     },
     refetchInterval: 30000, // Refresh every 30 seconds
+    staleTime: 10000, // Consider data fresh for 10 seconds
   });
 }
 

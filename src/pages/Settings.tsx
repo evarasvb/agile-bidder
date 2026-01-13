@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Save, Building2, MapPin, Clock, DollarSign, Shield, Key, Eye, EyeOff, CheckCircle2, Bell, Loader2, Settings as SettingsIcon } from "lucide-react";
+import { Save, Building2, MapPin, Clock, DollarSign, Shield, Key, Eye, EyeOff, CheckCircle2, Bell, Loader2, Settings as SettingsIcon, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +18,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import NotificacionesSettings from "@/components/settings/NotificacionesSettings";
 import { getClienteId } from "@/hooks/useCliente";
 import { Link } from "react-router-dom";
+import { 
+  useUserSettings, 
+  useSaveUserSettings, 
+  DEFAULT_SETTINGS,
+  CompanySettings,
+  BiddingSettings,
+  DeliverySettings,
+  AutomationSettings,
+  UserSettings
+} from "@/hooks/useUserSettings";
+import { useAuth } from "@/hooks/useAuth";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const regions = [
   "Metropolitana",
@@ -38,96 +50,39 @@ const regions = [
   "Aysén",
 ];
 
-// Types for settings
-interface CompanySettings {
-  rut: string;
-  razonSocial: string;
-  codigoOrganismo: string;
-  emailContacto: string;
-}
-
-interface BiddingSettings {
-  montoMaximoUTM: number;
-  margenMinimoGlobal: number;
-}
-
-interface DeliverySettings {
-  plazoEntrega: string;
-  tipoDespacho: string;
-}
-
-interface AutomationSettings {
-  autoMatch: boolean;
-  autoBid: boolean;
-}
-
-interface AllSettings {
-  company: CompanySettings;
-  bidding: BiddingSettings;
-  delivery: DeliverySettings;
-  automation: AutomationSettings;
-  regions: string[];
-  apiKey: string;
-  apiKeyConnected: boolean;
-}
-
-const DEFAULT_SETTINGS: AllSettings = {
-  company: {
-    rut: "76.123.456-7",
-    razonSocial: "FirmaVB SpA",
-    codigoOrganismo: "123456",
-    emailContacto: "ventas@firmavb.cl",
-  },
-  bidding: {
-    montoMaximoUTM: 30,
-    margenMinimoGlobal: 10,
-  },
-  delivery: {
-    plazoEntrega: "24",
-    tipoDespacho: "delivery",
-  },
-  automation: {
-    autoMatch: true,
-    autoBid: false,
-  },
-  regions: ["Metropolitana", "Valparaíso"],
-  apiKey: "",
-  apiKeyConnected: false,
-};
-
 export default function Settings() {
   const clienteId = getClienteId();
-  const [settings, setSettings] = useState<AllSettings>(DEFAULT_SETTINGS);
-  const [isSaving, setIsSaving] = useState(false);
+  const { user } = useAuth();
+  const { data: savedSettings, isLoading: isLoadingSettings, error: settingsError } = useUserSettings();
+  const saveSettingsMutation = useSaveUserSettings();
+  
+  const [settings, setSettings] = useState<Omit<UserSettings, 'id' | 'user_id'>>({
+    ...DEFAULT_SETTINGS,
+    api_key_encrypted: '',
+  });
   const [showApiKey, setShowApiKey] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
-  // Load settings from localStorage on mount
+  // Load settings from database when available
   useEffect(() => {
-    const saved = localStorage.getItem('firmavb_settings');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setSettings({ ...DEFAULT_SETTINGS, ...parsed });
-      } catch (e) {
-        console.error('Error loading settings:', e);
-      }
+    if (savedSettings) {
+      setSettings({
+        company_settings: savedSettings.company_settings,
+        bidding_settings: savedSettings.bidding_settings,
+        delivery_settings: savedSettings.delivery_settings,
+        automation_settings: savedSettings.automation_settings,
+        regions: savedSettings.regions,
+        api_key_encrypted: savedSettings.api_key_encrypted || '',
+        api_key_connected: savedSettings.api_key_connected,
+      });
     }
-  }, []);
+  }, [savedSettings]);
 
   // Track changes
-  const updateSettings = <K extends keyof AllSettings>(
-    key: K,
-    value: AllSettings[K]
-  ) => {
-    setSettings((prev) => ({ ...prev, [key]: value }));
-    setHasChanges(true);
-  };
-
   const updateCompany = (field: keyof CompanySettings, value: string) => {
     setSettings((prev) => ({
       ...prev,
-      company: { ...prev.company, [field]: value },
+      company_settings: { ...prev.company_settings, [field]: value },
     }));
     setHasChanges(true);
   };
@@ -135,7 +90,7 @@ export default function Settings() {
   const updateBidding = (field: keyof BiddingSettings, value: number) => {
     setSettings((prev) => ({
       ...prev,
-      bidding: { ...prev.bidding, [field]: value },
+      bidding_settings: { ...prev.bidding_settings, [field]: value },
     }));
     setHasChanges(true);
   };
@@ -143,7 +98,7 @@ export default function Settings() {
   const updateDelivery = (field: keyof DeliverySettings, value: string) => {
     setSettings((prev) => ({
       ...prev,
-      delivery: { ...prev.delivery, [field]: value },
+      delivery_settings: { ...prev.delivery_settings, [field]: value },
     }));
     setHasChanges(true);
   };
@@ -151,7 +106,7 @@ export default function Settings() {
   const updateAutomation = (field: keyof AutomationSettings, value: boolean) => {
     setSettings((prev) => ({
       ...prev,
-      automation: { ...prev.automation, [field]: value },
+      automation_settings: { ...prev.automation_settings, [field]: value },
     }));
     setHasChanges(true);
   };
@@ -167,31 +122,51 @@ export default function Settings() {
   };
 
   const handleSaveApiKey = () => {
-    if (settings.apiKey.length < 10) {
+    if (!settings.api_key_encrypted || settings.api_key_encrypted.length < 10) {
       toast.error("La API Key debe tener al menos 10 caracteres");
       return;
     }
-    updateSettings('apiKeyConnected', true);
-    toast.success("API Key de Mercado Público guardada correctamente");
+    setSettings(prev => ({ ...prev, api_key_connected: true }));
+    setHasChanges(true);
+    toast.success("API Key guardada - recuerda guardar los cambios");
   };
 
   const handleSaveAllChanges = async () => {
-    setIsSaving(true);
+    if (!user) {
+      toast.error("Debes iniciar sesión para guardar configuraciones");
+      return;
+    }
+    
     try {
-      // Save to localStorage
-      localStorage.setItem('firmavb_settings', JSON.stringify(settings));
-      
-      // Simulate API call delay
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      
-      toast.success("Cambios guardados correctamente");
+      await saveSettingsMutation.mutateAsync(settings);
       setHasChanges(false);
     } catch (error) {
-      toast.error("Error al guardar los cambios");
-    } finally {
-      setIsSaving(false);
+      // Error is handled by the mutation
     }
   };
+
+  // Show loading state
+  if (isLoadingSettings) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // Show auth required message
+  if (!user) {
+    return (
+      <div className="space-y-6 max-w-4xl">
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Debes iniciar sesión para ver y guardar tus configuraciones.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in max-w-4xl">
@@ -213,9 +188,9 @@ export default function Settings() {
           <Button 
             className="gap-2 bg-primary hover:bg-primary/90"
             onClick={handleSaveAllChanges}
-            disabled={isSaving || !hasChanges}
+            disabled={saveSettingsMutation.isPending || !hasChanges}
           >
-            {isSaving ? (
+            {saveSettingsMutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Save className="h-4 w-4" />
@@ -243,11 +218,11 @@ export default function Settings() {
       >
         <div className="space-y-4">
           <div className="flex items-center gap-2 mb-4">
-            <Badge 
-              variant={settings.apiKeyConnected ? "default" : "secondary"}
-              className={settings.apiKeyConnected ? "bg-success hover:bg-success" : ""}
+          <Badge 
+              variant={settings.api_key_connected ? "default" : "secondary"}
+              className={settings.api_key_connected ? "bg-success hover:bg-success" : ""}
             >
-              {settings.apiKeyConnected ? (
+              {settings.api_key_connected ? (
                 <>
                   <CheckCircle2 className="h-3 w-3 mr-1" />
                   Conectado
@@ -264,9 +239,10 @@ export default function Settings() {
                 <Input 
                   type={showApiKey ? "text" : "password"}
                   placeholder="Ingresa tu API Key..."
-                  value={settings.apiKey}
+                  value={settings.api_key_encrypted || ''}
                   onChange={(e) => {
-                    updateSettings('apiKey', e.target.value);
+                    setSettings(prev => ({ ...prev, api_key_encrypted: e.target.value }));
+                    setHasChanges(true);
                   }}
                   className="pr-10 font-mono"
                 />
@@ -315,7 +291,7 @@ export default function Settings() {
             <Label>RUT Empresa</Label>
             <Input 
               placeholder="76.XXX.XXX-X" 
-              value={settings.company.rut}
+              value={settings.company_settings.rut}
               onChange={(e) => updateCompany('rut', e.target.value)}
             />
           </div>
@@ -323,7 +299,7 @@ export default function Settings() {
             <Label>Razón Social</Label>
             <Input 
               placeholder="Empresa SpA" 
-              value={settings.company.razonSocial}
+              value={settings.company_settings.razonSocial}
               onChange={(e) => updateCompany('razonSocial', e.target.value)}
             />
           </div>
@@ -331,7 +307,7 @@ export default function Settings() {
             <Label>Código Organismo (Mercado Público)</Label>
             <Input 
               placeholder="XXXXXX" 
-              value={settings.company.codigoOrganismo}
+              value={settings.company_settings.codigoOrganismo}
               onChange={(e) => updateCompany('codigoOrganismo', e.target.value)}
             />
           </div>
@@ -340,7 +316,7 @@ export default function Settings() {
             <Input 
               type="email" 
               placeholder="contacto@empresa.cl" 
-              value={settings.company.emailContacto}
+              value={settings.company_settings.emailContacto}
               onChange={(e) => updateCompany('emailContacto', e.target.value)}
             />
           </div>
@@ -360,7 +336,7 @@ export default function Settings() {
               <Input 
                 type="number" 
                 placeholder="30" 
-                value={settings.bidding.montoMaximoUTM}
+                value={settings.bidding_settings.montoMaximoUTM}
                 onChange={(e) => updateBidding('montoMaximoUTM', Number(e.target.value))}
                 className="font-mono"
               />
@@ -376,7 +352,7 @@ export default function Settings() {
               <Input 
                 type="number" 
                 placeholder="10" 
-                value={settings.bidding.margenMinimoGlobal}
+                value={settings.bidding_settings.margenMinimoGlobal}
                 onChange={(e) => updateBidding('margenMinimoGlobal', Number(e.target.value))}
                 className="font-mono"
               />
@@ -396,7 +372,7 @@ export default function Settings() {
           <div className="space-y-2">
             <Label>Plazo de Entrega</Label>
             <Select 
-              value={settings.delivery.plazoEntrega}
+              value={settings.delivery_settings.plazoEntrega}
               onValueChange={(value) => updateDelivery('plazoEntrega', value)}
             >
               <SelectTrigger>
@@ -413,7 +389,7 @@ export default function Settings() {
           <div className="space-y-2">
             <Label>Tipo de Despacho</Label>
             <Select 
-              value={settings.delivery.tipoDespacho}
+              value={settings.delivery_settings.tipoDespacho}
               onValueChange={(value) => updateDelivery('tipoDespacho', value)}
             >
               <SelectTrigger>
@@ -468,7 +444,7 @@ export default function Settings() {
               </p>
             </div>
             <Switch 
-              checked={settings.automation.autoMatch} 
+              checked={settings.automation_settings.autoMatch} 
               onCheckedChange={(checked) => updateAutomation('autoMatch', checked)} 
             />
           </div>
@@ -480,7 +456,7 @@ export default function Settings() {
               </p>
             </div>
             <Switch 
-              checked={settings.automation.autoBid} 
+              checked={settings.automation_settings.autoBid} 
               onCheckedChange={(checked) => updateAutomation('autoBid', checked)}
               className="data-[state=checked]:bg-success"
             />
