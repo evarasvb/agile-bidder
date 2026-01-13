@@ -10,37 +10,77 @@
   // Detectar información de la página
   function detectPageInfo() {
     const url = window.location.href;
-    const isCompraAgil = url.includes('/CompraAgil/');
-    const isDetalle = url.includes('DetailsAcquisition.aspx');
+    const hostname = window.location.hostname;
+    
+    // Verificar que estamos en MercadoPúblico
+    const isMercadoPublico = hostname.includes('mercadopublico.cl');
+    const isCompraAgil = url.includes('/CompraAgil/') || url.includes('/Portal/Modules/Menu/');
+    const isDetalle = url.includes('DetailsAcquisition.aspx') || url.includes('Details.aspx');
+    const isListado = url.includes('/Procurement/') || url.includes('/StoreSearch/') || url.includes('/Search/');
+    const isOferta = url.includes('/Offer/') || url.includes('/Postulacion/');
+    const isPortal = url.includes('/Portal/');
     
     let codigoLicitacion = null;
     
-    // Extraer código de la URL
-    const urlMatch = url.match(/idLicitacion=([^&]+)/i) || 
-                     url.match(/CodigoExterno=([^&]+)/i);
-    if (urlMatch) {
-      codigoLicitacion = urlMatch[1];
+    // Extraer código de la URL - múltiples patrones
+    const urlPatterns = [
+      /idLicitacion=([^&]+)/i,
+      /CodigoExterno=([^&]+)/i,
+      /idAdquisicion=([^&]+)/i,
+      /qs=([^&]+)/i,
+      /id=([^&]+)/i
+    ];
+    
+    for (const pattern of urlPatterns) {
+      const match = url.match(pattern);
+      if (match) {
+        codigoLicitacion = decodeURIComponent(match[1]);
+        break;
+      }
     }
     
     // Si no está en la URL, buscar en la página
     if (!codigoLicitacion) {
-      const codeElements = document.querySelectorAll('[id*="codigo"], [id*="Codigo"], .codigo-licitacion');
+      const codePatterns = [
+        /(\d{4,}-\d+-[A-Z]+\d+)/,  // Patrón estándar: 1234-56-LP21
+        /(\d{7,})/                  // Solo números largos
+      ];
+      
+      const codeElements = document.querySelectorAll('[id*="codigo"], [id*="Codigo"], .codigo-licitacion, [class*="codigo"], h1, h2, .titulo');
       for (const el of codeElements) {
-        const match = el.textContent.match(/\d{4,}-\d+-[A-Z]+\d+/);
-        if (match) {
-          codigoLicitacion = match[0];
-          break;
+        for (const pattern of codePatterns) {
+          const match = el.textContent.match(pattern);
+          if (match) {
+            codigoLicitacion = match[1];
+            break;
+          }
         }
+        if (codigoLicitacion) break;
       }
     }
     
     return {
+      isMercadoPublico,
       isCompraAgil,
       isDetalle,
+      isListado,
+      isOferta,
+      isPortal,
       codigoLicitacion,
       url,
-      isLoggedIn: checkLoginStatus()
+      isLoggedIn: checkLoginStatus(),
+      pageType: getPageType(url)
     };
+  }
+
+  function getPageType(url) {
+    if (url.includes('/CompraAgil/')) return 'compra_agil';
+    if (url.includes('DetailsAcquisition.aspx')) return 'detalle_licitacion';
+    if (url.includes('/Offer/')) return 'formulario_oferta';
+    if (url.includes('/Portal/Modules/Menu/')) return 'menu_principal';
+    if (url.includes('/Procurement/')) return 'listado';
+    if (url.includes('/StoreSearch/')) return 'busqueda';
+    return 'otra';
   }
 
   function checkLoginStatus() {
@@ -490,12 +530,51 @@
     const pageInfo = detectPageInfo();
     console.log('FirmaVB: Page detected', pageInfo);
     
-    if (pageInfo.codigoLicitacion && (pageInfo.isCompraAgil || pageInfo.isDetalle)) {
-      injectButton(pageInfo.codigoLicitacion);
+    // Notificar al background que estamos en MercadoPúblico
+    if (pageInfo.isMercadoPublico) {
+      chrome.runtime.sendMessage({
+        action: 'PAGE_DETECTED',
+        data: pageInfo
+      }).catch(() => {});
       
-      // Auto-sync licitación al detectar la página
-      setTimeout(() => syncLicitacion(), 1500);
+      // Mostrar botón si hay código de licitación
+      if (pageInfo.codigoLicitacion) {
+        injectButton(pageInfo.codigoLicitacion);
+        setTimeout(() => syncLicitacion(), 1500);
+      }
+      
+      // Mostrar indicador de conexión
+      showConnectionIndicator();
     }
+  }
+
+  function showConnectionIndicator() {
+    const indicator = document.createElement('div');
+    indicator.id = 'firmavb-connection-indicator';
+    indicator.style.cssText = `
+      position: fixed;
+      bottom: 70px;
+      right: 20px;
+      z-index: 9999;
+      padding: 8px 12px;
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: white;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      box-shadow: 0 2px 10px rgba(34, 197, 94, 0.4);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    `;
+    indicator.innerHTML = '🟢 FirmaVB Conectada';
+    document.body.appendChild(indicator);
+    
+    // Auto-hide after 3 seconds
+    setTimeout(() => {
+      indicator.style.opacity = '0.7';
+    }, 3000);
   }
 
   // Esperar a que el DOM esté listo

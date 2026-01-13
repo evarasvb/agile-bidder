@@ -25,8 +25,8 @@
   "content_scripts": [
     {
       "matches": [
-        "*://www.mercadopublico.cl/CompraAgil/*",
-        "*://www.mercadopublico.cl/Procurement/Modules/RFB/DetailsAcquisition.aspx*"
+        "*://www.mercadopublico.cl/*",
+        "*://mercadopublico.cl/*"
       ],
       "js": ["content.js"],
       "css": ["content.css"],

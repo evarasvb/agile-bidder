@@ -151,7 +151,7 @@ export function useRegistrarCliente() {
       queryClient.invalidateQueries({ queryKey: ['cliente'] });
       toast({
         title: '¡Registro exitoso!',
-        description: 'Bienvenido a LicitaBot',
+        description: 'Bienvenido a FirmaVB',
       });
     },
     onError: (error: Error) => {

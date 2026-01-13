@@ -108,7 +108,7 @@ export default function ClienteRegistro() {
           <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
             <Sparkles className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="font-bold text-lg">LicitaBot</span>
+          <span className="font-bold text-lg">FirmaVB</span>
         </div>
         <Button variant="outline" size="sm" onClick={handleLogout}>
           Cerrar Sesión
