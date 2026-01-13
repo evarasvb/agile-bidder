@@ -11,6 +11,7 @@ export interface RolePermission {
   section_name: string;
   can_view: boolean;
   can_edit: boolean;
+  can_delete: boolean;
 }
 
 export interface UserPermissions {
@@ -91,6 +92,12 @@ export function useRolePermissions() {
     return permission?.can_edit ?? false;
   }, [permissions, userRole]);
 
+  const canDeleteSection = useCallback((sectionKey: string): boolean => {
+    if (userRole === 'super_admin') return true;
+    const permission = permissions.find(p => p.section_key === sectionKey);
+    return permission?.can_delete ?? false;
+  }, [permissions, userRole]);
+
   const updatePermission = async (permissionId: string, updates: Partial<RolePermission>) => {
     const { error } = await supabase
       .from('role_permissions')
@@ -122,6 +129,7 @@ export function useRolePermissions() {
     loading,
     canViewSection,
     canEditSection,
+    canDeleteSection,
     updatePermission,
     getAllPermissions,
     isSuperAdmin: userRole === 'super_admin',
