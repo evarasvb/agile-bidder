@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ExternalLink, FileText, TrendingUp, Shield, Clock, Building2 } from 'lucide-react';
@@ -6,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { Licitacion } from '@/hooks/useLicitaciones';
-import { toast } from 'sonner';
+import { GenerarCotizacionModal } from './GenerarCotizacionModal';
 
 // Simulated financial health data (in real app, this would come from backend)
 function getFinancialHealth(organismo: string) {
@@ -51,6 +52,7 @@ interface OpportunityCardProps {
 }
 
 export function OpportunityCard({ licitacion, onGenerarOferta }: OpportunityCardProps) {
+  const [showCotizacionModal, setShowCotizacionModal] = useState(false);
   const financialHealth = getFinancialHealth(licitacion.organismo);
   const winScore = licitacion.match_score ?? Math.floor(Math.random() * 40) + 60;
   
@@ -70,7 +72,7 @@ export function OpportunityCard({ licitacion, onGenerarOferta }: OpportunityCard
     if (onGenerarOferta) {
       onGenerarOferta();
     } else {
-      toast.info('Generando oferta...');
+      setShowCotizacionModal(true);
     }
   };
 
@@ -174,6 +176,13 @@ export function OpportunityCard({ licitacion, onGenerarOferta }: OpportunityCard
           )}
         </div>
       </CardContent>
+
+      {/* Modal para generar cotización */}
+      <GenerarCotizacionModal
+        open={showCotizacionModal}
+        onOpenChange={setShowCotizacionModal}
+        licitacion={licitacion}
+      />
     </Card>
   );
 }
