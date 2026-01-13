@@ -26,6 +26,7 @@ import ExtensionConfig from "./pages/ExtensionConfig";
 import AdminOdoo from "./pages/AdminOdoo";
 import Calendar from "./pages/Calendar";
 import Users from "./pages/Users";
+import MercadoPublico from "./pages/MercadoPublico";
 
 const queryClient = new QueryClient();
 
@@ -73,6 +74,7 @@ const App = () => (
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/history" element={<History />} />
             <Route path="/licitaciones" element={<Licitaciones />} />
+            <Route path="/mercadopublico" element={<MercadoPublico />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/extension" element={<ExtensionConfig />} />
             <Route path="/logs" element={<Logs />} />
