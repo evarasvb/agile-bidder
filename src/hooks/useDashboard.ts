@@ -135,10 +135,9 @@ export function useLicitacionesUrgentes() {
       const { data, error } = await supabase
         .from('licitaciones')
         .select('*')
-        .eq('match_encontrado', true)
         .gte('fecha_cierre', now.toISOString())
         .order('fecha_cierre', { ascending: true })
-        .limit(3);
+        .limit(5);
       
       if (error) throw error;
 

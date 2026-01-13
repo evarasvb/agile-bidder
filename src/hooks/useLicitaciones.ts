@@ -46,7 +46,7 @@ export function useLicitacionesNuevas() {
       const { data, error } = await supabase
         .from('licitaciones')
         .select('*')
-        .eq('procesada', false)
+        .or('procesada.eq.false,procesada.is.null')
         .order('created_at', { ascending: false });
       
       if (error) throw error;
