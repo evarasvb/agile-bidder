@@ -23,6 +23,7 @@ export function DownloadTemplateButton() {
         { wch: 15 },  // Precio Unitario
         { wch: 15 },  // Unidad de Medida
         { wch: 40 },  // Keywords para Matching
+        { wch: 45 },  // URL Imagen
       ];
       
       XLSX.utils.book_append_sheet(wb, wsProducts, 'Productos');

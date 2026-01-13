@@ -70,6 +70,7 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
         precio_unitario: Number(row['Precio Unitario'] || row['Precio'] || row['precio_unitario'] || 0),
         unidad_medida: row['Unidad de Medida'] || row['Unidad'] || row['unidad_medida'] || 'UN',
         keywords: row['Keywords para Matching'] || row['Keywords'] || row['keywords'] || row['palabras_clave'] || '',
+        imagen_url: row['URL Imagen'] || row['Imagen'] || row['imagen_url'] || row['Image URL'] || '',
       }));
 
       // Pre-validate for display

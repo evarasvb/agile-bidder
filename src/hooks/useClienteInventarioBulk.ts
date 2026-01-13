@@ -11,6 +11,7 @@ export interface BulkProductRow {
   precio_unitario?: number;
   unidad_medida?: string;
   keywords?: string;
+  imagen_url?: string;
 }
 
 export interface ValidationError {
@@ -78,6 +79,7 @@ export function useClienteInventarioBulk() {
           categoria: row.categoria?.trim() || null,
           precio_unitario: row.precio_unitario ? Number(row.precio_unitario) : 0,
           palabras_clave,
+          imagen_url: row.imagen_url?.trim() || null,
           activo: true,
           stock: 0,
           margen_minimo: 10,
@@ -167,7 +169,8 @@ export function generateTemplateData() {
       'Categoría': 'Insumos de Oficina',
       'Precio Unitario': 4500,
       'Unidad de Medida': 'UN',
-      'Keywords para Matching': 'papel, resma, carta, hojas, impresión'
+      'Keywords para Matching': 'papel, resma, carta, hojas, impresión',
+      'URL Imagen': 'https://ejemplo.com/images/resma-papel.jpg'
     },
     {
       'SKU': 'PROD-002',
@@ -176,7 +179,8 @@ export function generateTemplateData() {
       'Categoría': 'Tecnología',
       'Precio Unitario': 18500,
       'Unidad de Medida': 'UN',
-      'Keywords para Matching': 'toner, hp, impresora, cartucho, laser'
+      'Keywords para Matching': 'toner, hp, impresora, cartucho, laser',
+      'URL Imagen': 'https://ejemplo.com/images/toner-hp.jpg'
     },
     {
       'SKU': 'PROD-003',
@@ -185,7 +189,8 @@ export function generateTemplateData() {
       'Categoría': 'Limpieza e Higiene',
       'Precio Unitario': 3200,
       'Unidad de Medida': 'LT',
-      'Keywords para Matching': 'alcohol, gel, sanitizante, higiene, desinfectante'
+      'Keywords para Matching': 'alcohol, gel, sanitizante, higiene, desinfectante',
+      'URL Imagen': ''
     },
     {
       'SKU': 'PROD-004',
@@ -194,7 +199,8 @@ export function generateTemplateData() {
       'Categoría': 'Insumos de Oficina',
       'Precio Unitario': 2800,
       'Unidad de Medida': 'UN',
-      'Keywords para Matching': 'caja, archivo, plástico, oficina, organización'
+      'Keywords para Matching': 'caja, archivo, plástico, oficina, organización',
+      'URL Imagen': 'https://ejemplo.com/images/caja-archivo.jpg'
     },
     {
       'SKU': 'PROD-005',
@@ -203,7 +209,8 @@ export function generateTemplateData() {
       'Categoría': 'Tecnología',
       'Precio Unitario': 12990,
       'Unidad de Medida': 'UN',
-      'Keywords para Matching': 'mouse, ratón, inalámbrico, computador, periférico'
+      'Keywords para Matching': 'mouse, ratón, inalámbrico, computador, periférico',
+      'URL Imagen': 'https://ejemplo.com/images/mouse-logitech.jpg'
     }
   ];
 }
@@ -221,12 +228,14 @@ export function generateInstructionsData() {
     { 'Instrucciones para Carga Masiva de Productos': '   - Precio Unitario: Precio en pesos chilenos (solo números)' },
     { 'Instrucciones para Carga Masiva de Productos': '   - Unidad de Medida: UN (unidad), KG, LT, MT, etc.' },
     { 'Instrucciones para Carga Masiva de Productos': '   - Keywords para Matching: Palabras clave separadas por comas' },
+    { 'Instrucciones para Carga Masiva de Productos': '   - URL Imagen: Enlace directo a la imagen del producto (debe ser URL pública)' },
     { 'Instrucciones para Carga Masiva de Productos': '' },
     { 'Instrucciones para Carga Masiva de Productos': '3. NOTAS IMPORTANTES:' },
     { 'Instrucciones para Carga Masiva de Productos': '   - Si el SKU ya existe, el producto será ACTUALIZADO' },
     { 'Instrucciones para Carga Masiva de Productos': '   - No modifique los encabezados de las columnas' },
     { 'Instrucciones para Carga Masiva de Productos': '   - Puede cargar hasta 10,000 productos por archivo' },
     { 'Instrucciones para Carga Masiva de Productos': '   - Las keywords mejoran el matching con licitaciones' },
+    { 'Instrucciones para Carga Masiva de Productos': '   - Las imágenes deben ser URLs públicas accesibles (https://)' },
     { 'Instrucciones para Carga Masiva de Productos': '' },
     { 'Instrucciones para Carga Masiva de Productos': '4. FORMATOS ACEPTADOS:' },
     { 'Instrucciones para Carga Masiva de Productos': '   - Excel (.xlsx, .xls)' },
