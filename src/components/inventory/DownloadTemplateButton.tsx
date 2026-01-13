@@ -14,20 +14,20 @@ export function DownloadTemplateButton() {
       const templateData = generateInventoryTemplateData();
       const wsProducts = XLSX.utils.json_to_sheet(templateData);
       
-      // Set column widths for products sheet
+      // Set column widths for products sheet - Updated for new fields
       wsProducts['!cols'] = [
-        { wch: 15 },  // SKU
-        { wch: 35 },  // Nombre
-        { wch: 50 },  // Descripción
-        { wch: 20 },  // Categoría
-        { wch: 12 },  // Precio
+        { wch: 15 },  // Código
+        { wch: 40 },  // Descripción
+        { wch: 12 },  // Precio Neto
         { wch: 10 },  // Unidad
+        { wch: 20 },  // Categoría
         { wch: 10 },  // Stock
         { wch: 15 },  // Margen Mínimo
         { wch: 15 },  // Margen Objetivo
         { wch: 18 },  // Tiempo Entrega
         { wch: 20 },  // Proveedor
         { wch: 40 },  // Keywords
+        { wch: 50 },  // URL Imagen
       ];
       
       XLSX.utils.book_append_sheet(wb, wsProducts, 'Productos');

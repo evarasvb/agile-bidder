@@ -4,12 +4,12 @@ import { toast } from 'sonner';
 import { InventoryInput } from './useInventory';
 
 export interface BulkProductRow {
-  sku: string;
-  nombre: string;
+  sku: string;           // Codigo
+  nombre: string;        // Mapped from descripcion
   descripcion?: string;
   categoria?: string;
-  precio_unitario?: number;
-  unidad_medida?: string;
+  precio_unitario?: number; // Precio Neto
+  unidad_medida?: string;   // Unidad
   keywords?: string;
   imagen_url?: string;
   stock?: number;
@@ -31,7 +31,14 @@ export interface BulkImportResult {
   errors: ValidationError[];
 }
 
-export function useInventoryBulk() {
+export interface ImportProgress {
+  current: number;
+  total: number;
+  phase: 'validating' | 'inserting' | 'updating' | 'complete';
+  message: string;
+}
+
+export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -39,6 +46,8 @@ export function useInventoryBulk() {
       const errors: ValidationError[] = [];
       const toInsert: InventoryInput[] = [];
       const toUpdate: { id: string; data: Partial<InventoryInput> }[] = [];
+
+      onProgress?.({ current: 0, total: products.length, phase: 'validating', message: 'Validando productos...' });
 
       // Fetch existing products by SKU
       const { data: existingProducts, error: fetchError } = await supabase
@@ -53,19 +62,32 @@ export function useInventoryBulk() {
         (existingProducts || []).map(p => [p.sku.toLowerCase(), p.id])
       );
 
-      // Validate and categorize products
+      // Validate and categorize products - New required fields: codigo (sku), descripcion (nombre), precio neto, unidad
       for (let i = 0; i < products.length; i++) {
         const row = products[i];
         const rowNum = i + 2; // +2 because row 1 is header, and we're 0-indexed
 
-        // Validate required fields
+        // Validate required fields - codigo (SKU)
         if (!row.sku || row.sku.trim() === '') {
-          errors.push({ row: rowNum, field: 'SKU', message: 'SKU es obligatorio' });
+          errors.push({ row: rowNum, field: 'Código', message: 'Código es obligatorio' });
           continue;
         }
 
+        // Validate required fields - descripcion (nombre)
         if (!row.nombre || row.nombre.trim() === '') {
-          errors.push({ row: rowNum, field: 'Nombre', message: 'Nombre del Producto es obligatorio' });
+          errors.push({ row: rowNum, field: 'Descripción', message: 'Descripción es obligatoria' });
+          continue;
+        }
+
+        // Validate required fields - precio neto
+        if (row.precio_unitario === undefined || row.precio_unitario === null || isNaN(Number(row.precio_unitario))) {
+          errors.push({ row: rowNum, field: 'Precio Neto', message: 'Precio Neto es obligatorio' });
+          continue;
+        }
+
+        // Validate required fields - unidad
+        if (!row.unidad_medida || row.unidad_medida.trim() === '') {
+          errors.push({ row: rowNum, field: 'Unidad', message: 'Unidad es obligatoria' });
           continue;
         }
 
@@ -79,8 +101,8 @@ export function useInventoryBulk() {
           nombre_producto: row.nombre.trim(),
           descripcion: row.descripcion?.trim() || null,
           categoria: row.categoria?.trim() || 'General',
-          precio_unitario: row.precio_unitario ? Number(row.precio_unitario) : 0,
-          unidad_medida: row.unidad_medida?.trim() || 'UN',
+          precio_unitario: Number(row.precio_unitario),
+          unidad_medida: row.unidad_medida.trim(),
           keywords,
           imagen_url: row.imagen_url?.trim() || null,
           stock_disponible: row.stock !== undefined ? Number(row.stock) : 0,
@@ -98,15 +120,35 @@ export function useInventoryBulk() {
         } else {
           toInsert.push(productData);
         }
+
+        // Report validation progress every 100 items
+        if (i % 100 === 0) {
+          onProgress?.({ 
+            current: i, 
+            total: products.length, 
+            phase: 'validating', 
+            message: `Validando ${i + 1} de ${products.length}...` 
+          });
+        }
       }
 
-      // Perform bulk insert
+      // Perform bulk insert with progress
       let insertedCount = 0;
       if (toInsert.length > 0) {
-        // Insert in batches of 100
         const batchSize = 100;
+        const totalBatches = Math.ceil(toInsert.length / batchSize);
+        
         for (let i = 0; i < toInsert.length; i += batchSize) {
+          const batchNum = Math.floor(i / batchSize) + 1;
           const batch = toInsert.slice(i, i + batchSize);
+          
+          onProgress?.({ 
+            current: insertedCount, 
+            total: toInsert.length, 
+            phase: 'inserting', 
+            message: `Insertando lote ${batchNum} de ${totalBatches}...` 
+          });
+          
           const { error } = await supabase
             .from('inventory')
             .insert(batch);
@@ -115,7 +157,7 @@ export function useInventoryBulk() {
             errors.push({ 
               row: 0, 
               field: 'Batch', 
-              message: `Error al insertar lote: ${error.message}` 
+              message: `Error al insertar lote ${batchNum}: ${error.message}` 
             });
           } else {
             insertedCount += batch.length;
@@ -123,24 +165,46 @@ export function useInventoryBulk() {
         }
       }
 
-      // Perform updates
+      // Perform updates with progress
       let updatedCount = 0;
-      for (const item of toUpdate) {
-        const { error } = await supabase
-          .from('inventory')
-          .update(item.data)
-          .eq('id', item.id);
+      if (toUpdate.length > 0) {
+        const batchSize = 50;
         
-        if (error) {
-          errors.push({
-            row: 0,
-            field: item.data.sku || 'Unknown',
-            message: `Error al actualizar ${item.data.sku}: ${error.message}`
-          });
-        } else {
-          updatedCount++;
+        for (let i = 0; i < toUpdate.length; i++) {
+          const item = toUpdate[i];
+          
+          if (i % batchSize === 0) {
+            onProgress?.({ 
+              current: updatedCount, 
+              total: toUpdate.length, 
+              phase: 'updating', 
+              message: `Actualizando ${i + 1} de ${toUpdate.length}...` 
+            });
+          }
+          
+          const { error } = await supabase
+            .from('inventory')
+            .update(item.data)
+            .eq('id', item.id);
+          
+          if (error) {
+            errors.push({
+              row: 0,
+              field: item.data.sku || 'Unknown',
+              message: `Error al actualizar ${item.data.sku}: ${error.message}`
+            });
+          } else {
+            updatedCount++;
+          }
         }
       }
+
+      onProgress?.({ 
+        current: insertedCount + updatedCount, 
+        total: insertedCount + updatedCount, 
+        phase: 'complete', 
+        message: 'Importación completada' 
+      });
 
       return {
         inserted: insertedCount,
@@ -163,50 +227,50 @@ export function useInventoryBulk() {
   });
 }
 
-// Generate template data for inventory table
+// Generate template data for inventory table - Updated required fields
 export function generateInventoryTemplateData() {
   return [
     {
-      'SKU': 'PROD-001',
-      'Nombre': 'Resma Papel Carta 500 hojas',
-      'Descripción': 'Resma de papel carta blanco 75g/m2, 500 hojas',
-      'Categoría': 'Insumos de Oficina',
-      'Precio': 4500,
+      'Código': 'PROD-001',
+      'Descripción': 'Resma Papel Carta 500 hojas',
+      'Precio Neto': 4500,
       'Unidad': 'UN',
+      'Categoría': 'Insumos de Oficina',
       'Stock': 100,
       'Margen Mínimo (%)': 10,
       'Margen Objetivo (%)': 15,
       'Tiempo Entrega (días)': 3,
       'Proveedor': 'Papelera Nacional',
       'Keywords': 'papel, resma, carta, hojas, impresión',
+      'URL Imagen': 'https://ejemplo.com/imagen-producto.jpg',
     },
     {
-      'SKU': 'PROD-002',
-      'Nombre': 'Tóner HP 85A Compatible',
-      'Descripción': 'Tóner compatible para impresoras HP LaserJet P1102',
-      'Categoría': 'Tecnología',
-      'Precio': 18500,
+      'Código': 'PROD-002',
+      'Descripción': 'Tóner HP 85A Compatible',
+      'Precio Neto': 18500,
       'Unidad': 'UN',
+      'Categoría': 'Tecnología',
       'Stock': 50,
       'Margen Mínimo (%)': 12,
       'Margen Objetivo (%)': 20,
       'Tiempo Entrega (días)': 2,
       'Proveedor': 'TechSupply',
       'Keywords': 'toner, hp, impresora, cartucho, laser',
+      'URL Imagen': '',
     },
     {
-      'SKU': 'PROD-003',
-      'Nombre': 'Alcohol Gel 1 Litro',
-      'Descripción': 'Alcohol gel sanitizante 70%, envase 1 litro',
-      'Categoría': 'Limpieza e Higiene',
-      'Precio': 3200,
+      'Código': 'PROD-003',
+      'Descripción': 'Alcohol Gel 1 Litro',
+      'Precio Neto': 3200,
       'Unidad': 'LT',
+      'Categoría': 'Limpieza e Higiene',
       'Stock': 200,
       'Margen Mínimo (%)': 8,
       'Margen Objetivo (%)': 12,
       'Tiempo Entrega (días)': 1,
       'Proveedor': 'Higiene Total',
       'Keywords': 'alcohol, gel, sanitizante, higiene, desinfectante',
+      'URL Imagen': '',
     },
   ];
 }
@@ -217,26 +281,27 @@ export function generateInventoryInstructions() {
     { 'Instrucciones': '=== INSTRUCCIONES PARA CARGA MASIVA DE PRODUCTOS ===' },
     { 'Instrucciones': '' },
     { 'Instrucciones': '1. CAMPOS OBLIGATORIOS:' },
-    { 'Instrucciones': '   • SKU: Código único del producto (no puede repetirse)' },
-    { 'Instrucciones': '   • Nombre: Nombre descriptivo del producto' },
+    { 'Instrucciones': '   • Código: Código único del producto (SKU, no puede repetirse)' },
+    { 'Instrucciones': '   • Descripción: Nombre descriptivo del producto' },
+    { 'Instrucciones': '   • Precio Neto: Precio unitario en pesos chilenos (solo números)' },
+    { 'Instrucciones': '   • Unidad: UN (unidad), KG, LT, MT, etc.' },
     { 'Instrucciones': '' },
     { 'Instrucciones': '2. CAMPOS OPCIONALES:' },
-    { 'Instrucciones': '   • Descripción: Detalle adicional del producto' },
     { 'Instrucciones': '   • Categoría: Categoría del producto (ej: Tecnología, Limpieza)' },
-    { 'Instrucciones': '   • Precio: Precio unitario en pesos chilenos (solo números)' },
-    { 'Instrucciones': '   • Unidad: UN (unidad), KG, LT, MT, etc.' },
     { 'Instrucciones': '   • Stock: Cantidad disponible (por defecto: 0)' },
     { 'Instrucciones': '   • Margen Mínimo (%): Margen mínimo aceptable (por defecto: 10)' },
     { 'Instrucciones': '   • Margen Objetivo (%): Margen deseado (por defecto: 15)' },
     { 'Instrucciones': '   • Tiempo Entrega (días): Días para entregar (por defecto: 5)' },
     { 'Instrucciones': '   • Proveedor: Nombre del proveedor' },
     { 'Instrucciones': '   • Keywords: Palabras clave separadas por comas para matching' },
+    { 'Instrucciones': '   • URL Imagen: URL de imagen del producto (debe comenzar con https://)' },
     { 'Instrucciones': '' },
     { 'Instrucciones': '3. NOTAS IMPORTANTES:' },
-    { 'Instrucciones': '   • Si el SKU ya existe, el producto será ACTUALIZADO' },
+    { 'Instrucciones': '   • Si el Código ya existe, el producto será ACTUALIZADO' },
     { 'Instrucciones': '   • No modifique los encabezados de las columnas' },
     { 'Instrucciones': '   • Puede cargar hasta 10,000 productos por archivo' },
     { 'Instrucciones': '   • Las keywords mejoran el matching con licitaciones' },
+    { 'Instrucciones': '   • Las imágenes deben ser URLs válidas (https://)' },
     { 'Instrucciones': '' },
     { 'Instrucciones': '4. FORMATOS ACEPTADOS: Excel (.xlsx, .xls), CSV (.csv)' },
   ];
