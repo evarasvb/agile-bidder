@@ -11,7 +11,8 @@ import {
   Chrome,
   CalendarDays,
   Users,
-  Globe
+  Globe,
+  BarChart3
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,7 @@ const navItems: NavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Licitaciones", url: "/licitaciones", icon: FileSearch },
   { title: "MercadoPúblico", url: "/mercadopublico", icon: Globe },
+  { title: "BI Dashboard", url: "/bi-dashboard", icon: BarChart3 },
   { title: "Calendario", url: "/calendar", icon: CalendarDays },
   { title: "Inventario", url: "/inventory", icon: Package },
   { title: "Odoo CRM", url: "/odoo/dashboard", icon: Link2, requiresOdoo: true },
