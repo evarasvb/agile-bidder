@@ -11,8 +11,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Loader2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Loader2, Images, Package } from "lucide-react";
 import { InventoryItem } from "@/hooks/useInventory";
+import { ImageDropzone, ImagePreview } from "./ImageDropzone";
+import { useProductImages, useUploadProductImage, useDeleteProductImage, useSetPrincipalImage } from "@/hooks/useProductImages";
+import { useAuthUser } from "@/hooks/useCliente";
 
 interface EditProductDialogProps {
   open: boolean;
@@ -29,6 +34,8 @@ export function EditProductDialog({
   onSave,
   isLoading,
 }: EditProductDialogProps) {
+  const { user } = useAuthUser();
+  const [activeTab, setActiveTab] = useState("info");
   const [formData, setFormData] = useState({
     sku: "",
     nombre_producto: "",
@@ -41,6 +48,15 @@ export function EditProductDialog({
     keywords: "",
     activo: true,
   });
+
+  // Image management
+  const { data: images = [], isLoading: imagesLoading } = useProductImages(
+    product?.id || null, 
+    'inventory'
+  );
+  const uploadImage = useUploadProductImage();
+  const deleteImage = useDeleteProductImage();
+  const setPrincipal = useSetPrincipalImage();
 
   useEffect(() => {
     if (product) {
@@ -80,135 +96,212 @@ export function EditProductDialog({
     });
   };
 
+  const handleFilesSelected = async (files: File[]) => {
+    if (!product || !user) return;
+    
+    for (const file of files) {
+      await uploadImage.mutateAsync({
+        productId: product.id,
+        productType: 'inventory',
+        file,
+        userId: user.id,
+        esPrincipal: images.length === 0
+      });
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Editar Producto</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="sku">SKU</Label>
-              <Input
-                id="sku"
-                value={formData.sku}
-                onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="categoria">Categoría</Label>
-              <Input
-                id="categoria"
-                value={formData.categoria}
-                onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
-              />
-            </div>
-          </div>
+        
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="info" className="gap-2">
+              <Package className="h-4 w-4" />
+              Información
+            </TabsTrigger>
+            <TabsTrigger value="images" className="gap-2">
+              <Images className="h-4 w-4" />
+              Imágenes ({images.length})
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="info" className="flex-1 overflow-auto mt-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="sku">SKU</Label>
+                  <Input
+                    id="sku"
+                    value={formData.sku}
+                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="categoria">Categoría</Label>
+                  <Input
+                    id="categoria"
+                    value={formData.categoria}
+                    onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
+                  />
+                </div>
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="nombre">Nombre del Producto</Label>
-            <Input
-              id="nombre"
-              value={formData.nombre_producto}
-              onChange={(e) => setFormData({ ...formData, nombre_producto: e.target.value })}
-              required
+              <div className="space-y-2">
+                <Label htmlFor="nombre">Nombre del Producto</Label>
+                <Input
+                  id="nombre"
+                  value={formData.nombre_producto}
+                  onChange={(e) => setFormData({ ...formData, nombre_producto: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="descripcion">Descripción</Label>
+                <Textarea
+                  id="descripcion"
+                  value={formData.descripcion}
+                  onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                  rows={2}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="precio">Precio Unitario ($)</Label>
+                  <Input
+                    id="precio"
+                    type="number"
+                    min="0"
+                    value={formData.precio_unitario}
+                    onChange={(e) => setFormData({ ...formData, precio_unitario: Number(e.target.value) })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="margen">Margen Mínimo (%)</Label>
+                  <Input
+                    id="margen"
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={formData.margen_minimo}
+                    onChange={(e) => setFormData({ ...formData, margen_minimo: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="stock">Stock Disponible</Label>
+                  <Input
+                    id="stock"
+                    type="number"
+                    min="0"
+                    value={formData.stock_disponible}
+                    onChange={(e) => setFormData({ ...formData, stock_disponible: Number(e.target.value) })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="tiempo">Tiempo Entrega (días)</Label>
+                  <Input
+                    id="tiempo"
+                    type="number"
+                    min="1"
+                    value={formData.tiempo_entrega_dias}
+                    onChange={(e) => setFormData({ ...formData, tiempo_entrega_dias: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="keywords">Palabras Clave (separadas por coma)</Label>
+                <Input
+                  id="keywords"
+                  value={formData.keywords}
+                  onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
+                  placeholder="papel, oficina, resma"
+                />
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div>
+                  <Label htmlFor="activo" className="font-medium">Producto Activo</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Los productos inactivos no participan en el matching
+                  </p>
+                </div>
+                <Switch
+                  id="activo"
+                  checked={formData.activo}
+                  onCheckedChange={(checked) => setFormData({ ...formData, activo: checked })}
+                />
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Guardar Cambios
+                </Button>
+              </DialogFooter>
+            </form>
+          </TabsContent>
+          
+          <TabsContent value="images" className="flex-1 flex flex-col gap-4 mt-4 overflow-hidden">
+            {/* Upload Area */}
+            <ImageDropzone 
+              onFilesSelected={handleFilesSelected}
+              isUploading={uploadImage.isPending}
+              multiple
             />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="descripcion">Descripción</Label>
-            <Textarea
-              id="descripcion"
-              value={formData.descripcion}
-              onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-              rows={2}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="precio">Precio Unitario ($)</Label>
-              <Input
-                id="precio"
-                type="number"
-                min="0"
-                value={formData.precio_unitario}
-                onChange={(e) => setFormData({ ...formData, precio_unitario: Number(e.target.value) })}
-                required
-              />
+            
+            {/* Images Grid */}
+            {imagesLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : images.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Images className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                <p>No hay imágenes</p>
+                <p className="text-sm">Arrastra imágenes o haz clic para subir</p>
+              </div>
+            ) : (
+              <ScrollArea className="flex-1">
+                <div className="grid grid-cols-4 gap-3 p-1">
+                  {images.map((image) => (
+                    <ImagePreview
+                      key={image.id}
+                      src={image.image_url}
+                      isPrincipal={image.es_principal}
+                      onRemove={() => deleteImage.mutate(image)}
+                      onSetPrincipal={() => setPrincipal.mutate(image)}
+                      isLoading={deleteImage.isPending || setPrincipal.isPending}
+                      size="lg"
+                    />
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+            
+            <div className="flex justify-between items-center pt-2 border-t">
+              <span className="text-sm text-muted-foreground">
+                {images.length} imagen{images.length !== 1 ? 'es' : ''}
+              </span>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Cerrar
+              </Button>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="margen">Margen Mínimo (%)</Label>
-              <Input
-                id="margen"
-                type="number"
-                min="0"
-                max="100"
-                value={formData.margen_minimo}
-                onChange={(e) => setFormData({ ...formData, margen_minimo: Number(e.target.value) })}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="stock">Stock Disponible</Label>
-              <Input
-                id="stock"
-                type="number"
-                min="0"
-                value={formData.stock_disponible}
-                onChange={(e) => setFormData({ ...formData, stock_disponible: Number(e.target.value) })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="tiempo">Tiempo Entrega (días)</Label>
-              <Input
-                id="tiempo"
-                type="number"
-                min="1"
-                value={formData.tiempo_entrega_dias}
-                onChange={(e) => setFormData({ ...formData, tiempo_entrega_dias: Number(e.target.value) })}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="keywords">Palabras Clave (separadas por coma)</Label>
-            <Input
-              id="keywords"
-              value={formData.keywords}
-              onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
-              placeholder="papel, oficina, resma"
-            />
-          </div>
-
-          <div className="flex items-center justify-between rounded-lg border p-3">
-            <div>
-              <Label htmlFor="activo" className="font-medium">Producto Activo</Label>
-              <p className="text-sm text-muted-foreground">
-                Los productos inactivos no participan en el matching
-              </p>
-            </div>
-            <Switch
-              id="activo"
-              checked={formData.activo}
-              onCheckedChange={(checked) => setFormData({ ...formData, activo: checked })}
-            />
-          </div>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Guardar Cambios
-            </Button>
-          </DialogFooter>
-        </form>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
