@@ -375,6 +375,48 @@ export type Database = {
           },
         ]
       }
+      import_history: {
+        Row: {
+          created_at: string
+          error_count: number
+          errors: Json | null
+          file_name: string
+          file_type: string
+          id: string
+          imported_by: string | null
+          inserted_count: number
+          status: string
+          total_rows: number
+          updated_count: number
+        }
+        Insert: {
+          created_at?: string
+          error_count?: number
+          errors?: Json | null
+          file_name: string
+          file_type: string
+          id?: string
+          imported_by?: string | null
+          inserted_count?: number
+          status?: string
+          total_rows?: number
+          updated_count?: number
+        }
+        Update: {
+          created_at?: string
+          error_count?: number
+          errors?: Json | null
+          file_name?: string
+          file_type?: string
+          id?: string
+          imported_by?: string | null
+          inserted_count?: number
+          status?: string
+          total_rows?: number
+          updated_count?: number
+        }
+        Relationships: []
+      }
       inventory: {
         Row: {
           activo: boolean

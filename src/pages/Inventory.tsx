@@ -29,6 +29,7 @@ import { BulkDeleteDialog } from "@/components/inventory/BulkDeleteDialog";
 import { BulkUploadDialog } from "@/components/inventory/BulkUploadDialog";
 import { DownloadTemplateButton } from "@/components/inventory/DownloadTemplateButton";
 import { ProductGallery } from "@/components/inventory/ProductGallery";
+import { ImportHistoryPanel } from "@/components/inventory/ImportHistoryPanel";
 import { useAuthUser } from "@/hooks/useCliente";
 import * as XLSX from 'xlsx';
 
@@ -385,6 +386,9 @@ export default function Inventory() {
           </div>
         </div>
       </div>
+
+      {/* Import History Panel */}
+      <ImportHistoryPanel />
 
       {/* Search and Filters */}
       <div className="flex items-center gap-4">
