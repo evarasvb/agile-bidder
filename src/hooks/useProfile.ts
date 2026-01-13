@@ -12,22 +12,28 @@ interface Profile {
   updated_at: string;
 }
 
+export type AppRole = 'super_admin' | 'admin' | 'user' | 'vendedor' | 'visor';
+
 interface UserRole {
-  role: 'admin' | 'user';
+  role: AppRole;
 }
 
 export function useProfile() {
   const { user, isAuthenticated } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [roles, setRoles] = useState<UserRole[]>([]);
+  const [primaryRole, setPrimaryRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
       setProfile(null);
       setRoles([]);
+      setPrimaryRole(null);
       setIsAdmin(false);
+      setIsSuperAdmin(false);
       setLoading(false);
       return;
     }
@@ -56,8 +62,17 @@ export function useProfile() {
         if (rolesError) {
           console.error('Error fetching roles:', rolesError);
         } else {
-          setRoles(rolesData || []);
-          setIsAdmin(rolesData?.some(r => r.role === 'admin') || false);
+          const typedRoles = (rolesData || []) as UserRole[];
+          setRoles(typedRoles);
+          
+          // Determinar el rol principal (el de mayor jerarquía)
+          const roleHierarchy: AppRole[] = ['super_admin', 'admin', 'user', 'vendedor', 'visor'];
+          const userRoles = typedRoles.map(r => r.role);
+          const primary = roleHierarchy.find(r => userRoles.includes(r)) || null;
+          setPrimaryRole(primary);
+          
+          setIsSuperAdmin(userRoles.includes('super_admin'));
+          setIsAdmin(userRoles.includes('admin') || userRoles.includes('super_admin'));
         }
       } catch (error) {
         console.error('Error in fetchProfile:', error);
@@ -87,7 +102,9 @@ export function useProfile() {
   return {
     profile,
     roles,
+    primaryRole,
     isAdmin,
+    isSuperAdmin,
     loading,
     updateProfile,
   };

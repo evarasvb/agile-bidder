@@ -47,7 +47,7 @@ export default function Auth() {
   // Redirect if already authenticated
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      navigate('/clientes/dashboard');
+      navigate('/dashboard');
     }
   }, [isAuthenticated, authLoading, navigate]);
 
