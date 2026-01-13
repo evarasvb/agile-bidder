@@ -47,12 +47,25 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
       const toInsert: InventoryInput[] = [];
       const toUpdate: { id: string; data: Partial<InventoryInput> }[] = [];
 
+      onProgress?.({ current: 0, total: products.length, phase: 'validating', message: 'Obteniendo usuario autenticado...' });
+
+      // Get current authenticated user
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        throw new Error('Debes iniciar sesión para importar productos');
+      }
+
+      const userId = user.id;
+      console.log('Importing products for user:', userId);
+
       onProgress?.({ current: 0, total: products.length, phase: 'validating', message: 'Validando productos...' });
 
-      // Fetch existing products by SKU
+      // Fetch existing products by SKU for this user
       const { data: existingProducts, error: fetchError } = await supabase
         .from('inventory')
-        .select('id, sku');
+        .select('id, sku')
+        .eq('user_id', userId);
 
       if (fetchError) {
         throw new Error(`Error al verificar productos existentes: ${fetchError.message}`);
@@ -111,6 +124,7 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
           tiempo_entrega_dias: row.tiempo_entrega_dias !== undefined ? Number(row.tiempo_entrega_dias) : 5,
           proveedor: row.proveedor?.trim() || null,
           activo: true,
+          user_id: userId, // CRITICAL: Include user_id for RLS
         };
 
         // Check if SKU already exists
