@@ -1373,9 +1373,345 @@ export type Database = {
         }
         Relationships: []
       }
+      vendedor_asignaciones: {
+        Row: {
+          created_at: string
+          estado: string | null
+          fecha_cierre: string | null
+          id: string
+          licitacion_codigo: string | null
+          licitacion_id: string
+          monto_estimado: number | null
+          notas: string | null
+          updated_at: string
+          vendedor_id: string
+        }
+        Insert: {
+          created_at?: string
+          estado?: string | null
+          fecha_cierre?: string | null
+          id?: string
+          licitacion_codigo?: string | null
+          licitacion_id: string
+          monto_estimado?: number | null
+          notas?: string | null
+          updated_at?: string
+          vendedor_id: string
+        }
+        Update: {
+          created_at?: string
+          estado?: string | null
+          fecha_cierre?: string | null
+          id?: string
+          licitacion_codigo?: string | null
+          licitacion_id?: string
+          monto_estimado?: number | null
+          notas?: string | null
+          updated_at?: string
+          vendedor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendedor_asignaciones_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "v_asignaciones_detalle"
+            referencedColumns: ["vendedor_id"]
+          },
+          {
+            foreignKeyName: "vendedor_asignaciones_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "v_reporte_equipo"
+            referencedColumns: ["vendedor_id"]
+          },
+          {
+            foreignKeyName: "vendedor_asignaciones_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "v_vendedor_dashboard"
+            referencedColumns: ["vendedor_id"]
+          },
+          {
+            foreignKeyName: "vendedor_asignaciones_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vendedores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vendedor_calendario: {
+        Row: {
+          asignacion_id: string | null
+          color: string | null
+          created_at: string
+          fecha_fin: string | null
+          fecha_inicio: string
+          id: string
+          tipo_evento: string | null
+          titulo: string
+          vendedor_id: string
+        }
+        Insert: {
+          asignacion_id?: string | null
+          color?: string | null
+          created_at?: string
+          fecha_fin?: string | null
+          fecha_inicio: string
+          id?: string
+          tipo_evento?: string | null
+          titulo: string
+          vendedor_id: string
+        }
+        Update: {
+          asignacion_id?: string | null
+          color?: string | null
+          created_at?: string
+          fecha_fin?: string | null
+          fecha_inicio?: string
+          id?: string
+          tipo_evento?: string | null
+          titulo?: string
+          vendedor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendedor_calendario_asignacion_id_fkey"
+            columns: ["asignacion_id"]
+            isOneToOne: false
+            referencedRelation: "v_asignaciones_detalle"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendedor_calendario_asignacion_id_fkey"
+            columns: ["asignacion_id"]
+            isOneToOne: false
+            referencedRelation: "vendedor_asignaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendedor_calendario_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "v_asignaciones_detalle"
+            referencedColumns: ["vendedor_id"]
+          },
+          {
+            foreignKeyName: "vendedor_calendario_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "v_reporte_equipo"
+            referencedColumns: ["vendedor_id"]
+          },
+          {
+            foreignKeyName: "vendedor_calendario_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "v_vendedor_dashboard"
+            referencedColumns: ["vendedor_id"]
+          },
+          {
+            foreignKeyName: "vendedor_calendario_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vendedores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vendedor_indicadores: {
+        Row: {
+          created_at: string
+          id: string
+          monto_adjudicado: number | null
+          periodo: string
+          tasa_adjudicacion: number | null
+          total_adjudicadas: number | null
+          total_asignadas: number | null
+          total_postuladas: number | null
+          updated_at: string
+          vendedor_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          monto_adjudicado?: number | null
+          periodo: string
+          tasa_adjudicacion?: number | null
+          total_adjudicadas?: number | null
+          total_asignadas?: number | null
+          total_postuladas?: number | null
+          updated_at?: string
+          vendedor_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          monto_adjudicado?: number | null
+          periodo?: string
+          tasa_adjudicacion?: number | null
+          total_adjudicadas?: number | null
+          total_asignadas?: number | null
+          total_postuladas?: number | null
+          updated_at?: string
+          vendedor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendedor_indicadores_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "v_asignaciones_detalle"
+            referencedColumns: ["vendedor_id"]
+          },
+          {
+            foreignKeyName: "vendedor_indicadores_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "v_reporte_equipo"
+            referencedColumns: ["vendedor_id"]
+          },
+          {
+            foreignKeyName: "vendedor_indicadores_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "v_vendedor_dashboard"
+            referencedColumns: ["vendedor_id"]
+          },
+          {
+            foreignKeyName: "vendedor_indicadores_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vendedores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vendedores: {
+        Row: {
+          activo: boolean | null
+          created_at: string
+          email: string
+          id: string
+          nombre: string
+          rol: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          created_at?: string
+          email: string
+          id?: string
+          nombre: string
+          rol?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          activo?: boolean | null
+          created_at?: string
+          email?: string
+          id?: string
+          nombre?: string
+          rol?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
+      v_asignaciones_detalle: {
+        Row: {
+          created_at: string | null
+          estado: string | null
+          fecha_cierre: string | null
+          id: string | null
+          licitacion_codigo: string | null
+          licitacion_id: string | null
+          monto_estimado: number | null
+          notas: string | null
+          vendedor_email: string | null
+          vendedor_id: string | null
+          vendedor_nombre: string | null
+        }
+        Relationships: []
+      }
+      v_calendario_vendedor: {
+        Row: {
+          color: string | null
+          estado_asignacion: string | null
+          fecha_fin: string | null
+          fecha_inicio: string | null
+          id: string | null
+          licitacion_codigo: string | null
+          monto_estimado: number | null
+          tipo_evento: string | null
+          titulo: string | null
+          vendedor_id: string | null
+          vendedor_nombre: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendedor_calendario_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "v_asignaciones_detalle"
+            referencedColumns: ["vendedor_id"]
+          },
+          {
+            foreignKeyName: "vendedor_calendario_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "v_reporte_equipo"
+            referencedColumns: ["vendedor_id"]
+          },
+          {
+            foreignKeyName: "vendedor_calendario_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "v_vendedor_dashboard"
+            referencedColumns: ["vendedor_id"]
+          },
+          {
+            foreignKeyName: "vendedor_calendario_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vendedores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_reporte_equipo: {
+        Row: {
+          adjudicados: number | null
+          email: string | null
+          monto_adjudicado: number | null
+          monto_total: number | null
+          nombre: string | null
+          postulados: number | null
+          rol: string | null
+          tasa_adjudicacion: number | null
+          total_negocios: number | null
+          vendedor_id: string | null
+        }
+        Relationships: []
+      }
+      v_vendedor_dashboard: {
+        Row: {
+          email: string | null
+          monto_adjudicado: number | null
+          nombre: string | null
+          tasa_adjudicacion: number | null
+          total_adjudicadas: number | null
+          total_asignadas: number | null
+          total_postuladas: number | null
+          vendedor_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       has_role: {
