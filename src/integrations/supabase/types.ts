@@ -51,6 +51,7 @@ export type Database = {
           created_at: string
           descripcion: string | null
           id: string
+          imagen_url: string | null
           margen_minimo: number | null
           nombre: string
           palabras_clave: string[] | null
@@ -67,6 +68,7 @@ export type Database = {
           created_at?: string
           descripcion?: string | null
           id?: string
+          imagen_url?: string | null
           margen_minimo?: number | null
           nombre: string
           palabras_clave?: string[] | null
@@ -83,6 +85,7 @@ export type Database = {
           created_at?: string
           descripcion?: string | null
           id?: string
+          imagen_url?: string | null
           margen_minimo?: number | null
           nombre?: string
           palabras_clave?: string[] | null
