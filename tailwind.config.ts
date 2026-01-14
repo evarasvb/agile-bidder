@@ -14,8 +14,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['Poppins', 'Inter', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+        heading: ['Poppins', 'system-ui', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -87,8 +88,12 @@ export default {
         },
         firmavb: {
           blue: "hsl(var(--firmavb-blue))",
+          celeste: "hsl(var(--firmavb-celeste))",
           red: "hsl(var(--firmavb-red))",
+          green: "hsl(var(--firmavb-green))",
+          orange: "hsl(var(--firmavb-orange))",
           gray: "hsl(var(--firmavb-gray))",
+          cream: "hsl(var(--firmavb-cream))",
           black: "hsl(var(--firmavb-black))",
         },
       },

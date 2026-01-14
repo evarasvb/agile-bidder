@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -70,10 +70,22 @@
     --chart-4: 280 60% 50%;
     --chart-5: 0 72% 51%;
 
-    /* FirmaVB Brand Colors - Pantone 2728 C & 1805 */
-    --firmavb-blue: 227 40% 45%;
-    --firmavb-red: 351 66% 59%;
-    --firmavb-gray: 240 5% 94%;
+    /* FirmaVB Brand Colors - Official Brand Manual */
+    /* Azul corporativo #1E3A8A */
+    --firmavb-blue: 222 69% 33%;
+    /* Celeste #3B82F6 */
+    --firmavb-celeste: 217 91% 60%;
+    /* Rojo alerta/CTA #D85066 */
+    --firmavb-red: 351 60% 60%;
+    /* Verde éxito #10B981 */
+    --firmavb-green: 160 84% 40%;
+    /* Naranja alerta #F59E0B */
+    --firmavb-orange: 38 92% 50%;
+    /* Gris claro fondo #F3F4F6 */
+    --firmavb-gray: 220 14% 96%;
+    /* Cream para skeletons #EFEFF1 */
+    --firmavb-cream: 240 10% 94%;
+    /* Negro texto #0F0F0F */
     --firmavb-black: 0 0% 6%;
 
     /* Financial Health Colors */
@@ -140,7 +152,12 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Poppins', 'Inter', system-ui, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Poppins', system-ui, sans-serif;
+    font-weight: 600;
   }
 
   /* Monospace for data/numbers */
