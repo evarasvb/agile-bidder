@@ -21,7 +21,7 @@ export function StatusBar() {
   };
 
   return (
-    <header className="sticky top-0 z-30 h-16 border-b border-border bg-card/80 backdrop-blur-sm">
+    <header className="sticky top-0 z-30 h-16 border-b border-border bg-white/95 backdrop-blur-sm shadow-sm">
       <div className="flex h-full items-center justify-between px-6">
         {/* Left: Page Title Area */}
         <div className="flex items-center gap-4">

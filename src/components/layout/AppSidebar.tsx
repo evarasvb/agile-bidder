@@ -101,14 +101,14 @@ export function AppSidebar() {
 
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
-      {/* Logo */}
+      {/* Logo - FirmaVB Branding */}
       <div className="flex h-16 items-center gap-3 px-6 border-b border-sidebar-border">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary">
-          <Zap className="h-5 w-5 text-sidebar-primary-foreground" />
+        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm">
+          <span className="text-firmavb-blue font-heading font-bold text-lg">FV</span>
         </div>
         <div>
-          <h1 className="text-lg font-semibold text-sidebar-foreground">FirmaVB</h1>
-          <p className="text-xs text-sidebar-muted">Procurement Engine</p>
+          <h1 className="text-lg font-heading font-bold text-sidebar-foreground">FirmaVB</h1>
+          <p className="text-[10px] text-sidebar-muted font-medium tracking-wide">Inteligencia para Ganar Más</p>
         </div>
       </div>
 
