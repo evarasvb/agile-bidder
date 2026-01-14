@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "FirmaVB Postulador",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Automatiza postulaciones a Compras Ágiles en MercadoPúblico.cl - Conectado con FirmaVB",
   "author": "FirmaVB",
   
@@ -9,12 +9,16 @@
     "activeTab",
     "storage",
     "notifications",
-    "alarms"
+    "alarms",
+    "tabs",
+    "scripting"
   ],
   
   "host_permissions": [
     "*://www.mercadopublico.cl/*",
-    "*://*.supabase.co/*"
+    "*://mercadopublico.cl/*",
+    "*://*.supabase.co/*",
+    "https://compraagil-pending-sync.onrender.com/*"
   ],
   
   "background": {
@@ -52,8 +56,8 @@
   
   "web_accessible_resources": [
     {
-      "resources": ["icons/*"],
-      "matches": ["*://www.mercadopublico.cl/*"]
+      "resources": ["icons/*", "scraper.js"],
+      "matches": ["*://www.mercadopublico.cl/*", "*://mercadopublico.cl/*"]
     }
   ]
 }
