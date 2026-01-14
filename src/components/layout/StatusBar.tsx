@@ -6,6 +6,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import { OdooSyncErrorNotification } from "@/components/odoo/OdooSyncErrorNotification";
 import { useExtensionStatus } from "@/hooks/useExtensionStatus";
+import { SystemHealthIndicator } from "@/components/dashboard/SystemHealthIndicator";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -25,6 +26,7 @@ export function StatusBar() {
         {/* Left: Page Title Area */}
         <div className="flex items-center gap-4">
           <h2 className="text-lg font-semibold text-foreground">Centro de Control</h2>
+          <SystemHealthIndicator />
         </div>
 
         {/* Right: Status Indicators */}
