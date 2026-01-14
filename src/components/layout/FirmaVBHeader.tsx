@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import firmavbLogo from "@/assets/firmavb-logo.png";
 
 interface FirmaVBHeaderProps {
   title?: string;
@@ -11,9 +12,11 @@ export function FirmaVBLogo({ className }: { className?: string }) {
   return (
     <div className={cn("flex items-center gap-2", className)}>
       {/* FV Circle Logo */}
-      <div className="relative h-10 w-10 rounded-full bg-firmavb-blue flex items-center justify-center shadow-md">
-        <span className="text-white font-heading font-bold text-lg tracking-tight">FV</span>
-      </div>
+      <img 
+        src={firmavbLogo} 
+        alt="FirmaVB Logo" 
+        className="h-10 w-10 rounded-full object-cover shadow-md"
+      />
       {/* Brand Name */}
       <div className="flex flex-col">
         <span className="text-xl font-heading font-bold text-firmavb-blue leading-tight">FirmaVB</span>

@@ -5,7 +5,6 @@ import {
   History, 
   FileText,
   FileSearch,
-  Zap,
   LogOut,
   Link2,
   Chrome,
@@ -27,6 +26,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { useCliente } from "@/hooks/useCliente";
 import { Badge } from "@/components/ui/badge";
+import firmavbLogo from "@/assets/firmavb-logo.png";
 
 interface NavItem {
   title: string;
@@ -103,9 +103,11 @@ export function AppSidebar() {
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
       {/* Logo - FirmaVB Branding */}
       <div className="flex h-16 items-center gap-3 px-6 border-b border-sidebar-border">
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm">
-          <span className="text-firmavb-blue font-heading font-bold text-lg">FV</span>
-        </div>
+        <img 
+          src={firmavbLogo} 
+          alt="FirmaVB Logo" 
+          className="h-9 w-9 rounded-full object-cover shadow-sm"
+        />
         <div>
           <h1 className="text-lg font-heading font-bold text-sidebar-foreground">FirmaVB</h1>
           <p className="text-[10px] text-sidebar-muted font-medium tracking-wide">Inteligencia para Ganar Más</p>
