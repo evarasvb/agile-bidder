@@ -1659,6 +1659,35 @@ export type Database = {
       }
     }
     Views: {
+      calendario_eventos: {
+        Row: {
+          codigo: string | null
+          fecha_evento: string | null
+          institucion_nombre: string | null
+          nombre: string | null
+          presupuesto_estimado: number | null
+          tipo_evento: string | null
+          tipo_proceso: string | null
+        }
+        Relationships: []
+      }
+      oportunidades_all: {
+        Row: {
+          codigo: string | null
+          estado: string | null
+          fecha_cierre: string | null
+          fecha_publicacion: string | null
+          institucion_nombre: string | null
+          link_oficial: string | null
+          match_encontrado: boolean | null
+          match_score: number | null
+          nombre: string | null
+          presupuesto_estimado: number | null
+          procesada: boolean | null
+          tipo_proceso: string | null
+        }
+        Relationships: []
+      }
       v_asignaciones_detalle: {
         Row: {
           created_at: string | null
