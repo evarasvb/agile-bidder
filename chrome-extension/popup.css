@@ -1,3 +1,11 @@
+/* FirmaVB Brand Colors */
+:root {
+  --firmavb-blue: #4657A2;
+  --firmavb-red: #D85066;
+  --firmavb-gray: #EFEFF1;
+  --firmavb-black: #0F0F0F;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -7,9 +15,9 @@
 body {
   width: 380px;
   min-height: 400px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-  background: #f8fafc;
-  color: #1e293b;
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  background: var(--firmavb-gray);
+  color: var(--firmavb-black);
 }
 
 .hidden {
@@ -20,15 +28,21 @@ body {
   padding: 16px;
 }
 
-/* Header */
+/* Header with Logo */
 .header {
   margin-bottom: 16px;
+}
+
+.header-logo {
+  height: 40px;
+  width: auto;
+  margin-bottom: 8px;
 }
 
 .header h1 {
   font-size: 20px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--firmavb-blue);
 }
 
 .header-top {
@@ -53,7 +67,7 @@ body {
 
 /* Badge */
 .badge {
-  background: #3b82f6;
+  background: var(--firmavb-blue);
   color: white;
   padding: 2px 8px;
   border-radius: 12px;
@@ -75,7 +89,7 @@ body {
   width: 40px;
   height: 40px;
   border: 3px solid #e2e8f0;
-  border-top-color: #3b82f6;
+  border-top-color: var(--firmavb-blue);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -111,8 +125,8 @@ body {
 
 .login-form input:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: var(--firmavb-blue);
+  box-shadow: 0 0 0 3px rgba(70, 87, 162, 0.1);
 }
 
 .help-text {
@@ -123,7 +137,7 @@ body {
 
 .error-text {
   font-size: 12px;
-  color: #dc2626;
+  color: var(--firmavb-red);
   margin-top: 8px;
 }
 
@@ -131,7 +145,7 @@ body {
 .btn-primary {
   width: 100%;
   padding: 12px;
-  background: #3b82f6;
+  background: var(--firmavb-blue);
   color: white;
   border: none;
   border-radius: 8px;
@@ -143,11 +157,11 @@ body {
 }
 
 .btn-primary:hover {
-  background: #2563eb;
+  background: #3a4a8a;
 }
 
 .btn-primary:disabled {
-  background: #93c5fd;
+  background: #a3aed1;
   cursor: not-allowed;
 }
 
@@ -185,7 +199,7 @@ body {
 .btn-danger {
   width: 100%;
   padding: 12px;
-  background: #dc2626;
+  background: var(--firmavb-red);
   color: white;
   border: none;
   border-radius: 8px;
@@ -196,7 +210,7 @@ body {
 }
 
 .btn-danger:hover {
-  background: #b91c1c;
+  background: #c43d53;
 }
 
 /* Sync Bar */
@@ -235,7 +249,7 @@ body {
   box-shadow: 0 1px 3px rgba(0,0,0,0.08);
   cursor: pointer;
   transition: all 0.2s;
-  border-left: 4px solid #3b82f6;
+  border-left: 4px solid var(--firmavb-blue);
 }
 
 .match-card:hover {
@@ -261,8 +275,8 @@ body {
 .match-code {
   font-size: 11px;
   font-weight: 600;
-  color: #3b82f6;
-  background: #eff6ff;
+  color: var(--firmavb-blue);
+  background: rgba(70, 87, 162, 0.1);
   padding: 2px 6px;
   border-radius: 4px;
 }
@@ -308,7 +322,7 @@ body {
 }
 
 .match-deadline.urgent {
-  color: #dc2626;
+  color: var(--firmavb-red);
   font-weight: 600;
 }
 
@@ -385,6 +399,6 @@ body {
 }
 
 .status-badge.submitted {
-  background: #dbeafe;
-  color: #2563eb;
+  background: rgba(70, 87, 162, 0.1);
+  color: var(--firmavb-blue);
 }

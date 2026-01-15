@@ -27,7 +27,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { useCliente } from "@/hooks/useCliente";
 import { Badge } from "@/components/ui/badge";
-import firmavbLogo from "@/assets/firmavb-logo.png";
+import logoFirmavbBlanco from "@/assets/logo-firmavb-blanco.png";
 
 interface NavItem {
   title: string;
@@ -115,23 +115,13 @@ export function AppSidebar() {
 
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
-      {/* Logo Header - FirmaVB Branding with Red Line */}
-      <div className="flex h-16 items-center gap-3 px-5 border-b border-sidebar-border bg-sidebar">
+      {/* Logo Header - FirmaVB Branding */}
+      <div className="flex h-16 items-center justify-center px-5 border-b border-sidebar-border bg-sidebar">
         <img 
-          src={firmavbLogo} 
+          src={logoFirmavbBlanco} 
           alt="FirmaVB" 
-          className="h-9 w-auto object-contain"
+          className="h-10 w-auto object-contain"
         />
-        <div className="flex flex-col">
-          <div className="relative inline-block">
-            <span className="text-lg font-bold text-sidebar-foreground tracking-tight">FirmaVB</span>
-            {/* Red underline - brand characteristic */}
-            <div className="absolute -bottom-0.5 left-0 w-full h-0.5 bg-sidebar-primary rounded-full" />
-          </div>
-          <span className="text-[9px] text-sidebar-muted font-medium mt-1">
-            conectando grandes marcas
-          </span>
-        </div>
       </div>
 
       {/* User Profile with Notification Bell */}

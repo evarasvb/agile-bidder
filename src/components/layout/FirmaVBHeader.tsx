@@ -1,5 +1,7 @@
 import { cn } from "@/lib/utils";
-import firmavbLogo from "@/assets/firmavb-logo.png";
+import logoFirmavbOriginal from "@/assets/logo-firmavb-original.png";
+import logoFirmavbBlanco from "@/assets/logo-firmavb-blanco.png";
+import logoFirmavbNegro from "@/assets/logo-firmavb-negro.png";
 
 interface FirmaVBHeaderProps {
   title?: string;
@@ -8,17 +10,36 @@ interface FirmaVBHeaderProps {
   showLogo?: boolean;
 }
 
-export function FirmaVBLogo({ className }: { className?: string }) {
+type LogoVariant = 'original' | 'blanco' | 'negro';
+
+const logoVariants = {
+  original: logoFirmavbOriginal,
+  blanco: logoFirmavbBlanco,
+  negro: logoFirmavbNegro,
+};
+
+export function FirmaVBLogo({ 
+  className, 
+  variant = 'original',
+  size = 'md' 
+}: { 
+  className?: string; 
+  variant?: LogoVariant;
+  size?: 'sm' | 'md' | 'lg';
+}) {
+  const sizeClasses = {
+    sm: 'h-8',
+    md: 'h-10',
+    lg: 'h-14',
+  };
+
   return (
-    <div className={cn("flex items-center gap-3", className)}>
+    <div className={cn("flex items-center", className)}>
       <img 
-        src={firmavbLogo} 
+        src={logoVariants[variant]} 
         alt="FirmaVB Logo" 
-        className="h-10 w-auto object-contain"
+        className={cn("w-auto object-contain", sizeClasses[size])}
       />
-      <div className="firmavb-underline inline-block">
-        <span className="text-xl font-bold text-firmavb-blue leading-tight tracking-tight">FirmaVB</span>
-      </div>
     </div>
   );
 }
