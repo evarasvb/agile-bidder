@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useUserSettings } from './useUserSettings';
+import { esRegionActiva } from '@/utils/regiones';
 
 export interface CompraAgil {
   id: string;
@@ -31,8 +33,10 @@ export interface ComprasAgilesFilters {
 }
 
 export function useComprasAgiles(filters?: ComprasAgilesFilters) {
+  const { data: userSettings } = useUserSettings();
+  
   return useQuery({
-    queryKey: ['compras_agiles', filters],
+    queryKey: ['compras_agiles', filters, userSettings?.regiones_config, userSettings?.regions],
     queryFn: async () => {
       let query = supabase
         .from('compras_agiles')
@@ -48,11 +52,11 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
       }
 
       if (filters?.montoMin) {
-        query = query.gte('monto', filters.montoMin);
+        query = query.gte('monto_estimado', filters.montoMin);
       }
 
       if (filters?.montoMax) {
-        query = query.lte('monto', filters.montoMax);
+        query = query.lte('monto_estimado', filters.montoMax);
       }
 
       const { data, error } = await query;
@@ -60,11 +64,25 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
       if (error) throw error;
       
       // Mapear campos de BD a interfaz
-      return (data || []).map(compra => ({
+      let compras = (data || []).map(compra => ({
         ...compra,
         organismo: compra.nombre_organismo || compra.organismo || '',
         monto: compra.monto_estimado || compra.monto || null,
       })) as CompraAgil[];
+      
+      // Filtrar por regiones activas del usuario (si está configurado)
+      if (userSettings && (userSettings.regiones_config?.length > 0 || userSettings.regions?.length > 0)) {
+        compras = compras.filter(compra => {
+          if (!compra.region) return true; // Si no tiene región, mostrar
+          return esRegionActiva(
+            compra.region,
+            userSettings.regiones_config || [],
+            userSettings.regions || []
+          );
+        });
+      }
+      
+      return compras;
     },
     refetchInterval: 30000,
   });

@@ -4,12 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Package, PackageSearch, FileText, Calendar, MapPin, Building2, DollarSign, CheckCircle2, XCircle, ShieldCheck, ShieldX, AlertCircle } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import { Package, PackageSearch, FileText, Calendar, MapPin, Building2, DollarSign, CheckCircle2, XCircle, ShieldCheck, ShieldX, AlertCircle, TrendingUp, Clock, Percent, AlertTriangle } from "lucide-react";
+import { format, parseISO, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { useLicitacionItems, type LicitacionItem } from "@/hooks/useLicitacionItems";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 import { clasificarProceso, formatCurrency, montoEnUTM } from "@/utils/clasificacion";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface MatchPanelProps {
   compra: CompraAgil | null;
@@ -249,9 +251,26 @@ export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
                                 {item.margen_estimado && (
                                   <div>
                                     <span className="text-muted-foreground">Margen: </span>
-                                    <span className="font-medium">
-                                      {Math.round(item.margen_estimado * 100)}%
-                                    </span>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className={`font-medium ${
+                                          item.margen_estimado >= 0.3 ? 'text-green-600' :
+                                          item.margen_estimado >= 0.15 ? 'text-orange-600' :
+                                          item.margen_estimado >= 0.10 ? 'text-yellow-600' :
+                                          'text-red-600'
+                                        }`}>
+                                          {Math.round(item.margen_estimado * 100)}%
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p className="text-xs">
+                                          {item.margen_estimado >= 0.3 ? '✅ Margen excelente' :
+                                           item.margen_estimado >= 0.15 ? '✅ Margen bueno' :
+                                           item.margen_estimado >= 0.10 ? '⚠️ Margen aceptable' :
+                                           '❌ Margen bajo - Revisar'}
+                                        </p>
+                                      </TooltipContent>
+                                    </Tooltip>
                                   </div>
                                 )}
                                 {item.confidence_score && (

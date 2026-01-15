@@ -8,7 +8,9 @@ export interface InventoryItem {
   descripcion: string | null;
   categoria: string;
   keywords: string[];
+  costo_neto: number; // NUEVO: Costo del producto (obligatorio)
   precio_unitario: number;
+  margen_comercial: number | null; // Calculado automáticamente: (precio - costo) / precio * 100
   margen_minimo: number;
   margen_objetivo: number;
   stock_disponible: number;
@@ -27,7 +29,9 @@ export interface InventoryInput {
   descripcion?: string | null;
   categoria: string;
   keywords?: string[] | null;
+  costo_neto: number; // NUEVO: Costo del producto (obligatorio)
   precio_unitario: number;
+  margen_comercial?: number | null; // Calculado automáticamente si no se proporciona
   margen_minimo?: number;
   margen_objetivo?: number;
   stock_disponible?: number;
@@ -37,6 +41,19 @@ export interface InventoryInput {
   activo?: boolean;
   imagen_url?: string | null;
   user_id?: string; // Required for RLS - will be set automatically
+}
+
+/**
+ * Calcula el margen comercial automáticamente
+ * Fórmula: margen = (precio_venta - costo) / precio_venta * 100
+ */
+export function calcularMargenComercial(precioVenta: number, costo: number): number | null {
+  if (!precioVenta || precioVenta <= 0) return null;
+  if (!costo || costo < 0) return null;
+  if (costo >= precioVenta) return 0; // Sin margen o pérdida
+  
+  const margen = ((precioVenta - costo) / precioVenta) * 100;
+  return Math.round(margen * 100) / 100; // Redondear a 2 decimales
 }
 
 export function useInventory() {
@@ -101,8 +118,13 @@ export function useCreateInventoryItem() {
         throw new Error('Debes iniciar sesión para agregar productos');
       }
 
+      // Calcular margen comercial automáticamente si no se proporciona
+      const margenComercial = item.margen_comercial ?? 
+        calcularMargenComercial(item.precio_unitario, item.costo_neto);
+
       const itemWithUserId = {
         ...item,
+        margen_comercial: margenComercial,
         user_id: item.user_id || user.id, // Use provided user_id or current user
       };
 
@@ -126,6 +148,22 @@ export function useUpdateInventoryItem() {
   
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<InventoryItem> & { id: string }) => {
+      // Si se actualiza precio_unitario o costo_neto, recalcular margen
+      if (updates.precio_unitario !== undefined || updates.costo_neto !== undefined) {
+        // Necesitamos obtener el producto actual para calcular el margen
+        const { data: currentItem } = await supabase
+          .from('inventory')
+          .select('precio_unitario, costo_neto')
+          .eq('id', id)
+          .single();
+        
+        if (currentItem) {
+          const precio = updates.precio_unitario ?? currentItem.precio_unitario;
+          const costo = updates.costo_neto ?? currentItem.costo_neto;
+          updates.margen_comercial = calcularMargenComercial(precio, costo);
+        }
+      }
+
       const { data, error } = await supabase
         .from('inventory')
         .update(updates)

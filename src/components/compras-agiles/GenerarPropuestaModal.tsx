@@ -6,12 +6,15 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, Package, Calculator, Check, Loader2 } from "lucide-react";
+import { FileText, Package, Calculator, Check, Loader2, Percent, Info } from "lucide-react";
 import { toast } from "sonner";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 import { useUpdateCompraAgil } from "@/hooks/useComprasAgiles";
 import type { MatchedProduct } from "@/hooks/useMatchInventario";
 import { formatCurrency } from "@/utils/clasificacion";
+import { useUserSettings } from "@/hooks/useUserSettings";
+import { aplicarRecargoPorRegion, obtenerRecargoRegion } from "@/utils/regiones";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface GenerarPropuestaModalProps {
   open: boolean;
@@ -41,26 +44,44 @@ interface ItemSeleccionado {
 
 export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }: GenerarPropuestaModalProps) {
   const updateCompra = useUpdateCompraAgil();
+  const { data: userSettings } = useUserSettings();
+  
+  // Calcular precio con recargo por región
+  const calcularPrecioConRecargo = (precioNeto: number): number => {
+    if (!compra?.region || !userSettings) return precioNeto;
+    return aplicarRecargoPorRegion(
+      precioNeto,
+      compra.region,
+      userSettings.regiones_config || []
+    );
+  };
+  
+  const recargoAplicado = compra?.region 
+    ? obtenerRecargoRegion(compra.region, userSettings?.regiones_config || [])
+    : 0;
   
   const [itemsSeleccionados, setItemsSeleccionados] = useState<ItemSeleccionado[]>(() =>
-    productos.map((producto, index) => ({
-      itemId: producto.id || `item-${index}`,
-      nombre: producto.nombre,
-      descripcion: producto.descripcion || '',
-      cantidadSolicitada: 1, // Default, puede ajustarse
-      unidadMedida: 'unidad',
-      selected: producto.matchScore >= 50,
-      cantidad: 1,
-      match: {
-        id: producto.id,
-        sku: producto.sku,
+    productos.map((producto, index) => {
+      const precioConRecargo = calcularPrecioConRecargo(producto.precio_unitario);
+      return {
+        itemId: producto.id || `item-${index}`,
         nombre: producto.nombre,
-        precio_unitario: producto.precio_unitario,
-        stock: producto.stock || undefined,
-        matchScore: producto.matchScore
-      },
-      precioUnitario: producto.precio_unitario
-    }))
+        descripcion: producto.descripcion || '',
+        cantidadSolicitada: 1, // Default, puede ajustarse
+        unidadMedida: 'unidad',
+        selected: producto.matchScore >= 50,
+        cantidad: 1,
+        match: {
+          id: producto.id,
+          sku: producto.sku,
+          nombre: producto.nombre,
+          precio_unitario: producto.precio_unitario,
+          stock: producto.stock || undefined,
+          matchScore: producto.matchScore
+        },
+        precioUnitario: precioConRecargo // Precio con recargo aplicado
+      };
+    })
   );
 
   const handleToggleItem = (itemId: string) => {
@@ -136,9 +157,19 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
             Generar Propuesta
           </DialogTitle>
           {compra && (
-            <p className="text-sm text-muted-foreground">
-              Para: <span className="font-medium">{compra.codigo}</span> - {compra.nombre}
-            </p>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">
+                Para: <span className="font-medium">{compra.codigo}</span> - {compra.nombre}
+              </p>
+              {recargoAplicado > 0 && compra.region && (
+                <Alert className="py-2">
+                  <Info className="h-3.5 w-3.5" />
+                  <AlertDescription className="text-xs">
+                    Recargo por región ({compra.region}): <strong>+{recargoAplicado}%</strong> aplicado a todos los precios
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
           )}
         </DialogHeader>
 
@@ -197,9 +228,16 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                                 <span className="text-xs text-muted-foreground">
                                   Stock: {item.match.stock ?? 'N/A'}
                                 </span>
-                                <span className="text-xs text-muted-foreground">
-                                  Precio base: {formatCurrency(item.match.precio_unitario)}
-                                </span>
+                                <div className="flex flex-col">
+                                  <span className="text-xs text-muted-foreground">
+                                    Precio base: {formatCurrency(item.match.precio_unitario)}
+                                  </span>
+                                  {recargoAplicado > 0 && (
+                                    <span className="text-xs text-primary font-medium">
+                                      Con recargo: {formatCurrency(item.precioUnitario || 0)} (+{recargoAplicado}%)
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -234,9 +272,16 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                             className="h-8 text-sm"
                           />
                           {item.match && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Base: {formatCurrency(item.match.precio_unitario)}
-                            </p>
+                            <div className="mt-1 space-y-0.5">
+                              <p className="text-xs text-muted-foreground">
+                                Base: {formatCurrency(item.match.precio_unitario)}
+                              </p>
+                              {recargoAplicado > 0 && (
+                                <p className="text-xs text-primary font-medium">
+                                  Recargo aplicado: +{recargoAplicado}%
+                                </p>
+                              )}
+                            </div>
                           )}
                         </div>
                         <div className="text-right">

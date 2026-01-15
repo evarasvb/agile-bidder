@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Save, Building2, MapPin, Clock, DollarSign, Shield, Key, Eye, EyeOff, CheckCircle2, Bell, Loader2, Settings as SettingsIcon, AlertCircle } from "lucide-react";
+import { Save, Building2, MapPin, Clock, DollarSign, Shield, Key, Eye, EyeOff, CheckCircle2, Bell, Loader2, Settings as SettingsIcon, AlertCircle, Percent, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,7 +28,8 @@ import {
   BiddingSettings,
   DeliverySettings,
   AutomationSettings,
-  UserSettings
+  UserSettings,
+  RegionConfig
 } from "@/hooks/useUserSettings";
 import { useAuth } from "@/hooks/useAuth";
 import { useRolePermissions } from "@/hooks/useRolePermissions";
@@ -71,12 +72,24 @@ export default function Settings() {
   // Load settings from database when available
   useEffect(() => {
     if (savedSettings) {
+      // Inicializar regiones_config si no existe
+      let regionesConfig = savedSettings.regiones_config || [];
+      if (regionesConfig.length === 0 && savedSettings.regions) {
+        // Migrar de regions a regiones_config
+        regionesConfig = regions.map(region => ({
+          nombre: region,
+          activa: savedSettings.regions.includes(region),
+          recargo_porcentaje: 0,
+        }));
+      }
+      
       setSettings({
         company_settings: savedSettings.company_settings,
         bidding_settings: savedSettings.bidding_settings,
         delivery_settings: savedSettings.delivery_settings,
         automation_settings: savedSettings.automation_settings,
         regions: savedSettings.regions,
+        regiones_config: regionesConfig,
         api_key_encrypted: savedSettings.api_key_encrypted || '',
         api_key_connected: savedSettings.api_key_connected,
       });
@@ -117,12 +130,55 @@ export default function Settings() {
   };
 
   const toggleRegion = (region: string) => {
-    setSettings((prev) => ({
-      ...prev,
-      regions: prev.regions.includes(region)
+    setSettings((prev) => {
+      const isActive = prev.regions.includes(region);
+      const newRegions = isActive
         ? prev.regions.filter((r) => r !== region)
-        : [...prev.regions, region],
-    }));
+        : [...prev.regions, region];
+      
+      // Actualizar también regiones_config
+      const newRegionesConfig = prev.regiones_config || [];
+      const regionIndex = newRegionesConfig.findIndex(r => r.nombre === region);
+      
+      if (regionIndex >= 0) {
+        newRegionesConfig[regionIndex].activa = !isActive;
+      } else {
+        newRegionesConfig.push({
+          nombre: region,
+          activa: !isActive,
+          recargo_porcentaje: 0,
+        });
+      }
+      
+      return {
+        ...prev,
+        regions: newRegions,
+        regiones_config: newRegionesConfig,
+      };
+    });
+    setHasChanges(true);
+  };
+
+  const updateRegionRecargo = (regionNombre: string, recargo: number) => {
+    setSettings((prev) => {
+      const newRegionesConfig = [...(prev.regiones_config || [])];
+      const regionIndex = newRegionesConfig.findIndex(r => r.nombre === regionNombre);
+      
+      if (regionIndex >= 0) {
+        newRegionesConfig[regionIndex].recargo_porcentaje = Math.max(0, Math.min(100, recargo));
+      } else {
+        newRegionesConfig.push({
+          nombre: regionNombre,
+          activa: prev.regions.includes(regionNombre),
+          recargo_porcentaje: Math.max(0, Math.min(100, recargo)),
+        });
+      }
+      
+      return {
+        ...prev,
+        regiones_config: newRegionesConfig,
+      };
+    });
     setHasChanges(true);
   };
 
@@ -428,28 +484,102 @@ export default function Settings() {
             </div>
           </SettingsSection>
 
-          {/* Regions */}
+          {/* Regions with Recargo */}
           <SettingsSection
             icon={MapPin}
-            title="Cobertura Regional"
-            description="Regiones donde puedes despachar"
+            title="Cobertura Regional con Recargos"
+            description="Selecciona regiones donde quieres vender y configura recargos por región"
           >
-            <div className="grid grid-cols-4 gap-3">
-              {regions.map((region) => (
-                <div key={region} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={region}
-                    checked={settings.regions.includes(region)}
-                    onCheckedChange={() => toggleRegion(region)}
-                  />
-                  <label
-                    htmlFor={region}
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+            <Alert className="mb-4">
+              <Info className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                Solo se mostrarán compras ágiles de las regiones seleccionadas. El recargo se aplica al precio neto del producto.
+              </AlertDescription>
+            </Alert>
+            
+            <div className="space-y-3">
+              {regions.map((region) => {
+                const isActive = settings.regions.includes(region);
+                const regionConfig = settings.regiones_config?.find(r => r.nombre === region);
+                const recargo = regionConfig?.recargo_porcentaje ?? 0;
+                
+                return (
+                  <div 
+                    key={region} 
+                    className={`p-3 rounded-lg border transition-colors ${
+                      isActive 
+                        ? 'bg-primary/5 border-primary/30' 
+                        : 'bg-muted/30 border-border'
+                    }`}
                   >
-                    {region}
-                  </label>
-                </div>
-              ))}
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id={region}
+                          checked={isActive}
+                          onCheckedChange={() => toggleRegion(region)}
+                        />
+                        <label
+                          htmlFor={region}
+                          className="text-sm font-medium leading-none cursor-pointer"
+                        >
+                          {region}
+                        </label>
+                      </div>
+                      {isActive && (
+                        <Badge variant={isActive ? "default" : "secondary"}>
+                          Activa
+                        </Badge>
+                      )}
+                    </div>
+                    
+                    {isActive && (
+                      <div className="mt-2 pl-6 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Percent className="h-3.5 w-3.5 text-muted-foreground" />
+                          <Label htmlFor={`recargo-${region}`} className="text-xs text-muted-foreground">
+                            Recargo al precio neto:
+                          </Label>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              id={`recargo-${region}`}
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.5"
+                              className="w-20 h-7 text-xs"
+                              value={recargo}
+                              onChange={(e) => updateRegionRecargo(region, Number(e.target.value))}
+                              placeholder="0"
+                            />
+                            <span className="text-xs text-muted-foreground">%</span>
+                          </div>
+                        </div>
+                        {recargo > 0 && (
+                          <p className="text-xs text-muted-foreground pl-6">
+                            Ejemplo: Producto de $10.000 → Precio con recargo: ${(10000 * (1 + recargo / 100)).toLocaleString('es-CL')}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            
+            <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+              <p className="text-xs text-muted-foreground">
+                <strong>Total regiones activas:</strong> {settings.regions.length} de {regions.length}
+              </p>
+              {settings.regiones_config?.some(r => r.activa && r.recargo_porcentaje > 0) && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  <strong>Regiones con recargo:</strong>{' '}
+                  {settings.regiones_config
+                    .filter(r => r.activa && r.recargo_porcentaje > 0)
+                    .map(r => `${r.nombre} (+${r.recargo_porcentaje}%)`)
+                    .join(', ')}
+                </p>
+              )}
             </div>
           </SettingsSection>
 

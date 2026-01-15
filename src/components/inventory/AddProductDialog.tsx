@@ -19,8 +19,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Loader2 } from 'lucide-react';
-import { InventoryInput } from '@/hooks/useInventory';
+import { Loader2, Calculator } from 'lucide-react';
+import { InventoryInput, calcularMargenComercial } from '@/hooks/useInventory';
+import { Badge } from '@/components/ui/badge';
 
 interface AddProductDialogProps {
   open: boolean;
@@ -65,6 +66,7 @@ export function AddProductDialog({
     descripcion: '',
     categoria: '',
     keywords: [],
+    costo_neto: 0, // NUEVO: Campo obligatorio
     precio_unitario: 0,
     margen_minimo: 15,
     margen_objetivo: 30,
@@ -98,6 +100,7 @@ export function AddProductDialog({
         descripcion: '',
         categoria: '',
         keywords: [],
+        costo_neto: 0,
         precio_unitario: 0,
         margen_minimo: 15,
         margen_objetivo: 30,
@@ -199,13 +202,34 @@ export function AddProductDialog({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            {/* Precio Unitario */}
+            {/* Costo Neto - NUEVO */}
             <div className="space-y-2">
-              <Label htmlFor="precio">Precio Unitario (CLP) *</Label>
+              <Label htmlFor="costo">Costo Neto (CLP) *</Label>
+              <Input
+                id="costo"
+                type="number"
+                min="0"
+                step="1"
+                placeholder="2800"
+                value={formData.costo_neto || ''}
+                onChange={(e) =>
+                  setFormData({ ...formData, costo_neto: Number(e.target.value) })
+                }
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Costo de adquisición del producto
+              </p>
+            </div>
+
+            {/* Precio de Venta */}
+            <div className="space-y-2">
+              <Label htmlFor="precio">Precio de Venta (CLP) *</Label>
               <Input
                 id="precio"
                 type="number"
                 min="0"
+                step="1"
                 placeholder="3500"
                 value={formData.precio_unitario || ''}
                 onChange={(e) =>
@@ -213,23 +237,52 @@ export function AddProductDialog({
                 }
                 required
               />
+              <p className="text-xs text-muted-foreground">
+                Precio de venta al cliente
+              </p>
             </div>
+          </div>
 
-            {/* Stock */}
-            <div className="space-y-2">
-              <Label htmlFor="stock">Stock Disponible *</Label>
-              <Input
-                id="stock"
-                type="number"
-                min="0"
-                placeholder="100"
-                value={formData.stock_disponible || ''}
-                onChange={(e) =>
-                  setFormData({ ...formData, stock_disponible: Number(e.target.value) })
-                }
-                required
-              />
+          {/* Margen Comercial Calculado */}
+          {formData.costo_neto > 0 && formData.precio_unitario > formData.costo_neto && (
+            <div className="p-3 bg-muted/50 rounded-lg border border-border">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Calculator className="h-4 w-4 text-primary" />
+                  <Label className="text-sm font-medium">Margen Comercial Calculado</Label>
+                </div>
+                <Badge variant="default" className="text-sm font-semibold">
+                  {calcularMargenComercial(formData.precio_unitario, formData.costo_neto)?.toFixed(2) || '0.00'}%
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Fórmula: (Precio - Costo) / Precio × 100
+              </p>
             </div>
+          )}
+
+          {formData.costo_neto > 0 && formData.precio_unitario > 0 && formData.costo_neto >= formData.precio_unitario && (
+            <div className="p-3 bg-destructive/10 rounded-lg border border-destructive/20">
+              <p className="text-sm text-destructive font-medium">
+                ⚠️ El Precio de Venta debe ser mayor que el Costo Neto
+              </p>
+            </div>
+          )}
+
+          {/* Stock */}
+          <div className="space-y-2">
+            <Label htmlFor="stock">Stock Disponible *</Label>
+            <Input
+              id="stock"
+              type="number"
+              min="0"
+              placeholder="100"
+              value={formData.stock_disponible || ''}
+              onChange={(e) =>
+                setFormData({ ...formData, stock_disponible: Number(e.target.value) })
+              }
+              required
+            />
           </div>
 
           <div className="grid grid-cols-3 gap-4">

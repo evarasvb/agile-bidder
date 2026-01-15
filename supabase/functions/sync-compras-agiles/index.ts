@@ -115,8 +115,10 @@ Deno.serve(async (req) => {
         const compraData: any = {
           codigo: lic.codigo,
           nombre: lic.nombre || `Compra Ágil ${lic.codigo}`,
-          organismo: lic.organismo || lic.institucion_nombre || 'Organismo no especificado',
-          monto: monto,
+          nombre_organismo: lic.organismo || lic.institucion_nombre || 'Organismo no especificado',
+          organismo: lic.organismo || lic.institucion_nombre || 'Organismo no especificado', // Mantener por compatibilidad
+          monto_estimado: monto,
+          monto: monto, // Mantener por compatibilidad
           fecha_cierre: lic.fecha_cierre || null,
           estado: lic.estado || 'activa',
           region: lic.region || null,

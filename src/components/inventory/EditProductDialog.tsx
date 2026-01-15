@@ -13,8 +13,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Images, Package } from "lucide-react";
-import { InventoryItem } from "@/hooks/useInventory";
+import { Loader2, Images, Package, Calculator } from "lucide-react";
+import { InventoryItem, calcularMargenComercial } from "@/hooks/useInventory";
+import { Badge } from "@/components/ui/badge";
 import { ImageDropzone, ImagePreview } from "./ImageDropzone";
 import { useProductImages, useUploadProductImage, useDeleteProductImage, useSetPrincipalImage } from "@/hooks/useProductImages";
 import { useAuthUser } from "@/hooks/useCliente";
@@ -41,6 +42,7 @@ export function EditProductDialog({
     nombre_producto: "",
     descripcion: "",
     categoria: "",
+    costo_neto: 0, // NUEVO
     precio_unitario: 0,
     margen_minimo: 10,
     stock_disponible: 0,
@@ -79,13 +81,18 @@ export function EditProductDialog({
     e.preventDefault();
     if (!product) return;
 
+    // Calcular margen comercial automáticamente
+    const margenComercial = calcularMargenComercial(formData.precio_unitario, formData.costo_neto);
+    
     await onSave({
       id: product.id,
       sku: formData.sku,
       nombre_producto: formData.nombre_producto,
       descripcion: formData.descripcion || null,
       categoria: formData.categoria,
+      costo_neto: formData.costo_neto, // NUEVO
       precio_unitario: formData.precio_unitario,
+      margen_comercial: margenComercial, // Calculado automáticamente
       margen_minimo: formData.margen_minimo,
       stock_disponible: formData.stock_disponible,
       tiempo_entrega_dias: formData.tiempo_entrega_dias,
@@ -173,16 +180,64 @@ export function EditProductDialog({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="precio">Precio Unitario ($)</Label>
+                  <Label htmlFor="costo">Costo Neto (CLP) *</Label>
+                  <Input
+                    id="costo"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={formData.costo_neto}
+                    onChange={(e) => setFormData({ ...formData, costo_neto: Number(e.target.value) })}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Costo de adquisición
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="precio">Precio de Venta (CLP) *</Label>
                   <Input
                     id="precio"
                     type="number"
                     min="0"
+                    step="1"
                     value={formData.precio_unitario}
                     onChange={(e) => setFormData({ ...formData, precio_unitario: Number(e.target.value) })}
                     required
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Precio de venta al cliente
+                  </p>
                 </div>
+              </div>
+
+              {/* Margen Comercial Calculado */}
+              {formData.costo_neto > 0 && formData.precio_unitario > formData.costo_neto && (
+                <div className="p-3 bg-muted/50 rounded-lg border border-border">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Calculator className="h-4 w-4 text-primary" />
+                      <Label className="text-sm font-medium">Margen Comercial Calculado</Label>
+                    </div>
+                    <Badge variant="default" className="text-sm font-semibold">
+                      {calcularMargenComercial(formData.precio_unitario, formData.costo_neto)?.toFixed(2) || '0.00'}%
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Fórmula: (Precio - Costo) / Precio × 100
+                  </p>
+                </div>
+              )}
+
+              {formData.costo_neto > 0 && formData.precio_unitario > 0 && formData.costo_neto >= formData.precio_unitario && (
+                <div className="p-3 bg-destructive/10 rounded-lg border border-destructive/20">
+                  <p className="text-sm text-destructive font-medium">
+                    ⚠️ El Precio de Venta debe ser mayor que el Costo Neto
+                  </p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="margen">Margen Mínimo (%)</Label>
                   <Input
@@ -194,9 +249,6 @@ export function EditProductDialog({
                     onChange={(e) => setFormData({ ...formData, margen_minimo: Number(e.target.value) })}
                   />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="stock">Stock Disponible</Label>
                   <Input
@@ -207,6 +259,9 @@ export function EditProductDialog({
                     onChange={(e) => setFormData({ ...formData, stock_disponible: Number(e.target.value) })}
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="tiempo">Tiempo Entrega (días)</Label>
                   <Input

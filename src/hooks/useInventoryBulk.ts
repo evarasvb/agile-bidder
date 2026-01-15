@@ -1,15 +1,16 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { InventoryInput } from './useInventory';
+import { InventoryInput, calcularMargenComercial } from './useInventory';
 
 export interface BulkProductRow {
-  sku: string;           // Codigo
-  nombre: string;        // Mapped from descripcion
+  sku: string;           // Codigo (OBLIGATORIO)
+  nombre: string;        // Descripción (OBLIGATORIO)
   descripcion?: string;
   categoria?: string;
-  precio_unitario?: number; // Precio Neto
-  unidad_medida?: string;   // Unidad
+  costo_neto: number;    // Costo Neto (OBLIGATORIO) - NUEVO
+  precio_unitario: number; // Precio de Venta (OBLIGATORIO)
+  unidad_medida: string;   // Unidad (OBLIGATORIO)
   keywords?: string;
   imagen_url?: string;
   stock?: number;
@@ -92,9 +93,23 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
           continue;
         }
 
-        // Validate required fields - precio neto
-        if (row.precio_unitario === undefined || row.precio_unitario === null || isNaN(Number(row.precio_unitario))) {
-          errors.push({ row: rowNum, field: 'Precio Neto', message: 'Precio Neto es obligatorio' });
+        // Validate required fields - costo neto (NUEVO - OBLIGATORIO)
+        if (row.costo_neto === undefined || row.costo_neto === null || isNaN(Number(row.costo_neto)) || Number(row.costo_neto) < 0) {
+          errors.push({ row: rowNum, field: 'Costo Neto', message: 'Costo Neto es obligatorio y debe ser >= 0' });
+          continue;
+        }
+
+        // Validate required fields - precio de venta
+        if (row.precio_unitario === undefined || row.precio_unitario === null || isNaN(Number(row.precio_unitario)) || Number(row.precio_unitario) <= 0) {
+          errors.push({ row: rowNum, field: 'Precio de Venta', message: 'Precio de Venta es obligatorio y debe ser > 0' });
+          continue;
+        }
+
+        // Validar que precio >= costo
+        const costo = Number(row.costo_neto);
+        const precio = Number(row.precio_unitario);
+        if (costo >= precio) {
+          errors.push({ row: rowNum, field: 'Precio/Costo', message: 'El Precio de Venta debe ser mayor que el Costo Neto' });
           continue;
         }
 
@@ -109,12 +124,17 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
           ? row.keywords.split(',').map(k => k.trim()).filter(k => k.length > 0)
           : null;
 
+        // Calcular margen comercial automáticamente
+        const margenComercial = calcularMargenComercial(precio, costo);
+
         const productData: InventoryInput = {
           sku: row.sku.trim(),
           nombre_producto: row.nombre.trim(),
           descripcion: row.descripcion?.trim() || null,
           categoria: row.categoria?.trim() || 'General',
-          precio_unitario: Number(row.precio_unitario),
+          costo_neto: costo,
+          precio_unitario: precio,
+          margen_comercial: margenComercial, // Calculado automáticamente
           unidad_medida: row.unidad_medida.trim(),
           keywords,
           imagen_url: row.imagen_url?.trim() || null,
@@ -247,7 +267,8 @@ export function generateInventoryTemplateData() {
     {
       'Código': 'PROD-001',
       'Descripción': 'Resma Papel Carta 500 hojas',
-      'Precio Neto': 4500,
+      'Costo Neto': 3600, // NUEVO: Costo del producto
+      'Precio de Venta': 4500,
       'Unidad': 'UN',
       'Categoría': 'Insumos de Oficina',
       'Stock': 100,
@@ -261,7 +282,8 @@ export function generateInventoryTemplateData() {
     {
       'Código': 'PROD-002',
       'Descripción': 'Tóner HP 85A Compatible',
-      'Precio Neto': 18500,
+      'Costo Neto': 14800, // NUEVO: Costo del producto
+      'Precio de Venta': 18500,
       'Unidad': 'UN',
       'Categoría': 'Tecnología',
       'Stock': 50,
@@ -275,7 +297,8 @@ export function generateInventoryTemplateData() {
     {
       'Código': 'PROD-003',
       'Descripción': 'Alcohol Gel 1 Litro',
-      'Precio Neto': 3200,
+      'Costo Neto': 2560, // NUEVO: Costo del producto
+      'Precio de Venta': 3200,
       'Unidad': 'LT',
       'Categoría': 'Limpieza e Higiene',
       'Stock': 200,
@@ -297,10 +320,16 @@ export function generateInventoryInstructions() {
     { 'Instrucciones': '1. CAMPOS OBLIGATORIOS:' },
     { 'Instrucciones': '   • Código: Código único del producto (SKU, no puede repetirse)' },
     { 'Instrucciones': '   • Descripción: Nombre descriptivo del producto' },
-    { 'Instrucciones': '   • Precio Neto: Precio unitario en pesos chilenos (solo números)' },
+    { 'Instrucciones': '   • Costo Neto: Costo del producto en pesos chilenos (solo números, >= 0)' },
+    { 'Instrucciones': '   • Precio de Venta: Precio unitario de venta en pesos chilenos (solo números, > 0)' },
     { 'Instrucciones': '   • Unidad: UN (unidad), KG, LT, MT, etc.' },
     { 'Instrucciones': '' },
-    { 'Instrucciones': '2. CAMPOS OPCIONALES:' },
+    { 'Instrucciones': '2. IMPORTANTE - MARGEN COMERCIAL:' },
+    { 'Instrucciones': '   • El margen comercial se calcula automáticamente: (Precio - Costo) / Precio * 100' },
+    { 'Instrucciones': '   • El Precio de Venta DEBE ser mayor que el Costo Neto' },
+    { 'Instrucciones': '   • El margen calculado se mostrará en los matches y propuestas' },
+    { 'Instrucciones': '' },
+    { 'Instrucciones': '3. CAMPOS OPCIONALES:' },
     { 'Instrucciones': '   • Categoría: Categoría del producto (ej: Tecnología, Limpieza)' },
     { 'Instrucciones': '   • Stock: Cantidad disponible (por defecto: 0)' },
     { 'Instrucciones': '   • Margen Mínimo (%): Margen mínimo aceptable (por defecto: 10)' },
@@ -310,13 +339,14 @@ export function generateInventoryInstructions() {
     { 'Instrucciones': '   • Keywords: Palabras clave separadas por comas para matching' },
     { 'Instrucciones': '   • URL Imagen: URL de imagen del producto (debe comenzar con https://)' },
     { 'Instrucciones': '' },
-    { 'Instrucciones': '3. NOTAS IMPORTANTES:' },
+    { 'Instrucciones': '4. NOTAS IMPORTANTES:' },
     { 'Instrucciones': '   • Si el Código ya existe, el producto será ACTUALIZADO' },
     { 'Instrucciones': '   • No modifique los encabezados de las columnas' },
     { 'Instrucciones': '   • Puede cargar hasta 10,000 productos por archivo' },
     { 'Instrucciones': '   • Las keywords mejoran el matching con licitaciones' },
     { 'Instrucciones': '   • Las imágenes deben ser URLs válidas (https://)' },
+    { 'Instrucciones': '   • El margen comercial se calcula y muestra automáticamente en matches' },
     { 'Instrucciones': '' },
-    { 'Instrucciones': '4. FORMATOS ACEPTADOS: Excel (.xlsx, .xls), CSV (.csv)' },
+    { 'Instrucciones': '5. FORMATOS ACEPTADOS: Excel (.xlsx, .xls), CSV (.csv)' },
   ];
 }

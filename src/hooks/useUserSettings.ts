@@ -27,6 +27,12 @@ export interface AutomationSettings {
   autoBid: boolean;
 }
 
+export interface RegionConfig {
+  nombre: string;
+  activa: boolean;
+  recargo_porcentaje: number; // % de recargo al precio neto por región
+}
+
 export interface UserSettings {
   id?: string;
   user_id?: string;
@@ -34,7 +40,8 @@ export interface UserSettings {
   bidding_settings: BiddingSettings;
   delivery_settings: DeliverySettings;
   automation_settings: AutomationSettings;
-  regions: string[];
+  regions: string[]; // Mantener para compatibilidad
+  regiones_config: RegionConfig[]; // NUEVO: Configuración detallada de regiones
   api_key_encrypted: string | null;
   api_key_connected: boolean;
 }
@@ -58,7 +65,11 @@ export const DEFAULT_SETTINGS: Omit<UserSettings, 'id' | 'user_id'> = {
     autoMatch: true,
     autoBid: false,
   },
-  regions: ['Metropolitana', 'Valparaíso'],
+  regions: ['Metropolitana', 'Valparaíso'], // Mantener para compatibilidad
+  regiones_config: [
+    { nombre: 'Metropolitana', activa: true, recargo_porcentaje: 0 },
+    { nombre: 'Valparaíso', activa: true, recargo_porcentaje: 0 },
+  ],
   api_key_encrypted: null,
   api_key_connected: false,
 };
@@ -98,6 +109,7 @@ export function useUserSettings() {
         delivery_settings: (data.delivery_settings as unknown as DeliverySettings) || DEFAULT_SETTINGS.delivery_settings,
         automation_settings: (data.automation_settings as unknown as AutomationSettings) || DEFAULT_SETTINGS.automation_settings,
         regions: data.regions || DEFAULT_SETTINGS.regions,
+        regiones_config: (data.regiones_config as unknown as RegionConfig[]) || DEFAULT_SETTINGS.regiones_config,
         api_key_encrypted: data.api_key_encrypted,
         api_key_connected: data.api_key_connected || false,
       };

@@ -94,7 +94,8 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
       wsProducts['!cols'] = [
         { wch: 15 },  // Código
         { wch: 40 },  // Descripción
-        { wch: 12 },  // Precio Neto
+        { wch: 12 },  // Costo Neto (NUEVO)
+        { wch: 12 },  // Precio de Venta
         { wch: 10 },  // Unidad
         { wch: 20 },  // Categoría
         { wch: 10 },  // Stock
@@ -150,7 +151,8 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
         nombre: row['Descripción'] || row['Descripcion'] || row['descripcion'] || row['Nombre'] || row['nombre'] || '',
         descripcion: row['Detalle'] || row['detalle'] || '',
         categoria: row['Categoría'] || row['Categoria'] || row['categoria'] || '',
-        precio_unitario: Number(row['Precio Neto'] || row['Precio'] || row['Precio Unitario'] || row['precio'] || row['precio_unitario'] || 0),
+        costo_neto: Number(row['Costo Neto'] || row['Costo'] || row['costo_neto'] || row['costo'] || 0), // NUEVO: Campo obligatorio
+        precio_unitario: Number(row['Precio de Venta'] || row['Precio Neto'] || row['Precio'] || row['Precio Unitario'] || row['precio'] || row['precio_unitario'] || 0),
         unidad_medida: row['Unidad'] || row['Unidad de Medida'] || row['unidad'] || row['unidad_medida'] || '',
         stock: Number(row['Stock'] || row['stock'] || row['Stock Disponible'] || 0),
         margen_minimo: Number(row['Margen Mínimo (%)'] || row['Margen Minimo'] || row['margen_minimo'] || 10),
@@ -182,9 +184,23 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
           errors.push(`Fila ${rowNum}: Descripción es obligatoria`);
         }
         
-        // Required: Precio Neto
-        if (row.precio_unitario === undefined || row.precio_unitario === null || isNaN(Number(row.precio_unitario)) || row.precio_unitario === 0) {
-          errors.push(`Fila ${rowNum}: Precio Neto es obligatorio`);
+        // Required: Costo Neto (NUEVO)
+        if (row.costo_neto === undefined || row.costo_neto === null || isNaN(Number(row.costo_neto)) || Number(row.costo_neto) < 0) {
+          errors.push(`Fila ${rowNum}: Costo Neto es obligatorio y debe ser >= 0`);
+        }
+        
+        // Required: Precio de Venta
+        if (row.precio_unitario === undefined || row.precio_unitario === null || isNaN(Number(row.precio_unitario)) || row.precio_unitario <= 0) {
+          errors.push(`Fila ${rowNum}: Precio de Venta es obligatorio y debe ser > 0`);
+        }
+        
+        // Validar que precio >= costo
+        if (row.costo_neto !== undefined && row.precio_unitario !== undefined) {
+          const costo = Number(row.costo_neto);
+          const precio = Number(row.precio_unitario);
+          if (costo >= precio) {
+            errors.push(`Fila ${rowNum}: El Precio de Venta debe ser mayor que el Costo Neto`);
+          }
         }
         
         // Required: Unidad
@@ -292,13 +308,15 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
     }
   };
 
-  // Count valid rows based on new required fields
-  const validRows = previewData?.rows.filter(row => 
-    row.sku && row.sku.trim() !== '' && 
-    row.nombre && row.nombre.trim() !== '' &&
-    row.precio_unitario !== undefined && row.precio_unitario !== null && !isNaN(Number(row.precio_unitario)) && row.precio_unitario !== 0 &&
-    row.unidad_medida && row.unidad_medida.trim() !== ''
-  ).length || 0;
+      // Count valid rows based on new required fields
+      const validRows = previewData?.rows.filter(row => 
+        row.sku && row.sku.trim() !== '' && 
+        row.nombre && row.nombre.trim() !== '' &&
+        row.costo_neto !== undefined && row.costo_neto !== null && !isNaN(Number(row.costo_neto)) && Number(row.costo_neto) >= 0 &&
+        row.precio_unitario !== undefined && row.precio_unitario !== null && !isNaN(Number(row.precio_unitario)) && row.precio_unitario > 0 &&
+        Number(row.costo_neto) < Number(row.precio_unitario) &&
+        row.unidad_medida && row.unidad_medida.trim() !== ''
+      ).length || 0;
   
   const rowsWithImages = previewData?.rows.filter(row => 
     row.imagen_url && row.imagen_url.trim() !== '' && validateImageUrl(row.imagen_url)
@@ -488,7 +506,8 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
                       <TableHead className="w-[50px]">Img</TableHead>
                       <TableHead>Código</TableHead>
                       <TableHead>Descripción</TableHead>
-                      <TableHead className="text-right">Precio Neto</TableHead>
+                      <TableHead className="text-right">Costo Neto</TableHead>
+                      <TableHead className="text-right">Precio Venta</TableHead>
                       <TableHead>Unidad</TableHead>
                       <TableHead>Categoría</TableHead>
                       <TableHead className="text-right">Stock</TableHead>
@@ -533,7 +552,7 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
                     })}
                     {previewData.totalRows > 15 && (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center text-muted-foreground py-4">
+                        <TableCell colSpan={9} className="text-center text-muted-foreground py-4">
                           ... y {previewData.totalRows - 15} productos más
                         </TableCell>
                       </TableRow>
