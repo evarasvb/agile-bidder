@@ -4,24 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Package, PackageSearch, FileText, Calendar, MapPin, Building2, DollarSign, CheckCircle2, XCircle } from "lucide-react";
+import { Package, PackageSearch, FileText, Calendar, MapPin, Building2, DollarSign, CheckCircle2, XCircle, ShieldCheck, ShieldX, AlertCircle } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { useLicitacionItems, type LicitacionItem } from "@/hooks/useLicitacionItems";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
+import { clasificarProceso, formatCurrency, montoEnUTM } from "@/utils/clasificacion";
 
 interface MatchPanelProps {
   compra: CompraAgil | null;
   onGenerarPropuesta: (productos: any[]) => void;
-}
-
-function formatCurrency(amount: number | null): string {
-  if (amount === null || amount === undefined) return '-';
-  return new Intl.NumberFormat('es-CL', {
-    style: 'currency',
-    currency: 'CLP',
-    maximumFractionDigits: 0,
-  }).format(amount);
 }
 
 function MatchScoreBadge({ score }: { score: number }) {
@@ -80,6 +72,61 @@ export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
       <CardContent className="pt-4 flex-1 flex flex-col overflow-hidden">
         <div className="space-y-3 mb-4">
           <h3 className="font-medium text-foreground line-clamp-2">{compra.nombre}</h3>
+          
+          {/* Información de clasificación */}
+          {compra.monto && (() => {
+            const clasificacion = clasificarProceso(compra.monto);
+            const montoUTM = montoEnUTM(compra.monto);
+            return (
+              <div className="p-2 bg-muted/50 rounded-lg border border-border">
+                <div className="flex items-center justify-between mb-2">
+                  <Badge variant={clasificacion.tipo === 'compra_agil' ? 'default' : 'secondary'}>
+                    {clasificacion.tipo === 'compra_agil' ? 'Compra Ágil' : 'Licitación'} {clasificacion.categoria}
+                  </Badge>
+                  {montoUTM && (
+                    <span className="text-xs text-muted-foreground">{montoUTM.toFixed(1)} UTM</span>
+                  )}
+                </div>
+                <div className="space-y-1 text-xs">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-3 w-3 text-muted-foreground" />
+                    <span>Plazo mínimo: {clasificacion.plazoMinimoDias} días corridos</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {clasificacion.requiereFEA ? (
+                      <>
+                        <ShieldCheck className="h-3 w-3 text-orange-500" />
+                        <span className="text-orange-600">Firma Electrónica Avanzada (FEA) requerida</span>
+                      </>
+                    ) : (
+                      <>
+                        <ShieldX className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-muted-foreground">Firma Simple suficiente</span>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {clasificacion.requiereGarantia ? (
+                      <>
+                        <AlertCircle className="h-3 w-3 text-red-500" />
+                        <span className="text-red-600">Garantía de Fiel Cumplimiento requerida (5-30%)</span>
+                      </>
+                    ) : clasificacion.categoria === 'LE' ? (
+                      <>
+                        <ShieldX className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-muted-foreground">Garantía discrecional</span>
+                      </>
+                    ) : (
+                      <>
+                        <ShieldX className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-muted-foreground">Sin garantía requerida</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
           
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div className="flex items-center gap-1.5 text-muted-foreground">

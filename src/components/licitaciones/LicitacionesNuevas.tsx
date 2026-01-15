@@ -15,15 +15,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { useLicitacionesNuevas, useAnalizarMatch, type Licitacion } from '@/hooks/useLicitaciones';
 import { toast } from 'sonner';
-
-function formatCurrency(value: number | null): string {
-  if (value === null) return '-';
-  return new Intl.NumberFormat('es-CL', {
-    style: 'currency',
-    currency: 'CLP',
-    maximumFractionDigits: 0,
-  }).format(value);
-}
+import { clasificarProceso, formatCurrency, montoEnUTM } from '@/utils/clasificacion';
+import { Badge } from '@/components/ui/badge';
 
 function LicitacionNuevaRow({ licitacion }: { licitacion: Licitacion }) {
   const analizarMatch = useAnalizarMatch();
@@ -52,8 +45,23 @@ function LicitacionNuevaRow({ licitacion }: { licitacion: Licitacion }) {
       <TableCell className="text-muted-foreground">
         {licitacion.organismo}
       </TableCell>
-      <TableCell className="text-right font-mono">
-        {formatCurrency(licitacion.presupuesto)}
+      <TableCell className="text-right">
+        <div className="flex flex-col items-end gap-1">
+          <span className="font-mono font-medium">{formatCurrency(licitacion.presupuesto)}</span>
+          {licitacion.presupuesto && (() => {
+            const clasificacion = clasificarProceso(licitacion.presupuesto);
+            const montoUTM = montoEnUTM(licitacion.presupuesto);
+            return (
+              <Badge 
+                variant={clasificacion.tipo === 'compra_agil' ? 'default' : 'secondary'}
+                className="text-xs"
+              >
+                {clasificacion.categoria}
+                {montoUTM && ` (${montoUTM.toFixed(1)} UTM)`}
+              </Badge>
+            );
+          })()}
+        </div>
       </TableCell>
       <TableCell className="text-muted-foreground text-sm">
         {licitacion.created_at

@@ -8,6 +8,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAutoMatching } from '@/hooks/useMatching';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function Licitaciones() {
   const queryClient = useQueryClient();
@@ -42,23 +43,42 @@ export default function Licitaciones() {
         </div>
         <div className="flex gap-2">
           {pendingCount > 0 && (
-            <Button 
-              onClick={handleRunMatching} 
-              disabled={isProcessing}
-              className="gap-2"
-            >
-              {isProcessing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Sparkles className="h-4 w-4" />
-              )}
-              Analizar {pendingCount} nuevas
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  onClick={handleRunMatching} 
+                  disabled={isProcessing}
+                  className="gap-2 bg-firmavb-blue hover:bg-firmavb-blue/90"
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Procesando...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4" />
+                      Analizar {pendingCount} nuevas
+                    </>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">Analiza {pendingCount} compra{pendingCount > 1 ? 's' : ''} ágil{pendingCount > 1 ? 'es' : ''} nueva{pendingCount > 1 ? 's' : ''} con IA para encontrar matches con tu inventario</p>
+              </TooltipContent>
+            </Tooltip>
           )}
-          <Button variant="outline" onClick={handleRefresh} className="gap-2">
-            <RefreshCw className="h-4 w-4" />
-            Actualizar
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" onClick={handleRefresh} className="gap-2">
+                <RefreshCw className="h-4 w-4" />
+                Actualizar
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">Actualiza la lista de compras ágiles desde MercadoPúblico</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 

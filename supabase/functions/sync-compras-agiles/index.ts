@@ -85,17 +85,46 @@ Deno.serve(async (req) => {
         }
 
         // Map scraper data to database schema
+        const monto = lic.monto || lic.presupuesto_estimado || null;
+        
+        // Clasificar proceso según monto (regla 100 UTM)
+        // UTM Enero 2026: $69.751 CLP
+        // Umbral: 100 UTM = $6.975.100 CLP
+        const UTM_2026_ENE = 69751;
+        const UMBRAL_COMPRA_AGIL_CLP = 100 * UTM_2026_ENE; // $6.975.100 CLP
+        
+        let tipo_proceso = 'compra_agil'; // Por defecto
+        let categoria = 'L1';
+        
+        if (monto && monto > 0) {
+          const montoUTM = monto / UTM_2026_ENE;
+          if (montoUTM >= 100) {
+            tipo_proceso = 'licitacion';
+            if (montoUTM < 1000) {
+              categoria = 'LE'; // Intermedia
+            } else if (montoUTM < 5000) {
+              categoria = 'LP'; // Mayor
+            } else {
+              categoria = 'LR'; // Gran Compra
+            }
+          } else {
+            categoria = 'L1'; // Compra Ágil
+          }
+        }
+        
         const compraData: any = {
           codigo: lic.codigo,
           nombre: lic.nombre || `Compra Ágil ${lic.codigo}`,
           organismo: lic.organismo || lic.institucion_nombre || 'Organismo no especificado',
-          monto: lic.monto || lic.presupuesto_estimado || null,
+          monto: monto,
           fecha_cierre: lic.fecha_cierre || null,
           estado: lic.estado || 'activa',
           region: lic.region || null,
           descripcion: lic.descripcion || null,
           link_oficial: lic.link_oficial || null,
           datos_json: lic.datos_json || lic, // Store full scraped data
+          tipo_proceso: tipo_proceso, // 'compra_agil' o 'licitacion'
+          categoria: categoria, // 'L1', 'LE', 'LP', 'LR'
         };
 
         // Upsert compra ágil

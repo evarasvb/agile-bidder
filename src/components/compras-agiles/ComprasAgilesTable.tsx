@@ -21,6 +21,26 @@ function getDaysRemaining(fechaCierre: string | null): number | null {
   return differenceInDays(parseISO(fechaCierre), new Date());
 }
 
+function getCategoriaBadge(categoria: string, tipo: 'compra_agil' | 'licitacion') {
+  const badges = {
+    'L1': { variant: 'default' as const, label: 'L1', color: 'bg-blue-500' },
+    'LE': { variant: 'secondary' as const, label: 'LE', color: 'bg-green-500' },
+    'LP': { variant: 'secondary' as const, label: 'LP', color: 'bg-orange-500' },
+    'LR': { variant: 'secondary' as const, label: 'LR', color: 'bg-red-500' },
+  };
+  
+  const badge = badges[categoria as keyof typeof badges] || badges['L1'];
+  
+  return (
+    <Badge 
+      variant={badge.variant}
+      className={`text-xs font-semibold ${tipo === 'compra_agil' ? 'bg-blue-100 text-blue-700 border-blue-300' : ''}`}
+    >
+      {badge.label}
+    </Badge>
+  );
+}
+
 function getEstadoBadge(estado: string | null, diasRestantes: number | null) {
   if (estado === 'urgente' || (diasRestantes !== null && diasRestantes <= 2)) {
     return <Badge variant="accent" className="gap-1"><AlertTriangle className="h-3 w-3" /> Urgente</Badge>;
@@ -146,7 +166,13 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
                       {compra.codigo}
                     </TableCell>
                     <TableCell className="max-w-[250px]">
-                      <div className="truncate font-medium">{compra.nombre}</div>
+                      <div className="flex items-center gap-2">
+                        <div className="truncate font-medium">{compra.nombre}</div>
+                        {compra.monto && (() => {
+                          const clasificacion = clasificarProceso(compra.monto);
+                          return getCategoriaBadge(clasificacion.categoria, clasificacion.tipo);
+                        })()}
+                      </div>
                       {compra.region && (
                         <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                           <MapPin className="h-3 w-3" />
@@ -169,23 +195,44 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
                           return (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Badge 
-                                  variant={clasificacion.tipo === 'compra_agil' ? 'default' : 'secondary'}
-                                  className="text-xs cursor-help"
-                                >
-                                  {clasificacion.categoria}
-                                  {montoUTM && ` (${montoUTM.toFixed(1)} UTM)`}
-                                </Badge>
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground cursor-help">
+                                  {montoUTM && (
+                                    <>
+                                      <span>{montoUTM.toFixed(1)} UTM</span>
+                                      {clasificacion.requiereFEA && (
+                                        <ShieldCheck className="h-3 w-3 text-orange-500" />
+                                      )}
+                                      {clasificacion.requiereGarantia && (
+                                        <ShieldCheck className="h-3 w-3 text-red-500" />
+                                      )}
+                                    </>
+                                  )}
+                                </div>
                               </TooltipTrigger>
-                              <TooltipContent>
-                                <div className="text-xs space-y-1">
-                                  <p className="font-medium">
-                                    {clasificacion.tipo === 'compra_agil' ? 'Compra Ágil' : 'Licitación'} {clasificacion.categoria}
-                                  </p>
-                                  {montoUTM && <p>Monto: {montoUTM.toFixed(2)} UTM</p>}
-                                  <p>Plazo mínimo: {clasificacion.plazoMinimoDias} días</p>
-                                  {clasificacion.requiereFEA && <p>Requiere FEA: Sí</p>}
-                                  {clasificacion.requiereGarantia && <p>Requiere Garantía: Sí</p>}
+                              <TooltipContent className="max-w-xs">
+                                <div className="text-xs space-y-2">
+                                  <div>
+                                    <p className="font-semibold mb-1">
+                                      {clasificacion.tipo === 'compra_agil' ? 'Compra Ágil' : 'Licitación'} {clasificacion.categoria}
+                                    </p>
+                                    {montoUTM && <p className="text-muted-foreground">Monto: {montoUTM.toFixed(2)} UTM</p>}
+                                  </div>
+                                  <div className="border-t pt-2 space-y-1">
+                                    <p className="font-medium">Requisitos:</p>
+                                    <p>• Plazo mínimo: {clasificacion.plazoMinimoDias} días corridos</p>
+                                    {clasificacion.requiereFEA ? (
+                                      <p className="text-orange-600">• Firma Electrónica Avanzada (FEA) requerida</p>
+                                    ) : (
+                                      <p className="text-muted-foreground">• Firma Simple suficiente</p>
+                                    )}
+                                    {clasificacion.requiereGarantia ? (
+                                      <p className="text-red-600">• Garantía de Fiel Cumplimiento requerida (5-30%)</p>
+                                    ) : clasificacion.categoria === 'LE' ? (
+                                      <p className="text-muted-foreground">• Garantía discrecional</p>
+                                    ) : (
+                                      <p className="text-muted-foreground">• Sin garantía requerida</p>
+                                    )}
+                                  </div>
                                 </div>
                               </TooltipContent>
                             </Tooltip>

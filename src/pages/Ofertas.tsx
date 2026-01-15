@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Clock, TrendingUp, Filter, Search, ChevronRight } from 'lucide-react';
+import { FileText, Clock, TrendingUp, Filter, Search, ChevronRight, HelpCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useOfertas, useOfertasStats, Oferta } from '@/hooks/useOfertas';
 import { format, differenceInDays, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -115,32 +116,46 @@ export default function Ofertas() {
               className="pl-9"
             />
           </div>
-          <Select value={filtroEstado} onValueChange={setFiltroEstado}>
-            <SelectTrigger className="w-[180px]">
-              <Filter className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todas">Todos los estados</SelectItem>
-              <SelectItem value="borrador">Borrador</SelectItem>
-              <SelectItem value="revision">En Revisión</SelectItem>
-              <SelectItem value="aprobada">Aprobada</SelectItem>
-              <SelectItem value="enviada">Enviada</SelectItem>
-              <SelectItem value="ganada">Ganada</SelectItem>
-              <SelectItem value="perdida">Perdida</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={filtroOrden} onValueChange={setFiltroOrden}>
-            <SelectTrigger className="w-[180px]">
-              <Clock className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="Ordenar por" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="cierre">Próximos a cerrar</SelectItem>
-              <SelectItem value="match">Mayor match</SelectItem>
-              <SelectItem value="reciente">Más recientes</SelectItem>
-            </SelectContent>
-          </Select>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Select value={filtroEstado} onValueChange={setFiltroEstado}>
+                <SelectTrigger className="w-[180px]">
+                  <Filter className="mr-2 h-4 w-4" />
+                  <SelectValue placeholder="Estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todos los estados</SelectItem>
+                  <SelectItem value="borrador">Borrador</SelectItem>
+                  <SelectItem value="revision">En Revisión</SelectItem>
+                  <SelectItem value="aprobada">Aprobada</SelectItem>
+                  <SelectItem value="enviada">Enviada</SelectItem>
+                  <SelectItem value="ganada">Ganada</SelectItem>
+                  <SelectItem value="perdida">Perdida</SelectItem>
+                </SelectContent>
+              </Select>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">Filtra ofertas por estado de procesamiento</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Select value={filtroOrden} onValueChange={setFiltroOrden}>
+                <SelectTrigger className="w-[180px]">
+                  <Clock className="mr-2 h-4 w-4" />
+                  <SelectValue placeholder="Ordenar por" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cierre">Próximos a cerrar</SelectItem>
+                  <SelectItem value="match">Mayor match</SelectItem>
+                  <SelectItem value="reciente">Más recientes</SelectItem>
+                </SelectContent>
+              </Select>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">Ordena las ofertas por fecha de cierre, match score o fecha de creación</p>
+            </TooltipContent>
+          </Tooltip>
         </CardContent>
       </Card>
 

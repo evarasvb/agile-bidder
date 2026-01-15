@@ -2,8 +2,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ShoppingCart, CheckCircle2, AlertTriangle, DollarSign } from "lucide-react";
 import { useComprasAgilesStats } from "@/hooks/useComprasAgiles";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatCurrency } from "@/utils/clasificacion";
 
-function formatCurrency(amount: number): string {
+function formatCurrencyShort(amount: number): string {
   if (amount >= 1000000) {
     return `$${(amount / 1000000).toFixed(1)}M`;
   }
@@ -92,7 +93,7 @@ export function ComprasAgilesStats() {
       />
       <StatCard
         title="Monto Total"
-        value={formatCurrency(stats?.montoTotal || 0)}
+        value={formatCurrencyShort(stats?.montoTotal || 0)}
         subtitle="Valor potencial"
         icon={DollarSign}
         color="amber"

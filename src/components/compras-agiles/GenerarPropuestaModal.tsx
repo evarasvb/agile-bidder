@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 import { useUpdateCompraAgil } from "@/hooks/useComprasAgiles";
 import type { MatchedProduct } from "@/hooks/useMatchInventario";
+import { formatCurrency } from "@/utils/clasificacion";
 
 interface GenerarPropuestaModalProps {
   open: boolean;
@@ -36,14 +37,6 @@ interface ItemSeleccionado {
     matchScore: number;
   };
   precioUnitario?: number;
-}
-
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('es-CL', {
-    style: 'currency',
-    currency: 'CLP',
-    maximumFractionDigits: 0,
-  }).format(amount);
 }
 
 export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }: GenerarPropuestaModalProps) {
