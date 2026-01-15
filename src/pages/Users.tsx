@@ -159,16 +159,49 @@ export default function Users() {
   // Create new user
   const createUserMutation = useMutation({
     mutationFn: async () => {
-      // Note: Creating users requires admin API which isn't available client-side
-      // For now, users should register themselves through /auth
-      toast.info('Los usuarios pueden registrarse en /auth. Esta función requiere configuración adicional del backend.');
+      if (!newUserEmail || !newUserPassword) {
+        throw new Error('Email y contraseña son requeridos');
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No session');
+
+      const response = await fetch(
+        `${supabase.supabaseUrl}/functions/v1/create-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: newUserEmail,
+            password: newUserPassword,
+            full_name: newUserName || newUserEmail.split('@')[0],
+            role: newUserRole,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Error al crear usuario');
+      }
+
+      return response.json();
     },
     onSuccess: () => {
       setIsAddUserOpen(false);
       setNewUserEmail("");
       setNewUserPassword("");
       setNewUserName("");
+      setNewUserRole('user');
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      toast.success('Usuario creado correctamente');
+    },
+    onError: (error: Error) => {
+      console.error('Error creating user:', error);
+      toast.error(error.message || 'Error al crear usuario');
     },
   });
 
@@ -211,25 +244,70 @@ export default function Users() {
             <DialogHeader>
               <DialogTitle>Agregar Nuevo Usuario</DialogTitle>
               <DialogDescription>
-                Los usuarios pueden registrarse directamente en la página de login.
-                Aquí puedes ver el enlace de registro.
+                Crea un nuevo usuario en el sistema con email y contraseña.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="p-4 bg-muted rounded-lg">
-                <p className="text-sm font-medium mb-2">Enlace de Registro:</p>
-                <code className="text-xs bg-background p-2 rounded block">
-                  {window.location.origin}/auth
-                </code>
+              <div className="space-y-2">
+                <Label htmlFor="user-name">Nombre Completo</Label>
+                <Input
+                  id="user-name"
+                  placeholder="Nombre del usuario"
+                  value={newUserName}
+                  onChange={(e) => setNewUserName(e.target.value)}
+                />
               </div>
-              <p className="text-sm text-muted-foreground">
-                Comparte este enlace con los nuevos usuarios para que puedan registrarse.
-                Una vez registrados, podrás asignarles roles desde esta página.
-              </p>
+              <div className="space-y-2">
+                <Label htmlFor="user-email">Email *</Label>
+                <Input
+                  id="user-email"
+                  type="email"
+                  placeholder="usuario@ejemplo.com"
+                  value={newUserEmail}
+                  onChange={(e) => setNewUserEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="user-password">Contraseña *</Label>
+                <Input
+                  id="user-password"
+                  type="password"
+                  placeholder="Contraseña segura"
+                  value={newUserPassword}
+                  onChange={(e) => setNewUserPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="user-role">Rol</Label>
+                <Select value={newUserRole} onValueChange={(value: 'admin' | 'user') => setNewUserRole(value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">Usuario</SelectItem>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsAddUserOpen(false)}>
-                Cerrar
+                Cancelar
+              </Button>
+              <Button 
+                onClick={() => createUserMutation.mutate()}
+                disabled={createUserMutation.isPending || !newUserEmail || !newUserPassword}
+              >
+                {createUserMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creando...
+                  </>
+                ) : (
+                  'Crear Usuario'
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
