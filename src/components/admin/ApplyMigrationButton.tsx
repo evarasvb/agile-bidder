@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, Database, Copy, Check } from 'lucide-react';
+import { Loader2, Database, Copy, Check, Play } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 
 export function ApplyMigrationButton() {
@@ -15,10 +15,57 @@ export function ApplyMigrationButton() {
   const [copied, setCopied] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
 
+  const executeMigration = useMutation({
+    mutationFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No session');
+
+      // Intentar ejecutar usando la función PostgreSQL helper
+      const response = await fetch(
+        `${supabase.supabaseUrl}/functions/v1/apply-rls-fix`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || error.message || 'Error al ejecutar migración');
+      }
+
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.success('✅ Migración aplicada correctamente');
+        if (data.steps && Array.isArray(data.steps)) {
+          console.log('Pasos ejecutados:', data.steps);
+        }
+        setIsOpen(false);
+        // Recargar la página después de 2 segundos para ver los cambios
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      } else {
+        setSql(data.sql || '');
+        toast.warning('La función helper no existe. Ejecuta primero la migración SQL.');
+      }
+    },
+    onError: (error: Error) => {
+      console.error('Error ejecutando migración:', error);
+      toast.error(error.message || 'Error al ejecutar migración');
+      // Si falla, mostrar el SQL para ejecución manual
+      getMigrationSQL.mutate();
+    },
+  });
+
   const getMigrationSQL = useMutation({
     mutationFn: async () => {
       // Leer el SQL directamente del archivo de migración
-      // En producción, esto vendría de la Edge Function
       const migrationSQL = `-- Fix RLS policies for user_roles to allow admins to manage roles
 -- ================================================================
 
@@ -175,6 +222,24 @@ USING (public.is_current_user_admin());`;
                       onClick={openSQLEditor}
                     >
                       Abrir SQL Editor
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => executeMigration.mutate()}
+                      disabled={executeMigration.isPending}
+                    >
+                      {executeMigration.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          Ejecutando...
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-4 w-4 mr-1" />
+                          Intentar Ejecutar
+                        </>
+                      )}
                     </Button>
                   </div>
                 </div>
