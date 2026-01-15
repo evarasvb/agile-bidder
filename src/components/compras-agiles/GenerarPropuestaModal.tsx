@@ -10,28 +10,13 @@ import { FileText, Package, Calculator, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 import { useUpdateCompraAgil } from "@/hooks/useComprasAgiles";
-
-interface LicitacionItem {
-  id: string;
-  nombre: string;
-  descripcion: string;
-  cantidad_solicitada: number;
-  unidad_medida: string;
-  matches?: Array<{
-    id: string;
-    sku: string;
-    nombre: string;
-    precio_unitario: number;
-    stock?: number;
-    matchScore: number;
-  }>;
-}
+import type { MatchedProduct } from "@/hooks/useMatchInventario";
 
 interface GenerarPropuestaModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   compra: CompraAgil | null;
-  items: LicitacionItem[];
+  productos: MatchedProduct[];
 }
 
 interface ItemSeleccionado {
@@ -61,24 +46,28 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-export function GenerarPropuestaModal({ open, onOpenChange, compra, items }: GenerarPropuestaModalProps) {
+export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }: GenerarPropuestaModalProps) {
   const updateCompra = useUpdateCompraAgil();
   
   const [itemsSeleccionados, setItemsSeleccionados] = useState<ItemSeleccionado[]>(() =>
-    items.map(item => {
-      const bestMatch = item.matches?.[0];
-      return {
-        itemId: item.id,
-        nombre: item.nombre,
-        descripcion: item.descripcion,
-        cantidadSolicitada: item.cantidad_solicitada,
-        unidadMedida: item.unidad_medida,
-        selected: bestMatch?.matchScore >= 50 || false,
-        cantidad: item.cantidad_solicitada,
-        match: bestMatch,
-        precioUnitario: bestMatch?.precio_unitario
-      };
-    })
+    productos.map((producto, index) => ({
+      itemId: producto.id || `item-${index}`,
+      nombre: producto.nombre,
+      descripcion: producto.descripcion || '',
+      cantidadSolicitada: 1, // Default, puede ajustarse
+      unidadMedida: 'unidad',
+      selected: producto.matchScore >= 50,
+      cantidad: 1,
+      match: {
+        id: producto.id,
+        sku: producto.sku,
+        nombre: producto.nombre,
+        precio_unitario: producto.precio_unitario,
+        stock: producto.stock || undefined,
+        matchScore: producto.matchScore
+      },
+      precioUnitario: producto.precio_unitario
+    }))
   );
 
   const handleToggleItem = (itemId: string) => {

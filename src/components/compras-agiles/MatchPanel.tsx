@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Package, PackageSearch, FileText, Calendar, MapPin, Building2, DollarSign, CheckCircle2, XCircle } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -236,19 +237,30 @@ export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
               </ScrollArea>
 
               <div className="pt-4 mt-auto border-t">
-                <Button 
-                  className="w-full" 
-                  onClick={() => onGenerarPropuesta(productosConMatch)}
-                  disabled={productosConMatch.length === 0}
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  Generar Propuesta
-                  {productosConMatch.length > 0 && (
-                    <Badge variant="secondary" className="ml-2">
-                      {productosConMatch.length} matches
-                    </Badge>
-                  )}
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      className="w-full" 
+                      onClick={() => onGenerarPropuesta(productosConMatch)}
+                      disabled={productosConMatch.length === 0}
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Generar Propuesta
+                      {productosConMatch.length > 0 && (
+                        <Badge variant="secondary" className="ml-2">
+                          {productosConMatch.length} matches
+                        </Badge>
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {productosConMatch.length === 0 ? (
+                      <p className="text-xs">No hay productos con match para generar propuesta</p>
+                    ) : (
+                      <p className="text-xs">Genera una propuesta comercial con {productosConMatch.length} producto{productosConMatch.length > 1 ? 's' : ''} encontrado{productosConMatch.length > 1 ? 's' : ''}</p>
+                    )}
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </>
           ) : (

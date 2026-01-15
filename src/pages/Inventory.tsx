@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Upload, Search, MoreHorizontal, Edit2, Trash2, Package, Inbox, Loader2, RefreshCw, FileJson, Download, Trash, Image, FileText, CheckSquare, Square, FileSpreadsheet, Images, HelpCircle } from "lucide-react";
+import { Plus, Upload, Search, MoreHorizontal, Edit2, Trash2, Package, Inbox, Loader2, RefreshCw, FileJson, Download, Trash, Image, FileText, CheckSquare, Square, FileSpreadsheet, Images, HelpCircle, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -47,6 +47,7 @@ export default function Inventory() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
   const [galleryProduct, setGalleryProduct] = useState<InventoryItem | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; nombre: string } | null>(null);
   
   const { data: inventario = [], isLoading, refetch } = useInventory();
   const { data: licitacionesPorProducto = [] } = useLicitacionesPorProducto();
@@ -285,66 +286,102 @@ export default function Inventory() {
             Gestiona tus productos y reglas de matching
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            className="gap-2"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Actualizar
-          </Button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefresh}
+                className="gap-2"
+                disabled={isLoading}
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                Actualizar
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">Actualiza la lista de productos del inventario</p>
+            </TooltipContent>
+          </Tooltip>
           
           {/* Download Template */}
           <DownloadTemplateButton />
           
           {/* Bulk Upload */}
-          <Button 
-            variant="default" 
-            className="gap-2 bg-primary hover:bg-primary/90"
-            onClick={() => setBulkUploadOpen(true)}
-          >
-            <FileSpreadsheet className="h-4 w-4" />
-            Cargar desde Excel
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="default" 
+                className="gap-2 bg-primary hover:bg-primary/90"
+                onClick={() => setBulkUploadOpen(true)}
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                Cargar desde Excel
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">Importa múltiples productos desde un archivo Excel (.xlsx)</p>
+            </TooltipContent>
+          </Tooltip>
           
           {/* Export Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2">
-                <Download className="h-4 w-4" />
-                Exportar
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="gap-2">
+                    <Download className="h-4 w-4" />
+                    Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-popover">
+                  <DropdownMenuItem onClick={handleExportExcel} className="gap-2 cursor-pointer">
+                    <FileSpreadsheet className="h-4 w-4" />
+                    Exportar a Excel (.xlsx)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportCSV} className="gap-2 cursor-pointer">
+                    <FileText className="h-4 w-4" />
+                    Exportar a CSV (.csv)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">Exporta tu inventario completo en Excel o CSV</p>
+            </TooltipContent>
+          </Tooltip>
+          
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline" 
+                className="gap-2 border-firmavb-blue text-firmavb-blue hover:bg-firmavb-blue/10"
+                onClick={() => setImportDialogOpen(true)}
+              >
+                <FileJson className="h-4 w-4" />
+                Cargar desde Script
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-popover">
-              <DropdownMenuItem onClick={handleExportExcel} className="gap-2 cursor-pointer">
-                <FileSpreadsheet className="h-4 w-4" />
-                Exportar a Excel (.xlsx)
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleExportCSV} className="gap-2 cursor-pointer">
-                <FileText className="h-4 w-4" />
-                Exportar a CSV (.csv)
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">Importa productos desde un script JSON personalizado</p>
+            </TooltipContent>
+          </Tooltip>
           
-          <Button
-            variant="outline" 
-            className="gap-2 border-firmavb-blue text-firmavb-blue hover:bg-firmavb-blue/10"
-            onClick={() => setImportDialogOpen(true)}
-          >
-            <FileJson className="h-4 w-4" />
-            Cargar desde Script
-          </Button>
-          
-          <Button 
-            className="gap-2 bg-primary hover:bg-primary/90"
-            onClick={() => setAddDialogOpen(true)}
-          >
-            <Plus className="h-4 w-4" />
-            Agregar Producto
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                className="gap-2 bg-primary hover:bg-primary/90"
+                onClick={() => setAddDialogOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+                Agregar Producto
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">Agrega un nuevo producto al inventario manualmente</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
@@ -575,9 +612,16 @@ export default function Inventory() {
                     })()}
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">Ver ficha técnica del producto</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </TableCell>
                   <TableCell>{getStatusBadge(item.stock_disponible, item.activo)}</TableCell>
                   <TableCell>
@@ -597,7 +641,7 @@ export default function Inventory() {
                           </DropdownMenuItem>
                           <DropdownMenuItem 
                             className="gap-2 text-destructive cursor-pointer"
-                            onClick={() => setDeletingProduct(item)}
+                            onClick={() => handleDeleteClick(item)}
                           >
                             <Trash2 className="h-4 w-4" />
                             Eliminar
@@ -629,6 +673,44 @@ export default function Inventory() {
         onConfirm={handleDelete}
         isLoading={eliminarProducto.isPending}
       />
+
+      {/* Confirm Delete Alert Dialog */}
+      <AlertDialog open={!!confirmDelete} onOpenChange={(open) => !open && setConfirmDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar producto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDelete && (
+                <>
+                  Estás a punto de eliminar <strong>{confirmDelete.nombre}</strong> del inventario.
+                  <br />
+                  <br />
+                  <span className="text-amber-600 dark:text-amber-400">
+                    ⚠️ Esta acción no se puede deshacer. El producto será eliminado permanentemente.
+                  </span>
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (confirmDelete) {
+                  const product = inventario.find(p => p.id === confirmDelete.id);
+                  if (product) {
+                    setDeletingProduct(product);
+                    setConfirmDelete(null);
+                  }
+                }
+              }}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Import from Script Dialog */}
       <ImportScriptDialog

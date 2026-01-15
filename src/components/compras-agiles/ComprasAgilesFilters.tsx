@@ -2,8 +2,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Filter, DollarSign } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Filter, DollarSign, HelpCircle } from "lucide-react";
 import type { ComprasAgilesFilters as Filters } from "@/hooks/useComprasAgiles";
+import { UMBRAL_COMPRA_AGIL_CLP, formatCurrency } from "@/utils/clasificacion";
 
 interface ComprasAgilesFiltersProps {
   filters: Filters;
@@ -81,7 +83,20 @@ export function ComprasAgilesFilters({ filters, onFiltersChange }: ComprasAgiles
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Monto mínimo</Label>
+            <div className="flex items-center gap-1.5">
+              <Label className="text-xs text-muted-foreground">Monto mínimo</Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">Filtra compras ágiles por monto mínimo en CLP</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Umbral Compra Ágil: {formatCurrency(UMBRAL_COMPRA_AGIL_CLP)} (100 UTM)
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
             <div className="relative">
               <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -98,7 +113,20 @@ export function ComprasAgilesFilters({ filters, onFiltersChange }: ComprasAgiles
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Monto máximo</Label>
+            <div className="flex items-center gap-1.5">
+              <Label className="text-xs text-muted-foreground">Monto máximo</Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">Filtra compras ágiles por monto máximo en CLP</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Compras Ágiles: hasta {formatCurrency(UMBRAL_COMPRA_AGIL_CLP)} (≤100 UTM)
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
             <div className="relative">
               <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input

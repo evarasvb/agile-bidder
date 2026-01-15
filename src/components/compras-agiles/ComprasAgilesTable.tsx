@@ -7,21 +7,13 @@ import { format, differenceInDays, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { ShoppingCart, Clock, MapPin, Building2, CheckCircle2, AlertTriangle, DollarSign, TrendingUp, ShieldCheck, ShieldX, HelpCircle } from "lucide-react";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
+import { clasificarProceso, getCategoria, montoEnUTM, formatCurrency } from "@/utils/clasificacion";
 
 interface ComprasAgilesTableProps {
   compras: CompraAgil[] | undefined;
   isLoading: boolean;
   selectedId: string | null;
   onSelect: (compra: CompraAgil) => void;
-}
-
-function formatCurrency(amount: number | null): string {
-  if (amount === null || amount === undefined) return '-';
-  return new Intl.NumberFormat('es-CL', {
-    style: 'currency',
-    currency: 'CLP',
-    maximumFractionDigits: 0,
-  }).format(amount);
 }
 
 function getDaysRemaining(fechaCierre: string | null): number | null {
@@ -168,8 +160,38 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
                         <span className="truncate max-w-[150px]">{compra.organismo}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right font-medium">
-                      {formatCurrency(compra.monto)}
+                    <TableCell className="text-right">
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="font-medium">{formatCurrency(compra.monto)}</span>
+                        {compra.monto && (() => {
+                          const clasificacion = clasificarProceso(compra.monto);
+                          const montoUTM = montoEnUTM(compra.monto);
+                          return (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge 
+                                  variant={clasificacion.tipo === 'compra_agil' ? 'default' : 'secondary'}
+                                  className="text-xs cursor-help"
+                                >
+                                  {clasificacion.categoria}
+                                  {montoUTM && ` (${montoUTM.toFixed(1)} UTM)`}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <div className="text-xs space-y-1">
+                                  <p className="font-medium">
+                                    {clasificacion.tipo === 'compra_agil' ? 'Compra Ágil' : 'Licitación'} {clasificacion.categoria}
+                                  </p>
+                                  {montoUTM && <p>Monto: {montoUTM.toFixed(2)} UTM</p>}
+                                  <p>Plazo mínimo: {clasificacion.plazoMinimoDias} días</p>
+                                  {clasificacion.requiereFEA && <p>Requiere FEA: Sí</p>}
+                                  {clasificacion.requiereGarantia && <p>Requiere Garantía: Sí</p>}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        })()}
+                      </div>
                     </TableCell>
                     <TableCell>
                       {compra.fecha_cierre ? (

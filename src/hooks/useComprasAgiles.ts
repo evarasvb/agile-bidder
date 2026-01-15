@@ -5,8 +5,8 @@ export interface CompraAgil {
   id: string;
   codigo: string;
   nombre: string;
-  organismo: string;
-  monto: number | null;
+  organismo: string; // Mapeado desde nombre_organismo
+  monto: number | null; // Mapeado desde monto_estimado
   fecha_cierre: string | null;
   estado: string | null;
   region: string | null;
@@ -18,6 +18,9 @@ export interface CompraAgil {
   datos_json: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
+  // Campos reales de la BD
+  nombre_organismo?: string;
+  monto_estimado?: number | null;
 }
 
 export interface ComprasAgilesFilters {
@@ -55,7 +58,13 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
       const { data, error } = await query;
 
       if (error) throw error;
-      return data as CompraAgil[];
+      
+      // Mapear campos de BD a interfaz
+      return (data || []).map(compra => ({
+        ...compra,
+        organismo: compra.nombre_organismo || compra.organismo || '',
+        monto: compra.monto_estimado || compra.monto || null,
+      })) as CompraAgil[];
     },
     refetchInterval: 30000,
   });
@@ -112,7 +121,12 @@ export function useComprasAgilesStats() {
 
       if (error) throw error;
 
-      const compras = data as CompraAgil[];
+      const compras = (data || []).map(c => ({
+        ...c,
+        organismo: c.nombre_organismo || c.organismo || '',
+        monto: c.monto_estimado || c.monto || null,
+      })) as CompraAgil[];
+      
       const total = compras.length;
       const conMatch = compras.filter(c => c.match_encontrado).length;
       const urgentes = compras.filter(c => c.estado === 'urgente').length;

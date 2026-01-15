@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ShoppingCart, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ComprasAgilesStats } from "@/components/compras-agiles/ComprasAgilesStats";
 import { ComprasAgilesFilters } from "@/components/compras-agiles/ComprasAgilesFilters";
 import { ComprasAgilesTable } from "@/components/compras-agiles/ComprasAgilesTable";
@@ -51,14 +52,22 @@ export default function ComprasAgiles() {
             </p>
           </div>
         </div>
-        <Button 
-          variant="outline" 
-          onClick={handleRefresh} 
-          className="gap-2 border-firmavb-blue/30 hover:bg-firmavb-blue/10 hover:border-firmavb-blue"
-        >
-          <RefreshCw className="h-4 w-4" />
-          Actualizar
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button 
+              variant="outline" 
+              onClick={handleRefresh} 
+              className="gap-2 border-firmavb-blue/30 hover:bg-firmavb-blue/10 hover:border-firmavb-blue"
+              disabled={isLoading}
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              Actualizar
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="text-xs">Actualiza la lista de compras ágiles desde MercadoPúblico</p>
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Stats */}

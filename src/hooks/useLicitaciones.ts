@@ -40,8 +40,8 @@ export function useLicitaciones() {
       return (data || []).map(compra => ({
         id_licitacion: compra.codigo,
         titulo: compra.nombre,
-        organismo: compra.organismo,
-        presupuesto: compra.monto,
+        organismo: compra.nombre_organismo || compra.organismo || '',
+        presupuesto: compra.monto_estimado || compra.monto || null,
         fecha_cierre: compra.fecha_cierre,
         estado: compra.estado,
         link_oficial: compra.link_oficial,
@@ -71,8 +71,8 @@ export function useLicitacionesNuevas() {
       return (data || []).map(compra => ({
         id_licitacion: compra.codigo,
         titulo: compra.nombre,
-        organismo: compra.organismo,
-        presupuesto: compra.monto,
+        organismo: compra.nombre_organismo || compra.organismo || '',
+        presupuesto: compra.monto_estimado || compra.monto || null,
         fecha_cierre: compra.fecha_cierre,
         estado: compra.estado,
         link_oficial: compra.link_oficial,
@@ -102,8 +102,8 @@ export function useLicitacionesConMatch() {
       return (data || []).map(compra => ({
         id_licitacion: compra.codigo,
         titulo: compra.nombre,
-        organismo: compra.organismo,
-        presupuesto: compra.monto,
+        organismo: compra.nombre_organismo || compra.organismo || '',
+        presupuesto: compra.monto_estimado || compra.monto || null,
         fecha_cierre: compra.fecha_cierre,
         estado: compra.estado,
         link_oficial: compra.link_oficial,

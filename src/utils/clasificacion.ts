@@ -14,9 +14,10 @@
 // Valores UTM (actualizar mensualmente según Banco Central)
 // Fuente: https://si3.bcentral.cl/bdemovil/BDE/Series/MOV_SC_PR12
 export const UTM_2025_DIC = 69542; // CLP - Diciembre 2025
-export const UTM_2026_ENE = 69751; // CLP - Enero 2026
+export const UTM_2026_ENE = 69751; // CLP - Enero 2026 (Banco Central)
 
 // Valor actual (usar el del mes correspondiente)
+// UTM Enero 2026: $69.751 CLP
 export const UTM_ACTUAL = UTM_2026_ENE;
 
 // Umbrales según categorías de MercadoPúblico
@@ -139,6 +140,19 @@ export function getTipoProceso(monto: number | null | undefined): string {
 export function montoEnUTM(montoCLP: number | null | undefined): number | null {
   if (!montoCLP || montoCLP === 0) return null;
   return montoCLP / UTM_ACTUAL;
+}
+
+/**
+ * Formatea un monto en CLP como moneda chilena
+ */
+export function formatCurrency(amount: number | null | undefined): string {
+  if (!amount || amount === 0) return '-';
+  return new Intl.NumberFormat('es-CL', {
+    style: 'currency',
+    currency: 'CLP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
 }
 
 /**
