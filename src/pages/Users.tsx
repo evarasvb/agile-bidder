@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ApplyMigrationButton } from "@/components/admin/ApplyMigrationButton";
+import { ExecuteMigrationDialog } from "@/components/admin/ExecuteMigrationDialog";
 
 interface UserWithProfile {
   id: string;
@@ -242,13 +242,15 @@ export default function Users() {
             Administra los usuarios del sistema y sus permisos
           </p>
         </div>
-        <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <UserPlus className="h-4 w-4" />
-              Agregar Usuario
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <ExecuteMigrationDialog />
+          <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <UserPlus className="h-4 w-4" />
+                Agregar Usuario
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Agregar Nuevo Usuario</DialogTitle>

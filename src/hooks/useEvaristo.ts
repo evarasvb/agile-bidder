@@ -31,8 +31,9 @@ export function useEvaristoStatus() {
         throw new Error('Unauthorized: Solo el administrador autorizado puede acceder');
       }
 
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://euzqadopjvdszcdjegmo.supabase.co';
       const response = await fetch(
-        `${supabase.supabaseUrl}/functions/v1/evaristo-api`,
+        `${supabaseUrl}/functions/v1/evaristo-api`,
         {
           method: 'POST',
           headers: {
@@ -56,8 +57,9 @@ export function useEvaristoRevisar() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('No session');
 
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://euzqadopjvdszcdjegmo.supabase.co';
       const response = await fetch(
-        `${supabase.supabaseUrl}/functions/v1/evaristo-api`,
+        `${supabaseUrl}/functions/v1/evaristo-api`,
         {
           method: 'POST',
           headers: {
@@ -99,8 +101,9 @@ export function useEvaristoMision() {
         throw new Error('Unauthorized: Solo el administrador autorizado puede acceder');
       }
 
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://euzqadopjvdszcdjegmo.supabase.co';
       const response = await fetch(
-        `${supabase.supabaseUrl}/functions/v1/evaristo-api`,
+        `${supabaseUrl}/functions/v1/evaristo-api`,
         {
           method: 'POST',
           headers: {

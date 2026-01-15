@@ -20,9 +20,30 @@ export function ApplyMigrationButton() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('No session');
 
-      // Intentar ejecutar usando la función PostgreSQL helper
+      // Paso 1: Intentar ejecutar la función helper directamente usando RPC
+      // Esto requiere que la función ya exista en la BD
+      try {
+        // @ts-ignore - La función RPC se crea dinámicamente
+        const { data: rpcResult, error: rpcError } = await supabase.rpc('apply_user_roles_rls_fix');
+        
+        if (!rpcError && rpcResult) {
+          return { success: true, steps: (rpcResult as any)?.steps || [], method: 'rpc' };
+        }
+        
+        // Si la función no existe, intentar con Edge Function
+        if (rpcError?.code === '42883' || rpcError?.message?.includes('does not exist')) {
+          console.log('Función no existe, intentando con Edge Function...');
+        } else {
+          throw rpcError;
+        }
+      } catch (rpcError: any) {
+        console.log('RPC falló, intentando Edge Function...', rpcError);
+      }
+
+      // Paso 2: Si RPC falla, usar Edge Function
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://euzqadopjvdszcdjegmo.supabase.co';
       const response = await fetch(
-        `${supabase.supabaseUrl}/functions/v1/apply-rls-fix`,
+        `${supabaseUrl}/functions/v1/apply-rls-fix`,
         {
           method: 'POST',
           headers: {
@@ -135,7 +156,7 @@ USING (public.is_current_user_admin());`;
 
   const openSQLEditor = () => {
     // Obtener el project_id de la URL de Supabase
-    const supabaseUrl = supabase.supabaseUrl;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://euzqadopjvdszcdjegmo.supabase.co';
     const projectId = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
     
     if (projectId) {
