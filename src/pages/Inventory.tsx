@@ -16,7 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
+import { Badge, badgeVariants } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -30,7 +30,9 @@ import { BulkUploadDialog } from "@/components/inventory/BulkUploadDialog";
 import { DownloadTemplateButton } from "@/components/inventory/DownloadTemplateButton";
 import { ProductGallery } from "@/components/inventory/ProductGallery";
 import { ImportHistoryPanel } from "@/components/inventory/ImportHistoryPanel";
+import { OportunidadesModal } from "@/components/inventory/OportunidadesModal";
 import { useAuthUser } from "@/hooks/useCliente";
+import { useComprasAgilesMatch } from "@/hooks/useComprasAgilesMatch";
 import * as XLSX from 'xlsx';
 
 export default function Inventory() {
@@ -44,11 +46,13 @@ export default function Inventory() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
   const [galleryProduct, setGalleryProduct] = useState<InventoryItem | null>(null);
+  const [oportunidadesProduct, setOportunidadesProduct] = useState<InventoryItem | null>(null);
   
   const { data: inventario = [], isLoading, refetch } = useInventory();
   const actualizarProducto = useUpdateInventoryItem();
   const eliminarProducto = useDeleteInventoryItem();
   const crearProducto = useCreateInventoryItem();
+  const { countsByProductId, matchesByProductId, isLoading: isLoadingOportunidades } = useComprasAgilesMatch(inventario);
 
   const handleRefresh = () => {
     toast.info('Actualizando inventario...');
@@ -449,6 +453,7 @@ export default function Inventory() {
                 <TableHead className="font-semibold text-right">Precio</TableHead>
                 <TableHead className="font-semibold text-right">Margen</TableHead>
                 <TableHead className="font-semibold text-right">Stock</TableHead>
+                <TableHead className="font-semibold text-center">Oportunidades</TableHead>
                 <TableHead className="font-semibold">Ficha</TableHead>
                 <TableHead className="font-semibold">Estado</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
@@ -516,6 +521,35 @@ export default function Inventory() {
                     item.stock_disponible > 0 && item.stock_disponible < 50 && "text-warning"
                   )}>
                     {item.stock_disponible.toLocaleString("es-CL")}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {(() => {
+                      const oportunidadesCount = countsByProductId[item.id] ?? 0;
+                      const isDisabled = isLoadingOportunidades || oportunidadesCount === 0;
+
+                      return (
+                        <button
+                          type="button"
+                          className={cn(
+                            badgeVariants({ variant: oportunidadesCount > 0 ? "secondary" : "outline" }),
+                            "min-w-[34px] justify-center",
+                            isDisabled ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-primary/10"
+                          )}
+                          onClick={() => {
+                            if (isDisabled) return;
+                            setOportunidadesProduct(item);
+                          }}
+                          disabled={isDisabled}
+                          aria-label={`Ver oportunidades para ${item.nombre_producto}`}
+                        >
+                          {isLoadingOportunidades ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            oportunidadesCount
+                          )}
+                        </button>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell>
                     <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -615,6 +649,18 @@ export default function Inventory() {
           onOpenChange={(open) => !open && setGalleryProduct(null)}
         />
       )}
+
+      <OportunidadesModal
+        open={!!oportunidadesProduct}
+        onOpenChange={(open) => !open && setOportunidadesProduct(null)}
+        product={oportunidadesProduct}
+        matches={
+          oportunidadesProduct
+            ? matchesByProductId[oportunidadesProduct.id] || []
+            : []
+        }
+        isLoading={isLoadingOportunidades}
+      />
     </div>
   );
 }

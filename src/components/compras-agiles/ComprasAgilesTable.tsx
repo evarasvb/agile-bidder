@@ -2,6 +2,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
 import { format, differenceInDays, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { ShoppingCart, Clock, MapPin, Building2, CheckCircle2, AlertTriangle } from "lucide-react";
@@ -39,6 +40,89 @@ function getEstadoBadge(estado: string | null, diasRestantes: number | null) {
     return <Badge variant="success">Adjudicada</Badge>;
   }
   return <Badge variant="outline">Activa</Badge>;
+}
+
+function asObject(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function getItemsArray(datos: Record<string, unknown>): unknown[] {
+  const direct = Array.isArray(datos.items) ? datos.items : [];
+  if (direct.length > 0) return direct;
+
+  const detalle = asObject(datos.detalle);
+  const nested = detalle && Array.isArray(detalle.items) ? detalle.items : [];
+  if (nested.length > 0) return nested;
+
+  const lineas = Array.isArray(datos.lineas) ? datos.lineas : [];
+  if (lineas.length > 0) return lineas;
+
+  return Array.isArray(datos.productos) ? datos.productos : [];
+}
+
+function isMatchedItem(item: unknown): boolean {
+  const obj = asObject(item);
+  if (!obj) return false;
+
+  const matchFlag = obj.match === true || obj.match_encontrado === true || obj.matched === true;
+  const score =
+    typeof obj.match_score === "number"
+      ? obj.match_score
+      : typeof obj.matchScore === "number"
+        ? obj.matchScore
+        : null;
+  const linkedProduct =
+    typeof obj.producto_id === "string" ||
+    typeof obj.inventario_id === "string" ||
+    typeof obj.producto_match_id === "string";
+
+  return matchFlag || (score !== null && score >= 50) || linkedProduct;
+}
+
+function getItemsMatchProgress(compra: CompraAgil) {
+  const datos = asObject(compra.datos_json) || {};
+  const items = getItemsArray(datos);
+
+  const totalFromField =
+    typeof datos.total_items === "number"
+      ? datos.total_items
+      : typeof datos.items_total === "number"
+        ? datos.items_total
+        : typeof datos.totalItems === "number"
+          ? datos.totalItems
+          : 0;
+
+  const propuesta = asObject(datos.propuesta);
+  const propuestaProductos = propuesta && Array.isArray(propuesta.productos) ? propuesta.productos : [];
+  const productosMatcheados = Array.isArray(datos.productos_matcheados) ? datos.productos_matcheados : [];
+  const matchedFromField =
+    typeof datos.items_matcheados === "number"
+      ? datos.items_matcheados
+      : typeof datos.matched_items === "number"
+        ? datos.matched_items
+        : null;
+
+  let matchedItems = 0;
+  if (propuestaProductos.length > 0) {
+    matchedItems = propuestaProductos.length;
+  } else if (productosMatcheados.length > 0) {
+    matchedItems = productosMatcheados.length;
+  } else if (matchedFromField !== null) {
+    matchedItems = matchedFromField;
+  } else if (items.length > 0) {
+    matchedItems = items.filter(isMatchedItem).length;
+  }
+
+  let totalItems = items.length || totalFromField;
+  if (totalItems === 0 && matchedItems > 0) {
+    totalItems = matchedItems;
+  }
+
+  const boundedMatched = totalItems > 0 ? Math.min(matchedItems, totalItems) : matchedItems;
+  const progressValue = totalItems > 0 ? Math.round((boundedMatched / totalItems) * 100) : 0;
+
+  return { matchedItems: boundedMatched, totalItems, progressValue };
 }
 
 export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }: ComprasAgilesTableProps) {
@@ -81,19 +165,21 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
               <TableHead className="font-semibold text-right">Monto</TableHead>
               <TableHead className="font-semibold">Cierre</TableHead>
               <TableHead className="font-semibold">Estado</TableHead>
+              <TableHead className="font-semibold">Items</TableHead>
               <TableHead className="font-semibold text-center">Match</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {compras?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   No se encontraron compras ágiles con los filtros seleccionados
                 </TableCell>
               </TableRow>
             ) : (
               compras?.map((compra) => {
                 const diasRestantes = getDaysRemaining(compra.fecha_cierre);
+                const { matchedItems, totalItems, progressValue } = getItemsMatchProgress(compra);
                 const isSelected = selectedId === compra.id;
                 
                 return (
@@ -144,6 +230,15 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
                     </TableCell>
                     <TableCell>
                       {getEstadoBadge(compra.estado, diasRestantes)}
+                    </TableCell>
+                    <TableCell>
+                      <div className="min-w-[120px] space-y-1">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>{matchedItems}/{totalItems} items</span>
+                          {totalItems > 0 && <span>{progressValue}%</span>}
+                        </div>
+                        <Progress value={progressValue} className="h-2" />
+                      </div>
                     </TableCell>
                     <TableCell className="text-center">
                       {compra.match_encontrado ? (
