@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ApplyMigrationButton } from "@/components/admin/ApplyMigrationButton";
 
 interface UserWithProfile {
   id: string;
@@ -131,9 +132,17 @@ export default function Users() {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       toast.success('Rol actualizado correctamente');
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Error toggling admin:', error);
-      toast.error('Error al actualizar el rol');
+      const errorMessage = error?.message || error?.error_description || 'Error al actualizar el rol';
+      toast.error(errorMessage);
+      // Log full error for debugging
+      console.error('Full error details:', {
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint,
+        message: error?.message,
+      });
     },
   });
 
@@ -312,6 +321,7 @@ export default function Users() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Stats Cards */}
