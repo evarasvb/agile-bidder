@@ -1,8 +1,10 @@
 // Página de administración para Evaristo
 import { EvaristoPanel } from '@/components/evaristo/EvaristoPanel';
+import { EvaristoChat } from '@/components/evaristo/EvaristoChat';
 import { FirmaVBHeader } from '@/components/layout/FirmaVBHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Bot, BookOpen, Settings } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Bot, BookOpen, Settings, MessageSquare, Terminal } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
@@ -74,8 +76,27 @@ export default function AdminEvaristo() {
         </Card>
       </div>
 
-      {/* Main Panel */}
-      <EvaristoPanel />
+      {/* Main Content - Tabs */}
+      <Tabs defaultValue="chat" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="chat" className="gap-2">
+            <MessageSquare className="h-4 w-4" />
+            Conversar con Evaristo
+          </TabsTrigger>
+          <TabsTrigger value="panel" className="gap-2">
+            <Terminal className="h-4 w-4" />
+            Panel de Control
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="chat" className="mt-4">
+          <EvaristoChat />
+        </TabsContent>
+        
+        <TabsContent value="panel" className="mt-4">
+          <EvaristoPanel />
+        </TabsContent>
+      </Tabs>
 
       {/* Quick Actions */}
       <Card>
