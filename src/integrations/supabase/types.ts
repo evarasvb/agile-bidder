@@ -280,6 +280,60 @@ export type Database = {
         }
         Relationships: []
       }
+      compras_agiles: {
+        Row: {
+          codigo: string
+          created_at: string
+          datos_json: Json | null
+          descripcion: string | null
+          estado: string | null
+          fecha_cierre: string | null
+          id: string
+          link_oficial: string | null
+          match_encontrado: boolean | null
+          match_score: number | null
+          monto: number | null
+          nombre: string
+          organismo: string
+          region: string | null
+          updated_at: string
+        }
+        Insert: {
+          codigo: string
+          created_at?: string
+          datos_json?: Json | null
+          descripcion?: string | null
+          estado?: string | null
+          fecha_cierre?: string | null
+          id?: string
+          link_oficial?: string | null
+          match_encontrado?: boolean | null
+          match_score?: number | null
+          monto?: number | null
+          nombre: string
+          organismo: string
+          region?: string | null
+          updated_at?: string
+        }
+        Update: {
+          codigo?: string
+          created_at?: string
+          datos_json?: Json | null
+          descripcion?: string | null
+          estado?: string | null
+          fecha_cierre?: string | null
+          id?: string
+          link_oficial?: string | null
+          match_encontrado?: boolean | null
+          match_score?: number | null
+          monto?: number | null
+          nombre?: string
+          organismo?: string
+          region?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       extension_activity_log: {
         Row: {
           action: string

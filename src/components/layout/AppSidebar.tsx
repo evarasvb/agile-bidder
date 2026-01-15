@@ -13,7 +13,8 @@ import {
   Globe,
   BarChart3,
   Lightbulb,
-  Shield
+  Shield,
+  ShoppingCart
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -39,6 +40,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, sectionKey: "dashboard" },
   { title: "Licitaciones", url: "/licitaciones", icon: FileSearch, sectionKey: "licitaciones" },
+  { title: "Compras Ágiles", url: "/compras-agiles", icon: ShoppingCart, sectionKey: "compras_agiles" },
   { title: "Mis Ofertas", url: "/ofertas", icon: FileText, sectionKey: "ofertas" },
   { title: "Gestión Vendedores", url: "/vendedores", icon: Users, sectionKey: "vendedores" },
   { title: "MercadoPúblico", url: "/mercadopublico", icon: Globe, sectionKey: "mercadopublico" },
