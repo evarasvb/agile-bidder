@@ -1,59 +1,39 @@
 {
-  "fecha": "2026-01-15T13:24:11.819649",
-  "total_misiones": 13,
-  "exitosas": 11,
-  "fallidas": 2,
+  "fecha": "2026-01-15T14:27:03.039715",
+  "total_misiones": 8,
+  "exitosas": 8,
+  "fallidas": 0,
   "resultados": [
     {
-      "mision": "Verificar y optimizar extracción de compras ágiles",
+      "mision": "Verificar que el hook useLicitacionItems existe y funciona",
       "exito": true
     },
     {
-      "mision": "Verificar función Edge sync-compras-agiles",
+      "mision": "Actualizar MatchPanel para mostrar listado de productos solicitados",
       "exito": true
     },
     {
-      "mision": "Optimizar motor de matching para compras ágiles",
+      "mision": "Actualizar GenerarPropuestaModal para usar matches reales",
       "exito": true
     },
     {
-      "mision": "Verificar hook useMatchingAI para compras ágiles",
+      "mision": "Verificar que matcher_db_adapter procesa correctamente",
       "exito": true
     },
     {
-      "mision": "Mejorar componente GenerarCotizacionModal para envío a MercadoPúblico",
+      "mision": "Verificar integración del workflow de GitHub Actions",
       "exito": true
     },
     {
-      "mision": "Mejorar frontend de Compras Ágiles - Diseño profesional",
+      "mision": "Crear componente para mostrar listado de productos solicitados",
       "exito": true
     },
     {
-      "mision": "Mejorar componente ComprasAgilesTable para mostrar margen y buen pagador",
+      "mision": "Actualizar página ComprasAgiles para usar nuevo flujo",
       "exito": true
     },
     {
-      "mision": "Agregar campo buen_pagador a tabla compras_agiles si no existe",
-      "exito": false
-    },
-    {
-      "mision": "Mejorar servicio mercadoPublicoApi para compras ágiles",
-      "exito": true
-    },
-    {
-      "mision": "Revisar y mejorar branding FirmaVB en todo el código",
-      "exito": false
-    },
-    {
-      "mision": "Verificar hooks de compras ágiles",
-      "exito": true
-    },
-    {
-      "mision": "Verificar compilación y tipos TypeScript",
-      "exito": true
-    },
-    {
-      "mision": "Revisar y actualizar documentación",
+      "mision": "Verificar que el scraper extrae correctamente el listado",
       "exito": true
     }
   ]

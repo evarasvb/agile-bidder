@@ -1,0 +1,57 @@
+{
+  "nombre": "Solucionar Matching de Compras Ágiles - Listado de Productos",
+  "descripcion": "Corregir el sistema de matching para que use el listado de productos solicitados por la institución en cada compra ágil, en lugar de solo el nombre de la compra",
+  "fecha_creacion": "2026-01-15",
+  "prioridad": "critica",
+  "automatico": false,
+  "misiones": [
+    {
+      "nombre": "Verificar que el hook useLicitacionItems existe y funciona",
+      "tipo": "verificar",
+      "archivo": "src/hooks/useLicitacionItems.ts",
+      "instruccion": "Verifica que el hook useLicitacionItems existe y puede obtener los productos solicitados desde licitacion_items. Si no existe, créalo. Debe obtener: licitacion_codigo, item_index, nombre, descripcion, cantidad, unidad, match_sku, costo_unitario, margen_estimado, confidence_score."
+    },
+    {
+      "nombre": "Actualizar MatchPanel para mostrar listado de productos solicitados",
+      "tipo": "modificar",
+      "archivo": "src/components/compras-agiles/MatchPanel.tsx",
+      "instruccion": "Modifica MatchPanel para que: 1) Use useLicitacionItems(compra.codigo) para obtener los productos solicitados, 2) Muestre cada producto del listado con su nombre, descripción, cantidad y unidad, 3) Muestre el match encontrado para cada producto (SKU, precio, margen, confidence_score) desde los campos de licitacion_items, 4) Permita generar propuesta basada en los matches reales. NO uses useMatchInventario con el nombre de la compra, usa los matches ya calculados en licitacion_items."
+    },
+    {
+      "nombre": "Actualizar GenerarPropuestaModal para usar matches reales",
+      "tipo": "modificar",
+      "archivo": "src/components/compras-agiles/GenerarPropuestaModal.tsx",
+      "instruccion": "Modifica GenerarPropuestaModal para que reciba los items de licitacion_items con sus matches ya calculados, en lugar de productos del inventario. Debe mostrar: producto solicitado (nombre + descripción), match encontrado (SKU, precio), cantidad solicitada, y permitir ajustar cantidades y precios."
+    },
+    {
+      "nombre": "Verificar que matcher_db_adapter procesa correctamente",
+      "tipo": "verificar",
+      "archivo": "../matcher_db_adapter.py",
+      "instruccion": "Verifica que matcher_db_adapter.py: 1) Combina correctamente nombre + descripcion para cada producto, 2) Actualiza licitacion_items con match_sku, costo_unitario, margen_estimado, confidence_score, 3) Maneja correctamente productos sin match. Si hay problemas, corrígelos."
+    },
+    {
+      "nombre": "Verificar integración del workflow de GitHub Actions",
+      "tipo": "verificar",
+      "archivo": "../../.github/workflows/scraper-compras-agiles.yml",
+      "instruccion": "Verifica que el workflow ejecute el matcher después del scraper correctamente. Debe tener: 1) Variables de entorno SUPABASE_DB_URL, 2) Instalación de dependencias Python, 3) Ejecución de run_matcher.py --mode=db --days=1. Si falta algo, agrégalo."
+    },
+    {
+      "nombre": "Crear componente para mostrar listado de productos solicitados",
+      "tipo": "crear",
+      "archivo": "src/components/compras-agiles/ProductosSolicitadosList.tsx",
+      "instruccion": "Crea un nuevo componente ProductosSolicitadosList que muestre: 1) Lista de productos solicitados por la institución (nombre, descripción, cantidad, unidad), 2) Para cada producto, muestra el match encontrado si existe (SKU, precio, margen, score), 3) Indicador visual si no hay match. Usa el hook useLicitacionItems para obtener los datos."
+    },
+    {
+      "nombre": "Actualizar página ComprasAgiles para usar nuevo flujo",
+      "tipo": "verificar",
+      "archivo": "src/pages/ComprasAgiles.tsx",
+      "instruccion": "Verifica que la página ComprasAgiles esté usando correctamente MatchPanel con el nuevo flujo. Asegúrate de que pase el código de la compra (compra.codigo) para que pueda obtener los productos solicitados."
+    },
+    {
+      "nombre": "Verificar que el scraper extrae correctamente el listado",
+      "tipo": "verificar",
+      "archivo": "../../scraper.js",
+      "instruccion": "Verifica que scrapeCompraDetallada extrae correctamente el 'Listado de productos solicitados' y guarda cada producto en licitacion_items con: nombre, descripcion, cantidad, unidad. Si hay problemas en la extracción, corrígelos."
+    }
+  ]
+}

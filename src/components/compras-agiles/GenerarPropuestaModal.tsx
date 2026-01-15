@@ -8,20 +8,49 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileText, Package, Calculator, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import type { MatchedProduct } from "@/hooks/useMatchInventario";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 import { useUpdateCompraAgil } from "@/hooks/useComprasAgiles";
+
+interface LicitacionItem {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  cantidad_solicitada: number;
+  unidad_medida: string;
+  matches?: Array<{
+    id: string;
+    sku: string;
+    nombre: string;
+    precio_unitario: number;
+    stock?: number;
+    matchScore: number;
+  }>;
+}
 
 interface GenerarPropuestaModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   compra: CompraAgil | null;
-  productos: MatchedProduct[];
+  items: LicitacionItem[];
 }
 
-interface ProductoSeleccionado extends MatchedProduct {
-  cantidad: number;
+interface ItemSeleccionado {
+  itemId: string;
+  nombre: string;
+  descripcion: string;
+  cantidadSolicitada: number;
+  unidadMedida: string;
   selected: boolean;
+  cantidad: number;
+  match?: {
+    id: string;
+    sku: string;
+    nombre: string;
+    precio_unitario: number;
+    stock?: number;
+    matchScore: number;
+  };
+  precioUnitario?: number;
 }
 
 function formatCurrency(amount: number): string {
@@ -32,40 +61,72 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }: GenerarPropuestaModalProps) {
+export function GenerarPropuestaModal({ open, onOpenChange, compra, items }: GenerarPropuestaModalProps) {
   const updateCompra = useUpdateCompraAgil();
   
-  const [productosSeleccionados, setProductosSeleccionados] = useState<ProductoSeleccionado[]>(() =>
-    productos.map(p => ({ ...p, cantidad: 1, selected: p.matchScore >= 50 }))
+  const [itemsSeleccionados, setItemsSeleccionados] = useState<ItemSeleccionado[]>(() =>
+    items.map(item => {
+      const bestMatch = item.matches?.[0];
+      return {
+        itemId: item.id,
+        nombre: item.nombre,
+        descripcion: item.descripcion,
+        cantidadSolicitada: item.cantidad_solicitada,
+        unidadMedida: item.unidad_medida,
+        selected: bestMatch?.matchScore >= 50 || false,
+        cantidad: item.cantidad_solicitada,
+        match: bestMatch,
+        precioUnitario: bestMatch?.precio_unitario
+      };
+    })
   );
 
-  const handleToggleProducto = (id: string) => {
-    setProductosSeleccionados(prev =>
-      prev.map(p => p.id === id ? { ...p, selected: !p.selected } : p)
+  const handleToggleItem = (itemId: string) => {
+    setItemsSeleccionados(prev =>
+      prev.map(item => item.itemId === itemId ? { ...item, selected: !item.selected } : item)
     );
   };
 
-  const handleCantidadChange = (id: string, cantidad: number) => {
-    setProductosSeleccionados(prev =>
-      prev.map(p => p.id === id ? { ...p, cantidad: Math.max(1, cantidad) } : p)
+  const handleCantidadChange = (itemId: string, cantidad: number) => {
+    setItemsSeleccionados(prev =>
+      prev.map(item => item.itemId === itemId ? { 
+        ...item, 
+        cantidad: Math.max(1, Math.min(cantidad, item.cantidadSolicitada * 2)) 
+      } : item)
     );
   };
 
-  const productosActivos = productosSeleccionados.filter(p => p.selected);
-  const montoTotal = productosActivos.reduce((sum, p) => sum + (p.precio_unitario * p.cantidad), 0);
+  const handlePrecioChange = (itemId: string, precio: number) => {
+    setItemsSeleccionados(prev =>
+      prev.map(item => item.itemId === itemId ? { 
+        ...item, 
+        precioUnitario: Math.max(0, precio) 
+      } : item)
+    );
+  };
+
+  const itemsActivos = itemsSeleccionados.filter(item => item.selected);
+  const montoTotal = itemsActivos.reduce((sum, item) => 
+    sum + ((item.precioUnitario || 0) * item.cantidad), 0);
 
   const handleGuardarPropuesta = async () => {
     if (!compra) return;
 
     const propuesta = {
       fecha_generacion: new Date().toISOString(),
-      productos: productosActivos.map(p => ({
-        id: p.id,
-        sku: p.sku,
-        nombre: p.nombre,
-        cantidad: p.cantidad,
-        precio_unitario: p.precio_unitario,
-        subtotal: p.precio_unitario * p.cantidad,
+      items: itemsActivos.map(item => ({
+        item_id: item.itemId,
+        nombre_solicitado: item.nombre,
+        descripcion_solicitada: item.descripcion,
+        cantidad_solicitada: item.cantidadSolicitada,
+        unidad_medida: item.unidadMedida,
+        match_id: item.match?.id,
+        sku_match: item.match?.sku,
+        nombre_match: item.match?.nombre,
+        cantidad_propuesta: item.cantidad,
+        precio_unitario: item.precioUnitario || 0,
+        subtotal: (item.precioUnitario || 0) * item.cantidad,
+        match_score: item.match?.matchScore
       })),
       monto_total: montoTotal,
       estado: 'borrador',
@@ -86,7 +147,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-primary" />
@@ -101,59 +162,110 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
 
         <div className="flex-1 overflow-hidden">
           <div className="mb-4">
-            <Label className="text-sm font-medium">Selecciona los productos a incluir</Label>
+            <Label className="text-sm font-medium">Configura los items de la propuesta</Label>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Ajusta las cantidades según los requerimientos de la compra
+              Ajusta cantidades y precios según los requerimientos de la licitación
             </p>
           </div>
 
-          <ScrollArea className="h-[300px] pr-4 -mr-4">
-            <div className="space-y-3">
-              {productosSeleccionados.map((producto) => (
+          <ScrollArea className="h-[400px] pr-4 -mr-4">
+            <div className="space-y-4">
+              {itemsSeleccionados.map((item) => (
                 <div
-                  key={producto.id}
-                  className={`border rounded-lg p-3 transition-colors ${
-                    producto.selected ? 'border-primary/50 bg-primary/5' : 'border-border'
+                  key={item.itemId}
+                  className={`border rounded-lg p-4 transition-colors ${
+                    item.selected ? 'border-primary/50 bg-primary/5' : 'border-border'
                   }`}
                 >
                   <div className="flex items-start gap-3">
                     <Checkbox
-                      checked={producto.selected}
-                      onCheckedChange={() => handleToggleProducto(producto.id)}
+                      checked={item.selected}
+                      onCheckedChange={() => handleToggleItem(item.itemId)}
                       className="mt-1"
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs text-muted-foreground">{producto.sku}</span>
-                        <Badge variant="secondary" className="text-xs">{producto.matchScore}%</Badge>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h4 className="font-medium text-sm">{item.nombre}</h4>
+                          {item.descripcion && (
+                            <p className="text-xs text-muted-foreground mt-1">{item.descripcion}</p>
+                          )}
+                          <div className="flex items-center gap-3 mt-2">
+                            <span className="text-xs bg-muted px-2 py-1 rounded">
+                              Solicitado: {item.cantidadSolicitada} {item.unidadMedida}
+                            </span>
+                            {item.match && (
+                              <Badge variant="secondary" className="text-xs">
+                                Match: {item.match.matchScore}%
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <p className="font-medium text-sm mt-0.5 truncate">{producto.nombre}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        {producto.categoria && (
-                          <span className="text-xs bg-muted px-1.5 py-0.5 rounded">{producto.categoria}</span>
-                        )}
-                        <span className="text-xs text-muted-foreground">Stock: {producto.stock ?? 'N/A'}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="text-right">
-                        <p className="text-sm font-medium">{formatCurrency(producto.precio_unitario)}</p>
-                        <p className="text-xs text-muted-foreground">c/u</p>
-                      </div>
-                      <div className="w-20">
-                        <Input
-                          type="number"
-                          min={1}
-                          value={producto.cantidad}
-                          onChange={(e) => handleCantidadChange(producto.id, parseInt(e.target.value) || 1)}
-                          disabled={!producto.selected}
-                          className="text-center h-8"
-                        />
-                      </div>
-                      <div className="w-24 text-right">
-                        <p className="text-sm font-semibold text-primary">
-                          {formatCurrency(producto.precio_unitario * producto.cantidad)}
-                        </p>
+
+                      {item.match && (
+                        <div className="mt-3 p-3 bg-muted/30 rounded-md">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-xs">{item.match.sku}</span>
+                                <span className="text-xs font-medium">{item.match.nombre}</span>
+                              </div>
+                              <div className="flex items-center gap-3 mt-1">
+                                <span className="text-xs text-muted-foreground">
+                                  Stock: {item.match.stock ?? 'N/A'}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  Precio base: {formatCurrency(item.match.precio_unitario)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-3 gap-4 mt-4">
+                        <div>
+                          <Label className="text-xs">Cantidad a ofertar</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={item.cantidadSolicitada * 2}
+                            value={item.cantidad}
+                            onChange={(e) => handleCantidadChange(item.itemId, parseInt(e.target.value) || 1)}
+                            disabled={!item.selected}
+                            className="h-8 text-sm"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Solicitado: {item.cantidadSolicitada}
+                          </p>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Precio unitario (CLP)</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            step={100}
+                            value={item.precioUnitario || ''}
+                            onChange={(e) => handlePrecioChange(item.itemId, parseInt(e.target.value) || 0)}
+                            disabled={!item.selected}
+                            className="h-8 text-sm"
+                          />
+                          {item.match && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Base: {formatCurrency(item.match.precio_unitario)}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <Label className="text-xs">Subtotal</Label>
+                          <p className="text-sm font-semibold text-primary mt-2">
+                            {formatCurrency((item.precioUnitario || 0) * item.cantidad)}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {item.cantidad} × {formatCurrency(item.precioUnitario || 0)}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -167,7 +279,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Package className="h-4 w-4" />
-              <span>{productosActivos.length} productos seleccionados</span>
+              <span>{itemsActivos.length} items seleccionados</span>
             </div>
             <div className="flex items-center gap-2">
               <Calculator className="h-4 w-4 text-muted-foreground" />
@@ -181,7 +293,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
             </Button>
             <Button 
               onClick={handleGuardarPropuesta}
-              disabled={productosActivos.length === 0 || updateCompra.isPending}
+              disabled={itemsActivos.length === 0 || updateCompra.isPending}
             >
               {updateCompra.isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

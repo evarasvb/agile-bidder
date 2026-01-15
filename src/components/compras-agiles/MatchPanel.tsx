@@ -3,15 +3,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Package, PackageSearch, FileText, Calendar, MapPin, Building2, DollarSign, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { Package, PackageSearch, FileText, Calendar, MapPin, Building2, DollarSign, CheckCircle2, XCircle } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { useLicitacionItems, useProductoMaestro, type LicitacionItem } from "@/hooks/useLicitacionItems";
+import { useLicitacionItems, type LicitacionItem } from "@/hooks/useLicitacionItems";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 
 interface MatchPanelProps {
   compra: CompraAgil | null;
-  onGenerarPropuesta: (productos: MatchedProduct[]) => void;
+  onGenerarPropuesta: (productos: any[]) => void;
 }
 
 function formatCurrency(amount: number | null): string {
@@ -32,13 +32,7 @@ function MatchScoreBadge({ score }: { score: number }) {
   );
 }
 
-interface ProductoConMatch extends LicitacionItem {
-  productoMaestro?: any;
-  tieneMatch: boolean;
-}
-
 export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
-  // Obtener el listado de productos solicitados por la institución
   const { data: items, isLoading: isLoadingItems } = useLicitacionItems(compra?.codigo || null);
 
   if (!compra) {
@@ -54,6 +48,22 @@ export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
     );
   }
 
+  const productosConMatch = items
+    ?.filter(item => item.match_sku !== null && item.confidence_score !== null)
+    .map(item => ({
+      id: item.match_sku!,
+      sku: item.match_sku!,
+      nombre: item.nombre || '',
+      cantidad: typeof item.cantidad === 'number' ? item.cantidad : parseInt(item.cantidad || '1', 10),
+      precio_unitario: item.costo_unitario || 0,
+      matchScore: item.confidence_score ? Math.round(item.confidence_score * 100) : 0,
+      categoria: null,
+      stock: null,
+      descripcion: item.descripcion,
+      tiempo_entrega_dias: null,
+      margen_estimado: item.margen_estimado || 0,
+    })) || [];
+
   return (
     <Card className="shadow-sm h-full flex flex-col">
       <CardHeader className="pb-3 border-b">
@@ -67,7 +77,6 @@ export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
       </CardHeader>
 
       <CardContent className="pt-4 flex-1 flex flex-col overflow-hidden">
-        {/* Compra Details */}
         <div className="space-y-3 mb-4">
           <h3 className="font-medium text-foreground line-clamp-2">{compra.nombre}</h3>
           
@@ -101,66 +110,144 @@ export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
           )}
         </div>
 
-        {/* Matched Products */}
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="flex items-center justify-between mb-3">
             <h4 className="font-medium text-sm flex items-center gap-2">
               <PackageSearch className="h-4 w-4 text-primary" />
-              Productos Coincidentes
-              {productos && productos.length > 0 && (
-                <Badge variant="secondary">{productos.length}</Badge>
+              Productos Solicitados
+              {items && items.length > 0 && (
+                <Badge variant="secondary">{items.length}</Badge>
               )}
             </h4>
           </div>
 
-          {isLoading ? (
+          {isLoadingItems ? (
             <div className="space-y-2">
               {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-16 w-full" />
+                <Skeleton key={i} className="h-20 w-full" />
               ))}
             </div>
-          ) : productos && productos.length > 0 ? (
+          ) : items && items.length > 0 ? (
             <>
               <ScrollArea className="flex-1 -mx-4 px-4">
-                <div className="space-y-2">
-                  {productos.map((producto) => (
-                    <div
-                      key={producto.id}
-                      className="border rounded-lg p-3 bg-background hover:bg-muted/30 transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs text-muted-foreground">{producto.sku}</span>
-                            <MatchScoreBadge score={producto.matchScore} />
+                <div className="space-y-3">
+                  {items.map((item) => {
+                    const tieneMatch = item.match_sku !== null && item.confidence_score !== null;
+                    const confidenceScore = item.confidence_score ? Math.round(item.confidence_score * 100) : 0;
+                    
+                    return (
+                      <div
+                        key={`${item.licitacion_codigo}-${item.item_index}`}
+                        className={`border rounded-lg p-3 transition-colors ${
+                          tieneMatch 
+                            ? 'border-primary/50 bg-primary/5' 
+                            : 'border-border bg-background'
+                        }`}
+                      >
+                        <div className="space-y-2">
+                          <div>
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-xs font-medium text-muted-foreground">
+                                    Item #{item.item_index}
+                                  </span>
+                                  {tieneMatch && (
+                                    <MatchScoreBadge score={confidenceScore} />
+                                  )}
+                                  {!tieneMatch && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      Sin match
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="font-medium text-sm">
+                                  {item.nombre || 'Sin nombre'}
+                                </p>
+                                {item.descripcion && (
+                                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                    {item.descripcion}
+                                  </p>
+                                )}
+                                <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                                  {item.cantidad && (
+                                    <span>Cantidad: {item.cantidad}</span>
+                                  )}
+                                  {item.unidad && (
+                                    <span>Unidad: {item.unidad}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                          <p className="font-medium text-sm mt-1 truncate">{producto.nombre}</p>
-                          <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                            {producto.categoria && (
-                              <span className="bg-muted px-1.5 py-0.5 rounded">{producto.categoria}</span>
-                            )}
-                            <span>Stock: {producto.stock ?? 'N/A'}</span>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-sm">{formatCurrency(producto.precio_unitario)}</p>
-                          {producto.tiempo_entrega_dias && (
-                            <p className="text-xs text-muted-foreground">{producto.tiempo_entrega_dias} días</p>
+
+                          {tieneMatch && (
+                            <div className="pt-2 border-t border-primary/20">
+                              <div className="flex items-center gap-2 mb-1">
+                                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                <span className="text-xs font-medium text-green-700">Match encontrado</span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div>
+                                  <span className="text-muted-foreground">SKU: </span>
+                                  <span className="font-mono font-medium">{item.match_sku}</span>
+                                </div>
+                                {item.costo_unitario && (
+                                  <div>
+                                    <span className="text-muted-foreground">Costo: </span>
+                                    <span className="font-medium">{formatCurrency(item.costo_unitario)}</span>
+                                  </div>
+                                )}
+                                {item.margen_estimado && (
+                                  <div>
+                                    <span className="text-muted-foreground">Margen: </span>
+                                    <span className="font-medium">
+                                      {Math.round(item.margen_estimado * 100)}%
+                                    </span>
+                                  </div>
+                                )}
+                                {item.confidence_score && (
+                                  <div>
+                                    <span className="text-muted-foreground">Confianza: </span>
+                                    <span className="font-medium">
+                                      {Math.round(item.confidence_score * 100)}%
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {!tieneMatch && (
+                            <div className="pt-2 border-t">
+                              <div className="flex items-center gap-2">
+                                <XCircle className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-xs text-muted-foreground">
+                                  No se encontró match para este producto
+                                </span>
+                              </div>
+                            </div>
                           )}
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </ScrollArea>
 
               <div className="pt-4 mt-auto border-t">
                 <Button 
                   className="w-full" 
-                  onClick={() => onGenerarPropuesta(productos)}
+                  onClick={() => onGenerarPropuesta(productosConMatch)}
+                  disabled={productosConMatch.length === 0}
                 >
                   <FileText className="h-4 w-4 mr-2" />
                   Generar Propuesta
+                  {productosConMatch.length > 0 && (
+                    <Badge variant="secondary" className="ml-2">
+                      {productosConMatch.length} matches
+                    </Badge>
+                  )}
                 </Button>
               </div>
             </>
@@ -168,8 +255,8 @@ export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center text-muted-foreground">
                 <Package className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">No se encontraron productos coincidentes</p>
-                <p className="text-xs mt-1">Agrega productos a tu inventario para encontrar matches</p>
+                <p className="text-sm">No hay productos solicitados aún</p>
+                <p className="text-xs mt-1">El scraper está extrayendo el listado de productos...</p>
               </div>
             </div>
           )}

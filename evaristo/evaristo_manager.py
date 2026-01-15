@@ -499,6 +499,61 @@ INSTRUCCIONES:
                 self.log(f"❌ Archivo no encontrado: {archivo}")
                 return False
         
+        elif tipo == "modificar" and archivo:
+            # Modificar un archivo existente usando IA
+            ruta_archivo = PROYECTO_ROOT / archivo
+            if ruta_archivo.exists():
+                codigo_viejo = self.leer_archivo(ruta_archivo)
+                if codigo_viejo:
+                    if self.has_ai:
+                        self.hacer_backup(ruta_archivo)
+                        contexto = self.obtener_contexto_proyecto()
+                        codigo_nuevo = self.cerebro_pensante(codigo_viejo, instruccion, archivo, contexto)
+                        
+                        if codigo_nuevo and codigo_nuevo != codigo_viejo:
+                            if self.guardar_archivo(ruta_archivo, codigo_nuevo):
+                                self.generar_reporte(nombre, archivo, "✅ Completada", f"Archivo modificado: {archivo}")
+                                return True
+                        else:
+                            self.log(f"ℹ️  No se requirieron cambios en {archivo}")
+                            self.generar_reporte(nombre, archivo, "ℹ️ Sin cambios", "El código ya cumple con los requisitos")
+                            return True
+                    else:
+                        self.log("⚠️  Se requiere IA para modificar archivos")
+                        self.generar_reporte(nombre, archivo, "❌ Requiere IA", "Configura DEEPSEEK_API_KEY o GEMINI_API_KEY")
+                        return False
+            else:
+                self.log(f"❌ Archivo no encontrado: {archivo}")
+                return False
+        
+        elif tipo == "crear" and archivo:
+            # Crear un nuevo archivo usando IA
+            ruta_archivo = PROYECTO_ROOT / archivo
+            if ruta_archivo.exists():
+                self.log(f"ℹ️  Archivo ya existe: {archivo}")
+                self.generar_reporte(nombre, archivo, "ℹ️ Ya existe", "El archivo ya existe, no se creó")
+                return True
+            
+            if self.has_ai:
+                # Crear el archivo desde cero usando IA
+                contexto = self.obtener_contexto_proyecto()
+                codigo_nuevo = self.cerebro_pensante("", instruccion, archivo, contexto)
+                
+                if codigo_nuevo:
+                    # Asegurar que el directorio existe
+                    ruta_archivo.parent.mkdir(parents=True, exist_ok=True)
+                    if self.guardar_archivo(ruta_archivo, codigo_nuevo):
+                        self.generar_reporte(nombre, archivo, "✅ Creado", f"Nuevo archivo creado: {archivo}")
+                        return True
+                else:
+                    self.log(f"❌ No se pudo generar código para {archivo}")
+                    self.generar_reporte(nombre, archivo, "❌ Error", "No se pudo generar el código")
+                    return False
+            else:
+                self.log("⚠️  Se requiere IA para crear archivos")
+                self.generar_reporte(nombre, archivo, "❌ Requiere IA", "Configura DEEPSEEK_API_KEY o GEMINI_API_KEY")
+                return False
+        
         elif tipo == "verificar":
             # Verificar que el proyecto compile
             resultado = self.verificar_proyecto()
