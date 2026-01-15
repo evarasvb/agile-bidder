@@ -39,7 +39,13 @@ OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 # API Key principal (usa la primera disponible)
 API_KEY = GEMINI_API_KEY or DEEPSEEK_API_KEY or ""
 NOMBRE_AGENTE = "Evaristo 🤖"
-PROYECTO_ROOT = Path(__file__).parent.parent
+
+# Configuración de rutas - Evaristo trabaja sobre CompraAgil_VB
+# Estructura: CompraAgil_VB/mercadopublico-scraper/agile-bidder/evaristo/
+PROYECTO_ROOT = Path(__file__).parent.parent  # agile-bidder/
+REPOSITORIO_ROOT = PROYECTO_ROOT.parent.parent  # CompraAgil_VB/ (repositorio principal)
+FRONTEND_ROOT = PROYECTO_ROOT  # agile-bidder/ (frontend www.firmavb.cl)
+
 REPORTES_DIR = PROYECTO_ROOT / "evaristo" / "reportes"
 MISIONES_DIR = PROYECTO_ROOT / "evaristo" / "misiones"
 LOG_FILE = PROYECTO_ROOT / "evaristo" / "evaristo.log"
@@ -56,12 +62,18 @@ Eres Evaristo, un Ingeniero de Software Senior experto en:
 - Node.js y ecosistema moderno
 - Arquitectura de software y mejores prácticas
 
-Tu misión es mantener y mejorar el sistema FirmaVB (agile-bidder) que gestiona:
+Tu misión es mantener y mejorar el sistema FirmaVB que gestiona www.firmavb.cl:
+
+REPOSITORIO: CompraAgil_VB (evarasvb/CompraAgil_VB)
+FRONTEND: mercadopublico-scraper/agile-bidder/ (www.firmavb.cl)
+
+Sistema que gestiona:
 - Compras Ágiles de MercadoPúblico
 - Matching de inventario con licitaciones
 - Generación automática de ofertas
 - Integración con Odoo
 - Extensiones de Chrome para scraping
+- Bot autónomo (Evaristo) para mantenimiento continuo
 
 REGLAS DE ORO:
 1. SIEMPRE hacer backup antes de modificar código
