@@ -19,6 +19,7 @@ import NotFound from "./pages/NotFound";
 import OdooDashboard from "./pages/OdooDashboard";
 import ExtensionConfig from "./pages/ExtensionConfig";
 import AdminOdoo from "./pages/AdminOdoo";
+import AdminEvaristo from "./pages/AdminEvaristo";
 import Calendar from "./pages/Calendar";
 import Users from "./pages/Users";
 import MercadoPublico from "./pages/MercadoPublico";
@@ -64,6 +65,7 @@ const App = () => (
           
           {/* Admin Routes - protected */}
           <Route path="/admin" element={<ProtectedRoute><AdminOdoo /></ProtectedRoute>} />
+          <Route path="/admin/evaristo" element={<ProtectedRoute><AdminEvaristo /></ProtectedRoute>} />
           
           {/* All other routes with AppLayout using nested routing - ALL PROTECTED */}
           <Route element={<ProtectedLayoutWrapper />}>

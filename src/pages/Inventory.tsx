@@ -21,6 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useInventory, useUpdateInventoryItem, useDeleteInventoryItem, useCreateInventoryItem, InventoryItem, InventoryInput } from "@/hooks/useInventory";
+import { useLicitacionesPorProducto } from "@/hooks/useLicitacionesPorProducto";
 import { EditProductDialog } from "@/components/inventory/EditProductDialog";
 import { DeleteProductDialog } from "@/components/inventory/DeleteProductDialog";
 import { ImportScriptDialog } from "@/components/inventory/ImportScriptDialog";
@@ -31,6 +32,8 @@ import { DownloadTemplateButton } from "@/components/inventory/DownloadTemplateB
 import { ProductGallery } from "@/components/inventory/ProductGallery";
 import { ImportHistoryPanel } from "@/components/inventory/ImportHistoryPanel";
 import { useAuthUser } from "@/hooks/useCliente";
+import { Link } from "react-router-dom";
+import { Gavel } from "lucide-react";
 import * as XLSX from 'xlsx';
 
 export default function Inventory() {
@@ -46,9 +49,15 @@ export default function Inventory() {
   const [galleryProduct, setGalleryProduct] = useState<InventoryItem | null>(null);
   
   const { data: inventario = [], isLoading, refetch } = useInventory();
+  const { data: licitacionesPorProducto = [] } = useLicitacionesPorProducto();
   const actualizarProducto = useUpdateInventoryItem();
   const eliminarProducto = useDeleteInventoryItem();
   const crearProducto = useCreateInventoryItem();
+  
+  // Crear mapa de licitaciones por producto_id para acceso rápido
+  const licitacionesMap = new Map(
+    licitacionesPorProducto.map(lpp => [lpp.producto_id, lpp])
+  );
 
   const handleRefresh = () => {
     toast.info('Actualizando inventario...');
@@ -449,6 +458,7 @@ export default function Inventory() {
                 <TableHead className="font-semibold text-right">Precio</TableHead>
                 <TableHead className="font-semibold text-right">Margen</TableHead>
                 <TableHead className="font-semibold text-right">Stock</TableHead>
+                <TableHead className="font-semibold text-center">Oportunidades</TableHead>
                 <TableHead className="font-semibold">Ficha</TableHead>
                 <TableHead className="font-semibold">Estado</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
@@ -516,6 +526,30 @@ export default function Inventory() {
                     item.stock_disponible > 0 && item.stock_disponible < 50 && "text-warning"
                   )}>
                     {item.stock_disponible.toLocaleString("es-CL")}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {(() => {
+                      const licitaciones = licitacionesMap.get(item.id);
+                      if (!licitaciones || licitaciones.total_licitaciones_abiertas === 0) {
+                        return (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        );
+                      }
+                      return (
+                        <Link
+                          to={`/compras-agiles?producto=${item.id}`}
+                          className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-firmavb-blue/10 text-firmavb-blue hover:bg-firmavb-blue/20 transition-colors text-xs font-medium"
+                        >
+                          <Gavel className="h-3 w-3" />
+                          {licitaciones.total_licitaciones_abiertas}
+                          {licitaciones.mejor_match_score && (
+                            <span className="text-firmavb-green">
+                              ({licitaciones.mejor_match_score}%)
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell>
                     <Button variant="ghost" size="icon" className="h-8 w-8">
