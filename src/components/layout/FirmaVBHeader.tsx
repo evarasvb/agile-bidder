@@ -8,20 +8,25 @@ interface FirmaVBHeaderProps {
   showLogo?: boolean;
 }
 
-export function FirmaVBLogo({ className }: { className?: string }) {
+export function FirmaVBLogo({ className, showSlogan = true }: { className?: string; showSlogan?: boolean }) {
   return (
-    <div className={cn("flex items-center gap-2", className)}>
-      {/* FV Circle Logo */}
+    <div className={cn("flex items-center gap-3", className)}>
+      {/* Logo with Red Underline */}
       <img 
         src={firmavbLogo} 
         alt="FirmaVB Logo" 
-        className="h-10 w-10 rounded-full object-cover shadow-md"
+        className="h-10 w-auto object-contain"
       />
-      {/* Brand Name */}
-      <div className="flex flex-col">
-        <span className="text-xl font-heading font-bold text-firmavb-blue leading-tight">FirmaVB</span>
-        <span className="text-[10px] text-muted-foreground font-medium tracking-wide">Inteligencia para Ganar Más</span>
-      </div>
+      {showSlogan && (
+        <div className="flex flex-col">
+          <div className="firmavb-underline inline-block">
+            <span className="text-xl font-bold text-firmavb-blue leading-tight tracking-tight">FirmaVB</span>
+          </div>
+          <span className="text-[10px] text-muted-foreground font-medium tracking-wide mt-1.5">
+            conectando grandes marcas con grandes clientes
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -30,16 +35,16 @@ export function FirmaVBHeader({
   title = "Dashboard", 
   subtitle = "Centro de control de oportunidades",
   className,
-  showLogo = true
+  showLogo = false
 }: FirmaVBHeaderProps) {
   return (
     <div className={cn("flex items-center justify-between", className)}>
       <div className="flex items-center gap-6">
         {showLogo && <FirmaVBLogo />}
-        <div className="h-8 w-px bg-border hidden lg:block" />
+        {showLogo && <div className="h-8 w-px bg-border hidden lg:block" />}
         <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">{title}</h1>
-          <p className="text-sm text-muted-foreground">{subtitle}</p>
+          <h1 className="text-2xl font-bold text-foreground">{title}</h1>
+          <p className="text-sm text-muted-foreground font-light">{subtitle}</p>
         </div>
       </div>
     </div>

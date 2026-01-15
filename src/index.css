@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,8 +6,13 @@
 
 @layer base {
   :root {
-    /* FirmaVB Design System - Trading Terminal Aesthetic */
-    /* Background: Gris fondo #EFEFF1 y Negro #0F0F0F */
+    /* FirmaVB Brand Manual - Official Colors */
+    /* AZUL PRINCIPAL: #4657A2 (RGB: 93, 97, 162) */
+    /* ROJO ACCENT: #D85066 (RGB: 216, 80, 102) */
+    /* GRIS FONDO: #EFEFF1 (RGB: 239, 239, 241) */
+    /* NEGRO TEXTO: #0F0F0F (RGB: 15, 15, 15) */
+
+    /* Base Background: Gris fondo #EFEFF1 */
     --background: 240 10% 94%;
     --foreground: 0 0% 6%;
 
@@ -17,21 +22,21 @@
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 6%;
 
-    /* FirmaVB Azul Principal #4657A2 */
+    /* Primary: FirmaVB Azul #4657A2 - HSL(229, 37%, 48%) */
     --primary: 229 37% 48%;
     --primary-foreground: 0 0% 100%;
 
-    /* Slate Secondary */
-    --secondary: 220 15% 94%;
-    --secondary-foreground: 220 40% 25%;
+    /* Secondary */
+    --secondary: 240 6% 90%;
+    --secondary-foreground: 0 0% 6%;
 
-    /* Muted Slate */
-    --muted: 220 15% 92%;
-    --muted-foreground: 220 10% 45%;
+    /* Muted */
+    --muted: 240 6% 90%;
+    --muted-foreground: 0 0% 40%;
 
-    /* Accent - Subtle Blue */
-    --accent: 220 60% 95%;
-    --accent-foreground: 220 50% 25%;
+    /* Accent - Rojo #D85066 - HSL(351, 62%, 59%) */
+    --accent: 351 62% 59%;
+    --accent-foreground: 0 0% 100%;
 
     /* Status Colors */
     --success: 152 70% 42%;
@@ -40,66 +45,59 @@
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 351 62% 59%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Active/Online State - Vibrant Green */
+    /* Active/Online State */
     --online: 152 75% 45%;
-    --offline: 0 70% 55%;
+    --offline: 351 62% 59%;
 
-    --border: 220 15% 90%;
-    --input: 220 15% 90%;
-    --ring: 220 50% 40%;
+    --border: 240 6% 85%;
+    --input: 240 6% 90%;
+    --ring: 229 37% 48%;
 
     --radius: 0.625rem;
 
-    /* Sidebar - FirmaVB Azul */
-    --sidebar-background: 229 37% 35%;
+    /* Sidebar - FirmaVB Azul #4657A2 */
+    --sidebar-background: 229 37% 48%;
     --sidebar-foreground: 0 0% 100%;
     --sidebar-primary: 351 62% 59%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 229 37% 42%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 229 37% 30%;
+    --sidebar-border: 229 37% 40%;
     --sidebar-ring: 351 62% 59%;
-    --sidebar-muted: 229 25% 55%;
+    --sidebar-muted: 229 25% 75%;
 
     /* Chart Colors */
-    --chart-1: 220 50% 35%;
+    --chart-1: 229 37% 48%;
     --chart-2: 152 70% 45%;
     --chart-3: 38 92% 50%;
     --chart-4: 280 60% 50%;
-    --chart-5: 0 72% 51%;
+    --chart-5: 351 62% 59%;
 
     /* FirmaVB Brand Colors - Official Brand Manual */
-    /* Azul principal #4657A2 */
+    /* Azul principal #4657A2 - HSL(229, 37%, 48%) */
     --firmavb-blue: 229 37% 48%;
-    /* Celeste #3B82F6 */
+    /* Celeste #3B82F6 - HSL(217, 91%, 60%) */
     --firmavb-celeste: 217 91% 60%;
-    /* Rojo accent #D85066 */
+    /* Rojo accent #D85066 - HSL(351, 62%, 59%) */
     --firmavb-red: 351 62% 59%;
-    /* Verde éxito #10B981 */
+    /* Verde éxito #10B981 - HSL(160, 84%, 40%) */
     --firmavb-green: 160 84% 40%;
-    /* Naranja alerta #F59E0B */
+    /* Naranja alerta #F59E0B - HSL(38, 92%, 50%) */
     --firmavb-orange: 38 92% 50%;
-    /* Gris fondo #EFEFF1 */
+    /* Gris fondo #EFEFF1 - HSL(240, 10%, 94%) */
     --firmavb-gray: 240 10% 94%;
-    /* Cream para skeletons #EFEFF1 */
-    --firmavb-cream: 240 10% 94%;
-    /* Negro texto #0F0F0F */
+    /* Negro texto #0F0F0F - HSL(0, 0%, 6%) */
     --firmavb-black: 0 0% 6%;
 
     /* Financial Health Colors */
     --risk-low: 142 76% 36%;
     --risk-medium: 45 93% 47%;
-    --risk-high: 0 72% 51%;
-    --header-dark: 224 76% 33%;
+    --risk-high: 351 62% 59%;
+    --header-dark: 229 50% 35%;
 
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(220 50% 18%) 0%, hsl(220 45% 25%) 100%);
-    --gradient-success: linear-gradient(135deg, hsl(152 70% 42%) 0%, hsl(160 65% 48%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(220 20% 99%) 100%);
-    
     /* Shadows */
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
@@ -127,23 +125,24 @@
     --muted: 229 20% 18%;
     --muted-foreground: 240 10% 60%;
 
-    --accent: 229 25% 22%;
-    --accent-foreground: 240 10% 95%;
+    --accent: 351 62% 55%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 65% 45%;
+    --destructive: 351 65% 50%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 229 20% 20%;
     --input: 229 20% 20%;
     --ring: 351 62% 59%;
 
-    --sidebar-background: 229 37% 25%;
+    --sidebar-background: 229 37% 35%;
     --sidebar-foreground: 0 0% 100%;
     --sidebar-primary: 351 62% 59%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 229 37% 32%;
+    --sidebar-accent: 229 37% 42%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 229 30% 20%;
+    --sidebar-border: 229 30% 25%;
+    --sidebar-muted: 229 25% 60%;
   }
 }
 
@@ -153,13 +152,43 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Poppins', 'Inter', system-ui, sans-serif;
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Poppins', system-ui, sans-serif;
+    font-weight: 300;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  /* Poppins Typography Hierarchy - Brand Manual */
+  h1 {
     font-family: 'Poppins', system-ui, sans-serif;
-    font-weight: 600;
+    font-weight: 700;
+    font-size: 2.8125rem; /* 45pt */
+    line-height: 1.2;
+  }
+
+  h2 {
+    font-family: 'Poppins', system-ui, sans-serif;
+    font-weight: 500;
+    font-size: 2.1875rem; /* 35pt */
+    line-height: 1.3;
+  }
+
+  h3 {
+    font-family: 'Poppins', system-ui, sans-serif;
+    font-weight: 400;
+    font-size: 1.375rem; /* 22pt */
+    line-height: 1.4;
+  }
+
+  h4, h5, h6 {
+    font-family: 'Poppins', system-ui, sans-serif;
+    font-weight: 500;
+  }
+
+  p {
+    font-family: 'Poppins', system-ui, sans-serif;
+    font-weight: 300;
+    font-size: 1rem; /* 16pt */
+    line-height: 1.6;
   }
 
   /* Monospace for data/numbers */
@@ -211,7 +240,23 @@
   /* Gradient Text */
   .text-gradient {
     @apply bg-clip-text text-transparent;
-    background-image: var(--gradient-primary);
+    background-image: linear-gradient(135deg, hsl(var(--firmavb-blue)) 0%, hsl(var(--header-dark)) 100%);
+  }
+
+  /* FirmaVB Red Underline */
+  .firmavb-underline {
+    position: relative;
+  }
+
+  .firmavb-underline::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background-color: hsl(var(--firmavb-red));
+    border-radius: 2px;
   }
 }
 
@@ -238,5 +283,22 @@
   /* Glow effects */
   .glow-success {
     box-shadow: var(--shadow-glow-success);
+  }
+
+  /* Font weights */
+  .font-light {
+    font-weight: 300;
+  }
+  
+  .font-regular {
+    font-weight: 400;
+  }
+  
+  .font-medium {
+    font-weight: 500;
+  }
+  
+  .font-bold {
+    font-weight: 700;
   }
 }
