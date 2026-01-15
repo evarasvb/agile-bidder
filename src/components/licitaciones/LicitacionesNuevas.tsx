@@ -109,7 +109,7 @@ export function LicitacionesNuevas() {
           <div>
             <CardTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-orange-500" />
-              Licitaciones Nuevas
+              Compras Ágiles Nuevas
               {licitaciones && licitaciones.length > 0 && (
                 <Badge variant="secondary" className="ml-2">
                   {licitaciones.length} pendientes
@@ -117,7 +117,7 @@ export function LicitacionesNuevas() {
               )}
             </CardTitle>
             <CardDescription>
-              Licitaciones sin procesar que requieren análisis de match
+              Compras ágiles sin procesar que requieren análisis de match
             </CardDescription>
           </div>
           <Button
@@ -144,8 +144,8 @@ export function LicitacionesNuevas() {
         ) : !licitaciones || licitaciones.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <Inbox className="h-12 w-12 mb-4 opacity-50" />
-            <p className="text-lg font-medium">No hay licitaciones nuevas</p>
-            <p className="text-sm">Las licitaciones del scraper aparecerán aquí</p>
+            <p className="text-lg font-medium">No hay compras ágiles nuevas</p>
+            <p className="text-sm">Las compras ágiles del scraper aparecerán aquí</p>
           </div>
         ) : (
           <div className="rounded-lg border border-border">

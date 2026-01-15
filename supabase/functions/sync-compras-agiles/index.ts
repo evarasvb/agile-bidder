@@ -1,0 +1,145 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
+interface CompraAgilData {
+  codigo: string;
+  nombre?: string;
+  institucion_nombre?: string;
+  organismo?: string;
+  presupuesto_estimado?: number | null;
+  monto?: number | null;
+  fecha_cierre?: string | null;
+  estado?: string;
+  region?: string;
+  descripcion?: string;
+  link_oficial?: string;
+  tipo?: string;
+  datos_json?: Record<string, unknown>;
+}
+
+Deno.serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Get API key from header
+    const apiKey = req.headers.get('x-api-key');
+    
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({ error: 'API key requerida' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate API key
+    const { data: keyData, error: keyError } = await supabase
+      .from('extension_api_keys')
+      .select('id, cliente_id, activa')
+      .eq('key', apiKey)
+      .eq('activa', true)
+      .single();
+
+    if (keyError || !keyData) {
+      return new Response(
+        JSON.stringify({ error: 'API key inválida' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Parse request body
+    const body = await req.json();
+    const { licitaciones } = body;
+
+    if (!licitaciones || !Array.isArray(licitaciones)) {
+      return new Response(
+        JSON.stringify({ error: 'Se requiere un array de licitaciones' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const results = {
+      success: true,
+      synced: 0,
+      errors: [] as string[],
+      details: {} as any
+    };
+
+    // Process each compra ágil
+    for (const lic of licitaciones) {
+      try {
+        // Skip if not a compra ágil
+        if (lic.tipo !== 'compra_agil' && !lic.codigo) {
+          continue;
+        }
+
+        // Map scraper data to database schema
+        const compraData: any = {
+          codigo: lic.codigo,
+          nombre: lic.nombre || `Compra Ágil ${lic.codigo}`,
+          organismo: lic.organismo || lic.institucion_nombre || 'Organismo no especificado',
+          monto: lic.monto || lic.presupuesto_estimado || null,
+          fecha_cierre: lic.fecha_cierre || null,
+          estado: lic.estado || 'activa',
+          region: lic.region || null,
+          descripcion: lic.descripcion || null,
+          link_oficial: lic.link_oficial || null,
+          datos_json: lic.datos_json || lic, // Store full scraped data
+        };
+
+        // Upsert compra ágil
+        const { data: insertedCompra, error: compraError } = await supabase
+          .from('compras_agiles')
+          .upsert(compraData, { onConflict: 'codigo' })
+          .select('id')
+          .single();
+
+        if (compraError) {
+          console.error(`Error upserting compra ágil ${lic.codigo}:`, compraError);
+          results.errors.push(`Compra Ágil ${lic.codigo}: ${compraError.message}`);
+          continue;
+        }
+
+        results.synced++;
+      } catch (itemError) {
+        console.error(`Error processing compra ágil:`, itemError);
+        results.errors.push(`Error procesando compra ágil: ${itemError}`);
+      }
+    }
+
+    results.success = results.errors.length === 0;
+    results.details = {
+      total: licitaciones.length,
+      synced: results.synced,
+      errors: results.errors.length
+    };
+
+    console.log(`Sync compras ágiles completed: ${results.synced} items synced, ${results.errors.length} errors`);
+
+    return new Response(
+      JSON.stringify(results),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error) {
+    console.error('Error in sync-compras-agiles:', error);
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Error desconocido' 
+      }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});

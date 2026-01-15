@@ -1,0 +1,14 @@
+# Backups
+backups/
+*.backup
+
+# Reportes (opcional - puedes commitearlos si quieres)
+# reportes/
+
+# Logs
+*.log
+evaristo.log
+
+# API Keys (nunca commitear)
+config.json
+.env

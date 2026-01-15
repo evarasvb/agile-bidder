@@ -14,6 +14,7 @@ export interface CompraAgil {
   link_oficial: string | null;
   match_encontrado: boolean;
   match_score: number | null;
+  buen_pagador: boolean | null;
   datos_json: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;

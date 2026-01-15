@@ -347,7 +347,7 @@ export function LicitacionesTable() {
     return (
       <div className="py-12 text-center text-muted-foreground">
         <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-        <p className="text-lg font-medium">No hay licitaciones disponibles</p>
+        <p className="text-lg font-medium">No hay compras ágiles disponibles</p>
         <p className="text-sm mt-1">Los datos aparecerán cuando el scraper los envíe</p>
       </div>
     );
@@ -358,7 +358,7 @@ export function LicitacionesTable() {
       <CardHeader className="bg-header-dark text-white py-4">
         <CardTitle className="flex items-center gap-2 text-lg">
           <Package className="h-5 w-5" />
-          Todas las Licitaciones
+          Todas las Compras Ágiles
           <Badge variant="secondary" className="ml-2 bg-white/20 text-white">
             {licitaciones.length} registros
           </Badge>

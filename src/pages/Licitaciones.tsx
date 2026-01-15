@@ -15,6 +15,7 @@ export default function Licitaciones() {
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['licitaciones'] });
+    queryClient.invalidateQueries({ queryKey: ['compras_agiles'] });
   };
 
   const handleRunMatching = () => {
@@ -27,7 +28,7 @@ export default function Licitaciones() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <FileSearch className="h-6 w-6 text-primary" />
-            Licitaciones
+            Compras Ágiles
             {isProcessing && (
               <Badge variant="secondary" className="ml-2 animate-pulse">
                 <Loader2 className="h-3 w-3 mr-1 animate-spin" />
@@ -68,7 +69,7 @@ export default function Licitaciones() {
 
       <Tabs defaultValue="todas" className="w-full">
         <TabsList>
-          <TabsTrigger value="todas">Todas las Licitaciones</TabsTrigger>
+          <TabsTrigger value="todas">Todas las Compras Ágiles</TabsTrigger>
           <TabsTrigger value="resumidor">Resumidor IA</TabsTrigger>
         </TabsList>
         <TabsContent value="todas">

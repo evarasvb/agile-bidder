@@ -1,0 +1,60 @@
+{
+  "fecha": "2026-01-15T13:24:11.819649",
+  "total_misiones": 13,
+  "exitosas": 11,
+  "fallidas": 2,
+  "resultados": [
+    {
+      "mision": "Verificar y optimizar extracción de compras ágiles",
+      "exito": true
+    },
+    {
+      "mision": "Verificar función Edge sync-compras-agiles",
+      "exito": true
+    },
+    {
+      "mision": "Optimizar motor de matching para compras ágiles",
+      "exito": true
+    },
+    {
+      "mision": "Verificar hook useMatchingAI para compras ágiles",
+      "exito": true
+    },
+    {
+      "mision": "Mejorar componente GenerarCotizacionModal para envío a MercadoPúblico",
+      "exito": true
+    },
+    {
+      "mision": "Mejorar frontend de Compras Ágiles - Diseño profesional",
+      "exito": true
+    },
+    {
+      "mision": "Mejorar componente ComprasAgilesTable para mostrar margen y buen pagador",
+      "exito": true
+    },
+    {
+      "mision": "Agregar campo buen_pagador a tabla compras_agiles si no existe",
+      "exito": false
+    },
+    {
+      "mision": "Mejorar servicio mercadoPublicoApi para compras ágiles",
+      "exito": true
+    },
+    {
+      "mision": "Revisar y mejorar branding FirmaVB en todo el código",
+      "exito": false
+    },
+    {
+      "mision": "Verificar hooks de compras ágiles",
+      "exito": true
+    },
+    {
+      "mision": "Verificar compilación y tipos TypeScript",
+      "exito": true
+    },
+    {
+      "mision": "Revisar y actualizar documentación",
+      "exito": true
+    }
+  ]
+}

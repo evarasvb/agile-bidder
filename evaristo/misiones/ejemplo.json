@@ -1,0 +1,6 @@
+{
+  "nombre": "Ejemplo de Misión",
+  "tipo": "revisar",
+  "archivo": "src/components/compras-agiles/ComprasAgilesTable.tsx",
+  "instruccion": "Revisa este componente. Asegúrate de que maneje correctamente los estados de carga, que los tipos TypeScript sean correctos y que no haya errores de renderizado."
+}

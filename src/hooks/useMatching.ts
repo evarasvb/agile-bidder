@@ -30,7 +30,16 @@ export function useMatchingAI() {
 
   return useMutation({
     mutationFn: async (): Promise<MatchingResponse> => {
-      // 1. Cargar licitaciones no procesadas
+      // 1. Cargar compras ágiles no procesadas
+      const { data: comprasAgiles, error: caError } = await supabase
+        .from('compras_agiles')
+        .select('codigo, nombre, organismo, monto, descripcion')
+        .or('match_encontrado.eq.false,match_encontrado.is.null')
+        .limit(10);
+
+      if (caError) throw caError;
+      
+      // También cargar licitaciones legacy si existen
       const { data: licitaciones, error: licError } = await supabase
         .from('licitaciones')
         .select('id_licitacion, titulo, organismo, presupuesto')
@@ -38,13 +47,26 @@ export function useMatchingAI() {
         .limit(10);
 
       if (licError) throw licError;
-      if (!licitaciones || licitaciones.length === 0) {
-        return { results: [], error: 'No hay licitaciones nuevas para procesar' };
+      
+      // Combinar ambas fuentes
+      const todasLicitaciones = [
+        ...(comprasAgiles || []).map(ca => ({
+          id_licitacion: ca.codigo,
+          titulo: ca.nombre,
+          organismo: ca.organismo,
+          presupuesto: ca.monto,
+          descripcion: ca.descripcion,
+        })),
+        ...(licitaciones || []),
+      ];
+      
+      if (todasLicitaciones.length === 0) {
+        return { results: [], error: 'No hay compras ágiles nuevas para procesar' };
       }
 
-      // 2. Cargar items de cada licitación
+      // 2. Cargar items de cada licitación (si existen)
       const licitacionesConItems = await Promise.all(
-        licitaciones.map(async (lic) => {
+        todasLicitaciones.map(async (lic) => {
           const { data: items } = await supabase
             .from('licitacion_items')
             .select('nombre_producto, descripcion, cantidad')
@@ -92,23 +114,26 @@ export function useMatchingAI() {
 
       const response = data as MatchingResponse;
 
-      // 5. Actualizar licitaciones con resultados
+      // 5. Actualizar compras ágiles y licitaciones con resultados
       for (const result of response.results) {
-        if (result.match_score >= 40) {
+        const matchEncontrado = result.match_score >= 40;
+        
+        // Intentar actualizar en compras_agiles primero
+        const { error: caError } = await supabase
+          .from('compras_agiles')
+          .update({
+            match_encontrado: matchEncontrado,
+            match_score: result.match_score
+          })
+          .eq('codigo', result.licitacion_id);
+        
+        // Si no existe en compras_agiles, actualizar en licitaciones (legacy)
+        if (caError) {
           await supabase
             .from('licitaciones')
             .update({
               procesada: true,
-              match_encontrado: true,
-              match_score: result.match_score
-            })
-            .eq('id_licitacion', result.licitacion_id);
-        } else {
-          await supabase
-            .from('licitaciones')
-            .update({
-              procesada: true,
-              match_encontrado: false,
+              match_encontrado: matchEncontrado,
               match_score: result.match_score
             })
             .eq('id_licitacion', result.licitacion_id);
@@ -119,8 +144,10 @@ export function useMatchingAI() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['licitaciones'] });
+      queryClient.invalidateQueries({ queryKey: ['compras_agiles'] });
       queryClient.invalidateQueries({ queryKey: ['licitaciones-nuevas'] });
       queryClient.invalidateQueries({ queryKey: ['licitaciones-con-match'] });
+      queryClient.invalidateQueries({ queryKey: ['oportunidades'] });
 
       const matchCount = data.results.filter(r => r.match_score >= 50).length;
       if (matchCount > 0) {
@@ -147,18 +174,35 @@ export function useAutoMatching() {
   const { mutate: runMatching, isPending } = useMatchingAI();
   const hasRunRef = useRef(false);
 
-  // Query para detectar licitaciones no procesadas
+  // Query para detectar compras ágiles no procesadas
   const { data: licitacionesNuevas } = useQuery({
     queryKey: ['licitaciones-sin-procesar'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Consultar compras_agiles sin match
+      const { data: comprasAgiles, error: caError } = await supabase
+        .from('compras_agiles')
+        .select('codigo')
+        .or('match_encontrado.eq.false,match_encontrado.is.null')
+        .limit(1);
+
+      if (caError) throw caError;
+      
+      // También consultar licitaciones legacy
+      const { data: licitaciones, error: licError } = await supabase
         .from('licitaciones')
         .select('id_licitacion')
         .eq('procesada', false)
         .limit(1);
 
-      if (error) throw error;
-      return data || [];
+      if (licError) throw licError;
+      
+      // Combinar resultados
+      const todas = [
+        ...(comprasAgiles || []).map(ca => ({ id_licitacion: ca.codigo })),
+        ...(licitaciones || []),
+      ];
+      
+      return todas;
     },
     refetchInterval: 30000, // Revisar cada 30 segundos
   });
@@ -191,11 +235,28 @@ export function useMatchingResult(licitacionId: string | null) {
     queryFn: async () => {
       if (!licitacionId) return null;
 
+      // Buscar primero en compras_agiles
+      const { data: compraAgil, error: caError } = await supabase
+        .from('compras_agiles')
+        .select('codigo, nombre, match_encontrado, match_score')
+        .eq('codigo', licitacionId)
+        .maybeSingle();
+
+      if (!caError && compraAgil) {
+        return {
+          id_licitacion: compraAgil.codigo,
+          titulo: compraAgil.nombre,
+          match_encontrado: compraAgil.match_encontrado,
+          match_score: compraAgil.match_score,
+        };
+      }
+
+      // Si no está en compras_agiles, buscar en licitaciones (legacy)
       const { data, error } = await supabase
         .from('licitaciones')
         .select('id_licitacion, titulo, match_encontrado, match_score')
         .eq('id_licitacion', licitacionId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       return data;

@@ -91,7 +91,14 @@ export function useOportunidadesStats() {
   return useQuery({
     queryKey: ['oportunidades', 'stats'],
     queryFn: async () => {
-      // Get stats from licitaciones table (compras ágiles)
+      // Get stats from compras_agiles table
+      const { data: comprasAgiles, error: caError } = await supabase
+        .from('compras_agiles')
+        .select('codigo, estado, match_encontrado, monto, fecha_cierre');
+
+      if (caError) throw caError;
+
+      // Get stats from licitaciones table (legacy)
       const { data: licitaciones, error: licError } = await supabase
         .from('licitaciones')
         .select('id_licitacion, estado, match_encontrado, presupuesto, fecha_cierre');
@@ -106,24 +113,38 @@ export function useOportunidadesStats() {
       if (biError) throw biError;
 
       const now = new Date();
-      const comprasAgiles = licitaciones?.length || 0;
+      const totalComprasAgiles = (comprasAgiles?.length || 0) + (licitaciones?.length || 0);
       const licitacionesGrandes = licitacionesBICount || 0;
-      const totalOportunidades = comprasAgiles + licitacionesGrandes;
+      const totalOportunidades = totalComprasAgiles + licitacionesGrandes;
       
-      const activas = licitaciones?.filter(l => 
+      // Combine compras ágiles and licitaciones for stats
+      const todasComprasAgiles = [
+        ...(comprasAgiles || []).map(ca => ({
+          fecha_cierre: ca.fecha_cierre,
+          match_encontrado: ca.match_encontrado,
+          monto: ca.monto,
+        })),
+        ...(licitaciones || []).map(l => ({
+          fecha_cierre: l.fecha_cierre,
+          match_encontrado: l.match_encontrado,
+          monto: l.presupuesto,
+        })),
+      ];
+      
+      const activas = todasComprasAgiles.filter(l => 
         l.fecha_cierre && new Date(l.fecha_cierre) > now
       )?.length || 0;
       
-      const conMatch = licitaciones?.filter(l => l.match_encontrado)?.length || 0;
-      const matchRate = comprasAgiles > 0 ? Math.round((conMatch / comprasAgiles) * 100) : 0;
+      const conMatch = todasComprasAgiles.filter(l => l.match_encontrado)?.length || 0;
+      const matchRate = totalComprasAgiles > 0 ? Math.round((conMatch / totalComprasAgiles) * 100) : 0;
       
-      const valorPotencial = licitaciones
-        ?.filter(l => l.match_encontrado && l.presupuesto)
-        ?.reduce((sum, l) => sum + (l.presupuesto || 0), 0) || 0;
+      const valorPotencial = todasComprasAgiles
+        ?.filter(l => l.match_encontrado && l.monto)
+        ?.reduce((sum, l) => sum + (l.monto || 0), 0) || 0;
 
       return {
         totalOportunidades,
-        comprasAgiles,
+        comprasAgiles: totalComprasAgiles,
         licitacionesGrandes,
         oportunidadesActivas: activas,
         conMatch,

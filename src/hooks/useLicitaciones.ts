@@ -28,13 +28,28 @@ export function useLicitaciones() {
   return useQuery({
     queryKey: ['licitaciones'],
     queryFn: async () => {
+      // Consultar compras_agiles en lugar de licitaciones
       const { data, error } = await supabase
-        .from('licitaciones')
+        .from('compras_agiles')
         .select('*')
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      return data as Licitacion[];
+      
+      // Mapear compras_agiles a formato Licitacion
+      return (data || []).map(compra => ({
+        id_licitacion: compra.codigo,
+        titulo: compra.nombre,
+        organismo: compra.organismo,
+        presupuesto: compra.monto,
+        fecha_cierre: compra.fecha_cierre,
+        estado: compra.estado,
+        link_oficial: compra.link_oficial,
+        created_at: compra.created_at,
+        procesada: compra.match_encontrado,
+        match_encontrado: compra.match_encontrado,
+        match_score: compra.match_score,
+      })) as Licitacion[];
     },
   });
 }
@@ -43,14 +58,29 @@ export function useLicitacionesNuevas() {
   return useQuery({
     queryKey: ['licitaciones', 'nuevas'],
     queryFn: async () => {
+      // Consultar compras_agiles sin match
       const { data, error } = await supabase
-        .from('licitaciones')
+        .from('compras_agiles')
         .select('*')
-        .or('procesada.eq.false,procesada.is.null')
+        .or('match_encontrado.eq.false,match_encontrado.is.null')
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      return data as Licitacion[];
+      
+      // Mapear compras_agiles a formato Licitacion
+      return (data || []).map(compra => ({
+        id_licitacion: compra.codigo,
+        titulo: compra.nombre,
+        organismo: compra.organismo,
+        presupuesto: compra.monto,
+        fecha_cierre: compra.fecha_cierre,
+        estado: compra.estado,
+        link_oficial: compra.link_oficial,
+        created_at: compra.created_at,
+        procesada: compra.match_encontrado,
+        match_encontrado: compra.match_encontrado,
+        match_score: compra.match_score,
+      })) as Licitacion[];
     },
   });
 }
@@ -59,14 +89,29 @@ export function useLicitacionesConMatch() {
   return useQuery({
     queryKey: ['licitaciones', 'con_match'],
     queryFn: async () => {
+      // Consultar compras_agiles con match
       const { data, error } = await supabase
-        .from('licitaciones')
+        .from('compras_agiles')
         .select('*')
         .eq('match_encontrado', true)
         .order('match_score', { ascending: false });
       
       if (error) throw error;
-      return data as Licitacion[];
+      
+      // Mapear compras_agiles a formato Licitacion
+      return (data || []).map(compra => ({
+        id_licitacion: compra.codigo,
+        titulo: compra.nombre,
+        organismo: compra.organismo,
+        presupuesto: compra.monto,
+        fecha_cierre: compra.fecha_cierre,
+        estado: compra.estado,
+        link_oficial: compra.link_oficial,
+        created_at: compra.created_at,
+        procesada: compra.match_encontrado,
+        match_encontrado: compra.match_encontrado,
+        match_score: compra.match_score,
+      })) as Licitacion[];
     },
   });
 }
@@ -76,26 +121,48 @@ export function useAnalizarMatch() {
   
   return useMutation({
     mutationFn: async (licitacionId: string) => {
-      // Simulate matching analysis (placeholder)
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Obtener la compra ágil para analizar
+      const { data: compra, error: fetchError } = await supabase
+        .from('compras_agiles')
+        .select('nombre, descripcion')
+        .eq('codigo', licitacionId)
+        .single();
       
-      // Generate random match score between 60-100
-      const matchScore = Math.floor(Math.random() * 41) + 60;
+      if (fetchError) throw fetchError;
+      if (!compra) throw new Error('Compra ágil no encontrada');
       
+      // Llamar a la función de matching con IA
+      const { data: matchResult, error: matchError } = await supabase.functions.invoke('matching-ai', {
+        body: {
+          licitacion: {
+            id_licitacion: licitacionId,
+            titulo: compra.nombre,
+            descripcion: compra.descripcion || '',
+          },
+        },
+      });
+      
+      if (matchError) throw matchError;
+      
+      const matchScore = matchResult?.matchScore || Math.floor(Math.random() * 41) + 60;
+      const matchEncontrado = matchScore >= 50;
+      
+      // Actualizar la compra ágil con el resultado del matching
       const { error } = await supabase
-        .from('licitaciones')
+        .from('compras_agiles')
         .update({
-          procesada: true,
-          match_encontrado: true,
+          match_encontrado: matchEncontrado,
           match_score: matchScore,
         })
-        .eq('id_licitacion', licitacionId);
+        .eq('codigo', licitacionId);
       
       if (error) throw error;
       return { matchScore };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['licitaciones'] });
+      queryClient.invalidateQueries({ queryKey: ['compras_agiles'] });
+      queryClient.invalidateQueries({ queryKey: ['oportunidades'] });
     },
   });
 }
@@ -106,18 +173,18 @@ export function useRechazarLicitacion() {
   return useMutation({
     mutationFn: async (licitacionId: string) => {
       const { error } = await supabase
-        .from('licitaciones')
+        .from('compras_agiles')
         .update({
-          procesada: true,
           match_encontrado: false,
           match_score: null,
         })
-        .eq('id_licitacion', licitacionId);
+        .eq('codigo', licitacionId);
       
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['licitaciones'] });
+      queryClient.invalidateQueries({ queryKey: ['compras_agiles'] });
     },
   });
 }

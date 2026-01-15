@@ -1,0 +1,86 @@
+{
+  "nombre": "Misión Completa FirmaVB - Optimización Total",
+  "descripcion": "Solución completa: extracción de compras ágiles, matching, envío a MercadoPúblico, mejoras de frontend, incorporación de margen y buen pagador, revisión completa del código y branding FirmaVB",
+  "fecha_creacion": "2026-01-15",
+  "prioridad": "alta",
+  "misiones": [
+    {
+      "nombre": "Verificar y optimizar extracción de compras ágiles",
+      "tipo": "revisar",
+      "archivo": "chrome-extension/scraper.js",
+      "instruccion": "Revisa y optimiza la función scrapeCompraAgilList() y scrapeCompraAgilDetail(). Asegúrate de que extraiga correctamente: codigo, nombre, organismo, monto, fecha_cierre, estado, descripcion, link_oficial. Agrega manejo de errores robusto y logging adecuado. Verifica que los datos se mapeen correctamente al formato de la tabla compras_agiles."
+    },
+    {
+      "nombre": "Verificar función Edge sync-compras-agiles",
+      "tipo": "revisar",
+      "archivo": "supabase/functions/sync-compras-agiles/index.ts",
+      "instruccion": "Revisa que la función Edge sync-compras-agiles reciba correctamente los datos del scraper y los inserte/actualice en la tabla compras_agiles. Asegúrate de que maneje errores correctamente, valide la API key, y retorne respuestas apropiadas. Agrega logging para debugging."
+    },
+    {
+      "nombre": "Optimizar motor de matching para compras ágiles",
+      "tipo": "revisar",
+      "archivo": "src/services/matchingEngine.ts",
+      "instruccion": "Revisa y optimiza el motor de matching para que funcione correctamente con compras ágiles. Asegúrate de que calcule correctamente el match_score, considere el margen objetivo, y actualice correctamente match_encontrado y match_score en la tabla compras_agiles. Incorpora lógica para considerar si el organismo es buen pagador (agregar campo buen_pagador si no existe)."
+    },
+    {
+      "nombre": "Verificar hook useMatchingAI para compras ágiles",
+      "tipo": "revisar",
+      "archivo": "src/hooks/useMatching.ts",
+      "instruccion": "Revisa que useMatchingAI cargue correctamente compras ágiles no procesadas, ejecute el matching, y actualice correctamente la tabla compras_agiles. Asegúrate de que invalide las queries correctas después de actualizar. Verifica que maneje errores apropiadamente."
+    },
+    {
+      "nombre": "Mejorar componente GenerarCotizacionModal para envío a MercadoPúblico",
+      "tipo": "revisar",
+      "archivo": "src/components/licitaciones/GenerarCotizacionModal.tsx",
+      "instruccion": "Revisa y mejora la función handleEnviarMercadoPublico. Asegúrate de que: 1) Genere correctamente la oferta en la tabla ofertas, 2) Prepare el payload para la extensión de Chrome, 3) Muestre mensajes claros al usuario, 4) Maneje errores apropiadamente, 5) Actualice el estado de la oferta correctamente. Verifica que funcione tanto para licitaciones como para compras ágiles."
+    },
+    {
+      "nombre": "Mejorar frontend de Compras Ágiles - Diseño profesional",
+      "tipo": "revisar",
+      "archivo": "src/pages/ComprasAgiles.tsx",
+      "instruccion": "Mejora el diseño de la página Compras Ágiles para que se vea profesional y moderna. Asegúrate de que: 1) Use los colores de marca FirmaVB (firmavb-blue, firmavb-red), 2) Tenga un diseño limpio y minimalista, 3) Muestre claramente el margen en las tarjetas, 4) Muestre si el organismo es buen pagador, 5) Tenga buena UX con estados de carga y errores, 6) Sea responsive. Inspírate en diseños modernos de dashboards profesionales."
+    },
+    {
+      "nombre": "Mejorar componente ComprasAgilesTable para mostrar margen y buen pagador",
+      "tipo": "revisar",
+      "archivo": "src/components/compras-agiles/ComprasAgilesTable.tsx",
+      "instruccion": "Revisa y mejora la tabla de compras ágiles para que muestre claramente: 1) El margen calculado o estimado, 2) Si el organismo es buen pagador (con badge o icono), 3) El match_score de forma visual, 4) Estados claros. Asegúrate de que el diseño sea profesional y use los colores de marca FirmaVB."
+    },
+    {
+      "nombre": "Agregar campo buen_pagador a tabla compras_agiles si no existe",
+      "tipo": "revisar",
+      "archivo": "supabase/migrations/20260115000000_add_buen_pagador_compras_agiles.sql",
+      "instruccion": "Revisa esta migración SQL. Asegúrate de que agregue correctamente el campo buen_pagador (BOOLEAN) a la tabla compras_agiles, incluya comentarios apropiados, cree índices necesarios y tenga una función para calcular buen_pagador basado en historial de pagos."
+    },
+    {
+      "nombre": "Mejorar servicio mercadoPublicoApi para compras ágiles",
+      "tipo": "revisar",
+      "archivo": "src/services/mercadoPublicoApi.ts",
+      "instruccion": "Revisa y mejora prepararOfertaParaMP para que funcione correctamente con compras ágiles. Asegúrate de que obtenga los datos correctos de la tabla compras_agiles (no solo licitaciones), formatee correctamente los items, y prepare el payload para la extensión de Chrome. Verifica que incluya el margen y información del buen pagador si está disponible."
+    },
+    {
+      "nombre": "Revisar y mejorar branding FirmaVB en componentes principales",
+      "tipo": "revisar",
+      "archivo": "src/components/layout/AppSidebar.tsx",
+      "instruccion": "Revisa este componente para asegurar que el branding FirmaVB esté correctamente implementado. Verifica que los logos se muestren correctamente, que los colores de marca se usen consistentemente, y que todos los textos mencionen FirmaVB apropiadamente."
+    },
+    {
+      "nombre": "Verificar hooks de compras ágiles",
+      "tipo": "revisar",
+      "archivo": "src/hooks/useComprasAgiles.ts",
+      "instruccion": "Revisa que useComprasAgiles y otros hooks relacionados funcionen correctamente. Asegúrate de que: 1) Consulten la tabla compras_agiles correctamente, 2) Manejen filtros apropiadamente, 3) Invaliden queries cuando sea necesario, 4) Manejen errores correctamente, 5) Retornen datos en el formato esperado."
+    },
+    {
+      "nombre": "Verificar compilación y tipos TypeScript",
+      "tipo": "verificar",
+      "archivo": "proyecto",
+      "instruccion": "Ejecuta type-check y verifica que no haya errores de TypeScript. Corrige cualquier error de tipos que encuentres, especialmente relacionados con compras_agiles, buen_pagador, y margen."
+    },
+    {
+      "nombre": "Revisar y actualizar documentación",
+      "tipo": "revisar",
+      "archivo": "README.md",
+      "instruccion": "Actualiza el README.md para reflejar: 1) El sistema de compras ágiles, 2) El matching automático, 3) El envío de ofertas a MercadoPúblico, 4) La incorporación de margen y buen pagador, 5) La marca FirmaVB. Asegúrate de que la documentación esté actualizada y sea clara."
+    }
+  ]
+}

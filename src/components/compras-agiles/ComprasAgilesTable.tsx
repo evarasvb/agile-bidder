@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, differenceInDays, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { ShoppingCart, Clock, MapPin, Building2, CheckCircle2, AlertTriangle } from "lucide-react";
+import { ShoppingCart, Clock, MapPin, Building2, CheckCircle2, AlertTriangle, DollarSign, TrendingUp, ShieldCheck, ShieldX } from "lucide-react";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 
 interface ComprasAgilesTableProps {
@@ -39,6 +39,26 @@ function getEstadoBadge(estado: string | null, diasRestantes: number | null) {
     return <Badge variant="success">Adjudicada</Badge>;
   }
   return <Badge variant="outline">Activa</Badge>;
+}
+
+function getBuenPagadorBadge(buenPagador: boolean | null) {
+  if (buenPagador === true) {
+    return (
+      <Badge variant="success" className="gap-1">
+        <ShieldCheck className="h-3 w-3" />
+        Buen Pagador
+      </Badge>
+    );
+  }
+  if (buenPagador === false) {
+    return (
+      <Badge variant="accent" className="gap-1">
+        <ShieldX className="h-3 w-3" />
+        Revisar Pago
+      </Badge>
+    );
+  }
+  return <Badge variant="outline" className="text-xs">Sin info</Badge>;
 }
 
 export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }: ComprasAgilesTableProps) {
@@ -82,12 +102,13 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
               <TableHead className="font-semibold">Cierre</TableHead>
               <TableHead className="font-semibold">Estado</TableHead>
               <TableHead className="font-semibold text-center">Match</TableHead>
+              <TableHead className="font-semibold text-center">Pago</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {compras?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   No se encontraron compras ágiles con los filtros seleccionados
                 </TableCell>
               </TableRow>
@@ -147,7 +168,7 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
                     </TableCell>
                     <TableCell className="text-center">
                       {compra.match_encontrado ? (
-                        <div className="flex flex-col items-center">
+                        <div className="flex flex-col items-center gap-1">
                           <CheckCircle2 className="h-5 w-5 text-green-500" />
                           {compra.match_score && (
                             <span className="text-xs text-green-600 font-medium">{compra.match_score}%</span>
@@ -156,6 +177,9 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
                       ) : (
                         <span className="text-muted-foreground text-xs">Sin match</span>
                       )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {getBuenPagadorBadge(compra.buen_pagador)}
                     </TableCell>
                   </TableRow>
                 );

@@ -35,21 +35,27 @@ export default function ComprasAgiles() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
+    <div className="p-6 space-y-6 bg-gradient-to-br from-background via-firmavb-cream/5 to-background min-h-screen">
+      {/* Header con branding FirmaVB */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <ShoppingCart className="h-6 w-6 text-primary" />
+          <div className="p-3 rounded-xl bg-gradient-to-br from-firmavb-blue/20 to-firmavb-red/10 border border-firmavb-blue/20">
+            <ShoppingCart className="h-7 w-7 text-firmavb-blue" />
           </div>
           <div>
-            <h1 className="text-2xl font-heading font-bold text-foreground">Compras Ágiles</h1>
-            <p className="text-sm text-muted-foreground">
-              Gestiona y genera propuestas para compras ágiles de MercadoPúblico
+            <h1 className="text-3xl font-heading font-bold bg-gradient-to-r from-firmavb-blue to-firmavb-red bg-clip-text text-transparent">
+              Compras Ágiles
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Gestiona y genera propuestas inteligentes para compras ágiles de MercadoPúblico con FirmaVB
             </p>
           </div>
         </div>
-        <Button variant="outline" onClick={handleRefresh} className="gap-2">
+        <Button 
+          variant="outline" 
+          onClick={handleRefresh} 
+          className="gap-2 border-firmavb-blue/30 hover:bg-firmavb-blue/10 hover:border-firmavb-blue"
+        >
           <RefreshCw className="h-4 w-4" />
           Actualizar
         </Button>

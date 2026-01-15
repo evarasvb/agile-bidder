@@ -3,10 +3,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Package, PackageSearch, FileText, Calendar, MapPin, Building2, DollarSign } from "lucide-react";
+import { Package, PackageSearch, FileText, Calendar, MapPin, Building2, DollarSign, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { useMatchInventario, type MatchedProduct } from "@/hooks/useMatchInventario";
+import { useLicitacionItems, useProductoMaestro, type LicitacionItem } from "@/hooks/useLicitacionItems";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 
 interface MatchPanelProps {
@@ -32,8 +32,14 @@ function MatchScoreBadge({ score }: { score: number }) {
   );
 }
 
+interface ProductoConMatch extends LicitacionItem {
+  productoMaestro?: any;
+  tieneMatch: boolean;
+}
+
 export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
-  const { data: productos, isLoading } = useMatchInventario(compra?.nombre || null);
+  // Obtener el listado de productos solicitados por la institución
+  const { data: items, isLoading: isLoadingItems } = useLicitacionItems(compra?.codigo || null);
 
   if (!compra) {
     return (
