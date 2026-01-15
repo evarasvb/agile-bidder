@@ -75,15 +75,10 @@ export default function Landing() {
               alt="FirmaVB" 
               className="h-10 w-auto object-contain"
             />
-            <div>
-              <div className="relative inline-block">
-                <span className="font-bold text-firmavb-blue text-lg">FirmaVB</span>
-                {/* Red underline - brand characteristic */}
-                <div className="absolute -bottom-0.5 left-0 w-full h-0.5 bg-firmavb-red rounded-full" />
-              </div>
-              <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
-                conectando grandes marcas con grandes clientes
-              </p>
+            <div className="relative inline-block">
+              <span className="font-bold text-firmavb-blue text-lg">FirmaVB</span>
+              {/* Red underline - brand characteristic */}
+              <div className="absolute -bottom-0.5 left-0 w-full h-0.5 bg-firmavb-red rounded-full" />
             </div>
           </div>
           <div className="flex items-center gap-3">
