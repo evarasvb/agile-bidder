@@ -26,7 +26,6 @@ import {
   ChevronRight,
   Search,
   Filter,
-  ExternalLink,
   ArrowUpDown,
   Calendar,
   Building2,
@@ -430,14 +429,6 @@ export function OportunidadesTable() {
                 </div>
 
                 <div className="flex gap-3 pt-4 border-t">
-                  {selectedOportunidad.link_oficial && (
-                    <Button asChild>
-                      <a href={selectedOportunidad.link_oficial} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Ver en Mercado Público
-                      </a>
-                    </Button>
-                  )}
                   <Button variant="outline" className="border-firmavb-blue text-firmavb-blue hover:bg-firmavb-blue/10">
                     Preparar Oferta
                   </Button>

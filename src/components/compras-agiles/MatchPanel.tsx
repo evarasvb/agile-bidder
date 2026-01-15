@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Package, PackageSearch, FileText, ExternalLink, Calendar, MapPin, Building2, DollarSign } from "lucide-react";
+import { Package, PackageSearch, FileText, Calendar, MapPin, Building2, DollarSign } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { useMatchInventario, type MatchedProduct } from "@/hooks/useMatchInventario";
@@ -51,22 +51,12 @@ export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
   return (
     <Card className="shadow-sm h-full flex flex-col">
       <CardHeader className="pb-3 border-b">
-        <div className="flex items-start justify-between">
-          <div className="space-y-1">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Package className="h-5 w-5 text-primary" />
-              Detalle de Compra
-            </CardTitle>
-            <p className="text-xs text-muted-foreground font-mono">{compra.codigo}</p>
-          </div>
-          {compra.link_oficial && (
-            <Button variant="outline" size="sm" asChild>
-              <a href={compra.link_oficial} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-4 w-4 mr-1" />
-                Ver en MP
-              </a>
-            </Button>
-          )}
+        <div className="space-y-1">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Package className="h-5 w-5 text-primary" />
+            Detalle de Compra
+          </CardTitle>
+          <p className="text-xs text-muted-foreground font-mono">{compra.codigo}</p>
         </div>
       </CardHeader>
 
