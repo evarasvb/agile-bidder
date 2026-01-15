@@ -1,6 +1,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, differenceInDays, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -62,14 +63,22 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
     );
   }
 
+  const totalCompras = compras?.length ?? 0;
+  const conMatch = compras?.filter((compra) => compra.match_encontrado).length ?? 0;
+  const progreso = totalCompras > 0 ? Math.round((conMatch / totalCompras) * 100) : 0;
+
   return (
     <Card className="shadow-sm">
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-3 space-y-3">
         <CardTitle className="flex items-center gap-2 text-lg">
           <ShoppingCart className="h-5 w-5 text-primary" />
           Compras Ágiles
           <Badge variant="secondary" className="ml-2">{compras?.length || 0}</Badge>
         </CardTitle>
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <Progress value={progreso} className="h-2 flex-1" />
+          <span className="whitespace-nowrap">{conMatch}/{totalCompras} emparejadas</span>
+        </div>
       </CardHeader>
       <CardContent className="p-0">
         <Table>
