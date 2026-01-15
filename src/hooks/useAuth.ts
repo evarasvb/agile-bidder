@@ -13,6 +13,7 @@ interface AuthActions {
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
 }
 
 export function useAuth(): AuthState & AuthActions {
@@ -69,6 +70,14 @@ export function useAuth(): AuthState & AuthActions {
     }
   }, []);
 
+  const resetPassword = useCallback(async (email: string) => {
+    const redirectUrl = `${window.location.origin}/auth?reset=true`;
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: redirectUrl,
+    });
+    return { error };
+  }, []);
+
   return {
     user,
     session,
@@ -77,5 +86,6 @@ export function useAuth(): AuthState & AuthActions {
     signIn,
     signUp,
     signOut,
+    resetPassword,
   };
 }

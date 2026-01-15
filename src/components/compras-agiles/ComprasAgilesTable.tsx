@@ -2,9 +2,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { format, differenceInDays, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { ShoppingCart, Clock, MapPin, Building2, CheckCircle2, AlertTriangle, DollarSign, TrendingUp, ShieldCheck, ShieldX } from "lucide-react";
+import { ShoppingCart, Clock, MapPin, Building2, CheckCircle2, AlertTriangle, DollarSign, TrendingUp, ShieldCheck, ShieldX, HelpCircle } from "lucide-react";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 
 interface ComprasAgilesTableProps {
@@ -44,21 +45,47 @@ function getEstadoBadge(estado: string | null, diasRestantes: number | null) {
 function getBuenPagadorBadge(buenPagador: boolean | null) {
   if (buenPagador === true) {
     return (
-      <Badge variant="success" className="gap-1">
-        <ShieldCheck className="h-3 w-3" />
-        Buen Pagador
-      </Badge>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge variant="success" className="gap-1 cursor-help">
+            <ShieldCheck className="h-3 w-3" />
+            Buen Pagador
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p className="text-xs">Este organismo tiene historial de pagos puntuales y confiables</p>
+        </TooltipContent>
+      </Tooltip>
     );
   }
   if (buenPagador === false) {
     return (
-      <Badge variant="accent" className="gap-1">
-        <ShieldX className="h-3 w-3" />
-        Revisar Pago
-      </Badge>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge variant="accent" className="gap-1 cursor-help">
+            <ShieldX className="h-3 w-3" />
+            Revisar Pago
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p className="text-xs">Este organismo ha tenido problemas de pago. Revisa antes de ofertar</p>
+        </TooltipContent>
+      </Tooltip>
     );
   }
-  return <Badge variant="outline" className="text-xs">Sin info</Badge>;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge variant="outline" className="text-xs cursor-help">
+          <HelpCircle className="h-3 w-3 inline mr-1" />
+          Sin info
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p className="text-xs">No hay información disponible sobre el historial de pagos</p>
+      </TooltipContent>
+    </Tooltip>
+  );
 }
 
 export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }: ComprasAgilesTableProps) {

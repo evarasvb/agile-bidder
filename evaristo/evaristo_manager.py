@@ -75,12 +75,29 @@ Sistema que gestiona:
 - Extensiones de Chrome para scraping
 - Bot autónomo (Evaristo) para mantenimiento continuo
 
+REGLA DE NEGOCIO CRÍTICA - CLASIFICACIÓN DE PROCESOS:
+⚠️ IMPORTANTE: Distinción entre LICITACIONES y COMPRAS ÁGILES basada en monto:
+
+- LICITACIONES: Monto > 100 UTM (aproximadamente > $6.700.000 CLP en 2026)
+- COMPRAS ÁGILES: Monto <= 100 UTM (aproximadamente <= $6.700.000 CLP en 2026)
+
+Esta distinción debe aplicarse en TODO el sistema:
+- Clasificación de procesos al guardar
+- Filtros y queries
+- Interfaces de usuario
+- Documentación
+- Lógica de negocio
+
+UTM 2026: ~$67.000 CLP (verificar en SII y actualizar anualmente)
+Umbral: 100 UTM = ~$6.700.000 CLP
+
 REGLAS DE ORO:
 1. SIEMPRE hacer backup antes de modificar código
 2. Mantener compatibilidad con el código existente
 3. Seguir las convenciones del proyecto
 4. Probar cambios antes de aplicarlos
 5. Reportar claramente qué se hizo y por qué
+6. SIEMPRE respetar la regla de clasificación: >100 UTM = Licitación, <=100 UTM = Compra Ágil
 
 Cuando te pidan código, devuelve SOLO el código corregido/mejorado, sin explicaciones largas.
 Si hay errores, corrígelos. Si hay mejoras posibles, aplícalas.

@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, UserPlus, Shield, User, Mail, Building2, Calendar, MoreHorizontal, Trash2, KeyRound, UserCircle, Sparkles } from "lucide-react";
+import { Loader2, UserPlus, Shield, User, Mail, Building2, Calendar, MoreHorizontal, Trash2, KeyRound, UserCircle, Sparkles, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -128,9 +128,13 @@ export default function Users() {
         if (error) throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-      toast.success('Rol actualizado correctamente');
+      const newRole = variables.isCurrentlyAdmin ? 'Usuario' : 'Administrador';
+      toast.success(`Rol actualizado: ${newRole}`, {
+        description: `El usuario ahora tiene permisos de ${newRole.toLowerCase()}`,
+      });
+      setConfirmRoleChange(null);
     },
     onError: (error: any) => {
       console.error('Error toggling admin:', error);
@@ -508,26 +512,42 @@ export default function Users() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Badge variant={isUserAdmin ? "default" : "secondary"}>
-                          {isUserAdmin ? (
-                            <>
-                              <Shield className="h-3 w-3 mr-1" />
-                              Admin
-                            </>
-                          ) : (
-                            <>
-                              <User className="h-3 w-3 mr-1" />
-                              Usuario
-                            </>
-                          )}
-                        </Badge>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge variant={isUserAdmin ? "default" : "secondary"} className="cursor-help">
+                              {isUserAdmin ? (
+                                <>
+                                  <Shield className="h-3 w-3 mr-1" />
+                                  Admin
+                                </>
+                              ) : (
+                                <>
+                                  <User className="h-3 w-3 mr-1" />
+                                  Usuario
+                                </>
+                              )}
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">
+                              {isUserAdmin 
+                                ? 'Administrador: Acceso completo al sistema y gestión de usuarios'
+                                : 'Usuario: Acceso básico al sistema'}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
                         <Switch
                           checked={isUserAdmin}
-                          onCheckedChange={() => toggleAdminMutation.mutate({ 
-                            userId: user.id, 
-                            isCurrentlyAdmin: isUserAdmin 
-                          })}
+                          onCheckedChange={() => {
+                            const userName = user.profile?.full_name || user.email;
+                            setConfirmRoleChange({
+                              userId: user.id,
+                              newRole: isUserAdmin ? 'user' : 'admin',
+                              userName,
+                            });
+                          }}
                           disabled={toggleAdminMutation.isPending}
+                          className="data-[state=checked]:bg-firmavb-blue"
                         />
                       </div>
                     </TableCell>
@@ -577,6 +597,58 @@ export default function Users() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Confirm Role Change Dialog */}
+      <AlertDialog open={!!confirmRoleChange} onOpenChange={(open) => !open && setConfirmRoleChange(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Cambiar rol de usuario?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmRoleChange && (
+                <>
+                  Estás a punto de cambiar el rol de <strong>{confirmRoleChange.userName}</strong> a{' '}
+                  <strong>{confirmRoleChange.newRole === 'admin' ? 'Administrador' : 'Usuario'}</strong>.
+                  <br />
+                  <br />
+                  {confirmRoleChange.newRole === 'admin' ? (
+                    <span className="text-amber-600 dark:text-amber-400">
+                      ⚠️ Los administradores tienen acceso completo al sistema, incluyendo gestión de usuarios y configuración.
+                    </span>
+                  ) : (
+                    <span className="text-blue-600 dark:text-blue-400">
+                      ℹ️ El usuario tendrá acceso básico y no podrá gestionar otros usuarios.
+                    </span>
+                  )}
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (confirmRoleChange) {
+                  toggleAdminMutation.mutate({
+                    userId: confirmRoleChange.userId,
+                    isCurrentlyAdmin: confirmRoleChange.newRole === 'user',
+                  });
+                }
+              }}
+              className="bg-firmavb-blue hover:bg-firmavb-blue/90"
+              disabled={toggleAdminMutation.isPending}
+            >
+              {toggleAdminMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Actualizando...
+                </>
+              ) : (
+                'Confirmar Cambio'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

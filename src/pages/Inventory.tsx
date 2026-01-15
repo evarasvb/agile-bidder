@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Upload, Search, MoreHorizontal, Edit2, Trash2, Package, Inbox, Loader2, RefreshCw, FileJson, Download, Trash, Image, FileText, CheckSquare, Square, FileSpreadsheet, Images } from "lucide-react";
+import { Plus, Upload, Search, MoreHorizontal, Edit2, Trash2, Package, Inbox, Loader2, RefreshCw, FileJson, Download, Trash, Image, FileText, CheckSquare, Square, FileSpreadsheet, Images, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -532,22 +532,45 @@ export default function Inventory() {
                       const licitaciones = licitacionesMap.get(item.id);
                       if (!licitaciones || licitaciones.total_licitaciones_abiertas === 0) {
                         return (
-                          <span className="text-xs text-muted-foreground">-</span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="text-xs text-muted-foreground cursor-help inline-flex items-center gap-1">
+                                <HelpCircle className="h-3 w-3" />
+                                Sin oportunidades
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="text-xs">No hay licitaciones activas que coincidan con este producto</p>
+                            </TooltipContent>
+                          </Tooltip>
                         );
                       }
                       return (
-                        <Link
-                          to={`/compras-agiles?producto=${item.id}`}
-                          className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-firmavb-blue/10 text-firmavb-blue hover:bg-firmavb-blue/20 transition-colors text-xs font-medium"
-                        >
-                          <Gavel className="h-3 w-3" />
-                          {licitaciones.total_licitaciones_abiertas}
-                          {licitaciones.mejor_match_score && (
-                            <span className="text-firmavb-green">
-                              ({licitaciones.mejor_match_score}%)
-                            </span>
-                          )}
-                        </Link>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Link
+                              to={`/compras-agiles?producto=${item.id}`}
+                              className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-firmavb-blue/10 text-firmavb-blue hover:bg-firmavb-blue/20 transition-colors text-xs font-medium"
+                            >
+                              <Gavel className="h-3 w-3" />
+                              {licitaciones.total_licitaciones_abiertas}
+                              {licitaciones.mejor_match_score && (
+                                <span className="text-firmavb-green">
+                                  ({licitaciones.mejor_match_score}%)
+                                </span>
+                              )}
+                            </Link>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <div className="text-xs space-y-1">
+                              <p className="font-medium">{licitaciones.total_licitaciones_abiertas} licitaciones activas</p>
+                              {licitaciones.mejor_match_score && (
+                                <p>Mejor match: {licitaciones.mejor_match_score}%</p>
+                              )}
+                              <p className="text-muted-foreground">Click para ver detalles</p>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
                       );
                     })()}
                   </TableCell>

@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Mail, Lock, AlertCircle, ArrowLeft, Sparkles } from 'lucide-react';
+import { Loader2, Mail, Lock, AlertCircle, ArrowLeft, Sparkles, HelpCircle } from 'lucide-react';
 
 // Validation schemas
 const emailSchema = z.string().email('Email inválido');
@@ -30,12 +30,15 @@ const signupSchema = z.object({
 
 export default function Auth() {
   const navigate = useNavigate();
-  const { signIn, signUp, isAuthenticated, loading: authLoading } = useAuth();
+  const { signIn, signUp, resetPassword, isAuthenticated, loading: authLoading } = useAuth();
   
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
   
   // Form states
   const [loginEmail, setLoginEmail] = useState('');
@@ -198,7 +201,21 @@ export default function Auth() {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="login-password">Contraseña</Label>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="login-password">Contraseña</Label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowForgotPassword(true);
+                            setError(null);
+                            setSuccess(null);
+                          }}
+                          className="text-xs text-[hsl(var(--firmavb-blue))] hover:underline flex items-center gap-1"
+                        >
+                          <HelpCircle className="h-3 w-3" />
+                          ¿Olvidaste tu contraseña?
+                        </button>
+                      </div>
                       <div className="relative">
                         <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -227,6 +244,58 @@ export default function Auth() {
                       )}
                     </Button>
                   </form>
+
+                  {/* Forgot Password Form */}
+                  {showForgotPassword && (
+                    <div className="mt-4 p-4 rounded-lg border border-border bg-muted/30">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-semibold">Recuperar Contraseña</h3>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowForgotPassword(false);
+                            setResetEmail('');
+                            setError(null);
+                          }}
+                          className="text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                      <form onSubmit={handleForgotPassword} className="space-y-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="reset-email" className="text-xs">Email</Label>
+                          <div className="relative">
+                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              id="reset-email"
+                              type="email"
+                              placeholder="tu@email.com"
+                              value={resetEmail}
+                              onChange={(e) => setResetEmail(e.target.value)}
+                              className="pl-10 h-9 text-sm"
+                              disabled={resetLoading}
+                            />
+                          </div>
+                        </div>
+                        <Button 
+                          type="submit"
+                          size="sm"
+                          className="w-full bg-[hsl(var(--firmavb-blue))] hover:bg-[hsl(var(--firmavb-blue))]/90"
+                          disabled={resetLoading || !resetEmail}
+                        >
+                          {resetLoading ? (
+                            <>
+                              <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                              Enviando...
+                            </>
+                          ) : (
+                            'Enviar Enlace de Recuperación'
+                          )}
+                        </Button>
+                      </form>
+                    </div>
+                  )}
                 </TabsContent>
 
                 {/* Signup Tab */}
