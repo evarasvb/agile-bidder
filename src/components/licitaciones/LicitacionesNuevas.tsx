@@ -16,7 +16,6 @@ import { Badge } from '@/components/ui/badge';
 import { useLicitacionesNuevas, useAnalizarMatch, type Licitacion } from '@/hooks/useLicitaciones';
 import { toast } from 'sonner';
 import { clasificarProceso, formatCurrency, montoEnUTM } from '@/utils/clasificacion';
-import { Badge } from '@/components/ui/badge';
 
 function LicitacionNuevaRow({ licitacion }: { licitacion: Licitacion }) {
   const analizarMatch = useAnalizarMatch();

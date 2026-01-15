@@ -64,11 +64,14 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
       if (error) throw error;
       
       // Mapear campos de BD a interfaz
-      let compras = (data || []).map(compra => ({
-        ...compra,
-        organismo: compra.nombre_organismo || compra.organismo || '',
-        monto: compra.monto_estimado || compra.monto || null,
-      })) as CompraAgil[];
+      let compras = (data || []).map(compra => {
+        const compraAny = compra as any;
+        return {
+          ...compra,
+          organismo: compraAny.nombre_organismo || compra.organismo || '',
+          monto: compraAny.monto_estimado || compra.monto || null,
+        } as CompraAgil;
+      });
       
       // Filtrar por regiones activas del usuario (si está configurado)
       if (userSettings && (userSettings.regiones_config?.length > 0 || userSettings.regions?.length > 0)) {

@@ -10,8 +10,6 @@ import { es } from "date-fns/locale";
 import { useLicitacionItems, type LicitacionItem } from "@/hooks/useLicitacionItems";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 import { clasificarProceso, formatCurrency, montoEnUTM } from "@/utils/clasificacion";
-import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface MatchPanelProps {
   compra: CompraAgil | null;
