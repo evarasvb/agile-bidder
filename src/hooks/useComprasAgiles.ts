@@ -139,11 +139,14 @@ export function useComprasAgilesStats() {
 
       if (error) throw error;
 
-      const compras = (data || []).map(c => ({
-        ...c,
-        organismo: c.nombre_organismo || c.organismo || '',
-        monto: c.monto_estimado || c.monto || null,
-      })) as CompraAgil[];
+      const compras = (data || []).map(c => {
+        const cAny = c as any;
+        return {
+          ...c,
+          organismo: cAny.nombre_organismo || c.organismo || '',
+          monto: cAny.monto_estimado || c.monto || null,
+        } as CompraAgil;
+      });
       
       const total = compras.length;
       const conMatch = compras.filter(c => c.match_encontrado).length;
