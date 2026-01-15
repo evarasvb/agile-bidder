@@ -8,25 +8,17 @@ interface FirmaVBHeaderProps {
   showLogo?: boolean;
 }
 
-export function FirmaVBLogo({ className, showSlogan = true }: { className?: string; showSlogan?: boolean }) {
+export function FirmaVBLogo({ className }: { className?: string }) {
   return (
     <div className={cn("flex items-center gap-3", className)}>
-      {/* Logo with Red Underline */}
       <img 
         src={firmavbLogo} 
         alt="FirmaVB Logo" 
         className="h-10 w-auto object-contain"
       />
-      {showSlogan && (
-        <div className="flex flex-col">
-          <div className="firmavb-underline inline-block">
-            <span className="text-xl font-bold text-firmavb-blue leading-tight tracking-tight">FirmaVB</span>
-          </div>
-          <span className="text-[10px] text-muted-foreground font-medium tracking-wide mt-1.5">
-            conectando grandes marcas con grandes clientes
-          </span>
-        </div>
-      )}
+      <div className="firmavb-underline inline-block">
+        <span className="text-xl font-bold text-firmavb-blue leading-tight tracking-tight">FirmaVB</span>
+      </div>
     </div>
   );
 }
