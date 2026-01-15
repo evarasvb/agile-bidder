@@ -26,7 +26,8 @@ import {
   Repeat,
   Scale,
   X,
-  LogOut
+  LogOut,
+  Play
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -35,10 +36,14 @@ import { Input } from "@/components/ui/input";
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { DemoModal } from "@/components/landing/DemoModal";
+import firmavbLogo from "@/assets/firmavb-logo.png";
+import { toast } from "sonner";
 
 export default function Landing() {
   const [chatOpen, setChatOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [demoOpen, setDemoOpen] = useState(false);
   const { isAuthenticated, signOut, user } = useAuth();
   const navigate = useNavigate();
 
@@ -47,18 +52,38 @@ export default function Landing() {
     navigate('/');
   };
 
+  const handleSearch = () => {
+    if (!searchQuery.trim()) {
+      toast.error("Ingresa un producto o servicio para buscar");
+      return;
+    }
+    // Navigate to licitaciones with search query
+    navigate(`/licitaciones?search=${encodeURIComponent(searchQuery)}`);
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 px-6 py-4 backdrop-blur-md bg-background/80 border-b border-border/50">
+    <div className="min-h-screen bg-firmavb-gray">
+      {/* Demo Modal */}
+      <DemoModal open={demoOpen} onOpenChange={setDemoOpen} />
+
+      {/* Header with FirmaVB Branding */}
+      <header className="fixed top-0 left-0 right-0 z-50 px-6 py-4 backdrop-blur-md bg-white/90 border-b border-border/50">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-[hsl(var(--firmavb-blue))] to-[hsl(var(--header-dark))] flex items-center justify-center shadow-lg shadow-[hsl(var(--firmavb-blue))]/20">
-              <span className="text-white font-bold text-sm">FV</span>
-            </div>
+            <img 
+              src={firmavbLogo} 
+              alt="FirmaVB" 
+              className="h-10 w-auto object-contain"
+            />
             <div>
-              <span className="font-bold text-foreground text-lg">FirmaVB</span>
-              <p className="text-xs text-muted-foreground">Inteligencia para Ganar Más</p>
+              <div className="relative inline-block">
+                <span className="font-bold text-firmavb-blue text-lg">FirmaVB</span>
+                {/* Red underline - brand characteristic */}
+                <div className="absolute -bottom-0.5 left-0 w-full h-0.5 bg-firmavb-red rounded-full" />
+              </div>
+              <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
+                conectando grandes marcas con grandes clientes
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -84,7 +109,7 @@ export default function Landing() {
                 <Button variant="ghost" asChild>
                   <Link to="/auth">Iniciar Sesión</Link>
                 </Button>
-                <Button asChild className="bg-[hsl(var(--firmavb-blue))] hover:bg-[hsl(var(--firmavb-blue))]/90">
+                <Button asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90">
                   <Link to="/auth">
                     Comenzar Gratis
                     <ArrowRight className="ml-2 h-4 w-4" />
@@ -100,7 +125,7 @@ export default function Landing() {
       <section className="pt-32 pb-16 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center max-w-4xl mx-auto">
-            <Badge className="mb-6 bg-[hsl(var(--firmavb-blue))]/10 text-[hsl(var(--firmavb-blue))] border-[hsl(var(--firmavb-blue))]/20 hover:bg-[hsl(var(--firmavb-blue))]/20 px-4 py-2">
+            <Badge className="mb-6 bg-firmavb-blue/10 text-firmavb-blue border-firmavb-blue/20 hover:bg-firmavb-blue/20 px-4 py-2">
               <Sparkles className="h-4 w-4 mr-2" />
               Plataforma de Inteligencia Comercial para Licitaciones
             </Badge>
@@ -108,13 +133,13 @@ export default function Landing() {
             <h1 className="text-4xl md:text-6xl font-bold text-foreground mb-4 leading-tight">
               Adjudicar es clave.
             </h1>
-            <h2 className="text-3xl md:text-5xl font-bold text-[hsl(var(--firmavb-blue))] mb-6">
+            <h2 className="text-3xl md:text-5xl font-bold text-firmavb-blue mb-6">
               Hacerlo constante es vital.
             </h2>
             
-            <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-              FirmaVB maximiza tu <span className="text-[hsl(var(--success))] font-semibold">flujo de caja</span> y 
-              <span className="text-[hsl(var(--firmavb-blue))] font-semibold"> rentabilidad</span> con inteligencia 
+            <p className="text-xl text-muted-foreground font-light mb-8 max-w-3xl mx-auto">
+              FirmaVB maximiza tu <span className="text-success font-medium">flujo de caja</span> y 
+              <span className="text-firmavb-blue font-medium"> rentabilidad</span> con inteligencia 
               artificial que transforma cómo compites en Mercado Público.
             </p>
 
@@ -124,18 +149,20 @@ export default function Landing() {
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input 
                   placeholder="¿Qué producto o servicio quieres ofertar? Ej: suministros médicos, tecnología..."
-                  className="pl-12 pr-32 h-14 text-lg rounded-xl border-2 border-border focus:border-[hsl(var(--firmavb-blue))] transition-colors"
+                  className="pl-12 pr-32 h-14 text-lg rounded-xl border-2 border-border focus:border-firmavb-blue transition-colors bg-white"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                 />
                 <Button 
-                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-[hsl(var(--firmavb-blue))] hover:bg-[hsl(var(--firmavb-blue))]/90"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-firmavb-blue hover:bg-firmavb-blue/90"
+                  onClick={handleSearch}
                 >
                   <Brain className="h-4 w-4 mr-2" />
                   Analizar
                 </Button>
               </div>
-              <p className="text-sm text-muted-foreground mt-2">
+              <p className="text-sm text-muted-foreground font-light mt-2">
                 Nuestra IA analizará tu intención comercial y te mostrará oportunidades relevantes
               </p>
             </div>
@@ -144,7 +171,7 @@ export default function Landing() {
               <Button 
                 size="lg" 
                 asChild
-                className="bg-[hsl(var(--firmavb-blue))] hover:bg-[hsl(var(--firmavb-blue))]/90 shadow-lg shadow-[hsl(var(--firmavb-blue))]/25 text-base h-12 px-8"
+                className="bg-firmavb-blue hover:bg-firmavb-blue/90 shadow-lg shadow-firmavb-blue/25 text-base h-12 px-8"
               >
                 <Link to="/auth">
                   Configurar mi empresa
@@ -154,10 +181,11 @@ export default function Landing() {
               <Button 
                 size="lg" 
                 variant="outline" 
-                asChild
-                className="text-base h-12 px-8"
+                className="text-base h-12 px-8 gap-2"
+                onClick={() => setDemoOpen(true)}
               >
-                <Link to="/dashboard">Ver demostración</Link>
+                <Play className="h-4 w-4" />
+                Ver demostración
               </Button>
             </div>
           </div>
@@ -354,25 +382,25 @@ export default function Landing() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <Card className="p-6 bg-gradient-to-br from-[hsl(var(--firmavb-blue))]/10 to-transparent border-[hsl(var(--firmavb-blue))]/20">
-                <BarChart3 className="h-10 w-10 text-[hsl(var(--firmavb-blue))] mb-4" />
-                <h3 className="font-semibold text-foreground mb-1">Dashboard en Tiempo Real</h3>
-                <p className="text-sm text-muted-foreground">Métricas y KPIs actualizados al instante</p>
+              <Card className="p-6 bg-gradient-to-br from-firmavb-blue/10 to-transparent border-firmavb-blue/20 shadow-sm">
+                <BarChart3 className="h-10 w-10 text-firmavb-blue mb-4" />
+                <h3 className="font-medium text-foreground mb-1">Dashboard en Tiempo Real</h3>
+                <p className="text-sm text-muted-foreground font-light">Métricas y KPIs actualizados al instante</p>
               </Card>
-              <Card className="p-6 bg-gradient-to-br from-[hsl(var(--success))]/10 to-transparent border-[hsl(var(--success))]/20">
-                <Shield className="h-10 w-10 text-[hsl(var(--success))] mb-4" />
-                <h3 className="font-semibold text-foreground mb-1">100% Seguro</h3>
-                <p className="text-sm text-muted-foreground">Tus datos protegidos con encriptación</p>
+              <Card className="p-6 bg-gradient-to-br from-success/10 to-transparent border-success/20 shadow-sm">
+                <Shield className="h-10 w-10 text-success mb-4" />
+                <h3 className="font-medium text-foreground mb-1">100% Seguro</h3>
+                <p className="text-sm text-muted-foreground font-light">Tus datos protegidos con encriptación</p>
               </Card>
-              <Card className="p-6 bg-gradient-to-br from-[hsl(var(--warning))]/10 to-transparent border-[hsl(var(--warning))]/20">
-                <Clock className="h-10 w-10 text-[hsl(var(--warning))] mb-4" />
-                <h3 className="font-semibold text-foreground mb-1">24/7 Activo</h3>
-                <p className="text-sm text-muted-foreground">Nunca se pierde una oportunidad</p>
+              <Card className="p-6 bg-gradient-to-br from-warning/10 to-transparent border-warning/20 shadow-sm">
+                <Clock className="h-10 w-10 text-warning mb-4" />
+                <h3 className="font-medium text-foreground mb-1">24/7 Activo</h3>
+                <p className="text-sm text-muted-foreground font-light">Nunca se pierde una oportunidad</p>
               </Card>
-              <Card className="p-6 bg-gradient-to-br from-[hsl(var(--firmavb-red))]/10 to-transparent border-[hsl(var(--firmavb-red))]/20">
-                <Zap className="h-10 w-10 text-[hsl(var(--firmavb-red))] mb-4" />
-                <h3 className="font-semibold text-foreground mb-1">Ultra Rápido</h3>
-                <p className="text-sm text-muted-foreground">Respuestas en segundos, no horas</p>
+              <Card className="p-6 bg-gradient-to-br from-firmavb-red/10 to-transparent border-firmavb-red/20 shadow-sm">
+                <Zap className="h-10 w-10 text-firmavb-red mb-4" />
+                <h3 className="font-medium text-foreground mb-1">Ultra Rápido</h3>
+                <p className="text-sm text-muted-foreground font-light">Respuestas en segundos, no horas</p>
               </Card>
             </div>
           </div>
@@ -410,7 +438,7 @@ export default function Landing() {
       {/* CTA Final */}
       <section className="py-20 px-6">
         <div className="max-w-4xl mx-auto">
-          <Card className="p-8 md:p-12 bg-gradient-to-br from-[hsl(var(--firmavb-blue))] to-[hsl(var(--header-dark))] text-white border-0 shadow-2xl shadow-[hsl(var(--firmavb-blue))]/30">
+          <Card className="p-8 md:p-12 bg-gradient-to-br from-firmavb-blue to-header-dark text-white border-0 shadow-2xl shadow-firmavb-blue/30">
             <div className="text-center">
               <h2 className="text-3xl md:text-4xl font-bold mb-4">
                 ¿Listo para ganar más licitaciones?

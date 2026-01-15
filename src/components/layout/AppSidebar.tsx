@@ -37,6 +37,7 @@ interface NavItem {
   requiresOdoo?: boolean;
 }
 
+// Full navigation items - visibility controlled by RBAC
 const navItems: NavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, sectionKey: "dashboard" },
   { title: "Licitaciones", url: "/licitaciones", icon: FileSearch, sectionKey: "licitaciones" },
@@ -71,7 +72,7 @@ export function AppSidebar() {
   const { signOut, user } = useAuth();
   const { hasOdoo } = useClienteConfig();
   const { profile, primaryRole } = useProfile();
-  const { canViewSection, loading: permissionsLoading } = useRolePermissions();
+  const { canViewSection, loading: permissionsLoading, isSuperAdmin, isAdmin } = useRolePermissions();
   const { data: cliente } = useCliente();
 
   const handleLogout = async () => {
@@ -86,12 +87,23 @@ export function AppSidebar() {
     }
   };
 
-  // Filtrar items de navegación según permisos
+  // Dynamic sidebar based on role (RBAC)
   const filteredNavItems = navItems.filter(item => {
+    // Odoo requires separate flag
     if (item.requiresOdoo && !hasOdoo) return false;
-    // Si los permisos están cargando, mostrar items básicos
-    if (permissionsLoading) return ['dashboard', 'licitaciones'].includes(item.sectionKey);
-    // Verificar si el usuario puede ver esta sección
+    
+    // While loading, show basic items
+    if (permissionsLoading) {
+      return ['dashboard', 'licitaciones', 'ofertas'].includes(item.sectionKey);
+    }
+
+    // Super admin sees everything
+    if (isSuperAdmin) return true;
+
+    // Admin sees most things except role config
+    if (isAdmin && item.sectionKey !== 'role_config') return true;
+
+    // Check permission for this section
     return canViewSection(item.sectionKey);
   });
 
@@ -103,25 +115,31 @@ export function AppSidebar() {
 
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
-      {/* Logo - FirmaVB Branding */}
-      <div className="flex h-16 items-center gap-3 px-6 border-b border-sidebar-border">
+      {/* Logo Header - FirmaVB Branding with Red Line */}
+      <div className="flex h-16 items-center gap-3 px-5 border-b border-sidebar-border bg-sidebar">
         <img 
           src={firmavbLogo} 
-          alt="FirmaVB Logo" 
-          className="h-9 w-9 rounded-full object-cover shadow-sm"
+          alt="FirmaVB" 
+          className="h-9 w-auto object-contain"
         />
-        <div>
-          <h1 className="text-lg font-heading font-bold text-sidebar-foreground">FirmaVB</h1>
-          <p className="text-[10px] text-sidebar-muted font-medium tracking-wide">Inteligencia para Ganar Más</p>
+        <div className="flex flex-col">
+          <div className="relative inline-block">
+            <span className="text-lg font-bold text-sidebar-foreground tracking-tight">FirmaVB</span>
+            {/* Red underline - brand characteristic */}
+            <div className="absolute -bottom-0.5 left-0 w-full h-0.5 bg-sidebar-primary rounded-full" />
+          </div>
+          <span className="text-[9px] text-sidebar-muted font-medium mt-1">
+            conectando grandes marcas
+          </span>
         </div>
       </div>
 
       {/* User Profile with Notification Bell */}
       <div className="px-4 py-3 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <Avatar className="h-9 w-9">
+          <Avatar className="h-9 w-9 ring-2 ring-sidebar-accent">
             <AvatarImage src={profile?.avatar_url || undefined} />
-            <AvatarFallback className="bg-sidebar-accent text-sidebar-foreground text-sm">
+            <AvatarFallback className="bg-sidebar-accent text-sidebar-foreground text-sm font-medium">
               {userInitials}
             </AvatarFallback>
           </Avatar>
@@ -129,7 +147,10 @@ export function AppSidebar() {
             <p className="text-sm font-medium text-sidebar-foreground truncate">
               {profile?.full_name || user?.email || 'Usuario'}
             </p>
-            <Badge variant="secondary" className="text-xs mt-0.5">
+            <Badge 
+              variant="secondary" 
+              className="text-[10px] mt-0.5 bg-sidebar-primary/20 text-sidebar-primary border-0 font-medium"
+            >
               {roleLabel}
             </Badge>
           </div>
@@ -138,7 +159,7 @@ export function AppSidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 overflow-y-auto">
+      <nav className="flex-1 px-3 py-4 overflow-y-auto scrollbar-thin">
         <ul className="space-y-1">
           {filteredNavItems.map((item) => {
             const isActive = location.pathname === item.url;
@@ -149,13 +170,13 @@ export function AppSidebar() {
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150",
                     isActive
-                      ? "bg-sidebar-accent text-sidebar-primary"
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
                       : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   )}
                 >
                   <item.icon className={cn(
                     "h-5 w-5 transition-colors",
-                    isActive ? "text-sidebar-primary" : "text-sidebar-muted"
+                    isActive ? "text-sidebar-primary-foreground" : "text-sidebar-muted"
                   )} />
                   {item.title}
                 </NavLink>
