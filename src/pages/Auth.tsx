@@ -118,6 +118,29 @@ export default function Auth() {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
+
+    if (!resetEmail || !emailSchema.safeParse(resetEmail).success) {
+      setError('Por favor ingresa un email válido');
+      return;
+    }
+
+    setResetLoading(true);
+    const { error } = await resetPassword(resetEmail);
+    setResetLoading(false);
+
+    if (error) {
+      setError(error.message);
+    } else {
+      setSuccess('¡Revisa tu correo! Te hemos enviado un enlace para restablecer tu contraseña.');
+      setResetEmail('');
+      setShowForgotPassword(false);
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5">

@@ -13,7 +13,9 @@ import {
   RefreshCw,
   Inbox,
   BarChart3,
-  Zap
+  Zap,
+  Info,
+  HelpCircle
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +41,7 @@ import {
 } from "recharts";
 import { Link } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   MetricCardSkeleton, 
   ChartSkeleton, 
@@ -50,6 +53,10 @@ import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
 import { OportunidadesTable } from "@/components/dashboard/OportunidadesTable";
 import { FirmaVBHeader } from "@/components/layout/FirmaVBHeader";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Dashboard() {
   const { data: metrics, isLoading: metricsLoading, error: metricsError, refetch: refetchMetrics } = useDashboardMetrics();
@@ -57,6 +64,8 @@ export default function Dashboard() {
   const { data: urgentes, isLoading: urgentesLoading, error: urgentesError } = useLicitacionesUrgentes();
   const { data: stats, isLoading: statsLoading } = useOportunidadesStats();
   const { mutate: runMatching, isPending: isMatching } = useMatchingAI();
+  const [matchingDialogOpen, setMatchingDialogOpen] = useState(false);
+  const [matchingPreview, setMatchingPreview] = useState<{ total: number; comprasAgiles: number; licitaciones: number } | null>(null);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-CL', {
@@ -81,12 +90,96 @@ export default function Dashboard() {
     console.error('[Dashboard] Metrics error:', metricsError);
   }
 
+  const handleMatchingClick = async () => {
+    // Cargar preview antes de ejecutar
+    try {
+      const { data: comprasAgiles } = await supabase
+        .from('compras_agiles')
+        .select('codigo', { count: 'exact' })
+        .or('match_encontrado.eq.false,match_encontrado.is.null')
+        .limit(1000);
+      
+      const { data: licitaciones } = await supabase
+        .from('licitaciones')
+        .select('id_licitacion', { count: 'exact' })
+        .eq('procesada', false)
+        .limit(1000);
+
+      const total = (comprasAgiles?.length || 0) + (licitaciones?.length || 0);
+      
+      if (total === 0) {
+        toast.info('No hay compras ágiles nuevas para procesar', {
+          description: 'Todas las compras ágiles ya han sido procesadas'
+        });
+        return;
+      }
+
+      setMatchingPreview({
+        total,
+        comprasAgiles: comprasAgiles?.length || 0,
+        licitaciones: licitaciones?.length || 0,
+      });
+      setMatchingDialogOpen(true);
+    } catch (error) {
+      console.error('Error loading preview:', error);
+      // Si falla el preview, ejecutar directamente
+      runMatching();
+    }
+  };
+
+  const handleConfirmMatching = () => {
+    setMatchingDialogOpen(false);
+    runMatching();
+  };
+
   const handleForceRefresh = async () => {
     await refetchMetrics();
     toast({
       title: "Datos actualizados",
       description: "Se han recargado las métricas del dashboard",
     });
+  };
+
+  const handleMatchingClick = async () => {
+    // Cargar preview antes de ejecutar
+    try {
+      const { data: comprasAgiles } = await supabase
+        .from('compras_agiles')
+        .select('codigo', { count: 'exact' })
+        .or('match_encontrado.eq.false,match_encontrado.is.null')
+        .limit(1000);
+      
+      const { data: licitaciones } = await supabase
+        .from('licitaciones')
+        .select('id_licitacion', { count: 'exact' })
+        .eq('procesada', false)
+        .limit(1000);
+
+      const total = (comprasAgiles?.length || 0) + (licitaciones?.length || 0);
+      
+      if (total === 0) {
+        toast.info('No hay compras ágiles nuevas para procesar', {
+          description: 'Todas las compras ágiles ya han sido procesadas'
+        });
+        return;
+      }
+
+      setMatchingPreview({
+        total,
+        comprasAgiles: comprasAgiles?.length || 0,
+        licitaciones: licitaciones?.length || 0,
+      });
+      setMatchingDialogOpen(true);
+    } catch (error) {
+      console.error('Error loading preview:', error);
+      // Si falla el preview, ejecutar directamente
+      runMatching();
+    }
+  };
+
+  const handleConfirmMatching = () => {
+    setMatchingDialogOpen(false);
+    runMatching();
   };
 
   return (
@@ -98,36 +191,121 @@ export default function Dashboard() {
           subtitle="Resumen de oportunidades y rendimiento"
         />
         <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleForceRefresh}
-            disabled={metricsLoading}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${metricsLoading ? 'animate-spin' : ''}`} />
-            Actualizar
-          </Button>
-          <Button 
-            onClick={() => runMatching()}
-            disabled={isMatching}
-            className="bg-firmavb-blue hover:bg-firmavb-blue/90 text-white shadow-lg"
-          >
-            {isMatching ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Procesando...
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-4 w-4 mr-2" />
-                Ejecutar Matching IA
-              </>
-            )}
-          </Button>
-          <Badge variant="outline" className="gap-1.5 px-3 py-1.5 border-firmavb-green">
-            <span className="h-2 w-2 rounded-full bg-firmavb-green animate-pulse" />
-            En vivo
-          </Badge>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleForceRefresh}
+                disabled={metricsLoading}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${metricsLoading ? 'animate-spin' : ''}`} />
+                Actualizar
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">Actualiza las métricas del dashboard</p>
+            </TooltipContent>
+          </Tooltip>
+
+          <Dialog open={matchingDialogOpen} onOpenChange={setMatchingDialogOpen}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DialogTrigger asChild>
+                  <Button 
+                    onClick={handleMatchingClick}
+                    disabled={isMatching}
+                    className="bg-firmavb-blue hover:bg-firmavb-blue/90 text-white shadow-lg"
+                  >
+                    {isMatching ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Procesando...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Ejecutar Matching IA
+                      </>
+                    )}
+                  </Button>
+                </DialogTrigger>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">Analiza compras ágiles y encuentra matches con tu inventario usando IA</p>
+              </TooltipContent>
+            </Tooltip>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-firmavb-blue" />
+                  Ejecutar Matching con IA
+                </DialogTitle>
+                <DialogDescription>
+                  El sistema analizará las compras ágiles y licitaciones pendientes para encontrar matches con tu inventario.
+                </DialogDescription>
+              </DialogHeader>
+              {matchingPreview && (
+                <div className="space-y-4 py-4">
+                  <div className="p-4 rounded-lg bg-muted/50 border border-border">
+                    <p className="text-sm font-medium mb-3">Resumen de procesamiento:</p>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Total a procesar:</span>
+                        <span className="font-semibold">{matchingPreview.total}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Compras Ágiles:</span>
+                        <span className="font-medium">{matchingPreview.comprasAgiles}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Licitaciones:</span>
+                        <span className="font-medium">{matchingPreview.licitaciones}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+                    <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                    <p className="text-xs text-blue-900 dark:text-blue-100">
+                      <strong>Nota:</strong> El proceso puede tomar varios minutos dependiendo de la cantidad de compras ágiles. 
+                      Los resultados se mostrarán automáticamente al finalizar.
+                    </p>
+                  </div>
+                </div>
+              )}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setMatchingDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={handleConfirmMatching}
+                  disabled={isMatching}
+                  className="bg-firmavb-blue hover:bg-firmavb-blue/90"
+                >
+                  {isMatching ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Procesando...
+                    </>
+                  ) : (
+                    'Ejecutar Matching'
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="outline" className="gap-1.5 px-3 py-1.5 border-firmavb-green cursor-help">
+                <span className="h-2 w-2 rounded-full bg-firmavb-green animate-pulse" />
+                En vivo
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">Sistema activo y actualizando datos en tiempo real</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
@@ -237,7 +415,7 @@ export default function Dashboard() {
                       axisLine={false}
                       tickLine={false}
                     />
-                    <Tooltip 
+                    <RechartsTooltip 
                       contentStyle={{ 
                         backgroundColor: 'hsl(var(--card))',
                         border: '1px solid hsl(var(--border))',

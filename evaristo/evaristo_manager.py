@@ -75,11 +75,22 @@ Sistema que gestiona:
 - Extensiones de Chrome para scraping
 - Bot autónomo (Evaristo) para mantenimiento continuo
 
-REGLA DE NEGOCIO CRÍTICA - CLASIFICACIÓN DE PROCESOS:
-⚠️ IMPORTANTE: Distinción entre LICITACIONES y COMPRAS ÁGILES basada en monto:
+REGLA DE NEGOCIO CRÍTICA - CLASIFICACIÓN DE PROCESOS (MercadoPúblico):
+⚠️ IMPORTANTE: Distinción entre LICITACIONES y COMPRAS ÁGILES basada en monto UTM:
 
-- LICITACIONES: Monto > 100 UTM (aproximadamente > $6.700.000 CLP en 2026)
-- COMPRAS ÁGILES: Monto <= 100 UTM (aproximadamente <= $6.700.000 CLP en 2026)
+COMPRAS ÁGILES (<= 100 UTM):
+- L1 - Licitación Pública Menor: < 100 UTM
+- Plazo mínimo: 5 días corridos
+- Generalmente NO exigen Garantía de Seriedad
+- Firma Simple suficiente
+
+LICITACIONES (> 100 UTM):
+- LE - Intermedia: 100 a 1.000 UTM (plazo: 10 días, garantía discrecional)
+- LP - Mayor: 1.000 a 5.000 UTM (plazo: 20 días, requiere FEA y garantía 5%)
+- LR - Gran Compra: > 5.000 UTM (plazo: 30 días, máxima rigurosidad)
+
+UTM Enero 2026: $69.751 CLP (Banco Central)
+Umbral Compra Ágil: 100 UTM = $6.975.100 CLP
 
 Esta distinción debe aplicarse en TODO el sistema:
 - Clasificación de procesos al guardar
@@ -87,9 +98,12 @@ Esta distinción debe aplicarse en TODO el sistema:
 - Interfaces de usuario
 - Documentación
 - Lógica de negocio
+- Validación de requisitos (FEA, garantías)
 
-UTM 2026: ~$67.000 CLP (verificar en SII y actualizar anualmente)
-Umbral: 100 UTM = ~$6.700.000 CLP
+CAMBIOS NORMATIVOS 2024-2025:
+- LQ (eliminada): Ya no existe, absorbida por L1/LE
+- Nueva Ley N° 21.634: Modernización de compras públicas
+- Principio de Combinación Más Ventajosa: No solo precio
 
 REGLAS DE ORO:
 1. SIEMPRE hacer backup antes de modificar código

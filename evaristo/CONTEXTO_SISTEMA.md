@@ -2,17 +2,26 @@
 
 ## 🎯 Regla de Negocio Crítica
 
-### Clasificación de Procesos por Monto
+### Clasificación de Procesos por Monto (MercadoPúblico)
 
 **DISTINCIÓN FUNDAMENTAL:**
 
+- **COMPRAS ÁGILES**: Monto **<= 100 UTM** (L1 - Licitación Pública Menor)
+  - Plazo mínimo: 5 días corridos
+  - NO exigen Garantía de Seriedad generalmente
+  - Firma Simple suficiente
+
 - **LICITACIONES**: Monto **> 100 UTM**
-- **COMPRAS ÁGILES**: Monto **<= 100 UTM**
+  - **LE**: 100 a 1.000 UTM (Intermedia, 10 días, garantía discrecional)
+  - **LP**: 1.000 a 5.000 UTM (Mayor, 20 días, requiere FEA y garantía 5%)
+  - **LR**: > 5.000 UTM (Gran Compra, 30 días, máxima rigurosidad)
 
 ### Valores Actuales (Enero 2026)
 
-- **UTM Enero 2026**: $69.751 CLP
-- **Umbral de Licitación**: 100 UTM = **$6.975.100 CLP**
+- **UTM Enero 2026**: $69.751 CLP (Banco Central)
+- **Umbral Compra Ágil**: 100 UTM = **$6.975.100 CLP**
+- **Umbral LE**: 1.000 UTM = **$69.751.000 CLP**
+- **Umbral LP**: 5.000 UTM = **$348.755.000 CLP**
 
 ### Implementación
 
