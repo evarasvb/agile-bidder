@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ExternalLink, FileText, TrendingUp, Shield, Clock, Building2, UserPlus } from 'lucide-react';
+import { FileText, TrendingUp, Shield, Clock, Building2, UserPlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -79,9 +79,6 @@ export function OpportunityCard({ licitacion, onGenerarOferta }: OpportunityCard
     }
   };
 
-  const mercadoPublicoUrl = licitacion.link_oficial || 
-    `https://www.mercadopublico.cl/Procurement/Modules/RFB/DetailsAcquisition.aspx?qs=aWQ9${licitacion.id_licitacion}`;
-
   return (
     <Card className={cn(
       "overflow-hidden border-l-4 transition-all duration-200 hover:shadow-lg hover:-translate-y-1",
@@ -91,15 +88,9 @@ export function OpportunityCard({ licitacion, onGenerarOferta }: OpportunityCard
         {/* Header with dark blue background */}
         <div className="bg-header-dark px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <a
-              href={mercadoPublicoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-mono text-sm text-white/90 hover:text-white hover:underline flex items-center gap-1"
-            >
+            <span className="font-mono text-sm text-white/90">
               {licitacion.id_licitacion}
-              <ExternalLink className="h-3 w-3" />
-            </a>
+            </span>
             <Badge className={cn("font-semibold", riskColors[financialHealth.level])}>
               <Shield className="h-3 w-3 mr-1" />
               {financialHealth.label}
@@ -129,14 +120,7 @@ export function OpportunityCard({ licitacion, onGenerarOferta }: OpportunityCard
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Building2 className="h-4 w-4 shrink-0" />
-              <a
-                href={`https://www.mercadopublico.cl/Procurement/Modules/RFB/StoreSearch.aspx?SearchBy=OrgCode&Q=${encodeURIComponent(licitacion.organismo)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="truncate hover:text-primary hover:underline"
-              >
-                {licitacion.organismo}
-              </a>
+              <span className="truncate">{licitacion.organismo}</span>
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
               <Clock className="h-4 w-4 shrink-0" />

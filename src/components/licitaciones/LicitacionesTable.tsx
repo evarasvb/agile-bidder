@@ -2,9 +2,6 @@ import { useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
-  ExternalLink, 
-  ChevronDown, 
-  ChevronUp, 
   Package, 
   Loader2, 
   Calendar, 
@@ -12,7 +9,8 @@ import {
   TrendingUp,
   CheckCircle,
   XCircle,
-  Clock
+  Clock,
+  Info
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -121,15 +119,9 @@ function LicitacionDetailDialog({
                 {licitacion.titulo}
               </DialogTitle>
               <DialogDescription className="mt-2 flex items-center gap-2">
-                <a
-                  href={licitacion.link_oficial || `https://www.mercadopublico.cl/Procurement/Modules/RFB/DetailsAcquisition.aspx?qs=aWQ9${licitacion.id_licitacion}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-mono text-primary hover:underline flex items-center gap-1"
-                >
+                <span className="font-mono text-primary flex items-center gap-1">
                   {licitacion.id_licitacion}
-                  <ExternalLink className="h-3 w-3" />
-                </a>
+                </span>
               </DialogDescription>
             </div>
             <MatchBadge score={licitacion.match_score} matchEncontrado={licitacion.match_encontrado} />
@@ -314,13 +306,11 @@ function LicitacionRow({ licitacion }: { licitacion: Licitacion }) {
             size="icon"
             onClick={(e) => {
               e.stopPropagation();
-              window.open(
-                licitacion.link_oficial || `https://www.mercadopublico.cl/Procurement/Modules/RFB/DetailsAcquisition.aspx?qs=aWQ9${licitacion.id_licitacion}`,
-                '_blank'
-              );
+              setShowDetail(true);
             }}
+            title="Ver detalle"
           >
-            <ExternalLink className="h-4 w-4" />
+            <Info className="h-4 w-4" />
           </Button>
         </TableCell>
       </TableRow>
