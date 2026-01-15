@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, UserPlus, Shield, User, Mail, Building2, Calendar, MoreHorizontal, Trash2 } from "lucide-react";
+import { Loader2, UserPlus, Shield, User, Mail, Building2, Calendar, MoreHorizontal, Trash2, KeyRound, UserCircle, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -172,6 +172,16 @@ export default function Users() {
         throw new Error('Email y contraseña son requeridos');
       }
 
+      if (newUserPassword.length < 6) {
+        throw new Error('La contraseña debe tener al menos 6 caracteres');
+      }
+
+      // Validar formato de email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(newUserEmail)) {
+        throw new Error('El formato del email no es válido');
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('No session');
 
@@ -199,14 +209,20 @@ export default function Users() {
 
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       setIsAddUserOpen(false);
       setNewUserEmail("");
       setNewUserPassword("");
       setNewUserName("");
       setNewUserRole('user');
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-      toast.success('Usuario creado correctamente');
+      toast.success(
+        `✅ Usuario creado exitosamente${newUserRole === 'admin' ? ' como Administrador' : ''}`,
+        {
+          description: `${newUserEmail} puede iniciar sesión ahora`,
+          duration: 4000,
+        }
+      );
     },
     onError: (error: Error) => {
       console.error('Error creating user:', error);
@@ -244,32 +260,51 @@ export default function Users() {
         </div>
         <div className="flex gap-2">
           <ExecuteMigrationDialog />
-          <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <UserPlus className="h-4 w-4" />
-                Agregar Usuario
-              </Button>
-            </DialogTrigger>
-          <DialogContent>
+        <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
+          <DialogTrigger asChild>
+            <Button className="gap-2 bg-firmavb-blue hover:bg-firmavb-blue/90 shadow-md">
+              <UserPlus className="h-4 w-4" />
+              Crear Usuario
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
-              <DialogTitle>Agregar Nuevo Usuario</DialogTitle>
-              <DialogDescription>
-                Crea un nuevo usuario en el sistema con email y contraseña.
-              </DialogDescription>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-firmavb-blue/20 to-firmavb-red/10 flex items-center justify-center">
+                  <UserPlus className="h-5 w-5 text-firmavb-blue" />
+                </div>
+                <div>
+                  <DialogTitle className="text-xl">Crear Nuevo Usuario</DialogTitle>
+                  <DialogDescription className="mt-1">
+                    Completa los datos para crear un usuario y asignarle un rol
+                  </DialogDescription>
+                </div>
+              </div>
             </DialogHeader>
-            <div className="space-y-4 py-4">
+            
+            <div className="space-y-5 py-4">
+              {/* Nombre Completo */}
               <div className="space-y-2">
-                <Label htmlFor="user-name">Nombre Completo</Label>
+                <Label htmlFor="user-name" className="flex items-center gap-2 text-sm font-medium">
+                  <UserCircle className="h-4 w-4 text-muted-foreground" />
+                  Nombre Completo
+                </Label>
                 <Input
                   id="user-name"
-                  placeholder="Nombre del usuario"
+                  placeholder="Ej: Juan Pérez"
                   value={newUserName}
                   onChange={(e) => setNewUserName(e.target.value)}
+                  className="h-11"
                 />
+                <p className="text-xs text-muted-foreground">Opcional - Se usará el email si no se proporciona</p>
               </div>
+
+              {/* Email */}
               <div className="space-y-2">
-                <Label htmlFor="user-email">Email *</Label>
+                <Label htmlFor="user-email" className="flex items-center gap-2 text-sm font-medium">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  Email <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="user-email"
                   type="email"
@@ -277,39 +312,90 @@ export default function Users() {
                   value={newUserEmail}
                   onChange={(e) => setNewUserEmail(e.target.value)}
                   required
+                  className="h-11"
                 />
               </div>
+
+              {/* Contraseña */}
               <div className="space-y-2">
-                <Label htmlFor="user-password">Contraseña *</Label>
+                <Label htmlFor="user-password" className="flex items-center gap-2 text-sm font-medium">
+                  <KeyRound className="h-4 w-4 text-muted-foreground" />
+                  Contraseña <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="user-password"
                   type="password"
-                  placeholder="Contraseña segura"
+                  placeholder="Mínimo 6 caracteres"
                   value={newUserPassword}
                   onChange={(e) => setNewUserPassword(e.target.value)}
                   required
+                  className="h-11"
                 />
+                <p className="text-xs text-muted-foreground">El usuario podrá cambiarla después de iniciar sesión</p>
               </div>
+
+              {/* Rol */}
               <div className="space-y-2">
-                <Label htmlFor="user-role">Rol</Label>
+                <Label htmlFor="user-role" className="flex items-center gap-2 text-sm font-medium">
+                  <Shield className="h-4 w-4 text-muted-foreground" />
+                  Rol del Usuario
+                </Label>
                 <Select value={newUserRole} onValueChange={(value: 'admin' | 'user') => setNewUserRole(value)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-11">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="user">Usuario</SelectItem>
-                    <SelectItem value="admin">Administrador</SelectItem>
+                    <SelectItem value="user" className="py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                          <User className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <div className="font-medium">Usuario</div>
+                          <div className="text-xs text-muted-foreground">Acceso básico al sistema</div>
+                        </div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="admin" className="py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-firmavb-blue/10 flex items-center justify-center">
+                          <Shield className="h-4 w-4 text-firmavb-blue" />
+                        </div>
+                        <div>
+                          <div className="font-medium">Administrador</div>
+                          <div className="text-xs text-muted-foreground">Acceso completo y gestión de usuarios</div>
+                        </div>
+                      </div>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 border border-muted">
+                  <Sparkles className="h-4 w-4 text-firmavb-blue mt-0.5 shrink-0" />
+                  <div className="text-xs text-muted-foreground">
+                    <strong className="text-foreground">Tip:</strong> Puedes cambiar el rol después desde la lista de usuarios
+                  </div>
+                </div>
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAddUserOpen(false)}>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setIsAddUserOpen(false);
+                  setNewUserName("");
+                  setNewUserEmail("");
+                  setNewUserPassword("");
+                  setNewUserRole('user');
+                }}
+                disabled={createUserMutation.isPending}
+              >
                 Cancelar
               </Button>
               <Button 
                 onClick={() => createUserMutation.mutate()}
-                disabled={createUserMutation.isPending || !newUserEmail || !newUserPassword}
+                disabled={createUserMutation.isPending || !newUserEmail || !newUserPassword || newUserPassword.length < 6}
+                className="bg-firmavb-blue hover:bg-firmavb-blue/90"
               >
                 {createUserMutation.isPending ? (
                   <>
@@ -317,7 +403,10 @@ export default function Users() {
                     Creando...
                   </>
                 ) : (
-                  'Crear Usuario'
+                  <>
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Crear Usuario
+                  </>
                 )}
               </Button>
             </DialogFooter>
