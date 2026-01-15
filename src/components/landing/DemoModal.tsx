@@ -17,6 +17,7 @@ import {
   ChevronRight,
   ChevronLeft
 } from "lucide-react";
+import logoFirmavbOriginal from "@/assets/logo-firmavb-original.png";
 
 interface DemoModalProps {
   open: boolean;
@@ -68,8 +69,8 @@ export function DemoModal({ open, onOpenChange }: DemoModalProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl font-bold">
-            <Play className="h-5 w-5 text-firmavb-red" />
+          <DialogTitle className="flex items-center gap-3 text-xl font-bold">
+            <img src={logoFirmavbOriginal} alt="FirmaVB" className="h-10 w-auto" />
             Demo de FirmaVB
           </DialogTitle>
           <DialogDescription>

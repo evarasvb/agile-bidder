@@ -37,7 +37,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { DemoModal } from "@/components/landing/DemoModal";
-import firmavbLogo from "@/assets/firmavb-logo.png";
+import logoFirmavbOriginal from "@/assets/logo-firmavb-original.png";
 import { toast } from "sonner";
 
 export default function Landing() {
@@ -69,17 +69,12 @@ export default function Landing() {
       {/* Header with FirmaVB Branding */}
       <header className="fixed top-0 left-0 right-0 z-50 px-6 py-4 backdrop-blur-md bg-white/90 border-b border-border/50">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center">
             <img 
-              src={firmavbLogo} 
+              src={logoFirmavbOriginal} 
               alt="FirmaVB" 
-              className="h-10 w-auto object-contain"
+              className="h-12 w-auto object-contain"
             />
-            <div className="relative inline-block">
-              <span className="font-bold text-firmavb-blue text-lg">FirmaVB</span>
-              {/* Red underline - brand characteristic */}
-              <div className="absolute -bottom-0.5 left-0 w-full h-0.5 bg-firmavb-red rounded-full" />
-            </div>
           </div>
           <div className="flex items-center gap-3">
             {isAuthenticated ? (
