@@ -342,7 +342,19 @@ export default function Users() {
                 </Label>
                 <Select value={newUserRole} onValueChange={(value: 'admin' | 'user') => setNewUserRole(value)}>
                   <SelectTrigger className="h-11">
-                    <SelectValue />
+                    <SelectValue>
+                      {newUserRole === 'admin' ? (
+                        <div className="flex items-center gap-2">
+                          <Shield className="h-4 w-4 text-firmavb-blue" />
+                          <span>Administrador</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4" />
+                          <span>Usuario</span>
+                        </div>
+                      )}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="user" className="py-3">
@@ -369,10 +381,11 @@ export default function Users() {
                     </SelectItem>
                   </SelectContent>
                 </Select>
-                <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 border border-muted">
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-gradient-to-r from-firmavb-blue/5 to-firmavb-red/5 border border-firmavb-blue/10">
                   <Sparkles className="h-4 w-4 text-firmavb-blue mt-0.5 shrink-0" />
-                  <div className="text-xs text-muted-foreground">
-                    <strong className="text-foreground">Tip:</strong> Puedes cambiar el rol después desde la lista de usuarios
+                  <div className="text-xs">
+                    <strong className="text-foreground font-medium">💡 Tip:</strong>{' '}
+                    <span className="text-muted-foreground">Puedes cambiar el rol después desde la lista de usuarios usando el switch</span>
                   </div>
                 </div>
               </div>
