@@ -1,0 +1,70 @@
+{
+  "nombre": "Mantenimiento Automático Continuo",
+  "descripcion": "Misiones automáticas para mantener el proyecto 100% operativo, funcional y óptimo",
+  "fecha_creacion": "2026-01-15",
+  "prioridad": "alta",
+  "automatico": true,
+  "intervalo_horas": 24,
+  "misiones": [
+    {
+      "nombre": "Verificar compilación y tipos",
+      "tipo": "verificar",
+      "archivo": "proyecto",
+      "instruccion": "Verifica que el proyecto compile sin errores TypeScript. Si hay errores, repórtalos."
+    },
+    {
+      "nombre": "Revisar y optimizar hooks de datos",
+      "tipo": "revisar",
+      "archivo": "src/hooks/useComprasAgiles.ts",
+      "instruccion": "Revisa este hook. Asegúrate de que las queries estén optimizadas, que maneje errores correctamente, y que invalide queries cuando sea necesario. Optimiza el rendimiento."
+    },
+    {
+      "nombre": "Revisar y optimizar servicios de matching",
+      "tipo": "revisar",
+      "archivo": "src/services/matchingEngine.ts",
+      "instruccion": "Revisa el motor de matching. Asegúrate de que calcule correctamente los scores, que maneje edge cases, y que sea eficiente. Optimiza el algoritmo si es posible."
+    },
+    {
+      "nombre": "Revisar componentes principales del frontend",
+      "tipo": "revisar",
+      "archivo": "src/pages/ComprasAgiles.tsx",
+      "instruccion": "Revisa esta página. Verifica que todos los componentes estén correctamente importados, que el diseño sea responsive, que los handlers funcionen correctamente, y que no haya errores de TypeScript. Asegúrate de que el branding FirmaVB esté correctamente aplicado."
+    },
+    {
+      "nombre": "Revisar funciones Edge críticas",
+      "tipo": "revisar",
+      "archivo": "supabase/functions/sync-compras-agiles/index.ts",
+      "instruccion": "Revisa esta función Edge. Asegúrate de que valide correctamente los datos, maneje errores apropiadamente, que el mapeo de datos sea correcto, y que retorne respuestas apropiadas. Optimiza el rendimiento."
+    },
+    {
+      "nombre": "Revisar y mejorar diseño UI/UX",
+      "tipo": "revisar",
+      "archivo": "src/components/compras-agiles/ComprasAgilesTable.tsx",
+      "instruccion": "Revisa este componente. Asegúrate de que el diseño sea moderno y profesional, que use correctamente los colores de marca FirmaVB, que sea responsive, y que tenga buena UX. Mejora la accesibilidad si es posible."
+    },
+    {
+      "nombre": "Verificar integraciones externas",
+      "tipo": "revisar",
+      "archivo": "src/services/mercadoPublicoApi.ts",
+      "instruccion": "Revisa este servicio. Asegúrate de que las integraciones con MercadoPúblico funcionen correctamente, que maneje errores de red apropiadamente, y que los datos se formateen correctamente."
+    },
+    {
+      "nombre": "Optimizar rendimiento general",
+      "tipo": "revisar",
+      "archivo": "src/hooks/useMatching.ts",
+      "instruccion": "Revisa este hook. Optimiza las queries, reduce re-renders innecesarios, mejora el caching, y asegúrate de que las invalidaciones de queries sean eficientes."
+    },
+    {
+      "nombre": "Revisar seguridad y validaciones",
+      "tipo": "revisar",
+      "archivo": "src/hooks/useLicitaciones.ts",
+      "instruccion": "Revisa este hook. Asegúrate de que valide correctamente los datos, que maneje casos edge, que las queries sean seguras contra inyección, y que los errores se manejen apropiadamente."
+    },
+    {
+      "nombre": "Mejorar documentación y comentarios",
+      "tipo": "revisar",
+      "archivo": "README.md",
+      "instruccion": "Revisa el README. Asegúrate de que esté actualizado con todas las funcionalidades actuales, que las instrucciones sean claras, y que incluya información sobre Evaristo y las nuevas características."
+    }
+  ]
+}

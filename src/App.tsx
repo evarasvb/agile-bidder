@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Outlet, Navigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { AdminOnlyRoute } from "@/components/auth/AdminOnlyRoute";
 import { ChatWidget } from "@/components/support/ChatWidget";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -65,7 +66,7 @@ const App = () => (
           
           {/* Admin Routes - protected */}
           <Route path="/admin" element={<ProtectedRoute><AdminOdoo /></ProtectedRoute>} />
-          <Route path="/admin/evaristo" element={<ProtectedRoute><AdminEvaristo /></ProtectedRoute>} />
+          <Route path="/admin/evaristo" element={<AdminOnlyRoute><AdminEvaristo /></AdminOnlyRoute>} />
           
           {/* All other routes with AppLayout using nested routing - ALL PROTECTED */}
           <Route element={<ProtectedLayoutWrapper />}>

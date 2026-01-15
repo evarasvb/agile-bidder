@@ -25,6 +25,12 @@ export function useEvaristoStatus() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('No session');
 
+      // Verificar email autorizado
+      const userEmail = session.user.email?.toLowerCase();
+      if (userEmail !== 'evaras@firmavb.cl') {
+        throw new Error('Unauthorized: Solo el administrador autorizado puede acceder');
+      }
+
       const response = await fetch(
         `${supabase.supabaseUrl}/functions/v1/evaristo-api`,
         {
@@ -86,6 +92,12 @@ export function useEvaristoMision() {
     }): Promise<EvaristoResponse> => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('No session');
+
+      // Verificar email autorizado
+      const userEmail = session.user.email?.toLowerCase();
+      if (userEmail !== 'evaras@firmavb.cl') {
+        throw new Error('Unauthorized: Solo el administrador autorizado puede acceder');
+      }
 
       const response = await fetch(
         `${supabase.supabaseUrl}/functions/v1/evaristo-api`,

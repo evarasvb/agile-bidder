@@ -14,7 +14,8 @@ import {
   BarChart3,
   Lightbulb,
   Shield,
-  ShoppingCart
+  ShoppingCart,
+  Bot
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -87,8 +88,24 @@ export function AppSidebar() {
     }
   };
 
+  // Verificar si el usuario es el administrador autorizado de Evaristo
+  const isEvaristoAuthorized = user?.email?.toLowerCase() === 'evaras@firmavb.cl';
+
+  // Agregar Evaristo al menú solo para el email autorizado
+  const allNavItems = isEvaristoAuthorized 
+    ? [...navItems, { 
+        title: "Evaristo", 
+        url: "/admin/evaristo", 
+        icon: Bot, 
+        sectionKey: "evaristo" 
+      }]
+    : navItems;
+
   // Dynamic sidebar based on role (RBAC)
-  const filteredNavItems = navItems.filter(item => {
+  const filteredNavItems = allNavItems.filter(item => {
+    // Evaristo solo para email autorizado
+    if (item.sectionKey === 'evaristo' && !isEvaristoAuthorized) return false;
+    
     // Odoo requires separate flag
     if (item.requiresOdoo && !hasOdoo) return false;
     
@@ -96,6 +113,9 @@ export function AppSidebar() {
     if (permissionsLoading) {
       return ['dashboard', 'licitaciones', 'ofertas'].includes(item.sectionKey);
     }
+
+    // Evaristo siempre visible para email autorizado
+    if (item.sectionKey === 'evaristo' && isEvaristoAuthorized) return true;
 
     // Super admin sees everything
     if (isSuperAdmin) return true;
