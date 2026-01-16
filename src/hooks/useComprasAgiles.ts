@@ -74,6 +74,12 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
       // Mapear campos de BD a interfaz
       let compras = (data || []).map((compra): CompraAgil => {
         const compraRow = compra as CompraAgilRow;
+        // Convertir datos_json de Json a Record<string, unknown>
+        const datosJson = compraRow.datos_json;
+        const datosJsonRecord = datosJson && typeof datosJson === 'object' && !Array.isArray(datosJson)
+          ? datosJson as Record<string, unknown>
+          : null;
+        
         return {
           ...compra,
           organismo: compraRow.nombre_organismo || compraRow.organismo || '',
@@ -83,6 +89,7 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
           buen_pagador: compraRow.buen_pagador ?? null,
           nombre_organismo: compraRow.nombre_organismo ?? null,
           monto_estimado: compraRow.monto_estimado ?? null,
+          datos_json: datosJsonRecord,
         };
       });
       
@@ -120,6 +127,11 @@ export function useCompraAgil(id: string | null) {
       if (!data) return null;
       
       const compraRow = data as CompraAgilRow;
+      // Convertir datos_json de Json a Record<string, unknown>
+      const datosJson = compraRow.datos_json;
+      const datosJsonRecord = datosJson && typeof datosJson === 'object' && !Array.isArray(datosJson)
+        ? datosJson as Record<string, unknown>
+        : null;
       return {
         ...data,
         organismo: compraRow.nombre_organismo || compraRow.organismo || '',
@@ -129,6 +141,7 @@ export function useCompraAgil(id: string | null) {
         buen_pagador: compraRow.buen_pagador ?? null,
         nombre_organismo: compraRow.nombre_organismo ?? null,
         monto_estimado: compraRow.monto_estimado ?? null,
+        datos_json: datosJsonRecord,
       };
     },
     enabled: !!id,
@@ -169,6 +182,12 @@ export function useComprasAgilesStats() {
 
       const compras = (data || []).map((c): CompraAgil => {
         const compraRow = c as CompraAgilRow;
+        // Convertir datos_json de Json a Record<string, unknown>
+        const datosJson = compraRow.datos_json;
+        const datosJsonRecord = datosJson && typeof datosJson === 'object' && !Array.isArray(datosJson)
+          ? datosJson as Record<string, unknown>
+          : null;
+        
         return {
           ...c,
           organismo: compraRow.nombre_organismo || compraRow.organismo || '',
@@ -178,6 +197,7 @@ export function useComprasAgilesStats() {
           buen_pagador: compraRow.buen_pagador ?? null,
           nombre_organismo: compraRow.nombre_organismo ?? null,
           monto_estimado: compraRow.monto_estimado ?? null,
+          datos_json: datosJsonRecord,
         };
       });
       

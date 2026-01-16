@@ -7,7 +7,6 @@ import {
   BarChart3, 
   CheckCircle2,
   FileText,
-  Bot,
   TrendingUp,
   Building2,
   Star,
@@ -16,8 +15,6 @@ import {
   DollarSign,
   PieChart,
   Users,
-  MessageSquare,
-  Send,
   Sparkles,
   LineChart,
   Calculator,
@@ -25,7 +22,6 @@ import {
   Lightbulb,
   Repeat,
   Scale,
-  X,
   LogOut,
   Play
 } from "lucide-react";
@@ -37,6 +33,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { DemoModal } from "@/components/landing/DemoModal";
+import { LandingChat, LandingChatButton } from "@/components/landing/LandingChat";
 import logoFirmavbOriginal from "@/assets/logo-firmavb-original.png";
 import { toast } from "sonner";
 
@@ -69,11 +66,12 @@ export default function Landing() {
       {/* Header with FirmaVB Branding */}
       <header className="fixed top-0 left-0 right-0 z-50 px-6 py-4 backdrop-blur-md bg-white/90 border-b border-border/50">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center">
+          <div className="flex items-center gap-3">
             <img 
               src={logoFirmavbOriginal} 
               alt="FirmaVB" 
-              className="h-12 w-auto object-contain"
+              className="h-12 w-auto object-contain drop-shadow-sm"
+              style={{ padding: '2px' }}
             />
           </div>
           <div className="flex items-center gap-3">
@@ -96,10 +94,10 @@ export default function Landing() {
               </>
             ) : (
               <>
-                <Button variant="ghost" asChild>
+                <Button variant="ghost" asChild className="hover:bg-muted/50 transition-colors">
                   <Link to="/auth">Iniciar Sesión</Link>
                 </Button>
-                <Button asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90">
+                <Button asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90 transition-all hover:scale-105 active:scale-95">
                   <Link to="/auth">
                     Comenzar Gratis
                     <ArrowRight className="ml-2 h-4 w-4" />
@@ -161,7 +159,7 @@ export default function Landing() {
               <Button 
                 size="lg" 
                 asChild
-                className="bg-firmavb-blue hover:bg-firmavb-blue/90 shadow-lg shadow-firmavb-blue/25 text-base h-12 px-8"
+                className="bg-firmavb-blue hover:bg-firmavb-blue/90 shadow-lg shadow-firmavb-blue/25 text-base h-12 px-8 transition-all hover:scale-105 active:scale-95"
               >
                 <Link to="/auth">
                   Configurar mi empresa
@@ -171,7 +169,7 @@ export default function Landing() {
               <Button 
                 size="lg" 
                 variant="outline" 
-                className="text-base h-12 px-8 gap-2"
+                className="text-base h-12 px-8 gap-2 border-2 hover:bg-muted/50 transition-all hover:scale-105 active:scale-95"
                 onClick={() => setDemoOpen(true)}
               >
                 <Play className="h-4 w-4" />
@@ -440,7 +438,7 @@ export default function Landing() {
               <Button 
                 size="lg" 
                 asChild
-                className="bg-white text-[hsl(var(--firmavb-blue))] hover:bg-white/90 shadow-lg text-base h-12 px-8"
+                className="bg-white text-firmavb-blue hover:bg-white/90 shadow-lg text-base h-12 px-8 transition-all hover:scale-105 active:scale-95 font-semibold"
               >
                 <Link to="/auth">
                   Comenzar Configuración
@@ -456,91 +454,48 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="py-8 px-6 border-t border-border/50">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-[hsl(var(--firmavb-blue))] to-[hsl(var(--header-dark))] flex items-center justify-center">
-              <span className="text-white font-bold text-xs">FV</span>
+      <footer className="py-12 px-6 border-t border-border/50 bg-muted/20 mt-20">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-6">
+            <div className="flex items-center gap-3">
+              <img 
+                src={logoFirmavbOriginal} 
+                alt="FirmaVB" 
+                className="h-10 w-auto object-contain drop-shadow-sm"
+                style={{ padding: '2px' }}
+              />
+              <span className="font-semibold text-foreground">FirmaVB</span>
             </div>
-            <span className="font-semibold text-foreground">FirmaVB</span>
+            <div className="flex flex-col sm:flex-row items-center gap-4 text-sm">
+              <a 
+                href="mailto:contacto@firmavb.cl" 
+                className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2"
+              >
+                📧 contacto@firmavb.cl
+              </a>
+              <a 
+                href="https://wa.me/56994259157" 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2"
+              >
+                💬 +56 994259157
+              </a>
+            </div>
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <span className="hover:text-foreground cursor-pointer">Términos</span>
+              <span className="hover:text-foreground cursor-pointer">Privacidad</span>
+            </div>
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-center text-sm text-muted-foreground">
             © 2024 FirmaVB - Inteligencia para Ganar Más. Todos los derechos reservados.
           </p>
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <span className="hover:text-foreground cursor-pointer">Términos</span>
-            <span className="hover:text-foreground cursor-pointer">Privacidad</span>
-            <span className="hover:text-foreground cursor-pointer">Contacto</span>
-          </div>
         </div>
       </footer>
 
       {/* Chat Assistant Flotante */}
-      <div className="fixed bottom-6 right-6 z-50">
-        {chatOpen ? (
-          <Card className="w-80 h-96 flex flex-col shadow-2xl border-border/50 animate-in slide-in-from-bottom-4 fade-in duration-300">
-            <div className="flex items-center justify-between p-4 border-b border-border bg-gradient-to-r from-[hsl(var(--firmavb-blue))] to-[hsl(var(--header-dark))] rounded-t-lg">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center">
-                  <Bot className="h-4 w-4 text-white" />
-                </div>
-                <div>
-                  <p className="font-medium text-white text-sm">Asistente FirmaVB</p>
-                  <p className="text-xs text-white/70">En línea</p>
-                </div>
-              </div>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="text-white hover:bg-white/20"
-                onClick={() => setChatOpen(false)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="flex-1 p-4 overflow-y-auto bg-muted/30">
-              <div className="space-y-3">
-                <div className="bg-card rounded-lg p-3 max-w-[85%] shadow-sm">
-                  <p className="text-sm">¡Hola! 👋 Soy el asistente de FirmaVB. ¿En qué puedo ayudarte hoy?</p>
-                </div>
-                <div className="bg-card rounded-lg p-3 max-w-[85%] shadow-sm">
-                  <p className="text-sm text-muted-foreground">Puedo ayudarte con:</p>
-                  <ul className="text-sm mt-2 space-y-1">
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-3 w-3 text-[hsl(var(--success))]" />
-                      Configurar tu empresa
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-3 w-3 text-[hsl(var(--success))]" />
-                      Buscar licitaciones
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-3 w-3 text-[hsl(var(--success))]" />
-                      Analizar oportunidades
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-            <div className="p-3 border-t border-border">
-              <div className="flex gap-2">
-                <Input placeholder="Escribe tu mensaje..." className="text-sm" />
-                <Button size="icon" className="bg-[hsl(var(--firmavb-blue))] hover:bg-[hsl(var(--firmavb-blue))]/90">
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </Card>
-        ) : (
-          <Button 
-            size="lg"
-            className="h-14 w-14 rounded-full bg-gradient-to-br from-[hsl(var(--firmavb-blue))] to-[hsl(var(--header-dark))] hover:opacity-90 shadow-lg shadow-[hsl(var(--firmavb-blue))]/30 animate-in fade-in duration-300"
-            onClick={() => setChatOpen(true)}
-          >
-            <MessageSquare className="h-6 w-6" />
-          </Button>
-        )}
-      </div>
+      <LandingChat open={chatOpen} onClose={() => setChatOpen(false)} />
+      <LandingChatButton onClick={() => setChatOpen(true)} />
     </div>
   );
 }

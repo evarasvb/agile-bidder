@@ -64,20 +64,53 @@ export function useMatchingAI() {
         return { results: [], error: 'No hay compras ágiles nuevas para procesar' };
       }
 
-      // 2. Cargar items de cada licitación (si existen)
-      const licitacionesConItems = await Promise.all(
-        todasLicitaciones.map(async (lic) => {
-          const { data: items } = await supabase
-            .from('licitacion_items')
-            .select('nombre_producto, descripcion, cantidad')
-            .eq('licitacion_id', lic.id_licitacion);
-
-          return {
-            ...lic,
-            items: items || []
-          };
-        })
-      );
+      // 2. Cargar items de todas las licitaciones en una sola query (optimizado)
+      const codigosLicitaciones = todasLicitaciones.map(lic => lic.id_licitacion);
+      
+      // Query única para todos los items usando licitacion_codigo (nuevo) o licitacion_id (legacy)
+      const { data: todosItemsCodigo, error: itemsErrorCodigo } = await supabase
+        .from('licitacion_items')
+        .select('licitacion_codigo, licitacion_id, nombre_producto, descripcion, cantidad, item_index')
+        .in('licitacion_codigo', codigosLicitaciones);
+      
+      // También buscar por licitacion_id para compatibilidad legacy
+      const { data: todosItemsId, error: itemsErrorId } = await supabase
+        .from('licitacion_items')
+        .select('licitacion_codigo, licitacion_id, nombre_producto, descripcion, cantidad, item_index')
+        .in('licitacion_id', codigosLicitaciones);
+      
+      // Combinar resultados y eliminar duplicados
+      const todosItems = [
+        ...(todosItemsCodigo || []),
+        ...(todosItemsId || []).filter(item => 
+          !todosItemsCodigo?.some(cItem => 
+            cItem.licitacion_codigo === item.licitacion_codigo && 
+            cItem.item_index === item.item_index
+          )
+        )
+      ];
+      
+      if (itemsErrorCodigo && itemsErrorId) {
+        console.warn('Error obteniendo items (continuando sin items):', itemsErrorCodigo, itemsErrorId);
+      }
+      
+      // Crear mapa de items por licitación para búsqueda O(1)
+      const itemsMap = new Map<string, typeof todosItems>();
+      todosItems.forEach(item => {
+        const codigo = item.licitacion_codigo || item.licitacion_id;
+        if (codigo) {
+          if (!itemsMap.has(codigo)) {
+            itemsMap.set(codigo, []);
+          }
+          itemsMap.get(codigo)!.push(item);
+        }
+      });
+      
+      // Asignar items a cada licitación
+      const licitacionesConItems = todasLicitaciones.map(lic => ({
+        ...lic,
+        items: itemsMap.get(lic.id_licitacion) || []
+      }));
 
       // 3. Cargar inventario (tabla inventory que tiene los productos)
       const { data: inventario, error: invError } = await supabase
@@ -114,42 +147,92 @@ export function useMatchingAI() {
 
       const response = data as MatchingResponse;
 
-      // 5. Actualizar compras ágiles y licitaciones con resultados
+      // 5. Actualizar compras ágiles y licitaciones con resultados (optimizado con batch)
+      const updatesComprasAgiles: Array<{ codigo: string; match_encontrado: boolean; match_score: number }> = [];
+      const updatesLicitaciones: Array<{ id_licitacion: string; procesada: boolean; match_encontrado: boolean; match_score: number }> = [];
+      
+      // Crear Set de códigos de compras_agiles para búsqueda O(1)
+      const codigosCA = new Set((comprasAgiles || []).map(ca => ca.codigo));
+      
+      // Separar updates por tabla
       for (const result of response.results) {
         const matchEncontrado = result.match_score >= 40;
         
-        // Intentar actualizar en compras_agiles primero
-        const { error: caError } = await supabase
-          .from('compras_agiles')
-          .update({
+        // Verificar si existe en compras_agiles usando Set (O(1))
+        if (codigosCA.has(result.licitacion_id)) {
+          updatesComprasAgiles.push({
+            codigo: result.licitacion_id,
             match_encontrado: matchEncontrado,
             match_score: result.match_score
-          })
-          .eq('codigo', result.licitacion_id);
-        
-        // Si no existe en compras_agiles, actualizar en licitaciones (legacy)
-        if (caError) {
-          await supabase
-            .from('licitaciones')
-            .update({
-              procesada: true,
-              match_encontrado: matchEncontrado,
-              match_score: result.match_score
-            })
-            .eq('id_licitacion', result.licitacion_id);
+          });
+        } else {
+          updatesLicitaciones.push({
+            id_licitacion: result.licitacion_id,
+            procesada: true,
+            match_encontrado: matchEncontrado,
+            match_score: result.match_score
+          });
         }
+      }
+      
+      // Batch updates para compras_agiles
+      if (updatesComprasAgiles.length > 0) {
+        // Supabase no soporta batch updates nativamente, pero podemos hacer updates en paralelo
+        await Promise.all(
+          updatesComprasAgiles.map(update =>
+            supabase
+              .from('compras_agiles')
+              .update({
+                match_encontrado: update.match_encontrado,
+                match_score: update.match_score
+              })
+              .eq('codigo', update.codigo)
+          )
+        );
+      }
+      
+      // Batch updates para licitaciones (legacy)
+      if (updatesLicitaciones.length > 0) {
+        await Promise.all(
+          updatesLicitaciones.map(update =>
+            supabase
+              .from('licitaciones')
+              .update({
+                procesada: update.procesada,
+                match_encontrado: update.match_encontrado,
+                match_score: update.match_score
+              })
+              .eq('id_licitacion', update.id_licitacion)
+          )
+        );
       }
 
       return response;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['licitaciones'] });
-      queryClient.invalidateQueries({ queryKey: ['compras_agiles'] });
-      queryClient.invalidateQueries({ queryKey: ['licitaciones-nuevas'] });
-      queryClient.invalidateQueries({ queryKey: ['licitaciones-con-match'] });
-      queryClient.invalidateQueries({ queryKey: ['oportunidades'] });
-
+      // Invalidar solo las queries relevantes (optimizado)
+      queryClient.invalidateQueries({ 
+        queryKey: ['compras_agiles'],
+        exact: false // Invalida todas las variantes
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: ['licitaciones'],
+        exact: false
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: ['oportunidades'],
+        exact: false
+      });
+      
+      // Invalidar queries específicas solo si hay matches
       const matchCount = data.results.filter(r => r.match_score >= 50).length;
+      if (matchCount > 0) {
+        queryClient.invalidateQueries({ queryKey: ['licitaciones-con-match'] });
+        queryClient.invalidateQueries({ queryKey: ['compras_agiles_stats'] });
+      }
+      
+      queryClient.invalidateQueries({ queryKey: ['licitaciones-sin-procesar'] });
+
       if (matchCount > 0) {
         toast.success(`✨ ${matchCount} licitaciones con match encontradas`, {
           description: 'Se actualizaron los scores usando IA'
@@ -174,7 +257,7 @@ export function useAutoMatching() {
   const { mutate: runMatching, isPending } = useMatchingAI();
   const hasRunRef = useRef(false);
 
-  // Query para detectar compras ágiles no procesadas
+  // Query para detectar compras ágiles no procesadas (optimizado)
   const { data: licitacionesNuevas } = useQuery({
     queryKey: ['licitaciones-sin-procesar'],
     queryFn: async () => {
@@ -185,16 +268,23 @@ export function useAutoMatching() {
         .or('match_encontrado.eq.false,match_encontrado.is.null')
         .limit(1);
 
-      if (caError) throw caError;
+      if (caError) {
+        console.warn('Error consultando compras_agiles:', caError);
+        // Continuar con licitaciones legacy
+      }
       
-      // También consultar licitaciones legacy
-      const { data: licitaciones, error: licError } = await supabase
+      // También consultar licitaciones legacy (en paralelo si es posible)
+      const licitacionesPromise = supabase
         .from('licitaciones')
         .select('id_licitacion')
         .eq('procesada', false)
         .limit(1);
 
-      if (licError) throw licError;
+      const { data: licitaciones, error: licError } = await licitacionesPromise;
+
+      if (licError) {
+        console.warn('Error consultando licitaciones:', licError);
+      }
       
       // Combinar resultados
       const todas = [
@@ -205,6 +295,8 @@ export function useAutoMatching() {
       return todas;
     },
     refetchInterval: 30000, // Revisar cada 30 segundos
+    staleTime: 15000, // Cache por 15 segundos
+    gcTime: 60000, // Garbage collect después de 1 minuto
   });
 
   // Ejecutar matching cuando hay licitaciones nuevas
@@ -228,14 +320,14 @@ export function useAutoMatching() {
   };
 }
 
-// Hook para obtener el resultado de matching de una licitación específica
+// Hook para obtener el resultado de matching de una licitación específica (optimizado)
 export function useMatchingResult(licitacionId: string | null) {
   return useQuery({
     queryKey: ['matching-result', licitacionId],
     queryFn: async () => {
       if (!licitacionId) return null;
 
-      // Buscar primero en compras_agiles
+      // Buscar primero en compras_agiles (más común)
       const { data: compraAgil, error: caError } = await supabase
         .from('compras_agiles')
         .select('codigo, nombre, match_encontrado, match_score')
@@ -246,8 +338,8 @@ export function useMatchingResult(licitacionId: string | null) {
         return {
           id_licitacion: compraAgil.codigo,
           titulo: compraAgil.nombre,
-          match_encontrado: compraAgil.match_encontrado,
-          match_score: compraAgil.match_score,
+          match_encontrado: compraAgil.match_encontrado ?? false,
+          match_score: compraAgil.match_score ?? null,
         };
       }
 
@@ -258,9 +350,19 @@ export function useMatchingResult(licitacionId: string | null) {
         .eq('id_licitacion', licitacionId)
         .maybeSingle();
 
-      if (error) throw error;
-      return data;
+      if (error) {
+        console.error('Error obteniendo matching result:', error);
+        throw error;
+      }
+      
+      return data ? {
+        ...data,
+        match_encontrado: data.match_encontrado ?? false,
+        match_score: data.match_score ?? null,
+      } : null;
     },
     enabled: !!licitacionId,
+    staleTime: 30000, // Cache por 30 segundos
+    gcTime: 120000, // Garbage collect después de 2 minutos
   });
 }

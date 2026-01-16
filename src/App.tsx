@@ -31,6 +31,7 @@ import RoleConfig from "./pages/RoleConfig";
 import Ofertas from "./pages/Ofertas";
 import OfertaDetalle from "./pages/OfertaDetalle";
 import ComprasAgiles from "./pages/ComprasAgiles";
+import OrdenesCompra from "./pages/OrdenesCompra";
 
 const queryClient = new QueryClient();
 
@@ -76,6 +77,7 @@ const App = () => (
             <Route path="/history" element={<History />} />
             <Route path="/licitaciones" element={<Licitaciones />} />
             <Route path="/compras-agiles" element={<ComprasAgiles />} />
+            <Route path="/ordenes-compra" element={<OrdenesCompra />} />
             <Route path="/ofertas" element={<Ofertas />} />
             <Route path="/ofertas/:id" element={<OfertaDetalle />} />
             <Route path="/vendedores" element={<GestionVendedores />} />
