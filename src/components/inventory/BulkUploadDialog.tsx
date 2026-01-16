@@ -90,11 +90,10 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
       const templateData = generateInventoryTemplateData();
       const wsProducts = XLSX.utils.json_to_sheet(templateData);
       
-      // Set column widths - Updated for new fields
+      // Set column widths
       wsProducts['!cols'] = [
         { wch: 15 },  // Código
         { wch: 40 },  // Descripción
-        { wch: 12 },  // Costo Neto (NUEVO)
         { wch: 12 },  // Precio de Venta
         { wch: 10 },  // Unidad
         { wch: 20 },  // Categoría
@@ -145,13 +144,12 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
         return;
       }
 
-      // Map columns to expected format - flexible column matching with new required fields
+      // Map columns to expected format - flexible column matching
       const rows: BulkProductRow[] = jsonData.map((row: any) => ({
         sku: row['Código'] || row['Codigo'] || row['SKU'] || row['sku'] || row['Sku'] || '',
         nombre: row['Descripción'] || row['Descripcion'] || row['descripcion'] || row['Nombre'] || row['nombre'] || '',
         descripcion: row['Detalle'] || row['detalle'] || '',
         categoria: row['Categoría'] || row['Categoria'] || row['categoria'] || '',
-        costo_neto: Number(row['Costo Neto'] || row['Costo'] || row['costo_neto'] || row['costo'] || 0), // NUEVO: Campo obligatorio
         precio_unitario: Number(row['Precio de Venta'] || row['Precio Neto'] || row['Precio'] || row['Precio Unitario'] || row['precio'] || row['precio_unitario'] || 0),
         unidad_medida: row['Unidad'] || row['Unidad de Medida'] || row['unidad'] || row['unidad_medida'] || '',
         stock: Number(row['Stock'] || row['stock'] || row['Stock Disponible'] || 0),
@@ -163,7 +161,7 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
         imagen_url: row['URL Imagen'] || row['Imagen'] || row['imagen_url'] || row['Image URL'] || '',
       }));
 
-      // Pre-validate for display - Updated required fields
+      // Pre-validate for display
       const errors: string[] = [];
       const skuSet = new Set<string>();
       
@@ -184,23 +182,9 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
           errors.push(`Fila ${rowNum}: Descripción es obligatoria`);
         }
         
-        // Required: Costo Neto (NUEVO)
-        if (row.costo_neto === undefined || row.costo_neto === null || isNaN(Number(row.costo_neto)) || Number(row.costo_neto) < 0) {
-          errors.push(`Fila ${rowNum}: Costo Neto es obligatorio y debe ser >= 0`);
-        }
-        
         // Required: Precio de Venta
         if (row.precio_unitario === undefined || row.precio_unitario === null || isNaN(Number(row.precio_unitario)) || row.precio_unitario <= 0) {
           errors.push(`Fila ${rowNum}: Precio de Venta es obligatorio y debe ser > 0`);
-        }
-        
-        // Validar que precio >= costo
-        if (row.costo_neto !== undefined && row.precio_unitario !== undefined) {
-          const costo = Number(row.costo_neto);
-          const precio = Number(row.precio_unitario);
-          if (costo >= precio) {
-            errors.push(`Fila ${rowNum}: El Precio de Venta debe ser mayor que el Costo Neto`);
-          }
         }
         
         // Required: Unidad
@@ -308,15 +292,13 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
     }
   };
 
-      // Count valid rows based on new required fields
-      const validRows = previewData?.rows.filter(row => 
-        row.sku && row.sku.trim() !== '' && 
-        row.nombre && row.nombre.trim() !== '' &&
-        row.costo_neto !== undefined && row.costo_neto !== null && !isNaN(Number(row.costo_neto)) && Number(row.costo_neto) >= 0 &&
-        row.precio_unitario !== undefined && row.precio_unitario !== null && !isNaN(Number(row.precio_unitario)) && row.precio_unitario > 0 &&
-        Number(row.costo_neto) < Number(row.precio_unitario) &&
-        row.unidad_medida && row.unidad_medida.trim() !== ''
-      ).length || 0;
+  // Count valid rows based on required fields
+  const validRows = previewData?.rows.filter(row => 
+    row.sku && row.sku.trim() !== '' && 
+    row.nombre && row.nombre.trim() !== '' &&
+    row.precio_unitario !== undefined && row.precio_unitario !== null && !isNaN(Number(row.precio_unitario)) && row.precio_unitario > 0 &&
+    row.unidad_medida && row.unidad_medida.trim() !== ''
+  ).length || 0;
   
   const rowsWithImages = previewData?.rows.filter(row => 
     row.imagen_url && row.imagen_url.trim() !== '' && validateImageUrl(row.imagen_url)
@@ -443,151 +425,149 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
 
           {/* Preview */}
           {previewData && !bulkImport.isPending && (
-            <>
-              <div className="flex items-center justify-between">
+            <div className="flex-1 flex flex-col gap-4 min-h-0">
+              {/* File Info */}
+              <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                 <div className="flex items-center gap-3">
-                  <FileSpreadsheet className="h-5 w-5 text-primary" />
+                  <FileSpreadsheet className="h-8 w-8 text-firmavb-green" />
                   <div>
                     <p className="font-medium">{previewData.fileName}</p>
                     <p className="text-sm text-muted-foreground">
-                      {previewData.totalRows} productos encontrados
+                      {previewData.totalRows} filas • {validRows} válidas
                       {rowsWithImages > 0 && (
-                        <span className="text-primary ml-2">
-                          ({rowsWithImages} con imagen)
-                        </span>
-                      )}
-                      {parseErrors.length > 0 && (
-                        <span className="text-destructive ml-2">
-                          ({parseErrors.length} con errores)
+                        <span className="ml-2 inline-flex items-center gap-1">
+                          <ImageIcon className="h-3 w-3" />
+                          {rowsWithImages} con imagen
                         </span>
                       )}
                     </p>
                   </div>
                 </div>
-                <Button variant="ghost" size="icon" onClick={resetState}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={resetState}
+                >
                   <X className="h-4 w-4" />
                 </Button>
               </div>
 
               {/* Validation Warnings */}
               {parseErrors.length > 0 && (
-                <Alert variant="destructive" className="py-2">
+                <Alert variant="destructive" className="shrink-0">
                   <AlertCircle className="h-4 w-4" />
-                  <AlertDescription className="text-sm">
-                    {parseErrors.slice(0, 3).join(' • ')}
-                    {parseErrors.length > 3 && ` • +${parseErrors.length - 3} más`}
+                  <AlertTitle>Errores de validación ({parseErrors.length})</AlertTitle>
+                  <AlertDescription>
+                    <ScrollArea className="max-h-20 mt-2">
+                      <ul className="text-xs space-y-1">
+                        {parseErrors.slice(0, 10).map((error, i) => (
+                          <li key={i}>{error}</li>
+                        ))}
+                        {parseErrors.length > 10 && (
+                          <li className="font-medium">... y {parseErrors.length - 10} errores más</li>
+                        )}
+                      </ul>
+                    </ScrollArea>
                   </AlertDescription>
                 </Alert>
               )}
 
               {/* Import Errors */}
               {validationErrors.length > 0 && (
-                <Alert variant="destructive">
+                <Alert variant="destructive" className="shrink-0">
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>Errores durante la importación</AlertTitle>
                   <AlertDescription>
-                    <ul className="list-disc list-inside mt-2">
-                      {validationErrors.slice(0, 5).map((error, i) => (
-                        <li key={i}>
-                          Fila {error.row}: {error.message}
-                        </li>
-                      ))}
-                    </ul>
+                    <ScrollArea className="max-h-20 mt-2">
+                      <ul className="text-xs space-y-1">
+                        {validationErrors.slice(0, 10).map((error, i) => (
+                          <li key={i}>Fila {error.row}: {error.message}</li>
+                        ))}
+                        {validationErrors.length > 10 && (
+                          <li className="font-medium">... y {validationErrors.length - 10} errores más</li>
+                        )}
+                      </ul>
+                    </ScrollArea>
                   </AlertDescription>
                 </Alert>
               )}
 
-              {/* Preview Table - Updated columns */}
+              {/* Data Preview Table */}
               <ScrollArea className="flex-1 border rounded-lg">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-muted/30">
-                      <TableHead className="w-[60px]">#</TableHead>
-                      <TableHead className="w-[50px]">Img</TableHead>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="w-10">#</TableHead>
+                      <TableHead className="w-10">Img</TableHead>
                       <TableHead>Código</TableHead>
                       <TableHead>Descripción</TableHead>
-                      <TableHead className="text-right">Costo Neto</TableHead>
-                      <TableHead className="text-right">Precio Venta</TableHead>
+                      <TableHead className="text-right">Precio</TableHead>
                       <TableHead>Unidad</TableHead>
                       <TableHead>Categoría</TableHead>
                       <TableHead className="text-right">Stock</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {previewData.rows.slice(0, 15).map((row, index) => {
-                      const hasError = !row.sku || !row.nombre || !row.precio_unitario || !row.unidad_medida;
-                      const hasValidImage = row.imagen_url && validateImageUrl(row.imagen_url);
-                      return (
-                        <TableRow key={index} className={hasError ? 'bg-destructive/5' : ''}>
-                          <TableCell className="text-muted-foreground">{index + 1}</TableCell>
-                          <TableCell>
-                            {hasValidImage ? (
-                              <ImageThumbnail url={row.imagen_url!} />
-                            ) : (
-                              <div className="w-8 h-8 rounded bg-muted flex items-center justify-center">
-                                <ImageIcon className="h-4 w-4 text-muted-foreground/50" />
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell className={cn("font-mono", !row.sku && "text-destructive")}>
-                            {row.sku || '⚠️ Vacío'}
-                          </TableCell>
-                          <TableCell className={!row.nombre ? "text-destructive" : ""}>
-                            {row.nombre || '⚠️ Vacío'}
-                          </TableCell>
-                          <TableCell className={cn("text-right font-mono", !row.precio_unitario && "text-destructive")}>
-                            {row.precio_unitario ? `$${row.precio_unitario.toLocaleString('es-CL')}` : '⚠️ Vacío'}
-                          </TableCell>
-                          <TableCell className={!row.unidad_medida ? "text-destructive" : ""}>
-                            {row.unidad_medida || '⚠️ Vacío'}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {row.categoria || '-'}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {row.stock !== undefined ? row.stock : '-'}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                    {previewData.totalRows > 15 && (
-                      <TableRow>
-                        <TableCell colSpan={9} className="text-center text-muted-foreground py-4">
-                          ... y {previewData.totalRows - 15} productos más
+                    {previewData.rows.slice(0, 50).map((row, index) => (
+                      <TableRow key={index} className={cn(
+                        !row.sku || !row.nombre || !row.precio_unitario || !row.unidad_medida
+                          ? "bg-destructive/5"
+                          : ""
+                      )}>
+                        <TableCell className="font-mono text-xs text-muted-foreground">
+                          {index + 1}
                         </TableCell>
+                        <TableCell>
+                          {row.imagen_url && validateImageUrl(row.imagen_url) ? (
+                            <ImageThumbnail url={row.imagen_url} />
+                          ) : (
+                            <div className="w-8 h-8 rounded bg-muted flex items-center justify-center">
+                              <ImageOff className="h-4 w-4 text-muted-foreground/30" />
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">{row.sku || '-'}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">{row.nombre || '-'}</TableCell>
+                        <TableCell className="text-right font-mono">
+                          {row.precio_unitario ? `$${row.precio_unitario.toLocaleString()}` : '-'}
+                        </TableCell>
+                        <TableCell>{row.unidad_medida || '-'}</TableCell>
+                        <TableCell>{row.categoria || '-'}</TableCell>
+                        <TableCell className="text-right font-mono">{row.stock || 0}</TableCell>
                       </TableRow>
-                    )}
+                    ))}
                   </TableBody>
                 </Table>
+                {previewData.totalRows > 50 && (
+                  <p className="text-center text-sm text-muted-foreground py-3 bg-muted/30">
+                    Mostrando 50 de {previewData.totalRows} filas
+                  </p>
+                )}
               </ScrollArea>
 
-              {/* Summary */}
-              <div className="flex items-center justify-between pt-2 border-t">
-                <div className="flex items-center gap-4 text-sm">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    <span>{validRows} válidos</span>
-                  </div>
-                  {rowsWithImages > 0 && (
-                    <div className="flex items-center gap-2">
-                      <ImageIcon className="h-4 w-4 text-primary" />
-                      <span>{rowsWithImages} con imagen</span>
-                    </div>
-                  )}
-                  {parseErrors.length > 0 && (
-                    <div className="flex items-center gap-2">
-                      <AlertCircle className="h-4 w-4 text-destructive" />
-                      <span>{parseErrors.length} errores</span>
-                    </div>
+              {/* Actions */}
+              <div className="flex items-center justify-between pt-2 shrink-0">
+                <div className="text-sm text-muted-foreground">
+                  {validRows === previewData.totalRows ? (
+                    <span className="flex items-center gap-1.5 text-firmavb-green">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Todas las filas son válidas
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1.5 text-amber-600">
+                      <AlertCircle className="h-4 w-4" />
+                      {validRows} de {previewData.totalRows} filas válidas
+                    </span>
                   )}
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" onClick={resetState}>
-                    Cambiar archivo
+                  <Button variant="outline" onClick={handleClose}>
+                    Cancelar
                   </Button>
                   <Button 
                     onClick={handleImport}
                     disabled={validRows === 0 || bulkImport.isPending}
+                    className="bg-firmavb-green hover:bg-firmavb-green/90"
                   >
                     {bulkImport.isPending ? (
                       <>
@@ -603,7 +583,21 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
                   </Button>
                 </div>
               </div>
-            </>
+            </div>
+          )}
+
+          {/* Success State */}
+          {importProgress?.phase === 'complete' && !bulkImport.isPending && (
+            <div className="flex flex-col items-center justify-center py-8">
+              <CheckCircle2 className="h-16 w-16 text-firmavb-green mb-4" />
+              <h3 className="text-xl font-semibold mb-2">¡Importación Completada!</h3>
+              <p className="text-muted-foreground text-center mb-6">
+                Se han procesado {importProgress.total} productos exitosamente
+              </p>
+              <Button onClick={handleClose}>
+                Cerrar
+              </Button>
+            </div>
           )}
         </div>
       </DialogContent>
