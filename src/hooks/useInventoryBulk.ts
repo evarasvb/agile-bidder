@@ -1,16 +1,15 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { InventoryInput, calcularMargenComercial } from './useInventory';
+import { InventoryInput } from './useInventory';
 
 export interface BulkProductRow {
-  sku: string;           // Codigo (OBLIGATORIO)
-  nombre: string;        // Descripción (OBLIGATORIO)
+  sku: string;
+  nombre: string;
   descripcion?: string;
   categoria?: string;
-  costo_neto: number;    // Costo Neto (OBLIGATORIO) - NUEVO
-  precio_unitario: number; // Precio de Venta (OBLIGATORIO)
-  unidad_medida: string;   // Unidad (OBLIGATORIO)
+  precio_unitario: number;
+  unidad_medida: string;
   keywords?: string;
   imagen_url?: string;
   stock?: number;
@@ -50,7 +49,6 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
 
       onProgress?.({ current: 0, total: products.length, phase: 'validating', message: 'Obteniendo usuario autenticado...' });
 
-      // Get current authenticated user
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
       if (authError || !user) {
@@ -58,11 +56,9 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
       }
 
       const userId = user.id;
-      console.log('Importing products for user:', userId);
 
       onProgress?.({ current: 0, total: products.length, phase: 'validating', message: 'Validando productos...' });
 
-      // Fetch existing products by SKU for this user
       const { data: existingProducts, error: fetchError } = await supabase
         .from('inventory')
         .select('id, sku')
@@ -76,65 +72,40 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
         (existingProducts || []).map(p => [p.sku.toLowerCase(), p.id])
       );
 
-      // Validate and categorize products - New required fields: codigo (sku), descripcion (nombre), precio neto, unidad
       for (let i = 0; i < products.length; i++) {
         const row = products[i];
-        const rowNum = i + 2; // +2 because row 1 is header, and we're 0-indexed
+        const rowNum = i + 2;
 
-        // Validate required fields - codigo (SKU)
         if (!row.sku || row.sku.trim() === '') {
           errors.push({ row: rowNum, field: 'Código', message: 'Código es obligatorio' });
           continue;
         }
 
-        // Validate required fields - descripcion (nombre)
         if (!row.nombre || row.nombre.trim() === '') {
           errors.push({ row: rowNum, field: 'Descripción', message: 'Descripción es obligatoria' });
           continue;
         }
 
-        // Validate required fields - costo neto (NUEVO - OBLIGATORIO)
-        if (row.costo_neto === undefined || row.costo_neto === null || isNaN(Number(row.costo_neto)) || Number(row.costo_neto) < 0) {
-          errors.push({ row: rowNum, field: 'Costo Neto', message: 'Costo Neto es obligatorio y debe ser >= 0' });
-          continue;
-        }
-
-        // Validate required fields - precio de venta
         if (row.precio_unitario === undefined || row.precio_unitario === null || isNaN(Number(row.precio_unitario)) || Number(row.precio_unitario) <= 0) {
-          errors.push({ row: rowNum, field: 'Precio de Venta', message: 'Precio de Venta es obligatorio y debe ser > 0' });
+          errors.push({ row: rowNum, field: 'Precio', message: 'Precio es obligatorio y debe ser > 0' });
           continue;
         }
 
-        // Validar que precio >= costo
-        const costo = Number(row.costo_neto);
-        const precio = Number(row.precio_unitario);
-        if (costo >= precio) {
-          errors.push({ row: rowNum, field: 'Precio/Costo', message: 'El Precio de Venta debe ser mayor que el Costo Neto' });
-          continue;
-        }
-
-        // Validate required fields - unidad
         if (!row.unidad_medida || row.unidad_medida.trim() === '') {
           errors.push({ row: rowNum, field: 'Unidad', message: 'Unidad es obligatoria' });
           continue;
         }
 
-        // Parse keywords
         const keywords = row.keywords 
           ? row.keywords.split(',').map(k => k.trim()).filter(k => k.length > 0)
           : null;
-
-        // Calcular margen comercial automáticamente
-        const margenComercial = calcularMargenComercial(precio, costo);
 
         const productData: InventoryInput = {
           sku: row.sku.trim(),
           nombre_producto: row.nombre.trim(),
           descripcion: row.descripcion?.trim() || null,
           categoria: row.categoria?.trim() || 'General',
-          costo_neto: costo,
-          precio_unitario: precio,
-          margen_comercial: margenComercial, // Calculado automáticamente
+          precio_unitario: Number(row.precio_unitario),
           unidad_medida: row.unidad_medida.trim(),
           keywords,
           imagen_url: row.imagen_url?.trim() || null,
@@ -144,10 +115,9 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
           tiempo_entrega_dias: row.tiempo_entrega_dias !== undefined ? Number(row.tiempo_entrega_dias) : 5,
           proveedor: row.proveedor?.trim() || null,
           activo: true,
-          user_id: userId, // CRITICAL: Include user_id for RLS
+          user_id: userId,
         };
 
-        // Check if SKU already exists
         const existingId = existingSkuMap.get(row.sku.trim().toLowerCase());
         if (existingId) {
           toUpdate.push({ id: existingId, data: productData });
@@ -155,7 +125,6 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
           toInsert.push(productData);
         }
 
-        // Report validation progress every 100 items
         if (i % 100 === 0) {
           onProgress?.({ 
             current: i, 
@@ -166,11 +135,9 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
         }
       }
 
-      // Perform bulk insert with progress - increased batch size to 500
       let insertedCount = 0;
       if (toInsert.length > 0) {
         const batchSize = 500;
-        const totalBatches = Math.ceil(toInsert.length / batchSize);
         
         for (let i = 0; i < toInsert.length; i += batchSize) {
           const batchNum = Math.floor(i / batchSize) + 1;
@@ -199,7 +166,6 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
         }
       }
 
-      // Perform updates with progress - improved progress messages
       let updatedCount = 0;
       if (toUpdate.length > 0) {
         const batchSize = 100;
@@ -261,14 +227,12 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
   });
 }
 
-// Generate template data for inventory table - Updated required fields
 export function generateInventoryTemplateData() {
   return [
     {
       'Código': 'PROD-001',
       'Descripción': 'Resma Papel Carta 500 hojas',
-      'Costo Neto': 3600, // NUEVO: Costo del producto
-      'Precio de Venta': 4500,
+      'Precio Unitario': 4500,
       'Unidad': 'UN',
       'Categoría': 'Insumos de Oficina',
       'Stock': 100,
@@ -282,8 +246,7 @@ export function generateInventoryTemplateData() {
     {
       'Código': 'PROD-002',
       'Descripción': 'Tóner HP 85A Compatible',
-      'Costo Neto': 14800, // NUEVO: Costo del producto
-      'Precio de Venta': 18500,
+      'Precio Unitario': 18500,
       'Unidad': 'UN',
       'Categoría': 'Tecnología',
       'Stock': 50,
@@ -292,21 +255,6 @@ export function generateInventoryTemplateData() {
       'Tiempo Entrega (días)': 2,
       'Proveedor': 'TechSupply',
       'Keywords': 'toner, hp, impresora, cartucho, laser',
-      'URL Imagen': '',
-    },
-    {
-      'Código': 'PROD-003',
-      'Descripción': 'Alcohol Gel 1 Litro',
-      'Costo Neto': 2560, // NUEVO: Costo del producto
-      'Precio de Venta': 3200,
-      'Unidad': 'LT',
-      'Categoría': 'Limpieza e Higiene',
-      'Stock': 200,
-      'Margen Mínimo (%)': 8,
-      'Margen Objetivo (%)': 12,
-      'Tiempo Entrega (días)': 1,
-      'Proveedor': 'Higiene Total',
-      'Keywords': 'alcohol, gel, sanitizante, higiene, desinfectante',
       'URL Imagen': '',
     },
   ];
@@ -318,35 +266,24 @@ export function generateInventoryInstructions() {
     { 'Instrucciones': '=== INSTRUCCIONES PARA CARGA MASIVA DE PRODUCTOS ===' },
     { 'Instrucciones': '' },
     { 'Instrucciones': '1. CAMPOS OBLIGATORIOS:' },
-    { 'Instrucciones': '   • Código: Código único del producto (SKU, no puede repetirse)' },
+    { 'Instrucciones': '   • Código: Código único del producto (SKU)' },
     { 'Instrucciones': '   • Descripción: Nombre descriptivo del producto' },
-    { 'Instrucciones': '   • Costo Neto: Costo del producto en pesos chilenos (solo números, >= 0)' },
-    { 'Instrucciones': '   • Precio de Venta: Precio unitario de venta en pesos chilenos (solo números, > 0)' },
+    { 'Instrucciones': '   • Precio Unitario: Precio en pesos chilenos (solo números, > 0)' },
     { 'Instrucciones': '   • Unidad: UN (unidad), KG, LT, MT, etc.' },
     { 'Instrucciones': '' },
-    { 'Instrucciones': '2. IMPORTANTE - MARGEN COMERCIAL:' },
-    { 'Instrucciones': '   • El margen comercial se calcula automáticamente: (Precio - Costo) / Precio * 100' },
-    { 'Instrucciones': '   • El Precio de Venta DEBE ser mayor que el Costo Neto' },
-    { 'Instrucciones': '   • El margen calculado se mostrará en los matches y propuestas' },
-    { 'Instrucciones': '' },
-    { 'Instrucciones': '3. CAMPOS OPCIONALES:' },
-    { 'Instrucciones': '   • Categoría: Categoría del producto (ej: Tecnología, Limpieza)' },
+    { 'Instrucciones': '2. CAMPOS OPCIONALES:' },
+    { 'Instrucciones': '   • Categoría: Categoría del producto' },
     { 'Instrucciones': '   • Stock: Cantidad disponible (por defecto: 0)' },
     { 'Instrucciones': '   • Margen Mínimo (%): Margen mínimo aceptable (por defecto: 10)' },
     { 'Instrucciones': '   • Margen Objetivo (%): Margen deseado (por defecto: 15)' },
     { 'Instrucciones': '   • Tiempo Entrega (días): Días para entregar (por defecto: 5)' },
     { 'Instrucciones': '   • Proveedor: Nombre del proveedor' },
-    { 'Instrucciones': '   • Keywords: Palabras clave separadas por comas para matching' },
-    { 'Instrucciones': '   • URL Imagen: URL de imagen del producto (debe comenzar con https://)' },
+    { 'Instrucciones': '   • Keywords: Palabras clave separadas por comas' },
+    { 'Instrucciones': '   • URL Imagen: URL de imagen del producto' },
     { 'Instrucciones': '' },
-    { 'Instrucciones': '4. NOTAS IMPORTANTES:' },
+    { 'Instrucciones': '3. NOTAS:' },
     { 'Instrucciones': '   • Si el Código ya existe, el producto será ACTUALIZADO' },
     { 'Instrucciones': '   • No modifique los encabezados de las columnas' },
-    { 'Instrucciones': '   • Puede cargar hasta 10,000 productos por archivo' },
-    { 'Instrucciones': '   • Las keywords mejoran el matching con licitaciones' },
-    { 'Instrucciones': '   • Las imágenes deben ser URLs válidas (https://)' },
-    { 'Instrucciones': '   • El margen comercial se calcula y muestra automáticamente en matches' },
     { 'Instrucciones': '' },
-    { 'Instrucciones': '5. FORMATOS ACEPTADOS: Excel (.xlsx, .xls), CSV (.csv)' },
   ];
 }
