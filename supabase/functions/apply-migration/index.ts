@@ -127,8 +127,9 @@ serve(async (req) => {
           // Usar rpc para ejecutar SQL (requiere función helper)
           // Por ahora, retornamos instrucciones
           results.push({ command: command.substring(0, 50) + '...', status: 'pending' });
-        } catch (error) {
-          results.push({ command: command.substring(0, 50) + '...', status: 'error', error: error.message });
+        } catch (err: unknown) {
+          const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+          results.push({ command: command.substring(0, 50) + '...', status: 'error', error: errorMessage });
         }
       }
 
@@ -169,11 +170,12 @@ serve(async (req) => {
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error in apply-migration:', error);
     return new Response(
       JSON.stringify({ 
-        error: error.message,
+        error: errorMessage,
         timestamp: new Date().toISOString(),
       }),
       { 
