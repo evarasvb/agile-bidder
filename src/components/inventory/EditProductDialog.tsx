@@ -67,6 +67,7 @@ export function EditProductDialog({
         nombre_producto: product.nombre_producto || "",
         descripcion: product.descripcion || "",
         categoria: product.categoria || "",
+        costo_neto: (product as any).costo_neto || 0,
         precio_unitario: product.precio_unitario || 0,
         margen_minimo: product.margen_minimo || 10,
         stock_disponible: product.stock_disponible || 0,

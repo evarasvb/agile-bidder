@@ -20,6 +20,7 @@ interface CompraAgilData {
   link_oficial?: string;
   tipo?: string;
   datos_json?: Record<string, unknown>;
+  items?: unknown[];
 }
 
 Deno.serve(async (req) => {
@@ -47,7 +48,7 @@ Deno.serve(async (req) => {
     const { data: keyData, error: keyError } = await supabase
       .from('extension_api_keys')
       .select('id, cliente_id, activa')
-      .eq('key', apiKey)
+      .eq('api_key', apiKey)
       .eq('activa', true)
       .single();
 
@@ -73,11 +74,11 @@ Deno.serve(async (req) => {
       success: true,
       synced: 0,
       errors: [] as string[],
-      details: {} as any
+      details: {} as Record<string, unknown>
     };
 
     // Process each compra ágil
-    for (const lic of licitaciones) {
+    for (const lic of licitaciones as CompraAgilData[]) {
       try {
         // Skip if not a compra ágil
         if (lic.tipo !== 'compra_agil' && !lic.codigo) {
@@ -91,15 +92,12 @@ Deno.serve(async (req) => {
         // UTM Enero 2026: $69.751 CLP
         // Umbral: 100 UTM = $6.975.100 CLP
         const UTM_2026_ENE = 69751;
-        const UMBRAL_COMPRA_AGIL_CLP = 100 * UTM_2026_ENE; // $6.975.100 CLP
         
-        let tipo_proceso = 'compra_agil'; // Por defecto
         let categoria = 'L1';
         
         if (monto && monto > 0) {
           const montoUTM = monto / UTM_2026_ENE;
           if (montoUTM >= 100) {
-            tipo_proceso = 'licitacion';
             if (montoUTM < 1000) {
               categoria = 'LE'; // Intermedia
             } else if (montoUTM < 5000) {
@@ -112,25 +110,21 @@ Deno.serve(async (req) => {
           }
         }
         
-        const compraData: any = {
+        const compraData = {
           codigo: lic.codigo,
           nombre: lic.nombre || `Compra Ágil ${lic.codigo}`,
-          nombre_organismo: lic.organismo || lic.institucion_nombre || 'Organismo no especificado',
-          organismo: lic.organismo || lic.institucion_nombre || 'Organismo no especificado', // Mantener por compatibilidad
-          monto_estimado: monto,
-          monto: monto, // Mantener por compatibilidad
+          organismo: lic.organismo || lic.institucion_nombre || 'Organismo no especificado',
+          monto: monto,
           fecha_cierre: lic.fecha_cierre || null,
           estado: lic.estado || 'activa',
           region: lic.region || null,
           descripcion: lic.descripcion || null,
           link_oficial: lic.link_oficial || null,
-          datos_json: lic.datos_json || lic, // Store full scraped data
-          tipo_proceso: tipo_proceso, // 'compra_agil' o 'licitacion'
-          categoria: categoria, // 'L1', 'LE', 'LP', 'LR'
+          datos_json: lic.datos_json || lic,
         };
 
         // Upsert compra ágil
-        const { data: insertedCompra, error: compraError } = await supabase
+        const { error: compraError } = await supabase
           .from('compras_agiles')
           .upsert(compraData, { onConflict: 'codigo' })
           .select('id')
@@ -142,24 +136,22 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Si hay items en el body o en la licitación, guardarlos
-        const itemsToSave = items || lic.items || [];
-        if (itemsToSave.length > 0) {
+        // Si hay items en la licitación, guardarlos
+        const itemsToSave = lic.items || [];
+        if (Array.isArray(itemsToSave) && itemsToSave.length > 0) {
           // Eliminar items existentes para esta compra ágil
           await supabase
             .from('licitacion_items')
             .delete()
-            .eq('licitacion_codigo', lic.codigo);
+            .eq('licitacion_id', lic.codigo);
 
           // Insertar nuevos items
-          const itemsData = itemsToSave.map((item: any, index: number) => ({
-            licitacion_codigo: lic.codigo,
-            licitacion_id: lic.codigo, // Mantener compatibilidad con tabla licitaciones
-            item_index: item.correlativo || item.item_index || (index + 1),
-            nombre_producto: item.nombre_producto || item.nombre || 'Producto sin nombre',
-            descripcion: item.descripcion || null,
-            cantidad: item.cantidad || 1,
-            unidad: item.unidad || item.unidadMedida || 'UN'
+          const itemsData = (itemsToSave as Record<string, unknown>[]).map((item, index) => ({
+            licitacion_id: lic.codigo,
+            nombre_producto: (item.nombre_producto as string) || (item.nombre as string) || 'Producto sin nombre',
+            descripcion: (item.descripcion as string) || null,
+            cantidad: (item.cantidad as number) || 1,
+            unidad: (item.unidad as string) || (item.unidadMedida as string) || 'UN'
           }));
 
           const { error: itemsError } = await supabase
