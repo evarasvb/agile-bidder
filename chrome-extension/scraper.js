@@ -86,6 +86,7 @@
   // ============================================
   
   function scrapeCompraAgilDetail() {
+    const bodyText = document.body.textContent || '';
     const licitacion = {
       codigo: '',
       nombre: '',
@@ -96,12 +97,27 @@
       fecha_publicacion: null,
       fecha_cierre: null,
       estado: 'publicada',
-      tipo: 'compra_agil'
+      tipo: 'compra_agil',
+      region: null,
+      comuna: null,
+      contacto_email: null,
+      contacto_telefono: null,
+      organismo_direccion: null,
+      condiciones_pago: null,
+      plazo_entrega: null,
+      forma_pago: null,
+      lugar_entrega: null,
+      unidad_compra: null,
+      responsable: null,
+      moneda: 'CLP',
+      tipo_proceso: null,
+      modalidad: null
     };
     
     // Extraer código de URL o página
     const urlMatch = window.location.href.match(/idLicitacion=([^&]+)/i) ||
-                     window.location.href.match(/CodigoExterno=([^&]+)/i);
+                     window.location.href.match(/CodigoExterno=([^&]+)/i) ||
+                     window.location.href.match(/code=([^&]+)/i);
     if (urlMatch) {
       licitacion.codigo = decodeURIComponent(urlMatch[1]);
     }
@@ -132,12 +148,12 @@
       }
     }
     
-    // Descripción
-    const descSelectors = ['.descripcion', '[id*="descripcion"]', '.detalle'];
+    // Descripción completa
+    const descSelectors = ['.descripcion', '[id*="descripcion"]', '.detalle', '.objeto'];
     for (const sel of descSelectors) {
       const el = document.querySelector(sel);
-      if (el) {
-        licitacion.descripcion = el.textContent.trim().slice(0, 2000);
+      if (el && el.textContent.trim().length > 20) {
+        licitacion.descripcion = el.textContent.trim().slice(0, 5000);
         break;
       }
     }
@@ -152,16 +168,104 @@
       }
     }
     
+    // RUT Organismo
+    const rutMatch = bodyText.match(/RUT[:\s]*([\d\.]+-[\dkK])/i);
+    if (rutMatch) {
+      licitacion.institucion_rut = rutMatch[1];
+    }
+    
     // Presupuesto
-    const presupuestoMatch = document.body.textContent.match(/presupuesto[:\s]*\$?\s*([\d.,]+)/i);
+    const presupuestoMatch = bodyText.match(/presupuesto[:\s]*\$?\s*([\d\.,]+)/i) ||
+                            bodyText.match(/monto[:\s]*\$?\s*([\d\.,]+)/i);
     if (presupuestoMatch) {
       licitacion.presupuesto_estimado = parseAmount(presupuestoMatch[1]);
     }
     
     // Fechas
-    const fechaCierreMatch = document.body.textContent.match(/cierre[:\s]*(\d{2}[-/]\d{2}[-/]\d{4})/i);
+    const fechaPublicacionMatch = bodyText.match(/(?:publicada|publicaci[oó]n)[:\s]*(\d{2}[-/]\d{2}[-/]\d{4})/i);
+    if (fechaPublicacionMatch) {
+      licitacion.fecha_publicacion = parseDate(fechaPublicacionMatch[1]);
+    }
+    
+    const fechaCierreMatch = bodyText.match(/(?:cierre|finaliza)[:\s]*(\d{2}[-/]\d{2}[-/]\d{4})/i);
     if (fechaCierreMatch) {
       licitacion.fecha_cierre = parseDate(fechaCierreMatch[1]);
+    }
+    
+    // Región
+    const regiones = ['Arica y Parinacota', 'Tarapacá', 'Antofagasta', 'Atacama', 'Coquimbo', 
+                     'Valparaíso', 'Metropolitana', 'O\'Higgins', 'Maule', 'Ñuble', 
+                     'Biobío', 'Araucanía', 'Los Ríos', 'Los Lagos', 'Aysén', 'Magallanes'];
+    for (const reg of regiones) {
+      if (bodyText.includes(reg)) {
+        licitacion.region = reg;
+        break;
+      }
+    }
+    if (!licitacion.region) {
+      const regionMatch = bodyText.match(/Regi[oó]n[:\s]+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑa-záéíóúñ\s]+)/i);
+      if (regionMatch) licitacion.region = regionMatch[1].trim();
+    }
+    
+    // Comuna
+    const comunaMatch = bodyText.match(/Comuna[:\s]+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑa-záéíóúñ\s]+)/i);
+    if (comunaMatch) licitacion.comuna = comunaMatch[1].trim();
+    
+    // Contacto
+    const emailMatch = bodyText.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+    if (emailMatch) licitacion.contacto_email = emailMatch[1];
+    
+    const telefonoMatch = bodyText.match(/(\+?56\s?)?[\s]?([2-9]\d{8})/);
+    if (telefonoMatch) licitacion.contacto_telefono = telefonoMatch[0].trim();
+    
+    // Dirección
+    const direccionMatch = bodyText.match(/Direcci[oó]n[:\s]+([A-ZÁÉÍÓÚÑ0-9\s,\.-]+)/i);
+    if (direccionMatch) licitacion.organismo_direccion = direccionMatch[1].trim().slice(0, 200);
+    
+    // Condiciones de pago
+    const pagoMatch = bodyText.match(/Pago[:\s]+([^\.]+)/i) || bodyText.match(/Condiciones de pago[:\s]+([^\.]+)/i);
+    if (pagoMatch) licitacion.condiciones_pago = pagoMatch[1].trim().slice(0, 500);
+    
+    // Plazo de entrega
+    const entregaMatch = bodyText.match(/Plazo de entrega[:\s]+([^\.]+)/i) || bodyText.match(/Entrega[:\s]+([^\.]+)/i);
+    if (entregaMatch) licitacion.plazo_entrega = entregaMatch[1].trim().slice(0, 200);
+    
+    // Forma de pago
+    const formaPagoMatch = bodyText.match(/Forma de pago[:\s]+([^\.]+)/i);
+    if (formaPagoMatch) licitacion.forma_pago = formaPagoMatch[1].trim().slice(0, 200);
+    
+    // Lugar de entrega
+    const lugarEntregaMatch = bodyText.match(/Lugar de entrega[:\s]+([^\.]+)/i);
+    if (lugarEntregaMatch) licitacion.lugar_entrega = lugarEntregaMatch[1].trim().slice(0, 500);
+    
+    // Unidad de compra
+    const unidadCompraMatch = bodyText.match(/Unidad de compra[:\s]+([^\.]+)/i);
+    if (unidadCompraMatch) licitacion.unidad_compra = unidadCompraMatch[1].trim().slice(0, 200);
+    
+    // Responsable
+    const responsableMatch = bodyText.match(/Responsable[:\s]+([^\.]+)/i) || bodyText.match(/Contacto[:\s]+([^\.]+)/i);
+    if (responsableMatch) licitacion.responsable = responsableMatch[1].trim().slice(0, 200);
+    
+    // Moneda
+    const monedaMatch = bodyText.match(/Moneda[:\s]+([A-Z]{3})/i);
+    if (monedaMatch) licitacion.moneda = monedaMatch[1];
+    
+    // Tipo de proceso
+    const tipoMatch = bodyText.match(/Tipo[:\s]+([^\.]+)/i);
+    if (tipoMatch) licitacion.tipo_proceso = tipoMatch[1].trim().slice(0, 100);
+    
+    // Modalidad
+    const modalidadMatch = bodyText.match(/Modalidad[:\s]+([^\.]+)/i);
+    if (modalidadMatch) licitacion.modalidad = modalidadMatch[1].trim().slice(0, 100);
+    
+    // Estado
+    const estadoSelectors = ['.estado', '[id*="Estado"]', '.badge', '.status'];
+    for (const sel of estadoSelectors) {
+      const el = document.querySelector(sel);
+      if (el) {
+        licitacion.estado = el.textContent.trim().toLowerCase().slice(0, 50);
+        break;
+      }
     }
     
     // Extraer items
@@ -175,6 +279,7 @@
   // ============================================
   
   function scrapeOrdenCompraDetail() {
+    const bodyText = document.body.textContent || '';
     const orden_compra = {
       codigo: '',
       nombre: '',
@@ -184,42 +289,163 @@
       proveedor_nombre: '',
       proveedor_rut: '',
       total_neto: null,
+      total_iva: null,
       total: null,
       fecha_creacion: null,
       fecha_envio: null,
-      estado: ''
+      fecha_aceptacion: null,
+      estado: '',
+      moneda: 'CLP',
+      link_oficial: window.location.href
     };
     
     // Extraer código de OC
     const urlMatch = window.location.href.match(/idOrdenCompra=([^&]+)/i) ||
-                     window.location.href.match(/codigo=([^&]+)/i);
+                     window.location.href.match(/codigo=([^&]+)/i) ||
+                     window.location.href.match(/OC[=:]?([^&]+)/i);
     if (urlMatch) {
       orden_compra.codigo = decodeURIComponent(urlMatch[1]);
     }
     
-    // Buscar código en página
-    const codigoEl = document.querySelector('[id*="CodigoOC"], .codigo-oc, h1');
-    if (codigoEl && !orden_compra.codigo) {
-      const match = codigoEl.textContent.match(/(\d+-\d+-\w+\d*)/);
-      if (match) orden_compra.codigo = match[1];
+    // Buscar código en página (múltiples patrones)
+    if (!orden_compra.codigo) {
+      const codigoPatterns = [
+        /(?:Código|Codigo|OC)[:\s]*([\d]+-[\d]+-[A-Z]+\d*)/i,
+        /([\d]{4,}-[\d]+-[A-Z]{2,}\d+)/,
+        /OC[:\s]*([\d]+-[\d]+-[A-Z]+\d*)/i
+      ];
+      
+      for (const pattern of codigoPatterns) {
+        const match = bodyText.match(pattern);
+        if (match) {
+          orden_compra.codigo = match[1];
+          break;
+        }
+      }
     }
     
     // Nombre/descripción
-    const nombreEl = document.querySelector('.nombre-oc, [id*="NombreOC"], .descripcion-oc');
-    if (nombreEl) {
-      orden_compra.nombre = nombreEl.textContent.trim().slice(0, 500);
+    const nombreSelectors = [
+      'h1', '.nombre-oc', '[id*="NombreOC"]', '.descripcion-oc',
+      '.titulo-oc', '[class*="titulo"]', '[class*="nombre"]'
+    ];
+    for (const sel of nombreSelectors) {
+      const el = document.querySelector(sel);
+      if (el && el.textContent.trim().length > 10) {
+        orden_compra.nombre = el.textContent.trim().slice(0, 500);
+        break;
+      }
+    }
+    
+    // Descripción completa
+    const descSelectors = [
+      '.descripcion', '[id*="Descripcion"]', '.detalle',
+      '[class*="descripcion"]', '.objeto'
+    ];
+    for (const sel of descSelectors) {
+      const el = document.querySelector(sel);
+      if (el && el.textContent.trim().length > 20) {
+        orden_compra.descripcion = el.textContent.trim().slice(0, 2000);
+        break;
+      }
+    }
+    
+    // Institución
+    const instSelectors = [
+      '.institucion', '[id*="Institucion"]', '.organismo',
+      '.entidad', '[class*="institucion"]', '[class*="organismo"]'
+    ];
+    for (const sel of instSelectors) {
+      const el = document.querySelector(sel);
+      if (el) {
+        const text = el.textContent.replace(/Institucion:?|Organismo:?/i, '').trim();
+        if (text.length > 3) {
+          orden_compra.institucion_nombre = text.slice(0, 200);
+          break;
+        }
+      }
+    }
+    
+    // RUT Institución
+    const rutInstMatch = bodyText.match(/(?:Institucion|Organismo)[:\s]*.*?RUT[:\s]*([\d\.]+-[\dkK])/i) ||
+                          bodyText.match(/RUT[:\s]*([\d\.]+-[\dkK])/i);
+    if (rutInstMatch) {
+      orden_compra.institucion_rut = rutInstMatch[1];
     }
     
     // Proveedor
-    const proveedorEl = document.querySelector('.proveedor, [id*="Proveedor"]');
-    if (proveedorEl) {
-      orden_compra.proveedor_nombre = proveedorEl.textContent.replace(/Proveedor:?/i, '').trim();
+    const provSelectors = [
+      '.proveedor', '[id*="Proveedor"]', '.vendedor',
+      '[class*="proveedor"]', '[class*="vendedor"]'
+    ];
+    for (const sel of provSelectors) {
+      const el = document.querySelector(sel);
+      if (el) {
+        const text = el.textContent.replace(/Proveedor:?|Vendedor:?/i, '').trim();
+        if (text.length > 3) {
+          orden_compra.proveedor_nombre = text.slice(0, 200);
+          break;
+        }
+      }
     }
     
-    // Monto total
-    const totalMatch = document.body.textContent.match(/total[:\s]*\$?\s*([\d.,]+)/i);
+    // RUT Proveedor
+    const rutProvMatch = bodyText.match(/(?:Proveedor|Vendedor)[:\s]*.*?RUT[:\s]*([\d\.]+-[\dkK])/i);
+    if (rutProvMatch) {
+      orden_compra.proveedor_rut = rutProvMatch[1];
+    }
+    
+    // Montos (total, neto, IVA)
+    const totalMatch = bodyText.match(/total[:\s]*\$?\s*([\d\.,]+)/i) ||
+                      bodyText.match(/monto\s+total[:\s]*\$?\s*([\d\.,]+)/i);
     if (totalMatch) {
       orden_compra.total = parseAmount(totalMatch[1]);
+    }
+    
+    const netoMatch = bodyText.match(/neto[:\s]*\$?\s*([\d\.,]+)/i) ||
+                      bodyText.match(/subtotal[:\s]*\$?\s*([\d\.,]+)/i);
+    if (netoMatch) {
+      orden_compra.total_neto = parseAmount(netoMatch[1]);
+    }
+    
+    const ivaMatch = bodyText.match(/iva[:\s]*\$?\s*([\d\.,]+)/i);
+    if (ivaMatch) {
+      orden_compra.total_iva = parseAmount(ivaMatch[1]);
+    }
+    
+    // Fechas
+    const fechaCreacionMatch = bodyText.match(/(?:Fecha\s+creaci[oó]n|Creada|Emitida)[:\s]*(\d{2}[-/]\d{2}[-/]\d{4})/i);
+    if (fechaCreacionMatch) {
+      orden_compra.fecha_creacion = parseDate(fechaCreacionMatch[1]);
+    }
+    
+    const fechaEnvioMatch = bodyText.match(/(?:Fecha\s+env[ií]o|Enviada)[:\s]*(\d{2}[-/]\d{2}[-/]\d{4})/i);
+    if (fechaEnvioMatch) {
+      orden_compra.fecha_envio = parseDate(fechaEnvioMatch[1]);
+    }
+    
+    const fechaAceptacionMatch = bodyText.match(/(?:Fecha\s+aceptaci[oó]n|Aceptada)[:\s]*(\d{2}[-/]\d{2}[-/]\d{4})/i);
+    if (fechaAceptacionMatch) {
+      orden_compra.fecha_aceptacion = parseDate(fechaAceptacionMatch[1]);
+    }
+    
+    // Estado
+    const estadoSelectors = [
+      '.estado', '[id*="Estado"]', '.badge',
+      '[class*="estado"]', '.status'
+    ];
+    for (const sel of estadoSelectors) {
+      const el = document.querySelector(sel);
+      if (el) {
+        orden_compra.estado = el.textContent.trim().toLowerCase().slice(0, 50);
+        break;
+      }
+    }
+    
+    // Moneda
+    const monedaMatch = bodyText.match(/moneda[:\s]*([A-Z]{3})/i);
+    if (monedaMatch) {
+      orden_compra.moneda = monedaMatch[1];
     }
     
     // Items

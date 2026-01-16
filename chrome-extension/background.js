@@ -487,6 +487,36 @@ async function sendComplete(taskId, data, kind) {
         licitaciones: data.licitacion ? [data.licitacion] : [],
         items: data.items || []
       };
+      
+      // Sincronizar directamente a Supabase si hay API key
+      try {
+        const { apiKey } = await chrome.storage.local.get('apiKey');
+        if (apiKey && payload.licitaciones && payload.licitaciones.length > 0) {
+          const licitacion = payload.licitaciones[0];
+          const response = await fetch(`${SUPABASE_URL}/functions/v1/sync-compras-agiles`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': apiKey
+            },
+            body: JSON.stringify({
+              compras_agiles: [licitacion],
+              items: payload.items || []
+            })
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            console.log('[FirmaVB] Compra ágil sincronizada a Supabase:', licitacion.codigo, result);
+          } else {
+            const error = await response.json();
+            console.warn('[FirmaVB] Error sincronizando compra ágil a Supabase:', error);
+          }
+        }
+      } catch (syncError) {
+        console.error('[FirmaVB] Error en sync directo de compra ágil:', syncError);
+        // Continuar con el flujo normal aunque falle el sync directo
+      }
       break;
       
     case 'oc_detail':
@@ -494,6 +524,35 @@ async function sendComplete(taskId, data, kind) {
         orden_compra: data.orden_compra || data.header,
         items: data.items || []
       };
+      
+      // Sincronizar directamente a Supabase si hay API key
+      try {
+        const { apiKey } = await chrome.storage.local.get('apiKey');
+        if (apiKey && payload.orden_compra && payload.orden_compra.codigo) {
+          const response = await fetch(`${SUPABASE_URL}/functions/v1/sync-ordenes-compra`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': apiKey
+            },
+            body: JSON.stringify({
+              ordenes_compra: [payload.orden_compra],
+              items: payload.items || []
+            })
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            console.log('[FirmaVB] Orden de compra sincronizada a Supabase:', payload.orden_compra.codigo, result);
+          } else {
+            const error = await response.json();
+            console.warn('[FirmaVB] Error sincronizando OC a Supabase:', error);
+          }
+        }
+      } catch (syncError) {
+        console.error('[FirmaVB] Error en sync directo de OC:', syncError);
+        // Continuar con el flujo normal aunque falle el sync directo
+      }
       break;
       
     case 'licitacion_detail':
@@ -562,6 +621,37 @@ async function sendFailed(taskId, errorMsg) {
 
 // Handle scraped data from content script
 async function handleScrapedData(data, sender) {
+  // Si es una orden de compra, sincronizarla directamente a Supabase
+  if (data.orden_compra && data.orden_compra.codigo) {
+    try {
+      const { apiKey } = await chrome.storage.local.get('apiKey');
+      if (apiKey) {
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/sync-ordenes-compra`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey
+          },
+          body: JSON.stringify({
+            ordenes_compra: [data.orden_compra],
+            items: data.items || []
+          })
+        });
+        
+        if (response.ok) {
+          console.log('[FirmaVB] Orden de compra sincronizada:', data.orden_compra.codigo);
+          return { success: true, message: 'Orden de compra sincronizada' };
+        } else {
+          const error = await response.json();
+          console.warn('[FirmaVB] Error sincronizando OC:', error);
+        }
+      }
+    } catch (error) {
+      console.error('[FirmaVB] Error en handleScrapedData para OC:', error);
+    }
+  }
+  
+  // Para otros tipos de datos, usar el flujo existente
   console.log('[FirmaVB] Received scraped data from tab:', sender.tab?.id, data);
   
   // Store temporarily for processTask to retrieve

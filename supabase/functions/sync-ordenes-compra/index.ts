@@ -97,6 +97,7 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        // Extraer TODOS los campos disponibles del objeto oc
         const ordenData: any = {
           codigo: oc.codigo,
           nombre: oc.nombre || null,
@@ -106,13 +107,34 @@ Deno.serve(async (req) => {
           proveedor_nombre: oc.proveedor_nombre || null,
           proveedor_rut: oc.proveedor_rut || null,
           total_neto: oc.total_neto || null,
+          total_iva: oc.total_iva || null,
           total: oc.total || null,
           fecha_creacion: oc.fecha_creacion || null,
           fecha_envio: oc.fecha_envio || null,
           fecha_aceptacion: oc.fecha_aceptacion || null,
           estado: oc.estado || 'pendiente',
-          link_oficial: oc.link_oficial || null,
-          datos_json: oc.datos_json || oc, // Store full scraped data
+          link_oficial: oc.link_oficial || oc.link || null,
+          // Guardar TODOS los datos adicionales en datos_json
+          datos_json: {
+            ...(oc.datos_json || {}),
+            // Incluir todos los campos adicionales que puedan venir
+            moneda: oc.moneda || 'CLP',
+            region: oc.region || null,
+            comuna: oc.comuna || null,
+            contacto_email: oc.contacto_email || null,
+            contacto_telefono: oc.contacto_telefono || null,
+            organismo_direccion: oc.organismo_direccion || null,
+            condiciones_pago: oc.condiciones_pago || null,
+            plazo_entrega: oc.plazo_entrega || null,
+            forma_pago: oc.forma_pago || null,
+            lugar_entrega: oc.lugar_entrega || null,
+            unidad_compra: oc.unidad_compra || null,
+            responsable: oc.responsable || null,
+            tipo_proceso: oc.tipo_proceso || null,
+            modalidad: oc.modalidad || null,
+            // Incluir el objeto completo como fallback
+            raw_data: oc
+          }
         };
 
         // Upsert orden de compra
