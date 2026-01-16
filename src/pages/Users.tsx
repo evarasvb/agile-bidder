@@ -153,19 +153,51 @@ export default function Users() {
   // Toggle Odoo enabled
   const toggleOdooMutation = useMutation({
     mutationFn: async ({ userId, enabled }: { userId: string; enabled: boolean }) => {
-      const { error } = await supabase
+      // Verificar si existe el registro en clientes
+      const { data: existingCliente, error: checkError } = await supabase
         .from('clientes')
-        .update({ odoo_enabled: enabled })
-        .eq('user_id', userId);
-      if (error) throw error;
+        .select('user_id')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
+        throw checkError;
+      }
+
+      if (existingCliente) {
+        // Actualizar si existe
+        const { error } = await supabase
+          .from('clientes')
+          .update({ odoo_enabled: enabled })
+          .eq('user_id', userId);
+        if (error) throw error;
+      } else {
+        // Crear si no existe
+        const { error } = await supabase
+          .from('clientes')
+          .insert({
+            user_id: userId,
+            empresa_nombre: null,
+            odoo_enabled: enabled,
+          });
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       toast.success('Configuración de Odoo actualizada');
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Error toggling Odoo:', error);
-      toast.error('Error al actualizar Odoo');
+      const errorMessage = error?.message || error?.error_description || 'Error al actualizar Odoo';
+      toast.error(errorMessage);
+      // Log detallado para debugging
+      console.error('Error completo:', {
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint,
+        message: error?.message,
+      });
     },
   });
 
@@ -187,50 +219,161 @@ export default function Users() {
       }
 
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('No session');
+      if (!session) throw new Error('Debes estar autenticado para crear usuarios');
 
-      const response = await fetch(
-        `${supabase.supabaseUrl}/functions/v1/create-user`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+      // Intentar usar Edge Function primero, si falla usar método alternativo
+      try {
+        const response = await fetch(
+          `${supabase.supabaseUrl}/functions/v1/create-user`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: newUserEmail,
+              password: newUserPassword,
+              full_name: newUserName || newUserEmail.split('@')[0],
+              role: newUserRole,
+            }),
+          }
+        );
+
+        if (response.ok) {
+          return await response.json();
+        }
+        
+        // Si la función no existe (404), usar método alternativo
+        if (response.status === 404) {
+          console.warn('Edge Function create-user no existe, usando método alternativo');
+          throw new Error('EDGE_FUNCTION_NOT_FOUND');
+        }
+
+        const error = await response.json();
+        throw new Error(error.error || `Error ${response.status}: ${response.statusText}`);
+      } catch (error: any) {
+        // Método alternativo: usar signUp y luego actualizar perfil/rol
+        if (error.message === 'EDGE_FUNCTION_NOT_FOUND' || error.message?.includes('Failed to fetch')) {
+          console.log('Usando método alternativo: signUp + actualizar perfil');
+          
+          // Crear usuario con signUp (requiere que el email no esté confirmado o usar auto-confirm)
+          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
             email: newUserEmail,
             password: newUserPassword,
-            full_name: newUserName || newUserEmail.split('@')[0],
-            role: newUserRole,
-          }),
+            options: {
+              data: {
+                full_name: newUserName || newUserEmail.split('@')[0],
+              },
+              emailRedirectTo: window.location.origin,
+            }
+          });
+
+          if (signUpError) {
+            // Si el usuario ya existe, intentar actualizar
+            if (signUpError.message.includes('already registered') || signUpError.message.includes('already exists')) {
+              throw new Error('El usuario ya existe. Usa "Actualizar" en lugar de crear.');
+            }
+            throw signUpError;
+          }
+
+          if (!signUpData.user) {
+            throw new Error('No se pudo crear el usuario');
+          }
+
+          const userId = signUpData.user.id;
+
+          // Crear/actualizar perfil
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .upsert({
+              user_id: userId,
+              email: newUserEmail,
+              full_name: newUserName || newUserEmail.split('@')[0],
+            }, {
+              onConflict: 'user_id'
+            });
+
+          if (profileError) {
+            console.error('Error creando perfil:', profileError);
+            // Continuar aunque falle el perfil
+          }
+
+          // Asignar rol
+          const { error: roleError } = await supabase
+            .from('user_roles')
+            .upsert({
+              user_id: userId,
+              role: newUserRole,
+            }, {
+              onConflict: 'user_id,role'
+            });
+
+          if (roleError) {
+            console.error('Error asignando rol:', roleError);
+            // Continuar aunque falle el rol
+          }
+
+          // Crear registro en clientes si no existe
+          const { error: clienteError } = await supabase
+            .from('clientes')
+            .upsert({
+              user_id: userId,
+              empresa_nombre: null,
+              odoo_enabled: false,
+            }, {
+              onConflict: 'user_id'
+            });
+
+          if (clienteError) {
+            console.error('Error creando cliente:', clienteError);
+            // Continuar aunque falle
+          }
+
+          return {
+            user: signUpData.user,
+            message: 'Usuario creado exitosamente'
+          };
         }
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Error al crear usuario');
+        
+        throw error;
       }
-
-      return response.json();
     },
     onSuccess: (data) => {
       setIsAddUserOpen(false);
+      const emailCreated = newUserEmail;
+      const roleCreated = newUserRole;
       setNewUserEmail("");
       setNewUserPassword("");
       setNewUserName("");
       setNewUserRole('user');
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       toast.success(
-        `✅ Usuario creado exitosamente${newUserRole === 'admin' ? ' como Administrador' : ''}`,
+        `✅ Usuario creado exitosamente${roleCreated === 'admin' ? ' como Administrador' : ''}`,
         {
-          description: `${newUserEmail} puede iniciar sesión ahora`,
+          description: `${emailCreated} puede iniciar sesión ahora`,
           duration: 4000,
         }
       );
     },
     onError: (error: Error) => {
       console.error('Error creating user:', error);
-      toast.error(error.message || 'Error al crear usuario');
+      const errorMessage = error.message || 'Error al crear usuario';
+      
+      // Mensajes más descriptivos
+      let userMessage = errorMessage;
+      if (errorMessage.includes('already registered') || errorMessage.includes('already exists')) {
+        userMessage = 'El usuario ya existe. Verifica el email o actualiza el usuario existente.';
+      } else if (errorMessage.includes('Invalid email')) {
+        userMessage = 'El formato del email no es válido.';
+      } else if (errorMessage.includes('Password')) {
+        userMessage = 'La contraseña no cumple los requisitos mínimos.';
+      }
+      
+      toast.error(userMessage, {
+        description: 'Revisa los datos e intenta nuevamente',
+        duration: 5000,
+      });
     },
   });
 

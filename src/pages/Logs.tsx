@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Terminal, Filter, Download, Pause, Play, Trash2, Inbox } from "lucide-react";
+import { Terminal, Filter, Download, Pause, Play, Trash2, Inbox, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -11,8 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useSystemLogs, type SystemLog } from "@/hooks/useSystemLogs";
 
 interface LogEntry {
   id: string;
@@ -20,46 +19,57 @@ interface LogEntry {
   level: "info" | "warn" | "error" | "success";
   source: string;
   message: string;
+  tipo?: string;
 }
 
-function useLicitacionesLogs() {
-  return useQuery({
-    queryKey: ['licitaciones_logs'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('licitaciones')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
-      
-      if (error) throw error;
-      
-      // Transform licitaciones into log entries
-      return (data || []).map((lic): LogEntry => ({
-        id: lic.id_licitacion,
-        timestamp: new Date(lic.created_at),
-        level: lic.match_encontrado ? "success" : lic.procesada ? "info" : "warn",
-        source: "Scanner",
-        message: `Licitación ${lic.id_licitacion}: ${lic.titulo} - ${lic.organismo}`,
-      }));
-    },
-    refetchInterval: 30000,
-  });
+// Mapear severidad de system_logs a level de LogEntry
+function mapSeveridadToLevel(severidad: string): "info" | "warn" | "error" | "success" {
+  switch (severidad) {
+    case 'success': return 'success';
+    case 'warning': return 'warn';
+    case 'error': return 'error';
+    default: return 'info';
+  }
+}
+
+// Mapear tipo de log a source
+function mapTipoToSource(tipo: string): string {
+  switch (tipo) {
+    case 'scraping': return 'Scanner';
+    case 'match': return 'Matcher';
+    case 'oferta_generada': return 'Ofertas';
+    case 'oferta_enviada': return 'Ofertas';
+    case 'error': return 'Sistema';
+    default: return 'Sistema';
+  }
 }
 
 export default function Logs() {
-  const { data: dbLogs = [], isLoading } = useLicitacionesLogs();
+  const [isPaused, setIsPaused] = useState(false);
+  // Polling automático cada 10 segundos cuando no está pausado
+  const { data: systemLogs = [], isLoading } = useSystemLogs(100, {
+    refetchInterval: isPaused ? false : 10000, // 10 segundos si no está pausado
+  });
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [levelFilter, setLevelFilter] = useState<string>("all");
-  const [isPaused, setIsPaused] = useState(false);
 
-  // Update logs when data changes
+  // Transform system_logs to LogEntry format
   useEffect(() => {
-    if (dbLogs.length > 0) {
-      setLogs(dbLogs);
+    if (systemLogs.length > 0) {
+      const transformedLogs: LogEntry[] = systemLogs.map((log: SystemLog) => ({
+        id: log.id,
+        timestamp: new Date(log.created_at),
+        level: mapSeveridadToLevel(log.severidad),
+        source: mapTipoToSource(log.tipo),
+        message: log.mensaje,
+        tipo: log.tipo,
+      }));
+      setLogs(transformedLogs);
+    } else {
+      setLogs([]);
     }
-  }, [dbLogs]);
+  }, [systemLogs]);
 
   const filteredLogs = logs.filter((log) => {
     const matchesSearch =
@@ -104,7 +114,7 @@ export default function Logs() {
           <div>
             <h1 className="text-2xl font-semibold text-foreground">Logs del Sistema</h1>
             <p className="text-sm text-muted-foreground">
-              Registro de licitaciones procesadas
+              Registro de actividad del sistema en tiempo real
             </p>
           </div>
         </div>
@@ -191,7 +201,11 @@ export default function Logs() {
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
               <Inbox className="h-10 w-10 mb-3 opacity-50" />
               <p className="text-sm">No hay logs disponibles</p>
-              <p className="text-xs">Los logs de licitaciones aparecerán aquí</p>
+              <p className="text-xs">
+                {systemLogs.length === 0 
+                  ? "Los logs del sistema aparecerán aquí cuando haya actividad"
+                  : "No hay logs que coincidan con los filtros seleccionados"}
+              </p>
             </div>
           ) : (
             filteredLogs.map((log, index) => (

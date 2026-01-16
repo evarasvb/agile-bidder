@@ -41,21 +41,24 @@ export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
     );
   }
 
-  const productosConMatch = items
-    ?.filter(item => item.match_sku !== null && item.confidence_score !== null)
-    .map(item => ({
-      id: item.match_sku!,
-      sku: item.match_sku!,
+  // Preparar todos los items con su información de match para la propuesta
+  const productosParaPropuesta = items?.map(item => ({
+    itemId: `${item.licitacion_codigo}-${item.item_index}`,
+    itemIndex: item.item_index,
+    nombre: item.nombre || 'Sin nombre',
+    descripcion: item.descripcion || '',
+    cantidadSolicitada: typeof item.cantidad === 'number' ? item.cantidad : parseFloat(item.cantidad || '1'),
+    unidadMedida: item.unidad || 'unidad',
+    match: item.match_sku ? {
+      id: item.match_sku,
+      sku: item.match_sku,
       nombre: item.nombre || '',
-      cantidad: typeof item.cantidad === 'number' ? item.cantidad : parseInt(item.cantidad || '1', 10),
       precio_unitario: item.costo_unitario || 0,
-      matchScore: item.confidence_score ? Math.round(item.confidence_score * 100) : 0,
-      categoria: null,
       stock: null,
-      descripcion: item.descripcion,
-      tiempo_entrega_dias: null,
+      matchScore: item.confidence_score ? Math.round(item.confidence_score * 100) : 0,
       margen_estimado: item.margen_estimado || 0,
-    })) || [];
+    } : null,
+  })) || [];
 
   return (
     <Card className="shadow-sm h-full flex flex-col">
@@ -305,23 +308,30 @@ export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
                   <TooltipTrigger asChild>
                     <Button 
                       className="w-full" 
-                      onClick={() => onGenerarPropuesta(productosConMatch)}
-                      disabled={productosConMatch.length === 0}
+                      onClick={() => onGenerarPropuesta(productosParaPropuesta)}
+                      disabled={productosParaPropuesta.length === 0}
                     >
                       <FileText className="h-4 w-4 mr-2" />
                       Generar Propuesta
-                      {productosConMatch.length > 0 && (
+                      {productosParaPropuesta.length > 0 && (
                         <Badge variant="secondary" className="ml-2">
-                          {productosConMatch.length} matches
+                          {productosParaPropuesta.length} items
                         </Badge>
                       )}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    {productosConMatch.length === 0 ? (
-                      <p className="text-xs">No hay productos con match para generar propuesta</p>
+                    {productosParaPropuesta.length === 0 ? (
+                      <p className="text-xs">No hay productos solicitados para generar propuesta</p>
                     ) : (
-                      <p className="text-xs">Genera una propuesta comercial con {productosConMatch.length} producto{productosConMatch.length > 1 ? 's' : ''} encontrado{productosConMatch.length > 1 ? 's' : ''}</p>
+                      <p className="text-xs">
+                        Genera una propuesta comercial con {productosParaPropuesta.length} producto{productosParaPropuesta.length > 1 ? 's' : ''} solicitado{productosParaPropuesta.length > 1 ? 's' : ''}
+                        {productosParaPropuesta.filter(p => p.match).length > 0 && (
+                          <span className="block mt-1">
+                            ({productosParaPropuesta.filter(p => p.match).length} con match)
+                          </span>
+                        )}
+                      </p>
                     )}
                   </TooltipContent>
                 </Tooltip>

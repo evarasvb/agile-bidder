@@ -24,7 +24,7 @@ export interface LogInput {
   detalles?: Record<string, any>;
 }
 
-export function useSystemLogs(limit = 100) {
+export function useSystemLogs(limit = 100, options?: { refetchInterval?: number | false }) {
   return useQuery({
     queryKey: ['system_logs', limit],
     queryFn: async () => {
@@ -37,6 +37,8 @@ export function useSystemLogs(limit = 100) {
       if (error) throw error;
       return data as SystemLog[];
     },
+    refetchInterval: options?.refetchInterval ?? 10000, // 10 segundos por defecto
+    refetchIntervalInBackground: true, // Continuar polling incluso si la pestaña no está activa
   });
 }
 

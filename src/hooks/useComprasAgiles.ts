@@ -2,6 +2,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useUserSettings } from './useUserSettings';
 import { esRegionActiva } from '@/utils/regiones';
+import type { Database } from '@/integrations/supabase/types';
+
+// Tipo base de la BD con campos adicionales de migraciones
+type CompraAgilRow = Database['public']['Tables']['compras_agiles']['Row'] & {
+  nombre_organismo?: string | null;
+  monto_estimado?: number | null;
+  buen_pagador?: boolean | null;
+};
 
 export interface CompraAgil {
   id: string;
@@ -21,7 +29,7 @@ export interface CompraAgil {
   created_at: string;
   updated_at: string;
   // Campos reales de la BD
-  nombre_organismo?: string;
+  nombre_organismo?: string | null;
   monto_estimado?: number | null;
 }
 
@@ -64,13 +72,18 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
       if (error) throw error;
       
       // Mapear campos de BD a interfaz
-      let compras = (data || []).map(compra => {
-        const compraAny = compra as any;
+      let compras = (data || []).map((compra): CompraAgil => {
+        const compraRow = compra as CompraAgilRow;
         return {
           ...compra,
-          organismo: compraAny.nombre_organismo || compra.organismo || '',
-          monto: compraAny.monto_estimado || compra.monto || null,
-        } as CompraAgil;
+          organismo: compraRow.nombre_organismo || compraRow.organismo || '',
+          monto: compraRow.monto_estimado ?? compraRow.monto ?? null,
+          match_encontrado: compraRow.match_encontrado ?? false,
+          match_score: compraRow.match_score ?? null,
+          buen_pagador: compraRow.buen_pagador ?? null,
+          nombre_organismo: compraRow.nombre_organismo ?? null,
+          monto_estimado: compraRow.monto_estimado ?? null,
+        };
       });
       
       // Filtrar por regiones activas del usuario (si está configurado)
@@ -94,7 +107,7 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
 export function useCompraAgil(id: string | null) {
   return useQuery({
     queryKey: ['compra_agil', id],
-    queryFn: async () => {
+    queryFn: async (): Promise<CompraAgil | null> => {
       if (!id) return null;
       
       const { data, error } = await supabase
@@ -104,7 +117,19 @@ export function useCompraAgil(id: string | null) {
         .maybeSingle();
 
       if (error) throw error;
-      return data as CompraAgil | null;
+      if (!data) return null;
+      
+      const compraRow = data as CompraAgilRow;
+      return {
+        ...data,
+        organismo: compraRow.nombre_organismo || compraRow.organismo || '',
+        monto: compraRow.monto_estimado ?? compraRow.monto ?? null,
+        match_encontrado: compraRow.match_encontrado ?? false,
+        match_score: compraRow.match_score ?? null,
+        buen_pagador: compraRow.buen_pagador ?? null,
+        nombre_organismo: compraRow.nombre_organismo ?? null,
+        monto_estimado: compraRow.monto_estimado ?? null,
+      };
     },
     enabled: !!id,
   });
@@ -142,13 +167,18 @@ export function useComprasAgilesStats() {
 
       if (error) throw error;
 
-      const compras = (data || []).map(c => {
-        const cAny = c as any;
+      const compras = (data || []).map((c): CompraAgil => {
+        const compraRow = c as CompraAgilRow;
         return {
           ...c,
-          organismo: cAny.nombre_organismo || c.organismo || '',
-          monto: cAny.monto_estimado || c.monto || null,
-        } as CompraAgil;
+          organismo: compraRow.nombre_organismo || compraRow.organismo || '',
+          monto: compraRow.monto_estimado ?? compraRow.monto ?? null,
+          match_encontrado: compraRow.match_encontrado ?? false,
+          match_score: compraRow.match_score ?? null,
+          buen_pagador: compraRow.buen_pagador ?? null,
+          nombre_organismo: compraRow.nombre_organismo ?? null,
+          monto_estimado: compraRow.monto_estimado ?? null,
+        };
       });
       
       const total = compras.length;

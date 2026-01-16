@@ -3,24 +3,41 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, Package, Calculator, Check, Loader2, Percent, Info } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { FileText, Package, Calculator, Check, Loader2, Percent, Info, Download, Edit, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 import { useUpdateCompraAgil } from "@/hooks/useComprasAgiles";
-import type { MatchedProduct } from "@/hooks/useMatchInventario";
 import { formatCurrency } from "@/utils/clasificacion";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { aplicarRecargoPorRegion, obtenerRecargoRegion } from "@/utils/regiones";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
+interface ItemParaPropuesta {
+  itemId: string;
+  itemIndex: number;
+  nombre: string;
+  descripcion: string;
+  cantidadSolicitada: number;
+  unidadMedida: string;
+  match: {
+    id: string;
+    sku: string;
+    nombre: string;
+    precio_unitario: number;
+    stock: number | null;
+    matchScore: number;
+    margen_estimado: number;
+  } | null;
+}
+
 interface GenerarPropuestaModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   compra: CompraAgil | null;
-  productos: MatchedProduct[];
+  productos: ItemParaPropuesta[];
 }
 
 interface ItemSeleccionado {
@@ -29,7 +46,6 @@ interface ItemSeleccionado {
   descripcion: string;
   cantidadSolicitada: number;
   unidadMedida: string;
-  selected: boolean;
   cantidad: number;
   match?: {
     id: string;
@@ -38,8 +54,10 @@ interface ItemSeleccionado {
     precio_unitario: number;
     stock?: number;
     matchScore: number;
+    margen_estimado: number;
   };
-  precioUnitario?: number;
+  precioUnitario: number;
+  margen: number; // Margen calculado
 }
 
 export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }: GenerarPropuestaModalProps) {
@@ -61,56 +79,84 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
     : 0;
   
   const [itemsSeleccionados, setItemsSeleccionados] = useState<ItemSeleccionado[]>(() =>
-    productos.map((producto, index) => {
-      const precioConRecargo = calcularPrecioConRecargo(producto.precio_unitario);
+    productos.map((producto) => {
+      const precioBase = producto.match?.precio_unitario || 0;
+      const precioConRecargo = precioBase > 0 ? calcularPrecioConRecargo(precioBase) : 0;
+      const margenEstimado = producto.match?.margen_estimado || 0;
+      // Calcular margen real basado en precio de oferta vs costo
+      const margen = precioBase > 0 && precioConRecargo > 0 
+        ? ((precioConRecargo - precioBase) / precioBase) * 100 
+        : margenEstimado * 100;
+      
       return {
-        itemId: producto.id || `item-${index}`,
+        itemId: producto.itemId,
         nombre: producto.nombre,
-        descripcion: producto.descripcion || '',
-        cantidadSolicitada: 1, // Default, puede ajustarse
-        unidadMedida: 'unidad',
-        selected: producto.matchScore >= 50,
-        cantidad: 1,
-        match: {
-          id: producto.id,
-          sku: producto.sku,
-          nombre: producto.nombre,
-          precio_unitario: producto.precio_unitario,
-          stock: producto.stock || undefined,
-          matchScore: producto.matchScore
-        },
-        precioUnitario: precioConRecargo // Precio con recargo aplicado
+        descripcion: producto.descripcion,
+        cantidadSolicitada: producto.cantidadSolicitada,
+        unidadMedida: producto.unidadMedida,
+        cantidad: producto.cantidadSolicitada,
+        match: producto.match ? {
+          id: producto.match.id,
+          sku: producto.match.sku,
+          nombre: producto.match.nombre,
+          precio_unitario: producto.match.precio_unitario,
+          stock: producto.match.stock || undefined,
+          matchScore: producto.match.matchScore,
+          margen_estimado: producto.match.margen_estimado
+        } : undefined,
+        precioUnitario: precioConRecargo,
+        margen: margen
       };
     })
   );
 
-  const handleToggleItem = (itemId: string) => {
-    setItemsSeleccionados(prev =>
-      prev.map(item => item.itemId === itemId ? { ...item, selected: !item.selected } : item)
-    );
-  };
-
   const handleCantidadChange = (itemId: string, cantidad: number) => {
     setItemsSeleccionados(prev =>
-      prev.map(item => item.itemId === itemId ? { 
-        ...item, 
-        cantidad: Math.max(1, Math.min(cantidad, item.cantidadSolicitada * 2)) 
-      } : item)
+      prev.map(item => {
+        if (item.itemId === itemId) {
+          const nuevaCantidad = Math.max(1, Math.min(cantidad, item.cantidadSolicitada * 2));
+          return { ...item, cantidad: nuevaCantidad };
+        }
+        return item;
+      })
     );
   };
 
   const handlePrecioChange = (itemId: string, precio: number) => {
     setItemsSeleccionados(prev =>
-      prev.map(item => item.itemId === itemId ? { 
-        ...item, 
-        precioUnitario: Math.max(0, precio) 
-      } : item)
+      prev.map(item => {
+        if (item.itemId === itemId) {
+          const nuevoPrecio = Math.max(0, precio);
+          const precioBase = item.match?.precio_unitario || 0;
+          const nuevoMargen = precioBase > 0 
+            ? ((nuevoPrecio - precioBase) / precioBase) * 100 
+            : item.margen;
+          return { 
+            ...item, 
+            precioUnitario: nuevoPrecio,
+            margen: nuevoMargen
+          };
+        }
+        return item;
+      })
     );
   };
 
-  const itemsActivos = itemsSeleccionados.filter(item => item.selected);
-  const montoTotal = itemsActivos.reduce((sum, item) => 
-    sum + ((item.precioUnitario || 0) * item.cantidad), 0);
+  const itemsActivos = itemsSeleccionados.filter(item => item.precioUnitario > 0);
+  const subtotalItems = itemsActivos.reduce((sum, item) => 
+    sum + (item.precioUnitario * item.cantidad), 0);
+  const iva = subtotalItems * 0.19;
+  const montoTotal = subtotalItems + iva;
+  
+  // Función para obtener badge de buen pagador
+  const getBuenPagadorBadge = (buenPagador: boolean | null) => {
+    if (buenPagador === true) {
+      return <Badge variant="success" className="text-xs"><CheckCircle2 className="h-3 w-3 mr-1" />Buen Pagador</Badge>;
+    } else if (buenPagador === false) {
+      return <Badge variant="destructive" className="text-xs"><XCircle className="h-3 w-3 mr-1" />Revisar</Badge>;
+    }
+    return <Badge variant="secondary" className="text-xs">Sin info</Badge>;
+  };
 
   const handleGuardarPropuesta = async () => {
     if (!compra) return;

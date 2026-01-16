@@ -9,14 +9,31 @@ import { MatchPanel } from "@/components/compras-agiles/MatchPanel";
 import { GenerarPropuestaModal } from "@/components/compras-agiles/GenerarPropuestaModal";
 import { useComprasAgiles, type CompraAgil, type ComprasAgilesFilters as Filters } from "@/hooks/useComprasAgiles";
 import { useQueryClient } from "@tanstack/react-query";
-import type { MatchedProduct } from "@/hooks/useMatchInventario";
+
+interface ItemParaPropuesta {
+  itemId: string;
+  itemIndex: number;
+  nombre: string;
+  descripcion: string;
+  cantidadSolicitada: number;
+  unidadMedida: string;
+  match: {
+    id: string;
+    sku: string;
+    nombre: string;
+    precio_unitario: number;
+    stock: number | null;
+    matchScore: number;
+    margen_estimado: number;
+  } | null;
+}
 
 export default function ComprasAgiles() {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<Filters>({});
   const [selectedCompra, setSelectedCompra] = useState<CompraAgil | null>(null);
   const [propuestaModalOpen, setPropuestaModalOpen] = useState(false);
-  const [productosParaPropuesta, setProductosParaPropuesta] = useState<MatchedProduct[]>([]);
+  const [productosParaPropuesta, setProductosParaPropuesta] = useState<ItemParaPropuesta[]>([]);
 
   const { data: compras, isLoading, refetch } = useComprasAgiles(filters);
 
@@ -30,7 +47,7 @@ export default function ComprasAgiles() {
     setSelectedCompra(compra);
   };
 
-  const handleGenerarPropuesta = (productos: MatchedProduct[]) => {
+  const handleGenerarPropuesta = (productos: ItemParaPropuesta[]) => {
     setProductosParaPropuesta(productos);
     setPropuestaModalOpen(true);
   };
