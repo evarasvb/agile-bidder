@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useInventory, useUpdateInventoryItem, useDeleteInventoryItem, useCreateInventoryItem, InventoryItem, InventoryInput } from "@/hooks/useInventory";
 import { useLicitacionesPorProducto } from "@/hooks/useLicitacionesPorProducto";
+import { useComprasAgilesMatch } from "@/hooks/useComprasAgilesMatch";
 import { EditProductDialog } from "@/components/inventory/EditProductDialog";
 import { DeleteProductDialog } from "@/components/inventory/DeleteProductDialog";
 import { ImportScriptDialog } from "@/components/inventory/ImportScriptDialog";
@@ -31,6 +32,7 @@ import { BulkUploadDialog } from "@/components/inventory/BulkUploadDialog";
 import { DownloadTemplateButton } from "@/components/inventory/DownloadTemplateButton";
 import { ProductGallery } from "@/components/inventory/ProductGallery";
 import { ImportHistoryPanel } from "@/components/inventory/ImportHistoryPanel";
+import { OportunidadesModal } from "@/components/inventory/OportunidadesModal";
 import { useAuthUser } from "@/hooks/useCliente";
 import { Link } from "react-router-dom";
 import { Gavel } from "lucide-react";
@@ -48,9 +50,11 @@ export default function Inventory() {
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
   const [galleryProduct, setGalleryProduct] = useState<InventoryItem | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; nombre: string } | null>(null);
+  const [oportunidadesProducto, setOportunidadesProducto] = useState<InventoryItem | null>(null);
   
   const { data: inventario = [], isLoading, refetch } = useInventory();
   const { data: licitacionesPorProducto = [] } = useLicitacionesPorProducto();
+  const { matchesByProductId, countsByProductId, isLoading: isLoadingComprasAgiles } = useComprasAgilesMatch(inventario);
   const actualizarProducto = useUpdateInventoryItem();
   const eliminarProducto = useDeleteInventoryItem();
   const crearProducto = useCreateInventoryItem();
@@ -59,6 +63,10 @@ export default function Inventory() {
   const licitacionesMap = new Map(
     licitacionesPorProducto.map(lpp => [lpp.producto_id, lpp])
   );
+
+  const oportunidadesSeleccionadas = oportunidadesProducto
+    ? matchesByProductId[oportunidadesProducto.id] ?? []
+    : [];
 
   const handleRefresh = () => {
     toast.info('Actualizando inventario...');
@@ -497,12 +505,16 @@ export default function Inventory() {
                 <TableHead className="font-semibold text-right">Stock</TableHead>
                 <TableHead className="font-semibold text-center">Oportunidades</TableHead>
                 <TableHead className="font-semibold">Ficha</TableHead>
+                <TableHead className="font-semibold text-center">Oportunidades</TableHead>
                 <TableHead className="font-semibold">Estado</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredInventory.map((item) => (
+              {filteredInventory.map((item) => {
+                const oportunidadesCount = countsByProductId[item.id] ?? 0;
+
+                return (
                 <TableRow key={item.id} className="data-row">
                   <TableCell>
                     <Checkbox
@@ -623,6 +635,25 @@ export default function Inventory() {
                       </TooltipContent>
                     </Tooltip>
                   </TableCell>
+                  <TableCell className="text-center">
+                    <button
+                      type="button"
+                      onClick={() => setOportunidadesProducto(item)}
+                      className="inline-flex items-center justify-center"
+                      aria-label={`Ver oportunidades de ${item.nombre_producto}`}
+                    >
+                      <Badge
+                        variant={oportunidadesCount > 0 ? "success" : "secondary"}
+                        className={cn("cursor-pointer", isLoadingComprasAgiles && "opacity-70")}
+                      >
+                        {isLoadingComprasAgiles ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          oportunidadesCount
+                        )}
+                      </Badge>
+                    </button>
+                  </TableCell>
                   <TableCell>{getStatusBadge(item.stock_disponible, item.activo)}</TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -650,7 +681,8 @@ export default function Inventory() {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         )}
@@ -741,6 +773,15 @@ export default function Inventory() {
         open={bulkUploadOpen}
         onOpenChange={setBulkUploadOpen}
         onSuccess={refetch}
+      />
+
+      {/* Oportunidades Modal */}
+      <OportunidadesModal
+        open={!!oportunidadesProducto}
+        onOpenChange={(open) => !open && setOportunidadesProducto(null)}
+        producto={oportunidadesProducto}
+        compras={oportunidadesSeleccionadas}
+        isLoading={isLoadingComprasAgiles}
       />
 
       {/* Product Gallery Dialog */}

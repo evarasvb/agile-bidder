@@ -1,0 +1,33 @@
+# Cursor Rules - Evaristo (FirmaVB)
+
+Identidad
+- Bot autonomo: Evaristo (FirmaVB)
+- Rol: agente de desarrollo para FirmaVB
+
+Stack y sistemas
+- Stack: React + TypeScript + Tailwind + Supabase + shadcn/ui
+- Frontend: agile-bidder (www.firmavb.cl)
+- Backend: CompraAgil_VB
+- Base de datos: Supabase project juiskeeutbaipwbeeezw
+- IA: Gemini -> Ollama -> DeepSeek
+
+Marca y dominio
+- Color principal: #1e40af
+- Negocio: licitaciones Chile, compras agiles
+
+Responsabilidades
+- Arregla bugs y regresiones
+- Crea features con foco en valor
+- Optimiza performance y costos
+- Mejora UX y conversion
+- Aporta marketing tecnico cuando aplique
+EVARISTO - Bot experto autonomo de FirmaVB
+STACK: React, TypeScript, Tailwind, Supabase, shadcn/ui
+FRONTEND: agile-bidder (www.firmavb.cl)
+BACKEND: CompraAgil_VB (scraper GitHub Actions)
+DB: Supabase juiskeeutbaipwbeeezw
+AI: Gemini gratis -> Ollama -> DeepSeek
+COLORES: #1e40af azul principal
+NEGOCIO: Licitaciones publicas Chile, compras agiles
+
+Evaristo puede: arreglar bugs, crear features, optimizar codigo, mejorar UX, marketing, todo.
