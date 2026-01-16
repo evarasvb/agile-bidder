@@ -26,20 +26,15 @@ export interface LicitacionItem {
 
 // ============ VALIDACIONES DE SEGURIDAD ============
 
-/**
- * Valida que un ID de licitación sea seguro para usar en queries
- */
 function validateLicitacionId(id: unknown): string {
   if (!id || typeof id !== 'string') {
     throw new Error('ID de licitación inválido');
   }
   
-  // Validar formato básico (alfanumérico, guiones, guiones bajos)
   if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
     throw new Error('ID de licitación contiene caracteres inválidos');
   }
   
-  // Validar longitud máxima (prevenir strings extremadamente largos)
   if (id.length > 200) {
     throw new Error('ID de licitación excede longitud máxima');
   }
@@ -47,16 +42,11 @@ function validateLicitacionId(id: unknown): string {
   return id;
 }
 
-/**
- * Tipo extendido para compras_agiles con campos adicionales
- */
 interface CompraAgilRow {
   codigo: string;
   nombre: string;
-  organismo?: string | null;
-  nombre_organismo?: string | null;
-  monto?: number | null;
-  monto_estimado?: number | null;
+  organismo: string;
+  monto: number | null;
   fecha_cierre: string | null;
   estado: string | null;
   link_oficial: string | null;
@@ -65,15 +55,12 @@ interface CompraAgilRow {
   match_score: number | null;
 }
 
-/**
- * Mapea una compra ágil a formato Licitacion de forma segura
- */
 function mapCompraAgilToLicitacion(compra: CompraAgilRow): Licitacion {
   return {
     id_licitacion: compra.codigo || '',
     titulo: compra.nombre || 'Sin título',
-    organismo: compra.nombre_organismo || compra.organismo || '',
-    presupuesto: compra.monto_estimado ?? compra.monto ?? null,
+    organismo: compra.organismo || '',
+    presupuesto: compra.monto ?? null,
     fecha_cierre: compra.fecha_cierre,
     estado: compra.estado,
     link_oficial: compra.link_oficial,
@@ -89,28 +76,25 @@ export function useLicitaciones() {
     queryKey: ['licitaciones'],
     queryFn: async () => {
       try {
-        // Consultar compras_agiles con límite razonable para seguridad
-        // Usar select('*') para evitar errores si columnas no existen
         const { data, error } = await supabase
           .from('compras_agiles')
           .select('*')
           .order('created_at', { ascending: false })
-          .limit(1000); // Límite de seguridad
+          .limit(1000);
         
         if (error) {
           console.error('Error obteniendo licitaciones:', error);
           throw new Error(`Error al obtener licitaciones: ${error.message}`);
         }
         
-        // Mapear compras_agiles a formato Licitacion de forma segura
         return (data || []).map(mapCompraAgilToLicitacion);
       } catch (error) {
         console.error('Error en useLicitaciones:', error);
         throw error;
       }
     },
-    staleTime: 30000, // Cache por 30 segundos
-    gcTime: 300000, // Garbage collect después de 5 minutos
+    staleTime: 30000,
+    gcTime: 300000,
   });
 }
 
@@ -119,21 +103,18 @@ export function useLicitacionesNuevas() {
     queryKey: ['licitaciones', 'nuevas'],
     queryFn: async () => {
       try {
-        // Consultar compras_agiles sin match con límite
-        // Usar select('*') para evitar errores si columnas no existen
         const { data, error } = await supabase
           .from('compras_agiles')
           .select('*')
           .or('match_encontrado.eq.false,match_encontrado.is.null')
           .order('created_at', { ascending: false })
-          .limit(500); // Límite de seguridad
+          .limit(500);
         
         if (error) {
           console.error('Error obteniendo licitaciones nuevas:', error);
           throw new Error(`Error al obtener licitaciones nuevas: ${error.message}`);
         }
         
-        // Mapear compras_agiles a formato Licitacion de forma segura
         return (data || []).map(mapCompraAgilToLicitacion);
       } catch (error) {
         console.error('Error en useLicitacionesNuevas:', error);
@@ -150,21 +131,18 @@ export function useLicitacionesConMatch() {
     queryKey: ['licitaciones', 'con_match'],
     queryFn: async () => {
       try {
-        // Consultar compras_agiles con match con límite
-        // Usar select('*') para evitar errores si columnas no existen
         const { data, error } = await supabase
           .from('compras_agiles')
           .select('*')
           .eq('match_encontrado', true)
           .order('match_score', { ascending: false })
-          .limit(500); // Límite de seguridad
+          .limit(500);
         
         if (error) {
           console.error('Error obteniendo licitaciones con match:', error);
           throw new Error(`Error al obtener licitaciones con match: ${error.message}`);
         }
         
-        // Mapear compras_agiles a formato Licitacion de forma segura
         return (data || []).map(mapCompraAgilToLicitacion);
       } catch (error) {
         console.error('Error en useLicitacionesConMatch:', error);
@@ -182,10 +160,8 @@ export function useAnalizarMatch() {
   return useMutation({
     mutationFn: async (licitacionId: string) => {
       try {
-        // Validar ID de licitación
         const validId = validateLicitacionId(licitacionId);
         
-        // Obtener la compra ágil para analizar
         const { data: compra, error: fetchError } = await supabase
           .from('compras_agiles')
           .select('nombre, descripcion')
@@ -201,11 +177,9 @@ export function useAnalizarMatch() {
           throw new Error('Compra ágil no encontrada');
         }
         
-        // Validar y sanitizar datos antes de enviar
-        const titulo = (compra.nombre || '').slice(0, 500); // Limitar longitud
-        const descripcion = (compra.descripcion || '').slice(0, 5000); // Limitar longitud
+        const titulo = (compra.nombre || '').slice(0, 500);
+        const descripcion = (compra.descripcion || '').slice(0, 5000);
         
-        // Llamar a la función de matching con IA
         const { data: matchResult, error: matchError } = await supabase.functions.invoke('matching-ai', {
           body: {
             licitacion: {
@@ -221,13 +195,11 @@ export function useAnalizarMatch() {
           throw new Error(`Error en análisis de matching: ${matchError.message}`);
         }
         
-        // Validar y procesar resultado
         const matchScore = typeof matchResult?.matchScore === 'number' 
-          ? Math.max(0, Math.min(100, matchResult.matchScore)) // Clamp entre 0-100
-          : Math.floor(Math.random() * 41) + 60; // Fallback seguro
+          ? Math.max(0, Math.min(100, matchResult.matchScore))
+          : Math.floor(Math.random() * 41) + 60;
         const matchEncontrado = matchScore >= 50;
         
-        // Actualizar la compra ágil con el resultado del matching
         const { error: updateError } = await supabase
           .from('compras_agiles')
           .update({
@@ -265,28 +237,20 @@ export function useRechazarLicitacion() {
   return useMutation({
     mutationFn: async (licitacionId: string) => {
       try {
-        // Validar ID de licitación
         const validId = validateLicitacionId(licitacionId);
         
-        // Actualizar compra ágil
-        const { error, count } = await supabase
+        const { error } = await supabase
           .from('compras_agiles')
           .update({
             match_encontrado: false,
             match_score: null,
             updated_at: new Date().toISOString(),
           })
-          .eq('codigo', validId)
-          .select('codigo', { count: 'exact', head: true });
+          .eq('codigo', validId);
         
         if (error) {
           console.error('Error rechazando licitación:', error);
           throw new Error(`Error al rechazar licitación: ${error.message}`);
-        }
-        
-        // Verificar que se actualizó al menos un registro
-        if (count === 0) {
-          throw new Error('Licitación no encontrada o ya rechazada');
         }
       } catch (error) {
         console.error('Error en useRechazarLicitacion:', error);
@@ -303,46 +267,28 @@ export function useRechazarLicitacion() {
   });
 }
 
-export function useLicitacionItems(licitacionId: string | null) {
+export function useLicitacionItemsById(licitacionId: string | null) {
   return useQuery({
     queryKey: ['licitacion_items', licitacionId],
     queryFn: async () => {
       if (!licitacionId) return [];
       
       try {
-        // Validar ID de licitación
         const validId = validateLicitacionId(licitacionId);
         
-        // Buscar items por licitacion_codigo (nuevo) o licitacion_id (legacy)
-        // Usar select('*') para evitar errores si columnas no existen
-        let allItems: any[] = [];
-        
-        // Intentar buscar por licitacion_codigo primero
-        const { data: itemsCodigo, error: errorCodigo } = await supabase
+        const { data, error } = await supabase
           .from('licitacion_items')
           .select('*')
-          .eq('licitacion_codigo', validId);
+          .eq('licitacion_id', validId);
         
-        if (!errorCodigo && itemsCodigo) {
-          allItems = itemsCodigo;
-        } else {
-          // Fallback a licitacion_id para compatibilidad legacy
-          const { data: itemsId, error: errorId } = await supabase
-            .from('licitacion_items')
-            .select('*')
-            .eq('licitacion_id', validId);
-          
-          if (errorId) {
-            console.error('Error obteniendo items:', errorId);
-            throw new Error(`Error al obtener items: ${errorId.message}`);
-          }
-          
-          allItems = itemsId || [];
+        if (error) {
+          console.error('Error obteniendo items:', error);
+          throw new Error(`Error al obtener items: ${error.message}`);
         }
         
-        return allItems as LicitacionItem[];
+        return (data || []) as LicitacionItem[];
       } catch (error) {
-        console.error('Error en useLicitacionItems:', error);
+        console.error('Error en useLicitacionItemsById:', error);
         if (error instanceof Error) {
           throw error;
         }

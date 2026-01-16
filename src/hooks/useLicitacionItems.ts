@@ -2,82 +2,74 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 /**
- * Item de licitación con información del producto solicitado y su match (si existe)
+ * Item de licitación - matches database schema
  */
 export interface LicitacionItem {
-  licitacion_codigo: string;
-  item_index: number;
-  nombre: string | null;
+  id: number;
+  licitacion_id: string;
+  nombre_producto: string;
   descripcion: string | null;
-  cantidad: string | number | null;
+  cantidad: number | null;
   unidad: string | null;
-  producto_id: string | null;
-  // Campos de matching (calculados por matcher_db_adapter)
-  match_sku: string | null;
-  costo_unitario: number | null;
-  margen_estimado: number | null;
-  confidence_score: number | null;
-  fecha_match: string | null;
 }
 
 /**
- * Hook para obtener los productos solicitados (items) de una compra ágil
- * Estos son los productos que la institución publicó en su listado
+ * Hook para obtener los productos solicitados (items) de una licitación
  */
-export function useLicitacionItems(licitacionCodigo: string | null) {
+export function useLicitacionItems(licitacionId: string | null) {
   return useQuery({
-    queryKey: ['licitacion_items', licitacionCodigo],
+    queryKey: ['licitacion_items', licitacionId],
     queryFn: async () => {
-      if (!licitacionCodigo) return [];
+      if (!licitacionId) return [];
 
       const { data, error } = await supabase
         .from('licitacion_items')
         .select('*')
-        .eq('licitacion_codigo', licitacionCodigo)
-        .order('item_index', { ascending: true });
+        .eq('licitacion_id', licitacionId)
+        .order('id', { ascending: true });
 
       if (error) throw error;
       return (data || []) as LicitacionItem[];
     },
-    enabled: !!licitacionCodigo,
-    refetchInterval: 30000, // Refrescar cada 30 segundos para ver matches nuevos
+    enabled: !!licitacionId,
+    refetchInterval: 30000,
   });
 }
 
 /**
- * Hook para obtener un item específico con su información de match
+ * Hook para obtener un item específico
  */
-export function useLicitacionItem(licitacionCodigo: string | null, itemIndex: number | null) {
+export function useLicitacionItem(licitacionId: string | null, itemId: number | null) {
   return useQuery({
-    queryKey: ['licitacion_item', licitacionCodigo, itemIndex],
+    queryKey: ['licitacion_item', licitacionId, itemId],
     queryFn: async () => {
-      if (!licitacionCodigo || itemIndex === null) return null;
+      if (!licitacionId || itemId === null) return null;
 
       const { data, error } = await supabase
         .from('licitacion_items')
         .select('*')
-        .eq('licitacion_codigo', licitacionCodigo)
-        .eq('item_index', itemIndex)
+        .eq('licitacion_id', licitacionId)
+        .eq('id', itemId)
         .maybeSingle();
 
       if (error) throw error;
       return data as LicitacionItem | null;
     },
-    enabled: !!licitacionCodigo && itemIndex !== null,
+    enabled: !!licitacionId && itemId !== null,
   });
 }
 
 /**
- * Hook para obtener el producto maestro asociado a un SKU (si hay match)
+ * Hook para obtener el producto del inventario asociado a un SKU
  */
-export function useProductoMaestro(sku: string | null) {
+export function useProductoBySku(sku: string | null) {
   return useQuery({
-    queryKey: ['producto_maestro', sku],
+    queryKey: ['inventory_by_sku', sku],
     queryFn: async () => {
       if (!sku) return null;
 
       const { data, error } = await supabase
-        .from('producto_maestro')
+        .from('inventory')
         .select('*')
         .eq('sku', sku)
         .maybeSingle();

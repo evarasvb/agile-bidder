@@ -64,40 +64,22 @@ export function useMatchingAI() {
         return { results: [], error: 'No hay compras ágiles nuevas para procesar' };
       }
 
-      // 2. Cargar items de todas las licitaciones en una sola query (optimizado)
+      // 2. Cargar items de las licitaciones
       const codigosLicitaciones = todasLicitaciones.map(lic => lic.id_licitacion);
       
-      // Query única para todos los items usando licitacion_codigo (nuevo) o licitacion_id (legacy)
-      const { data: todosItemsCodigo, error: itemsErrorCodigo } = await supabase
+      const { data: todosItems, error: itemsError } = await supabase
         .from('licitacion_items')
-        .select('licitacion_codigo, licitacion_id, nombre_producto, descripcion, cantidad, item_index')
-        .in('licitacion_codigo', codigosLicitaciones);
-      
-      // También buscar por licitacion_id para compatibilidad legacy
-      const { data: todosItemsId, error: itemsErrorId } = await supabase
-        .from('licitacion_items')
-        .select('licitacion_codigo, licitacion_id, nombre_producto, descripcion, cantidad, item_index')
+        .select('licitacion_id, nombre_producto, descripcion, cantidad')
         .in('licitacion_id', codigosLicitaciones);
       
-      // Combinar resultados y eliminar duplicados
-      const todosItems = [
-        ...(todosItemsCodigo || []),
-        ...(todosItemsId || []).filter(item => 
-          !todosItemsCodigo?.some(cItem => 
-            cItem.licitacion_codigo === item.licitacion_codigo && 
-            cItem.item_index === item.item_index
-          )
-        )
-      ];
-      
-      if (itemsErrorCodigo && itemsErrorId) {
-        console.warn('Error obteniendo items (continuando sin items):', itemsErrorCodigo, itemsErrorId);
+      if (itemsError) {
+        console.warn('Error obteniendo items (continuando sin items):', itemsError);
       }
       
-      // Crear mapa de items por licitación para búsqueda O(1)
+      // Crear mapa de items por licitación
       const itemsMap = new Map<string, typeof todosItems>();
-      todosItems.forEach(item => {
-        const codigo = item.licitacion_codigo || item.licitacion_id;
+      (todosItems || []).forEach(item => {
+        const codigo = item.licitacion_id;
         if (codigo) {
           if (!itemsMap.has(codigo)) {
             itemsMap.set(codigo, []);
@@ -112,7 +94,7 @@ export function useMatchingAI() {
         items: itemsMap.get(lic.id_licitacion) || []
       }));
 
-      // 3. Cargar inventario (tabla inventory que tiene los productos)
+      // 3. Cargar inventario
       const { data: inventario, error: invError } = await supabase
         .from('inventory')
         .select('id, sku, nombre_producto, descripcion, categoria, keywords, precio_unitario, stock_disponible')
@@ -147,84 +129,39 @@ export function useMatchingAI() {
 
       const response = data as MatchingResponse;
 
-      // 5. Actualizar compras ágiles y licitaciones con resultados (optimizado con batch)
-      const updatesComprasAgiles: Array<{ codigo: string; match_encontrado: boolean; match_score: number }> = [];
-      const updatesLicitaciones: Array<{ id_licitacion: string; procesada: boolean; match_encontrado: boolean; match_score: number }> = [];
-      
-      // Crear Set de códigos de compras_agiles para búsqueda O(1)
+      // 5. Actualizar compras ágiles con resultados
       const codigosCA = new Set((comprasAgiles || []).map(ca => ca.codigo));
       
-      // Separar updates por tabla
       for (const result of response.results) {
         const matchEncontrado = result.match_score >= 40;
         
-        // Verificar si existe en compras_agiles usando Set (O(1))
         if (codigosCA.has(result.licitacion_id)) {
-          updatesComprasAgiles.push({
-            codigo: result.licitacion_id,
-            match_encontrado: matchEncontrado,
-            match_score: result.match_score
-          });
+          await supabase
+            .from('compras_agiles')
+            .update({
+              match_encontrado: matchEncontrado,
+              match_score: result.match_score
+            })
+            .eq('codigo', result.licitacion_id);
         } else {
-          updatesLicitaciones.push({
-            id_licitacion: result.licitacion_id,
-            procesada: true,
-            match_encontrado: matchEncontrado,
-            match_score: result.match_score
-          });
+          await supabase
+            .from('licitaciones')
+            .update({
+              procesada: true,
+              match_encontrado: matchEncontrado,
+              match_score: result.match_score
+            })
+            .eq('id_licitacion', result.licitacion_id);
         }
-      }
-      
-      // Batch updates para compras_agiles
-      if (updatesComprasAgiles.length > 0) {
-        // Supabase no soporta batch updates nativamente, pero podemos hacer updates en paralelo
-        await Promise.all(
-          updatesComprasAgiles.map(update =>
-            supabase
-              .from('compras_agiles')
-              .update({
-                match_encontrado: update.match_encontrado,
-                match_score: update.match_score
-              })
-              .eq('codigo', update.codigo)
-          )
-        );
-      }
-      
-      // Batch updates para licitaciones (legacy)
-      if (updatesLicitaciones.length > 0) {
-        await Promise.all(
-          updatesLicitaciones.map(update =>
-            supabase
-              .from('licitaciones')
-              .update({
-                procesada: update.procesada,
-                match_encontrado: update.match_encontrado,
-                match_score: update.match_score
-              })
-              .eq('id_licitacion', update.id_licitacion)
-          )
-        );
       }
 
       return response;
     },
     onSuccess: (data) => {
-      // Invalidar solo las queries relevantes (optimizado)
-      queryClient.invalidateQueries({ 
-        queryKey: ['compras_agiles'],
-        exact: false // Invalida todas las variantes
-      });
-      queryClient.invalidateQueries({ 
-        queryKey: ['licitaciones'],
-        exact: false
-      });
-      queryClient.invalidateQueries({ 
-        queryKey: ['oportunidades'],
-        exact: false
-      });
+      queryClient.invalidateQueries({ queryKey: ['compras_agiles'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['licitaciones'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['oportunidades'], exact: false });
       
-      // Invalidar queries específicas solo si hay matches
       const matchCount = data.results.filter(r => r.match_score >= 50).length;
       if (matchCount > 0) {
         queryClient.invalidateQueries({ queryKey: ['licitaciones-con-match'] });
@@ -257,11 +194,9 @@ export function useAutoMatching() {
   const { mutate: runMatching, isPending } = useMatchingAI();
   const hasRunRef = useRef(false);
 
-  // Query para detectar compras ágiles no procesadas (optimizado)
   const { data: licitacionesNuevas } = useQuery({
     queryKey: ['licitaciones-sin-procesar'],
     queryFn: async () => {
-      // Consultar compras_agiles sin match
       const { data: comprasAgiles, error: caError } = await supabase
         .from('compras_agiles')
         .select('codigo')
@@ -270,36 +205,28 @@ export function useAutoMatching() {
 
       if (caError) {
         console.warn('Error consultando compras_agiles:', caError);
-        // Continuar con licitaciones legacy
       }
       
-      // También consultar licitaciones legacy (en paralelo si es posible)
-      const licitacionesPromise = supabase
+      const { data: licitaciones, error: licError } = await supabase
         .from('licitaciones')
         .select('id_licitacion')
         .eq('procesada', false)
         .limit(1);
 
-      const { data: licitaciones, error: licError } = await licitacionesPromise;
-
       if (licError) {
         console.warn('Error consultando licitaciones:', licError);
       }
       
-      // Combinar resultados
-      const todas = [
+      return [
         ...(comprasAgiles || []).map(ca => ({ id_licitacion: ca.codigo })),
         ...(licitaciones || []),
       ];
-      
-      return todas;
     },
-    refetchInterval: 30000, // Revisar cada 30 segundos
-    staleTime: 15000, // Cache por 15 segundos
-    gcTime: 60000, // Garbage collect después de 1 minuto
+    refetchInterval: 30000,
+    staleTime: 15000,
+    gcTime: 60000,
   });
 
-  // Ejecutar matching cuando hay licitaciones nuevas
   useEffect(() => {
     if (licitacionesNuevas && licitacionesNuevas.length > 0 && !isPending && !hasRunRef.current) {
       console.log('🔄 Detectadas licitaciones nuevas, ejecutando matching automático...');
@@ -307,7 +234,6 @@ export function useAutoMatching() {
       runMatching();
     }
     
-    // Reset flag when no new licitaciones
     if (licitacionesNuevas?.length === 0) {
       hasRunRef.current = false;
     }
@@ -320,14 +246,13 @@ export function useAutoMatching() {
   };
 }
 
-// Hook para obtener el resultado de matching de una licitación específica (optimizado)
+// Hook para obtener el resultado de matching de una licitación específica
 export function useMatchingResult(licitacionId: string | null) {
   return useQuery({
     queryKey: ['matching-result', licitacionId],
     queryFn: async () => {
       if (!licitacionId) return null;
 
-      // Buscar primero en compras_agiles (más común)
       const { data: compraAgil, error: caError } = await supabase
         .from('compras_agiles')
         .select('codigo, nombre, match_encontrado, match_score')
@@ -343,7 +268,6 @@ export function useMatchingResult(licitacionId: string | null) {
         };
       }
 
-      // Si no está en compras_agiles, buscar en licitaciones (legacy)
       const { data, error } = await supabase
         .from('licitaciones')
         .select('id_licitacion, titulo, match_encontrado, match_score')
@@ -362,7 +286,7 @@ export function useMatchingResult(licitacionId: string | null) {
       } : null;
     },
     enabled: !!licitacionId,
-    staleTime: 30000, // Cache por 30 segundos
-    gcTime: 120000, // Garbage collect después de 2 minutos
+    staleTime: 30000,
+    gcTime: 120000,
   });
 }
