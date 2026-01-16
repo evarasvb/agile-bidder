@@ -188,7 +188,11 @@ CREATE INDEX IF NOT EXISTS idx_orden_compra_items_codigo ON public.orden_compra_
 ALTER TABLE public.ordenes_compra ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orden_compra_items ENABLE ROW LEVEL SECURITY;
 
--- Políticas RLS para ordenes_compra
+-- Políticas RLS para ordenes_compra (idempotente: DROP antes de CREATE)
+DROP POLICY IF EXISTS "Users can view ordenes_compra" ON public.ordenes_compra;
+DROP POLICY IF EXISTS "Users can insert ordenes_compra" ON public.ordenes_compra;
+DROP POLICY IF EXISTS "Users can update ordenes_compra" ON public.ordenes_compra;
+
 CREATE POLICY "Users can view ordenes_compra"
   ON public.ordenes_compra
   FOR SELECT
@@ -204,7 +208,11 @@ CREATE POLICY "Users can update ordenes_compra"
   FOR UPDATE
   USING (true);
 
--- Políticas RLS para orden_compra_items
+-- Políticas RLS para orden_compra_items (idempotente: DROP antes de CREATE)
+DROP POLICY IF EXISTS "Users can view orden_compra_items" ON public.orden_compra_items;
+DROP POLICY IF EXISTS "Users can insert orden_compra_items" ON public.orden_compra_items;
+DROP POLICY IF EXISTS "Users can update orden_compra_items" ON public.orden_compra_items;
+
 CREATE POLICY "Users can view orden_compra_items"
   ON public.orden_compra_items
   FOR SELECT
