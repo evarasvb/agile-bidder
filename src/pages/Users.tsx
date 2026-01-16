@@ -12,11 +12,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, UserPlus, Shield, User, Mail, Building2, Calendar, MoreHorizontal, Trash2, KeyRound, UserCircle, Sparkles, HelpCircle } from "lucide-react";
+import { Loader2, UserPlus, Shield, User, Mail, Building2, Calendar, MoreHorizontal, Trash2, KeyRound, UserCircle, Sparkles, HelpCircle, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ExecuteMigrationDialog } from "@/components/admin/ExecuteMigrationDialog";
 
 interface UserWithProfile {
@@ -41,6 +42,8 @@ export default function Users() {
   const [newUserEmail, setNewUserEmail] = useState("");
   const [newUserPassword, setNewUserPassword] = useState("");
   const [newUserName, setNewUserName] = useState("");
+  const [userToDelete, setUserToDelete] = useState<string | null>(null);
+  const [userToReset, setUserToReset] = useState<string | null>(null);
   const [newUserRole, setNewUserRole] = useState<'admin' | 'user'>('user');
 
   // Fetch all users with their profiles and roles
@@ -150,6 +153,133 @@ export default function Users() {
     },
   });
 
+  // Reset user password
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const redirectUrl = `${window.location.origin}/auth?reset=true`;
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectUrl,
+      });
+      if (error) throw error;
+    },
+    onSuccess: (_, email) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      setUserToReset(null);
+      toast.success('Email de recuperación enviado', {
+        description: `Se envió un email a ${email} para resetear la contraseña`,
+        duration: 5000,
+      });
+    },
+    onError: (error: any) => {
+      console.error('Error resetting password:', error);
+      const errorMessage = error?.message || 'Error al enviar email de recuperación';
+      toast.error(errorMessage);
+    },
+  });
+
+  // Delete user
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      // Primero eliminar de tablas relacionadas (CASCADE debería hacerlo automáticamente, pero por seguridad)
+      
+      // Eliminar roles
+      const { error: rolesError } = await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', userId);
+      
+      if (rolesError) {
+        console.warn('Error eliminando roles:', rolesError);
+        // Continuar aunque falle
+      }
+
+      // Eliminar perfil
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('user_id', userId);
+      
+      if (profileError) {
+        console.warn('Error eliminando perfil:', profileError);
+        // Continuar aunque falle
+      }
+
+      // Eliminar cliente
+      const { error: clienteError } = await supabase
+        .from('clientes')
+        .delete()
+        .eq('user_id', userId);
+      
+      if (clienteError) {
+        console.warn('Error eliminando cliente:', clienteError);
+        // Continuar aunque falle
+      }
+
+      // Finalmente eliminar el usuario de auth.users usando Admin API
+      // Nota: Esto requiere permisos de admin en Supabase
+      // Como no tenemos acceso directo desde el cliente, usaremos una Edge Function
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Debes estar autenticado');
+
+        const response = await fetch(
+          `${supabase.supabaseUrl}/functions/v1/delete-user`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ userId }),
+          }
+        );
+
+        if (!response.ok) {
+          // Si la función no existe, solo eliminamos los datos relacionados
+          if (response.status === 404) {
+            console.warn('Edge Function delete-user no existe. Solo se eliminaron datos relacionados.');
+            toast.warning('Usuario desactivado', {
+              description: 'Los datos relacionados fueron eliminados. El usuario debe ser eliminado manualmente desde Supabase Dashboard.',
+            });
+            return;
+          }
+          const error = await response.json();
+          throw new Error(error.error || `Error ${response.status}`);
+        }
+
+        return await response.json();
+      } catch (error: any) {
+        // Si falla, al menos eliminamos los datos relacionados
+        if (error.message?.includes('Failed to fetch') || error.message?.includes('404')) {
+          console.warn('No se pudo eliminar de auth.users, pero se eliminaron datos relacionados');
+          throw new Error('PARTIAL_DELETE');
+        }
+        throw error;
+      }
+    },
+    onSuccess: (_, userId) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      setUserToDelete(null);
+      toast.success('Usuario eliminado', {
+        description: 'El usuario y todos sus datos han sido eliminados del sistema',
+        duration: 5000,
+      });
+    },
+    onError: (error: any, userId) => {
+      console.error('Error deleting user:', error);
+      if (error.message === 'PARTIAL_DELETE') {
+        queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+        setUserToDelete(null);
+        // Ya mostramos el warning en el mutationFn
+        return;
+      }
+      const errorMessage = error?.message || 'Error al eliminar usuario';
+      toast.error(errorMessage, {
+        description: 'Revisa la consola para más detalles',
+      });
+    },
+  });
+
   // Toggle Odoo enabled
   const toggleOdooMutation = useMutation({
     mutationFn: async ({ userId, enabled }: { userId: string; enabled: boolean }) => {
@@ -201,7 +331,7 @@ export default function Users() {
     },
   });
 
-  // Create new user
+  // Create new user - Método simplificado y mejorado
   const createUserMutation = useMutation({
     mutationFn: async () => {
       if (!newUserEmail || !newUserPassword) {
@@ -221,125 +351,108 @@ export default function Users() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Debes estar autenticado para crear usuarios');
 
-      // Intentar usar Edge Function primero, si falla usar método alternativo
-      try {
-        const response = await fetch(
-          `${supabase.supabaseUrl}/functions/v1/create-user`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              email: newUserEmail,
-              password: newUserPassword,
-              full_name: newUserName || newUserEmail.split('@')[0],
-              role: newUserRole,
-            }),
-          }
-        );
+      // Verificar si el usuario ya existe
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('user_id, email')
+        .eq('email', newUserEmail.toLowerCase().trim())
+        .maybeSingle();
 
-        if (response.ok) {
-          return await response.json();
-        }
-        
-        // Si la función no existe (404), usar método alternativo
-        if (response.status === 404) {
-          console.warn('Edge Function create-user no existe, usando método alternativo');
-          throw new Error('EDGE_FUNCTION_NOT_FOUND');
-        }
-
-        const error = await response.json();
-        throw new Error(error.error || `Error ${response.status}: ${response.statusText}`);
-      } catch (error: any) {
-        // Método alternativo: usar signUp y luego actualizar perfil/rol
-        if (error.message === 'EDGE_FUNCTION_NOT_FOUND' || error.message?.includes('Failed to fetch')) {
-          console.log('Usando método alternativo: signUp + actualizar perfil');
-          
-          // Crear usuario con signUp (requiere que el email no esté confirmado o usar auto-confirm)
-          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-            email: newUserEmail,
-            password: newUserPassword,
-            options: {
-              data: {
-                full_name: newUserName || newUserEmail.split('@')[0],
-              },
-              emailRedirectTo: window.location.origin,
-            }
-          });
-
-          if (signUpError) {
-            // Si el usuario ya existe, intentar actualizar
-            if (signUpError.message.includes('already registered') || signUpError.message.includes('already exists')) {
-              throw new Error('El usuario ya existe. Usa "Actualizar" en lugar de crear.');
-            }
-            throw signUpError;
-          }
-
-          if (!signUpData.user) {
-            throw new Error('No se pudo crear el usuario');
-          }
-
-          const userId = signUpData.user.id;
-
-          // Crear/actualizar perfil
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .upsert({
-              user_id: userId,
-              email: newUserEmail,
-              full_name: newUserName || newUserEmail.split('@')[0],
-            }, {
-              onConflict: 'user_id'
-            });
-
-          if (profileError) {
-            console.error('Error creando perfil:', profileError);
-            // Continuar aunque falle el perfil
-          }
-
-          // Asignar rol
-          const { error: roleError } = await supabase
-            .from('user_roles')
-            .upsert({
-              user_id: userId,
-              role: newUserRole,
-            }, {
-              onConflict: 'user_id,role'
-            });
-
-          if (roleError) {
-            console.error('Error asignando rol:', roleError);
-            // Continuar aunque falle el rol
-          }
-
-          // Crear registro en clientes si no existe
-          const { error: clienteError } = await supabase
-            .from('clientes')
-            .upsert({
-              user_id: userId,
-              empresa_nombre: null,
-              odoo_enabled: false,
-            }, {
-              onConflict: 'user_id'
-            });
-
-          if (clienteError) {
-            console.error('Error creando cliente:', clienteError);
-            // Continuar aunque falle
-          }
-
-          return {
-            user: signUpData.user,
-            message: 'Usuario creado exitosamente'
-          };
-        }
-        
-        throw error;
+      if (existingProfile) {
+        throw new Error(`El usuario con email ${newUserEmail} ya existe en el sistema.`);
       }
+
+      // Crear usuario directamente con signUp
+      console.log('Creando usuario:', newUserEmail);
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: newUserEmail.toLowerCase().trim(),
+        password: newUserPassword,
+        options: {
+          data: {
+            full_name: newUserName || newUserEmail.split('@')[0],
+          },
+          emailRedirectTo: `${window.location.origin}/auth`,
+        }
+      });
+
+      if (signUpError) {
+        console.error('Error en signUp:', signUpError);
+        // Mensajes de error más amigables
+        if (signUpError.message.includes('already registered') || signUpError.message.includes('already exists') || signUpError.message.includes('User already registered')) {
+          throw new Error(`El email ${newUserEmail} ya está registrado. El usuario puede iniciar sesión directamente.`);
+        }
+        if (signUpError.message.includes('Invalid email')) {
+          throw new Error('El formato del email no es válido.');
+        }
+        if (signUpError.message.includes('Password')) {
+          throw new Error('La contraseña no cumple con los requisitos de seguridad.');
+        }
+        throw new Error(signUpError.message || 'Error al crear el usuario. Intenta nuevamente.');
+      }
+
+      if (!signUpData.user) {
+        throw new Error('No se pudo crear el usuario. Verifica la configuración de Supabase.');
+      }
+
+      const userId = signUpData.user.id;
+      const fullName = newUserName || newUserEmail.split('@')[0];
+
+      // Crear perfil (puede que ya exista por trigger, pero lo creamos/actualizamos por si acaso)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert({
+          user_id: userId,
+          email: newUserEmail.toLowerCase().trim(),
+          full_name: fullName,
+        }, {
+          onConflict: 'user_id'
+        });
+
+      if (profileError) {
+        console.warn('Advertencia al crear perfil (puede que ya exista):', profileError);
+        // Continuar aunque falle, el trigger puede haberlo creado
+      }
+
+      // Asignar rol (esperar un poco para que el perfil se cree)
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .upsert({
+          user_id: userId,
+          role: newUserRole,
+        }, {
+          onConflict: 'user_id,role'
+        });
+
+      if (roleError) {
+        console.warn('Advertencia al asignar rol:', roleError);
+        // Continuar aunque falle
+      }
+
+      // Crear registro en clientes si no existe
+      const { error: clienteError } = await supabase
+        .from('clientes')
+        .upsert({
+          user_id: userId,
+          empresa_nombre: null,
+          odoo_enabled: false,
+        }, {
+          onConflict: 'user_id'
+        });
+
+      if (clienteError) {
+        console.warn('Advertencia al crear cliente:', clienteError);
+        // Continuar aunque falle
+      }
+
+      return {
+        user: signUpData.user,
+        message: 'Usuario creado exitosamente',
+        emailConfirmed: !!signUpData.user.email_confirmed_at,
+      };
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       setIsAddUserOpen(false);
       const emailCreated = newUserEmail;
       const roleCreated = newUserRole;
@@ -351,8 +464,8 @@ export default function Users() {
       toast.success(
         `✅ Usuario creado exitosamente${roleCreated === 'admin' ? ' como Administrador' : ''}`,
         {
-          description: `${emailCreated} puede iniciar sesión ahora`,
-          duration: 4000,
+          description: `${emailCreated} puede iniciar sesión ahora. ${data?.emailConfirmed ? 'Email confirmado automáticamente.' : 'Debe confirmar su email para iniciar sesión.'}`,
+          duration: 6000,
         }
       );
     },
@@ -360,19 +473,27 @@ export default function Users() {
       console.error('Error creating user:', error);
       const errorMessage = error.message || 'Error al crear usuario';
       
-      // Mensajes más descriptivos
+      // Mensajes más descriptivos y útiles
       let userMessage = errorMessage;
-      if (errorMessage.includes('already registered') || errorMessage.includes('already exists')) {
-        userMessage = 'El usuario ya existe. Verifica el email o actualiza el usuario existente.';
-      } else if (errorMessage.includes('Invalid email')) {
-        userMessage = 'El formato del email no es válido.';
-      } else if (errorMessage.includes('Password')) {
-        userMessage = 'La contraseña no cumple los requisitos mínimos.';
+      let description = 'Revisa los datos e intenta nuevamente';
+      
+      if (errorMessage.includes('already registered') || errorMessage.includes('already exists') || errorMessage.includes('ya está registrado')) {
+        userMessage = 'El usuario ya existe';
+        description = 'Este email ya está registrado. El usuario puede iniciar sesión directamente o puedes resetear su contraseña.';
+      } else if (errorMessage.includes('Invalid email') || errorMessage.includes('formato del email')) {
+        userMessage = 'Email inválido';
+        description = 'Verifica que el email tenga un formato correcto (ejemplo: usuario@dominio.com)';
+      } else if (errorMessage.includes('Password') || errorMessage.includes('contraseña')) {
+        userMessage = 'Contraseña inválida';
+        description = 'La contraseña debe tener al menos 6 caracteres';
+      } else if (errorMessage.includes('autenticado')) {
+        userMessage = 'Sesión expirada';
+        description = 'Por favor, inicia sesión nuevamente';
       }
       
       toast.error(userMessage, {
-        description: 'Revisa los datos e intenta nuevamente',
-        duration: 5000,
+        description: description,
+        duration: 6000,
       });
     },
   });
@@ -457,10 +578,17 @@ export default function Users() {
                   type="email"
                   placeholder="usuario@ejemplo.com"
                   value={newUserEmail}
-                  onChange={(e) => setNewUserEmail(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value.toLowerCase().trim();
+                    setNewUserEmail(value);
+                  }}
                   required
                   className="h-11"
+                  disabled={createUserMutation.isPending}
                 />
+                {newUserEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newUserEmail) && (
+                  <p className="text-xs text-destructive">El formato del email no es válido</p>
+                )}
               </div>
 
               {/* Contraseña */}
@@ -477,8 +605,16 @@ export default function Users() {
                   onChange={(e) => setNewUserPassword(e.target.value)}
                   required
                   className="h-11"
+                  disabled={createUserMutation.isPending}
                 />
-                <p className="text-xs text-muted-foreground">El usuario podrá cambiarla después de iniciar sesión</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">El usuario podrá cambiarla después de iniciar sesión</p>
+                  {newUserPassword && (
+                    <p className={`text-xs ${newUserPassword.length >= 6 ? 'text-success' : 'text-destructive'}`}>
+                      {newUserPassword.length}/6 caracteres
+                    </p>
+                  )}
+                </div>
               </div>
 
               {/* Rol */}
@@ -554,13 +690,19 @@ export default function Users() {
               </Button>
               <Button 
                 onClick={() => createUserMutation.mutate()}
-                disabled={createUserMutation.isPending || !newUserEmail || !newUserPassword || newUserPassword.length < 6}
+                disabled={
+                  createUserMutation.isPending || 
+                  !newUserEmail || 
+                  !newUserPassword || 
+                  newUserPassword.length < 6 ||
+                  !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newUserEmail)
+                }
                 className="bg-firmavb-blue hover:bg-firmavb-blue/90"
               >
                 {createUserMutation.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creando...
+                    Creando usuario...
                   </>
                 ) : (
                   <>
@@ -718,10 +860,26 @@ export default function Users() {
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem className="text-destructive">
+                        <DropdownMenuContent align="end" className="w-56 z-50">
+                          <DropdownMenuItem 
+                            onSelect={(e) => {
+                              e.preventDefault();
+                              setUserToReset(user.email);
+                            }}
+                            className="cursor-pointer focus:bg-muted"
+                          >
+                            <RotateCcw className="h-4 w-4 mr-2 text-blue-600" />
+                            <span>Resetear Contraseña</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onSelect={(e) => {
+                              e.preventDefault();
+                              setUserToDelete(user.id);
+                            }}
+                            className="text-destructive cursor-pointer focus:bg-destructive/10 focus:text-destructive"
+                          >
                             <Trash2 className="h-4 w-4 mr-2" />
-                            Eliminar
+                            <span>Eliminar Usuario</span>
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -740,6 +898,120 @@ export default function Users() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Confirm Reset Password Dialog */}
+      <AlertDialog open={!!userToReset} onOpenChange={(open) => !open && setUserToReset(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Resetear contraseña?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se enviará un email a <strong>{userToReset}</strong> con un enlace para crear una nueva contraseña.
+              <br />
+              <br />
+              <span className="text-blue-600 dark:text-blue-400">
+                ℹ️ El usuario podrá ingresar con su nueva contraseña después de hacer clic en el enlace del email.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (userToReset) {
+                  resetPasswordMutation.mutate(userToReset);
+                }
+              }}
+              className="bg-firmavb-blue hover:bg-firmavb-blue/90"
+              disabled={resetPasswordMutation.isPending}
+            >
+              {resetPasswordMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                <>
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Enviar Email
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm Delete User Dialog */}
+      <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {userToDelete && (() => {
+                const user = users?.find(u => u.id === userToDelete);
+                return (
+                  <>
+                    Estás a punto de eliminar permanentemente a <strong>{user?.profile?.full_name || user?.email}</strong>.
+                    <br />
+                    <br />
+                    <span className="text-destructive font-semibold">
+                      ⚠️ Esta acción no se puede deshacer. Se eliminarán:
+                    </span>
+                    <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
+                      <li>Cuenta de usuario</li>
+                      <li>Perfil y datos personales</li>
+                      <li>Roles y permisos</li>
+                      <li>Datos de empresa/cliente</li>
+                      <li>Inventario asociado</li>
+                    </ul>
+                    <br />
+                    <span className="text-amber-600 dark:text-amber-400">
+                      💡 Alternativa: Puedes resetear la contraseña en lugar de eliminar el usuario.
+                    </span>
+                  </>
+                );
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (userToDelete) {
+                  const user = users?.find(u => u.id === userToDelete);
+                  setUserToDelete(null);
+                  setUserToReset(user?.email || null);
+                }
+              }}
+              className="mr-auto"
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Mejor resetear contraseña
+            </Button>
+            <AlertDialogAction
+              onClick={() => {
+                if (userToDelete) {
+                  deleteUserMutation.mutate(userToDelete);
+                }
+              }}
+              className="bg-destructive hover:bg-destructive/90"
+              disabled={deleteUserMutation.isPending}
+            >
+              {deleteUserMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Eliminando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Eliminar Permanentemente
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Confirm Role Change Dialog */}
       <AlertDialog open={!!confirmRoleChange} onOpenChange={(open) => !open && setConfirmRoleChange(null)}>
