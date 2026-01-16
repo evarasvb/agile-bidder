@@ -298,7 +298,7 @@
   function scrapeItems() {
     const items = [];
     
-    // Buscar tablas de productos
+    // Buscar tablas de productos - múltiples estrategias
     const tables = document.querySelectorAll('table');
     
     tables.forEach(table => {
@@ -307,19 +307,79 @@
       rows.forEach((row, index) => {
         const cells = row.querySelectorAll('td');
         if (cells.length >= 2) {
-          const nombre = cells[0]?.textContent?.trim();
-          if (nombre && nombre.length > 2) {
+          const nombre = cells[0]?.textContent?.trim() || cells[1]?.textContent?.trim();
+          if (nombre && nombre.length > 2 && !nombre.match(/^(item|producto|descripción|cantidad|unidad|precio)$/i)) {
+            // Intentar extraer cantidad de diferentes columnas
+            let cantidad = 1;
+            let unidad = 'UN';
+            let descripcion = '';
+            
+            // Buscar cantidad en diferentes posiciones
+            for (let i = 0; i < cells.length; i++) {
+              const cellText = cells[i]?.textContent?.trim() || '';
+              // Si parece una cantidad (número)
+              if (cellText.match(/^\d+([.,]\d+)?$/)) {
+                cantidad = parseFloat(cellText.replace(/[^\d.,]/g, '').replace(',', '.')) || 1;
+              }
+              // Si parece una unidad (texto corto)
+              if (cellText.match(/^(UN|KG|M|M2|M3|LT|PZA|CAJ|PAR|SET)$/i)) {
+                unidad = cellText.toUpperCase();
+              }
+              // Si es una descripción (texto largo)
+              if (i > 0 && cellText.length > 20 && cellText.length < 500) {
+                descripcion = cellText;
+              }
+            }
+            
+            // Si no encontramos cantidad en las celdas, buscar en el texto completo de la fila
+            if (cantidad === 1) {
+              const cantidadMatch = row.textContent.match(/(?:cantidad|qty|qty\.)[:\s]*(\d+([.,]\d+)?)/i);
+              if (cantidadMatch) {
+                cantidad = parseFloat(cantidadMatch[1].replace(',', '.')) || 1;
+              }
+            }
+            
             items.push({
               correlativo: index + 1,
+              item_index: index + 1,
               nombre_producto: nombre.slice(0, 500),
-              descripcion: cells[1]?.textContent?.trim()?.slice(0, 1000) || '',
-              cantidad: parseFloat(cells[2]?.textContent?.replace(/[^\d.,]/g, '').replace(',', '.')) || 1,
-              unidad: cells[3]?.textContent?.trim() || 'UN'
+              descripcion: descripcion || cells[1]?.textContent?.trim()?.slice(0, 1000) || '',
+              cantidad: cantidad,
+              unidad: unidad || cells[3]?.textContent?.trim() || 'UN'
             });
           }
         }
       });
     });
+    
+    // Si no encontramos items en tablas, buscar en listas o divs
+    if (items.length === 0) {
+      const itemSelectors = [
+        '.item-producto', '.producto-item', '.item-licitacion',
+        '[class*="item"]', '[class*="producto"]', '[class*="product"]'
+      ];
+      
+      itemSelectors.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach((el, index) => {
+          const nombre = el.querySelector('[class*="nombre"], [class*="titulo"], strong, b')?.textContent?.trim();
+          if (nombre && nombre.length > 2) {
+            const descripcion = el.querySelector('[class*="descripcion"], p')?.textContent?.trim() || '';
+            const cantidadMatch = el.textContent.match(/(?:cantidad|qty)[:\s]*(\d+)/i);
+            const cantidad = cantidadMatch ? parseFloat(cantidadMatch[1]) : 1;
+            
+            items.push({
+              correlativo: index + 1,
+              item_index: index + 1,
+              nombre_producto: nombre.slice(0, 500),
+              descripcion: descripcion.slice(0, 1000),
+              cantidad: cantidad,
+              unidad: 'UN'
+            });
+          }
+        });
+      });
+    }
     
     return items;
   }

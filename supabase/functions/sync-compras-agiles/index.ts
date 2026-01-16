@@ -142,6 +142,38 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        // Si hay items en el body o en la licitación, guardarlos
+        const itemsToSave = items || lic.items || [];
+        if (itemsToSave.length > 0) {
+          // Eliminar items existentes para esta compra ágil
+          await supabase
+            .from('licitacion_items')
+            .delete()
+            .eq('licitacion_codigo', lic.codigo);
+
+          // Insertar nuevos items
+          const itemsData = itemsToSave.map((item: any, index: number) => ({
+            licitacion_codigo: lic.codigo,
+            licitacion_id: lic.codigo, // Mantener compatibilidad con tabla licitaciones
+            item_index: item.correlativo || item.item_index || (index + 1),
+            nombre_producto: item.nombre_producto || item.nombre || 'Producto sin nombre',
+            descripcion: item.descripcion || null,
+            cantidad: item.cantidad || 1,
+            unidad: item.unidad || item.unidadMedida || 'UN'
+          }));
+
+          const { error: itemsError } = await supabase
+            .from('licitacion_items')
+            .insert(itemsData);
+
+          if (itemsError) {
+            console.error(`Error inserting items for compra ágil ${lic.codigo}:`, itemsError);
+            results.errors.push(`Error guardando items de ${lic.codigo}: ${itemsError.message}`);
+          } else {
+            console.log(`Inserted ${itemsData.length} items for compra ágil ${lic.codigo}`);
+          }
+        }
+
         results.synced++;
       } catch (itemError) {
         console.error(`Error processing compra ágil:`, itemError);
