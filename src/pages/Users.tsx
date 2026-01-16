@@ -19,6 +19,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ExecuteMigrationDialog } from "@/components/admin/ExecuteMigrationDialog";
 import { ApplyMigrationsButton } from "@/components/admin/ApplyMigrationsButton";
 
@@ -47,6 +48,7 @@ export default function Users() {
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   const [userToReset, setUserToReset] = useState<string | null>(null);
   const [newUserRole, setNewUserRole] = useState<AppRole>('user');
+  const [confirmRoleChange, setConfirmRoleChange] = useState<{ userId: string; isCurrentlyAdmin: boolean; userName?: string; newRole?: string } | null>(null);
 
   // Fetch all users with their profiles and roles
   const { data: users, isLoading } = useQuery({
@@ -224,8 +226,10 @@ export default function Users() {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) throw new Error('Debes estar autenticado');
 
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://euzqadopjvdszcdjegmo.supabase.co';
+
         const response = await fetch(
-          `${supabase.supabaseUrl}/functions/v1/delete-user`,
+          `${supabaseUrl}/functions/v1/delete-user`,
           {
             method: 'POST',
             headers: {
@@ -304,12 +308,17 @@ export default function Users() {
           .eq('user_id', userId);
         if (error) throw error;
       } else {
-        // Crear si no existe
+        // Crear si no existe - need to provide all required fields
+        const user = users?.find(u => u.id === userId);
         const { error } = await supabase
           .from('clientes')
           .insert({
             user_id: userId,
-            empresa_nombre: null,
+            empresa_nombre: user?.profile?.full_name || 'Sin nombre',
+            rut: '00.000.000-0',
+            email: user?.email || '',
+            nombre_responsable: user?.profile?.full_name || 'Sin nombre',
+            region: 'Metropolitana',
             odoo_enabled: enabled,
           });
         if (error) throw error;
@@ -432,12 +441,16 @@ export default function Users() {
         // Continuar aunque falle
       }
 
-      // Crear registro en clientes si no existe
+      // Crear registro en clientes si no existe - need to provide all required fields
       const { error: clienteError } = await supabase
         .from('clientes')
         .upsert({
+          email: newUserEmail.toLowerCase().trim(),
+          empresa_nombre: newUserName || 'Sin nombre',
+          nombre_responsable: newUserName || 'Sin nombre',
+          region: 'Metropolitana',
+          rut: '00.000.000-0',
           user_id: userId,
-          empresa_nombre: null,
           odoo_enabled: false,
         }, {
           onConflict: 'user_id'
@@ -880,6 +893,7 @@ export default function Users() {
                             const userName = user.profile?.full_name || user.email;
                             setConfirmRoleChange({
                               userId: user.id,
+                              isCurrentlyAdmin: isUserAdmin,
                               newRole: isUserAdmin ? 'user' : 'admin',
                               userName,
                             });

@@ -438,7 +438,7 @@ function OrdenCompraDetalle({ orden }: { orden: OrdenCompra }) {
                 <TableBody>
                   {orden.items.map((item, index) => (
                     <TableRow key={item.id}>
-                      <TableCell className="font-medium">{item.item_index}</TableCell>
+                      <TableCell className="font-medium">{item.correlativo || index + 1}</TableCell>
                       <TableCell className="font-medium max-w-[200px]">
                         <div className="truncate" title={item.nombre_producto || ''}>
                           {item.nombre_producto || 'N/A'}
@@ -454,10 +454,10 @@ function OrdenCompraDetalle({ orden }: { orden: OrdenCompra }) {
                       </TableCell>
                       <TableCell>{item.unidad || 'N/A'}</TableCell>
                       <TableCell className="text-right">
-                        {item.precio_unitario ? formatCurrency(item.precio_unitario) : 'N/A'}
+                        {item.precio_unitario_neto ? formatCurrency(item.precio_unitario_neto) : 'N/A'}
                       </TableCell>
                       <TableCell className="text-right font-semibold">
-                        {item.subtotal ? formatCurrency(item.subtotal) : 'N/A'}
+                        {item.total_neto ? formatCurrency(item.total_neto) : 'N/A'}
                       </TableCell>
                     </TableRow>
                   ))}
