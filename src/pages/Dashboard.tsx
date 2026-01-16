@@ -416,7 +416,7 @@ export default function Dashboard() {
                   <Gavel className="h-5 w-5 opacity-80" />
                 </div>
                 <p className="text-3xl font-heading font-bold font-mono tracking-tight">
-                  {formatCompact(stats?.valorTotal || metrics?.valorTotal || 0)}
+                  {formatCompact(stats?.valorPotencial || metrics?.valorPotencial || 0)}
                 </p>
                 <p className="text-sm opacity-80 mt-1">
                   En {stats?.totalOportunidades || metrics?.totalLicitaciones || 0} oportunidades activas
@@ -500,8 +500,8 @@ export default function Dashboard() {
                   <span className="font-semibold">{stats?.conMatch || 0}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Valor promedio</span>
-                  <span className="font-semibold font-mono">{formatCompact(stats?.valorPromedio || 0)}</span>
+                  <span className="text-sm text-muted-foreground">Valor potencial</span>
+                  <span className="font-semibold font-mono">{formatCompact(stats?.valorPotencial || 0)}</span>
                 </div>
               </CardContent>
             </Card>

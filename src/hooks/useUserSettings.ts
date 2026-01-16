@@ -26,6 +26,12 @@ export interface AutomationSettings {
   autoBid: boolean;
 }
 
+export interface RegionConfig {
+  nombre: string;
+  activa: boolean;
+  recargo_porcentaje: number;
+}
+
 export interface UserSettings {
   id?: string;
   user_id?: string;
@@ -34,6 +40,7 @@ export interface UserSettings {
   delivery_settings: DeliverySettings;
   automation_settings: AutomationSettings;
   regions: string[];
+  regiones_config?: RegionConfig[];
   api_key_encrypted: string | null;
   api_key_connected: boolean;
 }
