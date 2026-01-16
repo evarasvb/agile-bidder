@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
           fecha_envio: oc.fecha_envio || null,
           fecha_aceptacion: oc.fecha_aceptacion || null,
           estado: oc.estado || 'pendiente',
-          link_oficial: oc.link_oficial || window.location.href,
+          link_oficial: oc.link_oficial || null,
           datos_json: oc.datos_json || oc, // Store full scraped data
         };
 
