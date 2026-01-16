@@ -59,6 +59,7 @@ const navItems: NavItem[] = [
   { title: "Usuarios", url: "/users", icon: Users, sectionKey: "users" },
   { title: "Logs", url: "/logs", icon: FileText, sectionKey: "logs" },
   { title: "Configurar Roles", url: "/role-config", icon: Shield, sectionKey: "role_config" },
+  { title: "Permisos y Roles", url: "/permisos-roles", icon: Shield, sectionKey: "role_config" },
 ];
 
 const roleLabels: Record<string, string> = {

@@ -28,6 +28,7 @@ import BIDashboard from "./pages/BIDashboard";
 import BIAdvanced from "./pages/BIAdvanced";
 import GestionVendedores from "./pages/GestionVendedores";
 import RoleConfig from "./pages/RoleConfig";
+import PermisosRoles from "./pages/PermisosRoles";
 import Ofertas from "./pages/Ofertas";
 import OfertaDetalle from "./pages/OfertaDetalle";
 import ComprasAgiles from "./pages/ComprasAgiles";
@@ -89,6 +90,7 @@ const App = () => (
             <Route path="/logs" element={<Logs />} />
             <Route path="/users" element={<Users />} />
             <Route path="/role-config" element={<RoleConfig />} />
+            <Route path="/permisos-roles" element={<PermisosRoles />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/hooks/useProfile";
+import { type AppRole } from "@/hooks/useRolePermissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +20,7 @@ import { es } from "date-fns/locale";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ExecuteMigrationDialog } from "@/components/admin/ExecuteMigrationDialog";
+import { ApplyMigrationsButton } from "@/components/admin/ApplyMigrationsButton";
 
 interface UserWithProfile {
   id: string;
@@ -28,7 +30,7 @@ interface UserWithProfile {
     full_name: string | null;
     avatar_url: string | null;
   } | null;
-  roles: { role: 'admin' | 'user' }[];
+  roles: { role: AppRole }[];
   cliente: {
     empresa_nombre: string | null;
     odoo_enabled: boolean;
@@ -36,7 +38,7 @@ interface UserWithProfile {
 }
 
 export default function Users() {
-  const { isAdmin, loading: profileLoading } = useProfile();
+  const { isAdmin, isSuperAdmin, loading: profileLoading } = useProfile();
   const queryClient = useQueryClient();
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState("");
@@ -44,7 +46,7 @@ export default function Users() {
   const [newUserName, setNewUserName] = useState("");
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   const [userToReset, setUserToReset] = useState<string | null>(null);
-  const [newUserRole, setNewUserRole] = useState<'admin' | 'user'>('user');
+  const [newUserRole, setNewUserRole] = useState<AppRole>('user');
 
   // Fetch all users with their profiles and roles
   const { data: users, isLoading } = useQuery({
@@ -91,7 +93,7 @@ export default function Users() {
       roles?.forEach(role => {
         const user = usersMap.get(role.user_id);
         if (user) {
-          user.roles.push({ role: role.role as 'admin' | 'user' });
+          user.roles.push({ role: role.role as AppRole });
         }
       });
 
@@ -527,6 +529,7 @@ export default function Users() {
           </p>
         </div>
         <div className="flex gap-2">
+          <ApplyMigrationsButton />
           <ExecuteMigrationDialog />
         <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
           <DialogTrigger asChild>
@@ -623,13 +626,28 @@ export default function Users() {
                   <Shield className="h-4 w-4 text-muted-foreground" />
                   Rol del Usuario
                 </Label>
-                <Select value={newUserRole} onValueChange={(value: 'admin' | 'user') => setNewUserRole(value)}>
+                <Select value={newUserRole} onValueChange={(value: AppRole) => setNewUserRole(value)}>
                   <SelectTrigger className="h-11">
                     <SelectValue>
-                      {newUserRole === 'admin' ? (
+                      {newUserRole === 'super_admin' ? (
+                        <div className="flex items-center gap-2">
+                          <Shield className="h-4 w-4 text-destructive" />
+                          <span>Super Admin</span>
+                        </div>
+                      ) : newUserRole === 'admin' ? (
                         <div className="flex items-center gap-2">
                           <Shield className="h-4 w-4 text-firmavb-blue" />
                           <span>Administrador</span>
+                        </div>
+                      ) : newUserRole === 'vendedor' ? (
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-blue-600" />
+                          <span>Vendedor</span>
+                        </div>
+                      ) : newUserRole === 'visor' ? (
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          <span>Visor</span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">
@@ -658,10 +676,45 @@ export default function Users() {
                         </div>
                         <div>
                           <div className="font-medium">Administrador</div>
-                          <div className="text-xs text-muted-foreground">Acceso completo y gestión de usuarios</div>
+                          <div className="text-xs text-muted-foreground">Gestión completa del sistema</div>
                         </div>
                       </div>
                     </SelectItem>
+                    <SelectItem value="vendedor" className="py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                          <User className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div>
+                          <div className="font-medium">Vendedor</div>
+                          <div className="text-xs text-muted-foreground">Enfocado en oportunidades y postulaciones</div>
+                        </div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="visor" className="py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <div className="font-medium">Visor</div>
+                          <div className="text-xs text-muted-foreground">Solo lectura de reportes</div>
+                        </div>
+                      </div>
+                    </SelectItem>
+                    {isSuperAdmin && (
+                      <SelectItem value="super_admin" className="py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-destructive/10 flex items-center justify-center">
+                            <Shield className="h-4 w-4 text-destructive" />
+                          </div>
+                          <div>
+                            <div className="font-medium">Super Admin</div>
+                            <div className="text-xs text-muted-foreground">Acceso total y configuración de roles</div>
+                          </div>
+                        </div>
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
                 <div className="flex items-start gap-2 p-3 rounded-lg bg-gradient-to-r from-firmavb-blue/5 to-firmavb-red/5 border border-firmavb-blue/10">
@@ -733,7 +786,7 @@ export default function Users() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold">
-              {users?.filter(u => u.roles.some(r => r.role === 'admin')).length || 0}
+              {users?.filter(u => u.roles.some(r => r.role === 'admin' || r.role === 'super_admin')).length || 0}
             </p>
           </CardContent>
         </Card>
