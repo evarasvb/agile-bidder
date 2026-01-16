@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { 
   Search, 
   Gavel, 
@@ -33,7 +34,7 @@ import {
   XAxis, 
   YAxis, 
   CartesianGrid, 
-  Tooltip, 
+  Tooltip as RechartsTooltip, 
   ResponsiveContainer,
   Legend,
   BarChart,
@@ -55,8 +56,6 @@ import { FirmaVBHeader } from "@/components/layout/FirmaVBHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 
 export default function Dashboard() {
   const { data: metrics, isLoading: metricsLoading, error: metricsError, refetch: refetchMetrics } = useDashboardMetrics();
@@ -108,7 +107,8 @@ export default function Dashboard() {
       const total = (comprasAgiles?.length || 0) + (licitaciones?.length || 0);
       
       if (total === 0) {
-        toast.info('No hay compras ágiles nuevas para procesar', {
+        toast({
+          title: 'Sin compras ágiles nuevas',
           description: 'Todas las compras ágiles ya han sido procesadas'
         });
         return;
@@ -138,48 +138,6 @@ export default function Dashboard() {
       title: "Datos actualizados",
       description: "Se han recargado las métricas del dashboard",
     });
-  };
-
-  const handleMatchingClick = async () => {
-    // Cargar preview antes de ejecutar
-    try {
-      const { data: comprasAgiles } = await supabase
-        .from('compras_agiles')
-        .select('codigo', { count: 'exact' })
-        .or('match_encontrado.eq.false,match_encontrado.is.null')
-        .limit(1000);
-      
-      const { data: licitaciones } = await supabase
-        .from('licitaciones')
-        .select('id_licitacion', { count: 'exact' })
-        .eq('procesada', false)
-        .limit(1000);
-
-      const total = (comprasAgiles?.length || 0) + (licitaciones?.length || 0);
-      
-      if (total === 0) {
-        toast.info('No hay compras ágiles nuevas para procesar', {
-          description: 'Todas las compras ágiles ya han sido procesadas'
-        });
-        return;
-      }
-
-      setMatchingPreview({
-        total,
-        comprasAgiles: comprasAgiles?.length || 0,
-        licitaciones: licitaciones?.length || 0,
-      });
-      setMatchingDialogOpen(true);
-    } catch (error) {
-      console.error('Error loading preview:', error);
-      // Si falla el preview, ejecutar directamente
-      runMatching();
-    }
-  };
-
-  const handleConfirmMatching = () => {
-    setMatchingDialogOpen(false);
-    runMatching();
   };
 
   return (
@@ -458,248 +416,148 @@ export default function Dashboard() {
                   <Gavel className="h-5 w-5 opacity-80" />
                 </div>
                 <p className="text-3xl font-heading font-bold font-mono tracking-tight">
-                  {formatCompact(stats?.valorPotencial || metrics?.valorPotencial || 0)}
+                  {formatCompact(stats?.valorTotal || metrics?.valorTotal || 0)}
                 </p>
-                <p className="text-xs opacity-80 mt-2">
-                  De {stats?.conMatch || metrics?.matchesEncontrados || 0} oportunidades con match
+                <p className="text-sm opacity-80 mt-1">
+                  En {stats?.totalOportunidades || metrics?.totalLicitaciones || 0} oportunidades activas
                 </p>
               </CardContent>
             </Card>
           )}
 
-          {/* Próximas a Vencer */}
+          {/* Urgent Listings */}
           {urgentesLoading ? (
             <UrgentListSkeleton />
           ) : urgentesError ? (
             <Card className="border-border/50 shadow-sm">
-              <CardContent className="py-8 flex flex-col items-center justify-center text-firmavb-red">
-                <AlertTriangle className="h-8 w-8 mb-2 opacity-70" />
-                <p className="text-sm">Error al cargar</p>
+              <CardContent className="py-6 text-center text-firmavb-red">
+                <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-70" />
+                <p className="text-sm">Error al cargar urgentes</p>
               </CardContent>
             </Card>
           ) : (
             <Card className="border-border/50 shadow-sm">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base font-heading font-semibold flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-firmavb-orange" />
-                  Próximas a Vencer
+                  <Clock className="h-4 w-4 text-firmavb-amber" />
+                  Cierran Pronto
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 {!urgentes?.length ? (
                   <div className="text-center py-4 text-muted-foreground">
-                    <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <Inbox className="h-8 w-8 mx-auto mb-2 opacity-50" />
                     <p className="text-sm">Sin licitaciones urgentes</p>
                   </div>
                 ) : (
-                  urgentes.map((lic) => (
-                    <UrgentTenderCard key={lic.id_licitacion} tender={lic} />
+                  urgentes.slice(0, 4).map((lic) => (
+                    <div
+                      key={lic.id_licitacion}
+                      className="p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{lic.titulo}</p>
+                          <p className="text-xs text-muted-foreground truncate">{lic.organismo}</p>
+                        </div>
+                        <Badge variant="outline" className="shrink-0 text-firmavb-amber border-firmavb-amber/30">
+                          {lic.diasRestantes}d
+                        </Badge>
+                      </div>
+                    </div>
                   ))
                 )}
-                {urgentes && urgentes.length > 0 && (
-                  <Button 
-                    asChild 
-                    variant="ghost" 
-                    size="sm" 
-                    className="w-full mt-2 text-firmavb-blue hover:text-firmavb-blue hover:bg-firmavb-blue/10"
-                  >
-                    <Link to="/licitaciones">
-                      Ver todas
-                      <ArrowRight className="h-4 w-4 ml-1" />
-                    </Link>
-                  </Button>
+                {urgentes && urgentes.length > 4 && (
+                  <Link to="/licitaciones">
+                    <Button variant="ghost" className="w-full text-firmavb-blue hover:text-firmavb-blue hover:bg-firmavb-blue/10">
+                      Ver todas ({urgentes.length})
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </Link>
                 )}
               </CardContent>
             </Card>
           )}
 
           {/* Quick Stats */}
-          {metricsLoading ? (
+          {statsLoading ? (
             <StatsCardSkeleton />
           ) : (
             <Card className="border-border/50 shadow-sm">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base font-heading font-semibold">Rendimiento</CardTitle>
+                <CardTitle className="text-base font-heading font-semibold flex items-center gap-2">
+                  <Trophy className="h-4 w-4 text-firmavb-green" />
+                  Estadísticas Rápidas
+                </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <ProgressStat 
-                  label="Match Rate" 
-                  value={stats?.matchRate || metrics?.porcentajeMatches || 0} 
-                  color="blue" 
-                />
-                <ProgressStat 
-                  label="Tasa de Éxito" 
-                  value={metrics?.tasaExito || 0} 
-                  color="green" 
-                />
-                <ProgressStat 
-                  label="Ofertas Activas" 
-                  value={metrics?.ofertasEnviadas && metrics?.ofertasPendientes ? 
-                    Math.round((metrics.ofertasEnviadas / (metrics.ofertasEnviadas + metrics.ofertasPendientes)) * 100) : 0
-                  } 
-                  color="amber" 
-                />
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Tasa de match</span>
+                  <span className="font-semibold text-firmavb-green">{stats?.matchRate || 0}%</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Con match</span>
+                  <span className="font-semibold">{stats?.conMatch || 0}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Valor promedio</span>
+                  <span className="font-semibold font-mono">{formatCompact(stats?.valorPromedio || 0)}</span>
+                </div>
               </CardContent>
             </Card>
           )}
         </div>
       </div>
 
-      {/* Oportunidades Table */}
-      <OportunidadesTable />
-
-      {/* Activity Feed */}
-      <ActivityFeed />
+      {/* Activity Feed and Opportunities Table */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <div className="xl:col-span-2">
+          <OportunidadesTable />
+        </div>
+        <div>
+          <ActivityFeed />
+        </div>
+      </div>
     </div>
   );
 }
 
+// Metric Card Component
 interface MetricCardProps {
   title: string;
   value: string | number;
   subtitle: string;
-  icon: React.ElementType;
-  color: 'blue' | 'green' | 'amber' | 'emerald' | 'red';
+  icon: React.ComponentType<{ className?: string }>;
+  color: 'blue' | 'green' | 'amber' | 'emerald';
   trend?: string;
 }
 
 function MetricCard({ title, value, subtitle, icon: Icon, color, trend }: MetricCardProps) {
   const colorClasses = {
-    blue: {
-      bg: 'bg-firmavb-blue/10',
-      icon: 'text-firmavb-blue',
-      border: 'border-firmavb-blue/20',
-    },
-    green: {
-      bg: 'bg-firmavb-green/10',
-      icon: 'text-firmavb-green',
-      border: 'border-firmavb-green/20',
-    },
-    amber: {
-      bg: 'bg-firmavb-orange/10',
-      icon: 'text-firmavb-orange',
-      border: 'border-firmavb-orange/20',
-    },
-    emerald: {
-      bg: 'bg-firmavb-green/10',
-      icon: 'text-firmavb-green',
-      border: 'border-firmavb-green/20',
-    },
-    red: {
-      bg: 'bg-firmavb-red/10',
-      icon: 'text-firmavb-red',
-      border: 'border-firmavb-red/20',
-    },
+    blue: 'text-firmavb-blue bg-firmavb-blue/10',
+    green: 'text-firmavb-green bg-firmavb-green/10',
+    amber: 'text-firmavb-amber bg-firmavb-amber/10',
+    emerald: 'text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30',
   };
 
-  const colors = colorClasses[color];
-
   return (
-    <Card className={`border-border/50 shadow-sm hover:shadow-md transition-all duration-200 ${colors.border} card-hover`}>
+    <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
       <CardContent className="pt-6">
-        <div className="flex items-start justify-between">
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-muted-foreground">{title}</p>
-            <p className="text-2xl font-heading font-bold font-mono text-foreground">
-              {typeof value === 'number' ? value.toLocaleString() : value}
-            </p>
-            <p className="text-xs text-muted-foreground">{subtitle}</p>
+        <div className="flex items-center justify-between mb-3">
+          <div className={`p-2.5 rounded-lg ${colorClasses[color]}`}>
+            <Icon className="h-5 w-5" />
           </div>
-          <div className={`rounded-lg p-2.5 ${colors.bg}`}>
-            <Icon className={`h-5 w-5 ${colors.icon}`} />
-          </div>
+          {trend && (
+            <Badge variant="outline" className="text-firmavb-green border-firmavb-green/30">
+              <TrendingUp className="h-3 w-3 mr-1" />
+              {trend}
+            </Badge>
+          )}
         </div>
-        {trend && (
-          <div className="mt-3 flex items-center gap-1">
-            <TrendingUp className="h-3 w-3 text-firmavb-green" />
-            <span className="text-xs font-medium text-firmavb-green">{trend}</span>
-          </div>
-        )}
+        <p className="text-2xl font-heading font-bold">{value}</p>
+        <p className="text-sm text-muted-foreground mt-1">{title}</p>
+        <p className="text-xs text-muted-foreground/70 mt-0.5">{subtitle}</p>
       </CardContent>
     </Card>
-  );
-}
-
-interface UrgentTenderCardProps {
-  tender: {
-    id_licitacion: string;
-    titulo: string;
-    organismo: string;
-    diasRestantes: number;
-    presupuesto: number | null;
-    match_score: number | null;
-  };
-}
-
-function UrgentTenderCard({ tender }: UrgentTenderCardProps) {
-  const isVeryUrgent = tender.diasRestantes <= 2;
-  
-  return (
-    <div className={`rounded-lg border p-3 transition-all duration-200 ${
-      isVeryUrgent 
-        ? 'border-firmavb-red/30 bg-firmavb-red/5' 
-        : 'border-border hover:bg-muted/50'
-    }`}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-foreground line-clamp-1">
-            {tender.titulo}
-          </p>
-          <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
-            {tender.organismo}
-          </p>
-        </div>
-        <Badge 
-          variant={isVeryUrgent ? "destructive" : "secondary"}
-          className={isVeryUrgent ? "bg-firmavb-red" : ""}
-        >
-          {tender.diasRestantes === 0 
-            ? 'Hoy' 
-            : tender.diasRestantes === 1 
-            ? 'Mañana' 
-            : `${tender.diasRestantes}d`}
-        </Badge>
-      </div>
-      {tender.match_score && (
-        <div className="mt-2 flex items-center gap-1">
-          <div className="h-1.5 flex-1 rounded-full bg-muted overflow-hidden">
-            <div 
-              className="h-full rounded-full bg-firmavb-blue"
-              style={{ width: `${tender.match_score}%` }}
-            />
-          </div>
-          <span className="text-xs font-mono font-medium text-firmavb-blue">{tender.match_score}%</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-interface ProgressStatProps {
-  label: string;
-  value: number;
-  color: 'blue' | 'green' | 'amber';
-}
-
-function ProgressStat({ label, value, color }: ProgressStatProps) {
-  const colorClasses = {
-    blue: 'bg-firmavb-blue',
-    green: 'bg-firmavb-green',
-    amber: 'bg-firmavb-orange',
-  };
-
-  return (
-    <div className="space-y-1.5">
-      <div className="flex justify-between text-sm">
-        <span className="text-muted-foreground">{label}</span>
-        <span className="font-mono font-semibold">{value}%</span>
-      </div>
-      <div className="h-2 rounded-full bg-muted overflow-hidden">
-        <div 
-          className={`h-full rounded-full transition-all duration-500 ${colorClasses[color]}`}
-          style={{ width: `${Math.min(100, value)}%` }}
-        />
-      </div>
-    </div>
   );
 }
