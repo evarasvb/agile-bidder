@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +10,7 @@ import { es } from "date-fns/locale";
 import { ShoppingCart, Clock, MapPin, Building2, CheckCircle2, AlertTriangle, DollarSign, TrendingUp, ShieldCheck, ShieldX, HelpCircle } from "lucide-react";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 import { clasificarProceso, getCategoria, montoEnUTM, formatCurrency } from "@/utils/clasificacion";
+import { cn } from "@/lib/utils";
 
 interface ComprasAgilesTableProps {
   compras: CompraAgil[] | undefined;
@@ -102,12 +104,20 @@ function getBuenPagadorBadge(buenPagador: boolean | null) {
 }
 
 export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }: ComprasAgilesTableProps) {
+  // Memoizar cálculos para mejor performance
+  const { totalCompras, conMatch, progreso } = useMemo(() => {
+    const total = compras?.length ?? 0;
+    const conMatchCount = compras?.filter((compra) => compra.match_encontrado).length ?? 0;
+    const progresoValue = total > 0 ? Math.round((conMatchCount / total) * 100) : 0;
+    return { totalCompras: total, conMatch: conMatchCount, progreso: progresoValue };
+  }, [compras]);
+
   if (isLoading) {
     return (
-      <Card className="shadow-sm">
-        <CardHeader className="pb-3">
+      <Card className="shadow-sm border-firmavb-blue/10">
+        <CardHeader className="pb-3 bg-gradient-to-r from-firmavb-blue/5 to-transparent">
           <CardTitle className="flex items-center gap-2 text-lg">
-            <ShoppingCart className="h-5 w-5 text-primary" />
+            <ShoppingCart className="h-5 w-5 text-firmavb-blue" />
             Compras Ágiles
           </CardTitle>
         </CardHeader>
@@ -122,42 +132,54 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
     );
   }
 
-  const totalCompras = compras?.length ?? 0;
-  const conMatch = compras?.filter((compra) => compra.match_encontrado).length ?? 0;
-  const progreso = totalCompras > 0 ? Math.round((conMatch / totalCompras) * 100) : 0;
-
   return (
-    <Card className="shadow-sm">
-      <CardHeader className="pb-3 space-y-3">
+    <Card className="shadow-sm border-firmavb-blue/10 hover:shadow-md transition-shadow">
+      <CardHeader className="pb-3 space-y-3 bg-gradient-to-r from-firmavb-blue/5 to-transparent">
         <CardTitle className="flex items-center gap-2 text-lg">
-          <ShoppingCart className="h-5 w-5 text-primary" />
-          Compras Ágiles
-          <Badge variant="secondary" className="ml-2">{compras?.length || 0}</Badge>
+          <div className="p-2 rounded-lg bg-firmavb-blue/10">
+            <ShoppingCart className="h-5 w-5 text-firmavb-blue" />
+          </div>
+          <span className="bg-gradient-to-r from-firmavb-blue to-firmavb-red bg-clip-text text-transparent font-bold">
+            Compras Ágiles
+          </span>
+          <Badge variant="secondary" className="ml-2 border-firmavb-blue/20">{totalCompras}</Badge>
         </CardTitle>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          <Progress value={progreso} className="h-2 flex-1" />
-          <span className="whitespace-nowrap">{conMatch}/{totalCompras} emparejadas</span>
+          <Progress 
+            value={progreso} 
+            className="h-2 flex-1 bg-muted"
+          />
+          <span className="whitespace-nowrap font-medium">
+            {conMatch}/{totalCompras} emparejadas
+          </span>
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/50">
-              <TableHead className="font-semibold">Código</TableHead>
-              <TableHead className="font-semibold">Nombre</TableHead>
-              <TableHead className="font-semibold">Organismo</TableHead>
-              <TableHead className="font-semibold text-right">Monto</TableHead>
-              <TableHead className="font-semibold">Cierre</TableHead>
-              <TableHead className="font-semibold">Estado</TableHead>
-              <TableHead className="font-semibold text-center">Match</TableHead>
-              <TableHead className="font-semibold text-center">Pago</TableHead>
-            </TableRow>
-          </TableHeader>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50 hover:bg-muted/70">
+                <TableHead className="font-semibold text-firmavb-blue">Código</TableHead>
+                <TableHead className="font-semibold">Nombre</TableHead>
+                <TableHead className="font-semibold hidden md:table-cell">Organismo</TableHead>
+                <TableHead className="font-semibold text-right">Monto</TableHead>
+                <TableHead className="font-semibold hidden lg:table-cell">Cierre</TableHead>
+                <TableHead className="font-semibold">Estado</TableHead>
+                <TableHead className="font-semibold text-center">Match</TableHead>
+                <TableHead className="font-semibold text-center hidden sm:table-cell">Pago</TableHead>
+              </TableRow>
+            </TableHeader>
           <TableBody>
             {compras?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                  No se encontraron compras ágiles con los filtros seleccionados
+                <TableCell colSpan={8} className="text-center py-12">
+                  <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                    <ShoppingCart className="h-12 w-12 opacity-50" />
+                    <div>
+                      <p className="font-medium">No se encontraron compras ágiles</p>
+                      <p className="text-sm mt-1">Intenta ajustar los filtros de búsqueda</p>
+                    </div>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
@@ -168,8 +190,22 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
                 return (
                   <TableRow
                     key={compra.id}
-                    className={`cursor-pointer transition-colors ${isSelected ? 'bg-primary/5 border-l-2 border-l-primary' : 'hover:bg-muted/50'}`}
+                    className={cn(
+                      "cursor-pointer transition-all duration-200",
+                      isSelected 
+                        ? "bg-firmavb-blue/10 border-l-4 border-l-firmavb-blue shadow-sm" 
+                        : "hover:bg-firmavb-blue/5 hover:shadow-sm"
+                    )}
                     onClick={() => onSelect(compra)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onSelect(compra);
+                      }
+                    }}
+                    aria-label={`Seleccionar compra ${compra.codigo}`}
                   >
                     <TableCell className="font-mono text-sm font-medium text-primary">
                       {compra.codigo}
@@ -189,10 +225,12 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
                         </div>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell">
                       <div className="flex items-center gap-1.5 text-sm">
-                        <Building2 className="h-4 w-4 text-muted-foreground" />
-                        <span className="truncate max-w-[150px]">{compra.organismo}</span>
+                        <Building2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <span className="truncate max-w-[150px]" title={compra.organismo}>
+                          {compra.organismo}
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
@@ -249,16 +287,28 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
                         })()}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       {compra.fecha_cierre ? (
                         <div className="flex items-center gap-1.5">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
+                          <Clock className={cn(
+                            "h-4 w-4 flex-shrink-0",
+                            diasRestantes !== null && diasRestantes <= 2 
+                              ? "text-firmavb-red animate-pulse" 
+                              : "text-muted-foreground"
+                          )} />
                           <div>
-                            <div className="text-sm">
+                            <div className="text-sm font-medium">
                               {format(parseISO(compra.fecha_cierre), "dd MMM", { locale: es })}
                             </div>
                             {diasRestantes !== null && diasRestantes >= 0 && (
-                              <div className={`text-xs ${diasRestantes <= 2 ? 'text-accent font-medium' : 'text-muted-foreground'}`}>
+                              <div className={cn(
+                                "text-xs font-medium",
+                                diasRestantes <= 2 
+                                  ? 'text-firmavb-red' 
+                                  : diasRestantes <= 7
+                                  ? 'text-orange-600'
+                                  : 'text-muted-foreground'
+                              )}>
                                 {diasRestantes === 0 ? 'Hoy' : `${diasRestantes} días`}
                               </div>
                             )}
@@ -283,7 +333,7 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
                         <span className="text-muted-foreground text-xs">Sin match</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="text-center hidden sm:table-cell">
                       {getBuenPagadorBadge(compra.buen_pagador)}
                     </TableCell>
                   </TableRow>
@@ -291,7 +341,8 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
               })
             )}
           </TableBody>
-        </Table>
+          </Table>
+        </div>
       </CardContent>
     </Card>
   );

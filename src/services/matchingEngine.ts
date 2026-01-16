@@ -76,18 +76,40 @@ export interface MatchResult {
 
 // ============ UTILIDADES NLP ============
 
+// Cache para keywords extraídas (mejora performance)
+const keywordsCache = new Map<string, string[]>();
+const MAX_CACHE_SIZE = 1000;
+
 /**
- * Calcula la distancia de Levenshtein entre dos strings
+ * Calcula la distancia de Levenshtein entre dos strings (optimizado)
+ * Usa early exit para strings muy diferentes
  */
-function levenshteinDistance(str1: string, str2: string): number {
+function levenshteinDistance(str1: string, str2: string, maxDistance?: number): number {
   const m = str1.length;
   const n = str2.length;
+  
+  // Early exit si la diferencia de longitud es muy grande
+  if (maxDistance !== undefined && Math.abs(m - n) > maxDistance) {
+    return maxDistance + 1;
+  }
+  
+  // Si uno es muy largo, usar algoritmo simplificado
+  if (m > 100 || n > 100) {
+    // Para strings largos, usar comparación más rápida
+    if (str1.toLowerCase().includes(str2.toLowerCase()) || str2.toLowerCase().includes(str1.toLowerCase())) {
+      return Math.abs(m - n);
+    }
+    // Aproximación rápida
+    return Math.max(m, n) * 0.5;
+  }
+  
   const dp: number[][] = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
 
   for (let i = 0; i <= m; i++) dp[i][0] = i;
   for (let j = 0; j <= n; j++) dp[0][j] = j;
 
   for (let i = 1; i <= m; i++) {
+    let minRow = dp[i][0];
     for (let j = 1; j <= n; j++) {
       if (str1[i - 1] === str2[j - 1]) {
         dp[i][j] = dp[i - 1][j - 1];
@@ -98,6 +120,11 @@ function levenshteinDistance(str1: string, str2: string): number {
           dp[i][j - 1] + 1
         );
       }
+      minRow = Math.min(minRow, dp[i][j]);
+    }
+    // Early exit si toda la fila excede maxDistance
+    if (maxDistance !== undefined && minRow > maxDistance) {
+      return maxDistance + 1;
     }
   }
 
@@ -150,10 +177,22 @@ function stemWord(word: string): string {
 }
 
 /**
- * Extrae palabras clave de un texto
+ * Extrae palabras clave de un texto (con cache)
  */
 function extractKeywords(text: string): string[] {
-  if (!text) return [];
+  if (!text || typeof text !== 'string') return [];
+  
+  // Verificar cache
+  const cacheKey = text.toLowerCase().trim();
+  if (keywordsCache.has(cacheKey)) {
+    return keywordsCache.get(cacheKey)!;
+  }
+  
+  // Limpiar cache si es muy grande
+  if (keywordsCache.size > MAX_CACHE_SIZE) {
+    const firstKey = keywordsCache.keys().next().value;
+    keywordsCache.delete(firstKey);
+  }
   
   // Palabras vacías en español
   const stopWords = new Set([
@@ -180,6 +219,9 @@ function extractKeywords(text: string): string[] {
   // Aplicar stemming y deduplicar
   const stemmed = [...new Set(words.map(stemWord))];
   
+  // Guardar en cache
+  keywordsCache.set(cacheKey, stemmed);
+  
   return stemmed;
 }
 
@@ -188,28 +230,48 @@ function extractKeywords(text: string): string[] {
 /**
  * Calcula el score de match entre keywords de inventario y licitación
  * Peso: 40%
+ * Optimizado con early exit y mejor manejo de edge cases
  */
 function calculateKeywordScore(
-  inventoryKeywords: string[], 
-  licitacionKeywords: string[]
+  inventoryKeywords: string[] | null | undefined, 
+  licitacionKeywords: string[] | null | undefined
 ): { score: number; matchedKeywords: string[] } {
-  if (inventoryKeywords.length === 0 || licitacionKeywords.length === 0) {
+  // Validación de inputs
+  if (!inventoryKeywords || !licitacionKeywords || 
+      inventoryKeywords.length === 0 || licitacionKeywords.length === 0) {
     return { score: 0, matchedKeywords: [] };
   }
   
   const matchedKeywords: string[] = [];
   let totalSimilarity = 0;
   
+  // Crear Set para búsqueda más rápida (O(1) vs O(n))
+  const licitacionSet = new Set(licitacionKeywords);
+  
   // Para cada keyword del inventario, buscar mejor match en licitación
   for (const invKw of inventoryKeywords) {
+    if (!invKw || typeof invKw !== 'string') continue;
+    
     let bestSimilarity = 0;
     let bestMatch = '';
     
-    for (const licKw of licitacionKeywords) {
-      const sim = calculateStringSimilarity(stemWord(invKw), stemWord(licKw));
-      if (sim > bestSimilarity) {
-        bestSimilarity = sim;
-        bestMatch = licKw;
+    // Primero verificar match exacto (más rápido)
+    const stemmedInv = stemWord(invKw);
+    if (licitacionSet.has(invKw) || licitacionSet.has(stemmedInv)) {
+      bestSimilarity = 1.0;
+      bestMatch = invKw;
+    } else {
+      // Si no hay match exacto, buscar por similitud
+      for (const licKw of licitacionKeywords) {
+        if (!licKw || typeof licKw !== 'string') continue;
+        
+        const sim = calculateStringSimilarity(stemmedInv, stemWord(licKw));
+        if (sim > bestSimilarity) {
+          bestSimilarity = sim;
+          bestMatch = licKw;
+          // Early exit si encontramos match perfecto
+          if (sim >= 0.95) break;
+        }
       }
     }
     
@@ -326,18 +388,34 @@ function calculateDeliveryScore(
 
 /**
  * Analiza match entre una licitación y el inventario
+ * Optimizado con validaciones y mejor manejo de errores
  */
 export async function analyzeMatch(
   licitacion: Licitacion,
-  licitacionItems?: LicitacionItem[]
+  licitacionItems?: LicitacionItem[] | null
 ): Promise<MatchResult> {
+  // Validación de inputs
+  if (!licitacion || !licitacion.id_licitacion) {
+    throw new Error('Licitación inválida: falta id_licitacion');
+  }
+  
+  if (!licitacion.titulo || typeof licitacion.titulo !== 'string') {
+    return createEmptyResult(licitacion.id_licitacion, licitacion.presupuesto, [
+      'Licitación sin título válido'
+    ]);
+  }
+  
   // Obtener inventario activo
   const { data: inventory, error: invError } = await supabase
     .from('inventory')
     .select('*')
     .eq('activo', true);
   
-  if (invError) throw invError;
+  if (invError) {
+    console.error('Error obteniendo inventario:', invError);
+    throw new Error(`Error al obtener inventario: ${invError.message}`);
+  }
+  
   if (!inventory || inventory.length === 0) {
     return createEmptyResult(licitacion.id_licitacion, licitacion.presupuesto, [
       'No hay productos activos en el inventario'
@@ -345,13 +423,15 @@ export async function analyzeMatch(
   }
   
   // Extraer keywords de la licitación
-  const licitacionKeywords = extractKeywords(licitacion.titulo);
+  const licitacionKeywords = extractKeywords(licitacion.titulo || '');
   
   // También incluir keywords de items si existen
-  if (licitacionItems && licitacionItems.length > 0) {
+  if (licitacionItems && Array.isArray(licitacionItems) && licitacionItems.length > 0) {
     for (const item of licitacionItems) {
-      licitacionKeywords.push(...extractKeywords(item.nombre_producto));
-      if (item.descripcion) {
+      if (item && item.nombre_producto) {
+        licitacionKeywords.push(...extractKeywords(item.nombre_producto));
+      }
+      if (item && item.descripcion && typeof item.descripcion === 'string') {
         licitacionKeywords.push(...extractKeywords(item.descripcion));
       }
     }
@@ -359,33 +439,62 @@ export async function analyzeMatch(
   
   const uniqueLicitacionKeywords = [...new Set(licitacionKeywords)];
   
+  // Si no hay keywords, retornar resultado vacío
+  if (uniqueLicitacionKeywords.length === 0) {
+    return createEmptyResult(licitacion.id_licitacion, licitacion.presupuesto, [
+      'No se pudieron extraer keywords de la licitación'
+    ]);
+  }
+  
   // Analizar cada producto del inventario
   const productMatches: ProductMatch[] = [];
   const razones: string[] = [];
   const alertas: string[] = [];
   
   for (const item of inventory as InventoryItem[]) {
+    // Validar item
+    if (!item || !item.id || !item.nombre_producto) continue;
+    
+    // Validar valores numéricos
+    const precioUnitario = Number(item.precio_unitario) || 0;
+    const margenObjetivo = Number(item.margen_objetivo) || 0;
+    const stockDisponible = Number(item.stock_disponible) || 0;
+    const tiempoEntrega = Number(item.tiempo_entrega_dias) || 0;
+    
+    if (precioUnitario <= 0) continue; // Saltar productos sin precio
+    
     const { score: kwScore, matchedKeywords } = calculateKeywordScore(
-      item.keywords || [], 
+      Array.isArray(item.keywords) ? item.keywords : [], 
       uniqueLicitacionKeywords
     );
     
-    const categoryScore = calculateCategoryScore(item.categoria, licitacion.titulo);
+    const categoryScore = calculateCategoryScore(
+      item.categoria || '', 
+      licitacion.titulo || ''
+    );
     
     // Solo considerar productos con score de keywords >= 30 o categoría >= 50
     if (kwScore >= 30 || categoryScore >= 50) {
-      const cantidadEstimada = licitacionItems?.find(li => {
-        const itemKws = extractKeywords(li.nombre_producto);
-        return itemKws.some(kw => 
-          matchedKeywords.some(mk => calculateStringSimilarity(kw, mk) >= 0.7)
-        );
-      })?.cantidad || 1;
+      // Buscar cantidad estimada en items de licitación
+      let cantidadEstimada = 1;
+      if (licitacionItems && Array.isArray(licitacionItems) && licitacionItems.length > 0) {
+        const matchingItem = licitacionItems.find(li => {
+          if (!li || !li.nombre_producto) return false;
+          const itemKws = extractKeywords(li.nombre_producto);
+          return itemKws.some(kw => 
+            matchedKeywords.some(mk => calculateStringSimilarity(kw, mk) >= 0.7)
+          );
+        });
+        cantidadEstimada = matchingItem?.cantidad 
+          ? Math.max(1, Number(matchingItem.cantidad) || 1)
+          : 1;
+      }
       
-      const stockScore = calculateStockScore(item.stock_disponible, cantidadEstimada);
-      const deliveryScore = calculateDeliveryScore(item.tiempo_entrega_dias, licitacion.fecha_cierre);
+      const stockScore = calculateStockScore(stockDisponible, cantidadEstimada);
+      const deliveryScore = calculateDeliveryScore(tiempoEntrega, licitacion.fecha_cierre);
       
-      // Calcular precio con margen objetivo
-      const precioConMargen = item.precio_unitario * (1 + item.margen_objetivo / 100);
+      // Calcular precio con margen objetivo (validar que sea positivo)
+      const precioConMargen = precioUnitario * (1 + Math.max(0, margenObjetivo) / 100);
       
       // Score ponderado del producto
       const productScore = Math.round(
@@ -398,19 +507,19 @@ export async function analyzeMatch(
       if (productScore >= 35) {
         productMatches.push({
           inventory_id: item.id,
-          sku: item.sku,
+          sku: item.sku || 'N/A',
           nombre: item.nombre_producto,
           keywords_matched: matchedKeywords,
           similarity_score: productScore,
           cantidad_requerida: cantidadEstimada,
-          precio_unitario: item.precio_unitario,
+          precio_unitario: precioUnitario,
           precio_oferta: precioConMargen,
-          margen_aplicado: item.margen_objetivo,
+          margen_aplicado: margenObjetivo,
           subtotal: precioConMargen * cantidadEstimada
         });
         
-        if (item.stock_disponible < cantidadEstimada) {
-          alertas.push(`Stock insuficiente de ${item.sku}: ${item.stock_disponible} disponible, ${cantidadEstimada} requerido`);
+        if (stockDisponible < cantidadEstimada) {
+          alertas.push(`Stock insuficiente de ${item.sku || 'N/A'}: ${stockDisponible} disponible, ${cantidadEstimada} requerido`);
         }
         
         razones.push(
@@ -423,12 +532,17 @@ export async function analyzeMatch(
   // Ordenar por score de similitud
   productMatches.sort((a, b) => b.similarity_score - a.similarity_score);
   
-  // Calcular valor total y margen
-  const valorTotal = productMatches.reduce((sum, p) => sum + p.subtotal, 0);
-  const costoTotal = productMatches.reduce(
-    (sum, p) => sum + (p.precio_unitario * p.cantidad_requerida), 
-    0
-  );
+  // Calcular valor total y margen (con validación)
+  const valorTotal = productMatches.reduce((sum, p) => {
+    const subtotal = Number(p.subtotal) || 0;
+    return sum + subtotal;
+  }, 0);
+  
+  const costoTotal = productMatches.reduce((sum, p) => {
+    const costo = (Number(p.precio_unitario) || 0) * (Number(p.cantidad_requerida) || 0);
+    return sum + costo;
+  }, 0);
+  
   const margenTotal = costoTotal > 0 
     ? Math.round(((valorTotal - costoTotal) / costoTotal) * 100) 
     : 0;
@@ -436,9 +550,9 @@ export async function analyzeMatch(
   // Score de presupuesto
   const budgetScore = calculateBudgetScore(licitacion.presupuesto, valorTotal);
   
-  // Cobertura de items
-  const itemsCubiertos = licitacionItems 
-    ? productMatches.filter(pm => pm.cantidad_requerida > 0).length / (licitacionItems.length || 1) * 100
+  // Cobertura de items (con validación)
+  const itemsCubiertos = (licitacionItems && Array.isArray(licitacionItems) && licitacionItems.length > 0)
+    ? productMatches.filter(pm => (Number(pm.cantidad_requerida) || 0) > 0).length / licitacionItems.length * 100
     : productMatches.length > 0 ? 100 : 0;
   
   // Calcular score final ponderado

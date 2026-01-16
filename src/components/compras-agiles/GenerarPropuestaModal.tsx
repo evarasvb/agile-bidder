@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FileText, Package, Calculator, Check, Loader2, Percent, Info, Download, Edit, CheckCircle2, XCircle } from "lucide-react";
+import { FileText, Package, Calculator, Check, Loader2, Percent, Info, Download, Edit, CheckCircle2, XCircle, Search, Plus, X, TrendingUp, TrendingDown } from "lucide-react";
 import { toast } from "sonner";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 import { useUpdateCompraAgil } from "@/hooks/useComprasAgiles";
@@ -14,6 +14,11 @@ import { formatCurrency } from "@/utils/clasificacion";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { aplicarRecargoPorRegion, obtenerRecargoRegion } from "@/utils/regiones";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useInventoryActivo } from "@/hooks/useInventory";
+import { useTodoElInventario } from "@/hooks/useCliente";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface ItemParaPropuesta {
   itemId: string;
@@ -47,6 +52,7 @@ interface ItemSeleccionado {
   cantidadSolicitada: number;
   unidadMedida: string;
   cantidad: number;
+  selected: boolean;
   match?: {
     id: string;
     sku: string;
@@ -58,11 +64,16 @@ interface ItemSeleccionado {
   };
   precioUnitario: number;
   margen: number; // Margen calculado
+  esManual?: boolean; // Si fue agregado manualmente
 }
 
 export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }: GenerarPropuestaModalProps) {
   const updateCompra = useUpdateCompraAgil();
   const { data: userSettings } = useUserSettings();
+  const { data: inventario } = useInventoryActivo();
+  const { data: clienteInventario } = useTodoElInventario();
+  const [productoSeleccionando, setProductoSeleccionando] = useState<string | null>(null);
+  const [mostrarAgregarManual, setMostrarAgregarManual] = useState(false);
   
   // Calcular precio con recargo por región
   const calcularPrecioConRecargo = (precioNeto: number): number => {
@@ -105,7 +116,8 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
           margen_estimado: producto.match.margen_estimado
         } : undefined,
         precioUnitario: precioConRecargo,
-        margen: margen
+        margen: margen,
+        selected: producto.match !== null && (producto.match.matchScore >= 50 || precioBase > 0)
       };
     })
   );
@@ -140,6 +152,66 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
         return item;
       })
     );
+  };
+
+  const handleToggleItem = (itemId: string) => {
+    setItemsSeleccionados(prev =>
+      prev.map(item => 
+        item.itemId === itemId ? { ...item, selected: !item.selected } : item
+      )
+    );
+  };
+
+  const handleCambiarProducto = (itemId: string, nuevoProducto: any) => {
+    const precioConRecargo = calcularPrecioConRecargo(nuevoProducto.precio_unitario || 0);
+    const margen = nuevoProducto.precio_unitario > 0 
+      ? ((precioConRecargo - nuevoProducto.precio_unitario) / nuevoProducto.precio_unitario) * 100 
+      : 0;
+
+    setItemsSeleccionados(prev =>
+      prev.map(item => {
+        if (item.itemId === itemId) {
+          return {
+            ...item,
+            match: {
+              id: nuevoProducto.id,
+              sku: nuevoProducto.sku,
+              nombre: nuevoProducto.nombre_producto || nuevoProducto.nombre,
+              precio_unitario: nuevoProducto.precio_unitario,
+              stock: nuevoProducto.stock_disponible || nuevoProducto.stock,
+              matchScore: 100, // Manual selection
+              margen_estimado: margen / 100
+            },
+            precioUnitario: precioConRecargo,
+            margen: margen
+          };
+        }
+        return item;
+      })
+    );
+    setProductoSeleccionando(null);
+    toast.success('Producto actualizado');
+  };
+
+  const handleAgregarProductoManual = () => {
+    const nuevoItem: ItemSeleccionado = {
+      itemId: `manual-${Date.now()}`,
+      nombre: 'Producto manual',
+      descripcion: '',
+      cantidadSolicitada: 1,
+      unidadMedida: 'UN',
+      cantidad: 1,
+      selected: true,
+      precioUnitario: 0,
+      margen: 0,
+      esManual: true
+    };
+    setItemsSeleccionados(prev => [...prev, nuevoItem]);
+    setMostrarAgregarManual(false);
+  };
+
+  const handleEliminarItem = (itemId: string) => {
+    setItemsSeleccionados(prev => prev.filter(item => item.itemId !== itemId));
   };
 
   const itemsActivos = itemsSeleccionados.filter(item => item.precioUnitario > 0);
@@ -203,28 +275,71 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
             Generar Propuesta
           </DialogTitle>
           {compra && (
-            <div className="space-y-1">
+            <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
                 Para: <span className="font-medium">{compra.codigo}</span> - {compra.nombre}
               </p>
-              {recargoAplicado > 0 && compra.region && (
-                <Alert className="py-2">
-                  <Info className="h-3.5 w-3.5" />
-                  <AlertDescription className="text-xs">
-                    Recargo por región ({compra.region}): <strong>+{recargoAplicado}%</strong> aplicado a todos los precios
-                  </AlertDescription>
-                </Alert>
+              <div className="flex items-center gap-3 flex-wrap">
+                {compra.monto && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-muted-foreground">Presupuesto:</span>
+                    <span className="font-medium">{formatCurrency(compra.monto)}</span>
+                  </div>
+                )}
+                {getBuenPagadorBadge(compra.buen_pagador)}
+                {recargoAplicado > 0 && compra.region && (
+                  <Badge variant="outline" className="text-xs">
+                    Recargo {compra.region}: +{recargoAplicado}%
+                  </Badge>
+                )}
+              </div>
+              {compra.monto && (
+                <div className="flex items-center gap-4 text-xs pt-1 border-t">
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">Nuestra oferta:</span>
+                    <span className={`font-bold ${
+                      montoTotal <= compra.monto ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {formatCurrency(montoTotal)}
+                    </span>
+                  </div>
+                  {compra.monto > 0 && (
+                    <div className="flex items-center gap-2">
+                      {montoTotal <= compra.monto ? (
+                        <TrendingDown className="h-3.5 w-3.5 text-green-600" />
+                      ) : (
+                        <TrendingUp className="h-3.5 w-3.5 text-red-600" />
+                      )}
+                      <span className={montoTotal <= compra.monto ? 'text-green-600' : 'text-red-600'}>
+                        {montoTotal <= compra.monto ? 'Dentro del presupuesto' : 'Excede presupuesto'}
+                      </span>
+                      <span className="text-muted-foreground">
+                        ({((montoTotal / compra.monto) * 100).toFixed(1)}%)
+                      </span>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden">
-          <div className="mb-4">
-            <Label className="text-sm font-medium">Configura los items de la propuesta</Label>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Ajusta cantidades y precios según los requerimientos de la licitación
-            </p>
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <Label className="text-sm font-medium">Configura los items de la propuesta</Label>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Ajusta cantidades y precios según los requerimientos de la licitación
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMostrarAgregarManual(true)}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar Producto
+            </Button>
           </div>
 
           <ScrollArea className="h-[400px] pr-4 -mr-4">
@@ -265,29 +380,112 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                       {item.match && (
                         <div className="mt-3 p-3 bg-muted/30 rounded-md">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
                                 <span className="font-mono text-xs">{item.match.sku}</span>
                                 <span className="text-xs font-medium">{item.match.nombre}</span>
+                                {item.match.matchScore < 100 && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    Match: {item.match.matchScore}%
+                                  </Badge>
+                                )}
                               </div>
-                              <div className="flex items-center gap-3 mt-1">
-                                <span className="text-xs text-muted-foreground">
+                              <div className="flex items-center gap-3 flex-wrap text-xs">
+                                <span className="text-muted-foreground">
                                   Stock: {item.match.stock ?? 'N/A'}
                                 </span>
-                                <div className="flex flex-col">
-                                  <span className="text-xs text-muted-foreground">
-                                    Precio base: {formatCurrency(item.match.precio_unitario)}
+                                <span className="text-muted-foreground">
+                                  Precio base: {formatCurrency(item.match.precio_unitario)}
+                                </span>
+                                {recargoAplicado > 0 && (
+                                  <span className="text-primary font-medium">
+                                    Con recargo: {formatCurrency(item.precioUnitario || 0)} (+{recargoAplicado}%)
                                   </span>
-                                  {recargoAplicado > 0 && (
-                                    <span className="text-xs text-primary font-medium">
-                                      Con recargo: {formatCurrency(item.precioUnitario || 0)} (+{recargoAplicado}%)
-                                    </span>
-                                  )}
-                                </div>
+                                )}
                               </div>
                             </div>
+                            <Popover open={productoSeleccionando === item.itemId} onOpenChange={(open) => setProductoSeleccionando(open ? item.itemId : null)}>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm" className="ml-2">
+                                  <Edit className="h-3.5 w-3.5 mr-1" />
+                                  Cambiar
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-80 p-0" align="end">
+                                <Command>
+                                  <CommandInput placeholder="Buscar producto..." />
+                                  <CommandList>
+                                    <CommandEmpty>No se encontraron productos.</CommandEmpty>
+                                    <CommandGroup>
+                                      {inventario?.map((prod) => (
+                                        <CommandItem
+                                          key={prod.id}
+                                          onSelect={() => handleCambiarProducto(item.itemId, prod)}
+                                        >
+                                          <div className="flex flex-col">
+                                            <span className="font-medium">{prod.nombre_producto}</span>
+                                            <span className="text-xs text-muted-foreground">
+                                              SKU: {prod.sku} | {formatCurrency(prod.precio_unitario)}
+                                            </span>
+                                          </div>
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
                           </div>
                         </div>
+                      )}
+                      {!item.match && (
+                        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-yellow-800">Sin producto asignado</span>
+                            <Popover open={productoSeleccionando === item.itemId} onOpenChange={(open) => setProductoSeleccionando(open ? item.itemId : null)}>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                  <Search className="h-3.5 w-3.5 mr-1" />
+                                  Buscar Producto
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-80 p-0" align="end">
+                                <Command>
+                                  <CommandInput placeholder="Buscar producto..." />
+                                  <CommandList>
+                                    <CommandEmpty>No se encontraron productos.</CommandEmpty>
+                                    <CommandGroup>
+                                      {inventario?.map((prod) => (
+                                        <CommandItem
+                                          key={prod.id}
+                                          onSelect={() => handleCambiarProducto(item.itemId, prod)}
+                                        >
+                                          <div className="flex flex-col">
+                                            <span className="font-medium">{prod.nombre_producto}</span>
+                                            <span className="text-xs text-muted-foreground">
+                                              SKU: {prod.sku} | {formatCurrency(prod.precio_unitario)}
+                                            </span>
+                                          </div>
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </div>
+                      )}
+                      {item.esManual && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="mt-2 text-destructive hover:text-destructive"
+                          onClick={() => handleEliminarItem(item.itemId)}
+                        >
+                          <X className="h-3.5 w-3.5 mr-1" />
+                          Eliminar
+                        </Button>
                       )}
 
                       <div className="grid grid-cols-3 gap-4 mt-4">
@@ -313,7 +511,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                             min={0}
                             step={100}
                             value={item.precioUnitario || ''}
-                            onChange={(e) => handlePrecioChange(item.itemId, parseInt(e.target.value) || 0)}
+                            onChange={(e) => handlePrecioChange(item.itemId, parseFloat(e.target.value) || 0)}
                             disabled={!item.selected}
                             className="h-8 text-sm"
                           />
@@ -327,6 +525,23 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                                   Recargo aplicado: +{recargoAplicado}%
                                 </p>
                               )}
+                            </div>
+                          )}
+                          {/* Mostrar margen en tiempo real */}
+                          {item.match && item.precioUnitario > 0 && (
+                            <div className="mt-1">
+                              <Badge 
+                                variant={
+                                  item.margen >= 30 ? 'success' :
+                                  item.margen >= 15 ? 'default' :
+                                  item.margen >= 10 ? 'warning' :
+                                  'destructive'
+                                }
+                                className="text-xs"
+                              >
+                                <Percent className="h-3 w-3 mr-1" />
+                                Margen: {item.margen.toFixed(1)}%
+                              </Badge>
                             </div>
                           )}
                         </div>
@@ -378,6 +593,80 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
           </DialogFooter>
         </div>
       </DialogContent>
+
+      {/* Dialog para agregar producto manual */}
+      <Dialog open={mostrarAgregarManual} onOpenChange={setMostrarAgregarManual}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Agregar Producto Manual</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Buscar producto del inventario</Label>
+              <Command className="mt-2">
+                <CommandInput placeholder="Buscar por nombre o SKU..." />
+                <CommandList>
+                  <CommandEmpty>No se encontraron productos.</CommandEmpty>
+                  <CommandGroup>
+                    {inventario?.map((prod) => (
+                      <CommandItem
+                        key={prod.id}
+                        onSelect={() => {
+                          const itemId = `manual-${Date.now()}`;
+                          const precioConRecargo = calcularPrecioConRecargo(prod.precio_unitario);
+                          const margen = prod.precio_unitario > 0 
+                            ? ((precioConRecargo - prod.precio_unitario) / prod.precio_unitario) * 100 
+                            : 0;
+                          
+                          const nuevoItem: ItemSeleccionado = {
+                            itemId: itemId,
+                            nombre: prod.nombre_producto,
+                            descripcion: prod.descripcion || '',
+                            cantidadSolicitada: 1,
+                            unidadMedida: 'UN',
+                            cantidad: 1,
+                            selected: true,
+                            match: {
+                              id: prod.id,
+                              sku: prod.sku,
+                              nombre: prod.nombre_producto,
+                              precio_unitario: prod.precio_unitario,
+                              stock: prod.stock_disponible,
+                              matchScore: 100,
+                              margen_estimado: margen / 100
+                            },
+                            precioUnitario: precioConRecargo,
+                            margen: margen,
+                            esManual: true
+                          };
+                          setItemsSeleccionados(prev => [...prev, nuevoItem]);
+                          setMostrarAgregarManual(false);
+                          toast.success('Producto agregado');
+                        }}
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-medium">{prod.nombre_producto}</span>
+                          <span className="text-xs text-muted-foreground">
+                            SKU: {prod.sku} | {formatCurrency(prod.precio_unitario)}
+                          </span>
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              O puedes agregar un producto completamente nuevo editando los campos después de agregarlo.
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMostrarAgregarManual(false)}>
+              Cancelar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
