@@ -270,15 +270,28 @@ export function useLicitacionProductMatch(licitacionId: string | null) {
 }
 
 /**
- * Hook para obtener conteo rápido de matches para múltiples licitaciones
+ * Interfaz para licitación con título
  */
-export function useLicitacionMatchCounts(licitacionIds: string[]) {
+export interface LicitacionBasic {
+  id: string;
+  codigo: string;
+  titulo: string;
+  descripcion?: string | null;
+}
+
+/**
+ * Hook para obtener conteo rápido de matches para múltiples licitaciones
+ * Hace matching directo por título cuando no hay items en licitacion_items
+ */
+export function useLicitacionMatchCounts(licitaciones: LicitacionBasic[]) {
   return useQuery({
-    queryKey: ['licitacion-match-counts', licitacionIds],
+    queryKey: ['licitacion-match-counts', licitaciones.map(l => l.id)],
     queryFn: async (): Promise<Map<string, number>> => {
-      if (licitacionIds.length === 0) return new Map();
+      if (licitaciones.length === 0) return new Map();
       
-      // Obtener todos los items de las licitaciones
+      const licitacionIds = licitaciones.map(l => l.id);
+      
+      // Obtener todos los items de las licitaciones (si existen)
       const { data: allItems, error: itemsError } = await supabase
         .from('licitacion_items')
         .select('*')
@@ -299,27 +312,66 @@ export function useLicitacionMatchCounts(licitacionIds: string[]) {
       // Inicializar conteos
       licitacionIds.forEach(id => matchCounts.set(id, 0));
       
-      if (!allItems || !inventory) return matchCounts;
+      if (!inventory || inventory.length === 0) return matchCounts;
       
-      // Calcular matches para cada item
-      for (const licItem of allItems) {
-        for (const invItem of inventory) {
-          const { score } = calculateMatchScore(
-            licItem as LicitacionItemBasic,
-            invItem as InventoryItem
-          );
-          
-          if (score >= 30) {
-            const currentCount = matchCounts.get(licItem.licitacion_id) || 0;
-            matchCounts.set(licItem.licitacion_id, currentCount + 1);
-            break; // Solo contar una vez por item
+      // Agrupar items por licitacion_id
+      const itemsByLicitacion = new Map<string, typeof allItems>();
+      if (allItems) {
+        for (const item of allItems) {
+          const items = itemsByLicitacion.get(item.licitacion_id) || [];
+          items.push(item);
+          itemsByLicitacion.set(item.licitacion_id, items);
+        }
+      }
+      
+      // Calcular matches para cada licitación
+      for (const licitacion of licitaciones) {
+        const items = itemsByLicitacion.get(licitacion.id);
+        
+        if (items && items.length > 0) {
+          // Tenemos items: hacer matching tradicional
+          let matchCount = 0;
+          for (const licItem of items) {
+            for (const invItem of inventory) {
+              const { score } = calculateMatchScore(
+                licItem as LicitacionItemBasic,
+                invItem as InventoryItem
+              );
+              if (score >= 30) {
+                matchCount++;
+                break;
+              }
+            }
           }
+          matchCounts.set(licitacion.id, matchCount);
+        } else {
+          // NO tenemos items: hacer matching por título de licitación
+          const licitacionText = `${licitacion.titulo} ${licitacion.descripcion || ''}`;
+          let matchCount = 0;
+          
+          for (const invItem of inventory) {
+            const inventoryText = `${invItem.nombre_producto} ${invItem.descripcion || ''} ${(invItem.keywords || []).join(' ')}`;
+            
+            // Match de marca
+            const brandMatch = findBrandMatch(licitacionText, inventoryText);
+            // Match de tipo de producto
+            const typeMatch = findProductTypeMatch(licitacionText, inventoryText);
+            // Similitud general
+            const similarity = calculateSimilarity(licitacionText, inventoryText);
+            
+            // Si hay match de marca O tipo O similitud alta, contar
+            if (brandMatch || typeMatch || similarity > 25) {
+              matchCount++;
+            }
+          }
+          
+          matchCounts.set(licitacion.id, matchCount);
         }
       }
       
       return matchCounts;
     },
-    enabled: licitacionIds.length > 0,
+    enabled: licitaciones.length > 0,
     staleTime: 60000,
   });
 }

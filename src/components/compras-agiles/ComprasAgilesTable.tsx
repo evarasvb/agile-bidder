@@ -12,7 +12,7 @@ import { ShoppingCart, Clock, MapPin, Building2, CheckCircle2, AlertTriangle, Ex
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 import { clasificarProceso, montoEnUTM, formatCurrency } from "@/utils/clasificacion";
 import { cn } from "@/lib/utils";
-import { useLicitacionMatchCounts } from "@/hooks/useLicitacionProductMatch";
+import { useLicitacionMatchCounts, type LicitacionBasic } from "@/hooks/useLicitacionProductMatch";
 import { ProductMatchModal } from "./ProductMatchModal";
 
 // Función para extraer el monto de diferentes fuentes
@@ -115,13 +115,19 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
   const [selectedLicitacion, setSelectedLicitacion] = useState<{ id: string; nombre: string } | null>(null);
 
   // Obtener IDs de licitaciones para el hook de match counts
-  const licitacionIds = useMemo(() => 
-    compras?.map(c => c.codigo) || [], 
+  // Preparar datos para matching (necesita id, codigo, titulo)
+  const licitacionesParaMatch = useMemo((): LicitacionBasic[] => 
+    compras?.map(c => ({ 
+      id: c.codigo, 
+      codigo: c.codigo, 
+      titulo: c.nombre,
+      descripcion: c.descripcion || null 
+    })) || [], 
     [compras]
   );
   
   // Obtener conteos de matches para todas las licitaciones
-  const { data: matchCounts } = useLicitacionMatchCounts(licitacionIds);
+  const { data: matchCounts } = useLicitacionMatchCounts(licitacionesParaMatch);
 
   // Memoizar cálculos para mejor performance
   const { totalCompras, conMatch, progreso } = useMemo(() => {
