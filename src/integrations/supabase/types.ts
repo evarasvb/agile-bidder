@@ -1505,13 +1505,6 @@ export type Database = {
             foreignKeyName: "vendedor_asignaciones_vendedor_id_fkey"
             columns: ["vendedor_id"]
             isOneToOne: false
-            referencedRelation: "v_asignaciones_detalle"
-            referencedColumns: ["vendedor_id"]
-          },
-          {
-            foreignKeyName: "vendedor_asignaciones_vendedor_id_fkey"
-            columns: ["vendedor_id"]
-            isOneToOne: false
             referencedRelation: "v_reporte_equipo"
             referencedColumns: ["vendedor_id"]
           },
@@ -1584,13 +1577,6 @@ export type Database = {
             foreignKeyName: "vendedor_calendario_vendedor_id_fkey"
             columns: ["vendedor_id"]
             isOneToOne: false
-            referencedRelation: "v_asignaciones_detalle"
-            referencedColumns: ["vendedor_id"]
-          },
-          {
-            foreignKeyName: "vendedor_calendario_vendedor_id_fkey"
-            columns: ["vendedor_id"]
-            isOneToOne: false
             referencedRelation: "v_reporte_equipo"
             referencedColumns: ["vendedor_id"]
           },
@@ -1648,13 +1634,6 @@ export type Database = {
           vendedor_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "vendedor_indicadores_vendedor_id_fkey"
-            columns: ["vendedor_id"]
-            isOneToOne: false
-            referencedRelation: "v_asignaciones_detalle"
-            referencedColumns: ["vendedor_id"]
-          },
           {
             foreignKeyName: "vendedor_indicadores_vendedor_id_fkey"
             columns: ["vendedor_id"]
@@ -1756,7 +1735,29 @@ export type Database = {
           vendedor_id: string | null
           vendedor_nombre: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "vendedor_asignaciones_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "v_reporte_equipo"
+            referencedColumns: ["vendedor_id"]
+          },
+          {
+            foreignKeyName: "vendedor_asignaciones_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "v_vendedor_dashboard"
+            referencedColumns: ["vendedor_id"]
+          },
+          {
+            foreignKeyName: "vendedor_asignaciones_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vendedores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       v_calendario_vendedor: {
         Row: {
@@ -1773,13 +1774,6 @@ export type Database = {
           vendedor_nombre: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "vendedor_calendario_vendedor_id_fkey"
-            columns: ["vendedor_id"]
-            isOneToOne: false
-            referencedRelation: "v_asignaciones_detalle"
-            referencedColumns: ["vendedor_id"]
-          },
           {
             foreignKeyName: "vendedor_calendario_vendedor_id_fkey"
             columns: ["vendedor_id"]
