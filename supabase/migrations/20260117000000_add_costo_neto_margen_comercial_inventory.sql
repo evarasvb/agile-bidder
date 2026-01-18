@@ -13,12 +13,18 @@ BEGIN
         AND column_name = 'costo_neto'
     ) THEN
         ALTER TABLE public.inventory 
-        ADD COLUMN costo_neto NUMERIC DEFAULT 0;
+        ADD COLUMN IF NOT EXISTS costo_neto NUMERIC DEFAULT 0;
         
         -- Actualizar productos existentes: si no tienen costo, usar 80% del precio como estimación
-        UPDATE public.inventory 
-        SET costo_neto = precio_unitario * 0.8 
-        WHERE costo_neto = 0 OR costo_neto IS NULL;
+        -- Solo si la columna precio_unitario existe
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_schema = 'public' 
+            AND table_name = 'inventory' 
+            AND column_name = 'precio_unitario'
+        ) THEN
+            EXECUTE 'UPDATE public.inventory SET costo_neto = precio_unitario * 0.8 WHERE costo_neto = 0 OR costo_neto IS NULL';
+        END IF;
         
         -- Hacer el campo NOT NULL después de actualizar valores
         ALTER TABLE public.inventory 
@@ -40,16 +46,23 @@ BEGIN
         AND column_name = 'margen_comercial'
     ) THEN
         ALTER TABLE public.inventory 
-        ADD COLUMN margen_comercial NUMERIC;
+        ADD COLUMN IF NOT EXISTS margen_comercial NUMERIC;
         
         -- Calcular margen para productos existentes: (precio - costo) / precio * 100
-        UPDATE public.inventory 
-        SET margen_comercial = CASE 
-            WHEN precio_unitario > 0 AND costo_neto >= 0 AND costo_neto < precio_unitario 
-            THEN ROUND(((precio_unitario - costo_neto) / precio_unitario * 100)::numeric, 2)
-            ELSE 0
-        END
-        WHERE margen_comercial IS NULL;
+        -- Solo si la columna precio_unitario existe
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_schema = 'public' 
+            AND table_name = 'inventory' 
+            AND column_name = 'precio_unitario'
+        ) THEN
+            EXECUTE 'UPDATE public.inventory SET margen_comercial = CASE 
+                WHEN precio_unitario > 0 AND costo_neto >= 0 AND costo_neto < precio_unitario 
+                THEN ROUND(((precio_unitario - costo_neto) / precio_unitario * 100)::numeric, 2)
+                ELSE 0
+            END
+            WHERE margen_comercial IS NULL';
+        END IF;
         
         -- Agregar comentario
         COMMENT ON COLUMN public.inventory.margen_comercial IS 'Margen comercial calculado: (precio - costo) / precio * 100';
@@ -67,7 +80,7 @@ BEGIN
         AND column_name = 'regiones_config'
     ) THEN
         ALTER TABLE public.user_settings 
-        ADD COLUMN regiones_config JSONB DEFAULT '[]'::jsonb;
+        ADD COLUMN IF NOT EXISTS regiones_config JSONB DEFAULT '[]'::jsonb;
         
         -- Migrar datos de regions a regiones_config si existe regions
         IF EXISTS (
@@ -76,21 +89,28 @@ BEGIN
             AND table_name = 'user_settings' 
             AND column_name = 'regions'
         ) THEN
-            -- Migrar regions existentes a regiones_config
-            UPDATE public.user_settings
-            SET regiones_config = (
-                SELECT jsonb_agg(
-                    jsonb_build_object(
-                        'nombre', region,
-                        'activa', true,
-                        'recargo_porcentaje', 0
+            -- Migrar regions existentes a regiones_config (usando EXECUTE para evitar errores de tipo)
+            BEGIN
+                EXECUTE '
+                    UPDATE public.user_settings
+                    SET regiones_config = (
+                        SELECT COALESCE(jsonb_agg(
+                            jsonb_build_object(
+                                ''nombre'', region,
+                                ''activa'', true,
+                                ''recargo_porcentaje'', 0
+                            )
+                        ), ''[]''::jsonb)
+                        FROM jsonb_array_elements_text(regions::jsonb) AS region
                     )
-                )
-                FROM jsonb_array_elements_text(regions::jsonb) AS region
-            )
-            WHERE regions IS NOT NULL 
-            AND regions::text != '[]'::text
-            AND (regiones_config IS NULL OR regiones_config::text = '[]'::text);
+                    WHERE regions IS NOT NULL 
+                    AND regions::text != ''[]''::text
+                    AND (regiones_config IS NULL OR regiones_config::text = ''[]''::text)
+                ';
+            EXCEPTION WHEN OTHERS THEN
+                -- Si falla la migración, simplemente continuar
+                RAISE NOTICE 'No se pudo migrar regions a regiones_config: %', SQLERRM;
+            END;
         END IF;
         
         -- Agregar comentario
@@ -124,19 +144,47 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 CREATE OR REPLACE FUNCTION update_margen_comercial_trigger()
 RETURNS TRIGGER AS $$
 BEGIN
-    IF NEW.precio_unitario IS NOT NULL AND NEW.costo_neto IS NOT NULL THEN
-        NEW.margen_comercial = calcular_margen_comercial(NEW.precio_unitario, NEW.costo_neto);
+    -- Verificar si las columnas existen antes de usarlas
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'inventory' 
+        AND column_name = 'precio_unitario'
+    ) AND EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'inventory' 
+        AND column_name = 'costo_neto'
+    ) THEN
+        IF NEW.precio_unitario IS NOT NULL AND NEW.costo_neto IS NOT NULL THEN
+            NEW.margen_comercial = calcular_margen_comercial(NEW.precio_unitario, NEW.costo_neto);
+        END IF;
     END IF;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
--- Crear trigger si no existe
-DROP TRIGGER IF EXISTS trigger_update_margen_comercial ON public.inventory;
-CREATE TRIGGER trigger_update_margen_comercial
-    BEFORE INSERT OR UPDATE OF precio_unitario, costo_neto ON public.inventory
-    FOR EACH ROW
-    EXECUTE FUNCTION update_margen_comercial_trigger();
+-- Crear trigger si no existe (solo si las columnas existen)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'inventory' 
+        AND column_name = 'precio_unitario'
+    ) AND EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'inventory' 
+        AND column_name = 'costo_neto'
+    ) THEN
+        DROP TRIGGER IF EXISTS trigger_update_margen_comercial ON public.inventory;
+        CREATE TRIGGER trigger_update_margen_comercial
+            BEFORE INSERT OR UPDATE OF precio_unitario, costo_neto ON public.inventory
+            FOR EACH ROW
+            EXECUTE FUNCTION update_margen_comercial_trigger();
+    END IF;
+END $$;
 
 -- Índice para búsquedas por margen
 CREATE INDEX IF NOT EXISTS idx_inventory_margen_comercial 

@@ -1,7 +1,7 @@
 -- =============================================
 -- FASE 1: TABLA DE INVENTARIO COMPLETO
 -- =============================================
-CREATE TABLE public.inventory (
+CREATE TABLE IF NOT EXISTS public.inventory (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   sku TEXT NOT NULL UNIQUE,
   nombre_producto TEXT NOT NULL,
@@ -50,7 +50,7 @@ EXECUTE FUNCTION public.update_updated_at_column();
 -- =============================================
 -- FASE 3: TABLA DE OFERTAS
 -- =============================================
-CREATE TABLE public.ofertas (
+CREATE TABLE IF NOT EXISTS public.ofertas (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   licitacion_id TEXT NOT NULL REFERENCES public.licitaciones(id_licitacion),
   estado TEXT NOT NULL DEFAULT 'borrador' CHECK (estado IN ('borrador', 'revision', 'aprobada', 'enviada', 'rechazada', 'ganada', 'perdida')),
@@ -97,16 +97,34 @@ EXECUTE FUNCTION public.update_updated_at_column();
 -- =============================================
 -- FASE 9: TABLA DE LOGS MEJORADA
 -- =============================================
-CREATE TABLE public.system_logs (
+CREATE TABLE IF NOT EXISTS public.system_logs (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   tipo TEXT NOT NULL CHECK (tipo IN ('match', 'oferta_generada', 'oferta_enviada', 'scraping', 'error', 'info')),
   severidad TEXT NOT NULL DEFAULT 'info' CHECK (severidad IN ('info', 'warning', 'error', 'success')),
   mensaje TEXT NOT NULL,
   licitacion_id TEXT,
-  oferta_id UUID REFERENCES public.ofertas(id),
+  oferta_id UUID, -- Foreign key removida para evitar conflictos de tipo
   detalles JSONB DEFAULT '{}',
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
+
+-- Agregar foreign key solo si la tabla ofertas tiene id como UUID
+DO $$ 
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'ofertas' 
+    AND column_name = 'id' 
+    AND data_type = 'uuid'
+  ) THEN
+    ALTER TABLE public.system_logs 
+    ADD CONSTRAINT system_logs_oferta_id_fkey 
+    FOREIGN KEY (oferta_id) REFERENCES public.ofertas(id);
+  END IF;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
 
 -- Enable RLS
 ALTER TABLE public.system_logs ENABLE ROW LEVEL SECURITY;
@@ -121,16 +139,41 @@ ON public.system_logs FOR INSERT
 WITH CHECK (true);
 
 -- Indexes for better query performance
-CREATE INDEX idx_inventory_categoria ON public.inventory(categoria);
-CREATE INDEX idx_inventory_activo ON public.inventory(activo);
-CREATE INDEX idx_inventory_keywords ON public.inventory USING GIN(keywords);
-CREATE INDEX idx_ofertas_estado ON public.ofertas(estado);
-CREATE INDEX idx_ofertas_licitacion ON public.ofertas(licitacion_id);
-CREATE INDEX idx_system_logs_tipo ON public.system_logs(tipo);
-CREATE INDEX idx_system_logs_created ON public.system_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_inventory_categoria ON public.inventory(categoria);
+CREATE INDEX IF NOT EXISTS idx_inventory_activo ON public.inventory(activo);
+-- Crear índice GIN solo si keywords es un array
+DO $$ 
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'inventory' 
+    AND column_name = 'keywords' 
+    AND data_type = 'ARRAY'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_inventory_keywords ON public.inventory USING GIN(keywords);
+  END IF;
+EXCEPTION
+  WHEN OTHERS THEN null;
+END $$;
+CREATE INDEX IF NOT EXISTS idx_ofertas_estado ON public.ofertas(estado);
+-- Índice condicional para ofertas.licitacion_id
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ofertas' AND column_name = 'licitacion_id') THEN
+    CREATE INDEX IF NOT EXISTS idx_ofertas_licitacion ON public.ofertas(licitacion_id);
+  END IF;
+EXCEPTION
+  WHEN OTHERS THEN null;
+END $$;
+CREATE INDEX IF NOT EXISTS idx_system_logs_tipo ON public.system_logs(tipo);
+CREATE INDEX IF NOT EXISTS idx_system_logs_created ON public.system_logs(created_at DESC);
 
--- Insert sample inventory data for testing
-INSERT INTO public.inventory (sku, nombre_producto, descripcion, categoria, keywords, precio_unitario, margen_minimo, margen_objetivo, stock_disponible, unidad_medida, tiempo_entrega_dias, proveedor) VALUES
+-- Insert sample inventory data for testing (solo si la tabla tiene la estructura correcta)
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'inventory' AND column_name = 'nombre_producto') THEN
+    INSERT INTO public.inventory (sku, nombre_producto, descripcion, categoria, keywords, precio_unitario, margen_minimo, margen_objetivo, stock_disponible, unidad_medida, tiempo_entrega_dias, proveedor) VALUES
 ('OFF-001', 'Resma Papel Carta', 'Resma de papel bond tamaño carta 500 hojas 75g/m2', 'Oficina', ARRAY['papel', 'resma', 'carta', 'bond', 'oficina', 'impresion'], 3500, 15, 30, 500, 'resma', 3, 'Papeles del Sur'),
 ('OFF-002', 'Toner HP 85A', 'Toner compatible HP LaserJet 85A negro', 'Tecnología', ARRAY['toner', 'hp', 'impresora', 'laser', 'cartucho', 'negro'], 25000, 20, 35, 100, 'unidad', 5, 'TechSupply'),
 ('OFF-003', 'Silla Ergonómica Ejecutiva', 'Silla de oficina ergonómica con apoyo lumbar', 'Mobiliario', ARRAY['silla', 'ergonomica', 'oficina', 'ejecutiva', 'mobiliario'], 89000, 18, 28, 25, 'unidad', 10, 'Muebles Corp'),
@@ -138,4 +181,9 @@ INSERT INTO public.inventory (sku, nombre_producto, descripcion, categoria, keyw
 ('TEC-002', 'Monitor LED 24"', 'Monitor LED Full HD 24 pulgadas HDMI VGA', 'Tecnología', ARRAY['monitor', 'led', 'pantalla', 'display', 'hdmi'], 120000, 15, 25, 40, 'unidad', 5, 'TechSupply'),
 ('LIM-001', 'Kit Limpieza Industrial', 'Kit completo de limpieza industrial 20 piezas', 'Aseo', ARRAY['limpieza', 'aseo', 'industrial', 'kit', 'mantenimiento'], 45000, 25, 40, 80, 'kit', 3, 'CleanPro'),
 ('MED-001', 'Guantes Nitrilo Caja', 'Caja de 100 guantes de nitrilo talla M', 'Médico', ARRAY['guantes', 'nitrilo', 'medico', 'salud', 'proteccion', 'desechable'], 12000, 20, 35, 200, 'caja', 2, 'MediSupply'),
-('CON-001', 'Cemento Portland 25kg', 'Saco de cemento Portland gris 25 kilos', 'Construcción', ARRAY['cemento', 'portland', 'construccion', 'obra', 'material'], 6500, 10, 20, 300, 'saco', 5, 'Materiales XYZ');
+('CON-001', 'Cemento Portland 25kg', 'Saco de cemento Portland gris 25 kilos', 'Construcción', ARRAY['cemento', 'portland', 'construccion', 'obra', 'material'], 6500, 10, 20, 300, 'saco', 5, 'Materiales XYZ')
+    ON CONFLICT (sku) DO NOTHING;
+  END IF;
+EXCEPTION
+  WHEN OTHERS THEN null;
+END $$;

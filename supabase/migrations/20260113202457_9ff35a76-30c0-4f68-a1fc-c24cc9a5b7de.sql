@@ -1,5 +1,5 @@
 -- Tabla de vendedores
-CREATE TABLE public.vendedores (
+CREATE TABLE IF NOT EXISTS public.vendedores (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id),
   nombre TEXT NOT NULL,
@@ -11,7 +11,7 @@ CREATE TABLE public.vendedores (
 );
 
 -- Tabla de asignaciones de vendedores a licitaciones
-CREATE TABLE public.vendedor_asignaciones (
+CREATE TABLE IF NOT EXISTS public.vendedor_asignaciones (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   licitacion_id TEXT NOT NULL,
   licitacion_codigo TEXT,
@@ -25,7 +25,7 @@ CREATE TABLE public.vendedor_asignaciones (
 );
 
 -- Tabla de indicadores de vendedores
-CREATE TABLE public.vendedor_indicadores (
+CREATE TABLE IF NOT EXISTS public.vendedor_indicadores (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   vendedor_id UUID NOT NULL REFERENCES public.vendedores(id) ON DELETE CASCADE,
   periodo TEXT NOT NULL,
@@ -39,7 +39,7 @@ CREATE TABLE public.vendedor_indicadores (
 );
 
 -- Tabla de eventos de calendario
-CREATE TABLE public.vendedor_calendario (
+CREATE TABLE IF NOT EXISTS public.vendedor_calendario (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   vendedor_id UUID NOT NULL REFERENCES public.vendedores(id) ON DELETE CASCADE,
   asignacion_id UUID REFERENCES public.vendedor_asignaciones(id) ON DELETE CASCADE,
@@ -98,7 +98,8 @@ CREATE POLICY "Authenticated users can manage calendario" ON public.vendedor_cal
   FOR ALL USING (auth.uid() IS NOT NULL);
 
 -- Vista de dashboard del vendedor
-CREATE OR REPLACE VIEW public.v_vendedor_dashboard AS
+DROP VIEW IF EXISTS public.v_vendedor_dashboard;
+CREATE VIEW public.v_vendedor_dashboard AS
 SELECT 
   v.id as vendedor_id,
   v.nombre,
@@ -118,7 +119,8 @@ WHERE v.activo = true
 GROUP BY v.id, v.nombre, v.email;
 
 -- Vista de calendario por vendedor
-CREATE OR REPLACE VIEW public.v_calendario_vendedor AS
+DROP VIEW IF EXISTS public.v_calendario_vendedor;
+CREATE VIEW public.v_calendario_vendedor AS
 SELECT 
   vc.id,
   vc.vendedor_id,
@@ -136,7 +138,8 @@ JOIN public.vendedores v ON vc.vendedor_id = v.id
 LEFT JOIN public.vendedor_asignaciones va ON vc.asignacion_id = va.id;
 
 -- Vista de reporte de equipo
-CREATE OR REPLACE VIEW public.v_reporte_equipo AS
+DROP VIEW IF EXISTS public.v_reporte_equipo;
+CREATE VIEW public.v_reporte_equipo AS
 SELECT 
   v.id as vendedor_id,
   v.nombre,
@@ -158,7 +161,8 @@ WHERE v.activo = true
 GROUP BY v.id, v.nombre, v.email, v.rol;
 
 -- Vista de asignaciones detalladas
-CREATE OR REPLACE VIEW public.v_asignaciones_detalle AS
+DROP VIEW IF EXISTS public.v_asignaciones_detalle;
+CREATE VIEW public.v_asignaciones_detalle AS
 SELECT 
   va.id,
   va.licitacion_id,

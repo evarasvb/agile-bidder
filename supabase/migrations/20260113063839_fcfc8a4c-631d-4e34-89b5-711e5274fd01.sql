@@ -1,5 +1,5 @@
 -- Create user_settings table for persisting settings
-CREATE TABLE public.user_settings (
+CREATE TABLE IF NOT EXISTS public.user_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL UNIQUE,
   company_settings JSONB DEFAULT '{}',

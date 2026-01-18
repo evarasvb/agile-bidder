@@ -168,14 +168,14 @@ export function BIFiltersPanel({ filters, onFiltersChange }: BIFiltersPanelProps
           <div className="space-y-2">
             <Label>Mes</Label>
             <Select
-              value={filters.mes?.toString()}
-              onValueChange={(v) => onFiltersChange({ ...filters, mes: v ? parseInt(v) : undefined })}
+              value={filters.mes?.toString() || 'all'}
+              onValueChange={(v) => onFiltersChange({ ...filters, mes: v && v !== 'all' ? parseInt(v) : undefined })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Todos los meses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos los meses</SelectItem>
+                <SelectItem value="all">Todos los meses</SelectItem>
                 {MESES.map(m => (
                   <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
                 ))}
@@ -187,14 +187,14 @@ export function BIFiltersPanel({ filters, onFiltersChange }: BIFiltersPanelProps
           <div className="space-y-2">
             <Label>Año</Label>
             <Select
-              value={filters.anio?.toString()}
-              onValueChange={(v) => onFiltersChange({ ...filters, anio: v ? parseInt(v) : undefined })}
+              value={filters.anio?.toString() || 'all'}
+              onValueChange={(v) => onFiltersChange({ ...filters, anio: v && v !== 'all' ? parseInt(v) : undefined })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Todos los años" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos los años</SelectItem>
+                <SelectItem value="all">Todos los años</SelectItem>
                 {ANIOS.map(a => (
                   <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
                 ))}

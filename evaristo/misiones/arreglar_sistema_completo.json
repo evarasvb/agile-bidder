@@ -1,0 +1,48 @@
+{
+  "mision": "arreglar_sistema_completo",
+  "objetivo": "Asegurar que todo el sistema de compras ágiles funcione al 100%",
+  "tareas": [
+    {
+      "nombre": "Verificar estado de base de datos",
+      "accion": "verificar",
+      "archivo": "scripts/verificar-estado-bd.ts",
+      "instruccion": "Revisa el estado actual de compras_agiles en la base de datos. Verifica si hay datos de prueba que deban eliminarse."
+    },
+    {
+      "nombre": "Eliminar datos de prueba",
+      "accion": "ejecutar_sql",
+      "archivo": "scripts/eliminar-compras-prueba-directo.sql",
+      "instruccion": "Ejecuta el SQL para eliminar todos los datos de prueba de compras_agiles (códigos CA-2025-*, TEST-*, etc.)"
+    },
+    {
+      "nombre": "Verificar scraper",
+      "accion": "verificar",
+      "archivo": "scripts/verificar-compras-real.ts",
+      "instruccion": "Verifica que el scraper esté obteniendo compras reales y guardándolas correctamente en la base de datos"
+    },
+    {
+      "nombre": "Revisar hook useComprasAgiles",
+      "accion": "revisar",
+      "archivo": "src/hooks/useComprasAgiles.ts",
+      "instruccion": "Revisa que el filtro de datos de prueba esté funcionando correctamente. Verifica que el mapeo de campos sea correcto."
+    },
+    {
+      "nombre": "Revisar componente ComprasAgiles",
+      "accion": "revisar",
+      "archivo": "src/pages/ComprasAgiles.tsx",
+      "instruccion": "Revisa que el componente esté usando correctamente useComprasAgiles y mostrando los datos. Verifica que el refresh funcione."
+    },
+    {
+      "nombre": "Verificar migraciones",
+      "accion": "verificar",
+      "archivo": "supabase/migrations/20260118000000_eliminar_compras_agiles_prueba.sql",
+      "instruccion": "Verifica que la migración para eliminar datos de prueba esté correcta y se haya aplicado"
+    },
+    {
+      "nombre": "Generar reporte final",
+      "accion": "generar_reporte",
+      "archivo": "SISTEMA_COMPLETO_VERIFICADO.md",
+      "instruccion": "Genera un reporte completo del estado del sistema, verificando que todo funcione al 100%"
+    }
+  ]
+}

@@ -111,9 +111,77 @@ export function useOrdenesCompra(filters?: OrdenesCompraFilters, includeItems = 
 
         const ordenes = (data || []) as OrdenCompraRow[];
 
+        // Mejorar datos faltantes desde raw_data si está disponible
+        // Extracción más agresiva: SIEMPRE intentar extraer de raw_data si los campos están vacíos/null
+        const ordenesMejoradas = ordenes.map((orden) => {
+          const rawData = (orden.raw_data || orden.datos_json) as any;
+          
+          // Función helper para extraer valor de múltiples posibles claves
+          const extractValue = (primary: any, ...keys: string[]): any => {
+            if (primary !== null && primary !== undefined && primary !== '') return primary;
+            if (!rawData || typeof rawData !== 'object') return null;
+            
+            for (const key of keys) {
+              const value = rawData[key];
+              if (value !== null && value !== undefined && value !== '') {
+                return value;
+              }
+            }
+            return null;
+          };
+
+          // Siempre intentar extraer, incluso si algunos campos ya tienen valores
+          const mejorada = {
+            ...orden,
+            institucion_nombre: extractValue(
+              orden.institucion_nombre, 
+              'Organismo', 'organismo', 'Institucion', 'institucion', 'InstitucionNombre'
+            ),
+            institucion_rut: extractValue(
+              orden.institucion_rut,
+              'RutOrganismo', 'rut_organismo', 'RUTOrganismo', 'rutOrganismo', 'InstitucionRut'
+            ),
+            proveedor_nombre: extractValue(
+              orden.proveedor_nombre,
+              'Proveedor', 'proveedor', 'ProveedorNombre'
+            ),
+            proveedor_rut: extractValue(
+              orden.proveedor_rut,
+              'RutProveedor', 'rut_proveedor', 'RUTProveedor', 'rutProveedor'
+            ),
+            total: extractValue(
+              orden.total,
+              'Total', 'total', 'MontoTotal', 'monto_total'
+            ),
+            total_neto: extractValue(
+              orden.total_neto,
+              'TotalNeto', 'total_neto', 'MontoNeto', 'monto_neto'
+            ),
+            estado: extractValue(
+              orden.estado,
+              'Estado', 'estado', 'Status', 'status'
+            ),
+            fecha_creacion: extractValue(
+              orden.fecha_creacion,
+              'FechaCreacion', 'fecha_creacion', 'Fecha', 'fecha', 'created_at'
+            ),
+            fecha_envio: extractValue(
+              orden.fecha_envio,
+              'FechaEnvio', 'fecha_envio', 'FechaEnvío', 'sent_at'
+            ),
+          } as OrdenCompraRow;
+
+          return mejorada;
+        });
+
         // Si se solicitan items, cargarlos
+<<<<<<< Updated upstream
         if (includeItems && ordenes.length > 0) {
           const ordenIds = ordenes.map(o => o.id);
+=======
+        if (includeItems && ordenesMejoradas.length > 0) {
+          const codigos = ordenesMejoradas.map(o => o.codigo);
+>>>>>>> Stashed changes
           const { data: itemsData, error: itemsError } = await supabase
             .from('ordenes_compra_items')
             .select('*')
@@ -145,6 +213,7 @@ export function useOrdenesCompra(filters?: OrdenesCompraFilters, includeItems = 
             });
 
             // Asignar items a cada orden
+<<<<<<< Updated upstream
             return ordenes.map((orden): OrdenCompra => ({
               id: orden.id,
               codigo: orden.codigo,
@@ -185,6 +254,18 @@ export function useOrdenesCompra(filters?: OrdenesCompraFilters, includeItems = 
           created_at: orden.created_at,
           updated_at: orden.updated_at,
           items: undefined,
+=======
+            ordenesMejoradas.forEach(orden => {
+              (orden as any).items = itemsMap.get(orden.codigo) || [];
+            });
+          }
+        }
+
+        return ordenesMejoradas.map((orden): OrdenCompra => ({
+          ...orden,
+          datos_json: orden.datos_json as Record<string, unknown> | null,
+          items: includeItems ? (orden as any).items : undefined,
+>>>>>>> Stashed changes
         }));
       } catch (error) {
         console.error('Error en useOrdenesCompra:', error);
@@ -216,6 +297,62 @@ export function useOrdenCompra(codigo: string | null, includeItems = true) {
 
         if (!orden) return null;
 
+        // Extraer datos faltantes desde raw_data (misma lógica que useOrdenesCompra)
+        const rawData = (orden.raw_data || orden.datos_json) as any;
+        
+        const extractValue = (primary: any, ...keys: string[]): any => {
+          if (primary !== null && primary !== undefined && primary !== '') return primary;
+          if (!rawData || typeof rawData !== 'object') return null;
+          
+          for (const key of keys) {
+            const value = rawData[key];
+            if (value !== null && value !== undefined && value !== '') {
+              return value;
+            }
+          }
+          return null;
+        };
+
+        const ordenMejorada = {
+          ...orden,
+          institucion_nombre: extractValue(
+            orden.institucion_nombre, 
+            'Organismo', 'organismo', 'Institucion', 'institucion', 'InstitucionNombre'
+          ),
+          institucion_rut: extractValue(
+            orden.institucion_rut,
+            'RutOrganismo', 'rut_organismo', 'RUTOrganismo', 'rutOrganismo', 'InstitucionRut'
+          ),
+          proveedor_nombre: extractValue(
+            orden.proveedor_nombre,
+            'Proveedor', 'proveedor', 'ProveedorNombre'
+          ),
+          proveedor_rut: extractValue(
+            orden.proveedor_rut,
+            'RutProveedor', 'rut_proveedor', 'RUTProveedor', 'rutProveedor'
+          ),
+          total: extractValue(
+            orden.total,
+            'Total', 'total', 'MontoTotal', 'monto_total'
+          ),
+          total_neto: extractValue(
+            orden.total_neto,
+            'TotalNeto', 'total_neto', 'MontoNeto', 'monto_neto'
+          ),
+          estado: extractValue(
+            orden.estado,
+            'Estado', 'estado', 'Status', 'status'
+          ),
+          fecha_creacion: extractValue(
+            orden.fecha_creacion,
+            'FechaCreacion', 'fecha_creacion', 'Fecha', 'fecha', 'created_at'
+          ),
+          fecha_envio: extractValue(
+            orden.fecha_envio,
+            'FechaEnvio', 'fecha_envio', 'FechaEnvío', 'sent_at'
+          ),
+        } as OrdenCompraRow;
+
         let items: OrdenCompraItem[] = [];
 
         if (includeItems) {
@@ -245,6 +382,7 @@ export function useOrdenCompra(codigo: string | null, includeItems = true) {
         }
 
         return {
+<<<<<<< Updated upstream
           id: orden.id,
           codigo: orden.codigo,
           nombre: orden.nombre,
@@ -261,6 +399,10 @@ export function useOrdenCompra(codigo: string | null, includeItems = true) {
           estado: orden.estado,
           created_at: orden.created_at,
           updated_at: orden.updated_at,
+=======
+          ...ordenMejorada,
+          datos_json: orden.datos_json as Record<string, unknown> | null,
+>>>>>>> Stashed changes
           items,
         };
       } catch (error) {

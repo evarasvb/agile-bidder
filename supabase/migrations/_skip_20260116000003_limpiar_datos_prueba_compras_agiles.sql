@@ -2,20 +2,14 @@
 -- y verificar que todas las compras tengan productos asociados
 
 -- 1. Identificar compras ágiles que parecen ser de prueba/inventadas
--- Criterios para identificar datos de prueba:
--- - Códigos que no siguen el formato estándar de MercadoPúblico
--- - Nombres genéricos o de prueba
--- - Organismos que no existen o son genéricos
--- - Fechas muy antiguas o futuras
--- - Sin productos asociados
-
 -- Crear una vista temporal para identificar compras sospechosas
-CREATE OR REPLACE VIEW compras_agiles_sospechosas AS
+DROP VIEW IF EXISTS compras_agiles_sospechosas;
+CREATE VIEW compras_agiles_sospechosas AS
 SELECT 
   ca.id,
   ca.codigo,
   ca.nombre,
-  ca.organismo,
+  ca.nombre_organismo AS organismo,
   ca.created_at,
   ca.fecha_cierre,
   COUNT(li.id) as num_items
@@ -32,31 +26,31 @@ WHERE
   OR LOWER(ca.nombre) LIKE '%sample%'
   OR LOWER(ca.nombre) LIKE '%demo%'
   -- O organismos genéricos
-  OR LOWER(ca.organismo) LIKE '%test%'
-  OR LOWER(ca.organismo) LIKE '%prueba%'
-  OR LOWER(ca.organismo) LIKE '%ejemplo%'
-  OR ca.organismo = 'Organismo no especificado'
-  -- O sin productos asociados (más de 30 días sin items)
-  OR (COUNT(li.id) = 0 AND ca.created_at < NOW() - INTERVAL '30 days')
-GROUP BY ca.id, ca.codigo, ca.nombre, ca.organismo, ca.created_at, ca.fecha_cierre;
+  OR LOWER(COALESCE(ca.nombre_organismo, '')) LIKE '%test%'
+  OR LOWER(COALESCE(ca.nombre_organismo, '')) LIKE '%prueba%'
+  OR LOWER(COALESCE(ca.nombre_organismo, '')) LIKE '%ejemplo%'
+  OR ca.nombre_organismo = 'Organismo no especificado'
+GROUP BY ca.id, ca.codigo, ca.nombre, ca.nombre_organismo, ca.created_at, ca.fecha_cierre
+HAVING COUNT(li.id) = 0 OR ca.created_at < NOW() - INTERVAL '30 days';
 
 -- 2. Identificar compras sin productos asociados
-CREATE OR REPLACE VIEW compras_agiles_sin_productos AS
+DROP VIEW IF EXISTS compras_agiles_sin_productos;
+CREATE VIEW compras_agiles_sin_productos AS
 SELECT 
   ca.id,
   ca.codigo,
   ca.nombre,
-  ca.organismo,
+  ca.nombre_organismo AS organismo,
   ca.created_at,
   ca.fecha_cierre,
   COUNT(li.id) as num_items
 FROM public.compras_agiles ca
 LEFT JOIN public.licitacion_items li ON li.licitacion_codigo = ca.codigo
-GROUP BY ca.id, ca.codigo, ca.nombre, ca.organismo, ca.created_at, ca.fecha_cierre
+GROUP BY ca.id, ca.codigo, ca.nombre, ca.nombre_organismo, ca.created_at, ca.fecha_cierre
 HAVING COUNT(li.id) = 0;
 
 -- 3. Función para limpiar datos de prueba (NO ejecutar automáticamente, solo para revisión)
--- IMPORTANTE: Revisar manualmente antes de ejecutar DELETE
+DROP FUNCTION IF EXISTS revisar_datos_prueba_compras_agiles();
 CREATE OR REPLACE FUNCTION revisar_datos_prueba_compras_agiles()
 RETURNS TABLE(
   tipo TEXT,
@@ -74,7 +68,7 @@ BEGIN
     'SOSPECHOSA'::TEXT as tipo,
     cs.codigo,
     cs.nombre,
-    cs.organismo,
+    cs.organismo::TEXT,
     cs.num_items,
     cs.created_at,
     CASE 
@@ -90,7 +84,7 @@ BEGIN
     'SIN_PRODUCTOS'::TEXT as tipo,
     csp.codigo,
     csp.nombre,
-    csp.organismo,
+    csp.organismo::TEXT,
     csp.num_items,
     csp.created_at,
     CASE 
@@ -105,6 +99,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- 4. Función para obtener estadísticas de compras ágiles
+DROP FUNCTION IF EXISTS estadisticas_compras_agiles();
 CREATE OR REPLACE FUNCTION estadisticas_compras_agiles()
 RETURNS TABLE(
   total_compras BIGINT,

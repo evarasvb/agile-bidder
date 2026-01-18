@@ -1,5 +1,5 @@
 -- Table for licitaciones (procurements)
-CREATE TABLE public.licitaciones (
+CREATE TABLE IF NOT EXISTS public.licitaciones (
   id_licitacion TEXT PRIMARY KEY,
   titulo TEXT NOT NULL,
   organismo TEXT NOT NULL,
@@ -11,7 +11,7 @@ CREATE TABLE public.licitaciones (
 );
 
 -- Table for licitacion items (products within each procurement)
-CREATE TABLE public.licitacion_items (
+CREATE TABLE IF NOT EXISTS public.licitacion_items (
   id SERIAL PRIMARY KEY,
   licitacion_id TEXT NOT NULL REFERENCES public.licitaciones(id_licitacion) ON DELETE CASCADE,
   nombre_producto TEXT NOT NULL,

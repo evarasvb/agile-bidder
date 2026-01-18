@@ -12,8 +12,6 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { readTextFile } from 'https://deno.land/std@0.208.0/fs/mod.ts';
-import { join } from 'https://deno.land/std@0.208.0/path/mod.ts';
 
 // Colores para la consola
 const colors = {
@@ -39,7 +37,7 @@ function logSection(title: string) {
 // Cargar variables de entorno desde .env
 async function loadEnv() {
   try {
-    const envContent = await readTextFile('.env');
+    const envContent = await Deno.readTextFile('.env');
     const envVars: Record<string, string> = {};
     
     for (const line of envContent.split('\n')) {
@@ -178,15 +176,16 @@ async function main() {
 
   // Leer el archivo SQL
   log('\n📂 Leyendo APLICAR_MIGRACIONES.sql...', 'cyan');
-  const sqlPath = join(Deno.cwd(), 'APLICAR_MIGRACIONES.sql');
+  const sqlPath = 'APLICAR_MIGRACIONES.sql';
   
   let sql: string;
   try {
-    sql = await readTextFile(sqlPath);
+    sql = await Deno.readTextFile(sqlPath);
     log(`✅ Archivo leído (${sql.length} caracteres)`, 'green');
   } catch (error) {
     log(`❌ Error leyendo archivo: ${error.message}`, 'red');
-    log(`   Ruta esperada: ${sqlPath}`, 'yellow');
+    log(`   Ruta esperada: ${Deno.cwd()}/${sqlPath}`, 'yellow');
+    log(`   Verifica que el archivo existe en el directorio actual`, 'yellow');
     Deno.exit(1);
   }
 

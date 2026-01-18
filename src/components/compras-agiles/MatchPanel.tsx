@@ -1,20 +1,202 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
+<<<<<<< Updated upstream
 import { Package, PackageSearch, FileText, Calendar, MapPin, Building2, DollarSign, CheckCircle2, XCircle, ShieldCheck, ShieldX, AlertCircle } from "lucide-react";
 import { format, parseISO } from "date-fns";
+=======
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Package, PackageSearch, FileText, Calendar, MapPin, Building2, DollarSign, CheckCircle2, XCircle, ShieldCheck, ShieldX, AlertCircle, TrendingUp, Clock, Percent, AlertTriangle, Search, ChevronDown, ChevronUp } from "lucide-react";
+import { format, parseISO, differenceInDays } from "date-fns";
+>>>>>>> Stashed changes
 import { es } from "date-fns/locale";
 import { useLicitacionItems, type LicitacionItem } from "@/hooks/useLicitacionItems";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 import { clasificarProceso, formatCurrency, montoEnUTM } from "@/utils/clasificacion";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 interface MatchPanelProps {
   compra: CompraAgil | null;
   onGenerarPropuesta: (productos: any[]) => void;
 }
 
+<<<<<<< Updated upstream
+=======
+function MatchScoreBadge({ score }: { score: number }) {
+  const variant = score >= 70 ? 'success' : score >= 40 ? 'warning' : 'secondary';
+  return (
+    <Badge variant={variant} className="text-xs">
+      {score}% match
+    </Badge>
+  );
+}
+
+/**
+ * Hook para buscar productos del inventario que puedan hacer match con un item específico
+ */
+function useMatchItemInventario(itemNombre: string | null, itemDescripcion: string | null) {
+  return useQuery({
+    queryKey: ['match_item_inventario', itemNombre, itemDescripcion],
+    queryFn: async () => {
+      if (!itemNombre) return [];
+
+      const searchText = `${itemNombre} ${itemDescripcion || ''}`.toLowerCase();
+      const searchTerms = searchText
+        .split(/\s+/)
+        .filter(w => w.length > 2)
+        .slice(0, 10);
+
+      if (searchTerms.length === 0) return [];
+
+      // Buscar en inventory
+      const { data: inventario, error } = await supabase
+        .from('inventory')
+        .select('*')
+        .eq('activo', true)
+        .limit(100);
+
+      if (error) throw error;
+      if (!inventario || inventario.length === 0) return [];
+
+      // Calcular match score para cada producto
+      const matched = inventario
+        .map(item => {
+          const nombreLower = item.nombre_producto?.toLowerCase() || '';
+          const descLower = item.descripcion?.toLowerCase() || '';
+          const combined = `${nombreLower} ${descLower}`;
+
+          let score = 0;
+          let matches = 0;
+
+          for (const term of searchTerms) {
+            if (combined.includes(term)) {
+              matches++;
+              score += 20;
+            }
+            // Bonus por match en nombre
+            if (nombreLower.includes(term)) {
+              score += 10;
+            }
+          }
+
+          // Normalizar score
+          score = Math.min(score, 100);
+
+          return {
+            id: item.id,
+            sku: item.sku,
+            nombre: item.nombre_producto,
+            categoria: item.categoria,
+            stock: item.stock_disponible,
+            precio_unitario: item.precio_unitario,
+            costo_neto: item.costo_neto || null,
+            descripcion: item.descripcion,
+            tiempo_entrega_dias: item.tiempo_entrega_dias,
+            matchScore: score,
+            matches,
+          };
+        })
+        .filter(item => item.matchScore > 20 && item.matches > 0)
+        .sort((a, b) => b.matchScore - a.matchScore)
+        .slice(0, 20); // Top 20 matches (aumentado de 5 para mejor matching)
+
+      return matched;
+    },
+    enabled: !!itemNombre,
+  });
+}
+
+interface ItemMatchSuggestionsProps {
+  item: LicitacionItem;
+  onSelectMatch?: (sku: string) => void;
+}
+
+function ItemMatchSuggestions({ item, onSelectMatch }: ItemMatchSuggestionsProps) {
+  const [expanded, setExpanded] = useState(false);
+  const { data: suggestions, isLoading } = useMatchItemInventario(item.nombre, item.descripcion);
+
+  if (!item.nombre || item.match_sku) return null;
+
+  return (
+    <div className="pt-2 border-t">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="w-full justify-between h-auto py-1 text-xs"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-center gap-2">
+          <Search className="h-3 w-3" />
+          <span>Buscar en inventario</span>
+          {suggestions && suggestions.length > 0 && (
+            <Badge variant="secondary" className="text-xs">
+              {suggestions.length}
+            </Badge>
+          )}
+        </div>
+        {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+      </Button>
+
+      {expanded && (
+        <div className="mt-2 space-y-2">
+          {isLoading ? (
+            <div className="space-y-1">
+              {[1, 2].map(i => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          ) : suggestions && suggestions.length > 0 ? (
+            suggestions.map((suggestion) => (
+              <div
+                key={suggestion.id}
+                className="border rounded-md p-2 bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
+                onClick={() => onSelectMatch?.(suggestion.sku)}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-medium text-xs">{suggestion.nombre}</span>
+                      <MatchScoreBadge score={suggestion.matchScore} />
+                    </div>
+                    <div className="text-xs text-muted-foreground space-y-0.5">
+                      <div>
+                        <span className="font-mono">{suggestion.sku}</span>
+                        {suggestion.categoria && (
+                          <span className="ml-2">• {suggestion.categoria}</span>
+                        )}
+                      </div>
+                      {suggestion.stock !== null && (
+                        <div>Stock: {suggestion.stock}</div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <span>Precio: {formatCurrency(suggestion.precio_unitario)}</span>
+                        {suggestion.costo_neto && (
+                          <span className="text-green-600">
+                            Margen: {Math.round(((suggestion.precio_unitario - suggestion.costo_neto) / suggestion.precio_unitario) * 100)}%
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="text-xs text-muted-foreground text-center py-2">
+              No se encontraron productos similares en el inventario
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+>>>>>>> Stashed changes
 export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
   const { data: items, isLoading: isLoadingItems } = useLicitacionItems(compra?.codigo || null);
 
@@ -192,6 +374,73 @@ export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
                               )}
                             </div>
                           </div>
+<<<<<<< Updated upstream
+=======
+
+                          {tieneMatch && (
+                            <div className="pt-2 border-t border-primary/20">
+                              <div className="flex items-center gap-2 mb-1">
+                                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                <span className="text-xs font-medium text-green-700">Match encontrado</span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div>
+                                  <span className="text-muted-foreground">SKU: </span>
+                                  <span className="font-mono font-medium">{item.match_sku}</span>
+                                </div>
+                                {item.costo_unitario && (
+                                  <div>
+                                    <span className="text-muted-foreground">Costo: </span>
+                                    <span className="font-medium">{formatCurrency(item.costo_unitario)}</span>
+                                  </div>
+                                )}
+                                {item.margen_estimado && (
+                                  <div>
+                                    <span className="text-muted-foreground">Margen: </span>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className={`font-medium ${
+                                          item.margen_estimado >= 0.3 ? 'text-green-600' :
+                                          item.margen_estimado >= 0.15 ? 'text-orange-600' :
+                                          item.margen_estimado >= 0.10 ? 'text-yellow-600' :
+                                          'text-red-600'
+                                        }`}>
+                                          {Math.round(item.margen_estimado * 100)}%
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p className="text-xs">
+                                          {item.margen_estimado >= 0.3 ? '✅ Margen excelente' :
+                                           item.margen_estimado >= 0.15 ? '✅ Margen bueno' :
+                                           item.margen_estimado >= 0.10 ? '⚠️ Margen aceptable' :
+                                           '❌ Margen bajo - Revisar'}
+                                        </p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </div>
+                                )}
+                                {item.confidence_score && (
+                                  <div>
+                                    <span className="text-muted-foreground">Confianza: </span>
+                                    <span className="font-medium">
+                                      {Math.round(item.confidence_score * 100)}%
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {!tieneMatch && (
+                            <ItemMatchSuggestions 
+                              item={item}
+                              onSelectMatch={(sku) => {
+                                // TODO: Implementar selección de match manual
+                                console.log('Seleccionar match:', sku, 'para item:', item.item_index);
+                              }}
+                            />
+                          )}
+>>>>>>> Stashed changes
                         </div>
                       </div>
                     </div>

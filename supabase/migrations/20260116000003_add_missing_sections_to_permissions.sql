@@ -48,7 +48,7 @@ BEGIN
     AND table_name = 'role_permissions' 
     AND column_name = 'can_delete'
   ) THEN
-    ALTER TABLE public.role_permissions ADD COLUMN can_delete BOOLEAN DEFAULT false;
+    ALTER TABLE public.role_permissions ADD COLUMN IF NOT EXISTS can_delete BOOLEAN DEFAULT false;
   END IF;
 END $$;
 

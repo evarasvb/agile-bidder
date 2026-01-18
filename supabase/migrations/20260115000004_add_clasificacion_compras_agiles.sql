@@ -12,7 +12,7 @@ BEGIN
     AND column_name = 'nombre_organismo'
   ) THEN
     ALTER TABLE public.compras_agiles 
-    ADD COLUMN nombre_organismo TEXT;
+    ADD COLUMN IF NOT EXISTS nombre_organismo TEXT;
     
     -- Migrar datos de organismo a nombre_organismo
     UPDATE public.compras_agiles
@@ -28,12 +28,9 @@ BEGIN
     AND column_name = 'monto_estimado'
   ) THEN
     ALTER TABLE public.compras_agiles 
-    ADD COLUMN monto_estimado NUMERIC(15,2);
+    ADD COLUMN IF NOT EXISTS monto_estimado NUMERIC(15,2);
     
-    -- Migrar datos de monto a monto_estimado
-    UPDATE public.compras_agiles
-    SET monto_estimado = monto
-    WHERE monto_estimado IS NULL AND monto IS NOT NULL;
+    -- No hay columna monto para migrar, monto_estimado se llenará desde otros campos si es necesario
   END IF;
 
   -- Agregar tipo_proceso si no existe
@@ -44,7 +41,7 @@ BEGIN
     AND column_name = 'tipo_proceso'
   ) THEN
     ALTER TABLE public.compras_agiles 
-    ADD COLUMN tipo_proceso VARCHAR(20) DEFAULT 'compra_agil';
+    ADD COLUMN IF NOT EXISTS tipo_proceso VARCHAR(20) DEFAULT 'compra_agil';
   END IF;
 
   -- Agregar categoria si no existe
@@ -55,26 +52,26 @@ BEGIN
     AND column_name = 'categoria'
   ) THEN
     ALTER TABLE public.compras_agiles 
-    ADD COLUMN categoria VARCHAR(10) DEFAULT 'L1';
+    ADD COLUMN IF NOT EXISTS categoria VARCHAR(10) DEFAULT 'L1';
   END IF;
 END $$;
 
 -- Clasificar registros existentes según monto
 -- UTM Enero 2026: $69.751 CLP
 -- Umbral: 100 UTM = $6.975.100 CLP
--- Usar monto_estimado si existe, sino monto
+-- Usar solo monto_estimado (la columna monto no existe)
 UPDATE public.compras_agiles
 SET 
   tipo_proceso = CASE
-    WHEN COALESCE(monto_estimado, monto) IS NULL OR COALESCE(monto_estimado, monto) = 0 THEN 'compra_agil'
-    WHEN COALESCE(monto_estimado, monto) <= 6975100 THEN 'compra_agil'  -- <= 100 UTM
+    WHEN monto_estimado IS NULL OR monto_estimado = 0 THEN 'compra_agil'
+    WHEN monto_estimado <= 6975100 THEN 'compra_agil'  -- <= 100 UTM
     ELSE 'licitacion'  -- > 100 UTM
   END,
   categoria = CASE
-    WHEN COALESCE(monto_estimado, monto) IS NULL OR COALESCE(monto_estimado, monto) = 0 THEN 'L1'
-    WHEN COALESCE(monto_estimado, monto) <= 6975100 THEN 'L1'  -- < 100 UTM = Compra Ágil
-    WHEN COALESCE(monto_estimado, monto) <= 69751000 THEN 'LE'  -- 100 a 1.000 UTM = Intermedia
-    WHEN COALESCE(monto_estimado, monto) <= 348755000 THEN 'LP'  -- 1.000 a 5.000 UTM = Mayor
+    WHEN monto_estimado IS NULL OR monto_estimado = 0 THEN 'L1'
+    WHEN monto_estimado <= 6975100 THEN 'L1'  -- < 100 UTM = Compra Ágil
+    WHEN monto_estimado <= 69751000 THEN 'LE'  -- 100 a 1.000 UTM = Intermedia
+    WHEN monto_estimado <= 348755000 THEN 'LP'  -- 1.000 a 5.000 UTM = Mayor
     ELSE 'LR'  -- > 5.000 UTM = Gran Compra
   END
 WHERE tipo_proceso IS NULL OR categoria IS NULL;

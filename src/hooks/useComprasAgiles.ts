@@ -71,8 +71,50 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
 
       if (error) throw error;
       
+      // Filtrar datos de prueba/inventados antes de mapear
+      const datosReales = (data || []).filter((compra) => {
+        const nombreOrganismo = (compra as CompraAgilRow).nombre_organismo || compra.organismo || '';
+        const nombre = compra.nombre || '';
+        const codigo = compra.codigo || '';
+        
+        // Excluir si tiene nombres/códigos genéricos de prueba
+        const nombreLower = nombre.toLowerCase();
+        const organismoLower = nombreOrganismo.toLowerCase();
+        const codigoLower = codigo.toLowerCase();
+        
+        // Patrones sospechosos - códigos de prueba comunes
+        const esPrueba = 
+          // Códigos de prueba típicos (CA-2025-XXX, TEST-XXX, etc.)
+          /^CA-202[0-9]-/.test(codigo) || // CA-2025-001, CA-2024-123, etc.
+          /^TEST-/.test(codigo) ||
+          /^PRUEBA-/.test(codigo) ||
+          /^DEMO-/.test(codigo) ||
+          /^SAMPLE-/.test(codigo) ||
+          codigoLower === 'test' ||
+          codigoLower === 'prueba' ||
+          codigoLower === 'demo' ||
+          codigoLower === 'sample' ||
+          // Nombres de prueba
+          nombreLower.includes('test') ||
+          nombreLower.includes('prueba') ||
+          nombreLower.includes('ejemplo') ||
+          nombreLower.includes('dummy') ||
+          nombreLower.includes('sample') ||
+          nombreLower.includes('demo') ||
+          // Organismos de prueba
+          organismoLower.includes('test') ||
+          organismoLower.includes('prueba') ||
+          organismoLower.includes('ejemplo') ||
+          organismoLower === 'organismo no especificado' ||
+          organismoLower === 'organismo de prueba' ||
+          // Código debe ser alfanumérico o con guiones, y NO debe parecer de prueba
+          (codigo && !/^[0-9A-Z-]+$/.test(codigo));
+        
+        return !esPrueba;
+      });
+      
       // Mapear campos de BD a interfaz
-      let compras = (data || []).map((compra): CompraAgil => {
+      let compras = datosReales.map((compra): CompraAgil => {
         const compraRow = compra as CompraAgilRow;
         // Convertir datos_json de Json a Record<string, unknown>
         const datosJson = compraRow.datos_json;
@@ -180,7 +222,43 @@ export function useComprasAgilesStats() {
 
       if (error) throw error;
 
-      const compras = (data || []).map((c): CompraAgil => {
+      // Filtrar datos de prueba ANTES de mapear (mismo filtro que useComprasAgiles)
+      const datosReales = (data || []).filter((compra) => {
+        const nombreOrganismo = (compra as CompraAgilRow).nombre_organismo || compra.organismo || '';
+        const nombre = compra.nombre || '';
+        const codigo = compra.codigo || '';
+        
+        const nombreLower = nombre.toLowerCase();
+        const organismoLower = nombreOrganismo.toLowerCase();
+        const codigoLower = codigo.toLowerCase();
+        
+        const esPrueba = 
+          /^CA-202[0-9]-/.test(codigo) ||
+          /^TEST-/.test(codigo) ||
+          /^PRUEBA-/.test(codigo) ||
+          /^DEMO-/.test(codigo) ||
+          /^SAMPLE-/.test(codigo) ||
+          codigoLower === 'test' ||
+          codigoLower === 'prueba' ||
+          codigoLower === 'demo' ||
+          codigoLower === 'sample' ||
+          nombreLower.includes('test') ||
+          nombreLower.includes('prueba') ||
+          nombreLower.includes('ejemplo') ||
+          nombreLower.includes('dummy') ||
+          nombreLower.includes('sample') ||
+          nombreLower.includes('demo') ||
+          organismoLower.includes('test') ||
+          organismoLower.includes('prueba') ||
+          organismoLower.includes('ejemplo') ||
+          organismoLower === 'organismo no especificado' ||
+          organismoLower === 'organismo de prueba' ||
+          (codigo && !/^[0-9A-Z-]+$/.test(codigo));
+        
+        return !esPrueba;
+      });
+
+      const compras = datosReales.map((c): CompraAgil => {
         const compraRow = c as CompraAgilRow;
         // Convertir datos_json de Json a Record<string, unknown>
         const datosJson = compraRow.datos_json;

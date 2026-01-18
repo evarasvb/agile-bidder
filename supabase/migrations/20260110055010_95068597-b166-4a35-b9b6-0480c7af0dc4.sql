@@ -1,5 +1,5 @@
 -- Tabla de clientes (usuarios del sistema)
-CREATE TABLE public.clientes (
+CREATE TABLE IF NOT EXISTS public.clientes (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,
   empresa_nombre TEXT NOT NULL,
@@ -17,7 +17,7 @@ CREATE TABLE public.clientes (
 );
 
 -- Tabla de inventario de clientes
-CREATE TABLE public.cliente_inventario (
+CREATE TABLE IF NOT EXISTS public.cliente_inventario (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   cliente_id UUID NOT NULL REFERENCES public.clientes(id) ON DELETE CASCADE,
   sku TEXT NOT NULL,
@@ -36,7 +36,7 @@ CREATE TABLE public.cliente_inventario (
 );
 
 -- Tabla de exclusiones de clientes
-CREATE TABLE public.cliente_exclusiones (
+CREATE TABLE IF NOT EXISTS public.cliente_exclusiones (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   cliente_id UUID NOT NULL REFERENCES public.clientes(id) ON DELETE CASCADE,
   tipo_exclusion TEXT NOT NULL,
@@ -44,7 +44,7 @@ CREATE TABLE public.cliente_exclusiones (
 );
 
 -- Tabla de notificaciones de clientes
-CREATE TABLE public.cliente_notificaciones (
+CREATE TABLE IF NOT EXISTS public.cliente_notificaciones (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   cliente_id UUID NOT NULL REFERENCES public.clientes(id) ON DELETE CASCADE,
   email_instantaneo BOOLEAN DEFAULT true,
@@ -59,7 +59,7 @@ CREATE TABLE public.cliente_notificaciones (
 );
 
 -- Tabla de ofertas de clientes
-CREATE TABLE public.cliente_ofertas (
+CREATE TABLE IF NOT EXISTS public.cliente_ofertas (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   cliente_id UUID NOT NULL REFERENCES public.clientes(id) ON DELETE CASCADE,
   licitacion_id TEXT NOT NULL,
@@ -94,8 +94,8 @@ CREATE TRIGGER update_cliente_notificaciones_updated_at BEFORE UPDATE ON public.
 CREATE TRIGGER update_cliente_ofertas_updated_at BEFORE UPDATE ON public.cliente_ofertas FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 -- Indexes for performance
-CREATE INDEX idx_cliente_inventario_cliente ON public.cliente_inventario(cliente_id);
-CREATE INDEX idx_cliente_inventario_palabras ON public.cliente_inventario USING GIN(palabras_clave);
-CREATE INDEX idx_cliente_exclusiones_cliente ON public.cliente_exclusiones(cliente_id);
-CREATE INDEX idx_cliente_ofertas_cliente ON public.cliente_ofertas(cliente_id);
-CREATE INDEX idx_cliente_ofertas_licitacion ON public.cliente_ofertas(licitacion_id);
+CREATE INDEX IF NOT EXISTS idx_cliente_inventario_cliente ON public.cliente_inventario(cliente_id);
+CREATE INDEX IF NOT EXISTS idx_cliente_inventario_palabras ON public.cliente_inventario USING GIN(palabras_clave);
+CREATE INDEX IF NOT EXISTS idx_cliente_exclusiones_cliente ON public.cliente_exclusiones(cliente_id);
+CREATE INDEX IF NOT EXISTS idx_cliente_ofertas_cliente ON public.cliente_ofertas(cliente_id);
+CREATE INDEX IF NOT EXISTS idx_cliente_ofertas_licitacion ON public.cliente_ofertas(licitacion_id);

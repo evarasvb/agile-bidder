@@ -43,11 +43,27 @@ FOR SELECT
 TO authenticated
 USING (true);
 
-CREATE POLICY "Authenticated users can insert offers" 
-ON public.ofertas 
-FOR INSERT 
-TO authenticated
-WITH CHECK (auth.uid() = created_by OR created_by IS NULL);
+-- Política condicional para insertar ofertas (solo si created_by existe)
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ofertas' AND column_name = 'created_by') THEN
+    DROP POLICY IF EXISTS "Authenticated users can insert offers" ON public.ofertas;
+    CREATE POLICY "Authenticated users can insert offers" 
+    ON public.ofertas 
+    FOR INSERT 
+    TO authenticated
+    WITH CHECK (auth.uid() = created_by OR created_by IS NULL);
+  ELSE
+    DROP POLICY IF EXISTS "Authenticated users can insert offers" ON public.ofertas;
+    CREATE POLICY "Authenticated users can insert offers" 
+    ON public.ofertas 
+    FOR INSERT 
+    TO authenticated
+    WITH CHECK (true);
+  END IF;
+EXCEPTION
+  WHEN OTHERS THEN null;
+END $$;
 
 CREATE POLICY "Authenticated users can update offers" 
 ON public.ofertas 

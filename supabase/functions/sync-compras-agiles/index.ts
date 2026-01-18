@@ -61,11 +61,11 @@ Deno.serve(async (req) => {
 
     // Parse request body
     const body = await req.json();
-    const { licitaciones } = body;
+    const comprasToProcess = body.licitaciones || body.compras_agiles || body.compras || [];
 
-    if (!licitaciones || !Array.isArray(licitaciones)) {
+    if (!comprasToProcess || !Array.isArray(comprasToProcess) || comprasToProcess.length === 0) {
       return new Response(
-        JSON.stringify({ error: 'Se requiere un array de licitaciones' }),
+        JSON.stringify({ error: 'Se requiere un array de compras ágiles o licitaciones' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -78,7 +78,11 @@ Deno.serve(async (req) => {
     };
 
     // Process each compra ágil
+<<<<<<< Updated upstream
     for (const lic of licitaciones as CompraAgilData[]) {
+=======
+    for (const lic of comprasToProcess) {
+>>>>>>> Stashed changes
       try {
         // Skip if not a compra ágil
         if (lic.tipo !== 'compra_agil' && !lic.codigo) {
@@ -110,7 +114,34 @@ Deno.serve(async (req) => {
           }
         }
         
+<<<<<<< Updated upstream
         const compraData = {
+=======
+        // Guardar TODOS los datos adicionales en datos_json
+        const datosCompletos = {
+          ...(lic.datos_json || {}),
+          // Incluir todos los campos adicionales que puedan venir
+          institucion_rut: lic.institucion_rut || null,
+          contacto_email: lic.contacto_email || null,
+          contacto_telefono: lic.contacto_telefono || null,
+          organismo_direccion: lic.organismo_direccion || null,
+          condiciones_pago: lic.condiciones_pago || null,
+          plazo_entrega: lic.plazo_entrega || null,
+          forma_pago: lic.forma_pago || null,
+          lugar_entrega: lic.lugar_entrega || null,
+          unidad_compra: lic.unidad_compra || null,
+          responsable: lic.responsable || null,
+          moneda: lic.moneda || 'CLP',
+          tipo_proceso_detalle: lic.tipo_proceso || null,
+          modalidad: lic.modalidad || null,
+          comuna: lic.comuna || null,
+          fecha_publicacion: lic.fecha_publicacion || null,
+          // Incluir el objeto completo como fallback
+          raw_data: lic
+        };
+        
+        const compraData: any = {
+>>>>>>> Stashed changes
           codigo: lic.codigo,
           nombre: lic.nombre || `Compra Ágil ${lic.codigo}`,
           organismo: lic.organismo || lic.institucion_nombre || 'Organismo no especificado',
@@ -120,7 +151,13 @@ Deno.serve(async (req) => {
           region: lic.region || null,
           descripcion: lic.descripcion || null,
           link_oficial: lic.link_oficial || null,
+<<<<<<< Updated upstream
           datos_json: lic.datos_json || lic,
+=======
+          datos_json: datosCompletos, // Store ALL scraped data
+          tipo_proceso: tipo_proceso, // 'compra_agil' o 'licitacion'
+          categoria: categoria, // 'L1', 'LE', 'LP', 'LR'
+>>>>>>> Stashed changes
         };
 
         // Upsert compra ágil
@@ -175,7 +212,7 @@ Deno.serve(async (req) => {
 
     results.success = results.errors.length === 0;
     results.details = {
-      total: licitaciones.length,
+      total: comprasToProcess.length,
       synced: results.synced,
       errors: results.errors.length
     };

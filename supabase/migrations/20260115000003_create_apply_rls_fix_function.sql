@@ -27,19 +27,21 @@ BEGIN
 
   -- Paso 2: Crear función helper
   BEGIN
+    EXECUTE '
     CREATE OR REPLACE FUNCTION public.is_current_user_admin()
     RETURNS BOOLEAN
     LANGUAGE sql
     STABLE
     SECURITY DEFINER
     SET search_path = public
-    AS $$
+    AS $inner$
       SELECT EXISTS (
         SELECT 1 FROM public.user_roles 
         WHERE user_id = auth.uid() 
-        AND role = 'admin'
+        AND role = ''admin''
       );
-    $$;
+    $inner$;
+    ';
     step_result := 'Función is_current_user_admin creada';
   EXCEPTION WHEN OTHERS THEN
     step_result := 'Error creando función: ' || SQLERRM;

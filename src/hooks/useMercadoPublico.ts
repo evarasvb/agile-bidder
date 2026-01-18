@@ -210,12 +210,17 @@ export function useSyncOrdenesCompra() {
       return data;
     },
     onSuccess: (data) => {
+      // Invalidar todas las queries relacionadas con órdenes de compra
       queryClient.invalidateQueries({ queryKey: ['ordenes-compra-bi'] });
+      queryClient.invalidateQueries({ queryKey: ['ordenes_compra'] });
+      queryClient.invalidateQueries({ queryKey: ['orden_compra'] });
+      queryClient.invalidateQueries({ queryKey: ['orden_compra_items'] });
       queryClient.invalidateQueries({ queryKey: ['proveedores-bi'] });
       queryClient.invalidateQueries({ queryKey: ['instituciones-bi'] });
+      queryClient.invalidateQueries({ queryKey: ['bi-'] }); // Invalida todas las queries de BI
       
       if (data.success) {
-        toast.success(`${data.synced} órdenes de compra sincronizadas`);
+        toast.success(`${data.synced} órdenes de compra sincronizadas correctamente`);
       } else {
         toast.warning(`Sincronización parcial: ${data.synced} órdenes, ${data.errors.length} errores`);
       }

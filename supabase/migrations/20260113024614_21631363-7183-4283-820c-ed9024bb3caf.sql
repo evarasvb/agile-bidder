@@ -1,5 +1,5 @@
 -- Create import_history table to track all Excel/CSV imports
-CREATE TABLE public.import_history (
+CREATE TABLE IF NOT EXISTS public.import_history (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   file_name TEXT NOT NULL,

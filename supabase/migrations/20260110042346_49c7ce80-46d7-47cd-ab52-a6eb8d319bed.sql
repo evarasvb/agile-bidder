@@ -1,8 +1,12 @@
 -- Create enum for notification frequency
-CREATE TYPE public.notification_frequency AS ENUM ('immediate', 'daily', 'weekly');
+DO $$ BEGIN
+    CREATE TYPE public.notification_frequency AS ENUM ('immediate', 'daily', 'weekly');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
 -- Create user_preferences table
-CREATE TABLE public.user_preferences (
+CREATE TABLE IF NOT EXISTS public.user_preferences (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL UNIQUE,
     company_name TEXT,
@@ -13,7 +17,7 @@ CREATE TABLE public.user_preferences (
 );
 
 -- Create user_categories table
-CREATE TABLE public.user_categories (
+CREATE TABLE IF NOT EXISTS public.user_categories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
     category_id TEXT NOT NULL,
@@ -23,7 +27,7 @@ CREATE TABLE public.user_categories (
 );
 
 -- Create user_regions table
-CREATE TABLE public.user_regions (
+CREATE TABLE IF NOT EXISTS public.user_regions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
     region_code TEXT NOT NULL,
@@ -33,7 +37,7 @@ CREATE TABLE public.user_regions (
 );
 
 -- Create user_notifications table
-CREATE TABLE public.user_notifications (
+CREATE TABLE IF NOT EXISTS public.user_notifications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL UNIQUE,
     email_notifications BOOLEAN NOT NULL DEFAULT true,

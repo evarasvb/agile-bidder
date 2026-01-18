@@ -1,0 +1,63 @@
+{
+  "nombre": "Poderes Ampliados de Evaristo",
+  "descripcion": "Misiones que demuestran las nuevas capacidades ampliadas de Evaristo",
+  "fecha_creacion": "2026-01-17",
+  "prioridad": "alta",
+  "automatico": false,
+  "misiones": [
+    {
+      "nombre": "Aplicar migraciones de Supabase",
+      "tipo": "migrar",
+      "archivo": null,
+      "instruccion": "Aplica todas las migraciones pendientes de Supabase"
+    },
+    {
+      "nombre": "Verificar estado de Git",
+      "tipo": "git",
+      "archivo": null,
+      "accion": "status",
+      "parametros": [],
+      "instruccion": "Verifica el estado del repositorio Git"
+    },
+    {
+      "nombre": "Verificar migraciones pendientes",
+      "tipo": "supabase",
+      "archivo": null,
+      "accion": "db push --dry-run",
+      "parametros": [],
+      "instruccion": "Verifica qué migraciones están pendientes sin aplicarlas"
+    },
+    {
+      "nombre": "Verificar compilación TypeScript",
+      "tipo": "comando",
+      "archivo": null,
+      "comando": "npm run type-check",
+      "instruccion": "Verifica que el proyecto compile correctamente"
+    },
+    {
+      "nombre": "Ejecutar linter",
+      "tipo": "comando",
+      "archivo": null,
+      "comando": "npm run lint",
+      "instruccion": "Ejecuta el linter para verificar calidad de código"
+    },
+    {
+      "nombre": "Instalar dependencias",
+      "tipo": "instalar",
+      "archivo": null,
+      "instruccion": "Instala las dependencias del proyecto"
+    },
+    {
+      "nombre": "Revisar y optimizar hook de compras ágiles",
+      "tipo": "revisar",
+      "archivo": "src/hooks/useComprasAgiles.ts",
+      "instruccion": "Revisa este hook. Optimiza las queries, mejora el manejo de errores, y asegúrate de que invalide queries cuando sea necesario. Asegúrate de que el código sea eficiente y tenga buena performance."
+    },
+    {
+      "nombre": "Mejorar componente MatchPanel",
+      "tipo": "modificar",
+      "archivo": "src/components/compras-agiles/MatchPanel.tsx",
+      "instruccion": "Mejora este componente. Asegúrate de que muestre correctamente los matches item por item, que la búsqueda de inventario funcione bien, y que la UX sea excelente. Optimiza el rendimiento y asegúrate de que no haya memory leaks."
+    }
+  ]
+}

@@ -7,7 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+<<<<<<< Updated upstream
 import { Search, FileText, Building2, User, Calendar, Package, X, Filter } from "lucide-react";
+=======
+import { Search, FileText, Building2, User, Calendar, DollarSign, Package, X, Filter, RefreshCw } from "lucide-react";
+import { useSyncOrdenesCompra } from "@/hooks/useMercadoPublico";
+>>>>>>> Stashed changes
 import { formatCurrency } from "@/utils/clasificacion";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -38,6 +43,20 @@ export default function OrdenesCompra() {
     true // Cargar items del detalle
   );
 
+  const syncOrdenes = useSyncOrdenesCompra();
+
+  const handleSync = async () => {
+    // Sincronizar órdenes de los últimos 30 días
+    const hoy = new Date();
+    const fechaStr = hoy.toLocaleDateString('es-CL', { 
+      day: '2-digit', 
+      month: '2-digit', 
+      year: 'numeric' 
+    }).replace(/\//g, '');
+    
+    await syncOrdenes.mutateAsync({ fecha: fechaStr });
+  };
+
   const limpiarFiltros = () => {
     setSearchTerm("");
     setFiltroRut("");
@@ -58,6 +77,15 @@ export default function OrdenesCompra() {
             Gestiona y consulta todas las órdenes de compra con detalle completo
           </p>
         </div>
+        <Button
+          onClick={handleSync}
+          disabled={syncOrdenes.isPending}
+          variant="outline"
+          className="gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${syncOrdenes.isPending ? 'animate-spin' : ''}`} />
+          {syncOrdenes.isPending ? 'Sincronizando...' : 'Sincronizar desde MercadoPúblico'}
+        </Button>
       </div>
 
       {/* Filtros */}
@@ -161,6 +189,7 @@ export default function OrdenesCompra() {
                     <TableHead className="font-semibold text-right">Total</TableHead>
                     <TableHead className="font-semibold">Fecha</TableHead>
                     <TableHead className="font-semibold">Estado</TableHead>
+                    <TableHead className="font-semibold text-center">Items</TableHead>
                     <TableHead className="font-semibold text-center">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -234,6 +263,15 @@ export default function OrdenesCompra() {
                         >
                           {orden.estado || 'N/A'}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {orden.items && orden.items.length > 0 ? (
+                          <Badge variant="outline" className="font-mono">
+                            {orden.items.length}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">-</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-center">
                         <Dialog>

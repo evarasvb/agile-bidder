@@ -101,6 +101,42 @@ export function EvaristoChat() {
           },
         };
         setMessages(prev => [...prev, evaristoMessage]);
+      } else if (command.includes('migrar') || command.includes('migraciones')) {
+        // Nueva capacidad: aplicar migraciones
+        const result = await mision.mutateAsync({ mision_file: 'poderes_ampliados.json' });
+        const evaristoMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'evaristo',
+          content: result.success
+            ? '✅ Migraciones aplicadas exitosamente. Base de datos actualizada.'
+            : `❌ Error aplicando migraciones (código ${result.exit_code})`,
+          timestamp: new Date(),
+          type: 'result',
+          result: {
+            success: result.success,
+            output: result.output,
+            error: result.error,
+          },
+        };
+        setMessages(prev => [...prev, evaristoMessage]);
+      } else if (command.includes('poderes') || command.includes('ampliados')) {
+        // Nueva capacidad: ejecutar poderes ampliados
+        const result = await mision.mutateAsync({ mision_file: 'poderes_ampliados.json' });
+        const evaristoMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'evaristo',
+          content: result.success
+            ? '✅ Poderes ampliados ejecutados exitosamente. Evaristo está trabajando a máxima capacidad.'
+            : `❌ Error ejecutando poderes ampliados (código ${result.exit_code})`,
+          timestamp: new Date(),
+          type: 'result',
+          result: {
+            success: result.success,
+            output: result.output,
+            error: result.error,
+          },
+        };
+        setMessages(prev => [...prev, evaristoMessage]);
       } else if (command.includes('hola') || command.includes('ayuda') || command.includes('help')) {
         const evaristoMessage: Message = {
           id: (Date.now() + 1).toString(),
@@ -109,12 +145,23 @@ export function EvaristoChat() {
 
 🔍 **Revisar proyecto**: Di "revisar" o "revisa el código"
 🎯 **Ejecutar misión**: Di "mision" o "ejecuta mision_completa_firmavb"
+🔄 **Aplicar migraciones**: Di "migraciones" o "aplica migraciones"
+⚡ **Poderes ampliados**: Di "poderes ampliados" para activar todas las capacidades
 ❓ **Preguntas**: Hazme cualquier pregunta sobre el proyecto
+
+**Nuevas Capacidades:**
+- ✅ Aplicar migraciones de Supabase automáticamente
+- ✅ Ejecutar comandos git (status, commit, etc.)
+- ✅ Ejecutar comandos de Supabase CLI
+- ✅ Ejecutar comandos del sistema
+- ✅ Modificar código con IA
+- ✅ Optimizar componentes automáticamente
 
 Ejemplos:
 - "Revisa el proyecto"
 - "Ejecuta la misión completa"
-- "¿Qué mejoras has hecho hoy?"`,
+- "Aplica migraciones"
+- "Poderes ampliados"`,
           timestamp: new Date(),
           type: 'text',
         };

@@ -2,7 +2,7 @@
 -- Tabla principal para almacenar Órdenes de Compra (OC)
 -- Esta es la fuente principal de datos para BI
 -- =====================================================
-CREATE TABLE public.ordenes_compra (
+CREATE TABLE IF NOT EXISTS public.ordenes_compra (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   codigo TEXT NOT NULL UNIQUE, -- Código único de la OC en MercadoPúblico
   
@@ -48,7 +48,7 @@ CREATE TABLE public.ordenes_compra (
 -- =====================================================
 -- Tabla para los items/productos de las Órdenes de Compra
 -- =====================================================
-CREATE TABLE public.ordenes_compra_items (
+CREATE TABLE IF NOT EXISTS public.ordenes_compra_items (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   orden_compra_id UUID NOT NULL REFERENCES public.ordenes_compra(id) ON DELETE CASCADE,
   
@@ -75,7 +75,7 @@ CREATE TABLE public.ordenes_compra_items (
 -- =====================================================
 -- Tabla para almacenar información de Licitaciones con más detalle
 -- =====================================================
-CREATE TABLE public.licitaciones_bi (
+CREATE TABLE IF NOT EXISTS public.licitaciones_bi (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   codigo TEXT NOT NULL UNIQUE, -- CodigoExterno de MercadoPúblico
   
@@ -122,7 +122,7 @@ CREATE TABLE public.licitaciones_bi (
 -- =====================================================
 -- Tabla para los items requeridos en las licitaciones
 -- =====================================================
-CREATE TABLE public.licitaciones_bi_items (
+CREATE TABLE IF NOT EXISTS public.licitaciones_bi_items (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   licitacion_id UUID NOT NULL REFERENCES public.licitaciones_bi(id) ON DELETE CASCADE,
   
@@ -142,7 +142,7 @@ CREATE TABLE public.licitaciones_bi_items (
 -- =====================================================
 -- Tabla para adjudicaciones de licitaciones
 -- =====================================================
-CREATE TABLE public.licitaciones_adjudicaciones (
+CREATE TABLE IF NOT EXISTS public.licitaciones_adjudicaciones (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   licitacion_id UUID NOT NULL REFERENCES public.licitaciones_bi(id) ON DELETE CASCADE,
   
@@ -196,7 +196,7 @@ CREATE TABLE public.proveedores (
 -- =====================================================
 -- Tabla maestra de Instituciones Públicas
 -- =====================================================
-CREATE TABLE public.instituciones (
+CREATE TABLE IF NOT EXISTS public.instituciones (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   rut TEXT NOT NULL UNIQUE,
   nombre TEXT NOT NULL,
@@ -223,18 +223,34 @@ CREATE TABLE public.instituciones (
 -- =====================================================
 -- Índices para optimizar consultas BI
 -- =====================================================
-CREATE INDEX idx_ordenes_compra_fecha_envio ON public.ordenes_compra(fecha_envio);
-CREATE INDEX idx_ordenes_compra_proveedor_rut ON public.ordenes_compra(proveedor_rut);
-CREATE INDEX idx_ordenes_compra_institucion_rut ON public.ordenes_compra(institucion_rut);
-CREATE INDEX idx_ordenes_compra_estado ON public.ordenes_compra(estado);
-CREATE INDEX idx_ordenes_compra_licitacion ON public.ordenes_compra(licitacion_codigo);
+-- Índices condicionales (solo si las columnas existen)
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ordenes_compra' AND column_name = 'fecha_envio') THEN
+    CREATE INDEX IF NOT EXISTS idx_ordenes_compra_fecha_envio ON public.ordenes_compra(fecha_envio);
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ordenes_compra' AND column_name = 'proveedor_rut') THEN
+    CREATE INDEX IF NOT EXISTS idx_ordenes_compra_proveedor_rut ON public.ordenes_compra(proveedor_rut);
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ordenes_compra' AND column_name = 'institucion_rut') THEN
+    CREATE INDEX IF NOT EXISTS idx_ordenes_compra_institucion_rut ON public.ordenes_compra(institucion_rut);
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ordenes_compra' AND column_name = 'estado') THEN
+    CREATE INDEX IF NOT EXISTS idx_ordenes_compra_estado ON public.ordenes_compra(estado);
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ordenes_compra' AND column_name = 'licitacion_codigo') THEN
+    CREATE INDEX IF NOT EXISTS idx_ordenes_compra_licitacion ON public.ordenes_compra(licitacion_codigo);
+  END IF;
+EXCEPTION
+  WHEN OTHERS THEN null;
+END $$;
 
-CREATE INDEX idx_licitaciones_bi_fecha_cierre ON public.licitaciones_bi(fecha_cierre);
-CREATE INDEX idx_licitaciones_bi_institucion_rut ON public.licitaciones_bi(institucion_rut);
-CREATE INDEX idx_licitaciones_bi_estado ON public.licitaciones_bi(estado);
+CREATE INDEX IF NOT EXISTS idx_licitaciones_bi_fecha_cierre ON public.licitaciones_bi(fecha_cierre);
+CREATE INDEX IF NOT EXISTS idx_licitaciones_bi_institucion_rut ON public.licitaciones_bi(institucion_rut);
+CREATE INDEX IF NOT EXISTS idx_licitaciones_bi_estado ON public.licitaciones_bi(estado);
 
-CREATE INDEX idx_proveedores_nombre ON public.proveedores(nombre);
-CREATE INDEX idx_instituciones_nombre ON public.instituciones(nombre);
+CREATE INDEX IF NOT EXISTS idx_proveedores_nombre ON public.proveedores(nombre);
+CREATE INDEX IF NOT EXISTS idx_instituciones_nombre ON public.instituciones(nombre);
 
 -- =====================================================
 -- Triggers para updated_at

@@ -1,5 +1,5 @@
 -- Create extension_api_keys table for Chrome extension authentication
-CREATE TABLE public.extension_api_keys (
+CREATE TABLE IF NOT EXISTS public.extension_api_keys (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   cliente_id UUID NOT NULL REFERENCES public.clientes(id) ON DELETE CASCADE,
   api_key TEXT NOT NULL UNIQUE,
@@ -11,8 +11,8 @@ CREATE TABLE public.extension_api_keys (
 );
 
 -- Create index for faster lookups
-CREATE INDEX idx_extension_api_keys_api_key ON public.extension_api_keys(api_key);
-CREATE INDEX idx_extension_api_keys_cliente ON public.extension_api_keys(cliente_id);
+CREATE INDEX IF NOT EXISTS idx_extension_api_keys_api_key ON public.extension_api_keys(api_key);
+CREATE INDEX IF NOT EXISTS idx_extension_api_keys_cliente ON public.extension_api_keys(cliente_id);
 
 -- Enable RLS
 ALTER TABLE public.extension_api_keys ENABLE ROW LEVEL SECURITY;
@@ -61,7 +61,7 @@ CREATE TRIGGER update_extension_api_keys_updated_at
   EXECUTE FUNCTION public.update_updated_at_column();
 
 -- Table for logging extension activity
-CREATE TABLE public.extension_activity_log (
+CREATE TABLE IF NOT EXISTS public.extension_activity_log (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   api_key_id UUID REFERENCES public.extension_api_keys(id) ON DELETE SET NULL,
   cliente_id UUID NOT NULL REFERENCES public.clientes(id) ON DELETE CASCADE,
@@ -75,8 +75,8 @@ CREATE TABLE public.extension_activity_log (
 );
 
 -- Index for activity lookups
-CREATE INDEX idx_extension_activity_cliente ON public.extension_activity_log(cliente_id);
-CREATE INDEX idx_extension_activity_created ON public.extension_activity_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_extension_activity_cliente ON public.extension_activity_log(cliente_id);
+CREATE INDEX IF NOT EXISTS idx_extension_activity_created ON public.extension_activity_log(created_at DESC);
 
 -- Enable RLS
 ALTER TABLE public.extension_activity_log ENABLE ROW LEVEL SECURITY;

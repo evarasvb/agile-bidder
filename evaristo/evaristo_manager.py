@@ -17,7 +17,7 @@ import shutil
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 import re
 
 # Configuración - Usamos requests para HTTP directo
@@ -597,6 +597,33 @@ INSTRUCCIONES:
             self.generar_reporte(nombre, "dependencias", "✅ Instaladas" if resultado else "❌ Error", "")
             return resultado
         
+        elif tipo == "migrar":
+            # Aplicar migraciones de Supabase
+            resultado = self.aplicar_migraciones()
+            self.generar_reporte(nombre, "migraciones", "✅ Aplicadas" if resultado else "❌ Error", "")
+            return resultado
+        
+        elif tipo == "comando":
+            # Ejecutar comando del sistema
+            comando = mision.get("comando", "")
+            resultado = self.ejecutar_comando(comando)
+            self.generar_reporte(nombre, "comando", "✅ Ejecutado" if resultado[0] else "❌ Error", resultado[1])
+            return resultado[0]
+        
+        elif tipo == "git":
+            # Ejecutar comando git
+            accion_git = mision.get("accion", "status")
+            resultado = self.ejecutar_git(accion_git, mision.get("parametros", []))
+            self.generar_reporte(nombre, f"git_{accion_git}", "✅ Ejecutado" if resultado[0] else "❌ Error", resultado[1])
+            return resultado[0]
+        
+        elif tipo == "supabase":
+            # Ejecutar comando de Supabase CLI
+            accion_supabase = mision.get("accion", "status")
+            resultado = self.ejecutar_supabase(accion_supabase, mision.get("parametros", []))
+            self.generar_reporte(nombre, f"supabase_{accion_supabase}", "✅ Ejecutado" if resultado[0] else "❌ Error", resultado[1])
+            return resultado[0]
+        
         return False
     
     def obtener_contexto_proyecto(self) -> str:
@@ -656,6 +683,127 @@ Estructura:
         except Exception as e:
             self.log(f"❌ Error: {e}")
             return False
+    
+    def aplicar_migraciones(self) -> bool:
+        """Aplica migraciones pendientes de Supabase"""
+        self.log("🔄 Aplicando migraciones de Supabase...")
+        try:
+            # Primero verificar si hay migraciones pendientes
+            resultado = subprocess.run(
+                ["supabase", "db", "push", "--dry-run"],
+                cwd=PROYECTO_ROOT,
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+            
+            # Aplicar migraciones (sin dry-run)
+            resultado = subprocess.run(
+                ["echo", "y", "|", "supabase", "db", "push"],
+                cwd=PROYECTO_ROOT,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=300
+            )
+            if resultado.returncode == 0:
+                self.log("✅ Migraciones aplicadas correctamente")
+                return True
+            else:
+                self.log(f"⚠️  Migraciones: {resultado.stdout}")
+                # A veces puede retornar código no-0 pero haber aplicado correctamente
+                if "up to date" in resultado.stdout.lower() or "already exists" in resultado.stdout.lower():
+                    self.log("ℹ️  Base de datos ya está actualizada")
+                    return True
+                return False
+        except Exception as e:
+            self.log(f"⚠️  Error aplicando migraciones: {e}")
+            return False
+    
+    def ejecutar_comando(self, comando: str) -> Tuple[bool, str]:
+        """Ejecuta un comando del sistema"""
+        if not comando:
+            return (False, "No se especificó comando")
+        
+        self.log(f"⚙️  Ejecutando comando: {comando}")
+        try:
+            # Parsear comando (simple split por ahora)
+            partes = comando.split()
+            resultado = subprocess.run(
+                partes,
+                cwd=PROYECTO_ROOT,
+                capture_output=True,
+                text=True,
+                timeout=300
+            )
+            
+            output = resultado.stdout + resultado.stderr
+            if resultado.returncode == 0:
+                self.log(f"✅ Comando ejecutado exitosamente")
+                return (True, output)
+            else:
+                self.log(f"⚠️  Comando terminó con código {resultado.returncode}")
+                return (False, output)
+        except Exception as e:
+            error_msg = f"Error ejecutando comando: {e}"
+            self.log(f"❌ {error_msg}")
+            return (False, error_msg)
+    
+    def ejecutar_git(self, accion: str, parametros: list = None) -> Tuple[bool, str]:
+        """Ejecuta comandos git"""
+        if parametros is None:
+            parametros = []
+        
+        self.log(f"🔀 Ejecutando git {accion}...")
+        try:
+            comando = ["git", accion] + parametros
+            resultado = subprocess.run(
+                comando,
+                cwd=PROYECTO_ROOT,
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+            
+            output = resultado.stdout + resultado.stderr
+            if resultado.returncode == 0:
+                self.log(f"✅ Git {accion} ejecutado exitosamente")
+                return (True, output)
+            else:
+                self.log(f"⚠️  Git {accion} terminó con código {resultado.returncode}")
+                return (False, output)
+        except Exception as e:
+            error_msg = f"Error ejecutando git {accion}: {e}"
+            self.log(f"❌ {error_msg}")
+            return (False, error_msg)
+    
+    def ejecutar_supabase(self, accion: str, parametros: list = None) -> Tuple[bool, str]:
+        """Ejecuta comandos de Supabase CLI"""
+        if parametros is None:
+            parametros = []
+        
+        self.log(f"🗄️  Ejecutando supabase {accion}...")
+        try:
+            comando = ["supabase"] + accion.split() + parametros
+            resultado = subprocess.run(
+                comando,
+                cwd=PROYECTO_ROOT,
+                capture_output=True,
+                text=True,
+                timeout=300
+            )
+            
+            output = resultado.stdout + resultado.stderr
+            if resultado.returncode == 0:
+                self.log(f"✅ Supabase {accion} ejecutado exitosamente")
+                return (True, output)
+            else:
+                self.log(f"⚠️  Supabase {accion} terminó con código {resultado.returncode}")
+                return (False, output)
+        except Exception as e:
+            error_msg = f"Error ejecutando supabase {accion}: {e}"
+            self.log(f"❌ {error_msg}")
+            return (False, error_msg)
     
     def generar_reporte(self, mision: str, archivo: str, estado: str, detalles: str):
         """Genera un reporte de la misión"""
