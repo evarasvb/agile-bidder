@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { supabaseClient as supabase } from '@/lib/supabaseClient';
 import type { Database } from '@/integrations/supabase/types';
 
 // Tipo base de la BD - usar directamente los campos que existen
