@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
+import { useCompraAgilByCodigo } from "@/hooks/useComprasAgiles";
+import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { supabaseClient as supabase } from "@/lib/supabaseClient";
-import { supabase as mainSupabase } from "@/integrations/supabase/client";
 import { 
   ArrowLeft, 
   ExternalLink, 
@@ -18,7 +18,9 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle2,
-  ShoppingCart
+  ShoppingCart,
+  Copy,
+  List
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -32,7 +34,6 @@ import { format, parseISO, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { formatCurrency, clasificarProceso, montoEnUTM } from "@/utils/clasificacion";
 import { cn } from "@/lib/utils";
-import type { CompraAgil } from "@/hooks/useComprasAgiles";
 
 interface ProductoMatch {
   id: string;
@@ -50,6 +51,125 @@ interface ItemCompra {
   descripcion?: string;
   cantidad?: number;
   unidad?: string;
+  especificacion?: string;
+}
+
+// Helper para extraer items de diferentes estructuras de datos
+function extractItemsFromData(datosJson: Record<string, unknown> | null, descripcion: string | null, nombre: string | null): ItemCompra[] {
+  const items: ItemCompra[] = [];
+  
+  if (datosJson) {
+    // Intentar diferentes estructuras conocidas de MercadoPublico
+    
+    // Estructura: { Listado: [...] }
+    if (datosJson.Listado && Array.isArray(datosJson.Listado)) {
+      (datosJson.Listado as Record<string, unknown>[]).forEach((item) => {
+        items.push({
+          codigo: String(item.CodigoProducto || item.Codigo || item.codigo || ''),
+          nombre: String(item.NombreProducto || item.Nombre || item.nombre || ''),
+          descripcion: String(item.Especificacion || item.Descripcion || item.descripcion || item.EspecificacionComprador || ''),
+          cantidad: Number(item.Cantidad || item.cantidad || 1),
+          unidad: String(item.UnidadMedida || item.Unidad || item.unidad || 'Unidad'),
+        });
+      });
+    }
+    
+    // Estructura: { items: [...] }
+    if (datosJson.items && Array.isArray(datosJson.items)) {
+      (datosJson.items as Record<string, unknown>[]).forEach((item) => {
+        items.push({
+          codigo: String(item.codigo || item.CodigoProducto || ''),
+          nombre: String(item.nombre || item.NombreProducto || ''),
+          descripcion: String(item.descripcion || item.Especificacion || ''),
+          cantidad: Number(item.cantidad || item.Cantidad || 1),
+          unidad: String(item.unidad || item.UnidadMedida || 'Unidad'),
+        });
+      });
+    }
+    
+    // Estructura: { productos: [...] }
+    if (datosJson.productos && Array.isArray(datosJson.productos)) {
+      (datosJson.productos as Record<string, unknown>[]).forEach((item) => {
+        items.push({
+          codigo: String(item.codigo || ''),
+          nombre: String(item.nombre || ''),
+          descripcion: String(item.descripcion || ''),
+          cantidad: Number(item.cantidad || 1),
+          unidad: String(item.unidad || 'Unidad'),
+        });
+      });
+    }
+
+    // Estructura: { Items: {...} }
+    if (datosJson.Items && typeof datosJson.Items === 'object') {
+      const itemsObj = datosJson.Items as Record<string, unknown>;
+      if (itemsObj.Listado && Array.isArray(itemsObj.Listado)) {
+        (itemsObj.Listado as Record<string, unknown>[]).forEach((item) => {
+          items.push({
+            codigo: String(item.CodigoProducto || item.Codigo || ''),
+            nombre: String(item.NombreProducto || item.Nombre || ''),
+            descripcion: String(item.Especificacion || item.EspecificacionComprador || ''),
+            cantidad: Number(item.Cantidad || 1),
+            unidad: String(item.UnidadMedida || 'Unidad'),
+          });
+        });
+      }
+    }
+    
+    // Array directo en datos_json
+    if (Array.isArray(datosJson)) {
+      (datosJson as Record<string, unknown>[]).forEach((item) => {
+        items.push({
+          codigo: String(item.codigo || item.CodigoProducto || ''),
+          nombre: String(item.nombre || item.NombreProducto || ''),
+          descripcion: String(item.descripcion || item.Especificacion || ''),
+          cantidad: Number(item.cantidad || item.Cantidad || 1),
+          unidad: String(item.unidad || item.UnidadMedida || 'Unidad'),
+        });
+      });
+    }
+  }
+  
+  // Si no hay items estructurados, intentar extraer de la descripción
+  if (items.length === 0 && descripcion) {
+    // Intentar parsear líneas con formato "cantidad x producto"
+    const lines = descripcion.split(/[\n;,]/);
+    lines.forEach((line, index) => {
+      const trimmed = line.trim();
+      if (trimmed.length > 3) {
+        // Buscar patrones como "10 unidades de..." o "10x producto"
+        const match = trimmed.match(/^(\d+)\s*(x|unidad|unidades|un\.|pcs|pzas?)?\s*[-:]?\s*(.+)/i);
+        if (match) {
+          items.push({
+            codigo: `ITEM-${index + 1}`,
+            nombre: match[3].trim(),
+            cantidad: parseInt(match[1], 10),
+            unidad: match[2] || 'Unidad',
+          });
+        } else if (trimmed.length > 10) {
+          // Solo agregar como item si es suficientemente descriptivo
+          items.push({
+            codigo: `ITEM-${index + 1}`,
+            nombre: trimmed.substring(0, 100),
+            cantidad: 1,
+            unidad: 'Unidad',
+          });
+        }
+      }
+    });
+  }
+  
+  // Si aún no hay items, usar el nombre como único item
+  if (items.length === 0 && nombre) {
+    items.push({
+      codigo: 'ITEM-1',
+      nombre: nombre,
+      cantidad: 1,
+      unidad: 'Unidad',
+    });
+  }
+  
+  return items;
 }
 
 export default function CompraAgilDetalle() {
@@ -57,70 +177,41 @@ export default function CompraAgilDetalle() {
   const navigate = useNavigate();
   const [isFavorite, setIsFavorite] = useState(false);
 
-  // Fetch compra agil details
-  const { data: compra, isLoading, error } = useQuery({
-    queryKey: ['compra_agil', codigo],
-    queryFn: async () => {
-      if (!codigo) throw new Error('Código no proporcionado');
-      
-      const { data, error } = await supabase
-        .from('compras_agiles')
-        .select('*')
-        .eq('codigo', codigo)
-        .single();
-      
-      if (error) throw error;
-      return data as CompraAgil;
-    },
-    enabled: !!codigo,
-  });
+  // Fetch compra agil details usando el hook actualizado
+  const { data: compra, isLoading, error } = useCompraAgilByCodigo(codigo);
 
-  // Extract items from datos_json
+  // Extract items from datos_json or descripcion
   const items = useMemo<ItemCompra[]>(() => {
-    if (!compra?.datos_json) return [];
-    
-    const datosJson = compra.datos_json as Record<string, unknown>;
-    
-    // Try different possible structures
-    if (Array.isArray(datosJson)) {
-      return datosJson as ItemCompra[];
-    }
-    
-    if (datosJson.items && Array.isArray(datosJson.items)) {
-      return datosJson.items as ItemCompra[];
-    }
-    
-    if (datosJson.productos && Array.isArray(datosJson.productos)) {
-      return datosJson.productos as ItemCompra[];
-    }
-    
-    if (datosJson.Listado && Array.isArray(datosJson.Listado)) {
-      return (datosJson.Listado as Record<string, unknown>[]).map((item) => ({
-        codigo: item.CodigoProducto as string || item.Codigo as string,
-        nombre: item.NombreProducto as string || item.Nombre as string,
-        descripcion: item.Especificacion as string || item.Descripcion as string,
-        cantidad: Number(item.Cantidad) || 1,
-        unidad: item.UnidadMedida as string || item.Unidad as string || 'Unidad',
-      }));
-    }
-
-    return [];
-  }, [compra?.datos_json]);
+    if (!compra) return [];
+    return extractItemsFromData(compra.datos_json, compra.descripcion, compra.nombre);
+  }, [compra]);
 
   // Fetch matching products from inventory
   const { data: matchingProducts, isLoading: isLoadingMatches } = useQuery({
-    queryKey: ['inventory_matches', compra?.nombre],
+    queryKey: ['inventory_matches', compra?.nombre, items],
     queryFn: async () => {
-      if (!compra?.nombre) return [];
+      if (!compra?.nombre && items.length === 0) return [];
       
-      // Get keywords from compra name
-      const keywords = compra.nombre.toLowerCase().split(' ').filter(w => w.length > 3);
+      // Get keywords from compra name and items
+      const searchTerms: string[] = [];
       
-      const { data, error } = await mainSupabase
+      if (compra?.nombre) {
+        searchTerms.push(...compra.nombre.toLowerCase().split(' ').filter(w => w.length > 3));
+      }
+      
+      items.forEach(item => {
+        if (item.nombre) {
+          searchTerms.push(...item.nombre.toLowerCase().split(' ').filter(w => w.length > 3));
+        }
+      });
+      
+      const uniqueTerms = [...new Set(searchTerms)];
+      
+      const { data, error } = await supabase
         .from('inventory')
         .select('*')
         .eq('activo', true)
-        .limit(20);
+        .limit(50);
       
       if (error) throw error;
       
@@ -128,22 +219,24 @@ export default function CompraAgilDetalle() {
       const scored = (data || []).map(product => {
         const productName = product.nombre_producto.toLowerCase();
         const productKeywords = product.keywords || [];
+        const productDesc = (product.descripcion || '').toLowerCase();
         
         let score = 0;
-        keywords.forEach(kw => {
-          if (productName.includes(kw)) score += 20;
-          if (productKeywords.some((pk: string) => pk.toLowerCase().includes(kw))) score += 15;
+        uniqueTerms.forEach(term => {
+          if (productName.includes(term)) score += 25;
+          if (productDesc.includes(term)) score += 10;
+          if (productKeywords.some((pk: string) => pk.toLowerCase().includes(term))) score += 15;
         });
         
         return {
           ...product,
           matchScore: Math.min(score, 100),
         };
-      }).filter(p => p.matchScore > 0).sort((a, b) => b.matchScore - a.matchScore);
+      }).filter(p => p.matchScore > 0).sort((a, b) => b.matchScore - a.matchScore).slice(0, 10);
       
       return scored as ProductoMatch[];
     },
-    enabled: !!compra?.nombre,
+    enabled: !!compra?.nombre || items.length > 0,
   });
 
   const diasRestantes = useMemo(() => {
@@ -158,12 +251,18 @@ export default function CompraAgilDetalle() {
 
   const handleGenerarOferta = () => {
     toast.info('Funcionalidad de generar oferta en desarrollo');
-    // TODO: Navigate to offer generation
   };
 
   const toggleFavorite = () => {
     setIsFavorite(!isFavorite);
     toast.success(isFavorite ? 'Eliminado de favoritos' : 'Agregado a favoritos');
+  };
+
+  const copyCodigo = () => {
+    if (compra?.codigo) {
+      navigator.clipboard.writeText(compra.codigo);
+      toast.success('Código copiado al portapapeles');
+    }
   };
 
   if (isLoading) {
@@ -222,8 +321,9 @@ export default function CompraAgilDetalle() {
           </Button>
           <div className="space-y-2">
             <div className="flex items-center gap-3 flex-wrap">
-              <Badge variant="outline" className="font-mono text-sm">
+              <Badge variant="outline" className="font-mono text-sm cursor-pointer hover:bg-muted" onClick={copyCodigo}>
                 {compra.codigo}
+                <Copy className="h-3 w-3 ml-1" />
               </Badge>
               {clasificacion && (
                 <Badge 
@@ -233,9 +333,9 @@ export default function CompraAgilDetalle() {
                   {clasificacion.categoria}
                 </Badge>
               )}
-              {compra.estado === 'urgente' || (diasRestantes !== null && diasRestantes <= 2) ? (
-                <Badge variant="accent">Urgente</Badge>
-              ) : compra.estado === 'cerrada' ? (
+              {compra.estado === 'urgente' || (diasRestantes !== null && diasRestantes <= 2 && diasRestantes >= 0) ? (
+                <Badge variant="destructive">Urgente</Badge>
+              ) : compra.estado === 'cerrada' || (diasRestantes !== null && diasRestantes < 0) ? (
                 <Badge variant="secondary">Cerrada</Badge>
               ) : (
                 <Badge variant="outline">Activa</Badge>
@@ -312,34 +412,50 @@ export default function CompraAgilDetalle() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Monto</p>
-                  <p className="text-lg font-semibold text-firmavb-blue">
-                    {formatCurrency(compra.monto)}
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                    <DollarSign className="h-3 w-3" />
+                    Monto
                   </p>
-                  {compra.monto && (
+                  <p className="text-lg font-semibold text-firmavb-blue">
+                    {compra.monto !== null && compra.monto !== undefined 
+                      ? formatCurrency(compra.monto)
+                      : 'Sin monto'
+                    }
+                  </p>
+                  {compra.monto !== null && compra.monto !== undefined && (
                     <p className="text-xs text-muted-foreground">
                       {montoEnUTM(compra.monto)?.toFixed(1)} UTM
                     </p>
                   )}
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Fecha Cierre</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    Fecha Cierre
+                  </p>
                   <p className="text-lg font-semibold">
                     {compra.fecha_cierre 
                       ? format(parseISO(compra.fecha_cierre), "dd MMM yyyy", { locale: es })
-                      : '-'
+                      : 'Sin fecha'
                     }
                   </p>
                   {diasRestantes !== null && (
                     <p className={cn(
                       "text-xs font-medium",
-                      diasRestantes <= 2 
+                      diasRestantes < 0 
+                        ? 'text-muted-foreground'
+                        : diasRestantes <= 2 
                         ? 'text-destructive' 
                         : diasRestantes <= 7
                         ? 'text-orange-600'
                         : 'text-muted-foreground'
                     )}>
-                      {diasRestantes === 0 ? 'Cierra hoy' : diasRestantes > 0 ? `${diasRestantes} días restantes` : 'Cerrada'}
+                      {diasRestantes < 0 
+                        ? 'Cerrada' 
+                        : diasRestantes === 0 
+                        ? 'Cierra hoy' 
+                        : `${diasRestantes} días restantes`
+                      }
                     </p>
                   )}
                 </div>
@@ -407,11 +523,11 @@ export default function CompraAgilDetalle() {
             </CardContent>
           </Card>
 
-          {/* Items Table */}
+          {/* Items Table - PRODUCTOS SOLICITADOS */}
           <Card className="border-firmavb-blue/10">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
-                <Package className="h-5 w-5 text-firmavb-blue" />
+                <List className="h-5 w-5 text-firmavb-blue" />
                 Productos Solicitados
               </CardTitle>
               <CardDescription>
@@ -426,32 +542,39 @@ export default function CompraAgilDetalle() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50">
-                      <TableHead className="font-semibold">#</TableHead>
-                      <TableHead className="font-semibold">Código</TableHead>
-                      <TableHead className="font-semibold">Producto</TableHead>
-                      <TableHead className="font-semibold text-center">Cantidad</TableHead>
-                      <TableHead className="font-semibold">Unidad</TableHead>
+                      <TableHead className="font-semibold w-12">#</TableHead>
+                      <TableHead className="font-semibold w-[100px]">Código</TableHead>
+                      <TableHead className="font-semibold">Producto / Descripción</TableHead>
+                      <TableHead className="font-semibold text-center w-[80px]">Cant.</TableHead>
+                      <TableHead className="font-semibold w-[100px]">Unidad</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {items.map((item, index) => (
                       <TableRow key={index}>
-                        <TableCell className="text-muted-foreground">{index + 1}</TableCell>
-                        <TableCell className="font-mono text-sm">
+                        <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                        <TableCell className="font-mono text-xs">
                           {item.codigo || '-'}
                         </TableCell>
                         <TableCell>
-                          <div className="font-medium">{item.nombre || item.descripcion || 'Sin nombre'}</div>
-                          {item.descripcion && item.nombre && (
-                            <div className="text-xs text-muted-foreground truncate max-w-[300px]">
-                              {item.descripcion}
-                            </div>
-                          )}
+                          <div className="space-y-1">
+                            <p className="font-medium">{item.nombre || 'Sin nombre'}</p>
+                            {item.descripcion && item.descripcion !== item.nombre && (
+                              <p className="text-xs text-muted-foreground line-clamp-2">
+                                {item.descripcion}
+                              </p>
+                            )}
+                            {item.especificacion && (
+                              <p className="text-xs text-muted-foreground line-clamp-2">
+                                {item.especificacion}
+                              </p>
+                            )}
+                          </div>
                         </TableCell>
-                        <TableCell className="text-center font-medium">
+                        <TableCell className="text-center font-semibold">
                           {item.cantidad || 1}
                         </TableCell>
-                        <TableCell className="text-muted-foreground">
+                        <TableCell className="text-muted-foreground text-sm">
                           {item.unidad || 'Unidad'}
                         </TableCell>
                       </TableRow>
@@ -463,6 +586,19 @@ export default function CompraAgilDetalle() {
                   <Package className="h-10 w-10 mx-auto mb-2 opacity-50" />
                   <p>No hay información detallada de productos disponible.</p>
                   <p className="text-sm mt-1">Los detalles pueden estar en la descripción o en MercadoPúblico.</p>
+                  {compra.link_oficial && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="mt-3"
+                      asChild
+                    >
+                      <a href={compra.link_oficial} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Ver en MercadoPúblico
+                      </a>
+                    </Button>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -471,6 +607,7 @@ export default function CompraAgilDetalle() {
 
         {/* Right Column - Matches */}
         <div className="space-y-6">
+          {/* Match de Productos */}
           <Card className="border-green-500/20">
             <CardHeader className="pb-3 bg-gradient-to-r from-green-500/5 to-transparent">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -478,7 +615,7 @@ export default function CompraAgilDetalle() {
                 Match de Productos
               </CardTitle>
               <CardDescription>
-                Productos de tu inventario que coinciden
+                Productos de tu inventario que coinciden con esta compra
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -501,17 +638,20 @@ export default function CompraAgilDetalle() {
                           <p className="text-xs text-muted-foreground font-mono">SKU: {product.sku}</p>
                         </div>
                         <Badge 
-                          variant={product.matchScore >= 70 ? "success" : product.matchScore >= 40 ? "secondary" : "outline"}
-                          className="shrink-0"
+                          variant={product.matchScore >= 70 ? "default" : product.matchScore >= 40 ? "secondary" : "outline"}
+                          className={cn(
+                            "shrink-0",
+                            product.matchScore >= 70 && "bg-green-100 text-green-700 border-green-300"
+                          )}
                         >
                           {product.matchScore}%
                         </Badge>
                       </div>
                       <div className="mt-2 flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">
-                          Stock: {product.stock_disponible}
+                          Stock: <span className="font-medium">{product.stock_disponible}</span>
                         </span>
-                        <span className="font-medium text-firmavb-blue">
+                        <span className="font-semibold text-firmavb-blue">
                           {formatCurrency(product.precio_unitario)}
                         </span>
                       </div>
@@ -547,8 +687,8 @@ export default function CompraAgilDetalle() {
             </CardHeader>
             <CardContent className="space-y-2">
               <Button 
-                variant="outline" 
-                className="w-full justify-start gap-2"
+                variant="default" 
+                className="w-full justify-start gap-2 bg-firmavb-blue hover:bg-firmavb-blue/90"
                 onClick={handleGenerarOferta}
               >
                 <FileText className="h-4 w-4" />
@@ -569,13 +709,18 @@ export default function CompraAgilDetalle() {
               <Button 
                 variant="outline" 
                 className="w-full justify-start gap-2"
-                onClick={() => {
-                  navigator.clipboard.writeText(compra.codigo);
-                  toast.success('Código copiado');
-                }}
+                onClick={copyCodigo}
               >
-                <ShoppingCart className="h-4 w-4" />
+                <Copy className="h-4 w-4" />
                 Copiar Código
+              </Button>
+              <Button 
+                variant="outline" 
+                className="w-full justify-start gap-2"
+                onClick={toggleFavorite}
+              >
+                {isFavorite ? <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" /> : <StarOff className="h-4 w-4" />}
+                {isFavorite ? 'Quitar de Favoritos' : 'Agregar a Favoritos'}
               </Button>
             </CardContent>
           </Card>
