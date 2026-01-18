@@ -31,6 +31,7 @@ export interface ComprasAgilesFilters {
   montoMax?: number;
   fechaCierre?: string; // 'hoy' | 'proximos3' | 'proximos7' | 'todas'
   matchStatus?: string; // 'con_match' | 'sin_match' | 'todos'
+  matchThreshold?: number; // 0-100, default 70
 }
 
 export function useComprasAgiles(filters?: ComprasAgilesFilters) {
