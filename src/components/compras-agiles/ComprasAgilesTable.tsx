@@ -1,17 +1,19 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 import { format, differenceInDays, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { ShoppingCart, Clock, MapPin, Building2, CheckCircle2, AlertTriangle, ExternalLink, Package } from "lucide-react";
+import { ShoppingCart, Clock, MapPin, Building2, CheckCircle2, AlertTriangle, ExternalLink, Package, Boxes } from "lucide-react";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 import { clasificarProceso, montoEnUTM, formatCurrency } from "@/utils/clasificacion";
 import { cn } from "@/lib/utils";
+import { useLicitacionMatchCounts } from "@/hooks/useLicitacionProductMatch";
+import { ProductMatchModal } from "./ProductMatchModal";
 
 // Función para extraer el monto de diferentes fuentes
 function extractMonto(compra: CompraAgil): number | null {
@@ -107,6 +109,19 @@ function getEstadoBadge(estado: string | null, diasRestantes: number | null) {
 
 export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }: ComprasAgilesTableProps) {
   const navigate = useNavigate();
+  
+  // Estado para el modal de productos match
+  const [matchModalOpen, setMatchModalOpen] = useState(false);
+  const [selectedLicitacion, setSelectedLicitacion] = useState<{ id: string; nombre: string } | null>(null);
+
+  // Obtener IDs de licitaciones para el hook de match counts
+  const licitacionIds = useMemo(() => 
+    compras?.map(c => c.codigo) || [], 
+    [compras]
+  );
+  
+  // Obtener conteos de matches para todas las licitaciones
+  const { data: matchCounts } = useLicitacionMatchCounts(licitacionIds);
 
   // Memoizar cálculos para mejor performance
   const { totalCompras, conMatch, progreso } = useMemo(() => {
@@ -119,6 +134,12 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
   const handleRowClick = (compra: CompraAgil) => {
     // Navigate to detail page
     navigate(`/compras-agiles/${compra.codigo}`);
+  };
+  
+  const handleMatchClick = (e: React.MouseEvent, compra: CompraAgil) => {
+    e.stopPropagation(); // Evitar navegación
+    setSelectedLicitacion({ id: compra.codigo, nombre: compra.nombre });
+    setMatchModalOpen(true);
   };
 
   if (isLoading) {
@@ -173,6 +194,12 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
                 <TableHead className="font-semibold min-w-[180px]">Organismo</TableHead>
                 <TableHead className="font-semibold text-right w-[130px]">Monto</TableHead>
                 <TableHead className="font-semibold text-center w-[80px]">Productos</TableHead>
+                <TableHead className="font-semibold text-center w-[100px]">
+                  <div className="flex items-center justify-center gap-1">
+                    <Boxes className="h-4 w-4" />
+                    Match Catálogo
+                  </div>
+                </TableHead>
                 <TableHead className="font-semibold w-[100px]">Cierre</TableHead>
                 <TableHead className="font-semibold w-[100px]">Estado</TableHead>
                 <TableHead className="font-semibold text-center w-[80px]">Match</TableHead>
@@ -181,7 +208,7 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
           <TableBody>
             {compras?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-12">
+                <TableCell colSpan={9} className="text-center py-12">
                   <div className="flex flex-col items-center gap-3 text-muted-foreground">
                     <ShoppingCart className="h-12 w-12 opacity-50" />
                     <div>
@@ -291,6 +318,28 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
                       })()}
                     </TableCell>
                     
+                    {/* Productos Match - Coincidencias con catálogo */}
+                    <TableCell className="text-center">
+                      {(() => {
+                        const matchCount = matchCounts?.get(compra.codigo) || 0;
+                        return (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={cn(
+                              "h-8 px-2 gap-1 font-medium",
+                              matchCount > 0 
+                                ? "text-green-600 hover:text-green-700 hover:bg-green-50" 
+                                : "text-muted-foreground hover:text-foreground"
+                            )}
+                            onClick={(e) => handleMatchClick(e, compra)}
+                          >
+                            <Boxes className="h-4 w-4" />
+                            <span>{matchCount}</span>
+                          </Button>
+                        );
+                      })()}
+                    </TableCell>
                     {/* Fecha Cierre */}
                     <TableCell>
                       {compra.fecha_cierre ? (
@@ -357,6 +406,14 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
           </Table>
         </div>
       </CardContent>
+      
+      {/* Modal de productos match */}
+      <ProductMatchModal
+        isOpen={matchModalOpen}
+        onClose={() => setMatchModalOpen(false)}
+        licitacionId={selectedLicitacion?.id || null}
+        licitacionNombre={selectedLicitacion?.nombre || ''}
+      />
     </Card>
   );
 }
