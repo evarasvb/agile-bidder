@@ -14,30 +14,15 @@ interface ProductMatchModalProps {
   licitacionNombre: string;
 }
 
-function MatchCard({ match }: { match: ProductMatch }) {
+function MatchCard({ match, showLicitacionItem = true }: { match: ProductMatch; showLicitacionItem?: boolean }) {
   const { inventoryItem, licitacionItem, score, matchedTerms } = match;
   
   return (
     <div className="border rounded-lg p-4 bg-card hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 space-y-2">
-          {/* Item de licitación */}
+          {/* Producto del catálogo (principal) */}
           <div className="flex items-start gap-2">
-            <AlertCircle className="h-4 w-4 text-orange-500 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-xs text-muted-foreground">Item Solicitado:</p>
-              <p className="font-medium text-sm">{licitacionItem.nombre_producto}</p>
-              {licitacionItem.descripcion && (
-                <p className="text-xs text-muted-foreground mt-0.5">{licitacionItem.descripcion}</p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Cantidad: {licitacionItem.cantidad || 1} {licitacionItem.unidad || 'un'}
-              </p>
-            </div>
-          </div>
-          
-          {/* Producto del catálogo */}
-          <div className="flex items-start gap-2 pt-2 border-t">
             <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
               <p className="text-xs text-muted-foreground">Producto del Catálogo:</p>
@@ -64,7 +49,8 @@ function MatchCard({ match }: { match: ProductMatch }) {
           
           {/* Términos que matchearon */}
           {matchedTerms.length > 0 && (
-            <div className="flex flex-wrap gap-1 pt-2">
+            <div className="flex flex-wrap gap-1 pt-2 border-t">
+              <span className="text-xs text-muted-foreground mr-1">Coincidencias:</span>
               {matchedTerms.map((term, idx) => (
                 <Badge key={idx} variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
                   <Tag className="h-3 w-3 mr-1" />
@@ -93,8 +79,8 @@ function MatchCard({ match }: { match: ProductMatch }) {
 }
 
 export function ProductMatchModal({ isOpen, onClose, licitacionId, licitacionNombre }: ProductMatchModalProps) {
-  const { data: matchResult, isLoading } = useLicitacionProductMatch(licitacionId);
-  
+  // Pasar el nombre de la licitación al hook para matching por título
+  const { data: matchResult, isLoading } = useLicitacionProductMatch(licitacionId, licitacionNombre);
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[80vh]">
@@ -117,19 +103,16 @@ export function ProductMatchModal({ isOpen, onClose, licitacionId, licitacionNom
             {/* Resumen */}
             <div className="flex items-center gap-4 p-3 bg-muted/50 rounded-lg">
               <div className="flex items-center gap-2">
-                <Percent className="h-4 w-4 text-primary" />
+                <Package className="h-4 w-4 text-primary" />
                 <span className="text-sm font-medium">
-                  {matchResult.matchedItems} de {matchResult.totalItems} items con match
+                  {matchResult.matches.length} productos del catálogo coinciden
                 </span>
               </div>
               <Badge 
-                variant={matchResult.matchedItems > 0 ? "default" : "secondary"}
-                className={matchResult.matchedItems > 0 ? "bg-green-500" : ""}
+                variant={matchResult.matches.length > 0 ? "default" : "secondary"}
+                className={matchResult.matches.length > 0 ? "bg-green-500" : ""}
               >
-                {matchResult.totalItems > 0 
-                  ? `${Math.round((matchResult.matchedItems / matchResult.totalItems) * 100)}% cobertura`
-                  : "Sin items"
-                }
+                {matchResult.matches.length > 0 ? "Con matches" : "Sin matches"}
               </Badge>
             </div>
             
