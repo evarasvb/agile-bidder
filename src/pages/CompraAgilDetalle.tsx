@@ -1,0 +1,586 @@
+import { useState, useMemo } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { supabaseClient as supabase } from "@/lib/supabaseClient";
+import { supabase as mainSupabase } from "@/integrations/supabase/client";
+import { 
+  ArrowLeft, 
+  ExternalLink, 
+  Star, 
+  StarOff, 
+  FileText, 
+  Building2, 
+  MapPin, 
+  Calendar, 
+  DollarSign,
+  Clock,
+  Package,
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
+  ShoppingCart
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
+import { toast } from "sonner";
+import { format, parseISO, differenceInDays } from "date-fns";
+import { es } from "date-fns/locale";
+import { formatCurrency, clasificarProceso, montoEnUTM } from "@/utils/clasificacion";
+import { cn } from "@/lib/utils";
+import type { CompraAgil } from "@/hooks/useComprasAgiles";
+
+interface ProductoMatch {
+  id: string;
+  nombre_producto: string;
+  sku: string;
+  precio_unitario: number;
+  stock_disponible: number;
+  categoria: string;
+  matchScore: number;
+}
+
+interface ItemCompra {
+  codigo?: string;
+  nombre?: string;
+  descripcion?: string;
+  cantidad?: number;
+  unidad?: string;
+}
+
+export default function CompraAgilDetalle() {
+  const { codigo } = useParams<{ codigo: string }>();
+  const navigate = useNavigate();
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  // Fetch compra agil details
+  const { data: compra, isLoading, error } = useQuery({
+    queryKey: ['compra_agil', codigo],
+    queryFn: async () => {
+      if (!codigo) throw new Error('Código no proporcionado');
+      
+      const { data, error } = await supabase
+        .from('compras_agiles')
+        .select('*')
+        .eq('codigo', codigo)
+        .single();
+      
+      if (error) throw error;
+      return data as CompraAgil;
+    },
+    enabled: !!codigo,
+  });
+
+  // Extract items from datos_json
+  const items = useMemo<ItemCompra[]>(() => {
+    if (!compra?.datos_json) return [];
+    
+    const datosJson = compra.datos_json as Record<string, unknown>;
+    
+    // Try different possible structures
+    if (Array.isArray(datosJson)) {
+      return datosJson as ItemCompra[];
+    }
+    
+    if (datosJson.items && Array.isArray(datosJson.items)) {
+      return datosJson.items as ItemCompra[];
+    }
+    
+    if (datosJson.productos && Array.isArray(datosJson.productos)) {
+      return datosJson.productos as ItemCompra[];
+    }
+    
+    if (datosJson.Listado && Array.isArray(datosJson.Listado)) {
+      return (datosJson.Listado as Record<string, unknown>[]).map((item) => ({
+        codigo: item.CodigoProducto as string || item.Codigo as string,
+        nombre: item.NombreProducto as string || item.Nombre as string,
+        descripcion: item.Especificacion as string || item.Descripcion as string,
+        cantidad: Number(item.Cantidad) || 1,
+        unidad: item.UnidadMedida as string || item.Unidad as string || 'Unidad',
+      }));
+    }
+
+    return [];
+  }, [compra?.datos_json]);
+
+  // Fetch matching products from inventory
+  const { data: matchingProducts, isLoading: isLoadingMatches } = useQuery({
+    queryKey: ['inventory_matches', compra?.nombre],
+    queryFn: async () => {
+      if (!compra?.nombre) return [];
+      
+      // Get keywords from compra name
+      const keywords = compra.nombre.toLowerCase().split(' ').filter(w => w.length > 3);
+      
+      const { data, error } = await mainSupabase
+        .from('inventory')
+        .select('*')
+        .eq('activo', true)
+        .limit(20);
+      
+      if (error) throw error;
+      
+      // Simple fuzzy matching
+      const scored = (data || []).map(product => {
+        const productName = product.nombre_producto.toLowerCase();
+        const productKeywords = product.keywords || [];
+        
+        let score = 0;
+        keywords.forEach(kw => {
+          if (productName.includes(kw)) score += 20;
+          if (productKeywords.some((pk: string) => pk.toLowerCase().includes(kw))) score += 15;
+        });
+        
+        return {
+          ...product,
+          matchScore: Math.min(score, 100),
+        };
+      }).filter(p => p.matchScore > 0).sort((a, b) => b.matchScore - a.matchScore);
+      
+      return scored as ProductoMatch[];
+    },
+    enabled: !!compra?.nombre,
+  });
+
+  const diasRestantes = useMemo(() => {
+    if (!compra?.fecha_cierre) return null;
+    return differenceInDays(parseISO(compra.fecha_cierre), new Date());
+  }, [compra?.fecha_cierre]);
+
+  const clasificacion = useMemo(() => {
+    if (!compra?.monto) return null;
+    return clasificarProceso(compra.monto);
+  }, [compra?.monto]);
+
+  const handleGenerarOferta = () => {
+    toast.info('Funcionalidad de generar oferta en desarrollo');
+    // TODO: Navigate to offer generation
+  };
+
+  const toggleFavorite = () => {
+    setIsFavorite(!isFavorite);
+    toast.success(isFavorite ? 'Eliminado de favoritos' : 'Agregado a favoritos');
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-4 sm:p-6 space-y-6 bg-gradient-to-br from-background via-firmavb-cream/5 to-background min-h-screen">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-10 w-10" />
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <Skeleton className="h-48 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+          <Skeleton className="h-96 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !compra) {
+    return (
+      <div className="p-4 sm:p-6 min-h-screen flex items-center justify-center">
+        <Card className="max-w-md w-full">
+          <CardContent className="pt-6 text-center">
+            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Compra no encontrada</h2>
+            <p className="text-muted-foreground mb-4">
+              No se pudo encontrar la compra ágil con código {codigo}
+            </p>
+            <Button onClick={() => navigate('/compras-agiles')}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Volver a Compras Ágiles
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 sm:p-6 space-y-6 bg-gradient-to-br from-background via-firmavb-cream/5 to-background min-h-screen">
+      {/* Header */}
+      <header className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div className="flex items-start gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/compras-agiles')}
+            className="shrink-0 mt-1"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="space-y-2">
+            <div className="flex items-center gap-3 flex-wrap">
+              <Badge variant="outline" className="font-mono text-sm">
+                {compra.codigo}
+              </Badge>
+              {clasificacion && (
+                <Badge 
+                  variant="secondary" 
+                  className="bg-blue-100 text-blue-700 border-blue-300"
+                >
+                  {clasificacion.categoria}
+                </Badge>
+              )}
+              {compra.estado === 'urgente' || (diasRestantes !== null && diasRestantes <= 2) ? (
+                <Badge variant="accent">Urgente</Badge>
+              ) : compra.estado === 'cerrada' ? (
+                <Badge variant="secondary">Cerrada</Badge>
+              ) : (
+                <Badge variant="outline">Activa</Badge>
+              )}
+            </div>
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">
+              {compra.nombre}
+            </h1>
+            <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
+              <span className="flex items-center gap-1">
+                <Building2 className="h-4 w-4" />
+                {compra.organismo}
+              </span>
+              {compra.region && (
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-4 w-4" />
+                  {compra.region}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={toggleFavorite}
+            className={cn(
+              "gap-2",
+              isFavorite && "bg-yellow-50 border-yellow-300 text-yellow-700"
+            )}
+          >
+            {isFavorite ? <Star className="h-4 w-4 fill-current" /> : <StarOff className="h-4 w-4" />}
+            <span className="hidden sm:inline">{isFavorite ? 'Favorito' : 'Favorito'}</span>
+          </Button>
+          {compra.link_oficial && (
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              className="gap-2"
+            >
+              <a href={compra.link_oficial} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-4 w-4" />
+                <span className="hidden sm:inline">Ver en MercadoPúblico</span>
+              </a>
+            </Button>
+          )}
+          <Button
+            size="sm"
+            onClick={handleGenerarOferta}
+            className="gap-2 bg-firmavb-blue hover:bg-firmavb-blue/90"
+          >
+            <FileText className="h-4 w-4" />
+            Generar Oferta
+          </Button>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column - Info & Items */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Info Card */}
+          <Card className="border-firmavb-blue/10">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <ShoppingCart className="h-5 w-5 text-firmavb-blue" />
+                Información de la Compra
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Monto</p>
+                  <p className="text-lg font-semibold text-firmavb-blue">
+                    {formatCurrency(compra.monto)}
+                  </p>
+                  {compra.monto && (
+                    <p className="text-xs text-muted-foreground">
+                      {montoEnUTM(compra.monto)?.toFixed(1)} UTM
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Fecha Cierre</p>
+                  <p className="text-lg font-semibold">
+                    {compra.fecha_cierre 
+                      ? format(parseISO(compra.fecha_cierre), "dd MMM yyyy", { locale: es })
+                      : '-'
+                    }
+                  </p>
+                  {diasRestantes !== null && (
+                    <p className={cn(
+                      "text-xs font-medium",
+                      diasRestantes <= 2 
+                        ? 'text-destructive' 
+                        : diasRestantes <= 7
+                        ? 'text-orange-600'
+                        : 'text-muted-foreground'
+                    )}>
+                      {diasRestantes === 0 ? 'Cierra hoy' : diasRestantes > 0 ? `${diasRestantes} días restantes` : 'Cerrada'}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Estado</p>
+                  <p className="text-lg font-semibold capitalize">
+                    {compra.estado || 'Activa'}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Match</p>
+                  <div className="flex items-center gap-2">
+                    {compra.match_encontrado ? (
+                      <>
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
+                        <span className="text-lg font-semibold text-green-600">
+                          {compra.match_score || 0}%
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">Sin match</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {compra.descripcion && (
+                <>
+                  <Separator />
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Descripción</p>
+                    <p className="text-sm text-foreground whitespace-pre-wrap">
+                      {compra.descripcion}
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {clasificacion && (
+                <>
+                  <Separator />
+                  <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Requisitos del Proceso</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Plazo mínimo:</span>
+                        <span className="ml-1 font-medium">{clasificacion.plazoMinimoDias} días</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">FEA:</span>
+                        <span className={cn("ml-1 font-medium", clasificacion.requiereFEA ? "text-orange-600" : "")}>
+                          {clasificacion.requiereFEA ? 'Requerida' : 'No requerida'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Garantía:</span>
+                        <span className={cn("ml-1 font-medium", clasificacion.requiereGarantia ? "text-red-600" : "")}>
+                          {clasificacion.requiereGarantia ? 'Requerida' : 'No requerida'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Items Table */}
+          <Card className="border-firmavb-blue/10">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Package className="h-5 w-5 text-firmavb-blue" />
+                Productos Solicitados
+              </CardTitle>
+              <CardDescription>
+                {items.length > 0 
+                  ? `${items.length} producto${items.length > 1 ? 's' : ''} en esta compra`
+                  : 'No hay información detallada de productos'
+                }
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              {items.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="font-semibold">#</TableHead>
+                      <TableHead className="font-semibold">Código</TableHead>
+                      <TableHead className="font-semibold">Producto</TableHead>
+                      <TableHead className="font-semibold text-center">Cantidad</TableHead>
+                      <TableHead className="font-semibold">Unidad</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.map((item, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="text-muted-foreground">{index + 1}</TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {item.codigo || '-'}
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{item.nombre || item.descripcion || 'Sin nombre'}</div>
+                          {item.descripcion && item.nombre && (
+                            <div className="text-xs text-muted-foreground truncate max-w-[300px]">
+                              {item.descripcion}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center font-medium">
+                          {item.cantidad || 1}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {item.unidad || 'Unidad'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="p-6 text-center text-muted-foreground">
+                  <Package className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                  <p>No hay información detallada de productos disponible.</p>
+                  <p className="text-sm mt-1">Los detalles pueden estar en la descripción o en MercadoPúblico.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Column - Matches */}
+        <div className="space-y-6">
+          <Card className="border-green-500/20">
+            <CardHeader className="pb-3 bg-gradient-to-r from-green-500/5 to-transparent">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-green-500" />
+                Match de Productos
+              </CardTitle>
+              <CardDescription>
+                Productos de tu inventario que coinciden
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingMatches ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map(i => (
+                    <Skeleton key={i} className="h-20 w-full" />
+                  ))}
+                </div>
+              ) : matchingProducts && matchingProducts.length > 0 ? (
+                <div className="space-y-3">
+                  {matchingProducts.map((product) => (
+                    <div 
+                      key={product.id}
+                      className="p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{product.nombre_producto}</p>
+                          <p className="text-xs text-muted-foreground font-mono">SKU: {product.sku}</p>
+                        </div>
+                        <Badge 
+                          variant={product.matchScore >= 70 ? "success" : product.matchScore >= 40 ? "secondary" : "outline"}
+                          className="shrink-0"
+                        >
+                          {product.matchScore}%
+                        </Badge>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">
+                          Stock: {product.stock_disponible}
+                        </span>
+                        <span className="font-medium text-firmavb-blue">
+                          {formatCurrency(product.precio_unitario)}
+                        </span>
+                      </div>
+                      <Progress 
+                        value={product.matchScore} 
+                        className="h-1.5 mt-2"
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  <AlertCircle className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                  <p>No se encontraron productos coincidentes</p>
+                  <p className="text-sm mt-1">Revisa tu inventario o ajusta las palabras clave</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-3"
+                    onClick={() => navigate('/inventory')}
+                  >
+                    Ir al Inventario
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Quick Actions */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Acciones Rápidas</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start gap-2"
+                onClick={handleGenerarOferta}
+              >
+                <FileText className="h-4 w-4" />
+                Generar Oferta Completa
+              </Button>
+              {compra.link_oficial && (
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start gap-2"
+                  asChild
+                >
+                  <a href={compra.link_oficial} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="h-4 w-4" />
+                    Abrir en MercadoPúblico
+                  </a>
+                </Button>
+              )}
+              <Button 
+                variant="outline" 
+                className="w-full justify-start gap-2"
+                onClick={() => {
+                  navigator.clipboard.writeText(compra.codigo);
+                  toast.success('Código copiado');
+                }}
+              >
+                <ShoppingCart className="h-4 w-4" />
+                Copiar Código
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -104,6 +105,8 @@ function getBuenPagadorBadge(buenPagador: boolean | null) {
 }
 
 export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }: ComprasAgilesTableProps) {
+  const navigate = useNavigate();
+
   // Memoizar cálculos para mejor performance
   const { totalCompras, conMatch, progreso } = useMemo(() => {
     const total = compras?.length ?? 0;
@@ -111,6 +114,11 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
     const progresoValue = total > 0 ? Math.round((conMatchCount / total) * 100) : 0;
     return { totalCompras: total, conMatch: conMatchCount, progreso: progresoValue };
   }, [compras]);
+
+  const handleRowClick = (compra: CompraAgil) => {
+    // Navigate to detail page
+    navigate(`/compras-agiles/${compra.codigo}`);
+  };
 
   if (isLoading) {
     return (
@@ -191,21 +199,21 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
                   <TableRow
                     key={compra.id}
                     className={cn(
-                      "cursor-pointer transition-all duration-200",
+                      "cursor-pointer transition-all duration-200 group",
                       isSelected 
                         ? "bg-firmavb-blue/10 border-l-4 border-l-firmavb-blue shadow-sm" 
                         : "hover:bg-firmavb-blue/5 hover:shadow-sm"
                     )}
-                    onClick={() => onSelect(compra)}
+                    onClick={() => handleRowClick(compra)}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
-                        onSelect(compra);
+                        handleRowClick(compra);
                       }
                     }}
-                    aria-label={`Seleccionar compra ${compra.codigo}`}
+                    aria-label={`Ver detalle de compra ${compra.codigo}`}
                   >
                     <TableCell className="font-mono text-sm font-medium text-primary">
                       {compra.codigo}
