@@ -286,7 +286,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                     <span className="font-medium">{formatCurrency(compra.monto)}</span>
                   </div>
                 )}
-                {getBuenPagadorBadge(compra.buen_pagador)}
+                {/* Buen pagador feature removed */}
                 {recargoAplicado > 0 && compra.region && (
                   <Badge variant="outline" className="text-xs">
                     Recargo {compra.region}: +{recargoAplicado}%

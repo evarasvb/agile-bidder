@@ -1,22 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useUserSettings } from './useUserSettings';
-import { esRegionActiva } from '@/utils/regiones';
 import type { Database } from '@/integrations/supabase/types';
 
-// Tipo base de la BD con campos adicionales de migraciones
-type CompraAgilRow = Database['public']['Tables']['compras_agiles']['Row'] & {
-  nombre_organismo?: string | null;
-  monto_estimado?: number | null;
-  buen_pagador?: boolean | null;
-};
+// Tipo base de la BD - usar directamente los campos que existen
+type CompraAgilRow = Database['public']['Tables']['compras_agiles']['Row'];
 
 export interface CompraAgil {
   id: string;
   codigo: string;
   nombre: string;
-  organismo: string; // Mapeado desde nombre_organismo
-  monto: number | null; // Mapeado desde monto_estimado
+  organismo: string;
+  monto: number | null;
   fecha_cierre: string | null;
   estado: string | null;
   region: string | null;
@@ -24,13 +18,9 @@ export interface CompraAgil {
   link_oficial: string | null;
   match_encontrado: boolean;
   match_score: number | null;
-  buen_pagador: boolean | null;
   datos_json: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
-  // Campos reales de la BD
-  nombre_organismo?: string | null;
-  monto_estimado?: number | null;
 }
 
 export interface ComprasAgilesFilters {
@@ -41,16 +31,15 @@ export interface ComprasAgilesFilters {
 }
 
 export function useComprasAgiles(filters?: ComprasAgilesFilters) {
-  const { data: userSettings } = useUserSettings();
-  
   return useQuery({
-    queryKey: ['compras_agiles', filters, userSettings?.regiones_config, userSettings?.regions],
+    queryKey: ['compras_agiles', filters],
     queryFn: async () => {
       let query = supabase
         .from('compras_agiles')
         .select('*')
-        .order('fecha_cierre', { ascending: true });
+        .order('fecha_cierre', { ascending: true, nullsFirst: false });
 
+      // Aplicar filtros opcionales
       if (filters?.estado && filters.estado !== 'todas') {
         query = query.eq('estado', filters.estado);
       }
@@ -60,92 +49,46 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
       }
 
       if (filters?.montoMin) {
-        query = query.gte('monto_estimado', filters.montoMin);
+        query = query.gte('monto', filters.montoMin);
       }
 
       if (filters?.montoMax) {
-        query = query.lte('monto_estimado', filters.montoMax);
+        query = query.lte('monto', filters.montoMax);
       }
 
       const { data, error } = await query;
 
-      if (error) throw error;
-      
-      // Filtrar datos de prueba/inventados antes de mapear
-      const datosReales = (data || []).filter((compra) => {
-        const nombreOrganismo = (compra as CompraAgilRow).nombre_organismo || compra.organismo || '';
-        const nombre = compra.nombre || '';
-        const codigo = compra.codigo || '';
-        
-        // Excluir si tiene nombres/códigos genéricos de prueba
-        const nombreLower = nombre.toLowerCase();
-        const organismoLower = nombreOrganismo.toLowerCase();
-        const codigoLower = codigo.toLowerCase();
-        
-        // Patrones sospechosos - códigos de prueba comunes
-        const esPrueba = 
-          // Códigos de prueba típicos (CA-2025-XXX, TEST-XXX, etc.)
-          /^CA-202[0-9]-/.test(codigo) || // CA-2025-001, CA-2024-123, etc.
-          /^TEST-/.test(codigo) ||
-          /^PRUEBA-/.test(codigo) ||
-          /^DEMO-/.test(codigo) ||
-          /^SAMPLE-/.test(codigo) ||
-          codigoLower === 'test' ||
-          codigoLower === 'prueba' ||
-          codigoLower === 'demo' ||
-          codigoLower === 'sample' ||
-          // Nombres de prueba
-          nombreLower.includes('test') ||
-          nombreLower.includes('prueba') ||
-          nombreLower.includes('ejemplo') ||
-          nombreLower.includes('dummy') ||
-          nombreLower.includes('sample') ||
-          nombreLower.includes('demo') ||
-          // Organismos de prueba
-          organismoLower.includes('test') ||
-          organismoLower.includes('prueba') ||
-          organismoLower.includes('ejemplo') ||
-          organismoLower === 'organismo no especificado' ||
-          organismoLower === 'organismo de prueba' ||
-          // Código debe ser alfanumérico o con guiones, y NO debe parecer de prueba
-          (codigo && !/^[0-9A-Z-]+$/.test(codigo));
-        
-        return !esPrueba;
-      });
-      
-      // Mapear campos de BD a interfaz
-      let compras = datosReales.map((compra): CompraAgil => {
-        const compraRow = compra as CompraAgilRow;
+      if (error) {
+        console.error('Error fetching compras_agiles:', error);
+        throw error;
+      }
+
+      // Mapear campos de BD a interfaz (sin filtros que excluyan datos reales)
+      const compras = (data || []).map((compra: CompraAgilRow): CompraAgil => {
         // Convertir datos_json de Json a Record<string, unknown>
-        const datosJson = compraRow.datos_json;
+        const datosJson = compra.datos_json;
         const datosJsonRecord = datosJson && typeof datosJson === 'object' && !Array.isArray(datosJson)
           ? datosJson as Record<string, unknown>
           : null;
         
         return {
-          ...compra,
-          organismo: compraRow.nombre_organismo || compraRow.organismo || '',
-          monto: compraRow.monto_estimado ?? compraRow.monto ?? null,
-          match_encontrado: compraRow.match_encontrado ?? false,
-          match_score: compraRow.match_score ?? null,
-          buen_pagador: compraRow.buen_pagador ?? null,
-          nombre_organismo: compraRow.nombre_organismo ?? null,
-          monto_estimado: compraRow.monto_estimado ?? null,
+          id: compra.id,
+          codigo: compra.codigo,
+          nombre: compra.nombre,
+          organismo: compra.organismo,
+          monto: compra.monto,
+          fecha_cierre: compra.fecha_cierre,
+          estado: compra.estado,
+          region: compra.region,
+          descripcion: compra.descripcion,
+          link_oficial: compra.link_oficial,
+          match_encontrado: compra.match_encontrado ?? false,
+          match_score: compra.match_score,
           datos_json: datosJsonRecord,
+          created_at: compra.created_at,
+          updated_at: compra.updated_at,
         };
       });
-      
-      // Filtrar por regiones activas del usuario (si está configurado)
-      if (userSettings && (userSettings.regiones_config?.length > 0 || userSettings.regions?.length > 0)) {
-        compras = compras.filter(compra => {
-          if (!compra.region) return true; // Si no tiene región, mostrar
-          return esRegionActiva(
-            compra.region,
-            userSettings.regiones_config || [],
-            userSettings.regions || []
-          );
-        });
-      }
       
       return compras;
     },
@@ -168,22 +111,27 @@ export function useCompraAgil(id: string | null) {
       if (error) throw error;
       if (!data) return null;
       
-      const compraRow = data as CompraAgilRow;
-      // Convertir datos_json de Json a Record<string, unknown>
-      const datosJson = compraRow.datos_json;
+      const datosJson = data.datos_json;
       const datosJsonRecord = datosJson && typeof datosJson === 'object' && !Array.isArray(datosJson)
         ? datosJson as Record<string, unknown>
         : null;
+
       return {
-        ...data,
-        organismo: compraRow.nombre_organismo || compraRow.organismo || '',
-        monto: compraRow.monto_estimado ?? compraRow.monto ?? null,
-        match_encontrado: compraRow.match_encontrado ?? false,
-        match_score: compraRow.match_score ?? null,
-        buen_pagador: compraRow.buen_pagador ?? null,
-        nombre_organismo: compraRow.nombre_organismo ?? null,
-        monto_estimado: compraRow.monto_estimado ?? null,
+        id: data.id,
+        codigo: data.codigo,
+        nombre: data.nombre,
+        organismo: data.organismo,
+        monto: data.monto,
+        fecha_cierre: data.fecha_cierre,
+        estado: data.estado,
+        region: data.region,
+        descripcion: data.descripcion,
+        link_oficial: data.link_oficial,
+        match_encontrado: data.match_encontrado ?? false,
+        match_score: data.match_score,
         datos_json: datosJsonRecord,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
       };
     },
     enabled: !!id,
@@ -216,78 +164,36 @@ export function useComprasAgilesStats() {
   return useQuery({
     queryKey: ['compras_agiles_stats'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Usar count para obtener el total sin traer todos los datos
+      const { count: total, error: countError } = await supabase
         .from('compras_agiles')
-        .select('*');
+        .select('*', { count: 'exact', head: true });
 
-      if (error) throw error;
+      if (countError) throw countError;
 
-      // Filtrar datos de prueba ANTES de mapear (mismo filtro que useComprasAgiles)
-      const datosReales = (data || []).filter((compra) => {
-        const nombreOrganismo = (compra as CompraAgilRow).nombre_organismo || compra.organismo || '';
-        const nombre = compra.nombre || '';
-        const codigo = compra.codigo || '';
-        
-        const nombreLower = nombre.toLowerCase();
-        const organismoLower = nombreOrganismo.toLowerCase();
-        const codigoLower = codigo.toLowerCase();
-        
-        const esPrueba = 
-          /^CA-202[0-9]-/.test(codigo) ||
-          /^TEST-/.test(codigo) ||
-          /^PRUEBA-/.test(codigo) ||
-          /^DEMO-/.test(codigo) ||
-          /^SAMPLE-/.test(codigo) ||
-          codigoLower === 'test' ||
-          codigoLower === 'prueba' ||
-          codigoLower === 'demo' ||
-          codigoLower === 'sample' ||
-          nombreLower.includes('test') ||
-          nombreLower.includes('prueba') ||
-          nombreLower.includes('ejemplo') ||
-          nombreLower.includes('dummy') ||
-          nombreLower.includes('sample') ||
-          nombreLower.includes('demo') ||
-          organismoLower.includes('test') ||
-          organismoLower.includes('prueba') ||
-          organismoLower.includes('ejemplo') ||
-          organismoLower === 'organismo no especificado' ||
-          organismoLower === 'organismo de prueba' ||
-          (codigo && !/^[0-9A-Z-]+$/.test(codigo));
-        
-        return !esPrueba;
-      });
+      // Obtener stats agregados con consultas separadas
+      const { count: conMatch } = await supabase
+        .from('compras_agiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('match_encontrado', true);
 
-      const compras = datosReales.map((c): CompraAgil => {
-        const compraRow = c as CompraAgilRow;
-        // Convertir datos_json de Json a Record<string, unknown>
-        const datosJson = compraRow.datos_json;
-        const datosJsonRecord = datosJson && typeof datosJson === 'object' && !Array.isArray(datosJson)
-          ? datosJson as Record<string, unknown>
-          : null;
-        
-        return {
-          ...c,
-          organismo: compraRow.nombre_organismo || compraRow.organismo || '',
-          monto: compraRow.monto_estimado ?? compraRow.monto ?? null,
-          match_encontrado: compraRow.match_encontrado ?? false,
-          match_score: compraRow.match_score ?? null,
-          buen_pagador: compraRow.buen_pagador ?? null,
-          nombre_organismo: compraRow.nombre_organismo ?? null,
-          monto_estimado: compraRow.monto_estimado ?? null,
-          datos_json: datosJsonRecord,
-        };
-      });
-      
-      const total = compras.length;
-      const conMatch = compras.filter(c => c.match_encontrado).length;
-      const urgentes = compras.filter(c => c.estado === 'urgente').length;
-      const montoTotal = compras.reduce((sum, c) => sum + (c.monto || 0), 0);
+      // Calcular monto total con una consulta más eficiente
+      const { data: montoData } = await supabase
+        .from('compras_agiles')
+        .select('monto');
+
+      const montoTotal = (montoData || []).reduce((sum, c) => sum + (c.monto || 0), 0);
+
+      // Contar urgentes (si el estado existe)
+      const { count: urgentes } = await supabase
+        .from('compras_agiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('estado', 'urgente');
 
       return {
-        total,
-        conMatch,
-        urgentes,
+        total: total || 0,
+        conMatch: conMatch || 0,
+        urgentes: urgentes || 0,
         montoTotal,
       };
     },

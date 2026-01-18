@@ -7,12 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-<<<<<<< Updated upstream
-import { Search, FileText, Building2, User, Calendar, Package, X, Filter } from "lucide-react";
-=======
-import { Search, FileText, Building2, User, Calendar, DollarSign, Package, X, Filter, RefreshCw } from "lucide-react";
-import { useSyncOrdenesCompra } from "@/hooks/useMercadoPublico";
->>>>>>> Stashed changes
+import { Search, FileText, Building2, User, Calendar, Package, X, Filter, RefreshCw } from "lucide-react";
 import { formatCurrency } from "@/utils/clasificacion";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -33,7 +28,7 @@ export default function OrdenesCompra() {
     ...(filtroEstado && { estado: filtroEstado }),
   };
 
-  const { data: ordenes = [], isLoading } = useOrdenesCompra(
+  const { data: ordenes = [], isLoading, refetch } = useOrdenesCompra(
     Object.keys(filters).length > 0 ? filters : undefined,
     false // No cargar items en el listado inicial
   );
@@ -42,20 +37,6 @@ export default function OrdenesCompra() {
     ordenSeleccionada,
     true // Cargar items del detalle
   );
-
-  const syncOrdenes = useSyncOrdenesCompra();
-
-  const handleSync = async () => {
-    // Sincronizar órdenes de los últimos 30 días
-    const hoy = new Date();
-    const fechaStr = hoy.toLocaleDateString('es-CL', { 
-      day: '2-digit', 
-      month: '2-digit', 
-      year: 'numeric' 
-    }).replace(/\//g, '');
-    
-    await syncOrdenes.mutateAsync({ fecha: fechaStr });
-  };
 
   const limpiarFiltros = () => {
     setSearchTerm("");
@@ -78,13 +59,13 @@ export default function OrdenesCompra() {
           </p>
         </div>
         <Button
-          onClick={handleSync}
-          disabled={syncOrdenes.isPending}
+          onClick={() => refetch()}
+          disabled={isLoading}
           variant="outline"
           className="gap-2"
         >
-          <RefreshCw className={`h-4 w-4 ${syncOrdenes.isPending ? 'animate-spin' : ''}`} />
-          {syncOrdenes.isPending ? 'Sincronizando...' : 'Sincronizar desde MercadoPúblico'}
+          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          Actualizar
         </Button>
       </div>
 
@@ -420,31 +401,33 @@ function OrdenCompraDetalle({ orden }: { orden: OrdenCompra }) {
             Fechas
           </CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-3 gap-4">
-          {orden.fecha_creacion && (
+        <CardContent>
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="text-sm font-medium text-muted-foreground">Creación</label>
-              <p className="text-sm">
-                {format(parseISO(orden.fecha_creacion), "dd MMM yyyy HH:mm", { locale: es })}
+              <p>
+                {orden.fecha_creacion
+                  ? format(parseISO(orden.fecha_creacion), "dd MMM yyyy HH:mm", { locale: es })
+                  : 'N/A'}
               </p>
             </div>
-          )}
-          {orden.fecha_envio && (
             <div>
               <label className="text-sm font-medium text-muted-foreground">Envío</label>
-              <p className="text-sm">
-                {format(parseISO(orden.fecha_envio), "dd MMM yyyy HH:mm", { locale: es })}
+              <p>
+                {orden.fecha_envio
+                  ? format(parseISO(orden.fecha_envio), "dd MMM yyyy HH:mm", { locale: es })
+                  : 'N/A'}
               </p>
             </div>
-          )}
-          {orden.fecha_aceptacion && (
             <div>
               <label className="text-sm font-medium text-muted-foreground">Aceptación</label>
-              <p className="text-sm">
-                {format(parseISO(orden.fecha_aceptacion), "dd MMM yyyy HH:mm", { locale: es })}
+              <p>
+                {orden.fecha_aceptacion
+                  ? format(parseISO(orden.fecha_aceptacion), "dd MMM yyyy HH:mm", { locale: es })
+                  : 'N/A'}
               </p>
             </div>
-          )}
+          </div>
         </CardContent>
       </Card>
 
@@ -454,77 +437,45 @@ function OrdenCompraDetalle({ orden }: { orden: OrdenCompra }) {
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Package className="h-5 w-5 text-firmavb-blue" />
-              Productos ({orden.items.length})
+              Items ({orden.items.length})
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead className="font-semibold">#</TableHead>
-                    <TableHead className="font-semibold">Producto</TableHead>
-                    <TableHead className="font-semibold">Descripción</TableHead>
-                    <TableHead className="font-semibold text-right">Cantidad</TableHead>
-                    <TableHead className="font-semibold">Unidad</TableHead>
-                    <TableHead className="font-semibold text-right">Precio Unit.</TableHead>
-                    <TableHead className="font-semibold text-right">Subtotal</TableHead>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>#</TableHead>
+                  <TableHead>Producto</TableHead>
+                  <TableHead>Descripción</TableHead>
+                  <TableHead className="text-center">Cantidad</TableHead>
+                  <TableHead className="text-center">Unidad</TableHead>
+                  <TableHead className="text-right">Precio Unit.</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {orden.items.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-mono">{item.correlativo || '-'}</TableCell>
+                    <TableCell className="font-medium">{item.nombre_producto}</TableCell>
+                    <TableCell className="max-w-[200px] truncate" title={item.descripcion || ''}>
+                      {item.descripcion || '-'}
+                    </TableCell>
+                    <TableCell className="text-center">{item.cantidad}</TableCell>
+                    <TableCell className="text-center">{item.unidad || '-'}</TableCell>
+                    <TableCell className="text-right">
+                      {item.precio_unitario_neto ? formatCurrency(item.precio_unitario_neto) : '-'}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {item.total_neto ? formatCurrency(item.total_neto) : '-'}
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {orden.items.map((item, index) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-medium">{item.correlativo || index + 1}</TableCell>
-                      <TableCell className="font-medium max-w-[200px]">
-                        <div className="truncate" title={item.nombre_producto || ''}>
-                          {item.nombre_producto || 'N/A'}
-                        </div>
-                      </TableCell>
-                      <TableCell className="max-w-[300px]">
-                        <div className="truncate text-sm text-muted-foreground" title={item.descripcion || ''}>
-                          {item.descripcion || '-'}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {item.cantidad ?? 'N/A'}
-                      </TableCell>
-                      <TableCell>{item.unidad || 'N/A'}</TableCell>
-                      <TableCell className="text-right">
-                        {item.precio_unitario_neto ? formatCurrency(item.precio_unitario_neto) : 'N/A'}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold">
-                        {item.total_neto ? formatCurrency(item.total_neto) : 'N/A'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                ))}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
       )}
-
-      {/* Totales */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex justify-end gap-6">
-            {orden.total_neto && (
-              <div className="text-right">
-                <label className="text-sm font-medium text-muted-foreground">Total Neto</label>
-                <p className="font-semibold text-lg">{formatCurrency(orden.total_neto)}</p>
-              </div>
-            )}
-            {orden.total && (
-              <div className="text-right">
-                <label className="text-sm font-medium text-muted-foreground">Total</label>
-                <p className="font-semibold text-xl text-firmavb-blue">
-                  {formatCurrency(orden.total)}
-                </p>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
