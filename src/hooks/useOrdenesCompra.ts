@@ -111,77 +111,9 @@ export function useOrdenesCompra(filters?: OrdenesCompraFilters, includeItems = 
 
         const ordenes = (data || []) as OrdenCompraRow[];
 
-        // Mejorar datos faltantes desde raw_data si está disponible
-        // Extracción más agresiva: SIEMPRE intentar extraer de raw_data si los campos están vacíos/null
-        const ordenesMejoradas = ordenes.map((orden) => {
-          const rawData = (orden.raw_data || orden.datos_json) as any;
-          
-          // Función helper para extraer valor de múltiples posibles claves
-          const extractValue = (primary: any, ...keys: string[]): any => {
-            if (primary !== null && primary !== undefined && primary !== '') return primary;
-            if (!rawData || typeof rawData !== 'object') return null;
-            
-            for (const key of keys) {
-              const value = rawData[key];
-              if (value !== null && value !== undefined && value !== '') {
-                return value;
-              }
-            }
-            return null;
-          };
-
-          // Siempre intentar extraer, incluso si algunos campos ya tienen valores
-          const mejorada = {
-            ...orden,
-            institucion_nombre: extractValue(
-              orden.institucion_nombre, 
-              'Organismo', 'organismo', 'Institucion', 'institucion', 'InstitucionNombre'
-            ),
-            institucion_rut: extractValue(
-              orden.institucion_rut,
-              'RutOrganismo', 'rut_organismo', 'RUTOrganismo', 'rutOrganismo', 'InstitucionRut'
-            ),
-            proveedor_nombre: extractValue(
-              orden.proveedor_nombre,
-              'Proveedor', 'proveedor', 'ProveedorNombre'
-            ),
-            proveedor_rut: extractValue(
-              orden.proveedor_rut,
-              'RutProveedor', 'rut_proveedor', 'RUTProveedor', 'rutProveedor'
-            ),
-            total: extractValue(
-              orden.total,
-              'Total', 'total', 'MontoTotal', 'monto_total'
-            ),
-            total_neto: extractValue(
-              orden.total_neto,
-              'TotalNeto', 'total_neto', 'MontoNeto', 'monto_neto'
-            ),
-            estado: extractValue(
-              orden.estado,
-              'Estado', 'estado', 'Status', 'status'
-            ),
-            fecha_creacion: extractValue(
-              orden.fecha_creacion,
-              'FechaCreacion', 'fecha_creacion', 'Fecha', 'fecha', 'created_at'
-            ),
-            fecha_envio: extractValue(
-              orden.fecha_envio,
-              'FechaEnvio', 'fecha_envio', 'FechaEnvío', 'sent_at'
-            ),
-          } as OrdenCompraRow;
-
-          return mejorada;
-        });
-
         // Si se solicitan items, cargarlos
-<<<<<<< Updated upstream
         if (includeItems && ordenes.length > 0) {
           const ordenIds = ordenes.map(o => o.id);
-=======
-        if (includeItems && ordenesMejoradas.length > 0) {
-          const codigos = ordenesMejoradas.map(o => o.codigo);
->>>>>>> Stashed changes
           const { data: itemsData, error: itemsError } = await supabase
             .from('ordenes_compra_items')
             .select('*')
@@ -213,7 +145,6 @@ export function useOrdenesCompra(filters?: OrdenesCompraFilters, includeItems = 
             });
 
             // Asignar items a cada orden
-<<<<<<< Updated upstream
             return ordenes.map((orden): OrdenCompra => ({
               id: orden.id,
               codigo: orden.codigo,
@@ -254,18 +185,6 @@ export function useOrdenesCompra(filters?: OrdenesCompraFilters, includeItems = 
           created_at: orden.created_at,
           updated_at: orden.updated_at,
           items: undefined,
-=======
-            ordenesMejoradas.forEach(orden => {
-              (orden as any).items = itemsMap.get(orden.codigo) || [];
-            });
-          }
-        }
-
-        return ordenesMejoradas.map((orden): OrdenCompra => ({
-          ...orden,
-          datos_json: orden.datos_json as Record<string, unknown> | null,
-          items: includeItems ? (orden as any).items : undefined,
->>>>>>> Stashed changes
         }));
       } catch (error) {
         console.error('Error en useOrdenesCompra:', error);
@@ -297,62 +216,6 @@ export function useOrdenCompra(codigo: string | null, includeItems = true) {
 
         if (!orden) return null;
 
-        // Extraer datos faltantes desde raw_data (misma lógica que useOrdenesCompra)
-        const rawData = (orden.raw_data || orden.datos_json) as any;
-        
-        const extractValue = (primary: any, ...keys: string[]): any => {
-          if (primary !== null && primary !== undefined && primary !== '') return primary;
-          if (!rawData || typeof rawData !== 'object') return null;
-          
-          for (const key of keys) {
-            const value = rawData[key];
-            if (value !== null && value !== undefined && value !== '') {
-              return value;
-            }
-          }
-          return null;
-        };
-
-        const ordenMejorada = {
-          ...orden,
-          institucion_nombre: extractValue(
-            orden.institucion_nombre, 
-            'Organismo', 'organismo', 'Institucion', 'institucion', 'InstitucionNombre'
-          ),
-          institucion_rut: extractValue(
-            orden.institucion_rut,
-            'RutOrganismo', 'rut_organismo', 'RUTOrganismo', 'rutOrganismo', 'InstitucionRut'
-          ),
-          proveedor_nombre: extractValue(
-            orden.proveedor_nombre,
-            'Proveedor', 'proveedor', 'ProveedorNombre'
-          ),
-          proveedor_rut: extractValue(
-            orden.proveedor_rut,
-            'RutProveedor', 'rut_proveedor', 'RUTProveedor', 'rutProveedor'
-          ),
-          total: extractValue(
-            orden.total,
-            'Total', 'total', 'MontoTotal', 'monto_total'
-          ),
-          total_neto: extractValue(
-            orden.total_neto,
-            'TotalNeto', 'total_neto', 'MontoNeto', 'monto_neto'
-          ),
-          estado: extractValue(
-            orden.estado,
-            'Estado', 'estado', 'Status', 'status'
-          ),
-          fecha_creacion: extractValue(
-            orden.fecha_creacion,
-            'FechaCreacion', 'fecha_creacion', 'Fecha', 'fecha', 'created_at'
-          ),
-          fecha_envio: extractValue(
-            orden.fecha_envio,
-            'FechaEnvio', 'fecha_envio', 'FechaEnvío', 'sent_at'
-          ),
-        } as OrdenCompraRow;
-
         let items: OrdenCompraItem[] = [];
 
         if (includeItems) {
@@ -382,7 +245,6 @@ export function useOrdenCompra(codigo: string | null, includeItems = true) {
         }
 
         return {
-<<<<<<< Updated upstream
           id: orden.id,
           codigo: orden.codigo,
           nombre: orden.nombre,
@@ -399,10 +261,6 @@ export function useOrdenCompra(codigo: string | null, includeItems = true) {
           estado: orden.estado,
           created_at: orden.created_at,
           updated_at: orden.updated_at,
-=======
-          ...ordenMejorada,
-          datos_json: orden.datos_json as Record<string, unknown> | null,
->>>>>>> Stashed changes
           items,
         };
       } catch (error) {
@@ -493,13 +351,13 @@ export function useUpsertOrdenCompra() {
           throw new Error(`Error al guardar orden: ${ordenError.message}`);
         }
 
-        // Si hay items, upsertlos
+        // Si hay items, insertarlos
         if (items && items.length > 0 && savedOrden) {
-          const itemsToInsert = items.map((item, index) => ({
+          const itemsData = items.map((item) => ({
             orden_compra_id: savedOrden.id,
-            correlativo: item.correlativo ?? index + 1,
+            correlativo: item.correlativo ?? null,
             codigo_producto: item.codigo_producto ?? null,
-            nombre_producto: item.nombre_producto ?? 'Sin nombre',
+            nombre_producto: item.nombre_producto!,
             descripcion: item.descripcion ?? null,
             cantidad: item.cantidad ?? 0,
             unidad: item.unidad ?? null,
@@ -507,19 +365,12 @@ export function useUpsertOrdenCompra() {
             total_neto: item.total_neto ?? null,
           }));
 
-          // Eliminar items existentes y insertar nuevos
-          await supabase
-            .from('ordenes_compra_items')
-            .delete()
-            .eq('orden_compra_id', savedOrden.id);
-
           const { error: itemsError } = await supabase
             .from('ordenes_compra_items')
-            .insert(itemsToInsert);
+            .insert(itemsData);
 
           if (itemsError) {
-            console.error('Error upserting items:', itemsError);
-            throw new Error(`Error al guardar items: ${itemsError.message}`);
+            console.error('Error insertando items:', itemsError);
           }
         }
 
@@ -530,9 +381,37 @@ export function useUpsertOrdenCompra() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ordenes_compra'], exact: false });
-      queryClient.invalidateQueries({ queryKey: ['orden_compra'], exact: false });
-      queryClient.invalidateQueries({ queryKey: ['orden_compra_items'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['ordenes_compra'] });
+      queryClient.invalidateQueries({ queryKey: ['orden_compra'] });
+    },
+  });
+}
+
+export function useOrdenesCompraStats() {
+  return useQuery({
+    queryKey: ['ordenes_compra_stats'],
+    queryFn: async () => {
+      try {
+        const { count: total, error: countError } = await supabase
+          .from('ordenes_compra')
+          .select('*', { count: 'exact', head: true });
+
+        if (countError) throw countError;
+
+        const { data: montoData } = await supabase
+          .from('ordenes_compra')
+          .select('total');
+
+        const montoTotal = (montoData || []).reduce((sum, o) => sum + (o.total || 0), 0);
+
+        return {
+          total: total || 0,
+          montoTotal,
+        };
+      } catch (error) {
+        console.error('Error en useOrdenesCompraStats:', error);
+        throw error;
+      }
     },
   });
 }

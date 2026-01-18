@@ -334,7 +334,7 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
                       )}
                     </TableCell>
                     <TableCell className="text-center hidden sm:table-cell">
-                      {getBuenPagadorBadge(compra.buen_pagador)}
+                      <span className="text-muted-foreground text-xs">-</span>
                     </TableCell>
                   </TableRow>
                 );
