@@ -105,13 +105,6 @@ serve(async (req) => {
       // Como alternativa, retornamos el SQL para que se ejecute manualmente
       // o usamos una función PostgreSQL que ejecute el SQL
       
-      // Intentar ejecutar cada comando por separado usando rpc
-      const commands = FIX_USER_ROLES_RLS_SQL.split(';')
-        .map(cmd => cmd.trim())
-        .filter(cmd => cmd.length > 0 && !cmd.startsWith('--'));
-
-      const results = [];
-      
       // Nota: Supabase JS client no permite ejecutar SQL arbitrario directamente
       // Necesitamos usar una función PostgreSQL helper o Management API
       
@@ -137,11 +130,12 @@ serve(async (req) => {
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error in execute-sql:', error);
     return new Response(
       JSON.stringify({ 
-        error: error.message,
+        error: errorMessage,
         timestamp: new Date().toISOString(),
       }),
       { 

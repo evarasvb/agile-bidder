@@ -1,7 +1,6 @@
 import React from 'react';
 import { useLicitacionItems, type LicitacionItem } from '@/hooks/useLicitacionItems';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, XCircle } from 'lucide-react';
 
 interface ProductosSolicitadosListProps {
   licitacionCodigo: string;
@@ -30,60 +29,6 @@ export const ProductosSolicitadosList: React.FC<ProductosSolicitadosListProps> =
     );
   }
 
-  const renderMatchIndicator = (item: LicitacionItem) => {
-    const tieneMatch = item.match_sku !== null && item.confidence_score !== null;
-    const confidenceScore = item.confidence_score ? Math.round(item.confidence_score * 100) : 0;
-    
-    if (!tieneMatch) {
-      return (
-        <div className="flex items-center gap-2">
-          <XCircle className="h-4 w-4 text-muted-foreground" />
-          <Badge variant="secondary" className="text-xs">Sin match</Badge>
-        </div>
-      );
-    }
-
-    const variant = confidenceScore >= 70 ? 'default' : confidenceScore >= 40 ? 'secondary' : 'outline';
-    
-    return (
-      <div className="flex items-center gap-2">
-        <CheckCircle2 className="h-4 w-4 text-green-500" />
-        <Badge variant={variant} className="text-xs">{confidenceScore}% match</Badge>
-      </div>
-    );
-  };
-
-  const renderMatchDetails = (item: LicitacionItem) => {
-    if (!item.match_sku) return null;
-
-    return (
-      <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mt-2">
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div>
-            <span className="text-muted-foreground">SKU: </span>
-            <span className="font-mono font-medium">{item.match_sku}</span>
-          </div>
-          {item.costo_unitario && (
-            <div>
-              <span className="text-muted-foreground">Costo: </span>
-              <span className="font-medium">
-                {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(item.costo_unitario)}
-              </span>
-            </div>
-          )}
-          {item.margen_estimado && (
-            <div>
-              <span className="text-muted-foreground">Margen: </span>
-              <span className={`font-medium ${item.margen_estimado >= 0.2 ? 'text-green-600' : 'text-yellow-600'}`}>
-                {Math.round(item.margen_estimado * 100)}%
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className={`space-y-4 ${className}`}>
       <div className="flex justify-between items-center mb-4">
@@ -94,21 +39,17 @@ export const ProductosSolicitadosList: React.FC<ProductosSolicitadosListProps> =
       <div className="space-y-3">
         {items.map((item) => (
           <div
-            key={`${item.licitacion_codigo}-${item.item_index}`}
-            className={`border rounded-lg p-4 transition-colors ${
-              item.match_sku 
-                ? 'border-primary/50 bg-primary/5' 
-                : 'border-border bg-background'
-            }`}
+            key={`${item.licitacion_id}-${item.id}`}
+            className="border rounded-lg p-4 transition-colors border-border bg-background"
           >
             <div className="flex justify-between items-start">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-xs font-medium text-muted-foreground">
-                    Item #{item.item_index}
+                    Item #{item.id}
                   </span>
                 </div>
-                <h4 className="font-medium">{item.nombre || 'Sin nombre'}</h4>
+                <h4 className="font-medium">{item.nombre_producto || 'Sin nombre'}</h4>
                 {item.descripcion && (
                   <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{item.descripcion}</p>
                 )}
@@ -130,11 +71,9 @@ export const ProductosSolicitadosList: React.FC<ProductosSolicitadosListProps> =
               </div>
 
               <div className="ml-4">
-                {renderMatchIndicator(item)}
+                <Badge variant="secondary" className="text-xs">Pendiente</Badge>
               </div>
             </div>
-
-            {renderMatchDetails(item)}
           </div>
         ))}
       </div>

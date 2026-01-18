@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Plus, Upload, Search, MoreHorizontal, Edit2, Trash2, Package, Inbox, Loader2, RefreshCw, FileJson, Download, Trash, Image, FileText, CheckSquare, Square, FileSpreadsheet, Images, HelpCircle, Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -672,7 +674,7 @@ export default function Inventory() {
                           </DropdownMenuItem>
                           <DropdownMenuItem 
                             className="gap-2 text-destructive cursor-pointer"
-                            onClick={() => handleDeleteClick(item)}
+                            onClick={() => setConfirmDelete({ id: item.id, nombre: item.nombre_producto })}
                           >
                             <Trash2 className="h-4 w-4" />
                             Eliminar

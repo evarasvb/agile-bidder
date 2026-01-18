@@ -95,12 +95,13 @@ export function AppSidebar() {
   const isEvaristoAuthorized = user?.email?.toLowerCase() === 'evaras@firmavb.cl';
 
   // Agregar Evaristo al menú solo para el email autorizado
-  const allNavItems = isEvaristoAuthorized 
+  const allNavItems: NavItem[] = isEvaristoAuthorized 
     ? [...navItems, { 
         title: "Evaristo", 
         url: "/admin/evaristo", 
         icon: Bot, 
-        sectionKey: "evaristo" 
+        sectionKey: "evaristo",
+        requiresOdoo: false
       }]
     : navItems;
 

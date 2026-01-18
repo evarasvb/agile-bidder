@@ -4,7 +4,7 @@ import type { Database } from '@/integrations/supabase/types';
 
 // Tipo base de la BD
 type OrdenCompraRow = Database['public']['Tables']['ordenes_compra']['Row'];
-type OrdenCompraItemRow = Database['public']['Tables']['orden_compra_items']['Row'];
+type OrdenCompraItemRow = Database['public']['Tables']['ordenes_compra_items']['Row'];
 
 export interface OrdenCompra {
   id: string;
@@ -21,8 +21,6 @@ export interface OrdenCompra {
   fecha_envio: string | null;
   fecha_aceptacion: string | null;
   estado: string | null;
-  link_oficial: string | null;
-  datos_json: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
   // Items asociados (se cargan por separado)
@@ -31,15 +29,15 @@ export interface OrdenCompra {
 
 export interface OrdenCompraItem {
   id: string;
-  orden_compra_codigo: string;
-  item_index: number;
-  producto_id: string | null;
-  nombre_producto: string | null;
+  orden_compra_id: string;
+  correlativo: number | null;
+  codigo_producto: string | null;
+  nombre_producto: string;
   descripcion: string | null;
-  cantidad: number | null;
+  cantidad: number;
   unidad: string | null;
-  precio_unitario: number | null;
-  subtotal: number | null;
+  precio_unitario_neto: number | null;
+  total_neto: number | null;
   created_at: string;
 }
 
@@ -115,12 +113,12 @@ export function useOrdenesCompra(filters?: OrdenesCompraFilters, includeItems = 
 
         // Si se solicitan items, cargarlos
         if (includeItems && ordenes.length > 0) {
-          const codigos = ordenes.map(o => o.codigo);
+          const ordenIds = ordenes.map(o => o.id);
           const { data: itemsData, error: itemsError } = await supabase
-            .from('orden_compra_items')
+            .from('ordenes_compra_items')
             .select('*')
-            .in('orden_compra_codigo', codigos)
-            .order('orden_compra_codigo, item_index');
+            .in('orden_compra_id', ordenIds)
+            .order('correlativo');
 
           if (itemsError) {
             console.error('Error obteniendo items:', itemsError);
@@ -128,28 +126,65 @@ export function useOrdenesCompra(filters?: OrdenesCompraFilters, includeItems = 
             // Agrupar items por orden
             const itemsMap = new Map<string, OrdenCompraItem[]>();
             (itemsData || []).forEach((item: OrdenCompraItemRow) => {
-              if (!itemsMap.has(item.orden_compra_codigo)) {
-                itemsMap.set(item.orden_compra_codigo, []);
+              if (!itemsMap.has(item.orden_compra_id)) {
+                itemsMap.set(item.orden_compra_id, []);
               }
-              itemsMap.get(item.orden_compra_codigo)!.push({
-                ...item,
+              itemsMap.get(item.orden_compra_id)!.push({
+                id: item.id,
+                orden_compra_id: item.orden_compra_id,
+                correlativo: item.correlativo,
+                codigo_producto: item.codigo_producto,
+                nombre_producto: item.nombre_producto,
+                descripcion: item.descripcion,
                 cantidad: item.cantidad,
-                precio_unitario: item.precio_unitario,
-                subtotal: item.subtotal,
+                unidad: item.unidad,
+                precio_unitario_neto: item.precio_unitario_neto,
+                total_neto: item.total_neto,
+                created_at: item.created_at,
               });
             });
 
             // Asignar items a cada orden
-            ordenes.forEach(orden => {
-              orden.items = itemsMap.get(orden.codigo) || [];
-            });
+            return ordenes.map((orden): OrdenCompra => ({
+              id: orden.id,
+              codigo: orden.codigo,
+              nombre: orden.nombre,
+              descripcion: orden.descripcion,
+              institucion_nombre: orden.institucion_nombre,
+              institucion_rut: orden.institucion_rut,
+              proveedor_nombre: orden.proveedor_nombre,
+              proveedor_rut: orden.proveedor_rut,
+              total_neto: orden.total_neto,
+              total: orden.total,
+              fecha_creacion: orden.fecha_creacion,
+              fecha_envio: orden.fecha_envio,
+              fecha_aceptacion: orden.fecha_aceptacion,
+              estado: orden.estado,
+              created_at: orden.created_at,
+              updated_at: orden.updated_at,
+              items: itemsMap.get(orden.id) || [],
+            }));
           }
         }
 
         return ordenes.map((orden): OrdenCompra => ({
-          ...orden,
-          datos_json: orden.datos_json as Record<string, unknown> | null,
-          items: includeItems ? (orden as any).items : undefined,
+          id: orden.id,
+          codigo: orden.codigo,
+          nombre: orden.nombre,
+          descripcion: orden.descripcion,
+          institucion_nombre: orden.institucion_nombre,
+          institucion_rut: orden.institucion_rut,
+          proveedor_nombre: orden.proveedor_nombre,
+          proveedor_rut: orden.proveedor_rut,
+          total_neto: orden.total_neto,
+          total: orden.total,
+          fecha_creacion: orden.fecha_creacion,
+          fecha_envio: orden.fecha_envio,
+          fecha_aceptacion: orden.fecha_aceptacion,
+          estado: orden.estado,
+          created_at: orden.created_at,
+          updated_at: orden.updated_at,
+          items: undefined,
         }));
       } catch (error) {
         console.error('Error en useOrdenesCompra:', error);
@@ -185,26 +220,47 @@ export function useOrdenCompra(codigo: string | null, includeItems = true) {
 
         if (includeItems) {
           const { data: itemsData, error: itemsError } = await supabase
-            .from('orden_compra_items')
+            .from('ordenes_compra_items')
             .select('*')
-            .eq('orden_compra_codigo', codigo)
-            .order('item_index');
+            .eq('orden_compra_id', orden.id)
+            .order('correlativo');
 
           if (itemsError) {
             console.error('Error obteniendo items:', itemsError);
           } else {
-            items = (itemsData || []).map((item: OrdenCompraItemRow) => ({
-              ...item,
+            items = (itemsData || []).map((item: OrdenCompraItemRow): OrdenCompraItem => ({
+              id: item.id,
+              orden_compra_id: item.orden_compra_id,
+              correlativo: item.correlativo,
+              codigo_producto: item.codigo_producto,
+              nombre_producto: item.nombre_producto,
+              descripcion: item.descripcion,
               cantidad: item.cantidad,
-              precio_unitario: item.precio_unitario,
-              subtotal: item.subtotal,
+              unidad: item.unidad,
+              precio_unitario_neto: item.precio_unitario_neto,
+              total_neto: item.total_neto,
+              created_at: item.created_at,
             }));
           }
         }
 
         return {
-          ...orden,
-          datos_json: orden.datos_json as Record<string, unknown> | null,
+          id: orden.id,
+          codigo: orden.codigo,
+          nombre: orden.nombre,
+          descripcion: orden.descripcion,
+          institucion_nombre: orden.institucion_nombre,
+          institucion_rut: orden.institucion_rut,
+          proveedor_nombre: orden.proveedor_nombre,
+          proveedor_rut: orden.proveedor_rut,
+          total_neto: orden.total_neto,
+          total: orden.total,
+          fecha_creacion: orden.fecha_creacion,
+          fecha_envio: orden.fecha_envio,
+          fecha_aceptacion: orden.fecha_aceptacion,
+          estado: orden.estado,
+          created_at: orden.created_at,
+          updated_at: orden.updated_at,
           items,
         };
       } catch (error) {
@@ -218,36 +274,43 @@ export function useOrdenCompra(codigo: string | null, includeItems = true) {
   });
 }
 
-export function useOrdenCompraItems(ordenCompraCodigo: string | null) {
+export function useOrdenCompraItems(ordenCompraId: string | null) {
   return useQuery({
-    queryKey: ['orden_compra_items', ordenCompraCodigo],
+    queryKey: ['orden_compra_items', ordenCompraId],
     queryFn: async (): Promise<OrdenCompraItem[]> => {
-      if (!ordenCompraCodigo) return [];
+      if (!ordenCompraId) return [];
 
       try {
         const { data, error } = await supabase
-          .from('orden_compra_items')
+          .from('ordenes_compra_items')
           .select('*')
-          .eq('orden_compra_codigo', ordenCompraCodigo)
-          .order('item_index');
+          .eq('orden_compra_id', ordenCompraId)
+          .order('correlativo');
 
         if (error) {
           console.error('Error obteniendo items:', error);
           throw new Error(`Error al obtener items: ${error.message}`);
         }
 
-        return (data || []).map((item: OrdenCompraItemRow) => ({
-          ...item,
+        return (data || []).map((item: OrdenCompraItemRow): OrdenCompraItem => ({
+          id: item.id,
+          orden_compra_id: item.orden_compra_id,
+          correlativo: item.correlativo,
+          codigo_producto: item.codigo_producto,
+          nombre_producto: item.nombre_producto,
+          descripcion: item.descripcion,
           cantidad: item.cantidad,
-          precio_unitario: item.precio_unitario,
-          subtotal: item.subtotal,
+          unidad: item.unidad,
+          precio_unitario_neto: item.precio_unitario_neto,
+          total_neto: item.total_neto,
+          created_at: item.created_at,
         }));
       } catch (error) {
         console.error('Error en useOrdenCompraItems:', error);
         throw error;
       }
     },
-    enabled: !!ordenCompraCodigo,
+    enabled: !!ordenCompraId,
     staleTime: 30000,
     gcTime: 300000,
   });
@@ -259,10 +322,27 @@ export function useUpsertOrdenCompra() {
   return useMutation({
     mutationFn: async ({ orden, items }: { orden: Partial<OrdenCompra>; items?: Partial<OrdenCompraItem>[] }) => {
       try {
+        // Prepare orden data for upsert (remove items and non-DB fields)
+        const ordenData = {
+          codigo: orden.codigo!,
+          nombre: orden.nombre ?? null,
+          descripcion: orden.descripcion ?? null,
+          institucion_nombre: orden.institucion_nombre ?? null,
+          institucion_rut: orden.institucion_rut ?? null,
+          proveedor_nombre: orden.proveedor_nombre ?? null,
+          proveedor_rut: orden.proveedor_rut ?? null,
+          total_neto: orden.total_neto ?? null,
+          total: orden.total ?? null,
+          fecha_creacion: orden.fecha_creacion ?? null,
+          fecha_envio: orden.fecha_envio ?? null,
+          fecha_aceptacion: orden.fecha_aceptacion ?? null,
+          estado: orden.estado ?? null,
+        };
+
         // Upsert orden
-        const { data: ordenData, error: ordenError } = await supabase
+        const { data: savedOrden, error: ordenError } = await supabase
           .from('ordenes_compra')
-          .upsert(orden, { onConflict: 'codigo' })
+          .upsert(ordenData, { onConflict: 'codigo' })
           .select()
           .single();
 
@@ -272,27 +352,27 @@ export function useUpsertOrdenCompra() {
         }
 
         // Si hay items, upsertlos
-        if (items && items.length > 0 && ordenData) {
+        if (items && items.length > 0 && savedOrden) {
           const itemsToInsert = items.map((item, index) => ({
-            orden_compra_codigo: ordenData.codigo,
-            item_index: item.item_index ?? index + 1,
-            producto_id: item.producto_id ?? null,
-            nombre_producto: item.nombre_producto ?? null,
+            orden_compra_id: savedOrden.id,
+            correlativo: item.correlativo ?? index + 1,
+            codigo_producto: item.codigo_producto ?? null,
+            nombre_producto: item.nombre_producto ?? 'Sin nombre',
             descripcion: item.descripcion ?? null,
-            cantidad: item.cantidad ?? null,
+            cantidad: item.cantidad ?? 0,
             unidad: item.unidad ?? null,
-            precio_unitario: item.precio_unitario ?? null,
-            subtotal: item.subtotal ?? null,
+            precio_unitario_neto: item.precio_unitario_neto ?? null,
+            total_neto: item.total_neto ?? null,
           }));
 
           // Eliminar items existentes y insertar nuevos
           await supabase
-            .from('orden_compra_items')
+            .from('ordenes_compra_items')
             .delete()
-            .eq('orden_compra_codigo', ordenData.codigo);
+            .eq('orden_compra_id', savedOrden.id);
 
           const { error: itemsError } = await supabase
-            .from('orden_compra_items')
+            .from('ordenes_compra_items')
             .insert(itemsToInsert);
 
           if (itemsError) {
@@ -301,7 +381,7 @@ export function useUpsertOrdenCompra() {
           }
         }
 
-        return ordenData;
+        return savedOrden;
       } catch (error) {
         console.error('Error en useUpsertOrdenCompra:', error);
         throw error;

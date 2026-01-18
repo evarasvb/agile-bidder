@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useOrdenesCompra, useOrdenCompra, type OrdenCompra, type OrdenCompraItem } from "@/hooks/useOrdenesCompra";
+import { useOrdenesCompra, useOrdenCompra, type OrdenCompra } from "@/hooks/useOrdenesCompra";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -7,12 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, FileText, Building2, User, Calendar, DollarSign, Package, X, Filter } from "lucide-react";
+import { Search, FileText, Building2, User, Calendar, Package, X, Filter } from "lucide-react";
 import { formatCurrency } from "@/utils/clasificacion";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
 
 export default function OrdenesCompra() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -20,7 +19,6 @@ export default function OrdenesCompra() {
   const [filtroNombre, setFiltroNombre] = useState("");
   const [filtroEstado, setFiltroEstado] = useState<string>("");
   const [ordenSeleccionada, setOrdenSeleccionada] = useState<string | null>(null);
-  const [mostrarFiltros, setMostrarFiltros] = useState(false);
 
   // Construir filtros
   const filters = {
@@ -438,7 +436,7 @@ function OrdenCompraDetalle({ orden }: { orden: OrdenCompra }) {
                 <TableBody>
                   {orden.items.map((item, index) => (
                     <TableRow key={item.id}>
-                      <TableCell className="font-medium">{item.item_index}</TableCell>
+                      <TableCell className="font-medium">{item.correlativo || index + 1}</TableCell>
                       <TableCell className="font-medium max-w-[200px]">
                         <div className="truncate" title={item.nombre_producto || ''}>
                           {item.nombre_producto || 'N/A'}
@@ -454,10 +452,10 @@ function OrdenCompraDetalle({ orden }: { orden: OrdenCompra }) {
                       </TableCell>
                       <TableCell>{item.unidad || 'N/A'}</TableCell>
                       <TableCell className="text-right">
-                        {item.precio_unitario ? formatCurrency(item.precio_unitario) : 'N/A'}
+                        {item.precio_unitario_neto ? formatCurrency(item.precio_unitario_neto) : 'N/A'}
                       </TableCell>
                       <TableCell className="text-right font-semibold">
-                        {item.subtotal ? formatCurrency(item.subtotal) : 'N/A'}
+                        {item.total_neto ? formatCurrency(item.total_neto) : 'N/A'}
                       </TableCell>
                     </TableRow>
                   ))}

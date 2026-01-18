@@ -30,7 +30,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useLicitaciones, useLicitacionItems, type Licitacion } from '@/hooks/useLicitaciones';
+import { useLicitaciones, useLicitacionItemsById, type Licitacion } from '@/hooks/useLicitaciones';
 import { cn } from '@/lib/utils';
 
 function formatCurrency(value: number | null): string {
@@ -106,8 +106,7 @@ function LicitacionDetailDialog({
   open: boolean; 
   onClose: () => void;
 }) {
-  const { data: items, isLoading } = useLicitacionItems(licitacion.id_licitacion);
-  const matchedProducts = items?.filter(() => Math.random() > 0.5) || [];
+  const { data: items, isLoading } = useLicitacionItemsById(licitacion.id_licitacion);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -167,10 +166,10 @@ function LicitacionDetailDialog({
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
                 <Package className="h-4 w-4" />
-                Productos Match
+                Productos
               </div>
               <p className="font-bold text-lg">
-                {matchedProducts.length}/{items?.length || 0}
+                {items?.length || 0}
               </p>
             </CardContent>
           </Card>
@@ -199,30 +198,19 @@ function LicitacionDetailDialog({
                     <TableHead className="text-white font-semibold">Descripción</TableHead>
                     <TableHead className="text-white font-semibold text-right">Cantidad</TableHead>
                     <TableHead className="text-white font-semibold">Unidad</TableHead>
-                    <TableHead className="text-white font-semibold text-center">Match</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {items.map((item, index) => {
-                    const hasMatch = index < matchedProducts.length;
-                    return (
-                      <TableRow key={item.id} className="hover:bg-muted/50">
-                        <TableCell className="font-medium">{item.nombre_producto}</TableCell>
-                        <TableCell className="text-muted-foreground max-w-[200px] truncate">
-                          {item.descripcion || '-'}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">{item.cantidad ?? '-'}</TableCell>
-                        <TableCell>{item.unidad || '-'}</TableCell>
-                        <TableCell className="text-center">
-                          {hasMatch ? (
-                            <CheckCircle className="h-5 w-5 text-risk-low mx-auto" />
-                          ) : (
-                            <XCircle className="h-5 w-5 text-muted-foreground/40 mx-auto" />
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                  {items.map((item) => (
+                    <TableRow key={item.id} className="hover:bg-muted/50">
+                      <TableCell className="font-medium">{item.nombre_producto}</TableCell>
+                      <TableCell className="text-muted-foreground max-w-[200px] truncate">
+                        {item.descripcion || '-'}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">{item.cantidad ?? '-'}</TableCell>
+                      <TableCell>{item.unidad || '-'}</TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </div>
@@ -245,9 +233,8 @@ function LicitacionDetailDialog({
 
 function LicitacionRow({ licitacion }: { licitacion: Licitacion }) {
   const [showDetail, setShowDetail] = useState(false);
-  const { data: items } = useLicitacionItems(licitacion.id_licitacion);
+  const { data: items } = useLicitacionItemsById(licitacion.id_licitacion);
   const productCount = items?.length || 0;
-  const matchedCount = Math.floor(productCount * (licitacion.match_score || 0) / 100);
 
   return (
     <>
@@ -295,8 +282,6 @@ function LicitacionRow({ licitacion }: { licitacion: Licitacion }) {
         <TableCell>
           <div className="flex items-center gap-1 text-sm">
             <Package className="h-4 w-4 text-muted-foreground" />
-            <span className="font-semibold text-risk-low">{matchedCount}</span>
-            <span className="text-muted-foreground">/</span>
             <span>{productCount}</span>
           </div>
         </TableCell>

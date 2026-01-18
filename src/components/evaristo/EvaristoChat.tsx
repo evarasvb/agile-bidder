@@ -64,7 +64,7 @@ export function EvaristoChat() {
 
     try {
       if (command.includes('revisar') || command.includes('revisa')) {
-        const result = await revisar.mutateAsync();
+        const result = await revisar.mutateAsync({});
         const evaristoMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: 'evaristo',
