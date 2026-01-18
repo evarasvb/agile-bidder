@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Filter, DollarSign, HelpCircle } from "lucide-react";
+import { Filter, DollarSign, HelpCircle, Calendar, CheckCircle2 } from "lucide-react";
 import type { ComprasAgilesFilters as Filters } from "@/hooks/useComprasAgiles";
 import { UMBRAL_COMPRA_AGIL_CLP, formatCurrency } from "@/utils/clasificacion";
 
@@ -34,6 +34,19 @@ const REGIONES = [
   { value: 'Coquimbo', label: 'Coquimbo' },
 ];
 
+const FECHAS_CIERRE = [
+  { value: 'todas', label: 'Todas las fechas' },
+  { value: 'hoy', label: 'Cierra hoy' },
+  { value: 'proximos3', label: 'Próximos 3 días' },
+  { value: 'proximos7', label: 'Próximos 7 días' },
+];
+
+const MATCH_STATUS = [
+  { value: 'todos', label: 'Todos' },
+  { value: 'con_match', label: 'Con match' },
+  { value: 'sin_match', label: 'Sin match' },
+];
+
 export function ComprasAgilesFilters({ filters, onFiltersChange }: ComprasAgilesFiltersProps) {
   return (
     <Card className="bg-card border-border shadow-sm">
@@ -43,7 +56,54 @@ export function ComprasAgilesFilters({ filters, onFiltersChange }: ComprasAgiles
           <span className="text-sm font-medium text-foreground">Filtros</span>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {/* Fecha de Cierre */}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <Calendar className="h-3 w-3 text-muted-foreground" />
+              <Label className="text-xs text-muted-foreground">Fecha Cierre</Label>
+            </div>
+            <Select
+              value={filters.fechaCierre || 'todas'}
+              onValueChange={(value) => onFiltersChange({ ...filters, fechaCierre: value })}
+            >
+              <SelectTrigger className="bg-background">
+                <SelectValue placeholder="Seleccionar" />
+              </SelectTrigger>
+              <SelectContent>
+                {FECHAS_CIERRE.map((fecha) => (
+                  <SelectItem key={fecha.value} value={fecha.value}>
+                    {fecha.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Match Status */}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="h-3 w-3 text-muted-foreground" />
+              <Label className="text-xs text-muted-foreground">Estado Match</Label>
+            </div>
+            <Select
+              value={filters.matchStatus || 'todos'}
+              onValueChange={(value) => onFiltersChange({ ...filters, matchStatus: value })}
+            >
+              <SelectTrigger className="bg-background">
+                <SelectValue placeholder="Seleccionar" />
+              </SelectTrigger>
+              <SelectContent>
+                {MATCH_STATUS.map((status) => (
+                  <SelectItem key={status.value} value={status.value}>
+                    {status.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Estado */}
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Estado</Label>
             <Select
@@ -63,6 +123,7 @@ export function ComprasAgilesFilters({ filters, onFiltersChange }: ComprasAgiles
             </Select>
           </div>
 
+          {/* Región */}
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Región</Label>
             <Select
@@ -82,18 +143,16 @@ export function ComprasAgilesFilters({ filters, onFiltersChange }: ComprasAgiles
             </Select>
           </div>
 
+          {/* Monto Mínimo */}
           <div className="space-y-1.5">
             <div className="flex items-center gap-1.5">
-              <Label className="text-xs text-muted-foreground">Monto mínimo</Label>
+              <Label className="text-xs text-muted-foreground">Monto mín.</Label>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent>
                   <p className="text-xs">Filtra compras ágiles por monto mínimo en CLP</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Umbral Compra Ágil: {formatCurrency(UMBRAL_COMPRA_AGIL_CLP)} (100 UTM)
-                  </p>
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -112,18 +171,16 @@ export function ComprasAgilesFilters({ filters, onFiltersChange }: ComprasAgiles
             </div>
           </div>
 
+          {/* Monto Máximo */}
           <div className="space-y-1.5">
             <div className="flex items-center gap-1.5">
-              <Label className="text-xs text-muted-foreground">Monto máximo</Label>
+              <Label className="text-xs text-muted-foreground">Monto máx.</Label>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent>
                   <p className="text-xs">Filtra compras ágiles por monto máximo en CLP</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Compras Ágiles: hasta {formatCurrency(UMBRAL_COMPRA_AGIL_CLP)} (≤100 UTM)
-                  </p>
                 </TooltipContent>
               </Tooltip>
             </div>
