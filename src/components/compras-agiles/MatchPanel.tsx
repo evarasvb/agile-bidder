@@ -1,14 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Package, PackageSearch, FileText, Calendar, MapPin, Building2, DollarSign, CheckCircle2, XCircle, ShieldCheck, ShieldX, AlertCircle } from "lucide-react";
+import { 
+  Package, PackageSearch, FileText, Calendar, MapPin, Building2, 
+  DollarSign, CheckCircle2, XCircle, ShieldCheck, ShieldX, AlertCircle,
+  Sparkles, RefreshCw, TrendingUp
+} from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { useLicitacionItems, type LicitacionItem } from "@/hooks/useLicitacionItems";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
+import { useProductMatching, type ItemConMatch } from "@/hooks/useProductMatching";
 import { clasificarProceso, formatCurrency, montoEnUTM } from "@/utils/clasificacion";
 
 interface MatchPanelProps {
@@ -17,7 +21,44 @@ interface MatchPanelProps {
 }
 
 export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
-  const { data: items, isLoading: isLoadingItems } = useLicitacionItems(compra?.codigo || null);
+  const { 
+    procesarCompraAgil, 
+    calcularScorePromedio, 
+    isLoading: isLoadingInventario 
+  } = useProductMatching();
+  
+  const [itemsConMatch, setItemsConMatch] = useState<ItemConMatch[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [scorePromedio, setScorePromedio] = useState(0);
+  
+  // Procesar compra cuando cambia
+  useEffect(() => {
+    if (compra && !isLoadingInventario) {
+      setIsProcessing(true);
+      // Pequeño delay para mostrar loading
+      const timer = setTimeout(() => {
+        const items = procesarCompraAgil(compra);
+        setItemsConMatch(items);
+        setScorePromedio(calcularScorePromedio(items));
+        setIsProcessing(false);
+      }, 300);
+      return () => clearTimeout(timer);
+    } else {
+      setItemsConMatch([]);
+      setScorePromedio(0);
+    }
+  }, [compra, procesarCompraAgil, calcularScorePromedio, isLoadingInventario]);
+  
+  const handleRefreshMatches = () => {
+    if (!compra) return;
+    setIsProcessing(true);
+    setTimeout(() => {
+      const items = procesarCompraAgil(compra);
+      setItemsConMatch(items);
+      setScorePromedio(calcularScorePromedio(items));
+      setIsProcessing(false);
+    }, 300);
+  };
 
   if (!compra) {
     return (
@@ -32,16 +73,33 @@ export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
     );
   }
 
-  // Preparar items para la propuesta
-  const productosParaPropuesta = items?.map(item => ({
-    itemId: `${item.licitacion_id}-${item.id}`,
+  // Preparar items para la propuesta con info de match
+  const productosParaPropuesta = itemsConMatch.map(item => ({
+    itemId: item.id,
     itemIndex: item.id,
-    nombre: item.nombre_producto || 'Sin nombre',
+    nombre: item.nombre,
     descripcion: item.descripcion || '',
     cantidadSolicitada: item.cantidad || 1,
-    unidadMedida: item.unidad || 'unidad',
-    match: null, // Sin match info en schema actual
-  })) || [];
+    unidadMedida: item.unidad || 'UN',
+    match: item.bestMatch ? {
+      id: item.bestMatch.inventoryItem.id,
+      sku: item.bestMatch.inventoryItem.sku,
+      nombre: item.bestMatch.inventoryItem.nombre_producto,
+      precio_unitario: item.bestMatch.inventoryItem.precio_unitario,
+      stock: item.bestMatch.inventoryItem.stock_disponible,
+      matchScore: item.bestMatch.score,
+      margen_estimado: item.bestMatch.inventoryItem.margen_objetivo / 100,
+    } : null,
+  }));
+  
+  const itemsConMatchExitoso = itemsConMatch.filter(i => i.bestMatch !== null);
+
+  const getMatchBadgeColor = (score: number) => {
+    if (score >= 85) return 'bg-green-100 text-green-800 border-green-200';
+    if (score >= 60) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    if (score >= 40) return 'bg-orange-100 text-orange-800 border-orange-200';
+    return 'bg-red-100 text-red-800 border-red-200';
+  };
 
   return (
     <Card className="shadow-sm h-full flex flex-col">
@@ -58,6 +116,20 @@ export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
       <CardContent className="pt-4 flex-1 flex flex-col overflow-hidden">
         <div className="space-y-3 mb-4">
           <h3 className="font-medium text-foreground line-clamp-2">{compra.nombre}</h3>
+          
+          {/* Score de Match Promedio */}
+          {scorePromedio > 0 && (
+            <div className="flex items-center gap-2 p-2 bg-primary/5 rounded-lg border border-primary/20">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">Match Promedio:</span>
+              <Badge className={getMatchBadgeColor(scorePromedio)}>
+                {scorePromedio}%
+              </Badge>
+              <span className="text-xs text-muted-foreground ml-auto">
+                {itemsConMatchExitoso.length}/{itemsConMatch.length} items
+              </span>
+            </div>
+          )}
           
           {/* Información de clasificación */}
           {compra.monto && (() => {
@@ -143,41 +215,60 @@ export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
           <div className="flex items-center justify-between mb-3">
             <h4 className="font-medium text-sm flex items-center gap-2">
               <PackageSearch className="h-4 w-4 text-primary" />
-              Productos Solicitados
-              {items && items.length > 0 && (
-                <Badge variant="secondary">{items.length}</Badge>
+              Matches de Inventario
+              {itemsConMatch.length > 0 && (
+                <Badge variant="secondary">{itemsConMatch.length}</Badge>
               )}
             </h4>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRefreshMatches}
+              disabled={isProcessing || isLoadingInventario}
+            >
+              <RefreshCw className={`h-4 w-4 ${isProcessing ? 'animate-spin' : ''}`} />
+            </Button>
           </div>
 
-          {isLoadingItems ? (
+          {isProcessing || isLoadingInventario ? (
             <div className="space-y-2">
               {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-20 w-full" />
+                <Skeleton key={i} className="h-24 w-full" />
               ))}
             </div>
-          ) : items && items.length > 0 ? (
+          ) : itemsConMatch.length > 0 ? (
             <>
               <ScrollArea className="flex-1 -mx-4 px-4">
                 <div className="space-y-3">
-                  {items.map((item) => (
+                  {itemsConMatch.map((item) => (
                     <div
-                      key={`${item.licitacion_id}-${item.id}`}
-                      className="border rounded-lg p-3 transition-colors border-border bg-background"
+                      key={item.id}
+                      className={`border rounded-lg p-3 transition-colors ${
+                        item.bestMatch 
+                          ? 'border-green-200 bg-green-50/50' 
+                          : 'border-border bg-background'
+                      }`}
                     >
                       <div className="space-y-2">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="text-xs font-medium text-muted-foreground">
-                                Item #{item.id}
+                                Item
                               </span>
-                              <Badge variant="secondary" className="text-xs">
-                                Pendiente
-                              </Badge>
+                              {item.bestMatch ? (
+                                <Badge className={`text-xs ${getMatchBadgeColor(item.bestMatch.score)}`}>
+                                  <TrendingUp className="h-3 w-3 mr-1" />
+                                  {item.bestMatch.score}% match
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-xs text-muted-foreground">
+                                  Sin match
+                                </Badge>
+                              )}
                             </div>
                             <p className="font-medium text-sm">
-                              {item.nombre_producto || 'Sin nombre'}
+                              {item.nombre}
                             </p>
                             {item.descripcion && (
                               <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
@@ -194,6 +285,43 @@ export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
                             </div>
                           </div>
                         </div>
+                        
+                        {/* Producto match sugerido */}
+                        {item.bestMatch && (
+                          <div className="mt-2 p-2 bg-white rounded border border-green-200">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-xs font-medium text-green-800">
+                                  {item.bestMatch.inventoryItem.nombre_producto}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  SKU: {item.bestMatch.inventoryItem.sku} | 
+                                  Stock: {item.bestMatch.inventoryItem.stock_disponible}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm font-bold text-green-700">
+                                  {formatCurrency(item.bestMatch.inventoryItem.precio_unitario)}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {item.bestMatch.matchType}
+                                </p>
+                              </div>
+                            </div>
+                            {item.bestMatch.matchedTerms.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {item.bestMatch.matchedTerms.slice(0, 3).map((term, idx) => (
+                                  <span 
+                                    key={idx}
+                                    className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded"
+                                  >
+                                    {term}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -204,10 +332,10 @@ export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
                 <Button
                   onClick={() => onGenerarPropuesta(productosParaPropuesta)}
                   className="w-full gap-2"
-                  disabled={productosParaPropuesta.length === 0}
+                  disabled={itemsConMatchExitoso.length === 0}
                 >
                   <FileText className="h-4 w-4" />
-                  Generar Propuesta ({productosParaPropuesta.length} items)
+                  Generar Cotización ({itemsConMatchExitoso.length} productos)
                 </Button>
               </div>
             </>
@@ -215,7 +343,8 @@ export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center text-muted-foreground">
                 <Package className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">No hay productos registrados para esta compra</p>
+                <p className="text-sm">No se encontraron items para hacer matching</p>
+                <p className="text-xs mt-1">Agrega productos al inventario para ver coincidencias</p>
               </div>
             </div>
           )}
