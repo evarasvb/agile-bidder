@@ -21,6 +21,21 @@ interface CompraAgilData {
   tipo?: string;
   datos_json?: Record<string, unknown>;
   items?: unknown[];
+  institucion_rut?: string;
+  contacto_email?: string;
+  contacto_telefono?: string;
+  organismo_direccion?: string;
+  condiciones_pago?: string;
+  plazo_entrega?: string;
+  forma_pago?: string;
+  lugar_entrega?: string;
+  unidad_compra?: string;
+  responsable?: string;
+  moneda?: string;
+  tipo_proceso?: string;
+  modalidad?: string;
+  comuna?: string;
+  fecha_publicacion?: string;
 }
 
 Deno.serve(async (req) => {
@@ -78,11 +93,7 @@ Deno.serve(async (req) => {
     };
 
     // Process each compra ágil
-<<<<<<< Updated upstream
-    for (const lic of licitaciones as CompraAgilData[]) {
-=======
-    for (const lic of comprasToProcess) {
->>>>>>> Stashed changes
+    for (const lic of comprasToProcess as CompraAgilData[]) {
       try {
         // Skip if not a compra ágil
         if (lic.tipo !== 'compra_agil' && !lic.codigo) {
@@ -114,13 +125,9 @@ Deno.serve(async (req) => {
           }
         }
         
-<<<<<<< Updated upstream
-        const compraData = {
-=======
         // Guardar TODOS los datos adicionales en datos_json
         const datosCompletos = {
           ...(lic.datos_json || {}),
-          // Incluir todos los campos adicionales que puedan venir
           institucion_rut: lic.institucion_rut || null,
           contacto_email: lic.contacto_email || null,
           contacto_telefono: lic.contacto_telefono || null,
@@ -136,12 +143,11 @@ Deno.serve(async (req) => {
           modalidad: lic.modalidad || null,
           comuna: lic.comuna || null,
           fecha_publicacion: lic.fecha_publicacion || null,
-          // Incluir el objeto completo como fallback
+          categoria: categoria,
           raw_data: lic
         };
         
-        const compraData: any = {
->>>>>>> Stashed changes
+        const compraData = {
           codigo: lic.codigo,
           nombre: lic.nombre || `Compra Ágil ${lic.codigo}`,
           organismo: lic.organismo || lic.institucion_nombre || 'Organismo no especificado',
@@ -151,13 +157,7 @@ Deno.serve(async (req) => {
           region: lic.region || null,
           descripcion: lic.descripcion || null,
           link_oficial: lic.link_oficial || null,
-<<<<<<< Updated upstream
-          datos_json: lic.datos_json || lic,
-=======
-          datos_json: datosCompletos, // Store ALL scraped data
-          tipo_proceso: tipo_proceso, // 'compra_agil' o 'licitacion'
-          categoria: categoria, // 'L1', 'LE', 'LP', 'LR'
->>>>>>> Stashed changes
+          datos_json: datosCompletos,
         };
 
         // Upsert compra ágil
@@ -183,7 +183,7 @@ Deno.serve(async (req) => {
             .eq('licitacion_id', lic.codigo);
 
           // Insertar nuevos items
-          const itemsData = (itemsToSave as Record<string, unknown>[]).map((item, index) => ({
+          const itemsData = (itemsToSave as Record<string, unknown>[]).map((item) => ({
             licitacion_id: lic.codigo,
             nombre_producto: (item.nombre_producto as string) || (item.nombre as string) || 'Producto sin nombre',
             descripcion: (item.descripcion as string) || null,
