@@ -8,10 +8,57 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { format, differenceInDays, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { ShoppingCart, Clock, MapPin, Building2, CheckCircle2, AlertTriangle, ShieldCheck, ShieldX, HelpCircle, ExternalLink } from "lucide-react";
+import { ShoppingCart, Clock, MapPin, Building2, CheckCircle2, AlertTriangle, ExternalLink, Package } from "lucide-react";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 import { clasificarProceso, montoEnUTM, formatCurrency } from "@/utils/clasificacion";
 import { cn } from "@/lib/utils";
+
+// Función para extraer el monto de diferentes fuentes
+function extractMonto(compra: CompraAgil): number | null {
+  // Primero intentar el campo monto directo
+  if (compra.monto !== null && compra.monto !== undefined && compra.monto > 0) {
+    return compra.monto;
+  }
+  
+  // Buscar en datos_json
+  if (compra.datos_json) {
+    const json = compra.datos_json;
+    // Campos comunes donde puede estar el monto
+    const montoKeys = ['MontoEstimado', 'monto_estimado', 'monto', 'Monto', 'total', 'Total', 'amount', 'estimated_amount'];
+    for (const key of montoKeys) {
+      const value = json[key];
+      if (value !== null && value !== undefined) {
+        const num = typeof value === 'number' ? value : parseFloat(String(value));
+        if (!isNaN(num) && num > 0) return num;
+      }
+    }
+  }
+  
+  return null;
+}
+
+// Función para contar productos de una compra
+function countProductos(compra: CompraAgil): number {
+  if (!compra.datos_json) return 0;
+  
+  const json = compra.datos_json;
+  
+  // Buscar array de items/productos en diferentes formatos
+  const itemKeys = ['items', 'Items', 'productos', 'Productos', 'lineas', 'Lineas', 'detalle', 'Detalle'];
+  for (const key of itemKeys) {
+    const value = json[key];
+    if (Array.isArray(value)) {
+      return value.length;
+    }
+  }
+  
+  // Si hay un campo Listado con items
+  if (json.Listado && Array.isArray(json.Listado)) {
+    return json.Listado.length;
+  }
+  
+  return 0;
+}
 
 interface ComprasAgilesTableProps {
   compras: CompraAgil[] | undefined;
@@ -125,6 +172,7 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
                 <TableHead className="font-semibold min-w-[200px]">Nombre</TableHead>
                 <TableHead className="font-semibold min-w-[180px]">Organismo</TableHead>
                 <TableHead className="font-semibold text-right w-[130px]">Monto</TableHead>
+                <TableHead className="font-semibold text-center w-[80px]">Productos</TableHead>
                 <TableHead className="font-semibold w-[100px]">Cierre</TableHead>
                 <TableHead className="font-semibold w-[100px]">Estado</TableHead>
                 <TableHead className="font-semibold text-center w-[80px]">Match</TableHead>
@@ -133,7 +181,7 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
           <TableBody>
             {compras?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-12">
+                <TableCell colSpan={8} className="text-center py-12">
                   <div className="flex flex-col items-center gap-3 text-muted-foreground">
                     <ShoppingCart className="h-12 w-12 opacity-50" />
                     <div>
@@ -207,21 +255,40 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
                       </div>
                     </TableCell>
                     
-                    {/* Monto - MOSTRAR VALOR REAL */}
+                    {/* Monto - Extraído de monto o datos_json */}
                     <TableCell className="text-right">
-                      <div className="flex flex-col items-end gap-0.5">
-                        <span className="font-semibold text-foreground">
-                          {compra.monto !== null && compra.monto !== undefined 
-                            ? formatCurrency(compra.monto)
-                            : 'Sin monto'
-                          }
-                        </span>
-                        {compra.monto !== null && compra.monto !== undefined && (
-                          <span className="text-xs text-muted-foreground">
-                            {montoEnUTM(compra.monto)?.toFixed(1)} UTM
-                          </span>
-                        )}
-                      </div>
+                      {(() => {
+                        const montoReal = extractMonto(compra);
+                        if (montoReal !== null) {
+                          return (
+                            <div className="flex flex-col items-end gap-0.5">
+                              <span className="font-semibold text-foreground">
+                                {formatCurrency(montoReal)}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {montoEnUTM(montoReal)?.toFixed(1)} UTM
+                              </span>
+                            </div>
+                          );
+                        }
+                        return <span className="text-muted-foreground text-sm">Sin monto</span>;
+                      })()}
+                    </TableCell>
+                    
+                    {/* Productos - Cantidad de items */}
+                    <TableCell className="text-center">
+                      {(() => {
+                        const count = countProductos(compra);
+                        if (count > 0) {
+                          return (
+                            <div className="flex items-center justify-center gap-1">
+                              <Package className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-medium">{count}</span>
+                            </div>
+                          );
+                        }
+                        return <span className="text-muted-foreground text-sm">-</span>;
+                      })()}
                     </TableCell>
                     
                     {/* Fecha Cierre */}
