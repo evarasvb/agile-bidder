@@ -3,8 +3,8 @@ import { supabaseClient as supabase } from '@/lib/supabaseClient';
 import type { Database } from '@/integrations/supabase/types';
 import { differenceInDays, parseISO, startOfDay, addDays } from 'date-fns';
 
-// Tipo base de la BD - usar directamente los campos que existen
-type CompraAgilRow = Database['public']['Tables']['compras_agiles']['Row'];
+// Tipo base de la BD - usar tabla licitaciones
+type LicitacionRow = Database['public']['Tables']['licitaciones']['Row'];
 
 export interface CompraAgil {
   id: string;
@@ -37,8 +37,9 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
   return useQuery({
     queryKey: ['compras_agiles', filters],
     queryFn: async () => {
+      // CAMBIO CRÍTICO: Usar tabla licitaciones en lugar de compras_agiles
       let query = supabase
-        .from('compras_agiles')
+        .from('licitaciones')
         .select('*')
         .order('fecha_cierre', { ascending: true, nullsFirst: false });
 
@@ -47,16 +48,12 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
         query = query.eq('estado', filters.estado);
       }
 
-      if (filters?.region && filters.region !== 'todas') {
-        query = query.eq('region', filters.region);
-      }
-
       if (filters?.montoMin) {
-        query = query.gte('monto', filters.montoMin);
+        query = query.gte('presupuesto', filters.montoMin);
       }
 
       if (filters?.montoMax) {
-        query = query.lte('monto', filters.montoMax);
+        query = query.lte('presupuesto', filters.montoMax);
       }
 
       // Filtro de match status
@@ -86,36 +83,28 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
       const { data, error } = await query;
 
       if (error) {
-        console.error('Error fetching compras_agiles:', error);
+        console.error('Error fetching licitaciones:', error);
         throw error;
       }
 
-      // Mapear campos de BD a interfaz (sin filtros que excluyan datos reales)
-      const compras = (data || []).map((compra: CompraAgilRow): CompraAgil => {
-        // Convertir datos_json de Json a Record<string, unknown>
-        const datosJson = compra.datos_json;
-        const datosJsonRecord = datosJson && typeof datosJson === 'object' && !Array.isArray(datosJson)
-          ? datosJson as Record<string, unknown>
-          : Array.isArray(datosJson)
-          ? { items: datosJson }
-          : null;
-        
+      // Mapear campos de licitaciones a interfaz CompraAgil
+      const compras = (data || []).map((licitacion: LicitacionRow): CompraAgil => {
         return {
-          id: compra.id,
-          codigo: compra.codigo,
-          nombre: compra.nombre,
-          organismo: compra.organismo,
-          monto: compra.monto,
-          fecha_cierre: compra.fecha_cierre,
-          estado: compra.estado,
-          region: compra.region,
-          descripcion: compra.descripcion,
-          link_oficial: compra.link_oficial,
-          match_encontrado: compra.match_encontrado ?? false,
-          match_score: compra.match_score,
-          datos_json: datosJsonRecord,
-          created_at: compra.created_at,
-          updated_at: compra.updated_at,
+          id: licitacion.id_licitacion, // Usar id_licitacion como id
+          codigo: licitacion.id_licitacion,
+          nombre: licitacion.titulo,
+          organismo: licitacion.organismo,
+          monto: licitacion.presupuesto,
+          fecha_cierre: licitacion.fecha_cierre,
+          estado: licitacion.estado,
+          region: null, // No existe en licitaciones
+          descripcion: null, // No existe en licitaciones
+          link_oficial: licitacion.link_oficial,
+          match_encontrado: licitacion.match_encontrado ?? false,
+          match_score: licitacion.match_score,
+          datos_json: null, // No existe en licitaciones
+          created_at: licitacion.created_at,
+          updated_at: licitacion.created_at, // Usar created_at como fallback
         };
       });
       
@@ -131,38 +120,32 @@ export function useCompraAgil(id: string | null) {
     queryFn: async (): Promise<CompraAgil | null> => {
       if (!id) return null;
       
+      // Usar tabla licitaciones con id_licitacion
       const { data, error } = await supabase
-        .from('compras_agiles')
+        .from('licitaciones')
         .select('*')
-        .eq('id', id)
+        .eq('id_licitacion', id)
         .maybeSingle();
 
       if (error) throw error;
       if (!data) return null;
-      
-      const datosJson = data.datos_json;
-      const datosJsonRecord = datosJson && typeof datosJson === 'object' && !Array.isArray(datosJson)
-        ? datosJson as Record<string, unknown>
-        : Array.isArray(datosJson)
-        ? { items: datosJson }
-        : null;
 
       return {
-        id: data.id,
-        codigo: data.codigo,
-        nombre: data.nombre,
+        id: data.id_licitacion,
+        codigo: data.id_licitacion,
+        nombre: data.titulo,
         organismo: data.organismo,
-        monto: data.monto,
+        monto: data.presupuesto,
         fecha_cierre: data.fecha_cierre,
         estado: data.estado,
-        region: data.region,
-        descripcion: data.descripcion,
+        region: null,
+        descripcion: null,
         link_oficial: data.link_oficial,
         match_encontrado: data.match_encontrado ?? false,
         match_score: data.match_score,
-        datos_json: datosJsonRecord,
+        datos_json: null,
         created_at: data.created_at,
-        updated_at: data.updated_at,
+        updated_at: data.created_at,
       };
     },
     enabled: !!id,
@@ -175,38 +158,32 @@ export function useCompraAgilByCodigo(codigo: string | undefined) {
     queryFn: async (): Promise<CompraAgil | null> => {
       if (!codigo) return null;
       
+      // Usar tabla licitaciones con id_licitacion como codigo
       const { data, error } = await supabase
-        .from('compras_agiles')
+        .from('licitaciones')
         .select('*')
-        .eq('codigo', codigo)
+        .eq('id_licitacion', codigo)
         .maybeSingle();
 
       if (error) throw error;
       if (!data) return null;
-      
-      const datosJson = data.datos_json;
-      const datosJsonRecord = datosJson && typeof datosJson === 'object' && !Array.isArray(datosJson)
-        ? datosJson as Record<string, unknown>
-        : Array.isArray(datosJson)
-        ? { items: datosJson }
-        : null;
 
       return {
-        id: data.id,
-        codigo: data.codigo,
-        nombre: data.nombre,
+        id: data.id_licitacion,
+        codigo: data.id_licitacion,
+        nombre: data.titulo,
         organismo: data.organismo,
-        monto: data.monto,
+        monto: data.presupuesto,
         fecha_cierre: data.fecha_cierre,
         estado: data.estado,
-        region: data.region,
-        descripcion: data.descripcion,
+        region: null,
+        descripcion: null,
         link_oficial: data.link_oficial,
         match_encontrado: data.match_encontrado ?? false,
         match_score: data.match_score,
-        datos_json: datosJsonRecord,
+        datos_json: null,
         created_at: data.created_at,
-        updated_at: data.updated_at,
+        updated_at: data.created_at,
       };
     },
     enabled: !!codigo,
@@ -239,29 +216,29 @@ export function useComprasAgilesStats() {
   return useQuery({
     queryKey: ['compras_agiles_stats'],
     queryFn: async () => {
-      // Usar count para obtener el total sin traer todos los datos
+      // Usar tabla licitaciones para stats
       const { count: total, error: countError } = await supabase
-        .from('compras_agiles')
+        .from('licitaciones')
         .select('*', { count: 'exact', head: true });
 
       if (countError) throw countError;
 
       // Obtener stats agregados con consultas separadas
       const { count: conMatch } = await supabase
-        .from('compras_agiles')
+        .from('licitaciones')
         .select('*', { count: 'exact', head: true })
         .eq('match_encontrado', true);
 
-      // Calcular monto total con una consulta más eficiente
+      // Calcular monto total (usando presupuesto)
       const { data: montoData } = await supabase
-        .from('compras_agiles')
-        .select('monto');
+        .from('licitaciones')
+        .select('presupuesto');
 
-      const montoTotal = (montoData || []).reduce((sum, c) => sum + (c.monto || 0), 0);
+      const montoTotal = (montoData || []).reduce((sum, c) => sum + (c.presupuesto || 0), 0);
 
       // Contar urgentes (si el estado existe)
       const { count: urgentes } = await supabase
-        .from('compras_agiles')
+        .from('licitaciones')
         .select('*', { count: 'exact', head: true })
         .eq('estado', 'urgente');
 
