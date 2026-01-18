@@ -71,14 +71,14 @@ Deno.serve(async (req) => {
     // Filtrar comentarios y líneas vacías
     const statements = sql
       .split(';')
-      .map(s => s.trim())
-      .filter(s => {
+      .map((s: string) => s.trim())
+      .filter((s: string) => {
         const trimmed = s.trim();
         return trimmed.length > 0 && 
                !trimmed.startsWith('--') && 
                !trimmed.toLowerCase().startsWith('comment');
       })
-      .map(s => s + ';');
+      .map((s: string) => s + ';');
 
     const results = [];
     let successCount = 0;
