@@ -67,6 +67,7 @@ interface ComprasAgilesTableProps {
   isLoading: boolean;
   selectedId: string | null;
   onSelect: (compra: CompraAgil) => void;
+  matchThreshold?: number;
 }
 
 function getDaysRemaining(fechaCierre: string | null): number | null {
@@ -107,7 +108,7 @@ function getEstadoBadge(estado: string | null, diasRestantes: number | null) {
   return <Badge variant="outline">Activa</Badge>;
 }
 
-export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }: ComprasAgilesTableProps) {
+export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect, matchThreshold = 70 }: ComprasAgilesTableProps) {
   const navigate = useNavigate();
   
   // Estado para el modal de productos match
@@ -126,8 +127,8 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect }:
     [compras]
   );
   
-  // Obtener conteos de matches para todas las licitaciones
-  const { data: matchCounts } = useLicitacionMatchCounts(licitacionesParaMatch);
+  // Obtener conteos de matches para todas las licitaciones con el threshold configurado
+  const { data: matchCounts } = useLicitacionMatchCounts(licitacionesParaMatch, matchThreshold);
 
   // Memoizar cálculos para mejor performance
   const { totalCompras, conMatch, progreso } = useMemo(() => {

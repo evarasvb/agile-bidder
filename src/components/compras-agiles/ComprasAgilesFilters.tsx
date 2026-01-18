@@ -3,7 +3,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Filter, DollarSign, HelpCircle, Calendar, CheckCircle2 } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { Filter, DollarSign, HelpCircle, Calendar, CheckCircle2, Percent } from "lucide-react";
 import type { ComprasAgilesFilters as Filters } from "@/hooks/useComprasAgiles";
 import { UMBRAL_COMPRA_AGIL_CLP, formatCurrency } from "@/utils/clasificacion";
 
@@ -56,7 +57,7 @@ export function ComprasAgilesFilters({ filters, onFiltersChange }: ComprasAgiles
           <span className="text-sm font-medium text-foreground">Filtros</span>
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
           {/* Fecha de Cierre */}
           <div className="space-y-1.5">
             <div className="flex items-center gap-1.5">
@@ -196,6 +197,38 @@ export function ComprasAgilesFilters({ filters, onFiltersChange }: ComprasAgiles
                   montoMax: e.target.value ? Number(e.target.value) : undefined 
                 })}
               />
+            </div>
+          </div>
+
+          {/* Umbral de Match */}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <Percent className="h-3 w-3 text-muted-foreground" />
+              <Label className="text-xs text-muted-foreground">Umbral Match</Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">Porcentaje mínimo de similitud para considerar un match válido</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <div className="flex items-center gap-3">
+              <Slider
+                value={[filters.matchThreshold ?? 70]}
+                onValueChange={(value) => onFiltersChange({ 
+                  ...filters, 
+                  matchThreshold: value[0]
+                })}
+                min={0}
+                max={100}
+                step={5}
+                className="flex-1"
+              />
+              <span className="text-sm font-medium text-primary min-w-[40px] text-right">
+                {filters.matchThreshold ?? 70}%
+              </span>
             </div>
           </div>
         </div>
