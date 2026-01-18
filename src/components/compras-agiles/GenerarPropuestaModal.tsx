@@ -5,20 +5,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FileText, Package, Calculator, Check, Loader2, Percent, Info, Download, Edit, CheckCircle2, XCircle, Search, Plus, X, TrendingUp, TrendingDown } from "lucide-react";
+import { FileText, Package, Calculator, Check, Loader2, Percent, Download, Edit, Search, Plus, X, TrendingUp, TrendingDown, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 import { useUpdateCompraAgil } from "@/hooks/useComprasAgiles";
 import { formatCurrency } from "@/utils/clasificacion";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { aplicarRecargoPorRegion, obtenerRecargoRegion } from "@/utils/regiones";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useInventoryActivo } from "@/hooks/useInventory";
 import { useTodoElInventario } from "@/hooks/useCliente";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { descargarCotizacionPDF, type ItemCotizacion, type DatosCotizacion } from "@/services/pdfGenerator";
 
 interface ItemParaPropuesta {
   itemId: string;
@@ -575,9 +574,45 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                if (!compra) return;
+                const itemsPDF: ItemCotizacion[] = itemsActivos.map(item => ({
+                  itemRequerido: item.nombre,
+                  productoOfertado: item.match?.nombre || item.nombre,
+                  sku: item.match?.sku || 'N/A',
+                  cantidad: item.cantidad,
+                  unidad: item.unidadMedida,
+                  precioUnitario: item.precioUnitario,
+                  total: item.precioUnitario * item.cantidad,
+                  matchScore: item.match?.matchScore
+                }));
+                const datosPDF: DatosCotizacion = {
+                  numero: `COT-${Date.now().toString().slice(-8)}`,
+                  fecha: new Date(),
+                  validezDias: 15,
+                  compra: compra,
+                  items: itemsPDF,
+                  empresa: {
+                    nombre: 'FirmaVB',
+                    rut: '76.XXX.XXX-X',
+                    direccion: 'Santiago, Chile',
+                    telefono: '+56 9 XXXX XXXX',
+                    email: 'contacto@firmavb.cl'
+                  }
+                };
+                descargarCotizacionPDF(datosPDF);
+                toast.success('PDF generado correctamente');
+              }}
+              disabled={itemsActivos.length === 0}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Descargar PDF
             </Button>
             <Button 
               onClick={handleGuardarPropuesta}
