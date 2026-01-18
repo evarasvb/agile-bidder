@@ -32,6 +32,7 @@ import PermisosRoles from "./pages/PermisosRoles";
 import Ofertas from "./pages/Ofertas";
 import OfertaDetalle from "./pages/OfertaDetalle";
 import ComprasAgiles from "./pages/ComprasAgiles";
+import CompraAgilDetalle from "./pages/CompraAgilDetalle";
 import OrdenesCompra from "./pages/OrdenesCompra";
 
 const queryClient = new QueryClient();
@@ -78,6 +79,7 @@ const App = () => (
             <Route path="/history" element={<History />} />
             <Route path="/licitaciones" element={<Licitaciones />} />
             <Route path="/compras-agiles" element={<ComprasAgiles />} />
+            <Route path="/compras-agiles/:codigo" element={<CompraAgilDetalle />} />
             <Route path="/ordenes-compra" element={<OrdenesCompra />} />
             <Route path="/ofertas" element={<Ofertas />} />
             <Route path="/ofertas/:id" element={<OfertaDetalle />} />
