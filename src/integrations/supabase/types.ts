@@ -334,6 +334,36 @@ export type Database = {
         }
         Relationships: []
       }
+      evaristo_logs: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          mision_file: string | null
+          result: Json | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          mision_file?: string | null
+          result?: Json | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          mision_file?: string | null
+          result?: Json | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       extension_activity_log: {
         Row: {
           action: string

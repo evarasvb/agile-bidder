@@ -19,9 +19,9 @@ export default function AdminEvaristo() {
         mision_file: 'mision_completa_firmavb.json' 
       });
       if (result.success) {
-        toast.success('✅ Misión programada para ejecución');
+        toast.success(result.message || '✅ Misión completada');
       } else {
-        toast.error(`❌ Error: ${result.error || 'Unknown error'}`);
+        toast.error('❌ Error ejecutando misión');
       }
     } catch (error: any) {
       toast.error(`Error: ${error.message}`);

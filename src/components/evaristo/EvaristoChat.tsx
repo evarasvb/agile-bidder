@@ -18,7 +18,6 @@ interface Message {
   result?: {
     success: boolean;
     output?: string;
-    error?: string;
   };
 }
 
@@ -64,19 +63,16 @@ export function EvaristoChat() {
 
     try {
       if (command.includes('revisar') || command.includes('revisa')) {
-        const result = await revisar.mutateAsync({});
+        const result = await revisar.mutateAsync();
         const evaristoMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: 'evaristo',
-          content: result.success 
-            ? '✅ Revisión completada exitosamente. El proyecto está en buen estado.'
-            : `❌ Error en la revisión (código ${result.exit_code})`,
+          content: result.message,
           timestamp: new Date(),
           type: 'result',
           result: {
             success: result.success,
-            output: result.output,
-            error: result.error,
+            output: result.message,
           },
         };
         setMessages(prev => [...prev, evaristoMessage]);
@@ -89,15 +85,12 @@ export function EvaristoChat() {
         const evaristoMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: 'evaristo',
-          content: result.success
-            ? `✅ Misión "${misionFile}" completada exitosamente.`
-            : `❌ Error ejecutando misión (código ${result.exit_code})`,
+          content: result.message,
           timestamp: new Date(),
           type: 'result',
           result: {
             success: result.success,
-            output: result.output,
-            error: result.error,
+            output: result.message,
           },
         };
         setMessages(prev => [...prev, evaristoMessage]);
@@ -107,15 +100,12 @@ export function EvaristoChat() {
         const evaristoMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: 'evaristo',
-          content: result.success
-            ? '✅ Migraciones aplicadas exitosamente. Base de datos actualizada.'
-            : `❌ Error aplicando migraciones (código ${result.exit_code})`,
+          content: result.message,
           timestamp: new Date(),
           type: 'result',
           result: {
             success: result.success,
-            output: result.output,
-            error: result.error,
+            output: result.message,
           },
         };
         setMessages(prev => [...prev, evaristoMessage]);
@@ -125,15 +115,12 @@ export function EvaristoChat() {
         const evaristoMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: 'evaristo',
-          content: result.success
-            ? '✅ Poderes ampliados ejecutados exitosamente. Evaristo está trabajando a máxima capacidad.'
-            : `❌ Error ejecutando poderes ampliados (código ${result.exit_code})`,
+          content: result.message,
           timestamp: new Date(),
           type: 'result',
           result: {
             success: result.success,
-            output: result.output,
-            error: result.error,
+            output: result.message,
           },
         };
         setMessages(prev => [...prev, evaristoMessage]);
@@ -148,14 +135,6 @@ export function EvaristoChat() {
 🔄 **Aplicar migraciones**: Di "migraciones" o "aplica migraciones"
 ⚡ **Poderes ampliados**: Di "poderes ampliados" para activar todas las capacidades
 ❓ **Preguntas**: Hazme cualquier pregunta sobre el proyecto
-
-**Nuevas Capacidades:**
-- ✅ Aplicar migraciones de Supabase automáticamente
-- ✅ Ejecutar comandos git (status, commit, etc.)
-- ✅ Ejecutar comandos de Supabase CLI
-- ✅ Ejecutar comandos del sistema
-- ✅ Modificar código con IA
-- ✅ Optimizar componentes automáticamente
 
 Ejemplos:
 - "Revisa el proyecto"
@@ -263,7 +242,7 @@ Di "revisar" para una revisión completa, o "mision" para ejecutar una misión.`
                   
                   <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                   
-                  {msg.result?.output && (
+                  {msg.result?.output && msg.result.output !== msg.content && (
                     <details className="mt-2">
                       <summary className="text-xs text-muted-foreground cursor-pointer">
                         Ver detalles
