@@ -76,7 +76,7 @@ export function AppSidebar() {
   const { signOut, user } = useAuth();
   const { hasOdoo } = useClienteConfig();
   const { profile, primaryRole } = useProfile();
-  const { canViewSection, loading: permissionsLoading, isSuperAdmin, isAdmin } = useRolePermissions();
+  const { canViewSection, loading: permissionsLoading, isSuperAdmin, isAdmin, permissions } = useRolePermissions();
   const { data: cliente } = useCliente();
 
   const handleLogout = async () => {
@@ -105,6 +105,31 @@ export function AppSidebar() {
       }]
     : navItems;
 
+  // Secciones básicas que siempre deben mostrarse a usuarios autenticados
+  const basicSections = [
+    'dashboard', 
+    'licitaciones', 
+    'compras_agiles',
+    'ordenes_compra',
+    'ofertas', 
+    'inventory', 
+    'settings'
+  ];
+
+  // Secciones extendidas para usuarios con permisos adicionales
+  const extendedSections = [
+    ...basicSections,
+    'vendedores',
+    'mercadopublico',
+    'bi_dashboard',
+    'bi_advanced',
+    'calendar',
+    'extension',
+    'history',
+    'users',
+    'logs'
+  ];
+
   // Dynamic sidebar based on role (RBAC)
   const filteredNavItems = allNavItems.filter(item => {
     // Evaristo solo para email autorizado
@@ -113,11 +138,6 @@ export function AppSidebar() {
     // Odoo requires separate flag
     if (item.requiresOdoo && !hasOdoo) return false;
     
-    // While loading, show basic items
-    if (permissionsLoading) {
-      return ['dashboard', 'licitaciones', 'ofertas'].includes(item.sectionKey);
-    }
-
     // Evaristo siempre visible para email autorizado
     if (item.sectionKey === 'evaristo' && isEvaristoAuthorized) return true;
 
@@ -127,8 +147,19 @@ export function AppSidebar() {
     // Admin sees most things except role config
     if (isAdmin && item.sectionKey !== 'role_config') return true;
 
-    // Check permission for this section
-    return canViewSection(item.sectionKey);
+    // While loading permissions, show basic items
+    if (permissionsLoading) {
+      return basicSections.includes(item.sectionKey);
+    }
+
+    // Si el usuario tiene permisos configurados, verificar
+    if (permissions.length > 0) {
+      return canViewSection(item.sectionKey);
+    }
+
+    // Fallback: si no hay permisos configurados, mostrar secciones básicas
+    // Esto permite que usuarios nuevos vean el menú principal
+    return basicSections.includes(item.sectionKey);
   });
 
   const userInitials = profile?.full_name
