@@ -140,9 +140,16 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect, m
   }, [compras]);
 
   const handleRowClick = (compra: CompraAgil) => {
-    // Navigate to detail page using codigo (id_licitacion) or id as fallback
+    // DEBUG: Log completo del objeto compra
+    console.log('[ComprasAgilesTable] handleRowClick - compra object:', JSON.stringify(compra, null, 2));
+    console.log('[ComprasAgilesTable] compra.codigo:', compra.codigo);
+    console.log('[ComprasAgilesTable] compra.id:', compra.id);
+    
+    // Navigate to detail page using codigo or id as fallback
     const codigoNavegacion = compra.codigo || compra.id;
-    if (!codigoNavegacion) {
+    console.log('[ComprasAgilesTable] codigoNavegacion:', codigoNavegacion);
+    
+    if (!codigoNavegacion || codigoNavegacion === 'undefined') {
       console.error('Compra sin código para navegación:', compra);
       toast.error('No se puede abrir el detalle: código no disponible');
       return;
