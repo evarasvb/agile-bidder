@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useCompraAgilByCodigo } from "@/hooks/useComprasAgiles";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,7 +20,8 @@ import {
   CheckCircle2,
   ShoppingCart,
   Copy,
-  List
+  List,
+  Send
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -29,11 +30,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { format, parseISO, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { formatCurrency, clasificarProceso, montoEnUTM } from "@/utils/clasificacion";
 import { cn } from "@/lib/utils";
+import { ItemsMatchTable } from "@/components/compras-agiles/ItemsMatchTable";
+import { useLicitacionItems } from "@/hooks/useLicitacionItems";
 
 interface ProductoMatch {
   id: string;
@@ -176,9 +180,14 @@ export default function CompraAgilDetalle() {
   const { codigo } = useParams<{ codigo: string }>();
   const navigate = useNavigate();
   const [isFavorite, setIsFavorite] = useState(false);
+  const [isOfertaValid, setIsOfertaValid] = useState(false);
+  const [isSendingOferta, setIsSendingOferta] = useState(false);
 
   // Fetch compra agil details usando el hook actualizado
   const { data: compra, isLoading, error } = useCompraAgilByCodigo(codigo);
+  
+  // Fetch licitacion items from DB
+  const { data: licitacionItems } = useLicitacionItems(compra?.id || null);
 
   // Extract items from datos_json or descripcion
   const items = useMemo<ItemCompra[]>(() => {
@@ -252,6 +261,56 @@ export default function CompraAgilDetalle() {
   const handleGenerarOferta = () => {
     toast.info('Funcionalidad de generar oferta en desarrollo');
   };
+
+  // Handler para enviar oferta desde ItemsMatchTable
+  const handleEnviarOferta = useCallback(async (
+    items: Array<{ id: number; requerimiento: string; cantidad: number; precioUnitario: number; matchScore: number }>,
+    totals: { neto: number; iva: number; total: number }
+  ) => {
+    if (!compra) return;
+    
+    setIsSendingOferta(true);
+    try {
+      // Preparar datos de la oferta
+      const ofertaData = {
+        licitacion_id: compra.id,
+        productos_ofertados: items.map(item => ({
+          item_id: item.id,
+          requerimiento: item.requerimiento,
+          cantidad: item.cantidad,
+          precio_unitario: item.precioUnitario,
+          subtotal: item.cantidad * item.precioUnitario,
+          match_score: item.matchScore
+        })),
+        valor_total_oferta: totals.total,
+        margen_total: 0, // Calcular si es necesario
+        estado: 'borrador',
+        match_score: items.reduce((sum, i) => sum + i.matchScore, 0) / items.length
+      };
+
+      const { data, error } = await supabase
+        .from('ofertas')
+        .insert(ofertaData)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success('¡Oferta enviada correctamente!', {
+        description: `Total: ${new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(totals.total)}`
+      });
+      
+      // Opcionalmente navegar a la oferta creada
+      // navigate(`/ofertas/${data.id}`);
+    } catch (err) {
+      console.error('Error al enviar oferta:', err);
+      toast.error('Error al enviar la oferta', {
+        description: 'Por favor intenta nuevamente'
+      });
+    } finally {
+      setIsSendingOferta(false);
+    }
+  }, [compra]);
 
   const toggleFavorite = () => {
     setIsFavorite(!isFavorite);
@@ -523,7 +582,7 @@ export default function CompraAgilDetalle() {
             </CardContent>
           </Card>
 
-          {/* Items Table - PRODUCTOS SOLICITADOS */}
+          {/* Items Table - PRODUCTOS SOLICITADOS con Tabs */}
           <Card className="border-firmavb-blue/10">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -531,76 +590,110 @@ export default function CompraAgilDetalle() {
                 Productos Solicitados
               </CardTitle>
               <CardDescription>
-                {items.length > 0 
-                  ? `${items.length} producto${items.length > 1 ? 's' : ''} en esta compra`
+                {(licitacionItems?.length || items.length) > 0 
+                  ? `${licitacionItems?.length || items.length} producto${(licitacionItems?.length || items.length) > 1 ? 's' : ''} en esta compra`
                   : 'No hay información detallada de productos'
                 }
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
-              {items.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="font-semibold w-12">#</TableHead>
-                      <TableHead className="font-semibold w-[100px]">Código</TableHead>
-                      <TableHead className="font-semibold">Producto / Descripción</TableHead>
-                      <TableHead className="font-semibold text-center w-[80px]">Cant.</TableHead>
-                      <TableHead className="font-semibold w-[100px]">Unidad</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {items.map((item, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {item.codigo || '-'}
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <p className="font-medium">{item.nombre || 'Sin nombre'}</p>
-                            {item.descripcion && item.descripcion !== item.nombre && (
-                              <p className="text-xs text-muted-foreground line-clamp-2">
-                                {item.descripcion}
-                              </p>
-                            )}
-                            {item.especificacion && (
-                              <p className="text-xs text-muted-foreground line-clamp-2">
-                                {item.especificacion}
-                              </p>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center font-semibold">
-                          {item.cantidad || 1}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {item.unidad || 'Unidad'}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="p-6 text-center text-muted-foreground">
-                  <Package className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                  <p>No hay información detallada de productos disponible.</p>
-                  <p className="text-sm mt-1">Los detalles pueden estar en la descripción o en MercadoPúblico.</p>
-                  {compra.link_oficial && (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="mt-3"
-                      asChild
-                    >
-                      <a href={compra.link_oficial} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Ver en MercadoPúblico
-                      </a>
-                    </Button>
-                  )}
+              <Tabs defaultValue="oferta" className="w-full">
+                <div className="px-6 pt-2">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="oferta" className="gap-2">
+                      <Send className="h-4 w-4" />
+                      Preparar Oferta
+                    </TabsTrigger>
+                    <TabsTrigger value="detalle" className="gap-2">
+                      <List className="h-4 w-4" />
+                      Vista Detalle
+                    </TabsTrigger>
+                  </TabsList>
                 </div>
-              )}
+
+                {/* Tab: Preparar Oferta con ItemsMatchTable */}
+                <TabsContent value="oferta" className="p-6 pt-4">
+                  {compra?.id ? (
+                    <ItemsMatchTable
+                      licitacionId={compra.id}
+                      onSubmit={handleEnviarOferta}
+                      onValidationChange={setIsOfertaValid}
+                    />
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <AlertCircle className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                      <p>No se puede cargar la tabla de items</p>
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* Tab: Vista Detalle Original */}
+                <TabsContent value="detalle" className="mt-0">
+                  {items.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead className="font-semibold w-12">#</TableHead>
+                          <TableHead className="font-semibold w-[100px]">Código</TableHead>
+                          <TableHead className="font-semibold">Producto / Descripción</TableHead>
+                          <TableHead className="font-semibold text-center w-[80px]">Cant.</TableHead>
+                          <TableHead className="font-semibold w-[100px]">Unidad</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {items.map((item, index) => (
+                          <TableRow key={index}>
+                            <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {item.codigo || '-'}
+                            </TableCell>
+                            <TableCell>
+                              <div className="space-y-1">
+                                <p className="font-medium">{item.nombre || 'Sin nombre'}</p>
+                                {item.descripcion && item.descripcion !== item.nombre && (
+                                  <p className="text-xs text-muted-foreground line-clamp-2">
+                                    {item.descripcion}
+                                  </p>
+                                )}
+                                {item.especificacion && (
+                                  <p className="text-xs text-muted-foreground line-clamp-2">
+                                    {item.especificacion}
+                                  </p>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center font-semibold">
+                              {item.cantidad || 1}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm">
+                              {item.unidad || 'Unidad'}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="p-6 text-center text-muted-foreground">
+                      <Package className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                      <p>No hay información detallada de productos disponible.</p>
+                      <p className="text-sm mt-1">Los detalles pueden estar en la descripción o en MercadoPúblico.</p>
+                      {compra.link_oficial && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="mt-3"
+                          asChild
+                        >
+                          <a href={compra.link_oficial} target="_blank" rel="noopener noreferrer">
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            Ver en MercadoPúblico
+                          </a>
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
         </div>
