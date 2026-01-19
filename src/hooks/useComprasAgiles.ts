@@ -88,24 +88,34 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
         throw error;
       }
 
-      // Mapear campos de licitaciones a interfaz CompraAgil
-      const compras = (data || []).map((licitacion: LicitacionRow): CompraAgil => {
+      // Debug: ver estructura real de datos
+      if (data && data.length > 0) {
+        console.log('[useComprasAgiles] Sample row keys:', Object.keys(data[0]));
+        console.log('[useComprasAgiles] Sample row:', data[0]);
+      }
+
+      // Mapear campos - manejar diferentes schemas (licitaciones vs compras_agiles)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const compras = (data || []).map((row: any): CompraAgil => {
+        // El campo código puede venir como id_licitacion (tabla licitaciones) o codigo (tabla compras_agiles)
+        const codigo = row.id_licitacion || row.codigo || row.id || '';
+        
         return {
-          id: licitacion.id_licitacion, // Usar id_licitacion como id
-          codigo: licitacion.id_licitacion,
-          nombre: licitacion.titulo,
-          organismo: licitacion.organismo,
-          monto: licitacion.presupuesto,
-          fecha_cierre: licitacion.fecha_cierre,
-          estado: licitacion.estado,
-          region: null, // No existe en licitaciones
-          descripcion: null, // No existe en licitaciones
-          link_oficial: licitacion.link_oficial,
-          match_encontrado: licitacion.match_encontrado ?? false,
-          match_score: licitacion.match_score,
-          datos_json: null, // No existe en licitaciones
-          created_at: licitacion.created_at,
-          updated_at: licitacion.created_at, // Usar created_at como fallback
+          id: codigo,
+          codigo: codigo,
+          nombre: row.titulo || row.nombre || 'Sin título',
+          organismo: row.organismo || 'Sin organismo',
+          monto: row.presupuesto || row.monto || null,
+          fecha_cierre: row.fecha_cierre || null,
+          estado: row.estado || null,
+          region: row.region || null,
+          descripcion: row.descripcion || null,
+          link_oficial: row.link_oficial || null,
+          match_encontrado: row.match_encontrado ?? false,
+          match_score: row.match_score ?? null,
+          datos_json: row.datos_json || null,
+          created_at: row.created_at || new Date().toISOString(),
+          updated_at: row.updated_at || row.created_at || new Date().toISOString(),
         };
       });
       
@@ -131,22 +141,26 @@ export function useCompraAgil(id: string | null) {
       if (error) throw error;
       if (!data) return null;
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const row = data as any;
+      const codigo = row.id_licitacion || row.codigo || row.id || '';
+
       return {
-        id: data.id_licitacion,
-        codigo: data.id_licitacion,
-        nombre: data.titulo,
-        organismo: data.organismo,
-        monto: data.presupuesto,
-        fecha_cierre: data.fecha_cierre,
-        estado: data.estado,
-        region: null,
-        descripcion: null,
-        link_oficial: data.link_oficial,
-        match_encontrado: data.match_encontrado ?? false,
-        match_score: data.match_score,
-        datos_json: null,
-        created_at: data.created_at,
-        updated_at: data.created_at,
+        id: codigo,
+        codigo: codigo,
+        nombre: row.titulo || row.nombre || 'Sin título',
+        organismo: row.organismo || 'Sin organismo',
+        monto: row.presupuesto || row.monto || null,
+        fecha_cierre: row.fecha_cierre || null,
+        estado: row.estado || null,
+        region: row.region || null,
+        descripcion: row.descripcion || null,
+        link_oficial: row.link_oficial || null,
+        match_encontrado: row.match_encontrado ?? false,
+        match_score: row.match_score ?? null,
+        datos_json: row.datos_json || null,
+        created_at: row.created_at || new Date().toISOString(),
+        updated_at: row.updated_at || row.created_at || new Date().toISOString(),
       };
     },
     enabled: !!id,
@@ -169,28 +183,31 @@ export function useCompraAgilByCodigo(codigo: string | undefined) {
       if (error) throw error;
       if (!data) return null;
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const row = data as any;
+      const codigoValue = row.id_licitacion || row.codigo || row.id || '';
+
       return {
-        id: data.id_licitacion,
-        codigo: data.id_licitacion,
-        nombre: data.titulo,
-        organismo: data.organismo,
-        monto: data.presupuesto,
-        fecha_cierre: data.fecha_cierre,
-        estado: data.estado,
-        region: null,
-        descripcion: null,
-        link_oficial: data.link_oficial,
-        match_encontrado: data.match_encontrado ?? false,
-        match_score: data.match_score,
-        datos_json: null,
-        created_at: data.created_at,
-        updated_at: data.created_at,
+        id: codigoValue,
+        codigo: codigoValue,
+        nombre: row.titulo || row.nombre || 'Sin título',
+        organismo: row.organismo || 'Sin organismo',
+        monto: row.presupuesto || row.monto || null,
+        fecha_cierre: row.fecha_cierre || null,
+        estado: row.estado || null,
+        region: row.region || null,
+        descripcion: row.descripcion || null,
+        link_oficial: row.link_oficial || null,
+        match_encontrado: row.match_encontrado ?? false,
+        match_score: row.match_score ?? null,
+        datos_json: row.datos_json || null,
+        created_at: row.created_at || new Date().toISOString(),
+        updated_at: row.updated_at || row.created_at || new Date().toISOString(),
       };
     },
     enabled: !!codigo,
   });
 }
-
 export function useUpdateCompraAgil() {
   const queryClient = useQueryClient();
 
