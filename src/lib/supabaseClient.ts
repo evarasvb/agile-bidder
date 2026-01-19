@@ -10,5 +10,6 @@ export const supabaseClient = createClient<Database>(SUPABASE_URL, SUPABASE_ANON
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+    storageKey: 'firmavb-auth-token',
   }
 });
