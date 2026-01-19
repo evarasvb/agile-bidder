@@ -1,7 +1,6 @@
-// Hook para interactuar con Evaristo API
+// Hook para interactuar con Evaristo API - Using FirmaVB Supabase only
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { supabaseClient as firmavbSupabase } from '@/lib/supabaseClient';
+import { supabaseClient } from '@/lib/supabaseClient';
 
 interface EvaristoStatus {
   status: string;
@@ -20,64 +19,39 @@ interface EvaristoResponse {
   timestamp: string;
 }
 
-// Get the Lovable Cloud Supabase URL for edge functions
-const LOVABLE_CLOUD_URL = 'https://euzqadopjvdszcdjegmo.supabase.co';
-const LOVABLE_CLOUD_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV1enFhZG9wanZkc3pjZGplZ21vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc4ODkwNTAsImV4cCI6MjA4MzQ2NTA1MH0.xCowDYXij0nMYO0YNIizOX6PnbBWPVtzS-ypDuVKk-o';
+// FirmaVB Supabase configuration
+const FIRMAVB_URL = 'https://juiskeeutbaipwbeeezw.supabase.co';
+const FIRMAVB_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1aXNrZWV1dGJhaXB3YmVlZXp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc3NzQ4MzYsImV4cCI6MjA2MzM1MDgzNn0.EvUfaVNiDhJqPqHnxBjS_xJxKBJMqTpIn38ILAfv-TI';
 
-// Helper to get user email from either auth source
-async function getUserEmail(): Promise<string | null> {
-  // Try Lovable Cloud first
-  const { data: { session: cloudSession } } = await supabase.auth.getSession();
-  if (cloudSession?.user?.email) {
-    return cloudSession.user.email;
-  }
-  
-  // Try FirmaVB Supabase
-  const { data: { session: firmavbSession } } = await firmavbSupabase.auth.getSession();
-  if (firmavbSession?.user?.email) {
-    return firmavbSession.user.email;
-  }
-  
-  return null;
-}
-
-// Helper to get auth token - prefer Lovable Cloud, fall back to FirmaVB
-async function getAuthToken(): Promise<string | null> {
-  // Try Lovable Cloud first
-  const { data: { session: cloudSession } } = await supabase.auth.getSession();
-  if (cloudSession?.access_token) {
-    return cloudSession.access_token;
-  }
-  
-  // Fall back to FirmaVB session token
-  const { data: { session: firmavbSession } } = await firmavbSupabase.auth.getSession();
-  return firmavbSession?.access_token || null;
+// Helper to get session from FirmaVB Supabase
+async function getSession() {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  return session;
 }
 
 export function useEvaristoStatus() {
   return useQuery({
     queryKey: ['evaristo', 'status'],
     queryFn: async (): Promise<EvaristoStatus> => {
-      const token = await getAuthToken();
-      const userEmail = await getUserEmail();
+      const session = await getSession();
       
-      if (!token) {
+      if (!session) {
         throw new Error('No session - Inicia sesión para acceder a Evaristo');
       }
 
-      // Verificar email autorizado (client-side check for UX)
-      if (userEmail?.toLowerCase() !== 'evaras@firmavb.cl') {
+      // Verificar email autorizado
+      if (session.user.email?.toLowerCase() !== 'evaras@firmavb.cl') {
         throw new Error('Unauthorized: Solo el administrador autorizado puede acceder');
       }
 
       const response = await fetch(
-        `${LOVABLE_CLOUD_URL}/functions/v1/evaristo-api`,
+        `${FIRMAVB_URL}/functions/v1/evaristo-api`,
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${token}`,
+            'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
-            'apikey': LOVABLE_CLOUD_ANON_KEY,
+            'apikey': FIRMAVB_ANON_KEY,
           },
           body: JSON.stringify({ action: 'status' }),
         }
@@ -97,26 +71,25 @@ export function useEvaristoStatus() {
 export function useEvaristoRevisar() {
   return useMutation({
     mutationFn: async (apiKeys?: { gemini?: string; deepseek?: string }): Promise<EvaristoResponse> => {
-      const token = await getAuthToken();
-      const userEmail = await getUserEmail();
+      const session = await getSession();
       
-      if (!token) {
+      if (!session) {
         throw new Error('No session - Inicia sesión para acceder a Evaristo');
       }
 
-      // Verificar email autorizado (client-side check for UX)
-      if (userEmail?.toLowerCase() !== 'evaras@firmavb.cl') {
+      // Verificar email autorizado
+      if (session.user.email?.toLowerCase() !== 'evaras@firmavb.cl') {
         throw new Error('Unauthorized: Solo el administrador autorizado puede acceder');
       }
 
       const response = await fetch(
-        `${LOVABLE_CLOUD_URL}/functions/v1/evaristo-api`,
+        `${FIRMAVB_URL}/functions/v1/evaristo-api`,
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${token}`,
+            'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
-            'apikey': LOVABLE_CLOUD_ANON_KEY,
+            'apikey': FIRMAVB_ANON_KEY,
           },
           body: JSON.stringify({ 
             action: 'revisar',
@@ -144,26 +117,25 @@ export function useEvaristoMision() {
       mision_file: string; 
       api_keys?: { gemini?: string; deepseek?: string } 
     }): Promise<EvaristoResponse> => {
-      const token = await getAuthToken();
-      const userEmail = await getUserEmail();
+      const session = await getSession();
       
-      if (!token) {
+      if (!session) {
         throw new Error('No session - Inicia sesión para acceder a Evaristo');
       }
 
-      // Verificar email autorizado (client-side check for UX)
-      if (userEmail?.toLowerCase() !== 'evaras@firmavb.cl') {
+      // Verificar email autorizado
+      if (session.user.email?.toLowerCase() !== 'evaras@firmavb.cl') {
         throw new Error('Unauthorized: Solo el administrador autorizado puede acceder');
       }
 
       const response = await fetch(
-        `${LOVABLE_CLOUD_URL}/functions/v1/evaristo-api`,
+        `${FIRMAVB_URL}/functions/v1/evaristo-api`,
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${token}`,
+            'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
-            'apikey': LOVABLE_CLOUD_ANON_KEY,
+            'apikey': FIRMAVB_ANON_KEY,
           },
           body: JSON.stringify({ 
             action: 'mision',
