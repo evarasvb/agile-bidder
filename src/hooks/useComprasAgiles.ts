@@ -96,9 +96,19 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
 
       // Mapear campos - manejar diferentes schemas (licitaciones vs compras_agiles)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const compras = (data || []).map((row: any): CompraAgil => {
+      const compras = (data || []).map((row: any, index: number): CompraAgil => {
         // La tabla licitaciones usa 'id_licitacion', compras_agiles usa 'codigo'
         const codigo = row.id_licitacion || row.codigo || row.id || '';
+        
+        // DEBUG: Log primeros 3 registros para verificar mapeo
+        if (index < 3) {
+          console.log(`[useComprasAgiles] Row ${index}:`, { 
+            id_licitacion: row.id_licitacion, 
+            codigo: row.codigo, 
+            id: row.id,
+            mapped_codigo: codigo 
+          });
+        }
         
         return {
           id: codigo,
