@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { format, differenceInDays, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { ShoppingCart, Clock, MapPin, Building2, CheckCircle2, AlertTriangle, ExternalLink, Package, Boxes } from "lucide-react";
+import { toast } from "sonner";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 import { clasificarProceso, montoEnUTM, formatCurrency } from "@/utils/clasificacion";
 import { cn } from "@/lib/utils";
@@ -139,8 +140,14 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect, m
   }, [compras]);
 
   const handleRowClick = (compra: CompraAgil) => {
-    // Navigate to detail page
-    navigate(`/compras-agiles/${compra.codigo}`);
+    // Navigate to detail page using codigo (id_licitacion) or id as fallback
+    const codigoNavegacion = compra.codigo || compra.id;
+    if (!codigoNavegacion) {
+      console.error('Compra sin código para navegación:', compra);
+      toast.error('No se puede abrir el detalle: código no disponible');
+      return;
+    }
+    navigate(`/compras-agiles/${codigoNavegacion}`);
   };
   
   const handleMatchClick = (e: React.MouseEvent, compra: CompraAgil) => {
@@ -253,7 +260,7 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect, m
                     {/* Código */}
                     <TableCell className="font-mono text-sm font-medium text-primary">
                       <div className="flex items-center gap-1">
-                        {compra.codigo}
+                        {compra.codigo || compra.id || 'Sin código'}
                         <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity" />
                       </div>
                     </TableCell>
