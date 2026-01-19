@@ -97,8 +97,8 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
       // Mapear campos - manejar diferentes schemas (licitaciones vs compras_agiles)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const compras = (data || []).map((row: any): CompraAgil => {
-        // FirmaVB usa 'codigo', Lovable Cloud usa 'id_licitacion'
-        const codigo = row.codigo || row.id_licitacion || row.id || '';
+        // La tabla licitaciones usa 'id_licitacion', compras_agiles usa 'codigo'
+        const codigo = row.id_licitacion || row.codigo || row.id || '';
         
         return {
           id: codigo,
