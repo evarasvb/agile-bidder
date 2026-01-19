@@ -5,7 +5,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { supabaseClient as supabase } from '@/lib/supabaseClient';
 import type { InventoryItem } from './useInventory';
 
 export interface ProductMatch {
