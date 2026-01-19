@@ -34,6 +34,7 @@ import OfertaDetalle from "./pages/OfertaDetalle";
 import ComprasAgiles from "./pages/ComprasAgiles";
 import CompraAgilDetalle from "./pages/CompraAgilDetalle";
 import OrdenesCompra from "./pages/OrdenesCompra";
+import AuthCallback from "./pages/AuthCallback";
 
 const queryClient = new QueryClient();
 
@@ -56,6 +57,7 @@ const App = () => (
         <Routes>
           {/* Public routes */}
           <Route path="/" element={<Index />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/auth" element={<Auth />} />
           
           {/* Redirect old cliente routes to dashboard */}
