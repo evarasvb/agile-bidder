@@ -35,6 +35,7 @@ import ComprasAgiles from "./pages/ComprasAgiles";
 import CompraAgilDetalle from "./pages/CompraAgilDetalle";
 import OrdenesCompra from "./pages/OrdenesCompra";
 import AuthCallback from "./pages/AuthCallback";
+import Billing from "./pages/Billing";
 
 const queryClient = new QueryClient();
 
@@ -90,6 +91,7 @@ const App = () => (
             <Route path="/bi-dashboard" element={<BIDashboard />} />
             <Route path="/bi-advanced" element={<BIAdvanced />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/billing" element={<Billing />} />
             <Route path="/extension" element={<ExtensionConfig />} />
             <Route path="/logs" element={<Logs />} />
             <Route path="/users" element={<Users />} />

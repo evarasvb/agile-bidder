@@ -334,6 +334,54 @@ export type Database = {
         }
         Relationships: []
       }
+      empresas_billing: {
+        Row: {
+          comision_porcentaje: number
+          created_at: string
+          direccion_facturacion: string | null
+          email_facturacion: string | null
+          id: string
+          nombre_empresa: string | null
+          plan: string
+          rut_empresa: string | null
+          tarjeta_expiracion: string | null
+          tarjeta_marca: string | null
+          tarjeta_ultimos_4: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          comision_porcentaje?: number
+          created_at?: string
+          direccion_facturacion?: string | null
+          email_facturacion?: string | null
+          id?: string
+          nombre_empresa?: string | null
+          plan?: string
+          rut_empresa?: string | null
+          tarjeta_expiracion?: string | null
+          tarjeta_marca?: string | null
+          tarjeta_ultimos_4?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          comision_porcentaje?: number
+          created_at?: string
+          direccion_facturacion?: string | null
+          email_facturacion?: string | null
+          id?: string
+          nombre_empresa?: string | null
+          plan?: string
+          rut_empresa?: string | null
+          tarjeta_expiracion?: string | null
+          tarjeta_marca?: string | null
+          tarjeta_ultimos_4?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       evaristo_logs: {
         Row: {
           action: string
@@ -458,6 +506,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      facturas_comision: {
+        Row: {
+          created_at: string
+          documento_url: string | null
+          estado: string
+          fecha_emision: string
+          fecha_pago: string | null
+          fecha_vencimiento: string | null
+          id: string
+          metodo_pago: string | null
+          numero_factura: string
+          periodo: string
+          total_comision: number
+          total_ventas: number
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          documento_url?: string | null
+          estado?: string
+          fecha_emision?: string
+          fecha_pago?: string | null
+          fecha_vencimiento?: string | null
+          id?: string
+          metodo_pago?: string | null
+          numero_factura: string
+          periodo: string
+          total_comision?: number
+          total_ventas?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          documento_url?: string | null
+          estado?: string
+          fecha_emision?: string
+          fecha_pago?: string | null
+          fecha_vencimiento?: string | null
+          id?: string
+          metodo_pago?: string | null
+          numero_factura?: string
+          periodo?: string
+          total_comision?: number
+          total_ventas?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
       }
       import_history: {
         Row: {
@@ -1719,6 +1818,59 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      ventas_comisionables: {
+        Row: {
+          codigo_oc: string
+          comision_monto: number | null
+          comision_porcentaje: number
+          comprador: string | null
+          created_at: string
+          fecha_aceptacion: string | null
+          id: string
+          monto_neto: number
+          orden_compra_id: string | null
+          periodo: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          codigo_oc: string
+          comision_monto?: number | null
+          comision_porcentaje?: number
+          comprador?: string | null
+          created_at?: string
+          fecha_aceptacion?: string | null
+          id?: string
+          monto_neto?: number
+          orden_compra_id?: string | null
+          periodo: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          codigo_oc?: string
+          comision_monto?: number | null
+          comision_porcentaje?: number
+          comprador?: string | null
+          created_at?: string
+          fecha_aceptacion?: string | null
+          id?: string
+          monto_neto?: number
+          orden_compra_id?: string | null
+          periodo?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ventas_comisionables_orden_compra_id_fkey"
+            columns: ["orden_compra_id"]
+            isOneToOne: false
+            referencedRelation: "ordenes_compra"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

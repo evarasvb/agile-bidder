@@ -7,7 +7,8 @@ import {
   Zap,
   Target,
   Send,
-  Bot
+  Bot,
+  CreditCard
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,7 @@ const navItems = [
   { title: "Inventario", url: "/inventory", icon: Package },
   { title: "Oportunidades", url: "/opportunities", icon: Target },
   { title: "Mis Ofertas", url: "/my-bids", icon: Send },
+  { title: "Facturación", url: "/billing", icon: CreditCard },
   { title: "Configuración", url: "/settings", icon: Settings },
   { title: "Evaristo", url: "/admin/evaristo", icon: Bot },
 ];
