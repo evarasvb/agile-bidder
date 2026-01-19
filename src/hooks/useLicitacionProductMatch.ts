@@ -1,6 +1,7 @@
 /**
  * Hook para matching de productos de licitación con inventario
  * Usa fuzzy matching inteligente con marcas y categorías
+ * Usa cliente_inventario como fuente de datos
  */
 
 import { useQuery } from '@tanstack/react-query';
@@ -84,12 +85,10 @@ function calculateSimilarity(text1: string, text2: string): number {
   if (words1.size === 0 || words2.size === 0) return 0;
   
   let matchCount = 0;
-  const matchedTerms: string[] = [];
   
   words1.forEach(word => {
     if (words2.has(word)) {
       matchCount++;
-      matchedTerms.push(word);
     }
   });
   
@@ -126,6 +125,41 @@ function findProductTypeMatch(text1: string, text2: string): string | null {
     }
   }
   return null;
+}
+
+/**
+ * Helper to get current user's cliente_id
+ */
+async function getClienteId(): Promise<string | null> {
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) return null;
+  return user.id;
+}
+
+/**
+ * Map database row to InventoryItem
+ */
+function mapRowToInventoryItem(row: any): InventoryItem {
+  return {
+    id: row.id,
+    sku: row.sku,
+    nombre_producto: row.nombre,
+    descripcion: row.descripcion,
+    categoria: row.categoria,
+    keywords: row.palabras_clave,
+    precio_unitario: row.precio_unitario,
+    margen_minimo: row.margen_minimo,
+    margen_objetivo: row.margen_minimo, // Use same value as fallback
+    stock_disponible: row.stock,
+    unidad_medida: 'unidad', // Default
+    tiempo_entrega_dias: row.tiempo_entrega_dias,
+    proveedor: null, // Not in table
+    activo: row.activo,
+    imagen_url: row.imagen_url,
+    cliente_id: row.cliente_id,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
 }
 
 /**
@@ -200,6 +234,7 @@ export interface DirectMatchResult {
 /**
  * Hook para obtener matches de productos para una licitación
  * MEJORADO: Hace matching directo por título de licitación contra inventario
+ * Usa cliente_inventario como fuente de datos
  */
 export function useLicitacionProductMatch(licitacionId: string | null, licitacionTitulo?: string) {
   return useQuery({
@@ -207,17 +242,52 @@ export function useLicitacionProductMatch(licitacionId: string | null, licitacio
     queryFn: async (): Promise<LicitacionMatchResult | null> => {
       if (!licitacionId) return null;
       
-      // Obtener inventario activo de Lovable Cloud
-      const { data: inventory, error: invError } = await supabase
-        .from('inventory')
-        .select('*')
-        .eq('activo', true);
-      
-      if (invError) throw invError;
-      if (!inventory || inventory.length === 0) {
+      const clienteId = await getClienteId();
+      if (!clienteId) {
+        console.log('[useLicitacionProductMatch] No authenticated user');
         return {
           licitacionId,
-          totalItems: 1, // Contamos el título como 1 item
+          totalItems: 1,
+          matchedItems: 0,
+          matches: []
+        };
+      }
+      
+      // Fetch inventory from cliente_inventario with pagination
+      const allInventory: InventoryItem[] = [];
+      const pageSize = 1000;
+      let page = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        const from = page * pageSize;
+        const to = from + pageSize - 1;
+
+        const { data, error } = await supabase
+          .from('cliente_inventario')
+          .select('*')
+          .eq('cliente_id', clienteId)
+          .eq('activo', true)
+          .range(from, to);
+
+        if (error) {
+          console.error('[useLicitacionProductMatch] Error:', error);
+          throw error;
+        }
+
+        if (data && data.length > 0) {
+          allInventory.push(...data.map(mapRowToInventoryItem));
+          hasMore = data.length === pageSize;
+          page++;
+        } else {
+          hasMore = false;
+        }
+      }
+      
+      if (allInventory.length === 0) {
+        return {
+          licitacionId,
+          totalItems: 1,
           matchedItems: 0,
           matches: []
         };
@@ -236,7 +306,7 @@ export function useLicitacionProductMatch(licitacionId: string | null, licitacio
       };
       
       // Buscar matches en el inventario
-      for (const invItem of inventory) {
+      for (const invItem of allInventory) {
         const inventoryText = `${invItem.nombre_producto} ${invItem.descripcion || ''} ${(invItem.keywords || []).join(' ')}`;
         const matchedTerms: string[] = [];
         let score = 0;
@@ -281,7 +351,7 @@ export function useLicitacionProductMatch(licitacionId: string | null, licitacio
         // Umbral mínimo de 25 para considerar como match
         if (score >= 25) {
           matches.push({
-            inventoryItem: invItem as InventoryItem,
+            inventoryItem: invItem,
             licitacionItem: virtualItem,
             score: Math.min(score, 100),
             matchedTerms
@@ -346,8 +416,7 @@ function calculateMatchScoreSimple(
 
 /**
  * Hook para obtener conteo rápido de matches para múltiples licitaciones
- * SIEMPRE hace matching directo por título/descripción de la licitación contra inventario
- * ya que los datos de items no están disponibles en la tabla licitacion_items
+ * Usa cliente_inventario como fuente de datos
  * @param licitaciones Lista de licitaciones a evaluar
  * @param threshold Umbral mínimo de score (0-100) para considerar un match. Default: 70
  */
@@ -357,34 +426,62 @@ export function useLicitacionMatchCounts(licitaciones: LicitacionBasic[], thresh
     queryFn: async (): Promise<Map<string, number>> => {
       if (licitaciones.length === 0) return new Map();
       
-      // Obtener inventario activo de Lovable Cloud
-      const { data: inventory, error: invError } = await supabase
-        .from('inventory')
-        .select('id, nombre_producto, descripcion, keywords, activo')
-        .eq('activo', true);
+      const clienteId = await getClienteId();
+      if (!clienteId) {
+        console.log('[useLicitacionMatchCounts] No authenticated user');
+        const matchCounts = new Map<string, number>();
+        licitaciones.forEach(l => matchCounts.set(l.id, 0));
+        return matchCounts;
+      }
       
-      if (invError) {
-        console.error('Error fetching inventory:', invError);
-        throw invError;
+      // Fetch inventory from cliente_inventario with pagination
+      const allInventory: any[] = [];
+      const pageSize = 1000;
+      let page = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        const from = page * pageSize;
+        const to = from + pageSize - 1;
+
+        const { data, error } = await supabase
+          .from('cliente_inventario')
+          .select('id, nombre, descripcion, palabras_clave, activo')
+          .eq('cliente_id', clienteId)
+          .eq('activo', true)
+          .range(from, to);
+
+        if (error) {
+          console.error('[useLicitacionMatchCounts] Error:', error);
+          throw error;
+        }
+
+        if (data && data.length > 0) {
+          allInventory.push(...data);
+          hasMore = data.length === pageSize;
+          page++;
+        } else {
+          hasMore = false;
+        }
       }
       
       const matchCounts = new Map<string, number>();
       
-      if (!inventory || inventory.length === 0) {
+      if (allInventory.length === 0) {
         // Sin inventario, todos los conteos son 0
         licitaciones.forEach(l => matchCounts.set(l.id, 0));
         return matchCounts;
       }
       
-      console.log(`Matching ${licitaciones.length} licitaciones contra ${inventory.length} productos del inventario (threshold: ${threshold}%)`);
+      console.log(`Matching ${licitaciones.length} licitaciones contra ${allInventory.length} productos del inventario (threshold: ${threshold}%)`);
       
       // Calcular matches para cada licitación por título/descripción
       for (const licitacion of licitaciones) {
         const licitacionText = `${licitacion.titulo} ${licitacion.descripcion || ''}`;
         let matchCount = 0;
         
-        for (const invItem of inventory) {
-          const inventoryText = `${invItem.nombre_producto} ${invItem.descripcion || ''} ${(invItem.keywords || []).join(' ')}`;
+        for (const invItem of allInventory) {
+          const inventoryText = `${invItem.nombre} ${invItem.descripcion || ''} ${(invItem.palabras_clave || []).join(' ')}`;
           
           // Calcular score y comparar con threshold
           const score = calculateMatchScoreSimple(licitacionText, inventoryText);

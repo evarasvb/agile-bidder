@@ -44,8 +44,8 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
   return useMutation({
     mutationFn: async (products: BulkProductRow[]): Promise<BulkImportResult> => {
       const errors: ValidationError[] = [];
-      const toInsert: InventoryInput[] = [];
-      const toUpdate: { id: string; data: Partial<InventoryInput> }[] = [];
+      const toInsert: any[] = [];
+      const toUpdate: { id: string; data: any }[] = [];
 
       onProgress?.({ current: 0, total: products.length, phase: 'validating', message: 'Obteniendo usuario autenticado...' });
 
@@ -55,21 +55,41 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
         throw new Error('Debes iniciar sesión para importar productos');
       }
 
-      const userId = user.id;
+      const clienteId = user.id;
 
       onProgress?.({ current: 0, total: products.length, phase: 'validating', message: 'Validando productos...' });
 
-      const { data: existingProducts, error: fetchError } = await supabase
-        .from('inventory')
-        .select('id, sku')
-        .eq('user_id', userId);
+      // Fetch existing products from cliente_inventario
+      const allExisting: any[] = [];
+      const pageSize = 1000;
+      let page = 0;
+      let hasMore = true;
 
-      if (fetchError) {
-        throw new Error(`Error al verificar productos existentes: ${fetchError.message}`);
+      while (hasMore) {
+        const from = page * pageSize;
+        const to = from + pageSize - 1;
+
+        const { data, error } = await supabase
+          .from('cliente_inventario')
+          .select('id, sku')
+          .eq('cliente_id', clienteId)
+          .range(from, to);
+
+        if (error) {
+          throw new Error(`Error al verificar productos existentes: ${error.message}`);
+        }
+
+        if (data && data.length > 0) {
+          allExisting.push(...data);
+          hasMore = data.length === pageSize;
+          page++;
+        } else {
+          hasMore = false;
+        }
       }
 
       const existingSkuMap = new Map(
-        (existingProducts || []).map(p => [p.sku.toLowerCase(), p.id])
+        allExisting.map(p => [p.sku.toLowerCase(), p.id])
       );
 
       for (let i = 0; i < products.length; i++) {
@@ -100,22 +120,20 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
           ? row.keywords.split(',').map(k => k.trim()).filter(k => k.length > 0)
           : null;
 
-        const productData: InventoryInput = {
+        // Map to cliente_inventario schema
+        const productData = {
+          cliente_id: clienteId,
           sku: row.sku.trim(),
-          nombre_producto: row.nombre.trim(),
+          nombre: row.nombre.trim(),
           descripcion: row.descripcion?.trim() || null,
           categoria: row.categoria?.trim() || 'General',
           precio_unitario: Number(row.precio_unitario),
-          unidad_medida: row.unidad_medida.trim(),
-          keywords,
+          palabras_clave: keywords,
           imagen_url: row.imagen_url?.trim() || null,
-          stock_disponible: row.stock !== undefined ? Number(row.stock) : 0,
-          margen_minimo: row.margen_minimo !== undefined ? Number(row.margen_minimo) : 10,
-          margen_objetivo: row.margen_objetivo !== undefined ? Number(row.margen_objetivo) : 15,
+          stock: row.stock !== undefined ? Number(row.stock) : 0,
+          margen_minimo: row.margen_minimo !== undefined ? Number(row.margen_minimo) : (row.margen_objetivo !== undefined ? Number(row.margen_objetivo) : 10),
           tiempo_entrega_dias: row.tiempo_entrega_dias !== undefined ? Number(row.tiempo_entrega_dias) : 5,
-          proveedor: row.proveedor?.trim() || null,
           activo: true,
-          user_id: userId,
         };
 
         const existingId = existingSkuMap.get(row.sku.trim().toLowerCase());
@@ -151,7 +169,7 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
           });
           
           const { error } = await supabase
-            .from('inventory')
+            .from('cliente_inventario')
             .insert(batch);
           
           if (error) {
@@ -183,7 +201,7 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
           }
           
           const { error } = await supabase
-            .from('inventory')
+            .from('cliente_inventario')
             .update(item.data)
             .eq('id', item.id);
           
