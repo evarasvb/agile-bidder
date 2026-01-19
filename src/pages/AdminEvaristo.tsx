@@ -7,8 +7,27 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Bot, BookOpen, Settings, MessageSquare, Terminal } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+import { useEvaristoMision } from '@/hooks/useEvaristo';
 
 export default function AdminEvaristo() {
+  const mision = useEvaristoMision();
+
+  const handleEjecutarMisionCompleta = async () => {
+    try {
+      const result = await mision.mutateAsync({ 
+        mision_file: 'mision_completa_firmavb.json' 
+      });
+      if (result.success) {
+        toast.success('✅ Misión programada para ejecución');
+      } else {
+        toast.error(`❌ Error: ${result.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      toast.error(`Error: ${error.message}`);
+    }
+  };
+
   return (
     <div className="space-y-6 p-6">
       <FirmaVBHeader 
@@ -118,11 +137,10 @@ export default function AdminEvaristo() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  // Esto se manejará desde el panel
-                }}
+                onClick={handleEjecutarMisionCompleta}
+                disabled={mision.isPending}
               >
-                Ejecutar
+                {mision.isPending ? 'Ejecutando...' : 'Ejecutar'}
               </Button>
             </div>
           </div>
