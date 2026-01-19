@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { supabaseClient as supabase } from '@/lib/supabaseClient';
 
 /**
  * Item de licitación - matches database schema

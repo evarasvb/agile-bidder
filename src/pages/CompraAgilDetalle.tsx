@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useCompraAgilByCodigo } from "@/hooks/useComprasAgiles";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseClient as supabase } from "@/lib/supabaseClient";
 import { useQuery } from "@tanstack/react-query";
 import { 
   ArrowLeft, 
