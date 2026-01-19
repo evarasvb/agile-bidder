@@ -36,6 +36,8 @@ import CompraAgilDetalle from "./pages/CompraAgilDetalle";
 import OrdenesCompra from "./pages/OrdenesCompra";
 import AuthCallback from "./pages/AuthCallback";
 import Billing from "./pages/Billing";
+import Opportunities from "./pages/Opportunities";
+import MyBids from "./pages/MyBids";
 
 const queryClient = new QueryClient();
 
@@ -86,6 +88,8 @@ const App = () => (
             <Route path="/ordenes-compra" element={<OrdenesCompra />} />
             <Route path="/ofertas" element={<Ofertas />} />
             <Route path="/ofertas/:id" element={<OfertaDetalle />} />
+            <Route path="/opportunities" element={<Opportunities />} />
+            <Route path="/my-bids" element={<MyBids />} />
             <Route path="/vendedores" element={<GestionVendedores />} />
             <Route path="/mercadopublico" element={<MercadoPublico />} />
             <Route path="/bi-dashboard" element={<BIDashboard />} />

@@ -54,6 +54,10 @@ export default function Inventory() {
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; nombre: string } | null>(null);
   const [oportunidadesProducto, setOportunidadesProducto] = useState<InventoryItem | null>(null);
   
+  // Pagination state for UI performance
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 100; // Show 100 products per page to prevent performance issues
+  
   const { data: inventario = [], isLoading, refetch } = useInventory();
   const { data: licitacionesPorProducto = [] } = useLicitacionesPorProducto();
   const { matchesByProductId, countsByProductId, isLoading: isLoadingComprasAgiles } = useComprasAgilesMatch(inventario);
@@ -113,6 +117,17 @@ export default function Inventory() {
       item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (item.proveedor && item.proveedor.toLowerCase().includes(searchQuery.toLowerCase()))
   );
+
+  // Reset to page 1 when search changes
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+  };
+
+  // Calculate paginated data
+  const totalPages = Math.ceil(filteredInventory.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedInventory = filteredInventory.slice(startIndex, startIndex + pageSize);
 
   const toggleSelect = (id: string) => {
     const newSelected = new Set(selectedIds);
@@ -453,13 +468,16 @@ export default function Inventory() {
           <Input
             placeholder="Buscar por nombre, SKU o proveedor..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-10"
           />
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Package className="h-4 w-4" />
-          <span>{filteredInventory.length} de {totalProducts} productos</span>
+          <span>
+            Mostrando {startIndex + 1}-{Math.min(startIndex + pageSize, filteredInventory.length)} de {filteredInventory.length} productos
+            {filteredInventory.length !== totalProducts && ` (${totalProducts} total)`}
+          </span>
         </div>
         
         {selectedIds.size > 0 && (
@@ -513,7 +531,7 @@ export default function Inventory() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredInventory.map((item) => {
+              {paginatedInventory.map((item) => {
                 const oportunidadesCount = countsByProductId[item.id] ?? 0;
 
                 return (
@@ -689,6 +707,31 @@ export default function Inventory() {
           </Table>
         )}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 py-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+          >
+            Anterior
+          </Button>
+          <span className="text-sm text-muted-foreground px-4">
+            Página {currentPage} de {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+          >
+            Siguiente
+          </Button>
+        </div>
+      )}
 
       {/* Edit Dialog */}
       <EditProductDialog
