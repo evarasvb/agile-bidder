@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { supabaseClient as supabase } from '@/lib/supabaseClient';
 
 // Interface based on cliente_inventario table schema with additional UI fields
 export interface InventoryItem {
