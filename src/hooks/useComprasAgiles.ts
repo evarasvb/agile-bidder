@@ -97,8 +97,8 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
       // Mapear campos - manejar diferentes schemas (licitaciones vs compras_agiles)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const compras = (data || []).map((row: any): CompraAgil => {
-        // El campo código puede venir como id_licitacion (tabla licitaciones) o codigo (tabla compras_agiles)
-        const codigo = row.id_licitacion || row.codigo || row.id || '';
+        // FirmaVB usa 'codigo', Lovable Cloud usa 'id_licitacion'
+        const codigo = row.codigo || row.id_licitacion || row.id || '';
         
         return {
           id: codigo,
@@ -131,11 +131,12 @@ export function useCompraAgil(id: string | null) {
     queryFn: async (): Promise<CompraAgil | null> => {
       if (!id) return null;
       
-      // Usar tabla licitaciones con id_licitacion
-      const { data, error } = await supabase
+      // FirmaVB usa columna 'codigo', no 'id_licitacion'
+      // Usar any para evitar conflicto con tipos de Lovable Cloud
+      const { data, error } = await (supabase as any)
         .from('licitaciones')
         .select('*')
-        .eq('id_licitacion', id)
+        .eq('codigo', id)
         .maybeSingle();
 
       if (error) throw error;
@@ -143,7 +144,7 @@ export function useCompraAgil(id: string | null) {
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const row = data as any;
-      const codigo = row.id_licitacion || row.codigo || row.id || '';
+      const codigo = row.codigo || row.id_licitacion || row.id || '';
 
       return {
         id: codigo,
@@ -173,11 +174,12 @@ export function useCompraAgilByCodigo(codigo: string | undefined) {
     queryFn: async (): Promise<CompraAgil | null> => {
       if (!codigo) return null;
       
-      // Usar tabla licitaciones con id_licitacion como codigo
-      const { data, error } = await supabase
+      // FirmaVB usa columna 'codigo', no 'id_licitacion'
+      // Usar any para evitar conflicto con tipos de Lovable Cloud
+      const { data, error } = await (supabase as any)
         .from('licitaciones')
         .select('*')
-        .eq('id_licitacion', codigo)
+        .eq('codigo', codigo)
         .maybeSingle();
 
       if (error) throw error;
@@ -185,7 +187,7 @@ export function useCompraAgilByCodigo(codigo: string | undefined) {
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const row = data as any;
-      const codigoValue = row.id_licitacion || row.codigo || row.id || '';
+      const codigoValue = row.codigo || row.id_licitacion || row.id || '';
 
       return {
         id: codigoValue,
