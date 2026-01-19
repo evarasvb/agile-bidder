@@ -118,13 +118,13 @@
     return items;
   }
 
-  // Inyectar botón de postulación
+  // SECURITY FIX: Inyectar botón de postulación usando DOM methods
   function injectButton(codigoLicitacion) {
     if (document.getElementById(BUTTON_ID)) return;
     
     const button = document.createElement('button');
     button.id = BUTTON_ID;
-    button.innerHTML = '🏢 Postular con FirmaVB';
+    button.textContent = '🏢 Postular con FirmaVB';
     button.style.cssText = `
       position: fixed;
       bottom: 20px;
@@ -161,9 +161,9 @@
   // Iniciar proceso de autofill
   async function startAutofill(codigoLicitacion) {
     const button = document.getElementById(BUTTON_ID);
-    const originalText = button.innerHTML;
+    const originalText = button.textContent;
     
-    button.innerHTML = '⏳ Cargando oferta...';
+    button.textContent = '⏳ Cargando oferta...';
     button.disabled = true;
     
     try {
@@ -182,12 +182,12 @@
       console.error('Error getting offer:', error);
       showMessage('error', 'Error al obtener datos de la oferta');
     } finally {
-      button.innerHTML = originalText;
+      button.textContent = originalText;
       button.disabled = false;
     }
   }
 
-  // Modal de confirmación de autofill
+  // SECURITY FIX: Modal de confirmación usando DOM methods instead of innerHTML
   function showAutofillModal(oferta, codigoLicitacion) {
     // Remover modal existente
     const existingModal = document.getElementById(MODAL_ID);
@@ -196,6 +196,7 @@
     const productos = oferta.productos_ofertados || [];
     const valorTotal = oferta.valor_total || productos.reduce((sum, p) => sum + (p.precio_total || 0), 0);
     
+    // Create modal overlay
     const modal = document.createElement('div');
     modal.id = MODAL_ID;
     modal.style.cssText = `
@@ -212,106 +213,176 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     `;
     
-    modal.innerHTML = `
-      <div style="
-        background: white;
-        border-radius: 16px;
-        padding: 28px;
-        max-width: 500px;
-        width: 90%;
-        max-height: 80vh;
-        overflow-y: auto;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-      ">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-          <h2 style="margin: 0; font-size: 20px; color: #1e293b;">🏢 Confirmar Postulación</h2>
-          <button id="firmavb-modal-close" style="
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            color: #94a3b8;
-          ">×</button>
-        </div>
-        
-        <div style="background: #f8fafc; border-radius: 10px; padding: 16px; margin-bottom: 20px;">
-          <p style="margin: 0 0 8px; font-size: 13px; color: #64748b;">Licitación</p>
-          <p style="margin: 0; font-size: 15px; font-weight: 600; color: #1e293b;">${codigoLicitacion}</p>
-        </div>
-        
-        <div style="margin-bottom: 20px;">
-          <h3 style="font-size: 14px; color: #374151; margin-bottom: 12px;">Productos a Ofertar (${productos.length})</h3>
-          <div style="max-height: 200px; overflow-y: auto;">
-            ${productos.map(p => `
-              <div style="
-                background: white;
-                border: 1px solid #e2e8f0;
-                border-radius: 8px;
-                padding: 12px;
-                margin-bottom: 8px;
-              ">
-                <div style="font-weight: 600; font-size: 13px; color: #1e293b; margin-bottom: 4px;">${p.nombre || p.sku}</div>
-                <div style="display: flex; justify-content: space-between; font-size: 12px; color: #64748b;">
-                  <span>${p.cantidad || 1} ${p.unidad || 'UN'}</span>
-                  <span style="color: #059669; font-weight: 600;">$${(p.precio_total || 0).toLocaleString('es-CL')}</span>
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-        
-        <div style="
-          background: linear-gradient(135deg, #ecfdf5, #d1fae5);
-          border-radius: 10px;
-          padding: 16px;
-          margin-bottom: 20px;
-          text-align: center;
-        ">
-          <p style="margin: 0 0 4px; font-size: 13px; color: #059669;">Valor Total de la Oferta</p>
-          <p style="margin: 0; font-size: 24px; font-weight: 700; color: #047857;">$${valorTotal.toLocaleString('es-CL')}</p>
-        </div>
-        
-        <div style="display: flex; gap: 12px;">
-          <button id="firmavb-cancel" style="
-            flex: 1;
-            padding: 12px;
-            background: #f1f5f9;
-            color: #475569;
-            border: none;
-            border-radius: 10px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-          ">Cancelar</button>
-          <button id="firmavb-confirm" style="
-            flex: 1;
-            padding: 12px;
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-          ">Autocompletar Formulario</button>
-        </div>
-      </div>
+    // Create modal content container
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+      background: white;
+      border-radius: 16px;
+      padding: 28px;
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     `;
     
-    document.body.appendChild(modal);
+    // Create header
+    const headerDiv = document.createElement('div');
+    headerDiv.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;';
     
-    // Event listeners
-    document.getElementById('firmavb-modal-close').onclick = () => modal.remove();
-    document.getElementById('firmavb-cancel').onclick = () => modal.remove();
-    document.getElementById('firmavb-confirm').onclick = () => {
+    const title = document.createElement('h2');
+    title.style.cssText = 'margin: 0; font-size: 20px; color: #1e293b;';
+    title.textContent = '🏢 Confirmar Postulación';
+    
+    const closeBtn = document.createElement('button');
+    closeBtn.id = 'firmavb-modal-close';
+    closeBtn.style.cssText = 'background: none; border: none; font-size: 24px; cursor: pointer; color: #94a3b8;';
+    closeBtn.textContent = '×';
+    closeBtn.addEventListener('click', () => modal.remove());
+    
+    headerDiv.appendChild(title);
+    headerDiv.appendChild(closeBtn);
+    
+    // Create licitacion info section
+    const infoSection = document.createElement('div');
+    infoSection.style.cssText = 'background: #f8fafc; border-radius: 10px; padding: 16px; margin-bottom: 20px;';
+    
+    const infoLabel = document.createElement('p');
+    infoLabel.style.cssText = 'margin: 0 0 8px; font-size: 13px; color: #64748b;';
+    infoLabel.textContent = 'Licitación';
+    
+    const infoValue = document.createElement('p');
+    infoValue.style.cssText = 'margin: 0; font-size: 15px; font-weight: 600; color: #1e293b;';
+    infoValue.textContent = codigoLicitacion;
+    
+    infoSection.appendChild(infoLabel);
+    infoSection.appendChild(infoValue);
+    
+    // Create products section
+    const productsSection = document.createElement('div');
+    productsSection.style.cssText = 'margin-bottom: 20px;';
+    
+    const productsTitle = document.createElement('h3');
+    productsTitle.style.cssText = 'font-size: 14px; color: #374151; margin-bottom: 12px;';
+    productsTitle.textContent = `Productos a Ofertar (${productos.length})`;
+    
+    const productsList = document.createElement('div');
+    productsList.style.cssText = 'max-height: 200px; overflow-y: auto;';
+    
+    // Build product items safely with textContent
+    productos.forEach(p => {
+      const productItem = document.createElement('div');
+      productItem.style.cssText = `
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 8px;
+      `;
+      
+      const productName = document.createElement('div');
+      productName.style.cssText = 'font-weight: 600; font-size: 13px; color: #1e293b; margin-bottom: 4px;';
+      productName.textContent = p.nombre || p.sku || 'Producto';
+      
+      const productDetails = document.createElement('div');
+      productDetails.style.cssText = 'display: flex; justify-content: space-between; font-size: 12px; color: #64748b;';
+      
+      const quantitySpan = document.createElement('span');
+      quantitySpan.textContent = `${p.cantidad || 1} ${p.unidad || 'UN'}`;
+      
+      const priceSpan = document.createElement('span');
+      priceSpan.style.cssText = 'color: #059669; font-weight: 600;';
+      priceSpan.textContent = `$${(p.precio_total || 0).toLocaleString('es-CL')}`;
+      
+      productDetails.appendChild(quantitySpan);
+      productDetails.appendChild(priceSpan);
+      
+      productItem.appendChild(productName);
+      productItem.appendChild(productDetails);
+      productsList.appendChild(productItem);
+    });
+    
+    productsSection.appendChild(productsTitle);
+    productsSection.appendChild(productsList);
+    
+    // Create total section
+    const totalSection = document.createElement('div');
+    totalSection.style.cssText = `
+      background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 20px;
+      text-align: center;
+    `;
+    
+    const totalLabel = document.createElement('p');
+    totalLabel.style.cssText = 'margin: 0 0 4px; font-size: 13px; color: #059669;';
+    totalLabel.textContent = 'Valor Total de la Oferta';
+    
+    const totalValue = document.createElement('p');
+    totalValue.style.cssText = 'margin: 0; font-size: 24px; font-weight: 700; color: #047857;';
+    totalValue.textContent = `$${valorTotal.toLocaleString('es-CL')}`;
+    
+    totalSection.appendChild(totalLabel);
+    totalSection.appendChild(totalValue);
+    
+    // Create buttons section
+    const buttonsSection = document.createElement('div');
+    buttonsSection.style.cssText = 'display: flex; gap: 12px;';
+    
+    const cancelBtn = document.createElement('button');
+    cancelBtn.id = 'firmavb-cancel';
+    cancelBtn.style.cssText = `
+      flex: 1;
+      padding: 12px;
+      background: #f1f5f9;
+      color: #475569;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    `;
+    cancelBtn.textContent = 'Cancelar';
+    cancelBtn.addEventListener('click', () => modal.remove());
+    
+    const confirmBtn = document.createElement('button');
+    confirmBtn.id = 'firmavb-confirm';
+    confirmBtn.style.cssText = `
+      flex: 1;
+      padding: 12px;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    `;
+    confirmBtn.textContent = 'Autocompletar Formulario';
+    confirmBtn.addEventListener('click', () => {
       modal.remove();
       performAutofill(oferta);
-    };
+    });
+    
+    buttonsSection.appendChild(cancelBtn);
+    buttonsSection.appendChild(confirmBtn);
+    
+    // Assemble modal
+    modalContent.appendChild(headerDiv);
+    modalContent.appendChild(infoSection);
+    modalContent.appendChild(productsSection);
+    modalContent.appendChild(totalSection);
+    modalContent.appendChild(buttonsSection);
+    
+    modal.appendChild(modalContent);
     
     // Click fuera del modal para cerrar
     modal.addEventListener('click', (e) => {
       if (e.target === modal) modal.remove();
     });
+    
+    document.body.appendChild(modal);
   }
 
   // Ejecutar autofill en el formulario
@@ -548,6 +619,7 @@
     }
   }
 
+  // SECURITY FIX: Use textContent instead of innerHTML
   function showConnectionIndicator() {
     const indicator = document.createElement('div');
     indicator.id = 'firmavb-connection-indicator';
@@ -568,7 +640,7 @@
       align-items: center;
       gap: 6px;
     `;
-    indicator.innerHTML = '🟢 FirmaVB Conectada';
+    indicator.textContent = '🟢 FirmaVB Conectada';
     document.body.appendChild(indicator);
     
     // Auto-hide after 3 seconds

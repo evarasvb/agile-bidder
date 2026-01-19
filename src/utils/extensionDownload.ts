@@ -199,6 +199,7 @@ body { width: 380px; min-height: 400px; font-family: -apple-system, BlinkMacSyst
 .checkbox-label { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #374151; margin-bottom: 10px; cursor: pointer; }
 .checkbox-label input { width: 16px; height: 16px; cursor: pointer; }`,
 
+  // SECURITY FIX: popup.js now uses DOM methods instead of innerHTML to prevent XSS
   'popup.js': `const SUPABASE_URL = 'https://euzqadopjvdszcdjegmo.supabase.co';
 const EXTENSION_API_ENDPOINT = SUPABASE_URL + '/functions/v1/extension-api';
 let currentView = 'loading';
@@ -349,31 +350,60 @@ function updateMainView() {
   updateLastSync();
 }
 
+// SECURITY FIX: Use DOM methods instead of innerHTML to prevent XSS
 function renderMatches() {
   const container = document.getElementById('matches-list');
   const emptyState = document.getElementById('no-matches');
+  container.innerHTML = '';
   if (!matches || matches.length === 0) {
-    container.innerHTML = '';
     emptyState.classList.remove('hidden');
     return;
   }
   emptyState.classList.add('hidden');
-  container.innerHTML = matches.map(match => {
-    const score = match.match_score || 0;
-    const scoreClass = score >= 80 ? 'high-score' : score >= 60 ? 'medium-score' : '';
-    return '<div class="match-card ' + scoreClass + '" onclick="openLicitacion(\\'' + (match.link_oficial || '') + '\\')">' +
-      '<div class="match-header"><span class="match-code">' + (match.id_licitacion || 'N/A') + '</span><span class="match-score">' + score + '% match</span></div>' +
-      '<div class="match-title">' + (match.titulo || 'Sin título') + '</div>' +
-      '<div class="match-org">' + (match.organismo || 'Organismo no especificado') + '</div>' +
-      '<div class="match-footer"><span class="match-budget">' + formatCurrency(match.presupuesto) + '</span><span class="match-deadline">' + formatDeadline(match.fecha_cierre) + '</span></div>' +
-      '</div>';
-  }).join('');
+  matches.forEach(function(match) {
+    var score = match.match_score || 0;
+    var scoreClass = score >= 80 ? 'high-score' : score >= 60 ? 'medium-score' : '';
+    var card = document.createElement('div');
+    card.className = 'match-card ' + scoreClass;
+    card.addEventListener('click', function() { openLicitacion(match.link_oficial || ''); });
+    var header = document.createElement('div');
+    header.className = 'match-header';
+    var codeSpan = document.createElement('span');
+    codeSpan.className = 'match-code';
+    codeSpan.textContent = match.id_licitacion || 'N/A';
+    var scoreSpan = document.createElement('span');
+    scoreSpan.className = 'match-score';
+    scoreSpan.textContent = score + '% match';
+    header.appendChild(codeSpan);
+    header.appendChild(scoreSpan);
+    var titleDiv = document.createElement('div');
+    titleDiv.className = 'match-title';
+    titleDiv.textContent = match.titulo || 'Sin título';
+    var orgDiv = document.createElement('div');
+    orgDiv.className = 'match-org';
+    orgDiv.textContent = match.organismo || 'Organismo no especificado';
+    var footer = document.createElement('div');
+    footer.className = 'match-footer';
+    var budgetSpan = document.createElement('span');
+    budgetSpan.className = 'match-budget';
+    budgetSpan.textContent = formatCurrency(match.presupuesto);
+    var deadlineSpan = document.createElement('span');
+    deadlineSpan.className = 'match-deadline';
+    deadlineSpan.textContent = formatDeadline(match.fecha_cierre);
+    footer.appendChild(budgetSpan);
+    footer.appendChild(deadlineSpan);
+    card.appendChild(header);
+    card.appendChild(titleDiv);
+    card.appendChild(orgDiv);
+    card.appendChild(footer);
+    container.appendChild(card);
+  });
 }
 
 function updateLastSync() {
-  const element = document.getElementById('last-sync');
+  var element = document.getElementById('last-sync');
   if (lastSync) {
-    const date = new Date(lastSync);
+    var date = new Date(lastSync);
     element.textContent = 'Última sincronización: ' + date.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
   } else {
     element.textContent = 'Última sincronización: --';
@@ -389,18 +419,18 @@ function formatCurrency(amount) {
 
 function formatDeadline(dateStr) {
   if (!dateStr) return 'Sin fecha';
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffHours = Math.floor((date - now) / (1000 * 60 * 60));
+  var date = new Date(dateStr);
+  var now = new Date();
+  var diffHours = Math.floor((date - now) / (1000 * 60 * 60));
   if (diffHours < 0) return 'Vencida';
   if (diffHours < 24) return diffHours + 'h restantes';
-  const diffDays = Math.floor(diffHours / 24);
+  var diffDays = Math.floor(diffHours / 24);
   if (diffDays === 1) return 'Mañana';
   if (diffDays <= 7) return diffDays + ' días';
   return date.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' });
 }
 
-function openLicitacion(url) { if (url) chrome.tabs.create({ url }); }`,
+function openLicitacion(url) { if (url) chrome.tabs.create({ url: url }); }`,
 
   'background.js': `const SUPABASE_URL = 'https://euzqadopjvdszcdjegmo.supabase.co';
 const EXTENSION_API_ENDPOINT = SUPABASE_URL + '/functions/v1/extension-api';
@@ -513,45 +543,46 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });`,
 
+  // SECURITY FIX: content.js now uses DOM methods instead of innerHTML to prevent XSS
   'content.js': `(function() {
   'use strict';
-  const BUTTON_ID = 'firmavb-postular-btn';
-  const MODAL_ID = 'firmavb-modal';
+  var BUTTON_ID = 'firmavb-postular-btn';
+  var MODAL_ID = 'firmavb-modal';
 
   function detectPageInfo() {
-    const url = window.location.href;
-    const isCompraAgil = url.includes('/CompraAgil/');
-    const isDetalle = url.includes('DetailsAcquisition.aspx');
-    let codigoLicitacion = null;
-    const urlMatch = url.match(/idLicitacion=([^&]+)/i) || url.match(/CodigoExterno=([^&]+)/i);
+    var url = window.location.href;
+    var isCompraAgil = url.includes('/CompraAgil/');
+    var isDetalle = url.includes('DetailsAcquisition.aspx');
+    var codigoLicitacion = null;
+    var urlMatch = url.match(/idLicitacion=([^&]+)/i) || url.match(/CodigoExterno=([^&]+)/i);
     if (urlMatch) codigoLicitacion = urlMatch[1];
     if (!codigoLicitacion) {
-      const codeElements = document.querySelectorAll('[id*="codigo"], [id*="Codigo"], .codigo-licitacion');
-      for (const el of codeElements) {
-        const match = el.textContent.match(/\\d{4,}-\\d+-[A-Z]+\\d+/);
+      var codeElements = document.querySelectorAll('[id*="codigo"], [id*="Codigo"], .codigo-licitacion');
+      for (var i = 0; i < codeElements.length; i++) {
+        var match = codeElements[i].textContent.match(/\\d{4,}-\\d+-[A-Z]+\\d+/);
         if (match) { codigoLicitacion = match[0]; break; }
       }
     }
-    return { isCompraAgil, isDetalle, codigoLicitacion, url };
+    return { isCompraAgil: isCompraAgil, isDetalle: isDetalle, codigoLicitacion: codigoLicitacion, url: url };
   }
 
   function injectButton(codigoLicitacion) {
     if (document.getElementById(BUTTON_ID)) return;
-    const button = document.createElement('button');
+    var button = document.createElement('button');
     button.id = BUTTON_ID;
-    button.innerHTML = '🏢 Postular con FirmaVB';
+    button.textContent = '🏢 Postular con FirmaVB';
     button.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:10000;padding:14px 24px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 20px rgba(59,130,246,0.4);font-family:-apple-system,BlinkMacSystemFont,sans-serif;';
-    button.addEventListener('click', () => startAutofill(codigoLicitacion));
+    button.addEventListener('click', function() { startAutofill(codigoLicitacion); });
     document.body.appendChild(button);
   }
 
   async function startAutofill(codigoLicitacion) {
-    const button = document.getElementById(BUTTON_ID);
-    const originalText = button.innerHTML;
-    button.innerHTML = '⏳ Cargando oferta...';
+    var button = document.getElementById(BUTTON_ID);
+    var originalText = button.textContent;
+    button.textContent = '⏳ Cargando oferta...';
     button.disabled = true;
     try {
-      const response = await chrome.runtime.sendMessage({ action: 'GET_OFFER', data: { licitacionId: codigoLicitacion } });
+      var response = await chrome.runtime.sendMessage({ action: 'GET_OFFER', data: { licitacionId: codigoLicitacion } });
       if (response.success && response.oferta) {
         showAutofillModal(response.oferta, codigoLicitacion);
       } else {
@@ -561,35 +592,93 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       console.error('Error:', error);
       showMessage('error', 'Error al obtener datos');
     } finally {
-      button.innerHTML = originalText;
+      button.textContent = originalText;
       button.disabled = false;
     }
   }
 
+  // SECURITY FIX: Use DOM methods instead of innerHTML to prevent XSS
   function showAutofillModal(oferta, codigoLicitacion) {
-    const existingModal = document.getElementById(MODAL_ID);
+    var existingModal = document.getElementById(MODAL_ID);
     if (existingModal) existingModal.remove();
-    const productos = oferta.productos_ofertados || [];
-    const valorTotal = oferta.valor_total || productos.reduce((sum, p) => sum + (p.precio_total || 0), 0);
-    const modal = document.createElement('div');
+    var productos = oferta.productos_ofertados || [];
+    var valorTotal = oferta.valor_total || productos.reduce(function(sum, p) { return sum + (p.precio_total || 0); }, 0);
+    
+    var modal = document.createElement('div');
     modal.id = MODAL_ID;
     modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:10001;display:flex;align-items:center;justify-content:center;font-family:-apple-system,sans-serif;';
-    modal.innerHTML = '<div style="background:white;border-radius:16px;padding:28px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto;"><div style="display:flex;justify-content:space-between;margin-bottom:20px;"><h2 style="margin:0;font-size:20px;">🏢 Confirmar Postulación</h2><button id="firmavb-modal-close" style="background:none;border:none;font-size:24px;cursor:pointer;">×</button></div><div style="background:#f8fafc;border-radius:10px;padding:16px;margin-bottom:20px;"><p style="margin:0 0 8px;font-size:13px;color:#64748b;">Licitación</p><p style="margin:0;font-size:15px;font-weight:600;">' + codigoLicitacion + '</p></div><div style="background:linear-gradient(135deg,#ecfdf5,#d1fae5);border-radius:10px;padding:16px;margin-bottom:20px;text-align:center;"><p style="margin:0 0 4px;font-size:13px;color:#059669;">Valor Total</p><p style="margin:0;font-size:24px;font-weight:700;color:#047857;">$' + valorTotal.toLocaleString('es-CL') + '</p></div><div style="display:flex;gap:12px;"><button id="firmavb-cancel" style="flex:1;padding:12px;background:#f1f5f9;color:#475569;border:none;border-radius:10px;font-weight:600;cursor:pointer;">Cancelar</button><button id="firmavb-confirm" style="flex:1;padding:12px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:white;border:none;border-radius:10px;font-weight:600;cursor:pointer;">Autocompletar</button></div></div>';
+    
+    var modalContent = document.createElement('div');
+    modalContent.style.cssText = 'background:white;border-radius:16px;padding:28px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto;';
+    
+    var headerDiv = document.createElement('div');
+    headerDiv.style.cssText = 'display:flex;justify-content:space-between;margin-bottom:20px;';
+    var title = document.createElement('h2');
+    title.style.cssText = 'margin:0;font-size:20px;';
+    title.textContent = '🏢 Confirmar Postulación';
+    var closeBtn = document.createElement('button');
+    closeBtn.id = 'firmavb-modal-close';
+    closeBtn.style.cssText = 'background:none;border:none;font-size:24px;cursor:pointer;';
+    closeBtn.textContent = '×';
+    closeBtn.addEventListener('click', function() { modal.remove(); });
+    headerDiv.appendChild(title);
+    headerDiv.appendChild(closeBtn);
+    
+    var infoSection = document.createElement('div');
+    infoSection.style.cssText = 'background:#f8fafc;border-radius:10px;padding:16px;margin-bottom:20px;';
+    var infoLabel = document.createElement('p');
+    infoLabel.style.cssText = 'margin:0 0 8px;font-size:13px;color:#64748b;';
+    infoLabel.textContent = 'Licitación';
+    var infoValue = document.createElement('p');
+    infoValue.style.cssText = 'margin:0;font-size:15px;font-weight:600;';
+    infoValue.textContent = codigoLicitacion;
+    infoSection.appendChild(infoLabel);
+    infoSection.appendChild(infoValue);
+    
+    var totalSection = document.createElement('div');
+    totalSection.style.cssText = 'background:linear-gradient(135deg,#ecfdf5,#d1fae5);border-radius:10px;padding:16px;margin-bottom:20px;text-align:center;';
+    var totalLabel = document.createElement('p');
+    totalLabel.style.cssText = 'margin:0 0 4px;font-size:13px;color:#059669;';
+    totalLabel.textContent = 'Valor Total';
+    var totalValue = document.createElement('p');
+    totalValue.style.cssText = 'margin:0;font-size:24px;font-weight:700;color:#047857;';
+    totalValue.textContent = '$' + valorTotal.toLocaleString('es-CL');
+    totalSection.appendChild(totalLabel);
+    totalSection.appendChild(totalValue);
+    
+    var buttonsSection = document.createElement('div');
+    buttonsSection.style.cssText = 'display:flex;gap:12px;';
+    var cancelBtn = document.createElement('button');
+    cancelBtn.id = 'firmavb-cancel';
+    cancelBtn.style.cssText = 'flex:1;padding:12px;background:#f1f5f9;color:#475569;border:none;border-radius:10px;font-weight:600;cursor:pointer;';
+    cancelBtn.textContent = 'Cancelar';
+    cancelBtn.addEventListener('click', function() { modal.remove(); });
+    var confirmBtn = document.createElement('button');
+    confirmBtn.id = 'firmavb-confirm';
+    confirmBtn.style.cssText = 'flex:1;padding:12px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:white;border:none;border-radius:10px;font-weight:600;cursor:pointer;';
+    confirmBtn.textContent = 'Autocompletar';
+    confirmBtn.addEventListener('click', function() { modal.remove(); performAutofill(oferta); });
+    buttonsSection.appendChild(cancelBtn);
+    buttonsSection.appendChild(confirmBtn);
+    
+    modalContent.appendChild(headerDiv);
+    modalContent.appendChild(infoSection);
+    modalContent.appendChild(totalSection);
+    modalContent.appendChild(buttonsSection);
+    modal.appendChild(modalContent);
+    
+    modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
     document.body.appendChild(modal);
-    document.getElementById('firmavb-modal-close').onclick = () => modal.remove();
-    document.getElementById('firmavb-cancel').onclick = () => modal.remove();
-    document.getElementById('firmavb-confirm').onclick = () => { modal.remove(); performAutofill(oferta); };
-    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
   }
 
   function performAutofill(oferta) {
     try {
-      const productos = oferta.productos_ofertados || [];
-      let filledFields = 0;
-      productos.forEach((producto, index) => {
-        const selectors = ['input[name*="precio"][name*="' + index + '"]', 'tr:nth-child(' + (index + 2) + ') input[type="text"]'];
-        for (const selector of selectors) {
-          const input = document.querySelector(selector);
+      var productos = oferta.productos_ofertados || [];
+      var filledFields = 0;
+      productos.forEach(function(producto, index) {
+        var selectors = ['input[name*="precio"][name*="' + index + '"]', 'tr:nth-child(' + (index + 2) + ') input[type="text"]'];
+        for (var i = 0; i < selectors.length; i++) {
+          var input = document.querySelector(selectors[i]);
           if (input) { input.value = producto.precio_unitario || ''; input.dispatchEvent(new Event('input', { bubbles: true })); filledFields++; break; }
         }
       });
@@ -606,17 +695,17 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 
   function showMessage(type, text) {
-    const colors = { success: { bg: '#dcfce7', border: '#22c55e', text: '#166534' }, error: { bg: '#fee2e2', border: '#ef4444', text: '#991b1b' }, info: { bg: '#dbeafe', border: '#3b82f6', text: '#1e40af' } };
-    const style = colors[type] || colors.info;
-    const message = document.createElement('div');
+    var colors = { success: { bg: '#dcfce7', border: '#22c55e', text: '#166534' }, error: { bg: '#fee2e2', border: '#ef4444', text: '#991b1b' }, info: { bg: '#dbeafe', border: '#3b82f6', text: '#1e40af' } };
+    var style = colors[type] || colors.info;
+    var message = document.createElement('div');
     message.style.cssText = 'position:fixed;top:20px;right:20px;z-index:10002;padding:14px 20px;background:' + style.bg + ';border-left:4px solid ' + style.border + ';color:' + style.text + ';border-radius:8px;font-size:14px;font-weight:500;box-shadow:0 4px 15px rgba(0,0,0,0.1);';
     message.textContent = text;
     document.body.appendChild(message);
-    setTimeout(() => message.remove(), 4000);
+    setTimeout(function() { message.remove(); }, 4000);
   }
 
   function init() {
-    const pageInfo = detectPageInfo();
+    var pageInfo = detectPageInfo();
     if (pageInfo.codigoLicitacion && (pageInfo.isCompraAgil || pageInfo.isDetalle)) {
       injectButton(pageInfo.codigoLicitacion);
     }
@@ -625,7 +714,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
     if (message.action === 'CHECK_PAGE') sendResponse({ success: true, pageInfo: detectPageInfo() });
     return true;
   });

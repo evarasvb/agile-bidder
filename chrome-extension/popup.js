@@ -210,39 +210,81 @@ function updateMainView() {
   updateLastSync();
 }
 
+// SECURITY FIX: Use DOM methods instead of innerHTML to prevent XSS
 function renderMatches() {
   const container = document.getElementById('matches-list');
   const emptyState = document.getElementById('no-matches');
   
+  // Clear container safely
+  container.innerHTML = '';
+  
   if (!matches || matches.length === 0) {
-    container.innerHTML = '';
     emptyState.classList.remove('hidden');
     return;
   }
   
   emptyState.classList.add('hidden');
   
-  container.innerHTML = matches.map(match => {
+  // Build DOM elements safely using textContent instead of innerHTML
+  matches.forEach(match => {
     const score = match.match_score || 0;
     const scoreClass = score >= 80 ? 'high-score' : score >= 60 ? 'medium-score' : '';
     const deadline = formatDeadline(match.fecha_cierre);
     const isUrgent = isDeadlineUrgent(match.fecha_cierre);
     
-    return `
-      <div class="match-card ${scoreClass}" onclick="openLicitacion('${match.link_oficial || ''}')">
-        <div class="match-header">
-          <span class="match-code">${match.id_licitacion || 'N/A'}</span>
-          <span class="match-score">${score}% match</span>
-        </div>
-        <div class="match-title">${match.titulo || 'Sin título'}</div>
-        <div class="match-org">${match.organismo || 'Organismo no especificado'}</div>
-        <div class="match-footer">
-          <span class="match-budget">${formatCurrency(match.presupuesto)}</span>
-          <span class="match-deadline ${isUrgent ? 'urgent' : ''}">${deadline}</span>
-        </div>
-      </div>
-    `;
-  }).join('');
+    // Create card element
+    const card = document.createElement('div');
+    card.className = `match-card ${scoreClass}`;
+    card.addEventListener('click', () => openLicitacion(match.link_oficial || ''));
+    
+    // Create header
+    const header = document.createElement('div');
+    header.className = 'match-header';
+    
+    const codeSpan = document.createElement('span');
+    codeSpan.className = 'match-code';
+    codeSpan.textContent = match.id_licitacion || 'N/A';
+    
+    const scoreSpan = document.createElement('span');
+    scoreSpan.className = 'match-score';
+    scoreSpan.textContent = `${score}% match`;
+    
+    header.appendChild(codeSpan);
+    header.appendChild(scoreSpan);
+    
+    // Create title
+    const titleDiv = document.createElement('div');
+    titleDiv.className = 'match-title';
+    titleDiv.textContent = match.titulo || 'Sin título';
+    
+    // Create org
+    const orgDiv = document.createElement('div');
+    orgDiv.className = 'match-org';
+    orgDiv.textContent = match.organismo || 'Organismo no especificado';
+    
+    // Create footer
+    const footer = document.createElement('div');
+    footer.className = 'match-footer';
+    
+    const budgetSpan = document.createElement('span');
+    budgetSpan.className = 'match-budget';
+    budgetSpan.textContent = formatCurrency(match.presupuesto);
+    
+    const deadlineSpan = document.createElement('span');
+    deadlineSpan.className = `match-deadline ${isUrgent ? 'urgent' : ''}`;
+    deadlineSpan.textContent = deadline;
+    
+    footer.appendChild(budgetSpan);
+    footer.appendChild(deadlineSpan);
+    
+    // Assemble card
+    card.appendChild(header);
+    card.appendChild(titleDiv);
+    card.appendChild(orgDiv);
+    card.appendChild(footer);
+    
+    container.appendChild(card);
+  });
 }
 
 function updateLastSync() {
