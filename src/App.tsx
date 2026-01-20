@@ -39,6 +39,9 @@ import AuthCallback from "./pages/AuthCallback";
 import Billing from "./pages/Billing";
 import Opportunities from "./pages/Opportunities";
 import MyBids from "./pages/MyBids";
+import Instituciones from "./pages/Instituciones";
+import AutoBids from "./pages/AutoBids";
+import Planes from "./pages/Planes";
 
 const queryClient = new QueryClient();
 
@@ -103,6 +106,9 @@ const App = () => (
             <Route path="/users" element={<Users />} />
             <Route path="/role-config" element={<RoleConfig />} />
             <Route path="/permisos-roles" element={<PermisosRoles />} />
+            <Route path="/instituciones" element={<Instituciones />} />
+            <Route path="/auto-bids" element={<AutoBids />} />
+            <Route path="/planes" element={<Planes />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>

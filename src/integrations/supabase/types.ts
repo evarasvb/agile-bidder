@@ -14,6 +14,104 @@ export type Database = {
   }
   public: {
     Tables: {
+      auto_bid_items: {
+        Row: {
+          activo: boolean | null
+          bids_ganados: number | null
+          created_at: string | null
+          dashboard_id: string | null
+          id: string
+          margen_objetivo: number | null
+          nombre_producto: string
+          precio_maximo: number | null
+          precio_minimo: number | null
+          producto_id: string | null
+          total_bids: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          activo?: boolean | null
+          bids_ganados?: number | null
+          created_at?: string | null
+          dashboard_id?: string | null
+          id?: string
+          margen_objetivo?: number | null
+          nombre_producto: string
+          precio_maximo?: number | null
+          precio_minimo?: number | null
+          producto_id?: string | null
+          total_bids?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          activo?: boolean | null
+          bids_ganados?: number | null
+          created_at?: string | null
+          dashboard_id?: string | null
+          id?: string
+          margen_objetivo?: number | null
+          nombre_producto?: string
+          precio_maximo?: number | null
+          precio_minimo?: number | null
+          producto_id?: string | null
+          total_bids?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auto_bid_items_dashboard_id_fkey"
+            columns: ["dashboard_id"]
+            isOneToOne: false
+            referencedRelation: "auto_bids_dashboard"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      auto_bids_dashboard: {
+        Row: {
+          activo: boolean | null
+          configuracion: Json | null
+          created_at: string | null
+          id: string
+          monto_total_ganado: number | null
+          tasa_exito: number | null
+          total_bids_enviados: number | null
+          total_bids_ganados: number | null
+          ultimo_bid_fecha: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          activo?: boolean | null
+          configuracion?: Json | null
+          created_at?: string | null
+          id?: string
+          monto_total_ganado?: number | null
+          tasa_exito?: number | null
+          total_bids_enviados?: number | null
+          total_bids_ganados?: number | null
+          ultimo_bid_fecha?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          activo?: boolean | null
+          configuracion?: Json | null
+          created_at?: string | null
+          id?: string
+          monto_total_ganado?: number | null
+          tasa_exito?: number | null
+          total_bids_enviados?: number | null
+          total_bids_ganados?: number | null
+          ultimo_bid_fecha?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       cliente_exclusiones: {
         Row: {
           cliente_id: string
@@ -334,6 +432,100 @@ export type Database = {
         }
         Relationships: []
       }
+      compras_agiles_items: {
+        Row: {
+          cantidad: number | null
+          categoria: string | null
+          codigo_compra: string | null
+          codigo_producto: string | null
+          compra_agil_id: string | null
+          created_at: string | null
+          descripcion: string | null
+          id: string
+          nombre_producto: string
+          precio_unitario: number | null
+          total: number | null
+          unidad: string | null
+        }
+        Insert: {
+          cantidad?: number | null
+          categoria?: string | null
+          codigo_compra?: string | null
+          codigo_producto?: string | null
+          compra_agil_id?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          id?: string
+          nombre_producto: string
+          precio_unitario?: number | null
+          total?: number | null
+          unidad?: string | null
+        }
+        Update: {
+          cantidad?: number | null
+          categoria?: string | null
+          codigo_compra?: string | null
+          codigo_producto?: string | null
+          compra_agil_id?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          id?: string
+          nombre_producto?: string
+          precio_unitario?: number | null
+          total?: number | null
+          unidad?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compras_agiles_items_compra_agil_id_fkey"
+            columns: ["compra_agil_id"]
+            isOneToOne: false
+            referencedRelation: "compras_agiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conducta_pago: {
+        Row: {
+          id: string
+          institucion_id: string | null
+          monto_pendiente: number | null
+          ordenes_pagadas_a_tiempo: number | null
+          ordenes_pagadas_tardias: number | null
+          promedio_dias_pago: number | null
+          score_pago: number | null
+          ultima_actualizacion: string | null
+        }
+        Insert: {
+          id?: string
+          institucion_id?: string | null
+          monto_pendiente?: number | null
+          ordenes_pagadas_a_tiempo?: number | null
+          ordenes_pagadas_tardias?: number | null
+          promedio_dias_pago?: number | null
+          score_pago?: number | null
+          ultima_actualizacion?: string | null
+        }
+        Update: {
+          id?: string
+          institucion_id?: string | null
+          monto_pendiente?: number | null
+          ordenes_pagadas_a_tiempo?: number | null
+          ordenes_pagadas_tardias?: number | null
+          promedio_dias_pago?: number | null
+          score_pago?: number | null
+          ultima_actualizacion?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conducta_pago_institucion_id_fkey"
+            columns: ["institucion_id"]
+            isOneToOne: false
+            referencedRelation: "instituciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       empresas_billing: {
         Row: {
           comision_porcentaje: number
@@ -651,6 +843,151 @@ export type Database = {
         }
         Relationships: []
       }
+      instituciones_dashboard: {
+        Row: {
+          categoria_gasto: string | null
+          id: string
+          institucion_id: string | null
+          monto_total_compras: number | null
+          promedio_por_compra: number | null
+          score_oportunidad: number | null
+          tendencia_compras: string | null
+          total_compras: number | null
+          ultima_compra_fecha: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          categoria_gasto?: string | null
+          id?: string
+          institucion_id?: string | null
+          monto_total_compras?: number | null
+          promedio_por_compra?: number | null
+          score_oportunidad?: number | null
+          tendencia_compras?: string | null
+          total_compras?: number | null
+          ultima_compra_fecha?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          categoria_gasto?: string | null
+          id?: string
+          institucion_id?: string | null
+          monto_total_compras?: number | null
+          promedio_por_compra?: number | null
+          score_oportunidad?: number | null
+          tendencia_compras?: string | null
+          total_compras?: number | null
+          ultima_compra_fecha?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instituciones_dashboard_institucion_id_fkey"
+            columns: ["institucion_id"]
+            isOneToOne: false
+            referencedRelation: "instituciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      instituciones_gestion: {
+        Row: {
+          created_at: string | null
+          estado_gestion: string | null
+          fecha_ultimo_contacto: string | null
+          id: string
+          institucion_id: string | null
+          notas: string | null
+          prioridad: number | null
+          proximo_seguimiento: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          estado_gestion?: string | null
+          fecha_ultimo_contacto?: string | null
+          id?: string
+          institucion_id?: string | null
+          notas?: string | null
+          prioridad?: number | null
+          proximo_seguimiento?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          estado_gestion?: string | null
+          fecha_ultimo_contacto?: string | null
+          id?: string
+          institucion_id?: string | null
+          notas?: string | null
+          prioridad?: number | null
+          proximo_seguimiento?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instituciones_gestion_institucion_id_fkey"
+            columns: ["institucion_id"]
+            isOneToOne: false
+            referencedRelation: "instituciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      instituciones_interacciones: {
+        Row: {
+          created_at: string | null
+          descripcion: string | null
+          fecha_interaccion: string | null
+          gestion_id: string | null
+          id: string
+          institucion_id: string | null
+          resultado: string | null
+          tipo_interaccion: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          descripcion?: string | null
+          fecha_interaccion?: string | null
+          gestion_id?: string | null
+          id?: string
+          institucion_id?: string | null
+          resultado?: string | null
+          tipo_interaccion: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          descripcion?: string | null
+          fecha_interaccion?: string | null
+          gestion_id?: string | null
+          id?: string
+          institucion_id?: string | null
+          resultado?: string | null
+          tipo_interaccion?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instituciones_interacciones_gestion_id_fkey"
+            columns: ["gestion_id"]
+            isOneToOne: false
+            referencedRelation: "instituciones_gestion"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instituciones_interacciones_institucion_id_fkey"
+            columns: ["institucion_id"]
+            isOneToOne: false
+            referencedRelation: "instituciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory: {
         Row: {
           activo: boolean
@@ -745,6 +1082,20 @@ export type Database = {
             columns: ["licitacion_id"]
             isOneToOne: false
             referencedRelation: "licitaciones"
+            referencedColumns: ["id_licitacion"]
+          },
+          {
+            foreignKeyName: "licitacion_items_licitacion_id_fkey"
+            columns: ["licitacion_id"]
+            isOneToOne: false
+            referencedRelation: "licitaciones_con_match"
+            referencedColumns: ["id_licitacion"]
+          },
+          {
+            foreignKeyName: "licitacion_items_licitacion_id_fkey"
+            columns: ["licitacion_id"]
+            isOneToOne: false
+            referencedRelation: "licitaciones_urgentes"
             referencedColumns: ["id_licitacion"]
           },
         ]
@@ -1070,6 +1421,20 @@ export type Database = {
             referencedRelation: "licitaciones"
             referencedColumns: ["id_licitacion"]
           },
+          {
+            foreignKeyName: "ofertas_licitacion_id_fkey"
+            columns: ["licitacion_id"]
+            isOneToOne: false
+            referencedRelation: "licitaciones_con_match"
+            referencedColumns: ["id_licitacion"]
+          },
+          {
+            foreignKeyName: "ofertas_licitacion_id_fkey"
+            columns: ["licitacion_id"]
+            isOneToOne: false
+            referencedRelation: "licitaciones_urgentes"
+            referencedColumns: ["id_licitacion"]
+          },
         ]
       }
       ordenes_compra: {
@@ -1221,6 +1586,63 @@ export type Database = {
           },
         ]
       }
+      planes: {
+        Row: {
+          activo: boolean | null
+          created_at: string | null
+          descripcion: string | null
+          features: Json | null
+          id: string
+          limite_licitaciones: number | null
+          limite_ofertas: number | null
+          limite_usuarios: number | null
+          nombre: string
+          orden: number | null
+          precio_anual: number | null
+          precio_mensual: number
+          tiene_api: boolean | null
+          tiene_auto_bid: boolean | null
+          tiene_bi_avanzado: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          created_at?: string | null
+          descripcion?: string | null
+          features?: Json | null
+          id?: string
+          limite_licitaciones?: number | null
+          limite_ofertas?: number | null
+          limite_usuarios?: number | null
+          nombre: string
+          orden?: number | null
+          precio_anual?: number | null
+          precio_mensual: number
+          tiene_api?: boolean | null
+          tiene_auto_bid?: boolean | null
+          tiene_bi_avanzado?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          activo?: boolean | null
+          created_at?: string | null
+          descripcion?: string | null
+          features?: Json | null
+          id?: string
+          limite_licitaciones?: number | null
+          limite_ofertas?: number | null
+          limite_usuarios?: number | null
+          nombre?: string
+          orden?: number | null
+          precio_anual?: number | null
+          precio_mensual?: number
+          tiene_api?: boolean | null
+          tiene_auto_bid?: boolean | null
+          tiene_bi_avanzado?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       product_images: {
         Row: {
           created_at: string
@@ -1251,6 +1673,51 @@ export type Database = {
           product_id?: string
           product_type?: string
           storage_path?: string | null
+        }
+        Relationships: []
+      }
+      productos: {
+        Row: {
+          activo: boolean | null
+          categoria: string | null
+          codigo: string | null
+          created_at: string | null
+          descripcion: string | null
+          id: string
+          keywords: string[] | null
+          nombre: string
+          precio_referencia: number | null
+          subcategoria: string | null
+          unidad_medida: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          categoria?: string | null
+          codigo?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          id?: string
+          keywords?: string[] | null
+          nombre: string
+          precio_referencia?: number | null
+          subcategoria?: string | null
+          unidad_medida?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          activo?: boolean | null
+          categoria?: string | null
+          codigo?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          id?: string
+          keywords?: string[] | null
+          nombre?: string
+          precio_referencia?: number | null
+          subcategoria?: string | null
+          unidad_medida?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -1874,6 +2341,56 @@ export type Database = {
       }
     }
     Views: {
+      bi_oc_negocios_por_institucion: {
+        Row: {
+          institucion_nombre: string | null
+          institucion_rut: string | null
+          monto_total: number | null
+          promedio_orden: number | null
+          proveedores_distintos: number | null
+          total_ordenes: number | null
+          ultima_orden: string | null
+        }
+        Relationships: []
+      }
+      bi_oc_negocios_por_proveedor: {
+        Row: {
+          instituciones_distintas: number | null
+          monto_total: number | null
+          promedio_orden: number | null
+          proveedor_nombre: string | null
+          proveedor_rut: string | null
+          total_ordenes: number | null
+          ultima_orden: string | null
+        }
+        Relationships: []
+      }
+      bi_oc_precios_producto_proveedor: {
+        Row: {
+          nombre_producto: string | null
+          precio_maximo: number | null
+          precio_minimo: number | null
+          precio_promedio: number | null
+          proveedor_nombre: string | null
+          proveedor_rut: string | null
+          ultima_venta: string | null
+          veces_vendido: number | null
+        }
+        Relationships: []
+      }
+      bi_oc_productos: {
+        Row: {
+          cantidad_total: number | null
+          categoria: string | null
+          monto_total: number | null
+          nombre_producto: string | null
+          precio_maximo: number | null
+          precio_minimo: number | null
+          precio_promedio: number | null
+          total_ventas: number | null
+        }
+        Relationships: []
+      }
       calendario_eventos: {
         Row: {
           codigo: string | null
@@ -1883,6 +2400,107 @@ export type Database = {
           presupuesto_estimado: number | null
           tipo_evento: string | null
           tipo_proceso: string | null
+        }
+        Relationships: []
+      }
+      dashboard_estado: {
+        Row: {
+          con_match: number | null
+          monto_ganado: number | null
+          monto_ordenes: number | null
+          ofertas_enviadas: number | null
+          ofertas_ganadas: number | null
+          total_licitaciones: number | null
+          total_ofertas: number | null
+          total_ordenes: number | null
+          urgentes: number | null
+        }
+        Relationships: []
+      }
+      licitaciones_con_match: {
+        Row: {
+          created_at: string | null
+          estado: string | null
+          fecha_cierre: string | null
+          id_licitacion: string | null
+          link_oficial: string | null
+          match_encontrado: boolean | null
+          match_score: number | null
+          organismo: string | null
+          presupuesto: number | null
+          procesada: boolean | null
+          score: number | null
+          titulo: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          estado?: string | null
+          fecha_cierre?: string | null
+          id_licitacion?: string | null
+          link_oficial?: string | null
+          match_encontrado?: boolean | null
+          match_score?: number | null
+          organismo?: string | null
+          presupuesto?: number | null
+          procesada?: boolean | null
+          score?: never
+          titulo?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          estado?: string | null
+          fecha_cierre?: string | null
+          id_licitacion?: string | null
+          link_oficial?: string | null
+          match_encontrado?: boolean | null
+          match_score?: number | null
+          organismo?: string | null
+          presupuesto?: number | null
+          procesada?: boolean | null
+          score?: never
+          titulo?: string | null
+        }
+        Relationships: []
+      }
+      licitaciones_urgentes: {
+        Row: {
+          created_at: string | null
+          estado: string | null
+          fecha_cierre: string | null
+          id_licitacion: string | null
+          link_oficial: string | null
+          match_encontrado: boolean | null
+          match_score: number | null
+          organismo: string | null
+          presupuesto: number | null
+          procesada: boolean | null
+          titulo: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          estado?: string | null
+          fecha_cierre?: string | null
+          id_licitacion?: string | null
+          link_oficial?: string | null
+          match_encontrado?: boolean | null
+          match_score?: number | null
+          organismo?: string | null
+          presupuesto?: number | null
+          procesada?: boolean | null
+          titulo?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          estado?: string | null
+          fecha_cierre?: string | null
+          id_licitacion?: string | null
+          link_oficial?: string | null
+          match_encontrado?: boolean | null
+          match_score?: number | null
+          organismo?: string | null
+          presupuesto?: number | null
+          procesada?: boolean | null
+          titulo?: string | null
         }
         Relationships: []
       }
