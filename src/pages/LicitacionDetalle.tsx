@@ -30,8 +30,8 @@ import { format, differenceInDays, differenceInHours } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useLicitacionItems } from '@/hooks/useLicitacionItems';
+import { supabaseClient } from '@/lib/supabaseClient';
+import { useLicitacionItemsReal } from '@/hooks/useLicitacionItemsReal';
 import LicitacionesSimilares from '@/components/licitaciones/LicitacionesSimilares';
 
 interface LicitacionBIItem {
@@ -60,7 +60,7 @@ function useLicitacionDetalle(id: string | undefined) {
       if (!id) return null;
 
       // Try compras_agiles first
-      const { data: compraAgil, error: caError } = await supabase
+      const { data: compraAgil, error: caError } = await (supabaseClient as any)
         .from('compras_agiles')
         .select('*')
         .or(`codigo.eq.${id},id.eq.${id}`)
@@ -87,7 +87,7 @@ function useLicitacionDetalle(id: string | undefined) {
       }
 
       // Try licitaciones table
-      const { data: licitacion, error: licError } = await supabase
+      const { data: licitacion, error: licError } = await (supabaseClient as any)
         .from('licitaciones')
         .select('*')
         .or(`id_licitacion.eq.${id}`)
@@ -114,7 +114,7 @@ function useLicitacionDetalle(id: string | undefined) {
       }
 
       // Try licitaciones_bi
-      const { data: licitacionBI, error: biError } = await (supabase as any)
+      const { data: licitacionBI, error: biError } = await (supabaseClient as any)
         .from('licitaciones_bi')
         .select('*')
         .or(`codigo.eq.${id},id.eq.${id}`)
@@ -153,7 +153,7 @@ function useLicitacionBIItems(licitacionId: string | null, tipo: string | undefi
     queryFn: async () => {
       if (!licitacionId || tipo !== 'licitacion_bi') return [];
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await (supabaseClient as any)
         .from('licitaciones_bi_items')
         .select('*')
         .eq('licitacion_id', licitacionId)
@@ -170,7 +170,7 @@ export default function LicitacionDetalle() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: licitacion, isLoading, error } = useLicitacionDetalle(id);
-  const { data: itemsFromDB } = useLicitacionItems(licitacion?.id || null);
+  const { data: itemsFromDB } = useLicitacionItemsReal(licitacion?.id || licitacion?.codigo);
   const { data: itemsBI } = useLicitacionBIItems(licitacion?.id || null, licitacion?.tipo);
   const [copied, setCopied] = useState(false);
 

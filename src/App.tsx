@@ -44,6 +44,7 @@ import AutoBids from "./pages/AutoBids";
 import Planes from "./pages/Planes";
 import MisOportunidades from "./pages/MisOportunidades";
 import ConfiguracionOportunidades from "./pages/ConfiguracionOportunidades";
+import MiInventario from "./pages/MiInventario";
 
 const queryClient = new QueryClient();
 
@@ -113,6 +114,7 @@ const App = () => (
             <Route path="/planes" element={<Planes />} />
             <Route path="/mis-oportunidades" element={<MisOportunidades />} />
             <Route path="/configuracion-oportunidades" element={<ConfiguracionOportunidades />} />
+            <Route path="/mi-inventario" element={<MiInventario />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>

@@ -12,7 +12,8 @@ import {
   Building2,
   Sparkles,
   Crown,
-  Star
+  Star,
+  ShoppingBag
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -27,6 +28,7 @@ const navItems = [
   { title: "Licitaciones", url: "/licitaciones", icon: FileText },
   { title: "Compras Ágiles", url: "/compras-agiles", icon: Zap },
   { title: "Mis Oportunidades", url: "/mis-oportunidades", icon: Star },
+  { title: "Mi Inventario", url: "/mi-inventario", icon: ShoppingBag },
   { title: "Inventario", url: "/inventory", icon: Package },
   { title: "Instituciones", url: "/instituciones", icon: Building2 },
   { title: "Oportunidades", url: "/opportunities", icon: Target },
