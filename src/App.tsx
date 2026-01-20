@@ -15,6 +15,7 @@ import History from "./pages/History";
 import Settings from "./pages/Settings";
 import Logs from "./pages/Logs";
 import Licitaciones from "./pages/Licitaciones";
+import LicitacionDetalle from "./pages/LicitacionDetalle";
 import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
 import OdooDashboard from "./pages/OdooDashboard";
@@ -83,6 +84,7 @@ const App = () => (
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/history" element={<History />} />
             <Route path="/licitaciones" element={<Licitaciones />} />
+            <Route path="/licitaciones/:id" element={<LicitacionDetalle />} />
             <Route path="/compras-agiles" element={<ComprasAgiles />} />
             <Route path="/compras-agiles/:codigo" element={<CompraAgilDetalle />} />
             <Route path="/ordenes-compra" element={<OrdenesCompra />} />
