@@ -2,18 +2,52 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+// Types for notification system
+export type NotificationType = 
+  | 'nuevo_match' 
+  | 'cierre_proximo' 
+  | 'cambio_licitacion' 
+  | 'nueva_licitacion' 
+  | 'oferta_enviada' 
+  | 'adjudicacion' 
+  | 'recordatorio' 
+  | 'resumen_diario';
+
+export interface NotificationData {
+  licitacion_id?: string;
+  licitacion_codigo?: string;
+  licitacion_titulo?: string;
+  match_score?: number;
+  organismo?: string;
+  presupuesto?: number;
+  fecha_cierre?: string;
+  horas_restantes?: number;
+  resumen?: string;
+  // Oferta enviada
+  oferta_id?: string;
+  monto_ofertado?: number;
+  productos_count?: number;
+  // Adjudicación
+  resultado?: 'ganada' | 'perdida' | 'desierta';
+  monto_adjudicado?: number;
+  proveedor_ganador?: string;
+  // Recordatorio
+  dias_restantes?: number;
+  accion_pendiente?: string;
+  productos_match?: Array<{ nombre: string; score: number }>;
+}
+
+export interface SendNotificationParams {
+  to?: string;
+  clienteId?: string;
+  template: NotificationType;
+  data: NotificationData;
+}
+
 interface EventoNotificacion {
   tipo: 'nuevo_match' | 'cierre_proximo' | 'cambio_licitacion';
   licitacion_id: string;
-  datos: {
-    licitacion_titulo?: string;
-    match_score?: number;
-    organismo?: string;
-    presupuesto?: number;
-    fecha_cierre?: string;
-    horas_restantes?: number;
-    productos_match?: Array<{ nombre: string; score: number }>;
-  };
+  datos: NotificationData;
 }
 
 interface NotificacionPreferencias {
@@ -89,7 +123,7 @@ export function useActualizarNotificacionPreferencias() {
   });
 }
 
-// Hook para enviar notificación
+// Hook para enviar notificación (legacy)
 export function useEnviarNotificacion() {
   return useMutation({
     mutationFn: async ({ clienteId, evento }: { 
@@ -114,6 +148,59 @@ export function useEnviarNotificacion() {
       console.error('Error sending notification:', error);
     }
   });
+}
+
+/**
+ * Simplified hook to send notifications from any component
+ * 
+ * Usage:
+ * ```tsx
+ * const { sendNotification, isLoading } = useSendNotification();
+ * 
+ * await sendNotification({
+ *   to: "cliente@empresa.cl", // or use clienteId
+ *   template: "oferta_enviada",
+ *   data: {
+ *     licitacion_titulo: "Compra de equipos",
+ *     monto_ofertado: 5000000,
+ *     productos_count: 5
+ *   }
+ * });
+ * ```
+ */
+export function useSendNotification() {
+  const mutation = useMutation({
+    mutationFn: async (params: SendNotificationParams) => {
+      const { to, clienteId, template, data } = params;
+      
+      const { data: result, error } = await supabase.functions.invoke('send-notification', {
+        body: {
+          to,
+          cliente_id: clienteId,
+          tipo: template,
+          data
+        }
+      });
+      
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: (result) => {
+      if (result?.success) {
+        console.log('Notification sent successfully:', result.messageId);
+      }
+    },
+    onError: (error) => {
+      console.error('Error sending notification:', error);
+      toast.error('Error al enviar notificación');
+    }
+  });
+
+  return {
+    sendNotification: mutation.mutateAsync,
+    isLoading: mutation.isPending,
+    error: mutation.error,
+  };
 }
 
 // Hook para detectar y procesar eventos de notificación
