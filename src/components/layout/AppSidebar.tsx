@@ -8,7 +8,10 @@ import {
   Target,
   Send,
   Bot,
-  CreditCard
+  CreditCard,
+  Building2,
+  Sparkles,
+  Crown
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -23,8 +26,11 @@ const navItems = [
   { title: "Licitaciones", url: "/licitaciones", icon: FileText },
   { title: "Compras Ágiles", url: "/compras-agiles", icon: Zap },
   { title: "Inventario", url: "/inventory", icon: Package },
+  { title: "Instituciones", url: "/instituciones", icon: Building2 },
   { title: "Oportunidades", url: "/opportunities", icon: Target },
+  { title: "Auto-Bids", url: "/auto-bids", icon: Sparkles },
   { title: "Mis Ofertas", url: "/my-bids", icon: Send },
+  { title: "Planes", url: "/planes", icon: Crown },
   { title: "Facturación", url: "/billing", icon: CreditCard },
   { title: "Configuración", url: "/settings", icon: Settings },
   { title: "Evaristo", url: "/admin/evaristo", icon: Bot },
