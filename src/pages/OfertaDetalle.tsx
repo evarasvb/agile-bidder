@@ -42,7 +42,8 @@ const estadoConfig: Record<string, { label: string; color: string }> = {
   perdida: { label: 'Perdida', color: 'bg-muted text-muted-foreground' },
 };
 
-function formatCurrency(value: number) {
+function formatCurrency(value: number | null | undefined) {
+  if (value === null || value === undefined || isNaN(value)) return '$0';
   return new Intl.NumberFormat('es-CL', {
     style: 'currency',
     currency: 'CLP',
@@ -81,9 +82,9 @@ export default function OfertaDetalle() {
 
   const { label: estadoLabel, color: estadoColor } = estadoConfig[oferta.estado] || estadoConfig.borrador;
   const presupuesto = oferta.licitacion?.presupuesto || 0;
-  const totalNeto = oferta.valor_total_oferta;
-  const iva = Math.round(totalNeto * 0.19);
-  const totalConIva = totalNeto + iva;
+  const totalNeto = oferta.valor_total_oferta || 0;
+  const iva = Math.round((totalNeto || 0) * 0.19);
+  const totalConIva = (totalNeto || 0) + iva;
   const excedido = presupuesto > 0 && totalNeto > presupuesto;
 
   const handleGuardarBorrador = async () => {
@@ -216,26 +217,37 @@ export default function OfertaDetalle() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {oferta.productos_ofertados?.map((producto, index) => (
-                    <TableRow key={index}>
-                      <TableCell>
-                        <p className="font-medium text-sm">{producto.descripcion || '-'}</p>
-                      </TableCell>
-                      <TableCell>
-                        <p className="text-sm">{producto.nombre_producto}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{producto.sku}</p>
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {producto.cantidad} {producto.unidad_medida}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatCurrency(producto.precio_unitario)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono font-medium">
-                        {formatCurrency(producto.precio_total)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {oferta.productos_ofertados?.map((producto, index) => {
+                    const precioUnitario = producto.precio_unitario ?? 0;
+                    const cantidad = producto.cantidad ?? 1;
+                    const precioTotal = producto.precio_total ?? (precioUnitario * cantidad);
+                    
+                    return (
+                      <TableRow key={index}>
+                        <TableCell>
+                          <p className="font-medium text-sm">{producto.descripcion || 'Sin descripción'}</p>
+                          {producto.descripcion && producto.descripcion.length > 50 && (
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                              {producto.descripcion}
+                            </p>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <p className="text-sm font-medium">{producto.nombre_producto}</p>
+                          <p className="text-xs text-muted-foreground font-mono">{producto.sku}</p>
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {cantidad} {producto.unidad_medida || 'unidad'}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {formatCurrency(precioUnitario)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-medium">
+                          {formatCurrency(precioTotal)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                   {(!oferta.productos_ofertados || oferta.productos_ofertados.length === 0) && (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
@@ -290,10 +302,10 @@ export default function OfertaDetalle() {
                   {formatCurrency(totalConIva)}
                 </span>
               </div>
-              {oferta.margen_total > 0 && (
+              {oferta.margen_total != null && oferta.margen_total > 0 && (
                 <div className="flex justify-between pt-2">
                   <span className="text-xs text-muted-foreground">Margen</span>
-                  <Badge variant="secondary">{oferta.margen_total}%</Badge>
+                  <Badge variant="secondary">{oferta.margen_total.toFixed(2)}%</Badge>
                 </div>
               )}
             </CardContent>
