@@ -2425,7 +2425,6 @@ export type Database = {
           id_licitacion: string | null
           link_oficial: string | null
           match_encontrado: boolean | null
-          match_score: number | null
           organismo: string | null
           presupuesto: number | null
           procesada: boolean | null
@@ -2439,11 +2438,10 @@ export type Database = {
           id_licitacion?: string | null
           link_oficial?: string | null
           match_encontrado?: boolean | null
-          match_score?: number | null
           organismo?: string | null
           presupuesto?: number | null
           procesada?: boolean | null
-          score?: never
+          score?: number | null
           titulo?: string | null
         }
         Update: {
@@ -2453,11 +2451,10 @@ export type Database = {
           id_licitacion?: string | null
           link_oficial?: string | null
           match_encontrado?: boolean | null
-          match_score?: number | null
           organismo?: string | null
           presupuesto?: number | null
           procesada?: boolean | null
-          score?: never
+          score?: number | null
           titulo?: string | null
         }
         Relationships: []
