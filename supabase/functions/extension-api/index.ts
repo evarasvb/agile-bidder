@@ -246,13 +246,60 @@ Deno.serve(async (req) => {
     let apiKeyId: string | null = null;
 
     if (apiKey) {
-      const { data: keyData, error: keyError } = await supabase
+      // Extract prefix for lookup (first 12 chars: "fvb_ext_XXXX")
+      const apiKeyPrefix = apiKey.substring(0, 12);
+      
+      // Hash the provided API key using SHA-256
+      const encoder = new TextEncoder();
+      const data = encoder.encode(apiKey);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const providedKeyHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      
+      // First try to find by hash (new secure method)
+      let keyData: ApiKeyData | null = null;
+      let keyError: any = null;
+      
+      // Look up by prefix first, then verify hash
+      const { data: candidateKeys, error: lookupError } = await supabase
         .from('extension_api_keys')
-        .select('id, cliente_id, activa')
-        .eq('api_key', apiKey)
-        .single();
+        .select('id, cliente_id, activa, api_key_hash, api_key')
+        .eq('api_key_prefix', apiKeyPrefix);
+      
+      if (!lookupError && candidateKeys && candidateKeys.length > 0) {
+        // Find matching key by hash
+        for (const candidate of candidateKeys) {
+          if (candidate.api_key_hash === providedKeyHash) {
+            keyData = { id: candidate.id, cliente_id: candidate.cliente_id, activa: candidate.activa };
+            break;
+          }
+        }
+      }
+      
+      // Fallback: Check plain text api_key for backwards compatibility (migration period)
+      if (!keyData) {
+        const { data: legacyKeyData, error: legacyError } = await supabase
+          .from('extension_api_keys')
+          .select('id, cliente_id, activa')
+          .eq('api_key', apiKey)
+          .single();
+        
+        if (!legacyError && legacyKeyData) {
+          keyData = legacyKeyData;
+          
+          // Migrate this key to hashed storage
+          await supabase
+            .from('extension_api_keys')
+            .update({ 
+              api_key_hash: providedKeyHash,
+              api_key_prefix: apiKeyPrefix,
+              api_key: '[MIGRATED]' // Clear plaintext after migration
+            })
+            .eq('id', legacyKeyData.id);
+        }
+      }
 
-      if (keyError || !keyData) {
+      if (!keyData) {
         return new Response(
           JSON.stringify({ error: 'API key inválida' }),
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

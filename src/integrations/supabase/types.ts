@@ -662,6 +662,8 @@ export type Database = {
         Row: {
           activa: boolean
           api_key: string
+          api_key_hash: string | null
+          api_key_prefix: string | null
           cliente_id: string
           created_at: string
           id: string
@@ -672,6 +674,8 @@ export type Database = {
         Insert: {
           activa?: boolean
           api_key: string
+          api_key_hash?: string | null
+          api_key_prefix?: string | null
           cliente_id: string
           created_at?: string
           id?: string
@@ -682,6 +686,8 @@ export type Database = {
         Update: {
           activa?: boolean
           api_key?: string
+          api_key_hash?: string | null
+          api_key_prefix?: string | null
           cliente_id?: string
           created_at?: string
           id?: string
@@ -2624,6 +2630,7 @@ export type Database = {
       }
     }
     Functions: {
+      apply_user_roles_rls_fix: { Args: never; Returns: undefined }
       get_user_primary_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
