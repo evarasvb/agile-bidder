@@ -44,6 +44,15 @@ export function useExtensionApiKeys(clienteId: string | null) {
   });
 }
 
+// Hash API key using SHA-256 (browser-compatible)
+async function hashApiKey(apiKey: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(apiKey);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 export function useCreateApiKey() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -51,12 +60,16 @@ export function useCreateApiKey() {
   return useMutation({
     mutationFn: async ({ clienteId, nombre }: { clienteId: string; nombre: string }) => {
       const apiKey = generateApiKey();
+      const apiKeyHash = await hashApiKey(apiKey);
+      const apiKeyPrefix = apiKey.substring(0, 12); // "fvb_ext_XXXX" for lookup
       
       const { data, error } = await supabase
         .from('extension_api_keys')
         .insert({
           cliente_id: clienteId,
-          api_key: apiKey,
+          api_key: '[HASHED]', // We don't store the actual key
+          api_key_hash: apiKeyHash,
+          api_key_prefix: apiKeyPrefix,
           nombre: nombre || 'API Key',
           activa: true
         })
