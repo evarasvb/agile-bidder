@@ -18,7 +18,7 @@ env:
 jobs:
   maintenance:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,7 +30,8 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-    run: npm install || true
+        run: npm install || true
+
       - name: Verificar compilacion TypeScript
         run: npm run build --if-present || echo 'Build check completed'
 
