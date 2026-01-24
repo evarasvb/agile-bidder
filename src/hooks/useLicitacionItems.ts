@@ -8,7 +8,7 @@ export interface LicitacionItem {
   id: string;
   compra_agil_id: number;
   nombre_producto: string;
-  descripcion_producto: string | null;
+  descripcion: string | null;
   cantidad: number | null;
   unidad: string | null;
   codigo_producto: string | null;
