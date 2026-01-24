@@ -55,7 +55,7 @@ jobs:
             "${{ env.SUPABASE_URL }}/functions/v1/mercadopublico-api" \
             -H "Authorization: Bearer ${{ env.SUPABASE_SERVICE_KEY }}" \
             -H "Content-Type: application/json" \
-            -d '{"action": "sync_licitaciones", "fecha": "'${{ steps.fecha.outputs.FECHA }}'", "ticket": "'${{ env.MP_API_TICKET }}'"}')
+            -d '{"action": "sync-licitaciones", "fecha": "'${{ steps.fecha.outputs.FECHA }}'", "ticket": "'${{ env.MP_API_TICKET }}'"}')
           
           echo "Respuesta: $response"
 
@@ -69,7 +69,7 @@ jobs:
             "${{ env.SUPABASE_URL }}/functions/v1/mercadopublico-api" \
             -H "Authorization: Bearer ${{ env.SUPABASE_SERVICE_KEY }}" \
             -H "Content-Type: application/json" \
-            -d '{"action": "sync_ordenes", "fecha": "'${{ steps.fecha.outputs.FECHA }}'", "ticket": "'${{ env.MP_API_TICKET }}'"}')
+            -d '{"action": "sync-ordenes", "fecha": "'${{ steps.fecha.outputs.FECHA }}'", "ticket": "'${{ env.MP_API_TICKET }}'"}')
           
           echo "Respuesta: $response"
 
