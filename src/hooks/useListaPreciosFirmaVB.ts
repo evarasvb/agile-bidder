@@ -34,22 +34,22 @@ export function useListaPreciosFirmaVB(filters?: ListaPreciosFilters) {
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
 
-      // Exact column names from database
+      // Exact column names from database - uppercase columns need double quotes in PostgreSQL
       let query = (supabase as any)
         .from('lista_precios_firmavb')
-        .select('id, PROVEEDOR, CATEGORIA, DESCRIPCION, CODIGO, COSTO, "Mg Comercial", "Precio de venta neto", Unidad, activo, created_at', { count: 'exact' })
+        .select('id, "PROVEEDOR", "CATEGORIA", "DESCRIPCION", "CODIGO", "COSTO", "Mg Comercial", "Precio de venta neto", "Unidad", activo, created_at', { count: 'exact' })
         .range(from, to)
         .order('id', { ascending: true });
 
-      // Apply filters with exact column names
+      // Apply filters with quoted column names for PostgreSQL
       if (filters?.search && filters.search.length >= 2) {
-        query = query.or(`DESCRIPCION.ilike.%${filters.search}%,CODIGO.ilike.%${filters.search}%,PROVEEDOR.ilike.%${filters.search}%`);
+        query = query.or(`"DESCRIPCION".ilike.%${filters.search}%,"CODIGO".ilike.%${filters.search}%,"PROVEEDOR".ilike.%${filters.search}%`);
       }
       if (filters?.categoria && filters.categoria !== 'all') {
-        query = query.eq('CATEGORIA', filters.categoria);
+        query = query.eq('"CATEGORIA"', filters.categoria);
       }
       if (filters?.proveedor && filters.proveedor !== 'all') {
-        query = query.eq('PROVEEDOR', filters.proveedor);
+        query = query.eq('"PROVEEDOR"', filters.proveedor);
       }
 
       const { data, error, count } = await query;
@@ -101,13 +101,13 @@ export function useListaPreciosFilterOptions() {
     queryFn: async () => {
       const { data: catData } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('CATEGORIA');
+        .select('"CATEGORIA"');
 
       const categorias = [...new Set((catData || []).map((c: any) => c.CATEGORIA).filter(Boolean))].sort() as string[];
 
       const { data: provData } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('PROVEEDOR');
+        .select('"PROVEEDOR"');
 
       const proveedores = [...new Set((provData || []).map((p: any) => p.PROVEEDOR).filter(Boolean))].sort() as string[];
 
@@ -128,11 +128,11 @@ export function useListaPreciosStats() {
 
       const { data: categorias } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('CATEGORIA');
+        .select('"CATEGORIA"');
 
       const { data: proveedores } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('PROVEEDOR');
+        .select('"PROVEEDOR"');
 
       const { data: valorData } = await (supabase as any)
         .from('lista_precios_firmavb')
@@ -165,8 +165,8 @@ export function useBuscarProductosFirmaVB(searchTerm: string, enabled: boolean =
 
       const { data, error } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('id, PROVEEDOR, CATEGORIA, DESCRIPCION, CODIGO, COSTO, "Mg Comercial", "Precio de venta neto", Unidad')
-        .or(`DESCRIPCION.ilike.%${searchTerm}%,CODIGO.ilike.%${searchTerm}%`)
+        .select('id, "PROVEEDOR", "CATEGORIA", "DESCRIPCION", "CODIGO", "COSTO", "Mg Comercial", "Precio de venta neto", "Unidad"')
+        .or(`"DESCRIPCION".ilike.%${searchTerm}%,"CODIGO".ilike.%${searchTerm}%`)
         .limit(50);
 
       if (error) {
@@ -211,8 +211,8 @@ export function useMatchProductosFirmaVB(nombreBuscado: string | null) {
       const searchTerm = palabras[0];
       const { data, error } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('id, PROVEEDOR, CATEGORIA, DESCRIPCION, CODIGO, COSTO, "Mg Comercial", "Precio de venta neto", Unidad')
-        .or(`DESCRIPCION.ilike.%${searchTerm}%,CATEGORIA.ilike.%${searchTerm}%`)
+        .select('id, "PROVEEDOR", "CATEGORIA", "DESCRIPCION", "CODIGO", "COSTO", "Mg Comercial", "Precio de venta neto", "Unidad"')
+        .or(`"DESCRIPCION".ilike.%${searchTerm}%,"CATEGORIA".ilike.%${searchTerm}%`)
         .limit(200);
 
       if (error) {
