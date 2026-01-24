@@ -34,22 +34,22 @@ export function useListaPreciosFirmaVB(filters?: ListaPreciosFilters) {
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
 
-      // Columns are lowercase in the database
+      // Exact column names from database
       let query = (supabase as any)
         .from('lista_precios_firmavb')
-        .select('id, proveedor, categoria, descripcion, codigo, costo, margen_comercial, precio_venta_neto, unidad, activo, created_at', { count: 'exact' })
+        .select('id, PROVEEDOR, CATEGORIA, DESCRIPCION, CODIGO, COSTO, "Mg Comercial", "Precio de venta neto", Unidad, activo, created_at', { count: 'exact' })
         .range(from, to)
         .order('id', { ascending: true });
 
-      // Apply filters
+      // Apply filters with exact column names
       if (filters?.search && filters.search.length >= 2) {
-        query = query.or(`descripcion.ilike.%${filters.search}%,codigo.ilike.%${filters.search}%,proveedor.ilike.%${filters.search}%`);
+        query = query.or(`DESCRIPCION.ilike.%${filters.search}%,CODIGO.ilike.%${filters.search}%,PROVEEDOR.ilike.%${filters.search}%`);
       }
       if (filters?.categoria && filters.categoria !== 'all') {
-        query = query.eq('categoria', filters.categoria);
+        query = query.eq('CATEGORIA', filters.categoria);
       }
       if (filters?.proveedor && filters.proveedor !== 'all') {
-        query = query.eq('proveedor', filters.proveedor);
+        query = query.eq('PROVEEDOR', filters.proveedor);
       }
 
       const { data, error, count } = await query;
@@ -59,17 +59,17 @@ export function useListaPreciosFirmaVB(filters?: ListaPreciosFilters) {
         throw error;
       }
 
-      // Map to interface (columns are already lowercase)
+      // Map exact column names to interface
       const items: ProductoFirmaVB[] = (data || []).map((item: any) => ({
         id: item.id,
-        proveedor: item.proveedor,
-        categoria: item.categoria,
-        descripcion: item.descripcion,
-        codigo: item.codigo,
-        costo: item.costo,
-        margen_comercial: item.margen_comercial,
-        precio_venta_neto: item.precio_venta_neto,
-        unidad: item.unidad,
+        proveedor: item.PROVEEDOR,
+        categoria: item.CATEGORIA,
+        descripcion: item.DESCRIPCION,
+        codigo: item.CODIGO,
+        costo: item.COSTO,
+        margen_comercial: item['Mg Comercial'],
+        precio_venta_neto: item['Precio de venta neto'],
+        unidad: item.Unidad,
         activo: item.activo ?? true,
         created_at: item.created_at,
       }));
@@ -85,24 +85,22 @@ export function useListaPreciosFirmaVB(filters?: ListaPreciosFilters) {
   });
 }
 
-// Hook para obtener categorías y proveedores únicos (solo para filtros)
+// Hook para obtener categorías y proveedores únicos
 export function useListaPreciosFilterOptions() {
   return useQuery({
     queryKey: ['lista-precios-filter-options'],
     queryFn: async () => {
-      // Get unique categories
       const { data: catData } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('categoria');
+        .select('CATEGORIA');
 
-      const categorias = [...new Set((catData || []).map((c: any) => c.categoria).filter(Boolean))].sort() as string[];
+      const categorias = [...new Set((catData || []).map((c: any) => c.CATEGORIA).filter(Boolean))].sort() as string[];
 
-      // Get unique providers
       const { data: provData } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('proveedor');
+        .select('PROVEEDOR');
 
-      const proveedores = [...new Set((provData || []).map((p: any) => p.proveedor).filter(Boolean))].sort() as string[];
+      const proveedores = [...new Set((provData || []).map((p: any) => p.PROVEEDOR).filter(Boolean))].sort() as string[];
 
       return { categorias, proveedores };
     },
@@ -115,37 +113,33 @@ export function useListaPreciosStats() {
   return useQuery({
     queryKey: ['lista-precios-stats'],
     queryFn: async () => {
-      // Get total count
       const { count: total } = await (supabase as any)
         .from('lista_precios_firmavb')
         .select('*', { count: 'exact', head: true });
 
-      // Get unique categories
       const { data: categorias } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('categoria');
+        .select('CATEGORIA');
 
-      // Get unique providers
       const { data: proveedores } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('proveedor');
+        .select('PROVEEDOR');
 
-      // Get sum of prices (limited sample)
       const { data: valorData } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('precio_venta_neto')
+        .select('"Precio de venta neto"')
         .limit(1000);
 
       const valorTotal = (valorData || []).reduce((acc: number, item: any) => {
-        const precio = parseFloat(item.precio_venta_neto) || 0;
+        const precio = parseFloat(item['Precio de venta neto']) || 0;
         return acc + precio;
       }, 0);
 
       return {
         totalProductos: total || 0,
         productosActivos: total || 0,
-        totalCategorias: new Set((categorias || []).map((c: any) => c.categoria).filter(Boolean)).size,
-        totalProveedores: new Set((proveedores || []).map((p: any) => p.proveedor).filter(Boolean)).size,
+        totalCategorias: new Set((categorias || []).map((c: any) => c.CATEGORIA).filter(Boolean)).size,
+        totalProveedores: new Set((proveedores || []).map((p: any) => p.PROVEEDOR).filter(Boolean)).size,
         valorCatalogoTotal: valorTotal,
       };
     },
@@ -153,7 +147,7 @@ export function useListaPreciosStats() {
   });
 }
 
-// Hook para buscar productos (para matching)
+// Hook para buscar productos
 export function useBuscarProductosFirmaVB(searchTerm: string, enabled: boolean = true) {
   return useQuery({
     queryKey: ['lista-precios-search', searchTerm],
@@ -162,8 +156,8 @@ export function useBuscarProductosFirmaVB(searchTerm: string, enabled: boolean =
 
       const { data, error } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('id, proveedor, categoria, descripcion, codigo, costo, margen_comercial, precio_venta_neto, unidad')
-        .or(`descripcion.ilike.%${searchTerm}%,codigo.ilike.%${searchTerm}%`)
+        .select('id, PROVEEDOR, CATEGORIA, DESCRIPCION, CODIGO, COSTO, "Mg Comercial", "Precio de venta neto", Unidad')
+        .or(`DESCRIPCION.ilike.%${searchTerm}%,CODIGO.ilike.%${searchTerm}%`)
         .limit(50);
 
       if (error) {
@@ -173,14 +167,14 @@ export function useBuscarProductosFirmaVB(searchTerm: string, enabled: boolean =
 
       return (data || []).map((item: any) => ({
         id: item.id,
-        proveedor: item.proveedor,
-        categoria: item.categoria,
-        descripcion: item.descripcion,
-        codigo: item.codigo,
-        costo: item.costo,
-        margen_comercial: item.margen_comercial,
-        precio_venta_neto: item.precio_venta_neto,
-        unidad: item.unidad,
+        proveedor: item.PROVEEDOR,
+        categoria: item.CATEGORIA,
+        descripcion: item.DESCRIPCION,
+        codigo: item.CODIGO,
+        costo: item.COSTO,
+        margen_comercial: item['Mg Comercial'],
+        precio_venta_neto: item['Precio de venta neto'],
+        unidad: item.Unidad,
         activo: true,
         created_at: null,
       })) as ProductoFirmaVB[];
@@ -196,7 +190,6 @@ export function useMatchProductosFirmaVB(nombreBuscado: string | null) {
     queryFn: async () => {
       if (!nombreBuscado || nombreBuscado.length < 3) return [];
 
-      // Extraer palabras clave
       const palabras = nombreBuscado
         .toLowerCase()
         .normalize('NFD')
@@ -206,12 +199,11 @@ export function useMatchProductosFirmaVB(nombreBuscado: string | null) {
 
       if (palabras.length === 0) return [];
 
-      // Buscar productos
       const searchTerm = palabras[0];
       const { data, error } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('id, proveedor, categoria, descripcion, codigo, costo, margen_comercial, precio_venta_neto, unidad')
-        .or(`descripcion.ilike.%${searchTerm}%,categoria.ilike.%${searchTerm}%`)
+        .select('id, PROVEEDOR, CATEGORIA, DESCRIPCION, CODIGO, COSTO, "Mg Comercial", "Precio de venta neto", Unidad')
+        .or(`DESCRIPCION.ilike.%${searchTerm}%,CATEGORIA.ilike.%${searchTerm}%`)
         .limit(200);
 
       if (error) {
@@ -219,9 +211,8 @@ export function useMatchProductosFirmaVB(nombreBuscado: string | null) {
         throw error;
       }
 
-      // Calcular score de matching
       const productosConScore = (data || []).map((item: any) => {
-        const descripcionNorm = (item.descripcion || '')
+        const descripcionNorm = (item.DESCRIPCION || '')
           .toLowerCase()
           .normalize('NFD')
           .replace(/[\u0300-\u036f]/g, '');
@@ -236,21 +227,20 @@ export function useMatchProductosFirmaVB(nombreBuscado: string | null) {
           }
         });
 
-        // Bonus por coincidencia de código
-        if (item.codigo && nombreBuscado.toLowerCase().includes(item.codigo.toLowerCase())) {
+        if (item.CODIGO && nombreBuscado.toLowerCase().includes(item.CODIGO.toLowerCase())) {
           score += 20;
         }
 
         return {
           id: item.id,
-          proveedor: item.proveedor,
-          categoria: item.categoria,
-          descripcion: item.descripcion,
-          codigo: item.codigo,
-          costo: item.costo,
-          margen_comercial: item.margen_comercial,
-          precio_venta_neto: item.precio_venta_neto,
-          unidad: item.unidad,
+          proveedor: item.PROVEEDOR,
+          categoria: item.CATEGORIA,
+          descripcion: item.DESCRIPCION,
+          codigo: item.CODIGO,
+          costo: item.COSTO,
+          margen_comercial: item['Mg Comercial'],
+          precio_venta_neto: item['Precio de venta neto'],
+          unidad: item.Unidad,
           activo: true,
           created_at: null,
           matchScore: score,
