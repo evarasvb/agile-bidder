@@ -8,16 +8,17 @@ export interface LicitacionItem {
   id: string;
   compra_agil_id: number;
   nombre_producto: string;
-  descripcion: string | null;
+  descripcion_producto: string | null;
   cantidad: number | null;
   unidad: string | null;
   codigo_producto: string | null;
   categoria: string | null;
+  created_at: string | null;
 }
 
 /**
  * Hook para obtener los productos solicitados (items) de una compra ágil
- * Busca en compras_agiles_items usando el ID numérico de la compra
+ * Busca en compras_agiles_items usando el ID de la compra
  */
 export function useLicitacionItems(licitacionId: string | null) {
   return useQuery({
@@ -25,23 +26,11 @@ export function useLicitacionItems(licitacionId: string | null) {
     queryFn: async () => {
       if (!licitacionId) return [];
       
-      // First, get the numeric ID from compras_agiles using the UUID
-      const { data: compra, error: compraError } = await supabase
-        .from('compras_agiles')
-        .select('id')
-        .eq('id', licitacionId)
-        .single();
-      
-      if (compraError || !compra) {
-        console.log('No se encontró compra ágil con ID:', licitacionId);
-        return [];
-      }
-      
-      // Now fetch items from compras_agiles_items
+      // Fetch items from compras_agiles_items using the compra UUID
       const { data, error } = await supabase
         .from('compras_agiles_items')
         .select('*')
-        .eq('compra_agil_id', compra.id)
+        .eq('compra_agil_id', licitacionId)
         .order('id', { ascending: true });
       
       if (error) {
