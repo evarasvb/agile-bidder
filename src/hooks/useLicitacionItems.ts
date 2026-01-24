@@ -6,7 +6,7 @@ import { supabaseClient as supabase } from '@/lib/supabaseClient';
  */
 export interface LicitacionItem {
   id: string;
-  compra_agil_id: number;
+  compra_agil_id: string;
   nombre_producto: string;
   descripcion: string | null;
   cantidad: number | null;
@@ -14,6 +14,8 @@ export interface LicitacionItem {
   codigo_producto: string | null;
   categoria: string | null;
   created_at: string | null;
+    precio_unitario: number | null;
+  total: number | null;
 }
 
 /**
