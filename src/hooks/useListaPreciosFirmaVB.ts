@@ -23,7 +23,7 @@ export interface ListaPreciosFilters {
 }
 
 // Hook principal con paginación del lado del servidor
-// Actual column names (lowercase): id, proveedor, categoria, descripcion, codigo, costo, margen_comercial, precio_venta_neto, unidad, activo, created_at, updated_at
+// External Supabase columns are UPPERCASE: PROVEEDOR, CATEGORIA, DESCRIPCION, CODIGO, COSTO, "Mg Comercial", "Precio de venta neto", "Unidad"
 export function useListaPreciosFirmaVB(filters?: ListaPreciosFilters) {
   const page = filters?.page || 1;
   const pageSize = filters?.pageSize || 50;
@@ -46,6 +46,10 @@ export function useListaPreciosFirmaVB(filters?: ListaPreciosFilters) {
       console.log('Query result - data:', data);
       console.log('Query result - error:', error);
       console.log('Query result - count:', count);
+      if (data && data.length > 0) {
+        console.log('First item keys:', Object.keys(data[0]));
+        console.log('First item:', data[0]);
+      }
       console.log('=====================================');
 
       if (error) {
@@ -53,17 +57,17 @@ export function useListaPreciosFirmaVB(filters?: ListaPreciosFilters) {
         throw error;
       }
 
-      // Map directly - columns are already lowercase
+      // Map UPPERCASE columns from external Supabase to lowercase interface
       const items: ProductoFirmaVB[] = (data || []).map((item: any) => ({
         id: item.id,
-        proveedor: item.proveedor,
-        categoria: item.categoria,
-        descripcion: item.descripcion,
-        codigo: item.codigo,
-        costo: item.costo,
-        margen_comercial: item.margen_comercial,
-        precio_venta_neto: item.precio_venta_neto,
-        unidad: item.unidad,
+        proveedor: item.PROVEEDOR || item.proveedor || null,
+        categoria: item.CATEGORIA || item.categoria || null,
+        descripcion: item.DESCRIPCION || item.descripcion || null,
+        codigo: item.CODIGO || item.codigo || null,
+        costo: item.COSTO || item.costo || null,
+        margen_comercial: item['Mg Comercial'] || item['Mg Comercial '] || item.margen_comercial || null,
+        precio_venta_neto: item['Precio de venta neto'] || item.precio_venta_neto || null,
+        unidad: item['Unidad'] || item.unidad || null,
         activo: item.activo ?? true,
         created_at: item.created_at,
       }));
@@ -86,9 +90,10 @@ export function useListaPreciosFilterOptions() {
     queryFn: async () => {
       const { data: catData } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('categoria');
+        .select('*');
 
-      const categorias = [...new Set((catData || []).map((c: any) => c.categoria).filter(Boolean))].sort() as string[];
+      // Try both UPPERCASE and lowercase column names
+      const categorias = [...new Set((catData || []).map((c: any) => c.CATEGORIA || c.categoria).filter(Boolean))].sort() as string[];
 
       return { categorias, proveedores: [] };
     },
@@ -107,22 +112,22 @@ export function useListaPreciosStats() {
 
       const { data: categorias } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('categoria');
+        .select('*');
 
       const { data: valorData } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('precio_venta_neto')
+        .select('*')
         .limit(1000);
 
       const valorTotal = (valorData || []).reduce((acc: number, item: any) => {
-        const precio = parseFloat(item.precio_venta_neto) || 0;
+        const precio = parseFloat(item['Precio de venta neto'] || item.precio_venta_neto) || 0;
         return acc + precio;
       }, 0);
 
       return {
         totalProductos: total || 0,
         productosActivos: total || 0,
-        totalCategorias: new Set((categorias || []).map((c: any) => c.categoria).filter(Boolean)).size,
+        totalCategorias: new Set((categorias || []).map((c: any) => c.CATEGORIA || c.categoria).filter(Boolean)).size,
         totalProveedores: 0,
         valorCatalogoTotal: valorTotal,
       };
@@ -138,27 +143,34 @@ export function useBuscarProductosFirmaVB(searchTerm: string, enabled: boolean =
     queryFn: async () => {
       if (!searchTerm || searchTerm.length < 2) return [];
 
+      // Fetch all and filter client-side due to column name issues
       const { data, error } = await (supabase as any)
         .from('lista_precios_firmavb')
         .select('*')
-        .or(`descripcion.ilike.%${searchTerm}%,codigo.ilike.%${searchTerm}%`)
-        .limit(50);
+        .limit(500);
 
       if (error) {
         console.error('Error searching productos:', error);
         throw error;
       }
 
-      return (data || []).map((item: any) => ({
+      const searchLower = searchTerm.toLowerCase();
+      const filtered = (data || []).filter((item: any) => {
+        const descripcion = (item.DESCRIPCION || item.descripcion || '').toLowerCase();
+        const codigo = (item.CODIGO || item.codigo || '').toLowerCase();
+        return descripcion.includes(searchLower) || codigo.includes(searchLower);
+      });
+
+      return filtered.slice(0, 50).map((item: any) => ({
         id: item.id,
-        proveedor: item.proveedor,
-        categoria: item.categoria,
-        descripcion: item.descripcion,
-        codigo: item.codigo,
-        costo: item.costo,
-        margen_comercial: item.margen_comercial,
-        precio_venta_neto: item.precio_venta_neto,
-        unidad: item.unidad,
+        proveedor: item.PROVEEDOR || item.proveedor || null,
+        categoria: item.CATEGORIA || item.categoria || null,
+        descripcion: item.DESCRIPCION || item.descripcion || null,
+        codigo: item.CODIGO || item.codigo || null,
+        costo: item.COSTO || item.costo || null,
+        margen_comercial: item['Mg Comercial'] || item['Mg Comercial '] || item.margen_comercial || null,
+        precio_venta_neto: item['Precio de venta neto'] || item.precio_venta_neto || null,
+        unidad: item['Unidad'] || item.unidad || null,
         activo: item.activo ?? true,
         created_at: item.created_at,
       })) as ProductoFirmaVB[];
@@ -194,7 +206,8 @@ export function useMatchProductosFirmaVB(nombreBuscado: string | null) {
       }
 
       const productosConScore = (data || []).map((item: any) => {
-        const descripcionNorm = (item.descripcion || '')
+        const descripcion = item.DESCRIPCION || item.descripcion || '';
+        const descripcionNorm = descripcion
           .toLowerCase()
           .normalize('NFD')
           .replace(/[\u0300-\u036f]/g, '');
@@ -209,20 +222,21 @@ export function useMatchProductosFirmaVB(nombreBuscado: string | null) {
           }
         });
 
-        if (item.codigo && nombreBuscado.toLowerCase().includes(item.codigo.toLowerCase())) {
+        const codigo = item.CODIGO || item.codigo || '';
+        if (codigo && nombreBuscado.toLowerCase().includes(codigo.toLowerCase())) {
           score += 20;
         }
 
         return {
           id: item.id,
-          proveedor: item.proveedor,
-          categoria: item.categoria,
-          descripcion: item.descripcion,
-          codigo: item.codigo,
-          costo: item.costo,
-          margen_comercial: item.margen_comercial,
-          precio_venta_neto: item.precio_venta_neto,
-          unidad: item.unidad,
+          proveedor: item.PROVEEDOR || item.proveedor || null,
+          categoria: item.CATEGORIA || item.categoria || null,
+          descripcion: descripcion,
+          codigo: codigo,
+          costo: item.COSTO || item.costo || null,
+          margen_comercial: item['Mg Comercial'] || item['Mg Comercial '] || item.margen_comercial || null,
+          precio_venta_neto: item['Precio de venta neto'] || item.precio_venta_neto || null,
+          unidad: item['Unidad'] || item.unidad || null,
           activo: item.activo ?? true,
           created_at: item.created_at,
           matchScore: score,
