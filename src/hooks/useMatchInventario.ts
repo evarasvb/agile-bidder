@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface MatchedProduct {
-  id: number;
+  id: string;
   codigo: string | null;
   nombre: string;
   categoria: string | null;
@@ -101,11 +101,12 @@ export function useMatchInventario(compraNombre: string | null) {
       // Get first significant search term for DB query
       const mainTerm = searchTerms.find(t => t.length >= 3) || searchTerms[0];
 
-      // Fetch products from lista_precios_firmavb using correct column names
+      // Fetch products from lista_precios_firmavb using correct lowercase column names
       const { data: productos, error } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('id, "PROVEEDOR", "CATEGORIA", "DESCRIPCION", "CODIGO", "COSTO", "Mg Comercial", "Precio de venta neto", "Unidad"')
-        .or(`"DESCRIPCION".ilike.%${mainTerm}%,"CATEGORIA".ilike.%${mainTerm}%`)
+        .select('id, proveedor, categoria, descripcion, codigo, costo, margen_comercial, precio_venta_neto, unidad')
+        .eq('activo', true)
+        .or(`descripcion.ilike.%${mainTerm}%,categoria.ilike.%${mainTerm}%`)
         .limit(500);
 
       if (error) {
@@ -118,26 +119,26 @@ export function useMatchInventario(compraNombre: string | null) {
       // Match products based on search terms
       const matched = productos
         .map((item: any) => {
-          const { score, matchedTerms } = calculateMatchScore(item.DESCRIPCION || '', searchTerms);
+          const { score, matchedTerms } = calculateMatchScore(item.descripcion || '', searchTerms);
           
           // Additional score for código match
           let finalScore = score;
-          if (item.CODIGO && compraNombre.toLowerCase().includes(item.CODIGO.toLowerCase())) {
+          if (item.codigo && compraNombre.toLowerCase().includes(item.codigo.toLowerCase())) {
             finalScore += 25;
-            matchedTerms.push(`código: ${item.CODIGO}`);
+            matchedTerms.push(`código: ${item.codigo}`);
           }
           
           return {
             id: item.id,
-            codigo: item.CODIGO,
-            nombre: item.DESCRIPCION,
-            categoria: item.CATEGORIA,
-            proveedor: item.PROVEEDOR,
-            costo: parseFloat(item.COSTO) || 0,
-            margen_comercial: parseFloat(item['Mg Comercial']) || 0,
-            precio_unitario: parseFloat(item['Precio de venta neto']) || 0,
-            descripcion: item.DESCRIPCION,
-            unidad: item.Unidad,
+            codigo: item.codigo,
+            nombre: item.descripcion,
+            categoria: item.categoria,
+            proveedor: item.proveedor,
+            costo: parseFloat(item.costo) || 0,
+            margen_comercial: parseFloat(item.margen_comercial) || 0,
+            precio_unitario: parseFloat(item.precio_venta_neto) || 0,
+            descripcion: item.descripcion,
+            unidad: item.unidad,
             matchScore: finalScore,
             matchType: finalScore >= 40 ? 'exact' : finalScore >= 20 ? 'partial' : 'similar' as const,
             matchedTerms,
@@ -163,7 +164,8 @@ export function useMatchMultipleItems(items: { id: string; nombre: string }[]) {
       // Fetch all products (with limit for performance)
       const { data: productos, error } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('id, "PROVEEDOR", "CATEGORIA", "DESCRIPCION", "CODIGO", "COSTO", "Mg Comercial", "Precio de venta neto", "Unidad"')
+        .select('id, proveedor, categoria, descripcion, codigo, costo, margen_comercial, precio_venta_neto, unidad')
+        .eq('activo', true)
         .limit(5000);
 
       if (error) {
@@ -182,18 +184,18 @@ export function useMatchMultipleItems(items: { id: string; nombre: string }[]) {
 
         const matched = (productos || [])
           .map((p: any) => {
-            const { score, matchedTerms } = calculateMatchScore(p.DESCRIPCION || '', searchTerms);
+            const { score, matchedTerms } = calculateMatchScore(p.descripcion || '', searchTerms);
             return {
               id: p.id,
-              codigo: p.CODIGO,
-              nombre: p.DESCRIPCION,
-              categoria: p.CATEGORIA,
-              proveedor: p.PROVEEDOR,
-              costo: parseFloat(p.COSTO) || 0,
-              margen_comercial: parseFloat(p['Mg Comercial']) || 0,
-              precio_unitario: parseFloat(p['Precio de venta neto']) || 0,
-              descripcion: p.DESCRIPCION,
-              unidad: p.Unidad,
+              codigo: p.codigo,
+              nombre: p.descripcion,
+              categoria: p.categoria,
+              proveedor: p.proveedor,
+              costo: parseFloat(p.costo) || 0,
+              margen_comercial: parseFloat(p.margen_comercial) || 0,
+              precio_unitario: parseFloat(p.precio_venta_neto) || 0,
+              descripcion: p.descripcion,
+              unidad: p.unidad,
               matchScore: score,
               matchType: score >= 40 ? 'exact' : score >= 20 ? 'partial' : 'similar' as const,
               matchedTerms,
