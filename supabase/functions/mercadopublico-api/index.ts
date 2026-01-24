@@ -141,9 +141,8 @@ serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-    const action = url.searchParams.get('action') || 'licitaciones';
-    
-    const body = req.method === 'POST' ? await req.json() : {};
+      const body = req.method === 'POST' ? await req.json() : {};
+      const action = body.action || url.searchParams.get('action') || 'licitaciones';    
     
     const MP_API_KEY = Deno.env.get("MERCADOPUBLICO_API_KEY");
     if (!MP_API_KEY) {
