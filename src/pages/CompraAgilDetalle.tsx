@@ -618,6 +618,7 @@ export default function CompraAgilDetalle() {
                       licitacionId={compra.id}
                       onSubmit={handleEnviarOferta}
                       onValidationChange={setIsOfertaValid}
+                                          fallbackItems={items}
                     />
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">
