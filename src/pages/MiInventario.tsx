@@ -24,7 +24,6 @@ import {
   Package, 
   Layers,
   DollarSign,
-  CheckCircle,
   RefreshCw,
   Building2,
   Percent
@@ -54,13 +53,15 @@ export default function MiInventario() {
   const totalPages = Math.ceil(items.length / pageSize);
   const paginatedItems = items.slice((page - 1) * pageSize, page * pageSize);
 
-  const formatCurrency = (value: number | null) => {
+  const formatCurrency = (value: string | number | null) => {
     if (!value) return "-";
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+    if (isNaN(numValue)) return "-";
     return new Intl.NumberFormat("es-CL", {
       style: "currency",
       currency: "CLP",
       maximumFractionDigits: 0,
-    }).format(value);
+    }).format(numValue);
   };
 
   return (
@@ -68,9 +69,9 @@ export default function MiInventario() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Catálogo de Productos</h1>
+          <h1 className="text-3xl font-bold">Lista de Precios FirmaVB</h1>
           <p className="text-muted-foreground">
-            Lista de precios FirmaVB - Productos disponibles para ofertar
+            Catálogo de productos disponibles para ofertar en licitaciones
           </p>
         </div>
         <Button variant="outline" onClick={() => refetch()}>
@@ -80,7 +81,7 @@ export default function MiInventario() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Productos</CardTitle>
@@ -133,20 +134,6 @@ export default function MiInventario() {
               <Skeleton className="h-8 w-20" />
             ) : (
               <div className="text-2xl font-bold">{formatCurrency(stats?.valorCatalogoTotal || 0)}</div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Productos Activos</CardTitle>
-            <CheckCircle className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            {statsLoading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : (
-              <div className="text-2xl font-bold text-primary">{(stats?.productosActivos || 0).toLocaleString()}</div>
             )}
           </CardContent>
         </Card>

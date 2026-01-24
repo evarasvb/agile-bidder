@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface MatchedProduct {
-  id: string;
+  id: number;
   codigo: string | null;
   nombre: string;
   categoria: string | null;
@@ -10,7 +10,7 @@ export interface MatchedProduct {
   costo: number;
   margen_comercial: number;
   precio_unitario: number;
-  descripcion: string | null;
+  descripcion: string;
   unidad: string | null;
   matchScore: number;
   matchType: 'exact' | 'partial' | 'similar';
@@ -98,11 +98,14 @@ export function useMatchInventario(compraNombre: string | null) {
       
       if (searchTerms.length === 0) return [];
 
-      // Fetch products from lista_precios_firmavb
-      const { data: productos, error } = await supabase
+      // Get first significant search term for DB query
+      const mainTerm = searchTerms.find(t => t.length >= 3) || searchTerms[0];
+
+      // Fetch products from lista_precios_firmavb using correct column names
+      const { data: productos, error } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('*')
-        .eq('activo', true)
+        .select('id, "PROVEEDOR", "CATEGORIA", "DESCRIPCION", "CODIGO", "COSTO", "Mg Comercial", "Precio de venta neto", "Unidad"')
+        .or(`"DESCRIPCION".ilike.%${mainTerm}%,"CATEGORIA".ilike.%${mainTerm}%`)
         .limit(500);
 
       if (error) {
@@ -114,27 +117,27 @@ export function useMatchInventario(compraNombre: string | null) {
 
       // Match products based on search terms
       const matched = productos
-        .map(item => {
-          const { score, matchedTerms } = calculateMatchScore(item.descripcion, searchTerms);
+        .map((item: any) => {
+          const { score, matchedTerms } = calculateMatchScore(item.DESCRIPCION || '', searchTerms);
           
           // Additional score for código match
           let finalScore = score;
-          if (item.codigo && compraNombre.toLowerCase().includes(item.codigo.toLowerCase())) {
+          if (item.CODIGO && compraNombre.toLowerCase().includes(item.CODIGO.toLowerCase())) {
             finalScore += 25;
-            matchedTerms.push(`código: ${item.codigo}`);
+            matchedTerms.push(`código: ${item.CODIGO}`);
           }
           
           return {
             id: item.id,
-            codigo: item.codigo,
-            nombre: item.descripcion,
-            categoria: item.categoria,
-            proveedor: item.proveedor,
-            costo: Number(item.costo) || 0,
-            margen_comercial: Number(item.margen_comercial) || 0,
-            precio_unitario: Number(item.precio_venta_neto) || 0,
-            descripcion: item.descripcion,
-            unidad: item.unidad,
+            codigo: item.CODIGO,
+            nombre: item.DESCRIPCION,
+            categoria: item.CATEGORIA,
+            proveedor: item.PROVEEDOR,
+            costo: parseFloat(item.COSTO) || 0,
+            margen_comercial: parseFloat(item['Mg Comercial']) || 0,
+            precio_unitario: parseFloat(item['Precio de venta neto']) || 0,
+            descripcion: item.DESCRIPCION,
+            unidad: item.Unidad,
             matchScore: finalScore,
             matchType: finalScore >= 40 ? 'exact' : finalScore >= 20 ? 'partial' : 'similar' as const,
             matchedTerms,
@@ -157,11 +160,11 @@ export function useMatchMultipleItems(items: { id: string; nombre: string }[]) {
     queryFn: async () => {
       if (items.length === 0) return new Map<string, MatchedProduct[]>();
 
-      // Fetch all active products
-      const { data: productos, error } = await supabase
+      // Fetch all products (with limit for performance)
+      const { data: productos, error } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('*')
-        .eq('activo', true);
+        .select('id, "PROVEEDOR", "CATEGORIA", "DESCRIPCION", "CODIGO", "COSTO", "Mg Comercial", "Precio de venta neto", "Unidad"')
+        .limit(5000);
 
       if (error) {
         console.error('Error fetching productos for bulk matching:', error);
@@ -178,19 +181,19 @@ export function useMatchMultipleItems(items: { id: string; nombre: string }[]) {
         }
 
         const matched = (productos || [])
-          .map(p => {
-            const { score, matchedTerms } = calculateMatchScore(p.descripcion, searchTerms);
+          .map((p: any) => {
+            const { score, matchedTerms } = calculateMatchScore(p.DESCRIPCION || '', searchTerms);
             return {
               id: p.id,
-              codigo: p.codigo,
-              nombre: p.descripcion,
-              categoria: p.categoria,
-              proveedor: p.proveedor,
-              costo: Number(p.costo) || 0,
-              margen_comercial: Number(p.margen_comercial) || 0,
-              precio_unitario: Number(p.precio_venta_neto) || 0,
-              descripcion: p.descripcion,
-              unidad: p.unidad,
+              codigo: p.CODIGO,
+              nombre: p.DESCRIPCION,
+              categoria: p.CATEGORIA,
+              proveedor: p.PROVEEDOR,
+              costo: parseFloat(p.COSTO) || 0,
+              margen_comercial: parseFloat(p['Mg Comercial']) || 0,
+              precio_unitario: parseFloat(p['Precio de venta neto']) || 0,
+              descripcion: p.DESCRIPCION,
+              unidad: p.Unidad,
               matchScore: score,
               matchType: score >= 40 ? 'exact' : score >= 20 ? 'partial' : 'similar' as const,
               matchedTerms,
