@@ -68,7 +68,7 @@ export function ItemsMatchTable({ licitacionId, fallbackItems = [], onSubmit, on
       return licitacionItems.map(item => ({
         id: item.id,
         nombre_producto: item.nombre_producto,
-        descripcion: item.descripcion,
+        descripcion: item.descripcion_producto,
         cantidad: item.cantidad,
         unidad: item.unidad,
       }));
