@@ -39,39 +39,26 @@ export const ProductosSolicitadosList: React.FC<ProductosSolicitadosListProps> =
       <div className="space-y-3">
         {items.map((item) => (
           <div
-            key={`${item.licitacion_id}-${item.id}`}
-            className="border rounded-lg p-4 transition-colors border-border bg-background"
+            key={`${item.compra_agil_id}-${item.id}`}
+            className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow"
           >
             <div className="flex justify-between items-start">
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    Item #{item.id}
-                  </span>
-                </div>
-                <h4 className="font-medium">{item.nombre_producto || 'Sin nombre'}</h4>
-                {item.descripcion && (
-                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{item.descripcion}</p>
+                <h4 className="font-medium text-gray-900">{item.nombre_producto}</h4>
+                {item.descripcion_producto && (
+                  <p className="text-sm text-gray-600 mt-1">{item.descripcion_producto}</p>
                 )}
-                
-                <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
-                  {item.cantidad && (
-                    <div>
-                      <span>Cantidad: </span>
-                      <span className="font-medium">{item.cantidad}</span>
-                    </div>
-                  )}
-                  {item.unidad && (
-                    <div>
-                      <span>Unidad: </span>
-                      <span className="font-medium">{item.unidad}</span>
-                    </div>
-                  )}
-                </div>
+                {item.codigo_producto && (
+                  <p className="text-xs text-gray-400 mt-1">Código: {item.codigo_producto}</p>
+                )}
               </div>
-
-              <div className="ml-4">
-                <Badge variant="secondary" className="text-xs">Pendiente</Badge>
+              <div className="text-right ml-4">
+                <Badge variant="secondary" className="mb-1">
+                  {item.cantidad || 1} {item.unidad || 'UN'}
+                </Badge>
+                {item.categoria && (
+                  <p className="text-xs text-gray-400">{item.categoria}</p>
+                )}
               </div>
             </div>
           </div>
