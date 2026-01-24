@@ -54,6 +54,15 @@ export function useListaPreciosFirmaVB(filters?: ListaPreciosFilters) {
 
       const { data, error, count } = await query;
 
+      // Debug logging
+      console.log('=== useListaPreciosFirmaVB DEBUG ===');
+      console.log('Query result - data:', data);
+      console.log('Query result - error:', error);
+      console.log('Query result - count:', count);
+      console.log('Data length:', data?.length || 0);
+      console.log('First item:', data?.[0]);
+      console.log('=====================================');
+
       if (error) {
         console.error('Error fetching lista precios:', error);
         throw error;
