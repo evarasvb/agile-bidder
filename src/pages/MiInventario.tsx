@@ -26,32 +26,47 @@ import {
   DollarSign,
   RefreshCw,
   Building2,
-  Percent
+  Percent,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight
 } from "lucide-react";
-import { useListaPreciosFirmaVB, useListaPreciosStats } from "@/hooks/useListaPreciosFirmaVB";
+import { useListaPreciosFirmaVB, useListaPreciosStats, useListaPreciosFilterOptions } from "@/hooks/useListaPreciosFirmaVB";
 
 export default function MiInventario() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [categoriaFilter, setCategoriaFilter] = useState<string>("all");
   const [proveedorFilter, setProveedorFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
   const pageSize = 50;
 
-  const { data, isLoading, refetch } = useListaPreciosFirmaVB({
-    search: searchTerm,
+  // Debounce search
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    // Reset to page 1 on search
+    setPage(1);
+    // Debounce the actual search
+    setTimeout(() => setDebouncedSearch(value), 300);
+  };
+
+  const { data, isLoading, refetch, isFetching } = useListaPreciosFirmaVB({
+    search: debouncedSearch,
     categoria: categoriaFilter !== "all" ? categoriaFilter : undefined,
     proveedor: proveedorFilter !== "all" ? proveedorFilter : undefined,
+    page,
+    pageSize,
   });
 
   const { data: stats, isLoading: statsLoading } = useListaPreciosStats();
+  const { data: filterOptions } = useListaPreciosFilterOptions();
 
   const items = data?.items || [];
-  const categorias = data?.categorias || [];
-  const proveedores = data?.proveedores || [];
-
-  // Pagination
-  const totalPages = Math.ceil(items.length / pageSize);
-  const paginatedItems = items.slice((page - 1) * pageSize, page * pageSize);
+  const total = data?.total || 0;
+  const totalPages = data?.totalPages || 1;
+  const categorias = filterOptions?.categorias || [];
+  const proveedores = filterOptions?.proveedores || [];
 
   const formatCurrency = (value: string | number | null) => {
     if (!value) return "-";
@@ -64,6 +79,15 @@ export default function MiInventario() {
     }).format(numValue);
   };
 
+  const handleFilterChange = (type: 'categoria' | 'proveedor', value: string) => {
+    if (type === 'categoria') {
+      setCategoriaFilter(value);
+    } else {
+      setProveedorFilter(value);
+    }
+    setPage(1); // Reset to first page
+  };
+
   return (
     <div className="container mx-auto py-6 space-y-6">
       {/* Header */}
@@ -74,8 +98,8 @@ export default function MiInventario() {
             Catálogo de productos disponibles para ofertar en licitaciones
           </p>
         </div>
-        <Button variant="outline" onClick={() => refetch()}>
-          <RefreshCw className="h-4 w-4 mr-2" />
+        <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
           Actualizar
         </Button>
       </div>
@@ -142,10 +166,19 @@ export default function MiInventario() {
       {/* Filters and Table */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Productos</CardTitle>
-          <CardDescription>
-            {items.length.toLocaleString()} productos encontrados
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg">Productos</CardTitle>
+              <CardDescription>
+                Mostrando {items.length} de {total.toLocaleString()} productos
+              </CardDescription>
+            </div>
+            {isFetching && !isLoading && (
+              <Badge variant="secondary" className="animate-pulse">
+                Cargando...
+              </Badge>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col md:flex-row gap-4 mb-4">
@@ -154,14 +187,11 @@ export default function MiInventario() {
               <Input
                 placeholder="Buscar por código, descripción o proveedor..."
                 value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setPage(1);
-                }}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 className="pl-9"
               />
             </div>
-            <Select value={categoriaFilter} onValueChange={(v) => { setCategoriaFilter(v); setPage(1); }}>
+            <Select value={categoriaFilter} onValueChange={(v) => handleFilterChange('categoria', v)}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Categoría" />
               </SelectTrigger>
@@ -172,7 +202,7 @@ export default function MiInventario() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={proveedorFilter} onValueChange={(v) => { setProveedorFilter(v); setPage(1); }}>
+            <Select value={proveedorFilter} onValueChange={(v) => handleFilterChange('proveedor', v)}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Proveedor" />
               </SelectTrigger>
@@ -209,20 +239,20 @@ export default function MiInventario() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedItems.length === 0 ? (
+                    {items.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                           No se encontraron productos
                         </TableCell>
                       </TableRow>
                     ) : (
-                      paginatedItems.map((item) => (
+                      items.map((item) => (
                         <TableRow key={item.id}>
                           <TableCell className="font-mono text-xs">
                             {item.codigo || "-"}
                           </TableCell>
-                          <TableCell className="font-medium max-w-[300px]" title={item.descripcion}>
-                            <div className="truncate">{item.descripcion}</div>
+                          <TableCell className="font-medium max-w-[300px]" title={item.descripcion || ""}>
+                            <div className="truncate">{item.descripcion || "-"}</div>
                           </TableCell>
                           <TableCell className="max-w-[150px] truncate" title={item.proveedor || ""}>
                             {item.proveedor || "-"}
@@ -260,27 +290,47 @@ export default function MiInventario() {
               {totalPages > 1 && (
                 <div className="flex items-center justify-between mt-4">
                   <p className="text-sm text-muted-foreground">
-                    Mostrando {((page - 1) * pageSize + 1).toLocaleString()} - {Math.min(page * pageSize, items.length).toLocaleString()} de {items.length.toLocaleString()}
+                    Página {page} de {totalPages.toLocaleString()} ({total.toLocaleString()} productos totales)
                   </p>
-                  <div className="flex gap-2">
+                  <div className="flex gap-1">
                     <Button
                       variant="outline"
-                      size="sm"
-                      onClick={() => setPage(p => Math.max(1, p - 1))}
-                      disabled={page === 1}
+                      size="icon"
+                      onClick={() => setPage(1)}
+                      disabled={page === 1 || isFetching}
+                      title="Primera página"
                     >
-                      Anterior
+                      <ChevronsLeft className="h-4 w-4" />
                     </Button>
-                    <span className="flex items-center px-3 text-sm">
-                      Página {page} de {totalPages}
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1 || isFetching}
+                      title="Página anterior"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="flex items-center px-3 text-sm font-medium">
+                      {page}
                     </span>
                     <Button
                       variant="outline"
-                      size="sm"
+                      size="icon"
                       onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                      disabled={page === totalPages}
+                      disabled={page === totalPages || isFetching}
+                      title="Página siguiente"
                     >
-                      Siguiente
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setPage(totalPages)}
+                      disabled={page === totalPages || isFetching}
+                      title="Última página"
+                    >
+                      <ChevronsRight className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>

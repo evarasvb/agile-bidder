@@ -19,54 +19,62 @@ export interface ListaPreciosFilters {
   search?: string;
   categoria?: string;
   proveedor?: string;
+  page?: number;
+  pageSize?: number;
 }
 
-// Hook principal para listar productos con paginación
+// Hook principal con paginación del lado del servidor
 export function useListaPreciosFirmaVB(filters?: ListaPreciosFilters) {
+  const page = filters?.page || 1;
+  const pageSize = filters?.pageSize || 50;
+
   return useQuery({
     queryKey: ['lista-precios-firmavb', filters],
     queryFn: async () => {
-      // Fetch with pagination to handle large dataset
-      const allItems: ProductoFirmaVB[] = [];
-      let from = 0;
-      const pageSize = 1000;
-      let hasMore = true;
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
 
-      while (hasMore) {
-        let query = (supabase as any)
-          .from('lista_precios_firmavb')
-          .select('id, proveedor, categoria, descripcion, codigo, costo, margen_comercial, precio_venta_neto, unidad, activo, created_at')
-          .eq('activo', true)
-          .range(from, from + pageSize - 1)
-          .order('id', { ascending: true });
+      let query = (supabase as any)
+        .from('lista_precios_firmavb')
+        .select('id, proveedor, categoria, descripcion, codigo, costo, margen_comercial, precio_venta_neto, unidad, activo, created_at', { count: 'exact' })
+        .eq('activo', true)
+        .range(from, to)
+        .order('id', { ascending: true });
 
-        // Apply filters
-        if (filters?.search) {
-          query = query.or(`descripcion.ilike.%${filters.search}%,codigo.ilike.%${filters.search}%,proveedor.ilike.%${filters.search}%`);
-        }
-        if (filters?.categoria && filters.categoria !== 'all') {
-          query = query.eq('categoria', filters.categoria);
-        }
-        if (filters?.proveedor && filters.proveedor !== 'all') {
-          query = query.eq('proveedor', filters.proveedor);
-        }
-
-        const { data, error } = await query;
-
-        if (error) {
-          console.error('Error fetching lista precios:', error);
-          throw error;
-        }
-
-        if (data && data.length > 0) {
-          allItems.push(...data);
-          from += pageSize;
-          hasMore = data.length === pageSize;
-        } else {
-          hasMore = false;
-        }
+      // Apply filters
+      if (filters?.search && filters.search.length >= 2) {
+        query = query.or(`descripcion.ilike.%${filters.search}%,codigo.ilike.%${filters.search}%,proveedor.ilike.%${filters.search}%`);
+      }
+      if (filters?.categoria && filters.categoria !== 'all') {
+        query = query.eq('categoria', filters.categoria);
+      }
+      if (filters?.proveedor && filters.proveedor !== 'all') {
+        query = query.eq('proveedor', filters.proveedor);
       }
 
+      const { data, error, count } = await query;
+
+      if (error) {
+        console.error('Error fetching lista precios:', error);
+        throw error;
+      }
+
+      return {
+        items: (data || []) as ProductoFirmaVB[],
+        total: count || 0,
+        page,
+        pageSize,
+        totalPages: Math.ceil((count || 0) / pageSize),
+      };
+    },
+  });
+}
+
+// Hook para obtener categorías y proveedores únicos (solo para filtros)
+export function useListaPreciosFilterOptions() {
+  return useQuery({
+    queryKey: ['lista-precios-filter-options'],
+    queryFn: async () => {
       // Get unique categories
       const { data: catData } = await (supabase as any)
         .from('lista_precios_firmavb')
@@ -75,7 +83,7 @@ export function useListaPreciosFirmaVB(filters?: ListaPreciosFilters) {
 
       const categorias = [...new Set((catData || []).map((c: any) => c.categoria).filter(Boolean))].sort() as string[];
 
-      // Get unique providers
+      // Get unique providers  
       const { data: provData } = await (supabase as any)
         .from('lista_precios_firmavb')
         .select('proveedor')
@@ -83,13 +91,9 @@ export function useListaPreciosFirmaVB(filters?: ListaPreciosFilters) {
 
       const proveedores = [...new Set((provData || []).map((p: any) => p.proveedor).filter(Boolean))].sort() as string[];
 
-      return {
-        items: allItems,
-        total: allItems.length,
-        categorias,
-        proveedores,
-      };
+      return { categorias, proveedores };
     },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 }
 
@@ -113,10 +117,12 @@ export function useListaPreciosStats() {
         .select('proveedor')
         .eq('activo', true);
 
+      // Get sum of prices more efficiently
       const { data: valorData } = await (supabase as any)
         .from('lista_precios_firmavb')
         .select('precio_venta_neto')
-        .eq('activo', true);
+        .eq('activo', true)
+        .limit(1000); // Limit for performance
 
       const valorTotal = (valorData || []).reduce((acc: number, item: any) => {
         const precio = parseFloat(item.precio_venta_neto) || 0;
@@ -131,6 +137,7 @@ export function useListaPreciosStats() {
         valorCatalogoTotal: valorTotal,
       };
     },
+    staleTime: 60 * 1000, // Cache for 1 minute
   });
 }
 
