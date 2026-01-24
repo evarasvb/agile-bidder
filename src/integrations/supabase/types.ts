@@ -1332,6 +1332,51 @@ export type Database = {
           },
         ]
       }
+      lista_precios_firmavb: {
+        Row: {
+          activo: boolean | null
+          categoria: string | null
+          codigo: string | null
+          costo: number | null
+          created_at: string
+          descripcion: string
+          id: string
+          margen_comercial: number | null
+          precio_venta_neto: number | null
+          proveedor: string | null
+          unidad: string | null
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean | null
+          categoria?: string | null
+          codigo?: string | null
+          costo?: number | null
+          created_at?: string
+          descripcion: string
+          id?: string
+          margen_comercial?: number | null
+          precio_venta_neto?: number | null
+          proveedor?: string | null
+          unidad?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean | null
+          categoria?: string | null
+          codigo?: string | null
+          costo?: number | null
+          created_at?: string
+          descripcion?: string
+          id?: string
+          margen_comercial?: number | null
+          precio_venta_neto?: number | null
+          proveedor?: string | null
+          unidad?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notificaciones_log: {
         Row: {
           cliente_id: string | null

@@ -25,20 +25,30 @@ import {
   Layers,
   DollarSign,
   CheckCircle,
-  RefreshCw
+  RefreshCw,
+  Building2,
+  Percent
 } from "lucide-react";
-import { useClienteInventario } from "@/hooks/useClienteInventario";
+import { useListaPreciosFirmaVB, useListaPreciosStats } from "@/hooks/useListaPreciosFirmaVB";
 
 export default function MiInventario() {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoriaFilter, setCategoriaFilter] = useState<string>("all");
+  const [proveedorFilter, setProveedorFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
   const pageSize = 50;
 
-  const { items, categorias, stats, isLoading, refetch } = useClienteInventario({
+  const { data, isLoading, refetch } = useListaPreciosFirmaVB({
     search: searchTerm,
     categoria: categoriaFilter !== "all" ? categoriaFilter : undefined,
+    proveedor: proveedorFilter !== "all" ? proveedorFilter : undefined,
   });
+
+  const { data: stats, isLoading: statsLoading } = useListaPreciosStats();
+
+  const items = data?.items || [];
+  const categorias = data?.categorias || [];
+  const proveedores = data?.proveedores || [];
 
   // Pagination
   const totalPages = Math.ceil(items.length / pageSize);
@@ -58,9 +68,9 @@ export default function MiInventario() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Mi Inventario</h1>
+          <h1 className="text-3xl font-bold">Catálogo de Productos</h1>
           <p className="text-muted-foreground">
-            Catálogo de productos disponibles para ofertar
+            Lista de precios FirmaVB - Productos disponibles para ofertar
           </p>
         </div>
         <Button variant="outline" onClick={() => refetch()}>
@@ -70,17 +80,17 @@ export default function MiInventario() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Productos</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {statsLoading ? (
               <Skeleton className="h-8 w-20" />
             ) : (
-              <div className="text-2xl font-bold">{stats.totalProductos.toLocaleString()}</div>
+              <div className="text-2xl font-bold">{(stats?.totalProductos || 0).toLocaleString()}</div>
             )}
           </CardContent>
         </Card>
@@ -91,24 +101,38 @@ export default function MiInventario() {
             <Layers className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {statsLoading ? (
               <Skeleton className="h-8 w-20" />
             ) : (
-              <div className="text-2xl font-bold">{stats.totalCategorias}</div>
+              <div className="text-2xl font-bold">{stats?.totalCategorias || 0}</div>
             )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Valor Inventario</CardTitle>
+            <CardTitle className="text-sm font-medium">Proveedores</CardTitle>
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? (
+              <Skeleton className="h-8 w-20" />
+            ) : (
+              <div className="text-2xl font-bold">{stats?.totalProveedores || 0}</div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Valor Catálogo</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {statsLoading ? (
               <Skeleton className="h-8 w-20" />
             ) : (
-              <div className="text-2xl font-bold">{formatCurrency(stats.valorInventario)}</div>
+              <div className="text-2xl font-bold">{formatCurrency(stats?.valorCatalogoTotal || 0)}</div>
             )}
           </CardContent>
         </Card>
@@ -116,13 +140,13 @@ export default function MiInventario() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Productos Activos</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
+            <CheckCircle className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {statsLoading ? (
               <Skeleton className="h-8 w-20" />
             ) : (
-              <div className="text-2xl font-bold text-green-600">{stats.productosActivos.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-primary">{(stats?.productosActivos || 0).toLocaleString()}</div>
             )}
           </CardContent>
         </Card>
@@ -141,7 +165,7 @@ export default function MiInventario() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar por código, nombre o descripción..."
+                placeholder="Buscar por código, descripción o proveedor..."
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
@@ -161,6 +185,17 @@ export default function MiInventario() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={proveedorFilter} onValueChange={(v) => { setProveedorFilter(v); setPage(1); }}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Proveedor" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los proveedores</SelectItem>
+                {proveedores.map((prov) => (
+                  <SelectItem key={prov} value={prov}>{prov}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Table */}
@@ -176,19 +211,20 @@ export default function MiInventario() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[100px]">SKU</TableHead>
-                      <TableHead>Nombre</TableHead>
+                      <TableHead className="w-[100px]">Código</TableHead>
                       <TableHead>Descripción</TableHead>
+                      <TableHead>Proveedor</TableHead>
                       <TableHead>Categoría</TableHead>
-                      <TableHead className="text-right">Precio</TableHead>
-                      <TableHead className="text-center">Stock</TableHead>
-                      <TableHead className="text-center">Estado</TableHead>
+                      <TableHead className="text-right">Costo</TableHead>
+                      <TableHead className="text-center">Margen</TableHead>
+                      <TableHead className="text-right">Precio Venta</TableHead>
+                      <TableHead className="text-center">Unidad</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {paginatedItems.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                           No se encontraron productos
                         </TableCell>
                       </TableRow>
@@ -196,31 +232,35 @@ export default function MiInventario() {
                       paginatedItems.map((item) => (
                         <TableRow key={item.id}>
                           <TableCell className="font-mono text-xs">
-                            {item.sku}
+                            {item.codigo || "-"}
                           </TableCell>
-                          <TableCell className="font-medium max-w-[200px] truncate" title={item.nombre}>
-                            {item.nombre}
+                          <TableCell className="font-medium max-w-[300px]" title={item.descripcion}>
+                            <div className="truncate">{item.descripcion}</div>
                           </TableCell>
-                          <TableCell className="max-w-[250px] truncate text-muted-foreground" title={item.descripcion || ""}>
-                            {item.descripcion || "-"}
+                          <TableCell className="max-w-[150px] truncate" title={item.proveedor || ""}>
+                            {item.proveedor || "-"}
                           </TableCell>
                           <TableCell>
                             {item.categoria ? (
                               <Badge variant="outline">{item.categoria}</Badge>
                             ) : "-"}
                           </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {formatCurrency(item.precio_unitario)}
+                          <TableCell className="text-right text-muted-foreground">
+                            {formatCurrency(item.costo)}
                           </TableCell>
                           <TableCell className="text-center">
-                            {item.stock !== null ? item.stock.toLocaleString() : "-"}
+                            {item.margen_comercial ? (
+                              <Badge variant="secondary" className="gap-1">
+                                <Percent className="h-3 w-3" />
+                                {item.margen_comercial}%
+                              </Badge>
+                            ) : "-"}
                           </TableCell>
-                          <TableCell className="text-center">
-                            {item.activo !== false ? (
-                              <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Activo</Badge>
-                            ) : (
-                              <Badge variant="secondary">Inactivo</Badge>
-                            )}
+                          <TableCell className="text-right font-bold text-primary">
+                            {formatCurrency(item.precio_venta_neto)}
+                          </TableCell>
+                          <TableCell className="text-center text-sm text-muted-foreground">
+                            {item.unidad || "UN"}
                           </TableCell>
                         </TableRow>
                       ))
