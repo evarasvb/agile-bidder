@@ -113,7 +113,7 @@ export function useListaPreciosStats() {
 
       const { data: valorData } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('"Precio de venta neto"')
+        .select('*')
         .limit(1000);
 
       const valorTotal = (valorData || []).reduce((acc: number, item: any) => {
