@@ -2,25 +2,22 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ProductoFirmaVB {
-  id: string;
+  id: number;
   proveedor: string | null;
   categoria: string | null;
   descripcion: string;
   codigo: string | null;
-  costo: number;
-  margen_comercial: number;
-  precio_venta_neto: number;
+  costo: string | null;
+  margen_comercial: string | null;
+  precio_venta_neto: string | null;
   unidad: string | null;
-  activo: boolean;
-  created_at: string;
-  updated_at: string;
+  created_at: string | null;
 }
 
 export interface ListaPreciosFilters {
   search?: string;
   categoria?: string;
   proveedor?: string;
-  activo?: boolean;
 }
 
 // Hook principal para listar productos con paginación
@@ -28,34 +25,31 @@ export function useListaPreciosFirmaVB(filters?: ListaPreciosFilters) {
   return useQuery({
     queryKey: ['lista-precios-firmavb', filters],
     queryFn: async () => {
-      // Fetch all items with pagination to bypass 1000 row limit
+      // Fetch with pagination to handle large dataset
       const allItems: ProductoFirmaVB[] = [];
       let from = 0;
       const pageSize = 1000;
       let hasMore = true;
 
       while (hasMore) {
-        let query = supabase
+        let query = (supabase as any)
           .from('lista_precios_firmavb')
-          .select('*', { count: 'exact' })
+          .select('id, "PROVEEDOR", "CATEGORIA", "DESCRIPCION", "CODIGO", "COSTO", "Mg Comercial", "Precio de venta neto", "Unidad", created_at', { count: 'exact' })
           .range(from, from + pageSize - 1)
-          .order('descripcion', { ascending: true });
+          .order('id', { ascending: true });
 
-        // Apply filters
+        // Apply filters using correct column names
         if (filters?.search) {
-          query = query.or(`descripcion.ilike.%${filters.search}%,codigo.ilike.%${filters.search}%,proveedor.ilike.%${filters.search}%`);
+          query = query.or(`"DESCRIPCION".ilike.%${filters.search}%,"CODIGO".ilike.%${filters.search}%,"PROVEEDOR".ilike.%${filters.search}%`);
         }
         if (filters?.categoria && filters.categoria !== 'all') {
-          query = query.eq('categoria', filters.categoria);
+          query = query.eq('CATEGORIA', filters.categoria);
         }
         if (filters?.proveedor && filters.proveedor !== 'all') {
-          query = query.eq('proveedor', filters.proveedor);
-        }
-        if (filters?.activo !== undefined) {
-          query = query.eq('activo', filters.activo);
+          query = query.eq('PROVEEDOR', filters.proveedor);
         }
 
-        const { data, error, count } = await query;
+        const { data, error } = await query;
 
         if (error) {
           console.error('Error fetching lista precios:', error);
@@ -63,7 +57,20 @@ export function useListaPreciosFirmaVB(filters?: ListaPreciosFilters) {
         }
 
         if (data && data.length > 0) {
-          allItems.push(...(data as ProductoFirmaVB[]));
+          // Map the uppercase columns to our interface
+          const mapped = data.map((item: any) => ({
+            id: item.id,
+            proveedor: item.PROVEEDOR,
+            categoria: item.CATEGORIA,
+            descripcion: item.DESCRIPCION,
+            codigo: item.CODIGO,
+            costo: item.COSTO,
+            margen_comercial: item['Mg Comercial'],
+            precio_venta_neto: item['Precio de venta neto'],
+            unidad: item.Unidad,
+            created_at: item.created_at,
+          }));
+          allItems.push(...mapped);
           from += pageSize;
           hasMore = data.length === pageSize;
         } else {
@@ -72,20 +79,18 @@ export function useListaPreciosFirmaVB(filters?: ListaPreciosFilters) {
       }
 
       // Get unique categories
-      const { data: catData } = await supabase
+      const { data: catData } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('categoria')
-        .not('categoria', 'is', null);
+        .select('"CATEGORIA"');
 
-      const categorias = [...new Set((catData || []).map((c: any) => c.categoria).filter(Boolean))].sort();
+      const categorias = [...new Set((catData || []).map((c: any) => c.CATEGORIA).filter(Boolean))].sort();
 
       // Get unique providers
-      const { data: provData } = await supabase
+      const { data: provData } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('proveedor')
-        .not('proveedor', 'is', null);
+        .select('"PROVEEDOR"');
 
-      const proveedores = [...new Set((provData || []).map((p: any) => p.proveedor).filter(Boolean))].sort();
+      const proveedores = [...new Set((provData || []).map((p: any) => p.PROVEEDOR).filter(Boolean))].sort();
 
       return {
         items: allItems,
@@ -102,37 +107,32 @@ export function useListaPreciosStats() {
   return useQuery({
     queryKey: ['lista-precios-stats'],
     queryFn: async () => {
-      const { count: total } = await supabase
+      const { count: total } = await (supabase as any)
         .from('lista_precios_firmavb')
         .select('*', { count: 'exact', head: true });
 
-      const { count: activos } = await supabase
+      const { data: categorias } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('*', { count: 'exact', head: true })
-        .eq('activo', true);
+        .select('"CATEGORIA"');
 
-      const { data: categorias } = await supabase
+      const { data: proveedores } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('categoria')
-        .eq('activo', true);
+        .select('"PROVEEDOR"');
 
-      const { data: proveedores } = await supabase
+      const { data: valorData } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('proveedor')
-        .eq('activo', true);
+        .select('"Precio de venta neto"');
 
-      const { data: valorData } = await supabase
-        .from('lista_precios_firmavb')
-        .select('precio_venta_neto')
-        .eq('activo', true);
-
-      const valorTotal = (valorData || []).reduce((acc, item) => acc + (Number(item.precio_venta_neto) || 0), 0);
+      const valorTotal = (valorData || []).reduce((acc, item: any) => {
+        const precio = parseFloat(item['Precio de venta neto']) || 0;
+        return acc + precio;
+      }, 0);
 
       return {
         totalProductos: total || 0,
-        productosActivos: activos || 0,
-        totalCategorias: new Set((categorias || []).map((c: any) => c.categoria).filter(Boolean)).size,
-        totalProveedores: new Set((proveedores || []).map((p: any) => p.proveedor).filter(Boolean)).size,
+        productosActivos: total || 0,
+        totalCategorias: new Set((categorias || []).map((c: any) => c.CATEGORIA).filter(Boolean)).size,
+        totalProveedores: new Set((proveedores || []).map((p: any) => p.PROVEEDOR).filter(Boolean)).size,
         valorCatalogoTotal: valorTotal,
       };
     },
@@ -146,11 +146,10 @@ export function useBuscarProductosFirmaVB(searchTerm: string, enabled: boolean =
     queryFn: async () => {
       if (!searchTerm || searchTerm.length < 2) return [];
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('*')
-        .eq('activo', true)
-        .or(`descripcion.ilike.%${searchTerm}%,codigo.ilike.%${searchTerm}%`)
+        .select('id, "PROVEEDOR", "CATEGORIA", "DESCRIPCION", "CODIGO", "COSTO", "Mg Comercial", "Precio de venta neto", "Unidad"')
+        .or(`"DESCRIPCION".ilike.%${searchTerm}%,"CODIGO".ilike.%${searchTerm}%`)
         .limit(50);
 
       if (error) {
@@ -158,7 +157,18 @@ export function useBuscarProductosFirmaVB(searchTerm: string, enabled: boolean =
         throw error;
       }
 
-      return data as ProductoFirmaVB[];
+      return (data || []).map((item: any) => ({
+        id: item.id,
+        proveedor: item.PROVEEDOR,
+        categoria: item.CATEGORIA,
+        descripcion: item.DESCRIPCION,
+        codigo: item.CODIGO,
+        costo: item.COSTO,
+        margen_comercial: item['Mg Comercial'],
+        precio_venta_neto: item['Precio de venta neto'],
+        unidad: item.Unidad,
+        created_at: null,
+      })) as ProductoFirmaVB[];
     },
     enabled: enabled && searchTerm.length >= 2,
   });
@@ -181,11 +191,12 @@ export function useMatchProductosFirmaVB(nombreBuscado: string | null) {
 
       if (palabras.length === 0) return [];
 
-      // Buscar productos que coincidan
-      const { data, error } = await supabase
+      // Buscar productos que coincidan con el primer término
+      const searchTerm = palabras[0];
+      const { data, error } = await (supabase as any)
         .from('lista_precios_firmavb')
-        .select('*')
-        .eq('activo', true)
+        .select('id, "PROVEEDOR", "CATEGORIA", "DESCRIPCION", "CODIGO", "COSTO", "Mg Comercial", "Precio de venta neto", "Unidad"')
+        .or(`"DESCRIPCION".ilike.%${searchTerm}%,"CATEGORIA".ilike.%${searchTerm}%`)
         .limit(200);
 
       if (error) {
@@ -194,8 +205,8 @@ export function useMatchProductosFirmaVB(nombreBuscado: string | null) {
       }
 
       // Calcular score de matching
-      const productosConScore = (data || []).map((producto: ProductoFirmaVB) => {
-        const descripcionNorm = (producto.descripcion || '')
+      const productosConScore = (data || []).map((item: any) => {
+        const descripcionNorm = (item.DESCRIPCION || '')
           .toLowerCase()
           .normalize('NFD')
           .replace(/[\u0300-\u036f]/g, '');
@@ -211,12 +222,20 @@ export function useMatchProductosFirmaVB(nombreBuscado: string | null) {
         });
 
         // Bonus por coincidencia de código
-        if (producto.codigo && nombreBuscado.toLowerCase().includes(producto.codigo.toLowerCase())) {
+        if (item.CODIGO && nombreBuscado.toLowerCase().includes(item.CODIGO.toLowerCase())) {
           score += 20;
         }
 
         return {
-          ...producto,
+          id: item.id,
+          proveedor: item.PROVEEDOR,
+          categoria: item.CATEGORIA,
+          descripcion: item.DESCRIPCION,
+          codigo: item.CODIGO,
+          costo: item.COSTO,
+          margen_comercial: item['Mg Comercial'],
+          precio_venta_neto: item['Precio de venta neto'],
+          unidad: item.Unidad,
           matchScore: score,
           matchedTerms,
           matchType: score >= 30 ? 'exact' : score >= 15 ? 'partial' : 'similar' as const,
