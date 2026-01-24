@@ -51,7 +51,7 @@ export default function MiInventario() {
     setTimeout(() => setDebouncedSearch(value), 300);
   };
 
-  const { data, isLoading, refetch, isFetching } = useListaPreciosFirmaVB({
+  const { data, isLoading, refetch, isFetching, isError, error } = useListaPreciosFirmaVB({
     search: debouncedSearch,
     categoria: categoriaFilter !== "all" ? categoriaFilter : undefined,
     proveedor: proveedorFilter !== "all" ? proveedorFilter : undefined,
@@ -90,6 +90,25 @@ export default function MiInventario() {
 
   return (
     <div className="container mx-auto py-6 space-y-6">
+      {/* Debug Banner */}
+      <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded">
+        <h3 className="font-bold mb-2">🔧 Debug Info - useListaPreciosFirmaVB</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+          <div><strong>isLoading:</strong> {isLoading ? '✅ Yes' : '❌ No'}</div>
+          <div><strong>isFetching:</strong> {isFetching ? '✅ Yes' : '❌ No'}</div>
+          <div><strong>isError:</strong> {isError ? '🔴 Yes' : '🟢 No'}</div>
+          <div><strong>Total Items:</strong> {total}</div>
+        </div>
+        {isError && (
+          <div className="mt-2 bg-red-100 border border-red-400 text-red-700 p-2 rounded">
+            <strong>Error:</strong> {error?.message || JSON.stringify(error)}
+          </div>
+        )}
+        <div className="mt-2 text-xs text-gray-600">
+          <strong>Data items length:</strong> {items.length} | <strong>Page:</strong> {page} | <strong>TotalPages:</strong> {totalPages}
+        </div>
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
