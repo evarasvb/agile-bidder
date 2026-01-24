@@ -38,7 +38,7 @@ export default function MiInventario() {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [categoriaFilter, setCategoriaFilter] = useState<string>("all");
-  const [proveedorFilter, setProveedorFilter] = useState<string>("all");
+  
   const [page, setPage] = useState(1);
   const pageSize = 50;
 
@@ -54,7 +54,6 @@ export default function MiInventario() {
   const { data, isLoading, refetch, isFetching, isError, error } = useListaPreciosFirmaVB({
     search: debouncedSearch,
     categoria: categoriaFilter !== "all" ? categoriaFilter : undefined,
-    proveedor: proveedorFilter !== "all" ? proveedorFilter : undefined,
     page,
     pageSize,
   });
@@ -66,7 +65,6 @@ export default function MiInventario() {
   const total = data?.total || 0;
   const totalPages = data?.totalPages || 1;
   const categorias = filterOptions?.categorias || [];
-  const proveedores = filterOptions?.proveedores || [];
 
   const formatCurrency = (value: string | number | null) => {
     if (!value) return "-";
@@ -79,13 +77,9 @@ export default function MiInventario() {
     }).format(numValue);
   };
 
-  const handleFilterChange = (type: 'categoria' | 'proveedor', value: string) => {
-    if (type === 'categoria') {
-      setCategoriaFilter(value);
-    } else {
-      setProveedorFilter(value);
-    }
-    setPage(1); // Reset to first page
+  const handleFilterChange = (value: string) => {
+    setCategoriaFilter(value);
+    setPage(1);
   };
 
   return (
@@ -210,7 +204,7 @@ export default function MiInventario() {
                 className="pl-9"
               />
             </div>
-            <Select value={categoriaFilter} onValueChange={(v) => handleFilterChange('categoria', v)}>
+            <Select value={categoriaFilter} onValueChange={handleFilterChange}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Categoría" />
               </SelectTrigger>
@@ -218,17 +212,6 @@ export default function MiInventario() {
                 <SelectItem value="all">Todas las categorías</SelectItem>
                 {categorias.map((cat) => (
                   <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={proveedorFilter} onValueChange={(v) => handleFilterChange('proveedor', v)}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Proveedor" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los proveedores</SelectItem>
-                {proveedores.map((prov) => (
-                  <SelectItem key={prov} value={prov}>{prov}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -249,7 +232,6 @@ export default function MiInventario() {
                     <TableRow>
                       <TableHead className="w-[100px]">Código</TableHead>
                       <TableHead>Descripción</TableHead>
-                      <TableHead>Proveedor</TableHead>
                       <TableHead>Categoría</TableHead>
                       <TableHead className="text-right">Costo</TableHead>
                       <TableHead className="text-center">Margen</TableHead>
@@ -260,7 +242,7 @@ export default function MiInventario() {
                   <TableBody>
                     {items.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                           No se encontraron productos
                         </TableCell>
                       </TableRow>
@@ -272,9 +254,6 @@ export default function MiInventario() {
                           </TableCell>
                           <TableCell className="font-medium max-w-[300px]" title={item.descripcion || ""}>
                             <div className="truncate">{item.descripcion || "-"}</div>
-                          </TableCell>
-                          <TableCell className="max-w-[150px] truncate" title={item.proveedor || ""}>
-                            {item.proveedor || "-"}
                           </TableCell>
                           <TableCell>
                             {item.categoria ? (
