@@ -1,18 +1,20 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import { useCliente } from '@/hooks/useCliente';
 
 export interface MatchedProduct {
   id: string;
-  sku: string;
+  codigo: string | null;
   nombre: string;
   categoria: string | null;
-  stock: number | null;
+  proveedor: string | null;
+  costo: number;
+  margen_comercial: number;
   precio_unitario: number;
   descripcion: string | null;
-  tiempo_entrega_dias: number | null;
+  unidad: string | null;
   matchScore: number;
+  matchType: 'exact' | 'partial' | 'similar';
+  matchedTerms: string[];
 }
 
 const KEYWORDS_MAP: Record<string, string[]> = {
@@ -20,118 +22,189 @@ const KEYWORDS_MAP: Record<string, string[]> = {
   insumo: ['papel', 'toner', 'tinta', 'resma', 'carpeta', 'archivador', 'sobre', 'agenda'],
   oficina: ['escritorio', 'silla', 'estante', 'mueble', 'archivador', 'lámpara', 'material', 'artículo'],
   equipamiento: ['equipo', 'periférico', 'accesorio', 'cable', 'adaptador', 'hub', 'servidor'],
+  limpieza: ['limpieza', 'jabón', 'detergente', 'desinfectante', 'escoba', 'trapero', 'papel higiénico'],
+  seguridad: ['seguridad', 'extintor', 'cámara', 'alarma', 'sensor', 'cerradura'],
 };
 
-function calculateMatchScore(productName: string, searchTerms: string[]): number {
-  const nameLower = productName.toLowerCase();
+function normalizeText(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\w\s]/g, ' ')
+    .trim();
+}
+
+function calculateMatchScore(descripcion: string, searchTerms: string[]): { score: number; matchedTerms: string[] } {
+  const descNorm = normalizeText(descripcion);
   let score = 0;
+  const matchedTerms: string[] = [];
   
   for (const term of searchTerms) {
-    if (nameLower.includes(term.toLowerCase())) {
-      score += 30;
+    const termNorm = normalizeText(term);
+    if (termNorm.length < 2) continue;
+    
+    if (descNorm.includes(termNorm)) {
+      score += termNorm.length >= 5 ? 15 : 10;
+      matchedTerms.push(term);
     }
   }
   
-  // Bonus for exact category match
+  // Bonus for category keywords match
   for (const [category, keywords] of Object.entries(KEYWORDS_MAP)) {
     for (const keyword of keywords) {
-      if (nameLower.includes(keyword)) {
-        score += 15;
+      if (descNorm.includes(keyword)) {
+        score += 5;
+        if (!matchedTerms.includes(keyword)) {
+          matchedTerms.push(keyword);
+        }
       }
     }
   }
   
-  return Math.min(score, 100);
+  return { score: Math.min(score, 100), matchedTerms };
 }
 
 function extractSearchTerms(nombre: string): string[] {
   const terms: string[] = [];
-  const nombreLower = nombre.toLowerCase();
+  const nombreNorm = normalizeText(nombre);
   
+  // Extract words longer than 2 characters
+  const words = nombreNorm.split(/\s+/).filter(w => w.length > 2);
+  terms.push(...words);
+  
+  // Add relevant keywords based on the name
   for (const [category, keywords] of Object.entries(KEYWORDS_MAP)) {
-    if (nombreLower.includes(category)) {
+    if (nombreNorm.includes(category)) {
       terms.push(...keywords);
     }
     for (const keyword of keywords) {
-      if (nombreLower.includes(keyword)) {
+      if (nombreNorm.includes(keyword)) {
         terms.push(keyword);
       }
     }
   }
   
-  // Also extract words from the name
-  const words = nombre.split(/\s+/).filter(w => w.length > 3);
-  terms.push(...words);
-  
   return [...new Set(terms)];
 }
 
 export function useMatchInventario(compraNombre: string | null) {
-  const { user } = useAuth();
-  const { data: cliente } = useCliente();
-
   return useQuery({
-    queryKey: ['match_inventario', compraNombre, cliente?.id],
+    queryKey: ['match_inventario_firmavb', compraNombre],
     queryFn: async () => {
-      if (!compraNombre || !cliente?.id) return [];
+      if (!compraNombre || compraNombre.length < 3) return [];
 
       const searchTerms = extractSearchTerms(compraNombre);
       
       if (searchTerms.length === 0) return [];
 
-      // Get all active inventory for the client
-      const { data: inventario, error } = await supabase
-        .from('cliente_inventario')
+      // Fetch products from lista_precios_firmavb
+      const { data: productos, error } = await supabase
+        .from('lista_precios_firmavb')
         .select('*')
-        .eq('cliente_id', cliente.id)
-        .eq('activo', true);
+        .eq('activo', true)
+        .limit(500);
 
-      if (error) throw error;
-      if (!inventario || inventario.length === 0) {
-        // Try the general inventory table
-        const { data: generalInventory, error: genError } = await supabase
-          .from('inventory')
-          .select('*')
-          .eq('activo', true);
-
-        if (genError) throw genError;
-        
-        const matched = (generalInventory || [])
-          .map(item => ({
-            id: item.id,
-            sku: item.sku,
-            nombre: item.nombre_producto,
-            categoria: item.categoria,
-            stock: item.stock_disponible,
-            precio_unitario: item.precio_unitario,
-            descripcion: item.descripcion,
-            tiempo_entrega_dias: item.tiempo_entrega_dias,
-            matchScore: calculateMatchScore(item.nombre_producto, searchTerms),
-          }))
-          .filter(item => item.matchScore > 0)
-          .sort((a, b) => b.matchScore - a.matchScore);
-
-        return matched as MatchedProduct[];
+      if (error) {
+        console.error('Error fetching productos for matching:', error);
+        throw error;
       }
 
+      if (!productos || productos.length === 0) return [];
+
       // Match products based on search terms
-      const matched = inventario
-        .map(item => ({
-          id: item.id,
-          sku: item.sku,
-          nombre: item.nombre,
-          categoria: item.categoria,
-          stock: item.stock,
-          precio_unitario: item.precio_unitario,
-          descripcion: item.descripcion,
-          tiempo_entrega_dias: item.tiempo_entrega_dias,
-          matchScore: calculateMatchScore(item.nombre, searchTerms),
-        }))
+      const matched = productos
+        .map(item => {
+          const { score, matchedTerms } = calculateMatchScore(item.descripcion, searchTerms);
+          
+          // Additional score for código match
+          let finalScore = score;
+          if (item.codigo && compraNombre.toLowerCase().includes(item.codigo.toLowerCase())) {
+            finalScore += 25;
+            matchedTerms.push(`código: ${item.codigo}`);
+          }
+          
+          return {
+            id: item.id,
+            codigo: item.codigo,
+            nombre: item.descripcion,
+            categoria: item.categoria,
+            proveedor: item.proveedor,
+            costo: Number(item.costo) || 0,
+            margen_comercial: Number(item.margen_comercial) || 0,
+            precio_unitario: Number(item.precio_venta_neto) || 0,
+            descripcion: item.descripcion,
+            unidad: item.unidad,
+            matchScore: finalScore,
+            matchType: finalScore >= 40 ? 'exact' : finalScore >= 20 ? 'partial' : 'similar' as const,
+            matchedTerms,
+          };
+        })
         .filter(item => item.matchScore > 0)
-        .sort((a, b) => b.matchScore - a.matchScore);
+        .sort((a, b) => b.matchScore - a.matchScore)
+        .slice(0, 20);
 
       return matched as MatchedProduct[];
     },
-    enabled: !!compraNombre && !!cliente?.id,
+    enabled: !!compraNombre && compraNombre.length >= 3,
+  });
+}
+
+// Bulk matching for multiple items
+export function useMatchMultipleItems(items: { id: string; nombre: string }[]) {
+  return useQuery({
+    queryKey: ['match_multiple_firmavb', items.map(i => i.id).join(',')],
+    queryFn: async () => {
+      if (items.length === 0) return new Map<string, MatchedProduct[]>();
+
+      // Fetch all active products
+      const { data: productos, error } = await supabase
+        .from('lista_precios_firmavb')
+        .select('*')
+        .eq('activo', true);
+
+      if (error) {
+        console.error('Error fetching productos for bulk matching:', error);
+        throw error;
+      }
+
+      const results = new Map<string, MatchedProduct[]>();
+
+      for (const item of items) {
+        const searchTerms = extractSearchTerms(item.nombre);
+        if (searchTerms.length === 0) {
+          results.set(item.id, []);
+          continue;
+        }
+
+        const matched = (productos || [])
+          .map(p => {
+            const { score, matchedTerms } = calculateMatchScore(p.descripcion, searchTerms);
+            return {
+              id: p.id,
+              codigo: p.codigo,
+              nombre: p.descripcion,
+              categoria: p.categoria,
+              proveedor: p.proveedor,
+              costo: Number(p.costo) || 0,
+              margen_comercial: Number(p.margen_comercial) || 0,
+              precio_unitario: Number(p.precio_venta_neto) || 0,
+              descripcion: p.descripcion,
+              unidad: p.unidad,
+              matchScore: score,
+              matchType: score >= 40 ? 'exact' : score >= 20 ? 'partial' : 'similar' as const,
+              matchedTerms,
+            };
+          })
+          .filter(p => p.matchScore > 0)
+          .sort((a, b) => b.matchScore - a.matchScore)
+          .slice(0, 10);
+
+        results.set(item.id, matched as MatchedProduct[]);
+      }
+
+      return results;
+    },
+    enabled: items.length > 0,
   });
 }
