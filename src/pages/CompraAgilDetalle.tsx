@@ -243,7 +243,7 @@ export default function CompraAgilDetalle() {
       // Simple fuzzy matching
       const scored = (data || []).map(product => {
         const productName = product.descripcion.toLowerCase();
-        const productKeywords =  || [];
+        const productKeywords = product.categoria ? [product.categoria] : [];
         const productDesc = (product.descripcion || '').toLowerCase();
         
         let score = 0;
