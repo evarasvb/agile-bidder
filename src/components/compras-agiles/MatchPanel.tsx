@@ -24,7 +24,8 @@ interface MatchPanelProps {
 
 export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
   const { 
-    procesarCompraAgil, 
+procesarCompra,
+        procesarCompraAgil, 
     calcularScorePromedio, 
     isLoading: isLoadingInventario 
   } = useProductMatching();
@@ -51,7 +52,7 @@ export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
             nombre: item.descripcion || '',
             descripcion: item.descripcion || '',
             cantidad: item.cantidad || 1,
-            unidad: item.unidad_medida || 'UN'
+            unidad: item.unidad || 'UN'
           }));
           items = procesarCompra(itemsDesdeDB);
         } else {
