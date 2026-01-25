@@ -45,7 +45,7 @@ interface ProductoMatch {
   sku: string;
   precio_unitario: number;
   stock_disponible: number;
-  categoria: string;
+  categoria?: string;
   matchScore: number;
   // Campos adicionales de inventory
   activo?: boolean;
@@ -243,7 +243,7 @@ export default function CompraAgilDetalle() {
       // Simple fuzzy matching
       const scored = (data || []).map(product => {
         const productName = product.descripcion.toLowerCase();
-        const productKeywords = product.categoria ? [product.categoria] : [] || [];
+        const productKeywords =  || [];
         const productDesc = (product.descripcion || '').toLowerCase();
         
         let score = 0;
