@@ -45,8 +45,8 @@ export const ProductosSolicitadosList: React.FC<ProductosSolicitadosListProps> =
             <div className="flex justify-between items-start">
               <div className="flex-1">
                 <h4 className="font-medium text-gray-900">{item.nombre_producto}</h4>
-                {item.descripcion_producto && (
-                  <p className="text-sm text-gray-600 mt-1">{item.descripcion_producto}</p>
+                {item.descripcion && (
+                  <p className="text-sm text-gray-600 mt-1">{item.descripcion}</p>
                 )}
                 {item.codigo_producto && (
                   <p className="text-xs text-gray-400 mt-1">Código: {item.codigo_producto}</p>
