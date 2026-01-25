@@ -14,10 +14,12 @@ import { es } from "date-fns/locale";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 import { useProductMatching, type ItemConMatch } from "@/hooks/useProductMatching";
 import { clasificarProceso, formatCurrency, montoEnUTM } from "@/utils/clasificacion";
+import { useLicitacionItems, type LicitacionItem } from '@/hooks/useLicitacionItems';
 
 interface MatchPanelProps {
   compra: CompraAgil | null;
   onGenerarPropuesta: (productos: any[]) => void;
+  
 }
 
 export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
@@ -26,6 +28,9 @@ export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
     calcularScorePromedio, 
     isLoading: isLoadingInventario 
   } = useProductMatching();
+
+    // Obtener items de la DB directamente (igual que Vista Detalle)
+  const { data: licitacionItems, isLoading: isLoadingItems } = useLicitacionItems(compra?.codigo || '');
   
   const [itemsConMatch, setItemsConMatch] = useState<ItemConMatch[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -33,11 +38,26 @@ export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
   
   // Procesar compra cuando cambia
   useEffect(() => {
-    if (compra && !isLoadingInventario) {
+      if (compra && !isLoadingInventario && !isLoadingItems) {
       setIsProcessing(true);
       // Pequeño delay para mostrar loading
       const timer = setTimeout(() => {
-        const items = procesarCompraAgil(compra);
+        // Usar items de la DB si están disponibles (igual que Vista Detalle)
+        let items;
+        if (licitacionItems && licitacionItems.length > 0) {
+          // Convertir licitacionItems a ItemRequerido para matching
+          const itemsDesdeDB = licitacionItems.map((item, idx) => ({
+            id: item.id?.toString() || `db-${idx}`,
+            nombre: item.descripcion || '',
+            descripcion: item.descripcion || '',
+            cantidad: item.cantidad || 1,
+            unidad: item.unidad_medida || 'UN'
+          }));
+          items = procesarCompra(itemsDesdeDB);
+        } else {
+          // Fallback a procesarCompraAgil si no hay items en DB
+          items = procesarCompraAgil(compra);
+        }
         setItemsConMatch(items);
         setScorePromedio(calcularScorePromedio(items));
         setIsProcessing(false);
@@ -47,8 +67,7 @@ export function MatchPanel({ compra, onGenerarPropuesta }: MatchPanelProps) {
       setItemsConMatch([]);
       setScorePromedio(0);
     }
-  }, [compra, procesarCompraAgil, calcularScorePromedio, isLoadingInventario]);
-  
+  }, [compra, procesarCompraAgil, procesarCompra, calcularScorePromedio, isLoadingInventario, licitacionItems, isLoadingItems]);  
   const handleRefreshMatches = () => {
     if (!compra) return;
     setIsProcessing(true);
