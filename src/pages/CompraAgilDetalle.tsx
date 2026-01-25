@@ -47,6 +47,22 @@ interface ProductoMatch {
   stock_disponible: number;
   categoria: string;
   matchScore: number;
+  // Campos adicionales de inventory
+  activo?: boolean;
+  codigo?: string;
+  costo?: number;
+  costo_neto?: number;
+  created_at?: string;
+  descripcion?: string;
+  margen_comercial?: number;
+  nombre?: string;
+  precio?: number;
+  precio_venta_neto?: number;
+  proveedor?: string;
+  unidad?: string;
+  updated_at?: string;
+  user_id?: string;
+  keywords_text?: string;
 }
 
 interface ItemCompra {
