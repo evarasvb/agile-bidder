@@ -71,7 +71,7 @@ function extractItemsFromData(datosJson: Record<string, unknown> | null, descrip
         items.push({
           codigo: String(item.CodigoProducto || item.Codigo || item.codigo || ''),
           nombre: String(item.NombreProducto || item.Nombre || item.nombre || ''),
-          descripcion: String(item.Especificacion || item.Descripcion || item.descripcion || item.EspecificacionComprador || ''),
+          descripcion: String(item.Especificacion || item.descripcion || item.descripcion || item.EspecificacionComprador || ''),
           cantidad: Number(item.Cantidad || item.cantidad || 1),
           unidad: String(item.UnidadMedida || item.Unidad || item.unidad || 'Unidad'),
         });
@@ -226,9 +226,9 @@ export default function CompraAgilDetalle() {
       
       // Simple fuzzy matching
       const scored = (data || []).map(product => {
-        const productName = product.DESCRIPCION.toLowerCase();
-        const productKeywords = product.product.CATEGORIA ? [product.CATEGORIA] : [] || [];
-        const productDesc = (product.DESCRIPCION || '').toLowerCase();
+        const productName = product.descripcion.toLowerCase();
+        const productKeywords = product.categoria ? [product.categoria] : [] || [];
+        const productDesc = (product.descripcion || '').toLowerCase();
         
         let score = 0;
         uniqueTerms.forEach(term => {
@@ -728,7 +728,7 @@ export default function CompraAgilDetalle() {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{product.DESCRIPCION}</p>
+                          <p className="font-medium truncate">{product.descripcion}</p>
                           <p className="text-xs text-muted-foreground font-mono">SKU: {product.sku}</p>
                         </div>
                         <Badge 
