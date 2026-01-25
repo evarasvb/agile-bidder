@@ -217,7 +217,7 @@ export default function CompraAgilDetalle() {
       const uniqueTerms = [...new Set(searchTerms)];
       
       const { data, error } = await supabase
-        .from('inventory')
+        .from('lista_precios_firmavb')
         .select('*')
         .eq('activo', true)
         .limit(50);
@@ -226,9 +226,9 @@ export default function CompraAgilDetalle() {
       
       // Simple fuzzy matching
       const scored = (data || []).map(product => {
-        const productName = product.nombre_producto.toLowerCase();
-        const productKeywords = product.keywords || [];
-        const productDesc = (product.descripcion || '').toLowerCase();
+        const productName = product.DESCRIPCION.toLowerCase();
+        const productKeywords = product.CATEGORIA ? [product.CATEGORIA] || [];
+        const productDesc = (product.DESCRIPCION || '').toLowerCase();
         
         let score = 0;
         uniqueTerms.forEach(term => {
@@ -728,7 +728,7 @@ export default function CompraAgilDetalle() {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{product.nombre_producto}</p>
+                          <p className="font-medium truncate">{product.DESCRIPCION}</p>
                           <p className="text-xs text-muted-foreground font-mono">SKU: {product.sku}</p>
                         </div>
                         <Badge 
