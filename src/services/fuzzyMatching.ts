@@ -1,6 +1,7 @@
 /**
  * Servicio de matching difuso para productos
  * Implementa algoritmo de similitud de Levenshtein y búsqueda por keywords
+ * Incluye diccionario de sinónimos y matching por categoría
  */
 
 import type { InventoryItem } from "@/hooks/useInventory";
@@ -8,7 +9,7 @@ import type { InventoryItem } from "@/hooks/useInventory";
 export interface ProductMatch {
   inventoryItem: InventoryItem;
   score: number; // 0-100
-  matchType: 'exact' | 'partial' | 'keyword' | 'fuzzy';
+  matchType: 'exact' | 'partial' | 'keyword' | 'fuzzy' | 'category';
   matchedTerms: string[];
 }
 
@@ -21,6 +22,36 @@ export interface ItemRequerido {
 }
 
 /**
+ * Diccionario de sinónimos y términos relacionados por categoría
+ */
+const CATEGORY_SYNONYMS: Record<string, string[]> = {
+  'oficina': [
+    'escritorio', 'papeleria', 'papelería', 'utiles', 'útiles',
+    'articulos oficina', 'artículos oficina', 'suministros oficina',
+    'materiales oficina', 'elementos oficina'
+  ],
+  'papel': [
+    'resma', 'hoja', 'papel carta', 'papel oficio', 'papel bond',
+    'papel fotocopia', 'papel copia', 'papel blanco'
+  ],
+  'escritura': [
+    'lapiz', 'lápiz', 'boligrafo', 'bolígrafo', 'lapicera', 'marcador',
+    'pluma', 'plumón', 'resaltador', 'highlighter', 'tinta'
+  ],
+  'archivo': [
+    'carpeta', 'archivador', 'bibliorato', 'folder', 'portafolio',
+    'organizador', 'clasificador'
+  ],
+  'corte': [
+    'tijera', 'tijeras', 'cutter', 'cortador', 'guillotina'
+  ],
+  'pegamento': [
+    'cola', 'pegante', 'adhesivo', 'silicona', 'cinta adhesiva',
+    'scotch', 'tape', 'masking'
+  ]
+};
+
+/**
  * Normaliza texto para comparación
  */
 function normalizeText(text: string): string {
@@ -31,6 +62,27 @@ function normalizeText(text: string): string {
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/**
+ * Expande un texto con sinónimos conocidos
+ */
+function expandWithSynonyms(text: string): string[] {
+  const normalized = normalizeText(text);
+  const expanded: string[] = [normalized];
+  
+  // Buscar categorías que coincidan
+  for (const [category, synonyms] of Object.entries(CATEGORY_SYNONYMS)) {
+    for (const synonym of synonyms) {
+      if (normalized.includes(normalizeText(synonym))) {
+        expanded.push(category);
+        expanded.push(...synonyms.map(s => normalizeText(s)));
+        break;
+      }
+    }
+  }
+  
+  return [...new Set(expanded)];
 }
 
 /**
@@ -62,8 +114,8 @@ function levenshteinDistance(str1: string, str2: string): number {
     for (let j = 1; j <= n; j++) {
       const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
       matrix[i][j] = Math.min(
-        matrix[i - 1][j] + 1,      // Eliminación
-        matrix[i][j - 1] + 1,      // Inserción
+        matrix[i - 1][j] + 1, // Eliminación
+        matrix[i][j - 1] + 1, // Inserción
         matrix[i - 1][j - 1] + cost // Sustitución
       );
     }
@@ -106,19 +158,27 @@ function extractKeywords(text: string): string[] {
 
 /**
  * Calcula match entre un item requerido y un producto del inventario
+ * Versión mejorada con soporte para sinónimos y categorías
  */
 function calculateMatch(itemRequerido: ItemRequerido, producto: InventoryItem): ProductMatch | null {
   const nombreRequerido = normalizeText(itemRequerido.nombre);
   const descripcionRequerida = itemRequerido.descripcion ? normalizeText(itemRequerido.descripcion) : '';
   const textoCompleto = `${nombreRequerido} ${descripcionRequerida}`;
   
+  // Expandir con sinónimos
+  const textosExpandidos = expandWithSynonyms(textoCompleto);
+  
   const nombreProducto = normalizeText(producto.nombre_producto);
   const descripcionProducto = producto.descripcion ? normalizeText(producto.descripcion) : '';
+  const categoriaProducto = producto.categoria ? normalizeText(producto.categoria) : '';
   const keywordsProducto = (producto.keywords || []).map(k => normalizeText(k));
   const textoProducto = `${nombreProducto} ${descripcionProducto} ${keywordsProducto.join(' ')}`;
   
+  // También expandir el producto
+  const productoExpandido = expandWithSynonyms(textoProducto);
+  
   let score = 0;
-  let matchType: 'exact' | 'partial' | 'keyword' | 'fuzzy' = 'fuzzy';
+  let matchType: 'exact' | 'partial' | 'keyword' | 'fuzzy' | 'category' = 'fuzzy';
   const matchedTerms: string[] = [];
   
   // 1. Match exacto por nombre (100%)
@@ -139,7 +199,34 @@ function calculateMatch(itemRequerido: ItemRequerido, producto: InventoryItem): 
     matchedTerms.push(itemRequerido.nombre);
   }
   
-  // 3. Match por keywords del producto (hasta 75%)
+  // 3. Match por categoría expandida (hasta 70%)
+  let categoryMatches = 0;
+  for (const textoExp of textosExpandidos) {
+    // Match directo con categoría del producto
+    if (categoriaProducto && categoriaProducto.includes(textoExp)) {
+      categoryMatches += 2;
+      matchedTerms.push(textoExp);
+    }
+    
+    // Match con textos expandidos del producto
+    for (const prodExp of productoExpandido) {
+      if (prodExp.includes(textoExp) || textoExp.includes(prodExp)) {
+        categoryMatches++;
+        matchedTerms.push(textoExp);
+        break;
+      }
+    }
+  }
+  
+  if (categoryMatches > 0) {
+    const categoryScore = Math.min(categoryMatches * 15, 70);
+    if (categoryScore > score) {
+      score = categoryScore;
+      matchType = 'category';
+    }
+  }
+  
+  // 4. Match por keywords del producto (hasta 75%)
   const keywordsRequerido = extractKeywords(textoCompleto);
   let keywordMatches = 0;
   
@@ -168,7 +255,7 @@ function calculateMatch(itemRequerido: ItemRequerido, producto: InventoryItem): 
     }
   }
   
-  // 4. Similitud de texto completo (hasta 60%)
+  // 5. Similitud de texto completo (hasta 60%)
   const fullSimilarity = stringSimilarity(textoCompleto, textoProducto);
   if (fullSimilarity > 0.5) {
     const fuzzyScore = fullSimilarity * 60;
@@ -178,8 +265,8 @@ function calculateMatch(itemRequerido: ItemRequerido, producto: InventoryItem): 
     }
   }
   
-  // Umbral mínimo de 30%
-  if (score < 30) return null;
+  // Umbral mínimo de 25% (reducido para mejor cobertura)
+  if (score < 25) return null;
   
   return {
     inventoryItem: producto,
