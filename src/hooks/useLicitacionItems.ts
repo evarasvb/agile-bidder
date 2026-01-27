@@ -2,24 +2,20 @@ import { useQuery } from '@tanstack/react-query';
 import { supabaseClient as supabase } from '@/lib/supabaseClient';
 
 /**
- * Item de licitacion - matches database schema for licitacion_items
+ * Item de licitacion - matches expected frontend interface
  */
 export interface LicitacionItem {
   id: string;
-  licitacion_codigo: string;
-  item_index: number;
-  producto_id: string | null;
-  nombre: string;
+  compra_agil_id: string;
+  nombre_producto: string;
   descripcion: string | null;
   cantidad: number | null;
   unidad: string | null;
+  codigo_producto: string | null;
   categoria: string | null;
   created_at: string | null;
   precio_unitario: number | null;
   total: number | null;
-  // Mapped properties for frontend compatibility
-  nombre_producto?: string;
-  codigo_producto?: string | null;
 }
 
 /**
@@ -32,7 +28,7 @@ export function useLicitacionItems(licitacionCodigo: string | null) {
     queryFn: async () => {
       if (!licitacionCodigo) return [];
 
-      // Fetch items directly using licitacion_codigo
+      // Fetch items from licitacion_items using licitacion_codigo
       const { data, error } = await supabase
         .from('licitacion_items')
         .select('*')
@@ -44,11 +40,19 @@ export function useLicitacionItems(licitacionCodigo: string | null) {
         throw error;
       }
 
-      // Map to expected interface format for frontend
+      // Map database fields to expected interface
       return (data || []).map(item => ({
-        ...item,
-        nombre_producto: item.nombre,
+        id: String(item.id),
+        compra_agil_id: item.licitacion_codigo,
+        nombre_producto: item.nombre || '',
+        descripcion: item.descripcion,
+        cantidad: item.cantidad,
+        unidad: item.unidad,
         codigo_producto: item.producto_id,
+        categoria: item.categoria,
+        created_at: item.created_at,
+        precio_unitario: item.precio_unitario,
+        total: item.total,
       })) as LicitacionItem[];
     },
     enabled: !!licitacionCodigo,
