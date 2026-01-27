@@ -40,7 +40,7 @@ interface AutoBidItemConfig {
  */
 export async function processMatchesForAutoBids(matches: Match[]) {
   // 1. Obtener configuraciones activas de auto-bid items
-  const { data: autoBidItems, error: configError } = await supabase
+  const { data: autoBidItems, error: configError } = await (supabase as any)
     .from('auto_bid_items')
     .select('*')
     .eq('activo', true);
@@ -116,7 +116,7 @@ export async function processMatchesForAutoBids(matches: Match[]) {
 
   // 7. Insertar oportunidades en batch
   if (opportunities.length > 0) {
-    const { error: insertError } = await supabase
+    const { error: insertError } = await (supabase as any)
       .from('auto_bid_opportunities')
       .insert(opportunities);
 
