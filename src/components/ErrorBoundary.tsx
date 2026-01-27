@@ -49,7 +49,7 @@ export class ErrorBoundary extends Component<Props, State> {
   async logErrorToService(error: Error, errorInfo: ErrorInfo) {
     try {
       const { supabase } = await import('@/integrations/supabase/client');
-      await supabase.from('error_logs').insert({
+      await (supabase as any).from('error_logs').insert({
         error_message: error.message,
         error_stack: error.stack,
         component_stack: errorInfo.componentStack,
