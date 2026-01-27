@@ -1,7 +1,8 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clock, Building2, DollarSign, ExternalLink } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Clock, Building2, DollarSign, ExternalLink, Package } from 'lucide-react';
 import { AutoBidOpportunity } from '@/hooks/useAutoBidsOpportunities';
 
 interface AutoBidsOpportunitiesListProps {
@@ -27,12 +28,20 @@ const getUrgencyColor = (fecha_cierre: string) => {
 
 const getEstadoBadge = (estado: string) => {
   switch (estado) {
+    case 'activa': return <Badge variant="secondary">Activa</Badge>;
     case 'pendiente': return <Badge variant="secondary">Pendiente</Badge>;
     case 'ofertado': return <Badge variant="default" className="bg-blue-500">Ofertado</Badge>;
+    case 'enviada': return <Badge variant="default" className="bg-blue-500">Enviada</Badge>;
     case 'adjudicado': return <Badge variant="default" className="bg-green-500">Adjudicado</Badge>;
     case 'desierto': return <Badge variant="destructive">Desierto</Badge>;
     default: return <Badge variant="outline">{estado}</Badge>;
   }
+};
+
+const getMatchColor = (matchScore: number) => {
+  if (matchScore >= 80) return 'bg-green-500';
+  if (matchScore >= 60) return 'bg-yellow-500';
+  return 'bg-red-500';
 };
 
 export function AutoBidsOpportunitiesList({ opportunities }: AutoBidsOpportunitiesListProps) {
@@ -50,6 +59,7 @@ export function AutoBidsOpportunitiesList({ opportunities }: AutoBidsOpportuniti
                   </div>
                   {getEstadoBadge(opp.estado)}
                 </div>
+                
                 <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <Building2 className="h-4 w-4" />
@@ -60,7 +70,20 @@ export function AutoBidsOpportunitiesList({ opportunities }: AutoBidsOpportuniti
                     <span>Cierra: {formatDate(opp.fecha_cierre)}</span>
                   </div>
                 </div>
+
+                {/* Match Score - REAL DATA */}
+                <div className="mt-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-1 text-sm">
+                      <Package className="h-4 w-4" />
+                      <span>Productos emparejados: {opp.productos_matched}/{opp.productos_total}</span>
+                    </div>
+                    <span className="text-sm font-semibold">{opp.match_score.toFixed(1)}%</span>
+                  </div>
+                  <Progress value={opp.match_score} className="h-2" />
+                </div>
               </div>
+              
               <div className="flex flex-col items-end gap-2">
                 <div className="text-right">
                   <p className="text-xs text-muted-foreground">Presupuesto</p>
