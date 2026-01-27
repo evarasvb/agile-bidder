@@ -11,17 +11,20 @@ export interface AutoBidOpportunity {
   fecha_cierre: string;
   presupuesto: number;
   ofertado: number | null;
-  estado: 'pendiente' | 'ofertado' | 'adjudicado' | 'desierto';
+  estado: 'activa' | 'pendiente' | 'ofertado' | 'adjudicado' | 'desierto' | 'enviada';
   organismo: string;
   match_score: number;
-  categoria: string;
-  auto_bid_config_id: string;
+  productos_matched: number;
+  productos_total: number;
+  items: any[];
+  total_neto: number | null;
+  total_iva: number | null;
+  costo_envio: number | null;
 }
 
 export interface AutoBidsFilters {
   search: string;
   estado: string;
-  categoria: string;
   sortBy: 'fecha_cierre' | 'presupuesto' | 'match_score';
   sortOrder: 'asc' | 'desc';
 }
@@ -34,7 +37,6 @@ export function useAutoBidsOpportunities() {
   const [filters, setFilters] = useState<AutoBidsFilters>({
     search: '',
     estado: 'all',
-    categoria: 'all',
     sortBy: 'fecha_cierre',
     sortOrder: 'asc'
   });
@@ -50,38 +52,45 @@ export function useAutoBidsOpportunities() {
     
     setLoading(true);
     try {
-      // Fetch compras agiles
-      const { data: compras, error: comprasError } = await (supabase as any)
-        .from('compras_agiles')
+      // Fetch from auto_bid_opportunities table with REAL matching data
+      const { data: opportunities, error } = await (supabase as any)
+        .from('auto_bid_opportunities')
         .select('*')
-        .gte('fecha_cierre', new Date().toISOString());
+        .eq('user_id', user.id)
+        .gte('fecha_cierre', new Date().toISOString())
+        .order('fecha_cierre', { ascending: true });
 
-      if (comprasError) throw comprasError;
+      if (error) throw error;
 
-      const matchedOpportunities: AutoBidOpportunity[] = (compras || []).map((compra: any) => ({
-        id: compra.id || '',
-        codigo: compra.codigo || '',
-        nombre: compra.nombre || '',
-        descripcion: compra.descripcion || '',
-        fecha_cierre: compra.fecha_cierre || new Date().toISOString(),
-        presupuesto: compra.presupuesto || 0,
-        ofertado: compra.ofertado,
-        estado: compra.estado || 'pendiente',
-        organismo: compra.organismo || '',
-        match_score: 75,
-        categoria: compra.categoria || 'Sin categoria',
-        auto_bid_config_id: ''
+      // Map to component format using REAL data from database
+      const matchedOpportunities: AutoBidOpportunity[] = (opportunities || []).map((opp: any) => ({
+        id: opp.id,
+        codigo: opp.codigo_licitacion,
+        nombre: opp.nombre_licitacion,
+        descripcion: opp.descripcion_licitacion || '',
+        fecha_cierre: opp.fecha_cierre,
+        presupuesto: opp.presupuesto || 0,
+        ofertado: opp.monto_ofertado,
+        estado: opp.estado || 'activa',
+        organismo: opp.institucion || '',
+        match_score: opp.porcentaje_matching || 0, // REAL matching percentage
+        productos_matched: opp.productos_matched || 0,
+        productos_total: opp.productos_total || 0,
+        items: opp.items || [],
+        total_neto: opp.total_neto,
+        total_iva: opp.total_iva,
+        costo_envio: opp.costo_envio,
       }));
 
       setOpportunities(matchedOpportunities);
       setStats({
         total: matchedOpportunities.length,
-        pendientes: matchedOpportunities.filter(o => o.estado === 'pendiente').length,
-        ofertados: matchedOpportunities.filter(o => o.estado === 'ofertado').length,
+        pendientes: matchedOpportunities.filter(o => o.estado === 'activa' || o.estado === 'pendiente').length,
+        ofertados: matchedOpportunities.filter(o => o.estado === 'ofertado' || o.estado === 'enviada').length,
         adjudicados: matchedOpportunities.filter(o => o.estado === 'adjudicado').length
       });
     } catch (error) {
-      console.error('Error fetching opportunities:', error);
+      console.error('Error fetching auto-bid opportunities:', error);
       toast({ title: 'Error', description: 'No se pudieron cargar las oportunidades', variant: 'destructive' });
     } finally {
       setLoading(false);
@@ -92,11 +101,17 @@ export function useAutoBidsOpportunities() {
     fetchOpportunities();
   }, [fetchOpportunities]);
 
+  // Filter and sort opportunities
   const filteredOpportunities = opportunities
     .filter(opp => {
-      if (filters.search && !opp.nombre.toLowerCase().includes(filters.search.toLowerCase())) return false;
-      if (filters.estado !== 'all' && opp.estado !== filters.estado) return false;
-      if (filters.categoria !== 'all' && opp.categoria !== filters.categoria) return false;
+      if (filters.search && 
+          !opp.nombre.toLowerCase().includes(filters.search.toLowerCase()) &&
+          !opp.codigo.toLowerCase().includes(filters.search.toLowerCase())) return false;
+      if (filters.estado !== 'all') {
+        if (filters.estado === 'pendiente' && opp.estado !== 'activa' && opp.estado !== 'pendiente') return false;
+        if (filters.estado === 'ofertado' && opp.estado !== 'ofertado' && opp.estado !== 'enviada') return false;
+        if (filters.estado === 'adjudicado' && opp.estado !== 'adjudicado') return false;
+      }
       return true;
     })
     .sort((a, b) => {
@@ -106,12 +121,18 @@ export function useAutoBidsOpportunities() {
       return multiplier * (a.match_score - b.match_score);
     });
 
+  // Submit bid to auto_bid_opportunities
   const submitBid = async (opportunityId: string, amount: number) => {
     try {
       const { error } = await (supabase as any)
-        .from('compras_agiles')
-        .update({ ofertado: amount, estado: 'ofertado' })
+        .from('auto_bid_opportunities')
+        .update({ 
+          monto_ofertado: amount, 
+          estado: 'enviada',
+          updated_at: new Date().toISOString()
+        })
         .eq('id', opportunityId);
+
       if (error) throw error;
       toast({ title: 'Oferta enviada', description: `Se ha ofertado $${amount.toLocaleString('es-CL')}` });
       fetchOpportunities();
@@ -121,5 +142,13 @@ export function useAutoBidsOpportunities() {
     }
   };
 
-  return { opportunities: filteredOpportunities, loading, filters, setFilters, stats, refresh: fetchOpportunities, submitBid };
+  return { 
+    opportunities: filteredOpportunities, 
+    loading, 
+    filters, 
+    setFilters, 
+    stats, 
+    refresh: fetchOpportunities, 
+    submitBid 
+  };
 }
