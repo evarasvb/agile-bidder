@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
 
     // Configuración: últimas 8 horas para asegurar cobertura
     const now = new Date();
-    const hoursBack = 8;
+    const hoursBack = 168
     const dateFrom = new Date(now.getTime() - hoursBack * 60 * 60 * 1000);
     
     const dateFromStr = dateFrom.toISOString().split('T')[0];
