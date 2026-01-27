@@ -23,10 +23,10 @@ export interface LicitacionItem {
 export function useLicitacionItems(identifier: string | number | null) {
   return useQuery({
     queryKey: ['compra-agil-items', identifier],
-    queryFn: async () => {
+    queryFn: async (): Promise<LicitacionItem[]> => {
       if (!identifier) return [];
 
-      let compraAgilId: number;
+      let compraAgilId: number | string;
 
       // Si es string, buscar el ID por codigo en compras_agiles
       if (typeof identifier === 'string') {
@@ -40,7 +40,7 @@ export function useLicitacionItems(identifier: string | number | null) {
           console.error('Error finding compra agil:', compraError);
           return [];
         }
-        compraAgilId = compraAgil.id;
+        compraAgilId = (compraAgil as any).id;
       } else {
         compraAgilId = identifier;
       }
@@ -49,7 +49,7 @@ export function useLicitacionItems(identifier: string | number | null) {
       const { data, error } = await supabase
         .from('compras_agiles_items')
         .select('*')
-        .eq('compra_agil_id', compraAgilId);
+        .eq('compra_agil_id', compraAgilId as any);
 
       if (error) {
         console.error('Error fetching items:', error);
@@ -67,7 +67,7 @@ export function useLicitacionItems(identifier: string | number | null) {
         codigo_producto: item.codigo_producto,
         categoria: item.categoria,
         created_at: item.created_at,
-      })) as LicitacionItem[];
+      }));
     },
     enabled: !!identifier,
   });
