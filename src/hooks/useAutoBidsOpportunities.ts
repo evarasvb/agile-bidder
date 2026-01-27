@@ -50,41 +50,28 @@ export function useAutoBidsOpportunities() {
     
     setLoading(true);
     try {
-      const { data: configs, error: configError } = await supabase
-        .from('auto_bid_configs')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('activo', true);
-
-      if (configError) throw configError;
-
-      const { data: compras, error: comprasError } = await supabase
+      // Fetch compras agiles
+      const { data: compras, error: comprasError } = await (supabase as any)
         .from('compras_agiles')
         .select('*')
         .gte('fecha_cierre', new Date().toISOString());
 
       if (comprasError) throw comprasError;
 
-      const matchedOpportunities: AutoBidOpportunity[] = (compras || []).map((compra: any) => {
-        const matchingConfig = configs?.find(c => 
-          compra.nombre?.toLowerCase().includes(c.palabras_clave?.toLowerCase() || '')
-        );
-        
-        return {
-          id: compra.id,
-          codigo: compra.codigo || '',
-          nombre: compra.nombre || '',
-          descripcion: compra.descripcion || '',
-          fecha_cierre: compra.fecha_cierre,
-          presupuesto: compra.presupuesto || 0,
-          ofertado: compra.ofertado,
-          estado: compra.estado || 'pendiente',
-          organismo: compra.organismo || '',
-          match_score: matchingConfig ? 85 : 50,
-          categoria: compra.categoria || 'Sin categoria',
-          auto_bid_config_id: matchingConfig?.id || ''
-        };
-      });
+      const matchedOpportunities: AutoBidOpportunity[] = (compras || []).map((compra: any) => ({
+        id: compra.id || '',
+        codigo: compra.codigo || '',
+        nombre: compra.nombre || '',
+        descripcion: compra.descripcion || '',
+        fecha_cierre: compra.fecha_cierre || new Date().toISOString(),
+        presupuesto: compra.presupuesto || 0,
+        ofertado: compra.ofertado,
+        estado: compra.estado || 'pendiente',
+        organismo: compra.organismo || '',
+        match_score: 75,
+        categoria: compra.categoria || 'Sin categoria',
+        auto_bid_config_id: ''
+      }));
 
       setOpportunities(matchedOpportunities);
       setStats({
@@ -121,7 +108,7 @@ export function useAutoBidsOpportunities() {
 
   const submitBid = async (opportunityId: string, amount: number) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('compras_agiles')
         .update({ ofertado: amount, estado: 'ofertado' })
         .eq('id', opportunityId);
