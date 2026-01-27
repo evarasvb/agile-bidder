@@ -32,6 +32,7 @@ import RoleConfig from "./pages/RoleConfig";
 import PermisosRoles from "./pages/PermisosRoles";
 import Ofertas from "./pages/Ofertas";
 import OfertaDetalle from "./pages/OfertaDetalle";
+import ComprasAgilesMatch from "./pages/ComprasAgilesMatch";
 import ComprasAgiles from "./pages/ComprasAgiles";
 import CompraAgilDetalle from "./pages/CompraAgilDetalle";
 import OrdenesCompra from "./pages/OrdenesCompra";
@@ -96,6 +97,7 @@ const App = () => (
             <Route path="/ordenes-compra" element={<OrdenesCompra />} />
             <Route path="/ofertas" element={<Ofertas />} />
             <Route path="/ofertas/:id" element={<OfertaDetalle />} />
+                        <Route path="/compras-agiles-match" element={<ComprasAgilesMatch />} />
             <Route path="/opportunities" element={<Opportunities />} />
             <Route path="/my-bids" element={<MyBids />} />
             <Route path="/vendedores" element={<GestionVendedores />} />
