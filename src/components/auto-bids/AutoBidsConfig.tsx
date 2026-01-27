@@ -48,7 +48,7 @@ export function AutoBidsConfig() {
 
   const saveAllConfigs = async () => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('auto_bids')
         .upsert(configs.map(c => ({ ...c, activo: systemActive && c.activo })));
 
