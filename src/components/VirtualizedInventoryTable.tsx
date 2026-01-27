@@ -43,7 +43,7 @@ export function VirtualizedInventoryTable({
       const end = start + PAGE_SIZE - 1;
 
       let query = supabase
-        .from('products')
+        .from('cliente_inventario')
         .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
         .range(start, end);
