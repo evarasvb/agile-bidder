@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabaseClient as supabase } from '@/lib/supabaseClient';
 
 /**
- * Item de licitación - matches database schema for licitacion_items
+ * Item de licitacion - matches database schema for licitacion_items
  */
 export interface LicitacionItem {
   id: string;
@@ -17,11 +17,14 @@ export interface LicitacionItem {
   created_at: string | null;
   precio_unitario: number | null;
   total: number | null;
+  // Mapped properties for frontend compatibility
+  nombre_producto?: string;
+  codigo_producto?: string | null;
 }
 
 /**
- * Hook para obtener los productos solicitados (items) de una licitación
- * Busca en licitacion_items usando el CODIGO de la licitación
+ * Hook para obtener los productos solicitados (items) de una licitacion
+ * Busca en licitacion_items usando el CODIGO de la licitacion
  */
 export function useLicitacionItems(licitacionCodigo: string | null) {
   return useQuery({
@@ -41,7 +44,7 @@ export function useLicitacionItems(licitacionCodigo: string | null) {
         throw error;
       }
 
-      // Map to expected interface format
+      // Map to expected interface format for frontend
       return (data || []).map(item => ({
         ...item,
         nombre_producto: item.nombre,
