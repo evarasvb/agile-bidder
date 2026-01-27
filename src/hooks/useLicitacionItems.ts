@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabaseClient as supabase } from '@/lib/supabaseClient';
 
 /**
- * Item de licitacion - matches expected frontend interface
+ * Item de compra agil - matches expected frontend interface
  */
 export interface LicitacionItem {
   id: string;
@@ -14,26 +14,23 @@ export interface LicitacionItem {
   codigo_producto: string | null;
   categoria: string | null;
   created_at: string | null;
-  precio_unitario: number | null;
-  total: number | null;
 }
 
 /**
- * Hook para obtener los productos solicitados (items) de una licitacion
- * Busca en licitacion_items usando el CODIGO de la licitacion
+ * Hook para obtener los productos solicitados (items) de una compra agil
+ * Busca en compras_agiles_items usando el ID de la compra agil
  */
-export function useLicitacionItems(licitacionCodigo: string | null) {
+export function useLicitacionItems(compraAgilId: number | null) {
   return useQuery({
-    queryKey: ['licitacion_items', licitacionCodigo],
+    queryKey: ['compra-agil-items', compraAgilId],
     queryFn: async () => {
-      if (!licitacionCodigo) return [];
+      if (!compraAgilId) return [];
 
-      // Fetch items from licitacion_items using licitacion_codigo
+      // Fetch items from compras_agiles_items using compra_agil_id
       const { data, error } = await supabase
-        .from('licitacion_items')
+        .from('compras_agiles_items')
         .select('*')
-        .eq('licitacion_codigo', licitacionCodigo)
-        .order('item_index', { ascending: true });
+        .eq('compra_agil_id', compraAgilId);
 
       if (error) {
         console.error('Error fetching items:', error);
@@ -41,20 +38,18 @@ export function useLicitacionItems(licitacionCodigo: string | null) {
       }
 
       // Map database fields to expected interface
-      return (data || []).map(item => ({
+      return (data || []).map((item: any) => ({
         id: String(item.id),
-        compra_agil_id: item.licitacion_codigo,
-        nombre_producto: item.nombre || '',
-        descripcion: item.descripcion,
-        cantidad: item.cantidad,
+        compra_agil_id: String(item.compra_agil_id),
+        nombre_producto: item.nombre_producto || '',
+        descripcion: item.descripcion_producto,
+        cantidad: item.cantidad ? Number(item.cantidad) : null,
         unidad: item.unidad,
-        codigo_producto: item.producto_id,
+        codigo_producto: item.codigo_producto,
         categoria: item.categoria,
         created_at: item.created_at,
-        precio_unitario: item.precio_unitario,
-        total: item.total,
       })) as LicitacionItem[];
     },
-    enabled: !!licitacionCodigo,
+    enabled: !!compraAgilId,
   });
 }
