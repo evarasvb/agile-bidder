@@ -22,14 +22,14 @@ export interface LicitacionItem {
  */
 export function useLicitacionItems(identifier: string | number | null) {
   return useQuery({
-    queryKey: ['compra-agil-items', identifier],
+    queryKey: ['licitacion-items', identifier],
     queryFn: async (): Promise<LicitacionItem[]> => {
       if (!identifier) return [];
       
       console.log('[useLicitacionItems] Called with identifier:', identifier);
-      
+
       let compraAgilId: number | string;
-      
+
       // Si es string, buscar el ID por codigo en compras_agiles
       if (typeof identifier === 'string') {
         const { data: compraAgil, error: compraError } = await supabase
@@ -37,34 +37,34 @@ export function useLicitacionItems(identifier: string | number | null) {
           .select('id')
           .eq('codigo', identifier)
           .single();
-        
+
         console.log('[useLicitacionItems] Found compraAgil:', compraAgil, 'error:', compraError);
-        
+
         if (compraError || !compraAgil) {
           console.error('Error finding compra agil:', compraError);
           return [];
         }
-        
+
         compraAgilId = (compraAgil as any).id;
       } else {
         compraAgilId = identifier;
       }
-      
+
       console.log('[useLicitacionItems] Fetching items for compraAgilId:', compraAgilId);
-      
+
       // Fetch items from licitacion_items using compra_agil_id
       const { data, error } = await supabase
         .from('licitacion_items')
         .select('*')
-        .eq('licitacion_codigo', String(identifier));
-      
+        .eq('compra_agil_id', compraAgilId);
+
       console.log('[useLicitacionItems] Items result:', { data, error, count: data?.length });
-      
+
       if (error) {
         console.error('Error fetching items:', error);
         throw error;
       }
-      
+
       // Map database fields to expected interface
       return (data || []).map((item: any) => ({
         id: String(item.id),
