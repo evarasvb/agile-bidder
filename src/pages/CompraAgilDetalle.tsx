@@ -209,14 +209,9 @@ export default function CompraAgilDetalle() {
   // Fetch licitacion items from DB
 
   // Get cliente from authenticated user
-    
-  // Fetch items detallados de compras_agiles_items
-  const { data: licitacionItems, isLoading: isLoadingItems } = useLicitacionItems(codigo);
-  const { data: cliente } = useCliente();
-  const clienteId = cliente?.id || null;
+    const { data: cliente } = useCliente();
+const clienteId = cliente?.id || null;
   // Fetch matching products using new DB functions
-  const { data: matchingProductsDB } = useMatchingProducts(codigo || null, clienteId);
-  const { data: matchPercentageDB } = useMatchPercentage(codigo || null, clienteId);
   const { data: licitacionItems } = useLicitacionItems(codigo || null);
 
   // Extract items from datos_json or descripcion
