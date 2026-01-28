@@ -645,7 +645,7 @@ export default function CompraAgilDetalle() {
                 <TabsContent value="oferta" className="p-6 pt-4">
                   {compra?.id ? (
                     <ItemsMatchTable
-                      licitacionId={compra.id}
+                      licitacionId={Number(compra.id)}
                       onSubmit={handleEnviarOferta}
                       onValidationChange={setIsOfertaValid}
                                           fallbackItems={items}
