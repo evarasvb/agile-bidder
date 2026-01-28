@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useComprasAgiles, type CompraAgil } from "@/hooks/useComprasAgiles";
+import { useLicitaciones, type Licitacion } from "@/hooks/useLicitaciones";
 import type { InventoryItem } from "@/hooks/useInventory";
 
 const CLOSED_STATES = new Set(["cerrada", "adjudicada"]);
@@ -13,30 +13,30 @@ const normalizeText = (value: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
-const isCompraAbierta = (compra: CompraAgil) => {
-  if (!compra.estado) return true;
-  return !CLOSED_STATES.has(compra.estado.toLowerCase());
+const isLicitacionAbierta = (licitacion: Licitacion) => {
+  if (!licitacion.estado) return true;
+  return !CLOSED_STATES.has(licitacion.estado.toLowerCase());
 };
 
-const matchesKeywords = (compra: CompraAgil, keywords: string[]) => {
+const matchesKeywords = (licitacion: Licitacion, keywords: string[]) => {
   if (keywords.length === 0) return false;
   const haystack = normalizeText(
-    [compra.nombre, compra.descripcion, compra.organismo].filter(Boolean).join(" ")
+    [licitacion.nombre, licitacion.descripcion, licitacion.organismo].filter(Boolean).join(" ")
   );
   if (!haystack) return false;
   return keywords.some((keyword) => haystack.includes(keyword));
 };
 
-export function useComprasAgilesMatch(inventario?: InventoryItem[]) {
-  const comprasQuery = useComprasAgiles();
+export function useLicitacionesMatch(inventario?: InventoryItem[]) {
+  const licitacionesQuery = useLicitaciones();
 
-  const comprasAbiertas = useMemo(
-    () => (comprasQuery.data ?? []).filter(isCompraAbierta),
-    [comprasQuery.data]
+  const licitacionesAbiertas = useMemo(
+    () => (licitacionesQuery.data ?? []).filter(isLicitacionAbierta),
+    [licitacionesQuery.data]
   );
 
   const { matchesByProductId, countsByProductId } = useMemo(() => {
-    const matches: Record<string, CompraAgil[]> = {};
+    const matches: Record<string, Licitacion[]> = {};
     const counts: Record<string, number> = {};
 
     if (!inventario || inventario.length === 0) {
@@ -58,22 +58,22 @@ export function useComprasAgilesMatch(inventario?: InventoryItem[]) {
         continue;
       }
 
-      const matchedCompras = comprasAbiertas.filter((compra) =>
+      const matchedlicitaciones = licitacionesAbiertas.filter((compra) =>
         matchesKeywords(compra, keywords)
       );
-      matches[item.id] = matchedCompras;
-      counts[item.id] = matchedCompras.length;
+      matches[item.id] = matchedlicitaciones;
+      counts[item.id] = matchedlicitaciones.length;
     }
 
     return { matchesByProductId: matches, countsByProductId: counts };
-  }, [comprasAbiertas, inventario]);
+  }, [licitacionesAbiertas, inventario]);
 
   return {
-    comprasAbiertas,
+    licitacionesAbiertas,
     matchesByProductId,
     countsByProductId,
-    isLoading: comprasQuery.isLoading,
-    isFetching: comprasQuery.isFetching,
-    error: comprasQuery.error,
+    isLoading: licitacionesQuery.isLoading,
+    isFetching: licitacionesQuery.isFetching,
+    error: licitacionesQuery.error,
   };
 }
