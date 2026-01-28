@@ -134,8 +134,7 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
     if (filters?.clienteFiltros && filters.clienteFiltros.cliente_id) {
       console.log('[useComprasAgiles] Usando RPC server-side con cliente_id:', filters.clienteFiltros.cliente_id);
       
-      const { data: rpcData, error: rpcError } = await supabase
-        .rpc('get_licitaciones_filtradas_cliente', {
+      const { data: rpcData, error: rpcError } = await (supabase as any)        .rpc('get_licitaciones_filtradas_cliente', {
           p_cliente_id: filters.clienteFiltros.cliente_id,
           p_monto_min: filters.montoMin || null,
           p_monto_max: filters.montoMax || null
