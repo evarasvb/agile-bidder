@@ -1,8 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabaseClient as supabase } from '@/lib/supabaseClient';
 import type { Database } from '@/integrations/supabase/types';
-import { pasaFiltrosCliente, ClienteFiltros } from './useClienteFiltros';
-import { differenceInDays, parseISO, startOfDay, addDays } from 'date-fns';
+import { ClienteFiltros } from './useClienteFiltros';import { differenceInDays, parseISO, startOfDay, addDays } from 'date-fns';
 
 // Tipo base de la BD - usar tabla licitaciones
 type LicitacionRow = Database['public']['Tables']['licitaciones']['Row'];
@@ -132,11 +131,10 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
       });
       
       // Aplicar filtros personalizados del cliente
-      const comprasFiltradas = filters?.clienteFiltros 
-        ? compras.filter(compra => pasaFiltrosCliente(compra, filters.clienteFiltros!))
-        : compras;
+      // TODO: Implementar llamada a RPC get_licitaciones_filtradas_cliente cuando filters.clienteFiltros existe
+    // Por ahora, devolver compras sin filtrado cliente-side
+    return compras;
       
-      return comprasFiltradas;
     },
     refetchInterval: 30000,
   });
