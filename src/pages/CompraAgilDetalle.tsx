@@ -296,6 +296,7 @@ export default function CompraAgilDetalle() {
         sku: p.producto_sku,
         precio_unitario: p.producto_precio,
         stock_disponible: p.producto_stock,
+              descripcion: p.producto_nombre, // Use producto_nombre as descripcion
         matchScore: p.match_score
       }))
     : matchingProducts || [];
