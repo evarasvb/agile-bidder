@@ -52,11 +52,11 @@ export function useLicitacionItems(identifier: string | number | null) {
       
       console.log('[useLicitacionItems] Fetching items for compraAgilId:', compraAgilId);
       
-      // Fetch items from compras_agiles_items using compra_agil_id
+      // Fetch items from licitacion_items using compra_agil_id
       const { data, error } = await supabase
-        .from('compras_agiles_items')
+        .from('licitacion_items')
         .select('*')
-        .eq('compra_agil_id', compraAgilId as any);
+        .eq('licitacion_codigo', identifier);
       
       console.log('[useLicitacionItems] Items result:', { data, error, count: data?.length });
       
