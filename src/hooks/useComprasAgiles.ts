@@ -148,7 +148,7 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
       console.log(`[useComprasAgiles] RPC devolvió ${rpcData?.length || 0} compras filtradas`);
 
       // Mapear resultados RPC a formato CompraAgil
-      const comprasFiltradas: CompraAgil[] = (rpcData || []).map((row: LicitacionRow) => ({
+      const comprasFiltradas: CompraAgil[] = (rpcData || []).map((row: any) => ({
         id: row.codigo || row.id_licitacion || row.id || '',
         codigo: row.codigo || row.id_licitacion || row.id || '',
         nombre: row.titulo || row.nombre || 'Sin título',
