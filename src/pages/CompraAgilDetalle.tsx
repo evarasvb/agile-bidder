@@ -208,7 +208,7 @@ export default function CompraAgilDetalle() {
 
     // Get authenticated user's cliente ID
   const { user } = useAuth();
-  const clienteId = user?.id || null;
+  const clienteId = '11111111-1111-1111-1111-111111111111'; // TODO: Get from clientes table based on user?.id || null;
 
   // Fetch matching products using new DB functions
   const { data: matchingProductsDB } = useMatchingProducts(codigo || null, clienteId);
