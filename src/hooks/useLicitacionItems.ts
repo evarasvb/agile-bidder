@@ -24,55 +24,81 @@ export function useLicitacionItems(identifier: string | number | null) {
   return useQuery({
     queryKey: ['compra-agil-items', identifier],
     queryFn: async (): Promise<LicitacionItem[]> => {
-      if (!identifier) return [];
-            console.log('[useLicitacionItems] Called with identifier:', identifier);
-
-      let compraAgilId: number | string;
-
+      if (!identifier) {
+        console.log('[useLicitacionItems] No identifier provided');
+        return [];
+      }
+      
+      console.log('[useLicitacionItems] Called with identifier:', identifier, 'type:', typeof identifier);
+      
+      let compraAgilId: number;
+      
       // Si es string, buscar el ID por codigo en compras_agiles
       if (typeof identifier === 'string') {
+        console.log('[useLicitacionItems] Looking up compras_agiles by codigo:', identifier);
+        
         const { data: compraAgil, error: compraError } = await supabase
           .from('compras_agiles')
           .select('id')
           .eq('codigo', identifier)
-          .single();
-              console.log('[useLicitacionItems] Found compraAgil:', compraAgil);
-
-        if (compraError || !compraAgil) {
-          console.error('Error finding compra agil:', compraError);
+          .maybeSingle();
+        
+        console.log('[useLicitacionItems] compras_agiles lookup result:', { compraAgil, compraError });
+        
+        if (compraError) {
+          console.error('[useLicitacionItems] Error finding compra agil:', compraError);
           return [];
         }
-        compraAgilId = (compraAgil as any).id;
+        
+        if (!compraAgil) {
+          console.warn('[useLicitacionItems] No compra agil found for codigo:', identifier);
+          return [];
+        }
+        
+        compraAgilId = Number(compraAgil.id);
+        console.log('[useLicitacionItems] Found compra_agil_id:', compraAgilId);
       } else {
-        compraAgilId = identifier;
+        compraAgilId = Number(identifier);
       }
-
-      // Fetch items from compras_agiles_items using compra_agil_id
+      
+      // Fetch items from compras_agiles_items
+      console.log('[useLicitacionItems] Fetching items for compra_agil_id:', compraAgilId);
+      
       const { data, error } = await supabase
         .from('compras_agiles_items')
         .select('*')
-        .eq('compra_agil_id', compraAgilId as any);
-            console.log('[useLicitacionItems] Fetching items with compraAgilId:', compraAgilId);
-
+        .eq('compra_agil_id', compraAgilId);
+      
+      console.log('[useLicitacionItems] Items query result:', { data, error, count: data?.length });
+      
       if (error) {
-        console.error('Error fetching items:', error);
+        console.error('[useLicitacionItems] Error fetching items:', error);
         throw error;
       }
-            console.log('[useLicitacionItems] Fetched data:', data);
-
+      
+      if (!data || data.length === 0) {
+        console.warn('[useLicitacionItems] No items found for compra_agil_id:', compraAgilId);
+        return [];
+      }
+      
       // Map database fields to expected interface
-      return (data || []).map((item: any) => ({
+      const mappedItems = data.map((item: any) => ({
         id: String(item.id),
         compra_agil_id: String(item.compra_agil_id),
         nombre_producto: item.nombre_producto || '',
-        descripcion: item.descripcion_producto,
+        descripcion: item.descripcion_producto || null,
         cantidad: item.cantidad ? Number(item.cantidad) : null,
-        unidad: item.unidad,
-        codigo_producto: item.codigo_producto,
-        categoria: item.categoria,
-        created_at: item.created_at,
+        unidad: item.unidad || null,
+        codigo_producto: item.codigo_producto || null,
+        categoria: item.categoria || null,
+        created_at: item.created_at || null,
       }));
+      
+      console.log('[useLicitacionItems] Returning mapped items:', mappedItems.length);
+      return mappedItems;
     },
     enabled: !!identifier,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    retry: 2,
   });
 }
