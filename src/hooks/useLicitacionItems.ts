@@ -2,11 +2,11 @@ import { useQuery } from '@tanstack/react-query';
 import { supabaseClient as supabase } from '@/lib/supabaseClient';
 
 /**
- * Item de compra agil - matches expected frontend interface
+ * Item de licitacion - matches expected frontend interface
  */
 export interface LicitacionItem {
   id: string;
-  compra_agil_id: string;
+  licitacion_id: string;
   nombre_producto: string;
   descripcion: string | null;
   cantidad: number | null;
@@ -17,8 +17,8 @@ export interface LicitacionItem {
 }
 
 /**
- * Hook para obtener los productos solicitados (items) de una compra agil
- * Acepta codigo (string) o compra_agil_id (number)
+ * Hook para obtener los productos solicitados (items) de una licitacion
+ * Acepta codigo (string) o licitacion_id (number)
  */
 export function useLicitacionItems(identifier: string | number | null) {
   return useQuery({
@@ -28,35 +28,35 @@ export function useLicitacionItems(identifier: string | number | null) {
       
       console.log('[useLicitacionItems] Called with identifier:', identifier);
 
-      let compraAgilId: number;
+      let licitacionId: number;
 
-      // Si es string, buscar el ID por codigo en compras_agiles
+      // Si es string, buscar el ID por codigo en licitaciones
       if (typeof identifier === 'string') {
         const result = await supabase
-          .from('compras_agiles')
+          .from('licitaciones')
           .select('id')
           .eq('codigo', identifier)
           .single() as any;
 
-        console.log('[useLicitacionItems] Found compraAgil:', result.data, 'error:', result.error);
+        console.log('[useLicitacionItems] Found licitacion:', result.data, 'error:', result.error);
 
         if (result.error || !result.data) {
-          console.error('Error finding compra agil:', result.error);
+          console.error('Error finding licitacion:', result.error);
           return [];
         }
 
-        compraAgilId = Number(result.data.id);
+        licitacionId = Number(result.data.id);
       } else {
-        compraAgilId = identifier;
+        licitacionId = identifier;
       }
 
-      console.log('[useLicitacionItems] Fetching items for compraAgilId:', compraAgilId);
+      console.log('[useLicitacionItems] Fetching items for licitacionId:', licitacionId);
 
-      // Fetch items from compras_agiles_items using compra_agil_id
+      // Fetch items from licitacion_items using licitacion_id
       const itemsResult = await (supabase as any)
-        .from('compras_agiles_items')
+        .from('licitacion_items')
         .select('*')
-        .eq('compra_agil_id', compraAgilId) as any;
+        .eq('licitacion_id', licitacionId) as any;
 
       console.log('[useLicitacionItems] Items result:', { data: itemsResult.data, error: itemsResult.error, count: itemsResult.data?.length });
 
@@ -70,7 +70,7 @@ export function useLicitacionItems(identifier: string | number | null) {
       // Map database fields to expected interface
       return data.map((item: any) => ({
         id: String(item.id),
-        compra_agil_id: String(item.compra_agil_id),
+        licitacion_id: String(item.licitacion_id),
         nombre_producto: item.nombre_producto || '',
         descripcion: item.descripcion_producto,
         cantidad: item.cantidad ? Number(item.cantidad) : null,
