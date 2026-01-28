@@ -5,6 +5,7 @@ import { supabaseClient as supabase } from "@/lib/supabaseClient";
 import { useQuery } from "@tanstack/react-query";
 import { useMatchingProducts, useMatchPercentage } from "@/hooks/useMatchingDB";
 import { useAuth } from "@/hooks/useAuth";
+import { useCliente } from "@/hooks/useCliente";
 import { 
   ArrowLeft, 
   ExternalLink, 
@@ -206,10 +207,9 @@ export default function CompraAgilDetalle() {
   
   // Fetch licitacion items from DB
 
-    // Get authenticated user's cliente ID
-  const { user } = useAuth();
-  const clienteId = '11111111-1111-1111-1111-111111111111'; // TODO: Get from clientes table based on user?.id || null;
-
+  // Get cliente from authenticated user
+  const { data: cliente } = useCliente();
+  const clienteId = cliente?.id || null;
   // Fetch matching products using new DB functions
   const { data: matchingProductsDB } = useMatchingProducts(codigo || null, clienteId);
   const { data: matchPercentageDB } = useMatchPercentage(codigo || null, clienteId);
