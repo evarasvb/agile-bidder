@@ -3,6 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useCompraAgilByCodigo } from "@/hooks/useComprasAgiles";
 import { supabaseClient as supabase } from "@/lib/supabaseClient";
 import { useQuery } from "@tanstack/react-query";
+import { useMatchingProducts, useMatchPercentage } from "@/hooks/useMatchingDB";
+import { useAuth } from "@/hooks/useAuth";
 import { 
   ArrowLeft, 
   ExternalLink, 
@@ -203,6 +205,14 @@ export default function CompraAgilDetalle() {
   const { data: compra, isLoading, error } = useCompraAgilByCodigo(codigo);
   
   // Fetch licitacion items from DB
+
+    // Get authenticated user's cliente ID
+  const { user } = useAuth();
+  const clienteId = user?.id || null;
+
+  // Fetch matching products using new DB functions
+  const { data: matchingProductsDB } = useMatchingProducts(codigo || null, clienteId);
+  const { data: matchPercentageDB } = useMatchPercentage(codigo || null, clienteId);
   const { data: licitacionItems } = useLicitacionItems(codigo || null);
 
   // Extract items from datos_json or descripcion
