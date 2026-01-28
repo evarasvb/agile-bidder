@@ -11,6 +11,7 @@ import { GenerarPropuestaModal } from "@/components/compras-agiles/GenerarPropue
 import { useComprasAgiles, type CompraAgil, type ComprasAgilesFilters as Filters } from "@/hooks/useComprasAgiles";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useClienteFiltros } from "@/hooks/useClienteFiltros";
 
 interface ItemParaPropuesta {
   itemId: string;
@@ -37,8 +38,16 @@ export default function ComprasAgiles() {
   const [propuestaModalOpen, setPropuestaModalOpen] = useState(false);
   const [productosParaPropuesta, setProductosParaPropuesta] = useState<ItemParaPropuesta[]>([]);
 
-  const { data: compras, isLoading, error, refetch } = useComprasAgiles(filters);
+  // Obtener filtros personalizados del cliente
+  const { filtros: clienteFiltros } = useClienteFiltros();
+  
+  // Combinar filtros de UI con filtros del cliente
+  const filtersWithClient = useMemo(() => ({
+    ...filters,
+    clienteFiltros: clienteFiltros || undefined,
+  }), [filters, clienteFiltros]);
 
+  const { data: compras, isLoading, error, refetch } = useComprasAgiles(filtersWithClient);
   // Memoizar handlers para evitar re-renders innecesarios
   const handleRefresh = useCallback(async () => {
     try {
