@@ -25,6 +25,7 @@ export function useLicitacionItems(identifier: string | number | null) {
     queryKey: ['compra-agil-items', identifier],
     queryFn: async (): Promise<LicitacionItem[]> => {
       if (!identifier) return [];
+            console.log('[useLicitacionItems] Called with identifier:', identifier);
 
       let compraAgilId: number | string;
 
@@ -35,6 +36,7 @@ export function useLicitacionItems(identifier: string | number | null) {
           .select('id')
           .eq('codigo', identifier)
           .single();
+              console.log('[useLicitacionItems] Found compraAgil:', compraAgil);
 
         if (compraError || !compraAgil) {
           console.error('Error finding compra agil:', compraError);
@@ -50,11 +52,13 @@ export function useLicitacionItems(identifier: string | number | null) {
         .from('compras_agiles_items')
         .select('*')
         .eq('compra_agil_id', compraAgilId as any);
+            console.log('[useLicitacionItems] Fetching items with compraAgilId:', compraAgilId);
 
       if (error) {
         console.error('Error fetching items:', error);
         throw error;
       }
+            console.log('[useLicitacionItems] Fetched data:', data);
 
       // Map database fields to expected interface
       return (data || []).map((item: any) => ({
