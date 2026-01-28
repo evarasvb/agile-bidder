@@ -24,81 +24,60 @@ export function useLicitacionItems(identifier: string | number | null) {
   return useQuery({
     queryKey: ['compra-agil-items', identifier],
     queryFn: async (): Promise<LicitacionItem[]> => {
-      if (!identifier) {
-        console.log('[useLicitacionItems] No identifier provided');
-        return [];
-      }
+      if (!identifier) return [];
       
-      console.log('[useLicitacionItems] Called with identifier:', identifier, 'type:', typeof identifier);
+      console.log('[useLicitacionItems] Called with identifier:', identifier);
       
-      let compraAgilId: number;
+      let compraAgilId: number | string;
       
       // Si es string, buscar el ID por codigo en compras_agiles
       if (typeof identifier === 'string') {
-        console.log('[useLicitacionItems] Looking up compras_agiles by codigo:', identifier);
-        
         const { data: compraAgil, error: compraError } = await supabase
           .from('compras_agiles')
           .select('id')
           .eq('codigo', identifier)
-          .maybeSingle();
+          .single();
         
-        console.log('[useLicitacionItems] compras_agiles lookup result:', { compraAgil, compraError });
+        console.log('[useLicitacionItems] Found compraAgil:', compraAgil, 'error:', compraError);
         
-        if (compraError) {
-          console.error('[useLicitacionItems] Error finding compra agil:', compraError);
+        if (compraError || !compraAgil) {
+          console.error('Error finding compra agil:', compraError);
           return [];
         }
         
-        if (!compraAgil) {
-          console.warn('[useLicitacionItems] No compra agil found for codigo:', identifier);
-          return [];
-        }
-        
-        compraAgilId = Number(compraAgil.id);
-        console.log('[useLicitacionItems] Found compra_agil_id:', compraAgilId);
+        compraAgilId = (compraAgil as any).id;
       } else {
-        compraAgilId = Number(identifier);
+        compraAgilId = identifier;
       }
       
-      // Fetch items from compras_agiles_items
-      console.log('[useLicitacionItems] Fetching items for compra_agil_id:', compraAgilId);
+      console.log('[useLicitacionItems] Fetching items for compraAgilId:', compraAgilId);
       
+      // Fetch items from compras_agiles_items using compra_agil_id
       const { data, error } = await supabase
         .from('compras_agiles_items')
         .select('*')
-        .eq('compra_agil_id', compraAgilId);
+        .eq('compra_agil_id', compraAgilId as any);
       
-      console.log('[useLicitacionItems] Items query result:', { data, error, count: data?.length });
+      console.log('[useLicitacionItems] Items result:', { data, error, count: data?.length });
       
       if (error) {
-        console.error('[useLicitacionItems] Error fetching items:', error);
+        console.error('Error fetching items:', error);
         throw error;
       }
       
-      if (!data || data.length === 0) {
-        console.warn('[useLicitacionItems] No items found for compra_agil_id:', compraAgilId);
-        return [];
-      }
-      
       // Map database fields to expected interface
-      const mappedItems = data.map((item: any) => ({
+      return (data || []).map((item: any) => ({
         id: String(item.id),
         compra_agil_id: String(item.compra_agil_id),
         nombre_producto: item.nombre_producto || '',
-        descripcion: item.descripcion_producto || null,
+        descripcion: item.descripcion_producto,
         cantidad: item.cantidad ? Number(item.cantidad) : null,
-        unidad: item.unidad || null,
-        codigo_producto: item.codigo_producto || null,
-        categoria: item.categoria || null,
-        created_at: item.created_at || null,
+        unidad: item.unidad,
+        codigo_producto: item.codigo_producto,
+        categoria: item.categoria,
+        created_at: item.created_at,
       }));
-      
-      console.log('[useLicitacionItems] Returning mapped items:', mappedItems.length);
-      return mappedItems;
     },
     enabled: !!identifier,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    retry: 2,
   });
 }
