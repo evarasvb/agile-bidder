@@ -99,3 +99,60 @@ export function useClienteFiltros() {
     isUpdating: updateFiltros.isPending,
   };
 }
+
+// Interfaz para compra ágil simplificada (para filtrado)
+export interface CompraAgilParaFiltrar {
+  nombre?: string;
+  descripcion?: string | null;
+  region?: string | null;
+  monto?: number | null;
+}
+
+// Función para verificar si una compra ágil pasa los filtros del cliente
+export function pasaFiltrosCliente(
+  compra: CompraAgilParaFiltrar,
+  filtros: ClienteFiltros | null
+): boolean {
+  // Si no hay filtros configurados, todas las compras pasan
+  if (!filtros) return true;
+
+  // Crear texto combinado para buscar palabras
+  const texto = `${compra.nombre || ''} ${compra.descripcion || ''}`.toLowerCase();
+
+  // Filtrar por palabras a incluir (debe contener al menos una)
+  if (filtros.palabras_incluir && filtros.palabras_incluir.length > 0) {
+    const tieneIncluida = filtros.palabras_incluir.some(palabra =>
+      texto.includes(palabra.toLowerCase())
+    );
+    if (!tieneIncluida) return false;
+  }
+
+  // Filtrar por palabras a excluir (no debe contener ninguna)
+  if (filtros.palabras_excluir && filtros.palabras_excluir.length > 0) {
+    const tieneExcluida = filtros.palabras_excluir.some(palabra =>
+      texto.includes(palabra.toLowerCase())
+    );
+    if (tieneExcluida) return false;
+  }
+
+  // Filtrar por monto mínimo
+  if (filtros.monto_min && compra.monto !== null && compra.monto !== undefined) {
+    if (compra.monto < filtros.monto_min) return false;
+  }
+
+  // Filtrar por monto máximo
+  if (filtros.monto_max && compra.monto !== null && compra.monto !== undefined) {
+    if (compra.monto > filtros.monto_max) return false;
+  }
+
+  // Filtrar por regiones activas
+  if (filtros.regiones_activas && filtros.regiones_activas.length > 0 && compra.region) {
+    const regionNormalizada = compra.region.toLowerCase();
+    const regionActiva = filtros.regiones_activas.some(region =>
+      regionNormalizada.includes(region.toLowerCase())
+    );
+    if (!regionActiva) return false;
+  }
+
+  return true;
+}
