@@ -6,7 +6,7 @@ import { ClienteFiltros } from './useClienteFiltros';import { differenceInDays, 
 // Tipo base de la BD - usar tabla licitaciones
 type LicitacionRow = Database['public']['Tables']['licitaciones']['Row'];
 
-export interface CompraAgil {
+export interface Licitacion {
   id: string;
   codigo: string;
   nombre: string;
@@ -24,7 +24,7 @@ export interface CompraAgil {
   updated_at: string;
 }
 
-export interface ComprasAgilesFilters {
+export interface LicitacionesFilters {
   estado?: string;
   region?: string;
   montoMin?: number;
@@ -35,11 +35,11 @@ export interface ComprasAgilesFilters {
   clienteFiltros?: ClienteFiltros | null; // Filtros personalizados del cliente
 }
 
-export function useComprasAgiles(filters?: ComprasAgilesFilters) {
+export function useLicitaciones(filters?: LicitacionesFilters) {
   return useQuery({
-    queryKey: ['compras_agiles', filters],
+    queryKey: ['licitaciones', filters],
     queryFn: async () => {
-      // CAMBIO CRÍTICO: Usar tabla licitaciones en lugar de compras_agiles
+      // CAMBIO CRÍTICO: Usar tabla licitaciones en lugar de licitaciones
       let query = supabase
         .from('licitaciones')
         .select('*')
@@ -91,19 +91,19 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
 
       // Debug: ver estructura real de datos
       if (data && data.length > 0) {
-        console.log('[useComprasAgiles] Sample row keys:', Object.keys(data[0]));
-        console.log('[useComprasAgiles] Sample row:', data[0]);
+        console.log('[useLicitaciones] Sample row keys:', Object.keys(data[0]));
+        console.log('[useLicitaciones] Sample row:', data[0]);
       }
 
-      // Mapear campos - manejar diferentes schemas (licitaciones vs compras_agiles)
+      // Mapear campos - manejar diferentes schemas (licitaciones vs licitaciones)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const compras = (data || []).map((row: any, index: number): CompraAgil => {
-        // La tabla licitaciones usa 'id_licitacion', compras_agiles usa 'codigo'
+      const licitacioness = (data || []).map((row: any, index: number): Licitacion => {
+        // La tabla licitaciones usa 'id_licitacion', licitaciones usa 'codigo'
         const codigo = row.id_licitacion || row.codigo || row.id || '';
         
         // DEBUG: Log primeros 3 registros para verificar mapeo
         if (index < 3) {
-          console.log(`[useComprasAgiles] Row ${index}:`, { 
+          console.log(`[useLicitaciones] Row ${index}:`, { 
             id_licitacion: row.id_licitacion, 
             codigo: row.codigo, 
             id: row.id,
@@ -132,7 +132,7 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
       
       // Filtrado server-side con RPC si hay configuración del cliente
     if (filters?.clienteFiltros && filters.clienteFiltros.cliente_id) {
-      console.log('[useComprasAgiles] Usando RPC server-side con cliente_id:', filters.clienteFiltros.cliente_id);
+      console.log('[useLicitaciones] Usando RPC server-side con cliente_id:', filters.clienteFiltros.cliente_id);
       
       const { data: rpcData, error: rpcError } = await (supabase as any)        .rpc('get_licitaciones_filtradas_cliente', {
           p_cliente_id: filters.clienteFiltros.cliente_id,
@@ -141,14 +141,14 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
         });
 
       if (rpcError) {
-        console.error('[useComprasAgiles] Error en RPC filtrado:', rpcError);
+        console.error('[useLicitaciones] Error en RPC filtrado:', rpcError);
         throw rpcError;
       }
 
-      console.log(`[useComprasAgiles] RPC devolvió ${rpcData?.length || 0} compras filtradas`);
+      console.log(`[useLicitaciones] RPC devolvió ${rpcData?.length || 0} licitacioness filtradas`);
 
-      // Mapear resultados RPC a formato CompraAgil
-      const comprasFiltradas: CompraAgil[] = (rpcData || []).map((row: any) => ({
+      // Mapear resultados RPC a formato Licitacion
+      const licitacionessFiltradas: Licitacion[] = (rpcData || []).map((row: any) => ({
         id: row.codigo || row.id_licitacion || row.id || '',
         codigo: row.codigo || row.id_licitacion || row.id || '',
         nombre: row.titulo || row.nombre || 'Sin título',
@@ -167,12 +167,12 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
       }));
 
       // Aplicar filtros adicionales de UI (matchStatus, fechaCierre)
-      let comprasFinales = comprasFiltradas;
+      let licitacionessFinales = licitacionessFiltradas;
 
       if (filters?.matchStatus === 'con_match') {
-        comprasFinales = comprasFinales.filter(c => c.match_encontrado);
+        licitacionessFinales = licitacionessFinales.filter(c => c.match_encontrado);
       } else if (filters?.matchStatus === 'sin_match') {
-        comprasFinales = comprasFinales.filter(c => !c.match_encontrado);
+        licitacionessFinales = licitacionessFinales.filter(c => !c.match_encontrado);
       }
 
       if (filters?.fechaCierre && filters.fechaCierre !== 'todas') {
@@ -181,39 +181,39 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
 
         if (filters.fechaCierre === 'hoy') {
           const tomorrow = addDays(today, 1);
-          comprasFinales = comprasFinales.filter(c => 
+          licitacionessFinales = licitacionessFinales.filter(c => 
             c.fecha_cierre && c.fecha_cierre >= todayISO && c.fecha_cierre < tomorrow.toISOString()
           );
         } else if (filters.fechaCierre === 'proximos3') {
           const in3Days = addDays(today, 3);
-          comprasFinales = comprasFinales.filter(c => 
+          licitacionessFinales = licitacionessFinales.filter(c => 
             c.fecha_cierre && c.fecha_cierre >= todayISO && c.fecha_cierre <= in3Days.toISOString()
           );
         } else if (filters.fechaCierre === 'proximos7') {
           const in7Days = addDays(today, 7);
-          comprasFinales = comprasFinales.filter(c => 
+          licitacionessFinales = licitacionessFinales.filter(c => 
             c.fecha_cierre && c.fecha_cierre >= todayISO && c.fecha_cierre <= in7Days.toISOString()
           );
         }
       }
 
-      console.log(`[useComprasAgiles] Después de filtros UI: ${comprasFinales.length} compras`);
-      return comprasFinales;
+      console.log(`[useLicitaciones] Después de filtros UI: ${licitacionessFinales.length} licitacioness`);
+      return licitacionessFinales;
     }
 
-    // Sin filtros de cliente: devolver todas las compras sin filtrar
-    console.log('[useComprasAgiles] Sin filtros de cliente, devolviendo todas las compras');
-    return compras;
+    // Sin filtros de cliente: devolver todas las licitacioness sin filtrar
+    console.log('[useLicitaciones] Sin filtros de cliente, devolviendo todas las licitacioness');
+    return licitacioness;
       
     },
     refetchInterval: 30000,
   });
 }
 
-export function useCompraAgil(id: string | null) {
+export function useLicitacion(id: string | null) {
   return useQuery({
-    queryKey: ['compra_agil', id],
-    queryFn: async (): Promise<CompraAgil | null> => {
+    queryKey: ['licitaciones_agil', id],
+    queryFn: async (): Promise<Licitacion | null> => {
       if (!id) return null;
       
       // FirmaVB usa columna 'codigo', no 'id_licitacion'
@@ -253,10 +253,10 @@ export function useCompraAgil(id: string | null) {
   });
 }
 
-export function useCompraAgilByCodigo(codigo: string | undefined) {
+export function useLicitacionByCodigo(codigo: string | undefined) {
   return useQuery({
-    queryKey: ['compra_agil_codigo', codigo],
-    queryFn: async (): Promise<CompraAgil | null> => {
+    queryKey: ['licitaciones_agil_codigo', codigo],
+    queryFn: async (): Promise<Licitacion | null> => {
       if (!codigo) return null;
       
       // FirmaVB usa columna 'codigo', no 'id_licitacion'
@@ -295,13 +295,13 @@ export function useCompraAgilByCodigo(codigo: string | undefined) {
     enabled: !!codigo,
   });
 }
-export function useUpdateCompraAgil() {
+export function useUpdateLicitacion() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ id, datos_json }: { id: string; datos_json: Record<string, unknown> }) => {
       const { data, error } = await supabase
-        .from('compras_agiles')
+        .from('licitaciones')
         .update({ datos_json: datos_json as unknown as import('@/integrations/supabase/types').Json })
         .eq('id', id)
         .select()
@@ -311,15 +311,15 @@ export function useUpdateCompraAgil() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['compras_agiles'] });
-      queryClient.invalidateQueries({ queryKey: ['compra_agil'] });
+      queryClient.invalidateQueries({ queryKey: ['licitaciones'] });
+      queryClient.invalidateQueries({ queryKey: ['licitaciones_agil'] });
     },
   });
 }
 
-export function useComprasAgilesStats() {
+export function useLicitacionesStats() {
   return useQuery({
-    queryKey: ['compras_agiles_stats'],
+    queryKey: ['licitaciones_stats'],
     queryFn: async () => {
       // Usar tabla licitaciones para stats
       const { count: total, error: countError } = await supabase
