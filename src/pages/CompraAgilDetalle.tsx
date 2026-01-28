@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMatchingProducts, useMatchPercentage } from "@/hooks/useMatchingDB";
 import { useAuth } from "@/hooks/useAuth";
 import { useCliente } from "@/hooks/useCliente";
+import { useLicitacionItems } from "@/hooks/useLicitacionItems";
 import { 
   ArrowLeft, 
   ExternalLink, 
@@ -208,6 +209,9 @@ export default function CompraAgilDetalle() {
   // Fetch licitacion items from DB
 
   // Get cliente from authenticated user
+    
+  // Fetch items detallados de compras_agiles_items
+  const { data: licitacionItems, isLoading: isLoadingItems } = useLicitacionItems(codigo);
   const { data: cliente } = useCliente();
   const clienteId = cliente?.id || null;
   // Fetch matching products using new DB functions
