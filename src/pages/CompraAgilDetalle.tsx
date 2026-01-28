@@ -288,6 +288,18 @@ export default function CompraAgilDetalle() {
     enabled: !!compra?.nombre || items.length > 0,
   });
 
+    // Use DB matching products if available (from new get_matching_products function)
+  const finalMatchingProducts = matchingProductsDB?.length > 0 
+    ? matchingProductsDB.map(p => ({
+        id: String(p.producto_id),
+        nombre_producto: p.producto_nombre,
+        sku: p.producto_sku,
+        precio_unitario: p.producto_precio,
+        stock_disponible: p.producto_stock,
+        matchScore: p.match_score
+      }))
+    : matchingProducts || [];
+
   const diasRestantes = useMemo(() => {
     if (!compra?.fecha_cierre) return null;
     return differenceInDays(parseISO(compra.fecha_cierre), new Date());
@@ -759,9 +771,9 @@ export default function CompraAgilDetalle() {
                     <Skeleton key={i} className="h-20 w-full" />
                   ))}
                 </div>
-              ) : matchingProducts && matchingProducts.length > 0 ? (
+              ) : finalMatchingProducts && finalMatchingProducts.length > 0 ? (
                 <div className="space-y-3">
-                  {matchingProducts.map((product) => (
+                  {finalMatchingProducts.map((product) => (
                     <div 
                       key={product.id}
                       className="p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
