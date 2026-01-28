@@ -56,7 +56,7 @@ export function useLicitacionItems(identifier: string | number | null) {
       const { data, error } = await supabase
         .from('licitacion_items')
         .select('*')
-        .eq('licitacion_codigo', identifier);
+        .eq('licitacion_codigo', String(identifier));
       
       console.log('[useLicitacionItems] Items result:', { data, error, count: data?.length });
       
