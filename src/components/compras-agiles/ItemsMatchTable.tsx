@@ -38,7 +38,7 @@ interface FallbackItem {
 }
 
 interface ItemsMatchTableProps {
-  licitacionId: string;
+  licitacionId: string | number;
   fallbackItems?: FallbackItem[]; // Items extracted from datos_json
   onSubmit?: (items: ItemRow[], totals: { neto: number; iva: number; total: number }) => void;
   onValidationChange?: (isValid: boolean) => void;
