@@ -28,24 +28,24 @@ export function useLicitacionItems(identifier: string | number | null) {
       
       console.log('[useLicitacionItems] Called with identifier:', identifier);
 
-      let compraAgilId: number | string;
+      let compraAgilId: number;
 
       // Si es string, buscar el ID por codigo en compras_agiles
       if (typeof identifier === 'string') {
-        const { data: compraAgil, error: compraError } = await supabase
+        const result = await supabase
           .from('compras_agiles')
           .select('id')
           .eq('codigo', identifier)
           .single();
 
-        console.log('[useLicitacionItems] Found compraAgil:', compraAgil, 'error:', compraError);
+        console.log('[useLicitacionItems] Found compraAgil:', result.data, 'error:', result.error);
 
-        if (compraError || !compraAgil) {
-          console.error('Error finding compra agil:', compraError);
+        if (result.error || !result.data) {
+          console.error('Error finding compra agil:', result.error);
           return [];
         }
 
-        compraAgilId = (compraAgil as any).id;
+        compraAgilId = (result.data as { id: number }).id;
       } else {
         compraAgilId = identifier;
       }
@@ -53,20 +53,22 @@ export function useLicitacionItems(identifier: string | number | null) {
       console.log('[useLicitacionItems] Fetching items for compraAgilId:', compraAgilId);
 
       // Fetch items from licitacion_items using compra_agil_id
-      const { data, error } = await supabase
+      const itemsResult = await supabase
         .from('licitacion_items')
         .select('*')
         .eq('compra_agil_id', compraAgilId);
 
-      console.log('[useLicitacionItems] Items result:', { data, error, count: data?.length });
+      console.log('[useLicitacionItems] Items result:', { data: itemsResult.data, error: itemsResult.error, count: itemsResult.data?.length });
 
-      if (error) {
-        console.error('Error fetching items:', error);
-        throw error;
+      if (itemsResult.error) {
+        console.error('Error fetching items:', itemsResult.error);
+        throw itemsResult.error;
       }
 
+      const data = itemsResult.data as any[] || [];
+
       // Map database fields to expected interface
-      return (data || []).map((item: any) => ({
+      return data.map((item) => ({
         id: String(item.id),
         compra_agil_id: String(item.compra_agil_id),
         nombre_producto: item.nombre_producto || '',
