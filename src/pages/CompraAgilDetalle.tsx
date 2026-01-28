@@ -203,7 +203,7 @@ export default function CompraAgilDetalle() {
   const { data: compra, isLoading, error } = useCompraAgilByCodigo(codigo);
   
   // Fetch licitacion items from DB
-  const { data: licitacionItems } = useLicitacionItems(compra?.id || null);
+  const { data: licitacionItems } = useLicitacionItems(codigo || null);
 
   // Extract items from datos_json or descripcion
   const items = useMemo<ItemCompra[]>(() => {
