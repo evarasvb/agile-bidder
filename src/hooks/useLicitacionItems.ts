@@ -32,12 +32,11 @@ export function useLicitacionItems(identifier: string | number | null) {
 
       // Si es string, buscar el ID por codigo en compras_agiles
       if (typeof identifier === 'string') {
-        // @ts-expect-error TS2589 - Supabase types are too deep
         const result = await supabase
           .from('compras_agiles')
           .select('id')
           .eq('codigo', identifier)
-          .single();
+          .single() as any;
 
         console.log('[useLicitacionItems] Found compraAgil:', result.data, 'error:', result.error);
 
@@ -46,7 +45,7 @@ export function useLicitacionItems(identifier: string | number | null) {
           return [];
         }
 
-        compraAgilId = Number((result.data as { id: number }).id);
+        compraAgilId = Number(result.data.id);
       } else {
         compraAgilId = identifier;
       }
@@ -54,11 +53,10 @@ export function useLicitacionItems(identifier: string | number | null) {
       console.log('[useLicitacionItems] Fetching items for compraAgilId:', compraAgilId);
 
       // Fetch items from licitacion_items using compra_agil_id
-      // @ts-expect-error TS2589 - Supabase types are too deep
       const itemsResult = await supabase
         .from('licitacion_items')
         .select('*')
-        .eq('compra_agil_id', compraAgilId);
+        .eq('compra_agil_id', compraAgilId) as any;
 
       console.log('[useLicitacionItems] Items result:', { data: itemsResult.data, error: itemsResult.error, count: itemsResult.data?.length });
 
@@ -67,10 +65,10 @@ export function useLicitacionItems(identifier: string | number | null) {
         throw itemsResult.error;
       }
 
-      const data = (itemsResult.data || []) as any[];
+      const data = itemsResult.data || [];
 
       // Map database fields to expected interface
-      return data.map((item) => ({
+      return data.map((item: any) => ({
         id: String(item.id),
         compra_agil_id: String(item.compra_agil_id),
         nombre_producto: item.nombre_producto || '',
