@@ -130,9 +130,80 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
         };
       });
       
-      // Aplicar filtros personalizados del cliente
-      // TODO: Implementar llamada a RPC get_licitaciones_filtradas_cliente cuando filters.clienteFiltros existe
-    // Por ahora, devolver compras sin filtrado cliente-side
+      // Filtrado server-side con RPC si hay configuración del cliente
+    if (filters?.clienteFiltros && filters.clienteFiltros.cliente_id) {
+      console.log('[useComprasAgiles] Usando RPC server-side con cliente_id:', filters.clienteFiltros.cliente_id);
+      
+      const { data: rpcData, error: rpcError } = await supabase
+        .rpc('get_licitaciones_filtradas_cliente', {
+          p_cliente_id: filters.clienteFiltros.cliente_id,
+          p_monto_min: filters.montoMin || null,
+          p_monto_max: filters.montoMax || null
+        });
+
+      if (rpcError) {
+        console.error('[useComprasAgiles] Error en RPC filtrado:', rpcError);
+        throw rpcError;
+      }
+
+      console.log(`[useComprasAgiles] RPC devolvió ${rpcData?.length || 0} compras filtradas`);
+
+      // Mapear resultados RPC a formato CompraAgil
+      const comprasFiltradas: CompraAgil[] = (rpcData || []).map((row: LicitacionRow) => ({
+        id: row.codigo || row.id_licitacion || row.id || '',
+        codigo: row.codigo || row.id_licitacion || row.id || '',
+        nombre: row.titulo || row.nombre || 'Sin título',
+        organismo: row.organismo || 'Sin organismo',
+        monto: row.presupuesto || row.monto || null,
+        fecha_cierre: row.fecha_cierre || null,
+        estado: row.estado || null,
+        region: row.region || null,
+        descripcion: row.descripcion || null,
+        link_oficial: row.link_oficial || null,
+        match_encontrado: row.match_encontrado ?? false,
+        match_score: row.match_score ?? null,
+        datos_json: row.datos_json || null,
+        created_at: row.created_at || new Date().toISOString(),
+        updated_at: row.updated_at || row.created_at || new Date().toISOString(),
+      }));
+
+      // Aplicar filtros adicionales de UI (matchStatus, fechaCierre)
+      let comprasFinales = comprasFiltradas;
+
+      if (filters?.matchStatus === 'con_match') {
+        comprasFinales = comprasFinales.filter(c => c.match_encontrado);
+      } else if (filters?.matchStatus === 'sin_match') {
+        comprasFinales = comprasFinales.filter(c => !c.match_encontrado);
+      }
+
+      if (filters?.fechaCierre && filters.fechaCierre !== 'todas') {
+        const today = startOfDay(new Date());
+        const todayISO = today.toISOString();
+
+        if (filters.fechaCierre === 'hoy') {
+          const tomorrow = addDays(today, 1);
+          comprasFinales = comprasFinales.filter(c => 
+            c.fecha_cierre && c.fecha_cierre >= todayISO && c.fecha_cierre < tomorrow.toISOString()
+          );
+        } else if (filters.fechaCierre === 'proximos3') {
+          const in3Days = addDays(today, 3);
+          comprasFinales = comprasFinales.filter(c => 
+            c.fecha_cierre && c.fecha_cierre >= todayISO && c.fecha_cierre <= in3Days.toISOString()
+          );
+        } else if (filters.fechaCierre === 'proximos7') {
+          const in7Days = addDays(today, 7);
+          comprasFinales = comprasFinales.filter(c => 
+            c.fecha_cierre && c.fecha_cierre >= todayISO && c.fecha_cierre <= in7Days.toISOString()
+          );
+        }
+      }
+
+      console.log(`[useComprasAgiles] Después de filtros UI: ${comprasFinales.length} compras`);
+      return comprasFinales;
+    }
+
+    // Sin filtros de cliente: devolver todas las compras sin filtrar
+    console.log('[useComprasAgiles] Sin filtros de cliente, devolviendo todas las compras');
     return compras;
       
     },
