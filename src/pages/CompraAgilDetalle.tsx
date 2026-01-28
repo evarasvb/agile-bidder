@@ -211,6 +211,20 @@ export default function CompraAgilDetalle() {
     return extractItemsFromData(compra.datos_json, compra.descripcion, compra.nombre);
   }, [compra]);
 
+    // Usar licitacionItems si están disponibles, sino items de datos_json
+  const displayItems = useMemo(() => {
+    if (licitacionItems && licitacionItems.length > 0) {
+      return licitacionItems.map(item => ({
+        codigo: item.codigo_producto || `ITEM-${item.id}`,
+        nombre: item.descripcion || item.nombre_producto || '',
+        descripcion: item.descripcion || '',
+        cantidad: item.cantidad || 1,
+        unidad: item.unidad || 'Unidad'
+      }));
+    }
+    return items;
+  }, [licitacionItems, items]);
+
   // Fetch matching products from inventory
   const { data: matchingProducts, isLoading: isLoadingMatches } = useQuery({
     queryKey: ['inventory_matches', compra?.nombre, items],
@@ -646,7 +660,7 @@ export default function CompraAgilDetalle() {
 
                 {/* Tab: Vista Detalle Original */}
                 <TabsContent value="detalle" className="mt-0">
-                  {items.length > 0 ? (
+                  {displayItems.length > 0 ? (
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-muted/50">
@@ -658,7 +672,7 @@ export default function CompraAgilDetalle() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {items.map((item, index) => (
+                        {displayItems.map((item, index) => (
                           <TableRow key={index}>
                             <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
                             <TableCell className="font-mono text-xs">
