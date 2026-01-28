@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabaseClient as supabase } from '@/lib/supabaseClient';
 import type { Database } from '@/integrations/supabase/types';
+import { pasaFiltrosCliente, ClienteFiltros } from './useClienteFiltros';
 import { differenceInDays, parseISO, startOfDay, addDays } from 'date-fns';
 
 // Tipo base de la BD - usar tabla licitaciones
@@ -32,6 +33,7 @@ export interface ComprasAgilesFilters {
   fechaCierre?: string; // 'hoy' | 'proximos3' | 'proximos7' | 'todas'
   matchStatus?: string; // 'con_match' | 'sin_match' | 'todos'
   matchThreshold?: number; // 0-100, default 70
+  clienteFiltros?: ClienteFiltros | null; // Filtros personalizados del cliente
 }
 
 export function useComprasAgiles(filters?: ComprasAgilesFilters) {
@@ -129,7 +131,12 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
         };
       });
       
-      return compras;
+      // Aplicar filtros personalizados del cliente
+      const comprasFiltradas = filters?.clienteFiltros 
+        ? compras.filter(compra => pasaFiltrosCliente(compra, filters.clienteFiltros!))
+        : compras;
+      
+      return comprasFiltradas;
     },
     refetchInterval: 30000,
   });
