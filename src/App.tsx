@@ -116,7 +116,7 @@ const App = () => (
             <Route path="/planes" element={<Planes />} />
             <Route path="/mis-oportunidades" element={<MisOportunidades />} />
             <Route path="/configuracion-oportunidades" element={<ConfiguracionOportunidades />} />
-            <Route path="/mi-inventario" element={<MiInventario />} />
+            <Route path="/lista-precios" element={<MiInventario />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>
