@@ -1,19 +1,10 @@
-import { 
-  LayoutDashboard, 
-  Package, 
-  Settings, 
-  FileText,
-  LogOut,
-  Zap,
-  Target,
-  Send,
-  Bot,
-  CreditCard,
-  Building2,
-  Sparkles,
-  Crown,
+import {
   Star,
-  ShoppingBag
+  Package,
+  Store,
+  Settings,
+  User,
+  LogOut,
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -22,22 +13,13 @@ import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import logoFirmavbBlanco from "@/assets/logo-firmavb-blanco.png";
 
-// Navigation items - ALWAYS shown to all users
+// Navigation items - Simplified to 5 main routes
 const navItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Licitaciones", url: "/licitaciones", icon: FileText },
-  { title: "Compras Ágiles", url: "/compras-agiles", icon: Zap },
   { title: "Mis Oportunidades", url: "/mis-oportunidades", icon: Star },
-  { title: "Lista de Precios", url: "/lista-precios", icon: ShoppingBag },
-  { title: "Inventario", url: "/inventory", icon: Package },
-  { title: "Instituciones", url: "/instituciones", icon: Building2 },
-  { title: "Oportunidades", url: "/opportunities", icon: Target },
-  { title: "Auto-Bids", url: "/auto-bids", icon: Sparkles },
-  { title: "Mis Ofertas", url: "/my-bids", icon: Send },
-  { title: "Planes", url: "/planes", icon: Crown },
-  { title: "Facturación", url: "/billing", icon: CreditCard },
-  { title: "Configuración", url: "/settings", icon: Settings },
-  { title: "Evaristo", url: "/admin/evaristo", icon: Bot },
+  { title: "Productos", url: "/productos", icon: Package },
+  { title: "Mercado", url: "/mercado", icon: Store },
+  { title: "Configuración", url: "/configuracion", icon: Settings },
+  { title: "Cuenta", url: "/cuenta", icon: User },
 ];
 
 export function AppSidebar() {
@@ -84,11 +66,12 @@ export function AppSidebar() {
         </div>
       </div>
 
-      {/* Navigation - ALWAYS show ALL items */}
+      {/* Navigation */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto scrollbar-thin">
         <ul className="space-y-1">
           {navItems.map((item) => {
-            const isActive = location.pathname === item.url;
+            const isActive = location.pathname === item.url || 
+              (item.url !== '/' && location.pathname.startsWith(item.url));
             return (
               <li key={item.title}>
                 <NavLink
