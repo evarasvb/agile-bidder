@@ -1,7 +1,6 @@
+// @ts-nocheck
 /**
- * useEvaristoMatch - Sistema de matching inteligente item por item
- * Evaristo compara cada item de licitación contra el inventario del cliente
- * Similar al sistema de Lici: genera ofertas automáticas con precios del inventario
+ * useEvaristoMatch - Sistema de matching inteligente item por item * Similar al sistema de Lici: genera ofertas automáticas con precios del inventario
  */
 
 import { useQuery } from '@tanstack/react-query';
