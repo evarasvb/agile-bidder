@@ -279,8 +279,8 @@ export default function MisOportunidades() {
                           No se encontraron oportunidades con los filtros actuales
                         </TableCell>
                       </TableRow>
-                    ) : 9
-                      paginatedOportunidades.map((op) => (
+                ) : (     
+                                paginatedOportunidades.map((op) => (
                         <TableRow key={op.id} className="cursor-pointer hover:bg-muted/50">
                           <TableCell className="font-mono text-xs">
                             <div className="flex items-center gap-2">
