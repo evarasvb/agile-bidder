@@ -268,6 +268,7 @@ export default function MisOportunidades() {
                       <TableHead className="text-right">Monto</TableHead>
                       <TableHead>Cierre</TableHead>
                       <TableHead className="text-center">Match</TableHead>
+                                      <TableHead>Riesgo</TableHead>
                       <TableHead className="w-[50px]"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -278,7 +279,7 @@ export default function MisOportunidades() {
                           No se encontraron oportunidades con los filtros actuales
                         </TableCell>
                       </TableRow>
-                    ) : (
+                    ) : 9
                       paginatedOportunidades.map((op) => (
                         <TableRow key={op.id} className="cursor-pointer hover:bg-muted/50">
                           <TableCell className="font-mono text-xs">
@@ -308,6 +309,11 @@ export default function MisOportunidades() {
                           <TableCell className="text-center">
                             {getMatchBadge(op.match_score)}
                           </TableCell>
+                                          <TableCell>
+                  <Badge variant={op.risk_level === 'BAJO' ? 'default' : op.risk_level === 'MEDIO' ? 'secondary' : 'destructive'}>
+                    {op.risk_level || 'N/A'}
+                  </Badge>
+                </TableCell>
                           <TableCell>
                             {op.link_oficial && (
                               <Button variant="ghost" size="icon" asChild>
