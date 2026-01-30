@@ -224,8 +224,7 @@ export function useEvaristoMatch(licitacionId: string | null, threshold: number 
       // 1. Obtener info de la licitación
       const { data: licitacion, error: licitacionError } = await supabase
         .from('licitaciones')
-        .select('id, codigo, nombre, descripcion')
-        .eq('id', licitacionId)
+        .select(''*'    .eq('id', licitacionId)
         .single();
       
       if (licitacionError || !licitacion) {
