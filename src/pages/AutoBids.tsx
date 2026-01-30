@@ -274,7 +274,6 @@ export default function AutoBids() {
                       <TableCell className="text-green-600">{item.bids_ganados}</TableCell>
                       <TableCell>
                         <MatchProgressBadge 
-                          matchedCount={item.bids_ganados} 
                           totalCount={item.total_bids || 1} 
                         />
                       </TableCell>
