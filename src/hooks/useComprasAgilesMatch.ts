@@ -78,3 +78,6 @@ export function useLicitacionesMatch(inventario?: InventoryItem[]) {
     error: licitacionesQuery.error,
   };
 }
+
+// Export alias for backward compatibility
+export { useLicitacionesMatch as useComprasAgilesMatch };
