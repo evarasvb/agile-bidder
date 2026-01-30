@@ -12,8 +12,7 @@ import { Zap, Plus, Trash2, Edit, TrendingUp, DollarSign, Target, Activity } fro
 import { useAutoBidDashboard, useAutoBidItems, useToggleAutoBid, useCreateAutoBidItem, useDeleteAutoBidItem, useAutoBidStats } from '@/hooks/useAutoBids';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { MatchProgressBadge } from '@/components/ui/match-progress-bar';
-
+import { MatchProgressBar } from '@/components/ui/match-progress-bar';
 export default function AutoBids() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newItem, setNewItem] = useState({
@@ -273,9 +272,10 @@ export default function AutoBids() {
                       <TableCell>{item.total_bids}</TableCell>
                       <TableCell className="text-green-600">{item.bids_ganados}</TableCell>
                       <TableCell>
-                        <MatchProgressBadge 
-                          totalCount={item.total_bids || 1} 
-                        />
+                        <MatchProgressBar
+                      matchedProducts={item.bids_ganados || 0}
+                      totalProducts={item.total_bids || 1}
+                    />
                       </TableCell>
                       <TableCell>
                         <Badge variant={item.activo ? 'default' : 'secondary'}>
