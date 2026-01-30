@@ -48,6 +48,9 @@ import ConfiguracionOportunidades from "./pages/ConfiguracionOportunidades";
 import MiInventario from "./pages/MiInventario";
 
 const queryClient = new QueryClient();
+import Productos from "./pages/Productos";
+import Mercado from "./pages/Mercado";
+import Cuenta from "./pages/Cuenta";
 
 // Layout wrapper that uses Outlet for nested routes with protection
 const ProtectedLayoutWrapper = () => (
@@ -119,6 +122,10 @@ const App = () => (
             <Route path="/lista-precios" element={<MiInventario />} />
             <Route path="*" element={<NotFound />} />
           </Route>
+                      <Route path="/productos" element={<Productos />} />
+            <Route path="/mercado" element={<Mercado />} />
+            <Route path="/cuenta" element={<Cuenta />} />
+                      <Route path="/configuracion" element={<ConfiguracionOportunidades />} />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>
