@@ -19,6 +19,7 @@ export interface OportunidadFiltrada {
   match_score: number | null;
   match_encontrado: boolean | null;
   created_at: string;
+    risk_level: string | null;
 }
 
 function calculateMatchScore(
@@ -97,6 +98,7 @@ export function useOportunidadesFiltradas() {
         match_score: c.match_score,
         match_encontrado: c.match_encontrado,
         created_at: c.created_at,
+              risk_level: null,
       }));
 
       // Transform licitaciones
@@ -117,6 +119,7 @@ export function useOportunidadesFiltradas() {
         match_score: l.match_score,
         match_encontrado: l.match_encontrado,
         created_at: l.created_at,
+              risk_level: null,
       }));
 
       // Combine all opportunities
