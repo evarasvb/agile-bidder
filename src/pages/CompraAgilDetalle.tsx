@@ -40,6 +40,7 @@ import { format, parseISO, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { formatCurrency, clasificarProceso, montoEnUTM } from "@/utils/clasificacion";
 import { cn } from "@/lib/utils";
+import { EconomicSummary } from "@/components/ui/economic-breakdown";
 import { ItemsMatchTable } from "@/components/compras-agiles/ItemsMatchTable";
 import { useLicitacionItems } from "@/hooks/useLicitacionItems";
 

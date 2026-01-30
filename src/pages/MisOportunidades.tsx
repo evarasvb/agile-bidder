@@ -34,6 +34,7 @@ import { useOportunidadesFiltradas, OportunidadFiltrada } from "@/hooks/useOport
 import { useClienteFiltros } from "@/hooks/useClienteFiltros";
 import { format, differenceInHours } from "date-fns";
 import { es } from "date-fns/locale";
+import { SimpleFeedback } from "@/components/ui/feedback-buttons";
 
 export default function MisOportunidades() {
   const { oportunidades, stats, isLoading, refetch } = useOportunidadesFiltradas();

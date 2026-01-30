@@ -12,7 +12,7 @@ import { Zap, Plus, Trash2, Edit, TrendingUp, DollarSign, Target, Activity } fro
 import { useAutoBidDashboard, useAutoBidItems, useToggleAutoBid, useCreateAutoBidItem, useDeleteAutoBidItem, useAutoBidStats } from '@/hooks/useAutoBids';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-
+import { MatchProgressBar } from '@/components/ui/match-progress-bar';
 export default function AutoBids() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newItem, setNewItem] = useState({
@@ -87,7 +87,7 @@ export default function AutoBids() {
               Auto-Bids
             </h1>
             <p className="text-muted-foreground">
-              Sistema automático de ofertas para licitaciones
+              Sistema autom\u00e1tico de ofertas para licitaciones
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -140,7 +140,7 @@ export default function AutoBids() {
           
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Tasa de Éxito</CardTitle>
+              <CardTitle className="text-sm font-medium">Tasa de \u00c9xito</CardTitle>
               <Activity className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -173,7 +173,7 @@ export default function AutoBids() {
             <div>
               <CardTitle>Productos Configurados</CardTitle>
               <CardDescription>
-                Productos para los cuales se generarán ofertas automáticas
+                Productos para los cuales se generar\u00e1n ofertas autom\u00e1ticas
               </CardDescription>
             </div>
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -187,7 +187,7 @@ export default function AutoBids() {
                 <DialogHeader>
                   <DialogTitle>Agregar Producto para Auto-Bid</DialogTitle>
                   <DialogDescription>
-                    Configura un producto para ofertas automáticas
+                    Configura un producto para ofertas autom\u00e1ticas
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
@@ -201,7 +201,7 @@ export default function AutoBids() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Precio Mínimo</Label>
+                      <Label>Precio M\u00ednimo</Label>
                       <Input
                         type="number"
                         value={newItem.precio_minimo}
@@ -210,7 +210,7 @@ export default function AutoBids() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Precio Máximo</Label>
+                      <Label>Precio M\u00e1ximo</Label>
                       <Input
                         type="number"
                         value={newItem.precio_maximo}
@@ -252,11 +252,12 @@ export default function AutoBids() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Producto</TableHead>
-                    <TableHead>Precio Mín</TableHead>
-                    <TableHead>Precio Máx</TableHead>
+                    <TableHead>Precio M\u00edn</TableHead>
+                    <TableHead>Precio M\u00e1x</TableHead>
                     <TableHead>Margen</TableHead>
                     <TableHead>Bids</TableHead>
                     <TableHead>Ganados</TableHead>
+                    <TableHead>Match</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
@@ -270,6 +271,12 @@ export default function AutoBids() {
                       <TableCell>{item.margen_objetivo}%</TableCell>
                       <TableCell>{item.total_bids}</TableCell>
                       <TableCell className="text-green-600">{item.bids_ganados}</TableCell>
+                      <TableCell>
+                        <MatchProgressBar
+                      matchedProducts={item.bids_ganados || 0}
+                      totalProducts={item.total_bids || 1}
+                    />
+                      </TableCell>
                       <TableCell>
                         <Badge variant={item.activo ? 'default' : 'secondary'}>
                           {item.activo ? 'Activo' : 'Inactivo'}
@@ -288,7 +295,7 @@ export default function AutoBids() {
                   ))}
                   {!items?.length && (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                         No hay productos configurados. Agrega uno para comenzar.
                       </TableCell>
                     </TableRow>
