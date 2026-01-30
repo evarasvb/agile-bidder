@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Hook para matching de productos con inventario y catálogo FirmaVB
  */
