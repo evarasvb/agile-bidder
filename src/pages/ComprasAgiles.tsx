@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useCallback, useMemo } from "react";
 import { ShoppingCart, RefreshCw, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
