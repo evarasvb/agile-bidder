@@ -62,13 +62,13 @@ export function useOportunidadesFiltradas() {
       // Fetch from both tables
       const [comprasResult, licitacionesResult] = await Promise.all([
         (supabaseClient as any)
-          .60
-          .select('*, institucion_riesgo!left(nivel_riesgo))
+          .from('compras_agiles')
+          .select(**, institucion_riesgo!left(nivel_riesgo)')
           .order('created_at', { ascending: false })
           .limit(2000),
         (supabaseClient as any)
           .from('licitaciones')
-          .select('*, institucion_riesgo!left(nivel_riesgo))
+          .select(**, institucion_riesgo!left(nivel_riesgo)')
           .order('created_at', { ascending: false })
           .limit(2000),
       ]);
