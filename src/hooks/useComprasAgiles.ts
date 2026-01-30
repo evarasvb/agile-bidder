@@ -302,7 +302,7 @@ export function useUpdateLicitacion() {
     mutationFn: async ({ id, datos_json }: { id: string; datos_json: Record<string, unknown> }) => {
       const { data, error } = await supabase
         .from('licitaciones')
-        .update({ datos_json: datos_json as unknown as import('@/integrations/supabase/types').Json })
+        
         .eq('id', id)
         .select()
         .single();
