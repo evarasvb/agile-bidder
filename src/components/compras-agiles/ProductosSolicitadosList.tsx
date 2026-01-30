@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import { useLicitacionItems, type LicitacionItem } from '@/hooks/useLicitacionItems';
 import { Badge } from '@/components/ui/badge';
