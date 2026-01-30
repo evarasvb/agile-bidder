@@ -357,3 +357,7 @@ export function useLicitacionesStats() {
     },
   });
 }
+
+// Export aliases for backward compatibility
+export { useLicitacionesStats as useComprasAgilesStats };
+export { useLicitaciones as useComprasAgiles };
