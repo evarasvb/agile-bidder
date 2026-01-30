@@ -21,7 +21,7 @@ const isLicitacionAbierta = (licitacion: Licitacion) => {
 const matchesKeywords = (licitacion: Licitacion, keywords: string[]) => {
   if (keywords.length === 0) return false;
   const haystack = normalizeText(
-    [licitacion.nombre, licitacion.descripcion, licitacion.organismo].filter(Boolean).join(" ")
+    [licitacion.titulo, licitacion.descripcion, licitacion.organismo].filter(Boolean).join(" ")
   );
   if (!haystack) return false;
   return keywords.some((keyword) => haystack.includes(keyword));
