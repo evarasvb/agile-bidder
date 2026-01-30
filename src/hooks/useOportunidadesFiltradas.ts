@@ -62,13 +62,13 @@ export function useOportunidadesFiltradas() {
       // Fetch from both tables
       const [comprasResult, licitacionesResult] = await Promise.all([
         (supabaseClient as any)
-          .from('compras_agiles')
-          .select('*')
+          .60
+          .select('*, institucion_riesgo!left(nivel_riesgo))
           .order('created_at', { ascending: false })
           .limit(2000),
         (supabaseClient as any)
           .from('licitaciones')
-          .select('*')
+          .select('*, institucion_riesgo!left(nivel_riesgo))
           .order('created_at', { ascending: false })
           .limit(2000),
       ]);
@@ -98,7 +98,7 @@ export function useOportunidadesFiltradas() {
         match_score: c.match_score,
         match_encontrado: c.match_encontrado,
         created_at: c.created_at,
-              risk_level: null,
+              risk_level: c.institucion_riesgo?.[0]?.nivel_riesgo || null,
       }));
 
       // Transform licitaciones
@@ -119,7 +119,7 @@ export function useOportunidadesFiltradas() {
         match_score: l.match_score,
         match_encontrado: l.match_encontrado,
         created_at: l.created_at,
-              risk_level: null,
+              risk_level: l.institucion_riesgo?.[0]?.nivel_riesgo || null,
       }));
 
       // Combine all opportunities
