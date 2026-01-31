@@ -18,7 +18,6 @@ import NotFound from "./pages/NotFound";
 // Mis Oportunidades
 import MisOportunidades from "./pages/MisOportunidades";
 import LicitacionDetalle from "./pages/LicitacionDetalle";
-import CompraAgilDetalle from "./pages/CompraAgilDetalle";
 
 // Mercado
 import Mercado from "./pages/Mercado";
@@ -76,7 +75,6 @@ const App = () => (
             {/* ----- MIS OPORTUNIDADES ----- */}
             <Route path="/mis-oportunidades" element={<MisOportunidades />} />
             <Route path="/licitaciones/:id" element={<LicitacionDetalle />} />
-            <Route path="/compras-agiles/:codigo" element={<CompraAgilDetalle />} />
             
             {/* ----- MERCADO ----- */}
             <Route path="/mercado" element={<Mercado />} />
