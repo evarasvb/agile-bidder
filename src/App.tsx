@@ -7,52 +7,42 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AdminOnlyRoute } from "@/components/auth/AdminOnlyRoute";
 import { ChatWidget } from "@/components/support/ChatWidget";
+
+// Auth
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
-import Inventory from "./pages/Inventory";
-import History from "./pages/History";
-import Settings from "./pages/Settings";
-import Logs from "./pages/Logs";
-import Licitaciones from "./pages/Licitaciones";
-import LicitacionDetalle from "./pages/LicitacionDetalle";
+import AuthCallback from "./pages/AuthCallback";
 import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
-import OdooDashboard from "./pages/OdooDashboard";
-import ExtensionConfig from "./pages/ExtensionConfig";
-import AdminOdoo from "./pages/AdminOdoo";
-import AdminEvaristo from "./pages/AdminEvaristo";
-import Calendar from "./pages/Calendar";
-import Users from "./pages/Users";
-import MercadoPublico from "./pages/MercadoPublico";
-import BIDashboard from "./pages/BIDashboard";
-import BIAdvanced from "./pages/BIAdvanced";
-import GestionVendedores from "./pages/GestionVendedores";
-import RoleConfig from "./pages/RoleConfig";
-import PermisosRoles from "./pages/PermisosRoles";
-import Ofertas from "./pages/Ofertas";
-import OfertaDetalle from "./pages/OfertaDetalle";
-import ComprasAgilesMatch from "./pages/ComprasAgilesMatch";
-import ComprasAgiles from "./pages/ComprasAgiles";
-import CompraAgilDetalle from "./pages/CompraAgilDetalle";
-import OrdenesCompra from "./pages/OrdenesCompra";
-import AuthCallback from "./pages/AuthCallback";
-import Billing from "./pages/Billing";
-import Opportunities from "./pages/Opportunities";
-import MyBids from "./pages/MyBids";
-import Instituciones from "./pages/Instituciones";
-import AutoBids from "./pages/AutoBids";
-import Planes from "./pages/Planes";
+
+// Mis Oportunidades
 import MisOportunidades from "./pages/MisOportunidades";
+import LicitacionDetalle from "./pages/LicitacionDetalle";
+import CompraAgilDetalle from "./pages/CompraAgilDetalle";
+
+// Mercado
+import Mercado from "./pages/Mercado";
+import Instituciones from "./pages/Instituciones";
+import OrdenesCompra from "./pages/OrdenesCompra";
+
+// Dashboard
+import Dashboard from "./pages/Dashboard";
+import Calendar from "./pages/Calendar";
+import GestionVendedores from "./pages/GestionVendedores";
+
+// Configuracion
 import ConfiguracionOportunidades from "./pages/ConfiguracionOportunidades";
-import MiInventario from "./pages/MiInventario";
+import Users from "./pages/Users";
+
+// Cuenta
+import Cuenta from "./pages/Cuenta";
+import Billing from "./pages/Billing";
+
+// Admin (oculto)
+import AdminEvaristo from "./pages/AdminEvaristo";
 
 const queryClient = new QueryClient();
-import Productos from "./pages/Productos";
-import Mercado from "./pages/Mercado";
-import Cuenta from "./pages/Cuenta";
 
-// Layout wrapper that uses Outlet for nested routes with protection
 const ProtectedLayoutWrapper = () => (
   <ProtectedRoute>
     <AppLayout>
@@ -69,63 +59,50 @@ const App = () => (
       <ChatWidget />
       <BrowserRouter>
         <Routes>
-          {/* Public routes */}
+          {/* ========== RUTAS PUBLICAS ========== */}
           <Route path="/" element={<Index />} />
-          <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
           
-          {/* Redirect old cliente routes to dashboard */}
-          <Route path="/clientes/*" element={<Navigate to="/dashboard" replace />} />
-          
-          {/* Onboarding route - standalone without AppLayout */}
+          {/* Onboarding - sin sidebar */}
           <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
           
-          {/* Odoo Dashboard - protected but without sidebar layout for now */}
-          <Route path="/odoo/dashboard" element={<ProtectedRoute><OdooDashboard /></ProtectedRoute>} />
-          
-          {/* Admin Routes - protected */}
-          <Route path="/admin" element={<ProtectedRoute><AdminOdoo /></ProtectedRoute>} />
+          {/* Admin oculto */}
           <Route path="/admin/evaristo" element={<AdminOnlyRoute><AdminEvaristo /></AdminOnlyRoute>} />
-          
-          {/* All other routes with AppLayout using nested routing - ALL PROTECTED */}
+
+          {/* ========== RUTAS PROTEGIDAS CON LAYOUT ========== */}
           <Route element={<ProtectedLayoutWrapper />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/inventory" element={<Inventory />} />
-            <Route path="/calendar" element={<Calendar />} />
-            <Route path="/history" element={<History />} />
-            <Route path="/licitaciones" element={<Licitaciones />} />
-            <Route path="/licitaciones/:id" element={<LicitacionDetalle />} />
-            <Route path="/compras-agiles" element={<ComprasAgiles />} />
-            <Route path="/compras-agiles/:codigo" element={<CompraAgilDetalle />} />
-            <Route path="/ordenes-compra" element={<OrdenesCompra />} />
-            <Route path="/ofertas" element={<Ofertas />} />
-            <Route path="/ofertas/:id" element={<OfertaDetalle />} />
-                        <Route path="/compras-agiles-match" element={<ComprasAgilesMatch />} />
-            <Route path="/opportunities" element={<Opportunities />} />
-            <Route path="/my-bids" element={<MyBids />} />
-            <Route path="/vendedores" element={<GestionVendedores />} />
-            <Route path="/mercadopublico" element={<MercadoPublico />} />
-            <Route path="/bi-dashboard" element={<BIDashboard />} />
-            <Route path="/bi-advanced" element={<BIAdvanced />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/billing" element={<Billing />} />
-            <Route path="/extension" element={<ExtensionConfig />} />
-            <Route path="/logs" element={<Logs />} />
-            <Route path="/users" element={<Users />} />
-            <Route path="/role-config" element={<RoleConfig />} />
-            <Route path="/permisos-roles" element={<PermisosRoles />} />
-            <Route path="/instituciones" element={<Instituciones />} />
-            <Route path="/auto-bids" element={<AutoBids />} />
-            <Route path="/planes" element={<Planes />} />
+            
+            {/* ----- MIS OPORTUNIDADES ----- */}
             <Route path="/mis-oportunidades" element={<MisOportunidades />} />
-            <Route path="/configuracion-oportunidades" element={<ConfiguracionOportunidades />} />
-            <Route path="/lista-precios" element={<MiInventario />} />
+            <Route path="/licitaciones/:id" element={<LicitacionDetalle />} />
+            <Route path="/compras-agiles/:codigo" element={<CompraAgilDetalle />} />
+            
+            {/* ----- MERCADO ----- */}
+            <Route path="/mercado" element={<Mercado />} />
+            <Route path="/mercado/instituciones" element={<Instituciones />} />
+            <Route path="/mercado/ordenes" element={<OrdenesCompra />} />
+            
+            {/* ----- DASHBOARD ----- */}
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/dashboard/calendario" element={<Calendar />} />
+            <Route path="/dashboard/vendedores" element={<GestionVendedores />} />
+            
+            {/* ----- CONFIGURACION ----- */}
+            <Route path="/configuracion" element={<ConfiguracionOportunidades />} />
+            <Route path="/configuracion/equipo" element={<Users />} />
+            
+            {/* ----- CUENTA ----- */}
+            <Route path="/cuenta" element={<Cuenta />} />
+            <Route path="/cuenta/facturacion" element={<Billing />} />
+            
+            {/* Redirects de rutas antiguas */}
+            <Route path="/dashboard-old" element={<Navigate to="/mis-oportunidades" replace />} />
+            <Route path="/clientes/*" element={<Navigate to="/mis-oportunidades" replace />} />
+            
+            {/* 404 */}
             <Route path="*" element={<NotFound />} />
           </Route>
-                      <Route path="/productos" element={<Productos />} />
-            <Route path="/mercado" element={<Mercado />} />
-            <Route path="/cuenta" element={<Cuenta />} />
-                      <Route path="/configuracion" element={<ConfiguracionOportunidades />} />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>
