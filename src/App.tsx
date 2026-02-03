@@ -18,6 +18,7 @@ import NotFound from "./pages/NotFound";
 // Mis Oportunidades
 import MisOportunidades from "./pages/MisOportunidades";
 import LicitacionDetalle from "./pages/LicitacionDetalle";
+import Licitaciones from "./pages/Licitaciones";
 
 // Mercado
 import Mercado from "./pages/Mercado";
@@ -75,6 +76,7 @@ const App = () => (
             {/* ----- MIS OPORTUNIDADES ----- */}
             <Route path="/mis-oportunidades" element={<MisOportunidades />} />
             <Route path="/licitaciones/:id" element={<LicitacionDetalle />} />
+                      <Route path="/licitaciones" element={<Licitaciones />} />
             
             {/* ----- MERCADO ----- */}
             <Route path="/mercado" element={<Mercado />} />
