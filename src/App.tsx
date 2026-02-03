@@ -25,6 +25,9 @@ import Mercado from "./pages/Mercado";
 import Instituciones from "./pages/Instituciones";
 import OrdenesCompra from "./pages/OrdenesCompra";
 
+// Inventario / Lista de Precios
+import Inventory from "./pages/Inventory";
+
 // Dashboard
 import Dashboard from "./pages/Dashboard";
 import Calendar from "./pages/Calendar";
@@ -82,6 +85,9 @@ const App = () => (
             <Route path="/mercado" element={<Mercado />} />
             <Route path="/mercado/instituciones" element={<Instituciones />} />
             <Route path="/mercado/ordenes" element={<OrdenesCompra />} />
+
+                        {/* ----- INVENTARIO / LISTA DE PRECIOS ----- */}
+            <Route path="/inventario" element={<Inventory />} />
             
             {/* ----- DASHBOARD ----- */}
             <Route path="/dashboard" element={<Dashboard />} />
