@@ -10,6 +10,7 @@ import {
   Calendar,
   Users,
   CreditCard,
+    Package,
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
@@ -44,6 +45,11 @@ const navItems: NavItem[] = [
       { title: "Instituciones", url: "/mercado/instituciones", icon: Building2 },
       { title: "Ordenes de Compra", url: "/mercado/ordenes", icon: FileText },
     ]
+  },
+    { 
+    title: "Lista de Precios", 
+    url: "/inventario", 
+    icon: Package
   },
   { 
     title: "Dashboard", 
