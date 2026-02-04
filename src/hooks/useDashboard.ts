@@ -40,7 +40,7 @@ export function useDashboardMetrics() {
       // Fetch licitaciones - use count for efficiency
       const { data: licitaciones, error: licError, count: licCount } = await supabase
         .from('licitaciones')
-        .select(''codigo, estado, procesada, match_encontrado, presupuesto_estimado', { count: 'exact' });
+        .select('codigo, estado, procesada, match_encontrado, presupuesto_estimado', { count: 'exact' });
       
       if (licError) {
         console.error('[Dashboard] Error fetching licitaciones:', licError);
