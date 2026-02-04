@@ -40,7 +40,7 @@ export function useDashboardMetrics() {
       // Fetch licitaciones - use count for efficiency
       const { data: licitaciones, error: licError, count: licCount } = await supabase
         .from('licitaciones')
-        .select('codigo, estado, procesada, match_encontrado, presupuesto_estimado', { count: 'exact' });
+        .select('id_licitacion, estado, procesada, match_encontrado, presupuesto', { count: 'exact' });
       
       if (licError) {
         console.error('[Dashboard] Error fetching licitaciones:', licError);
@@ -77,8 +77,8 @@ export function useDashboardMetrics() {
       const ganadas = ofertasList.filter(o => o.estado === 'ganada').length;
 
       const valorPotencial = licitaciones
-        ?.filter(l => l.match_encontrado && l.presupuesto_estimado)
-        ?.reduce((sum, l) => sum + (l.presupuesto_estimado || 0), 0) || 0;
+        ?.filter(l => l.match_encontrado && l.presupuesto)
+        ?.reduce((sum, l) => sum + (l.presupuesto || 0), 0) || 0;
 
       const metrics = {
         totalLicitaciones: total,
