@@ -23,6 +23,8 @@ import Licitaciones from "./pages/Licitaciones";
 // Mercado
 import Mercado from "./pages/Mercado";
 import Instituciones from "./pages/Instituciones";
+import ComprasAgiles from "./pages/ComprasAgiles";
+import CompraAgilDetalle from "./pages/CompraAgilDetalle";
 import OrdenesCompra from "./pages/OrdenesCompra";
 
 // Inventario / Lista de Precios
@@ -83,6 +85,10 @@ const App = () => (
             
             {/* ----- MERCADO ----- */}
             <Route path="/mercado" element={<Mercado />} />
+            
+              {/* ----- COMPRAS AGILES ----- */}
+              <Route path="/compras-agiles" element={<ComprasAgiles />} />
+              <Route path="/compras-agiles/:codigo" element={<CompraAgilDetalle />} />
             <Route path="/mercado/instituciones" element={<Instituciones />} />
             <Route path="/mercado/ordenes" element={<OrdenesCompra />} />
 
