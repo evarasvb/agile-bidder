@@ -18,6 +18,7 @@ import {
   Ban
 } from "lucide-react";
 import { useClienteFiltros } from "@/hooks/useClienteFiltros";
+import { RecargosRegion } from '@/components/settings/RecargosRegion';
 import { toast } from "sonner";
 
 const REGIONES_CHILE = [
@@ -376,6 +377,9 @@ export default function ConfiguracionOportunidades() {
           </div>
         </CardContent>
       </Card>
+
+              {/* Componente de Recargos por Region */}
+        <RecargosRegion />
     </div>
   );
 }
