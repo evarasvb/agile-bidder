@@ -1,352 +1,225 @@
 // @ts-nocheck
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabaseClient as supabase } from '@/lib/supabaseClient';
-import type { Database } from '@/integrations/supabase/types';
-import { ClienteFiltros } from './useClienteFiltros';import { differenceInDays, parseISO, startOfDay, addDays } from 'date-fns';
+import { differenceInHours, parseISO, startOfDay, addDays } from 'date-fns';
+import type { ClienteFiltros } from './useClienteFiltros';
 
-// Tipo base de la BD - usar tabla licitaciones
-type LicitacionRow = Database['public']['Tables']['licitaciones']['Row'];
+// =============================================================================
+// INTERFACES
+// =============================================================================
 
-export interface Licitacion {
+export interface CompraAgilItem {
+  id: string;
+  compra_agil_id: string;
+  codigo_producto: string | null;
+  nombre_producto: string;
+  descripcion_producto: string | null;
+  cantidad: number;
+  unidad: string | null;
+}
+
+export interface CompraAgil {
   id: string;
   codigo: string;
   nombre: string;
   organismo: string;
   monto: number | null;
+  moneda: string | null;
   fecha_cierre: string | null;
+  fecha_publicacion: string | null;
   estado: string | null;
-  region: string | null;
   descripcion: string | null;
-  link_oficial: string | null;
   match_encontrado: boolean;
-  match_score: number | null;
+  match_score: number;
+  items: CompraAgilItem[];
   datos_json: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }
 
-export interface LicitacionesFilters {
+export interface ComprasAgilesFilters {
   estado?: string;
-  region?: string;
   montoMin?: number;
   montoMax?: number;
-  fechaCierre?: string; // 'hoy' | 'proximos3' | 'proximos7' | 'todas'
-  matchStatus?: string; // 'con_match' | 'sin_match' | 'todos'
-  matchThreshold?: number; // 0-100, default 70
-  clienteFiltros?: ClienteFiltros | null; // Filtros personalizados del cliente
+  fechaCierre?: 'hoy' | 'proximos3' | 'proximos7' | 'todas';
+  matchStatus?: 'con_match' | 'sin_match' | 'todos';
+  clienteFiltros?: ClienteFiltros | null;
 }
 
-export function useLicitaciones(filters?: LicitacionesFilters) {
-  return useQuery({
-    queryKey: ['licitaciones', filters],
-    queryFn: async () => {
-      // CAMBIO CRÍTICO: Usar tabla licitaciones en lugar de licitaciones
-      let query = supabase
-        .from('licitaciones')
-        .select('*')
-        .order('fecha_cierre', { ascending: true, nullsFirst: false });
+// =============================================================================
+// MAPPER
+// =============================================================================
 
-      // Aplicar filtros opcionales
+function mapRowToCompraAgil(row: any): CompraAgil {
+  return {
+    id: row.id,
+    codigo: row.codigo,
+    nombre: row.nombre || 'Sin título',
+    organismo: row.nombre_organismo || row.organismo || 'Sin organismo',
+    monto: row.monto_estimado ?? row.monto_disponible ?? null,
+    moneda: row.moneda ?? null,
+    fecha_cierre: row.fecha_cierre || null,
+    fecha_publicacion: row.fecha_publicacion || null,
+    estado: row.estado || null,
+    descripcion: row.descripcion || null,
+    match_encontrado: row.match_encontrado ?? false,
+    match_score: row.match_score ?? 0,
+    items: (row.compras_agiles_items || []).map((i: any) => ({
+      id: i.id,
+      compra_agil_id: i.compra_agil_id,
+      codigo_producto: i.codigo_producto,
+      nombre_producto: i.nombre_producto,
+      descripcion_producto: i.descripcion_producto,
+      cantidad: i.cantidad,
+      unidad: i.unidad,
+    })),
+    datos_json: row.datos_json || null,
+    created_at: row.created_at || new Date().toISOString(),
+    updated_at: row.updated_at || row.created_at || new Date().toISOString(),
+  };
+}
+
+// =============================================================================
+// HOOKS PRINCIPALES
+// =============================================================================
+
+/**
+ * Hook para listar compras ágiles con items incluidos
+ * CORREGIDO: Ahora consulta tabla 'compras_agiles' con JOIN a 'compras_agiles_items'
+ */
+export function useComprasAgiles(filters?: ComprasAgilesFilters) {
+  return useQuery({
+    queryKey: ['compras_agiles', filters],
+    queryFn: async (): Promise<CompraAgil[]> => {
+      // CAMBIO CRÍTICO: Usar tabla compras_agiles (NO licitaciones)
+      let query = supabase
+        .from('compras_agiles')
+        .select(`
+          *,
+          compras_agiles_items(*)
+        `)
+        .order('fecha_cierre', { ascending: true });
+
+      // Filtros opcionales
       if (filters?.estado && filters.estado !== 'todas') {
         query = query.eq('estado', filters.estado);
       }
 
       if (filters?.montoMin) {
-        query = query.gte('presupuesto', filters.montoMin);
+        query = query.gte('monto_estimado', filters.montoMin);
       }
 
       if (filters?.montoMax) {
-        query = query.lte('presupuesto', filters.montoMax);
-      }
-
-      // Filtro de match status
-      if (filters?.matchStatus === 'con_match') {
-        query = query.eq('match_encontrado', true);
-      } else if (filters?.matchStatus === 'sin_match') {
-        query = query.eq('match_encontrado', false);
+        query = query.lte('monto_estimado', filters.montoMax);
       }
 
       // Filtro de fecha de cierre
       if (filters?.fechaCierre && filters.fechaCierre !== 'todas') {
         const today = startOfDay(new Date());
         const todayISO = today.toISOString();
-        
+
         if (filters.fechaCierre === 'hoy') {
           const tomorrow = addDays(today, 1);
-          query = query.gte('fecha_cierre', todayISO).lt('fecha_cierre', tomorrow.toISOString());
+          query = query
+            .gte('fecha_cierre', todayISO)
+            .lt('fecha_cierre', tomorrow.toISOString());
         } else if (filters.fechaCierre === 'proximos3') {
-          const in3Days = addDays(today, 3);
-          query = query.gte('fecha_cierre', todayISO).lte('fecha_cierre', in3Days.toISOString());
+          const in3 = addDays(today, 3);
+          query = query
+            .gte('fecha_cierre', todayISO)
+            .lte('fecha_cierre', in3.toISOString());
         } else if (filters.fechaCierre === 'proximos7') {
-          const in7Days = addDays(today, 7);
-          query = query.gte('fecha_cierre', todayISO).lte('fecha_cierre', in7Days.toISOString());
+          const in7 = addDays(today, 7);
+          query = query
+            .gte('fecha_cierre', todayISO)
+            .lte('fecha_cierre', in7.toISOString());
         }
       }
 
       const { data, error } = await query;
-
       if (error) {
-        console.error('Error fetching licitaciones:', error);
+        console.error('Error fetching compras_agiles:', error);
         throw error;
       }
 
-      // Debug: ver estructura real de datos
-      if (data && data.length > 0) {
-        console.log('[useLicitaciones] Sample row keys:', Object.keys(data[0]));
-        console.log('[useLicitaciones] Sample row:', data[0]);
-      }
+      let compras = (data || []).map(mapRowToCompraAgil);
 
-      // Mapear campos - manejar diferentes schemas (licitaciones vs licitaciones)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const licitacioness = (data || []).map((row: any, index: number): Licitacion => {
-        // La tabla licitaciones usa 'id_licitacion', licitaciones usa 'codigo'
-        const codigo = row.id_licitacion || row.codigo || row.id || '';
-        
-        // DEBUG: Log primeros 3 registros para verificar mapeo
-        if (index < 3) {
-          console.log(`[useLicitaciones] Row ${index}:`, { 
-            id_licitacion: row.id_licitacion, 
-            codigo: row.codigo, 
-            id: row.id,
-            mapped_codigo: codigo 
-          });
-        }
-        
-        return {
-          id: codigo,
-          codigo: codigo,
-          nombre: row.titulo || row.nombre || 'Sin título',
-          organismo: row.organismo || 'Sin organismo',
-          monto: row.presupuesto || row.monto || null,
-          fecha_cierre: row.fecha_cierre || null,
-          estado: row.estado || null,
-          region: row.region || null,
-          descripcion: row.descripcion || null,
-          link_oficial: row.link_oficial || null,
-          match_encontrado: row.match_encontrado ?? false,
-          match_score: row.match_score ?? null,
-          datos_json: row.datos_json || null,
-          created_at: row.created_at || new Date().toISOString(),
-          updated_at: row.updated_at || row.created_at || new Date().toISOString(),
-        };
-      });
-      
-      // Filtrado server-side con RPC si hay configuración del cliente
-    if (filters?.clienteFiltros && filters.clienteFiltros.cliente_id) {
-      console.log('[useLicitaciones] Usando RPC server-side con cliente_id:', filters.clienteFiltros.cliente_id);
-      
-      const { data: rpcData, error: rpcError } = await (supabase as any)        .rpc('get_licitaciones_filtradas_cliente', {
-          p_cliente_id: filters.clienteFiltros.cliente_id,
-          p_monto_min: filters.montoMin || null,
-          p_monto_max: filters.montoMax || null
-        });
-
-      if (rpcError) {
-        console.error('[useLicitaciones] Error en RPC filtrado:', rpcError);
-        throw rpcError;
-      }
-
-      console.log(`[useLicitaciones] RPC devolvió ${rpcData?.length || 0} licitacioness filtradas`);
-
-      // Mapear resultados RPC a formato Licitacion
-      const licitacionessFiltradas: Licitacion[] = (rpcData || []).map((row: any) => ({
-        id: row.codigo || row.id_licitacion || row.id || '',
-        codigo: row.codigo || row.id_licitacion || row.id || '',
-        nombre: row.titulo || row.nombre || 'Sin título',
-        organismo: row.organismo || 'Sin organismo',
-        monto: row.presupuesto || row.monto || null,
-        fecha_cierre: row.fecha_cierre || null,
-        estado: row.estado || null,
-        region: row.region || null,
-        descripcion: row.descripcion || null,
-        link_oficial: row.link_oficial || null,
-        match_encontrado: row.match_encontrado ?? false,
-        match_score: row.match_score ?? null,
-        datos_json: row.datos_json || null,
-        created_at: row.created_at || new Date().toISOString(),
-        updated_at: row.updated_at || row.created_at || new Date().toISOString(),
-      }));
-
-      // Aplicar filtros adicionales de UI (matchStatus, fechaCierre)
-      let licitacionessFinales = licitacionessFiltradas;
-
+      // Filtro de match en memoria
       if (filters?.matchStatus === 'con_match') {
-        licitacionessFinales = licitacionessFinales.filter(c => c.match_encontrado);
+        compras = compras.filter(c => c.match_encontrado);
       } else if (filters?.matchStatus === 'sin_match') {
-        licitacionessFinales = licitacionessFinales.filter(c => !c.match_encontrado);
+        compras = compras.filter(c => !c.match_encontrado);
       }
 
-      if (filters?.fechaCierre && filters.fechaCierre !== 'todas') {
-        const today = startOfDay(new Date());
-        const todayISO = today.toISOString();
-
-        if (filters.fechaCierre === 'hoy') {
-          const tomorrow = addDays(today, 1);
-          licitacionessFinales = licitacionessFinales.filter(c => 
-            c.fecha_cierre && c.fecha_cierre >= todayISO && c.fecha_cierre < tomorrow.toISOString()
-          );
-        } else if (filters.fechaCierre === 'proximos3') {
-          const in3Days = addDays(today, 3);
-          licitacionessFinales = licitacionessFinales.filter(c => 
-            c.fecha_cierre && c.fecha_cierre >= todayISO && c.fecha_cierre <= in3Days.toISOString()
-          );
-        } else if (filters.fechaCierre === 'proximos7') {
-          const in7Days = addDays(today, 7);
-          licitacionessFinales = licitacionessFinales.filter(c => 
-            c.fecha_cierre && c.fecha_cierre >= todayISO && c.fecha_cierre <= in7Days.toISOString()
-          );
-        }
-      }
-
-      console.log(`[useLicitaciones] Después de filtros UI: ${licitacionessFinales.length} licitacioness`);
-      return licitacionessFinales;
-    }
-
-    // Sin filtros de cliente: devolver todas las licitacioness sin filtrar
-    console.log('[useLicitaciones] Sin filtros de cliente, devolviendo todas las licitacioness');
-    return licitacioness;
-      
+      console.log(`[useComprasAgiles] Loaded ${compras.length} compras ágiles`);
+      return compras;
     },
     refetchInterval: 30000,
   });
 }
 
-export function useLicitacion(id: string | null) {
+/**
+ * Hook para obtener detalle de una compra ágil por código
+ * Incluye items relacionados
+ */
+export function useCompraAgil(codigo: string | null) {
   return useQuery({
-    queryKey: ['licitaciones_agil', id],
-    queryFn: async (): Promise<Licitacion | null> => {
-      if (!id) return null;
-      
-      // FirmaVB usa columna 'codigo', no 'id_licitacion'
-      // Usar any para evitar conflicto con tipos de Lovable Cloud
-      const { data, error } = await (supabase as any)
-        .from('licitaciones')
-        .select('*')
-        .eq('codigo', id)
-        .maybeSingle();
-
-      if (error) throw error;
-      if (!data) return null;
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const row = data as any;
-      const codigo = row.codigo || row.id_licitacion || row.id || '';
-
-      return {
-        id: codigo,
-        codigo: codigo,
-        nombre: row.titulo || row.nombre || 'Sin título',
-        organismo: row.organismo || 'Sin organismo',
-        monto: row.presupuesto || row.monto || null,
-        fecha_cierre: row.fecha_cierre || null,
-        estado: row.estado || null,
-        region: row.region || null,
-        descripcion: row.descripcion || null,
-        link_oficial: row.link_oficial || null,
-        match_encontrado: row.match_encontrado ?? false,
-        match_score: row.match_score ?? null,
-        datos_json: row.datos_json || null,
-        created_at: row.created_at || new Date().toISOString(),
-        updated_at: row.updated_at || row.created_at || new Date().toISOString(),
-      };
-    },
-    enabled: !!id,
-  });
-}
-
-export function useLicitacionByCodigo(codigo: string | undefined) {
-  return useQuery({
-    queryKey: ['licitaciones_agil_codigo', codigo],
-    queryFn: async (): Promise<Licitacion | null> => {
+    queryKey: ['compra_agil', codigo],
+    queryFn: async (): Promise<CompraAgil | null> => {
       if (!codigo) return null;
-      
-      // FirmaVB usa columna 'codigo', no 'id_licitacion'
-      // Usar any para evitar conflicto con tipos de Lovable Cloud
-      const { data, error } = await (supabase as any)
-        .from('licitaciones')
-        .select('*')
+
+      const { data, error } = await supabase
+        .from('compras_agiles')
+        .select(`
+          *,
+          compras_agiles_items(*)
+        `)
         .eq('codigo', codigo)
         .maybeSingle();
 
       if (error) throw error;
       if (!data) return null;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const row = data as any;
-      const codigoValue = row.codigo || row.id_licitacion || row.id || '';
-
-      return {
-        id: codigoValue,
-        codigo: codigoValue,
-        nombre: row.titulo || row.nombre || 'Sin título',
-        organismo: row.organismo || 'Sin organismo',
-        monto: row.presupuesto || row.monto || null,
-        fecha_cierre: row.fecha_cierre || null,
-        estado: row.estado || null,
-        region: row.region || null,
-        descripcion: row.descripcion || null,
-        link_oficial: row.link_oficial || null,
-        match_encontrado: row.match_encontrado ?? false,
-        match_score: row.match_score ?? null,
-        datos_json: row.datos_json || null,
-        created_at: row.created_at || new Date().toISOString(),
-        updated_at: row.updated_at || row.created_at || new Date().toISOString(),
-      };
+      return mapRowToCompraAgil(data);
     },
     enabled: !!codigo,
   });
 }
-export function useUpdateLicitacion() {
-  const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async ({ id, datos_json }: { id: string; datos_json: Record<string, unknown> }) => {
-      const { data, error } = await supabase
-        .from('licitaciones')
-        
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['licitaciones'] });
-      queryClient.invalidateQueries({ queryKey: ['licitaciones_agil'] });
-    },
-  });
-}
-
-export function useLicitacionesStats() {
+/**
+ * Hook para obtener estadísticas de compras ágiles
+ */
+export function useComprasAgilesStats() {
   return useQuery({
-    queryKey: ['licitaciones_stats'],
+    queryKey: ['compras_agiles_stats'],
     queryFn: async () => {
-      // Usar tabla licitaciones para stats
       const { count: total, error: countError } = await supabase
-        .from('licitaciones')
+        .from('compras_agiles')
         .select('*', { count: 'exact', head: true });
 
       if (countError) throw countError;
 
-      // Obtener stats agregados con consultas separadas
       const { count: conMatch } = await supabase
-        .from('licitaciones')
+        .from('compras_agiles')
         .select('*', { count: 'exact', head: true })
         .eq('match_encontrado', true);
 
-      // Calcular monto total (usando presupuesto)
       const { data: montoData } = await supabase
-        .from('licitaciones')
-        .select('presupuesto');
+        .from('compras_agiles')
+        .select('monto_estimado');
 
-      const montoTotal = (montoData || []).reduce((sum, c) => sum + (c.presupuesto || 0), 0);
+      const montoTotal = (montoData || []).reduce(
+        (sum, c) => sum + (c.monto_estimado || 0),
+        0
+      );
 
-      // Contar urgentes (si el estado existe)
+      // Compras urgentes (cierre < 24hrs)
+      const tomorrow = addDays(new Date(), 1);
       const { count: urgentes } = await supabase
-        .from('licitaciones')
+        .from('compras_agiles')
         .select('*', { count: 'exact', head: true })
-        .eq('estado', 'urgente');
+        .gte('fecha_cierre', new Date().toISOString())
+        .lt('fecha_cierre', tomorrow.toISOString());
 
       return {
         total: total || 0,
@@ -358,7 +231,48 @@ export function useLicitacionesStats() {
   });
 }
 
-// Export aliases for backward compatibility
-export { useLicitacionesStats as useComprasAgilesStats };
-export { useLicitaciones as useComprasAgiles };
-export { useUpdateLicitacion as useUpdateCompraAgil };
+/**
+ * Hook para actualizar una compra ágil
+ */
+export function useUpdateCompraAgil() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      datos_json,
+    }: {
+      id: string;
+      datos_json: Record<string, unknown>;
+    }) => {
+      const { data, error } = await supabase
+        .from('compras_agiles')
+        .update({ datos_json })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['compras_agiles'] });
+      queryClient.invalidateQueries({ queryKey: ['compra_agil'] });
+    },
+  });
+}
+
+// =============================================================================
+// BACKWARD COMPATIBILITY ALIASES
+// =============================================================================
+
+// Mantener compatibilidad con código existente que usa nombres antiguos
+export { useComprasAgiles as useLicitaciones };
+export { useCompraAgil as useLicitacion };
+export { useCompraAgil as useLicitacionByCodigo };
+export { useUpdateCompraAgil as useUpdateLicitacion };
+export { useComprasAgilesStats as useLicitacionesStats };
+
+// Tipos para backward compatibility
+export type Licitacion = CompraAgil;
+export type LicitacionesFilters = ComprasAgilesFilters;
