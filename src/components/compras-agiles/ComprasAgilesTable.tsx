@@ -42,13 +42,20 @@ function extractMonto(compra: CompraAgil): number | null {
 }
 
 // Función para contar productos de una compra
+// MEJORADO: Primero usa compra.items del hook, fallback a datos_json
 function countProductos(compra: CompraAgil): number {
+  // Primero intentar usar items del hook (compras_agiles_items)
+  if (compra.items && Array.isArray(compra.items) && compra.items.length > 0) {
+    return compra.items.length;
+  }
+  
+  // Fallback: buscar en datos_json
   if (!compra.datos_json) return 0;
   
   const json = compra.datos_json;
   
   // Buscar array de items/productos en diferentes formatos
-  const itemKeys = ['items', 'Items', 'productos', 'Productos', 'lineas', 'Lineas', 'detalle', 'Detalle'];
+  const itemKeys = ['items', 'Items', 'productos', 'Productos', 'lineas', 'Lineas', 'detalle', 'Detalle', 'Listado'];
   for (const key of itemKeys) {
     const value = json[key];
     if (Array.isArray(value)) {
@@ -56,13 +63,9 @@ function countProductos(compra: CompraAgil): number {
     }
   }
   
-  // Si hay un campo Listado con items
-  if (json.Listado && Array.isArray(json.Listado)) {
-    return json.Listado.length;
-  }
-  
   return 0;
 }
+
 
 interface ComprasAgilesTableProps {
   compras: CompraAgil[] | undefined;
