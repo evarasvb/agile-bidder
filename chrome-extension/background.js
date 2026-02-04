@@ -3,7 +3,7 @@
 // Dual-mode: Supabase API (auth/matches) + PendingSync Server (scraping tasks)
 
 // === SUPABASE CONFIGURATION (existing) ===
-const SUPABASE_URL = 'https://euzqadopjvdszcdjegmo.supabase.co';
+const SUPABASE_URL = 'https://juiskeeutbaipwbeeezw.supabase.co';
 const EXTENSION_API_ENDPOINT = `${SUPABASE_URL}/functions/v1/extension-api`;
 const SYNC_ALARM_NAME = 'firmavb-sync';
 const SYNC_INTERVAL_MINUTES = 30;
