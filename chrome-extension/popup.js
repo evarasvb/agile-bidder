@@ -1,6 +1,6 @@
 // FirmaVB Postulador - Popup Script
 // Configuración de Supabase
-const SUPABASE_URL = 'https://euzqadopjvdszcdjegmo.supabase.co';
+const SUPABASE_URL = 'https://juiskeeutbaipwbeeezw.supabase.co';
 const EXTENSION_API_ENDPOINT = `${SUPABASE_URL}/functions/v1/extension-api`;
 
 // Estado de la aplicación
