@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { useLicitacionMatchCounts, type LicitacionBasic } from "@/hooks/useLicitacionProductMatch";
 import { ProductMatchModal } from "./ProductMatchModal";
 import { AsignarVendedorModal } from "./AsignarVendedorModal";
+import { PagadorBadge, calcularPagadorInfo } from "@/components/shared/PagadorBadge";
 
 // Función para extraer el monto de diferentes fuentes
 function extractMonto(compra: CompraAgil): number | null {
@@ -240,13 +241,14 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect, m
                 <TableHead className="font-semibold w-[100px]">Cierre</TableHead>
                 <TableHead className="font-semibold w-[100px]">Estado</TableHead>
                 <TableHead className="font-semibold text-center w-[80px]">Match</TableHead>
+                <TableHead className="font-semibold text-center w-[100px]">Pagador</TableHead>
                 <TableHead className="font-semibold text-center w-[70px]">Asignar</TableHead>
               </TableRow>
             </TableHeader>
           <TableBody>
             {compras?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-12">
+                <TableCell colSpan={11} className="text-center py-12">
                   <div className="flex flex-col items-center gap-3 text-muted-foreground">
                     <ShoppingCart className="h-12 w-12 opacity-50" />
                     <div>
@@ -435,6 +437,18 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect, m
                       ) : (
                         <span className="text-muted-foreground text-xs">-</span>
                       )}
+                    </TableCell>
+                    
+                    {/* Pagador */}
+                    <TableCell className="text-center">
+                      <PagadorBadge
+                        info={calcularPagadorInfo({
+                          buenPagador: compra.datos_json?.buen_pagador,
+                          diasPagoPromedio: compra.datos_json?.dias_pago_promedio,
+                          reclamos12m: compra.datos_json?.reclamos_12m,
+                        })}
+                        size="sm"
+                      />
                     </TableCell>
                     
                     {/* Asignar */}

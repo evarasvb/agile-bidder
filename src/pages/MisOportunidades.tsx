@@ -42,6 +42,7 @@ import { useClienteFiltros } from "@/hooks/useClienteFiltros";
 import { format, differenceInHours, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { PagadorBadge, calcularPagadorInfo } from "@/components/shared/PagadorBadge";
 
 /**
  * Genera link a MercadoPúblico según el tipo y código
@@ -271,13 +272,14 @@ export default function MisOportunidades() {
                   <TableHead className="text-right font-semibold w-[130px]">Monto</TableHead>
                   <TableHead className="font-semibold w-[110px]">Cierre</TableHead>
                   <TableHead className="text-center font-semibold w-[70px]">Match</TableHead>
+                  <TableHead className="text-center font-semibold w-[110px]">Pagador</TableHead>
                   <TableHead className="text-center font-semibold w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedOportunidades.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                       <Search className="h-10 w-10 mx-auto mb-3 opacity-30" />
                       <p className="font-medium">No se encontraron oportunidades</p>
                       <p className="text-sm mt-1">Ajusta los filtros o la búsqueda</p>
@@ -380,6 +382,16 @@ export default function MisOportunidades() {
                           ) : (
                             <span className="text-muted-foreground text-xs">-</span>
                           )}
+                        </TableCell>
+
+                        {/* Pagador */}
+                        <TableCell className="text-center">
+                          <PagadorBadge
+                            info={calcularPagadorInfo({
+                              nivelRiesgo: op.risk_level,
+                            })}
+                            size="sm"
+                          />
                         </TableCell>
 
                         {/* Ver / Link MP */}

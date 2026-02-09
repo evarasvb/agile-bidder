@@ -40,6 +40,7 @@ import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { AsignarVendedorModal } from '@/components/compras-agiles/AsignarVendedorModal';
 import { cn } from '@/lib/utils';
+import { PagadorCard, PagadorBadge, calcularPagadorInfo } from '@/components/shared/PagadorBadge';
 
 function formatCurrency(v: number | null) {
   if (!v) return 'No especificado';
@@ -158,6 +159,15 @@ export default function CompraAgilDetalle() {
                   {compra.match_score}% Match
                 </Badge>
               )}
+
+              <PagadorBadge
+                info={calcularPagadorInfo({
+                  buenPagador: json.buen_pagador,
+                  diasPagoPromedio: json.dias_pago_promedio,
+                  reclamos12m: json.reclamos_12m,
+                })}
+                size="md"
+              />
             </div>
 
             {/* Título */}
@@ -395,6 +405,16 @@ export default function CompraAgilDetalle() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Comportamiento de Pago - ATRIBUTO DIFERENCIADOR */}
+          <PagadorCard
+            info={calcularPagadorInfo({
+              buenPagador: json.buen_pagador,
+              diasPagoPromedio: json.dias_pago_promedio,
+              reclamos12m: json.reclamos_12m,
+            })}
+            organismo={compra.organismo}
+          />
 
           {/* Entrega */}
           {(direccionEntrega || plazoEntrega) && (

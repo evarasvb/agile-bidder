@@ -33,6 +33,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabaseClient } from '@/lib/supabaseClient';
 import { useLicitacionItemsReal } from '@/hooks/useLicitacionItemsReal';
 import LicitacionesSimilares from '@/components/licitaciones/LicitacionesSimilares';
+import { PagadorBadge, PagadorCard, calcularPagadorInfo } from '@/components/shared/PagadorBadge';
 
 interface LicitacionBIItem {
   id: string;
@@ -293,6 +294,15 @@ export default function LicitacionDetalle() {
                   {licitacion.match_score.toFixed(0)}% Match
                 </Badge>
               )}
+              
+              <PagadorBadge
+                info={calcularPagadorInfo({
+                  buenPagador: licitacion.datos_json?.buen_pagador,
+                  diasPagoPromedio: licitacion.datos_json?.dias_pago_promedio,
+                  reclamos12m: licitacion.datos_json?.reclamos_12m,
+                })}
+                size="md"
+              />
             </div>
 
             {/* Title */}
@@ -457,6 +467,16 @@ export default function LicitacionDetalle() {
               )}
             </CardContent>
           </Card>
+
+          {/* Comportamiento de Pago */}
+          <PagadorCard
+            info={calcularPagadorInfo({
+              buenPagador: licitacion.datos_json?.buen_pagador,
+              diasPagoPromedio: licitacion.datos_json?.dias_pago_promedio,
+              reclamos12m: licitacion.datos_json?.reclamos_12m,
+            })}
+            organismo={licitacion.organismo || ''}
+          />
 
           {/* Dates Card */}
           <Card>
