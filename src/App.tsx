@@ -42,6 +42,7 @@ import Users from "./pages/Users";
 // Cuenta
 import Cuenta from "./pages/Cuenta";
 import Billing from "./pages/Billing";
+import Profile from "./pages/Profile";
 
 // Admin (oculto)
 import AdminEvaristo from "./pages/AdminEvaristo";
@@ -106,6 +107,7 @@ const App = () => (
             
             {/* ----- CUENTA ----- */}
             <Route path="/cuenta" element={<Cuenta />} />
+            <Route path="/cuenta/perfil" element={<Profile />} />
             <Route path="/cuenta/facturacion" element={<Billing />} />
             
             {/* Redirects de rutas antiguas */}

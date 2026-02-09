@@ -2,12 +2,21 @@ import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
 
-interface Profile {
+export interface Profile {
   id: string;
   user_id: string;
   email: string | null;
   full_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
   avatar_url: string | null;
+  rut: string | null;
+  phone: string | null;
+  about_me: string | null;
+  instagram_username: string | null;
+  instagram_verified: boolean | null;
+  website: string | null;
+  company_name: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -50,7 +59,7 @@ export function useProfile() {
         if (profileError) {
           console.error('Error fetching profile:', profileError);
         } else {
-          setProfile(profileData);
+          setProfile(profileData as Profile | null);
         }
 
         // Fetch roles
