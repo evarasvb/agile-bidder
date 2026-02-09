@@ -305,109 +305,66 @@ export default function Inventory() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Inventario</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-firmavb-blue to-firmavb-red bg-clip-text text-transparent">
+            Lista de Precios
+          </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Gestiona tus productos y reglas de matching
+            Tu catálogo de productos para matching automático con oportunidades
           </p>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRefresh}
-                className="gap-2"
-                disabled={isLoading}
-              >
-                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                Actualizar
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isLoading} className="gap-2">
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Actualizar</span>
+          </Button>
+
+          {/* Import/Export agrupados */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Upload className="h-4 w-4" />
+                Importar
               </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="text-xs">Actualiza la lista de productos del inventario</p>
-            </TooltipContent>
-          </Tooltip>
-          
-          {/* Download Template */}
-          <DownloadTemplateButton />
-          
-          {/* Bulk Upload */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="default" 
-                className="gap-2 bg-primary hover:bg-primary/90"
-                onClick={() => setBulkUploadOpen(true)}
-              >
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-popover w-56">
+              <DropdownMenuItem onClick={() => setBulkUploadOpen(true)} className="gap-2 cursor-pointer">
                 <FileSpreadsheet className="h-4 w-4" />
-                Cargar desde Excel
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="text-xs">Importa múltiples productos desde un archivo Excel (.xlsx)</p>
-            </TooltipContent>
-          </Tooltip>
-          
-          {/* Export Dropdown */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <Download className="h-4 w-4" />
-                    Exportar
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-popover">
-                  <DropdownMenuItem onClick={handleExportExcel} className="gap-2 cursor-pointer">
-                    <FileSpreadsheet className="h-4 w-4" />
-                    Exportar a Excel (.xlsx)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleExportCSV} className="gap-2 cursor-pointer">
-                    <FileText className="h-4 w-4" />
-                    Exportar a CSV (.csv)
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="text-xs">Exporta tu inventario completo en Excel o CSV</p>
-            </TooltipContent>
-          </Tooltip>
-          
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline" 
-                className="gap-2 border-firmavb-blue text-firmavb-blue hover:bg-firmavb-blue/10"
-                onClick={() => setImportDialogOpen(true)}
-              >
+                Desde Excel (.xlsx)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setImportDialogOpen(true)} className="gap-2 cursor-pointer">
                 <FileJson className="h-4 w-4" />
-                Cargar desde Script
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="text-xs">Importa productos desde un script JSON personalizado</p>
-            </TooltipContent>
-          </Tooltip>
+                Desde Script (JSON)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                className="gap-2 bg-primary hover:bg-primary/90"
-                onClick={() => setAddDialogOpen(true)}
-              >
-                <Plus className="h-4 w-4" />
-                Agregar Producto
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Download className="h-4 w-4" />
+                Exportar
               </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="text-xs">Agrega un nuevo producto al inventario manualmente</p>
-            </TooltipContent>
-          </Tooltip>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-popover w-56">
+              <DropdownMenuItem onClick={handleExportExcel} className="gap-2 cursor-pointer">
+                <FileSpreadsheet className="h-4 w-4" />
+                Excel (.xlsx)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportCSV} className="gap-2 cursor-pointer">
+                <FileText className="h-4 w-4" />
+                CSV (.csv)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DownloadTemplateButton />
+
+          <Button size="sm" onClick={() => setAddDialogOpen(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Agregar Producto
+          </Button>
         </div>
       </div>
 
@@ -503,8 +460,18 @@ export default function Inventory() {
         ) : filteredInventory.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <Inbox className="h-12 w-12 mb-4 opacity-50" />
-            <p className="text-lg font-medium">No hay productos en el inventario</p>
-            <p className="text-sm">Agrega productos para comenzar el matching con licitaciones</p>
+            <p className="text-lg font-medium">No hay productos en tu lista de precios</p>
+            <p className="text-sm">Carga tu lista Excel o agrega productos manualmente para activar el matching</p>
+            <div className="flex gap-2 mt-4">
+              <Button onClick={() => setBulkUploadOpen(true)} className="gap-2">
+                <FileSpreadsheet className="h-4 w-4" />
+                Cargar Excel
+              </Button>
+              <Button variant="outline" onClick={() => setAddDialogOpen(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Agregar Manual
+              </Button>
+            </div>
           </div>
         ) : (
           <Table>
@@ -516,18 +483,15 @@ export default function Inventory() {
                     onCheckedChange={toggleSelectAll}
                   />
                 </TableHead>
-                <TableHead className="font-semibold w-[60px]">Imagen</TableHead>
-                <TableHead className="font-semibold">SKU</TableHead>
-                <TableHead className="font-semibold">Producto</TableHead>
-                <TableHead className="font-semibold">Proveedor</TableHead>
+                <TableHead className="font-semibold w-[50px]"></TableHead>
+                <TableHead className="font-semibold w-[100px]">SKU</TableHead>
+                <TableHead className="font-semibold min-w-[200px]">Producto</TableHead>
                 <TableHead className="font-semibold">Categoría</TableHead>
-                <TableHead className="font-semibold text-right">Precio</TableHead>
-                <TableHead className="font-semibold text-right">Margen</TableHead>
-                <TableHead className="font-semibold text-right">Stock</TableHead>
-                <TableHead className="font-semibold text-center">Oportunidades</TableHead>
-                <TableHead className="font-semibold">Ficha</TableHead>
-                <TableHead className="font-semibold text-center">Oportunidades</TableHead>
-                <TableHead className="font-semibold">Estado</TableHead>
+                <TableHead className="font-semibold text-right w-[110px]">Precio Unit.</TableHead>
+                <TableHead className="font-semibold text-right w-[80px]">Margen</TableHead>
+                <TableHead className="font-semibold text-right w-[80px]">Stock</TableHead>
+                <TableHead className="font-semibold text-center w-[110px]">Oportunidades</TableHead>
+                <TableHead className="font-semibold w-[90px]">Estado</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -536,7 +500,7 @@ export default function Inventory() {
                 const oportunidadesCount = countsByProductId[item.id] ?? 0;
 
                 return (
-                <TableRow key={item.id} className="data-row">
+                <TableRow key={item.id} className="group hover:bg-muted/30">
                   <TableCell>
                     <Checkbox
                       checked={selectedIds.has(item.id)}
@@ -546,7 +510,7 @@ export default function Inventory() {
                   <TableCell>
                     <button 
                       onClick={() => setGalleryProduct(item)}
-                      className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden relative group hover:ring-2 hover:ring-primary/50 transition-all"
+                      className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center overflow-hidden relative group/img hover:ring-2 hover:ring-primary/50 transition-all"
                     >
                       {item.imagen_url ? (
                         <img 
@@ -559,146 +523,93 @@ export default function Inventory() {
                           }}
                         />
                       ) : null}
-                      <Images className={cn("h-5 w-5 text-muted-foreground", item.imagen_url && "hidden")} />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <Images className="h-4 w-4 text-white" />
-                      </div>
+                      <Package className={cn("h-4 w-4 text-muted-foreground", item.imagen_url && "hidden")} />
                     </button>
                   </TableCell>
-                  <TableCell className="font-mono text-sm font-medium">
+                  <TableCell className="font-mono text-xs font-medium text-primary">
                     {item.sku}
                   </TableCell>
                   <TableCell>
                     <div>
-                      <p className="font-medium">{item.nombre_producto}</p>
+                      <p className="font-medium text-sm">{item.nombre_producto}</p>
                       {item.descripcion && (
-                        <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                        <p className="text-xs text-muted-foreground truncate max-w-[250px]">
                           {item.descripcion}
+                        </p>
+                      )}
+                      {item.proveedor && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          Proveedor: {item.proveedor}
                         </p>
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {item.proveedor || '-'}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="text-sm text-muted-foreground">
                     {item.categoria || '-'}
                   </TableCell>
-                  <TableCell className="text-right font-mono">
+                  <TableCell className="text-right font-mono text-sm font-medium">
                     ${item.precio_unitario.toLocaleString("es-CL")}
                   </TableCell>
-                  <TableCell className="text-right font-mono">
+                  <TableCell className="text-right font-mono text-sm">
                     {item.margen_minimo || 10}%
                   </TableCell>
                   <TableCell className={cn(
-                    "text-right font-mono font-medium",
+                    "text-right font-mono text-sm font-medium",
                     item.stock_disponible === 0 && "text-destructive",
                     item.stock_disponible > 0 && item.stock_disponible < 50 && "text-warning"
                   )}>
-                    {item.stock_disponible.toLocaleString("es-CL")}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {(() => {
-                      const licitaciones = licitacionesMap.get(item.id);
-                      if (!licitaciones || licitaciones.total_licitaciones_abiertas === 0) {
-                        return (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="text-xs text-muted-foreground cursor-help inline-flex items-center gap-1">
-                                <HelpCircle className="h-3 w-3" />
-                                Sin oportunidades
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="text-xs">No hay licitaciones activas que coincidan con este producto</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        );
-                      }
-                      return (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Link
-                              to={`/compras-agiles?producto=${item.id}`}
-                              className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-firmavb-blue/10 text-firmavb-blue hover:bg-firmavb-blue/20 transition-colors text-xs font-medium"
-                            >
-                              <Gavel className="h-3 w-3" />
-                              {licitaciones.total_licitaciones_abiertas}
-                              {licitaciones.mejor_match_score && (
-                                <span className="text-firmavb-green">
-                                  ({licitaciones.mejor_match_score}%)
-                                </span>
-                              )}
-                            </Link>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <div className="text-xs space-y-1">
-                              <p className="font-medium">{licitaciones.total_licitaciones_abiertas} licitaciones activas</p>
-                              {licitaciones.mejor_match_score && (
-                                <p>Mejor match: {licitaciones.mejor_match_score}%</p>
-                              )}
-                              <p className="text-muted-foreground">Click para ver detalles</p>
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      );
-                    })()}
-                  </TableCell>
-                  <TableCell>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="text-xs">Ver ficha técnica del producto</p>
-                      </TooltipContent>
-                    </Tooltip>
+                    {(item.stock_disponible || 0).toLocaleString("es-CL")}
                   </TableCell>
                   <TableCell className="text-center">
                     <button
                       type="button"
                       onClick={() => setOportunidadesProducto(item)}
-                      className="inline-flex items-center justify-center"
+                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors text-xs font-medium"
                       aria-label={`Ver oportunidades de ${item.nombre_producto}`}
                     >
-                      <Badge
-                        variant={oportunidadesCount > 0 ? "success" : "secondary"}
-                        className={cn("cursor-pointer", isLoadingComprasAgiles && "opacity-70")}
-                      >
-                        {isLoadingComprasAgiles ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          oportunidadesCount
-                        )}
-                      </Badge>
+                      {isLoadingComprasAgiles ? (
+                        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                      ) : oportunidadesCount > 0 ? (
+                        <span className="inline-flex items-center gap-1 bg-firmavb-blue/10 text-firmavb-blue px-2 py-0.5 rounded-md hover:bg-firmavb-blue/20">
+                          <Gavel className="h-3 w-3" />
+                          {oportunidadesCount} match
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
                     </button>
                   </TableCell>
-                  <TableCell>{getStatusBadge(item.stock_disponible, item.activo)}</TableCell>
+                  <TableCell>{getStatusBadge(item.stock_disponible || 0, item.activo)}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-popover">
-                          <DropdownMenuItem 
-                            className="gap-2 cursor-pointer"
-                            onClick={() => setEditingProduct(item)}
-                          >
-                            <Edit2 className="h-4 w-4" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            className="gap-2 text-destructive cursor-pointer"
-                            onClick={() => setConfirmDelete({ id: item.id, nombre: item.nombre_producto })}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            Eliminar
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
+                      <DropdownMenuContent align="end" className="bg-popover">
+                        <DropdownMenuItem 
+                          className="gap-2 cursor-pointer"
+                          onClick={() => setEditingProduct(item)}
+                        >
+                          <Edit2 className="h-4 w-4" />
+                          Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="gap-2 cursor-pointer"
+                          onClick={() => setGalleryProduct(item)}
+                        >
+                          <Image className="h-4 w-4" />
+                          Imágenes
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className="gap-2 text-destructive cursor-pointer"
+                          onClick={() => setConfirmDelete({ id: item.id, nombre: item.nombre_producto })}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Eliminar
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
