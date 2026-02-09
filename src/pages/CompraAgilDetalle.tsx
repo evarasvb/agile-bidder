@@ -1,6 +1,8 @@
 // @ts-nocheck
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCompraAgil } from '@/hooks/useComprasAgiles';
+import { useLicitacionAsignacion } from '@/hooks/useVendedores';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,14 +15,16 @@ import {
   TableRow,
   TableCell,
 } from '@/components/ui/table';
-import { ArrowLeft, Building2, Calendar, DollarSign, Package, Clock } from 'lucide-react';
+import { ArrowLeft, Building2, Calendar, DollarSign, Package, Clock, UserPlus, User } from 'lucide-react';
 import { format, parseISO, differenceInHours } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { AsignarVendedorModal } from '@/components/compras-agiles/AsignarVendedorModal';
 
 export default function CompraAgilDetalle() {
   const { codigo } = useParams<{ codigo: string }>();
   const navigate = useNavigate();
   const { data: compra, isLoading, error } = useCompraAgil(codigo || null);
+  const [asignarOpen, setAsignarOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -48,19 +52,62 @@ export default function CompraAgilDetalle() {
   }
 
   const isUrgent = compra.fecha_cierre && differenceInHours(parseISO(compra.fecha_cierre), new Date()) < 24;
+  const { data: asignacion } = useLicitacionAsignacion(compra.id);
 
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/compras-agiles')}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold">{compra.nombre}</h1>
-          <p className="text-sm text-muted-foreground">Código: {compra.codigo}</p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/compras-agiles')}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">{compra.nombre}</h1>
+            <p className="text-sm text-muted-foreground">Código: {compra.codigo}</p>
+          </div>
         </div>
+        <Button onClick={() => setAsignarOpen(true)} className="gap-2">
+          <UserPlus className="h-4 w-4" />
+          {asignacion ? 'Reasignar' : 'Asignar Ejecutivo'}
+        </Button>
       </div>
+
+      {/* Asignación actual */}
+      {asignacion && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="p-2.5 rounded-full bg-primary/10">
+                <User className="h-5 w-5 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm text-muted-foreground">Asignado a</p>
+                <p className="font-semibold text-lg">{asignacion.vendedor_nombre}</p>
+                <p className="text-xs text-muted-foreground">{asignacion.vendedor_email}</p>
+              </div>
+              <Badge
+                className={
+                  asignacion.estado === 'adjudicada'
+                    ? 'bg-green-100 text-green-700'
+                    : asignacion.estado === 'postulada'
+                    ? 'bg-amber-100 text-amber-700'
+                    : asignacion.estado === 'perdida'
+                    ? 'bg-red-100 text-red-700'
+                    : 'bg-blue-100 text-blue-700'
+                }
+              >
+                {asignacion.estado}
+              </Badge>
+              {asignacion.notas && (
+                <p className="text-sm text-muted-foreground max-w-xs truncate" title={asignacion.notas}>
+                  {asignacion.notas}
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Info General */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -186,6 +233,13 @@ export default function CompraAgilDetalle() {
           </CardContent>
         </Card>
       )}
+
+      {/* Modal de Asignación */}
+      <AsignarVendedorModal
+        open={asignarOpen}
+        onOpenChange={setAsignarOpen}
+        compra={compra}
+      />
     </div>
   );
 }
