@@ -1,4 +1,8 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+// =============================================================================
+// MERCADOPÚBLICO API - Proxy y Sync para licitaciones y órdenes de compra
+// Usa la API pública oficial: api.mercadopublico.cl/servicios/v1/publico
+// =============================================================================
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
@@ -6,7 +10,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// MercadoPúblico API Base URL
+// MercadoPúblico API Base URL (API oficial con ticket)
 const MP_API_BASE = 'https://api.mercadopublico.cl/servicios/v1/publico';
 
 // =====================================================
@@ -30,7 +34,6 @@ interface LicitacionMP {
   FechaCierreRecepcionDoctos: string;
   CodigoTipo: number;
   Estimacion: number;
-  // Campos adicionales del detalle
   RutUnidadCompra?: string;
   NombreUnidadCompra?: string;
   DireccionUnidadCompra?: string;
@@ -129,11 +132,31 @@ function createSupabaseClient() {
   return createClient(supabaseUrl, supabaseKey);
 }
 
+/**
+ * Obtiene la API key de MercadoPúblico.
+ * Prioridad: body.ticket > env MERCADOPUBLICO_API_KEY > env MP_API_TICKET
+ */
+function getApiKey(body: Record<string, unknown>): string | null {
+  return (
+    (body.ticket as string) ||
+    Deno.env.get('MERCADOPUBLICO_API_KEY') ||
+    Deno.env.get('MP_API_TICKET') ||
+    null
+  );
+}
+
+function formatDate(date: Date): string {
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}${month}${year}`;
+}
+
 // =====================================================
-// Función principal
+// Handler principal (usa Deno.serve nativo)
 // =====================================================
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -141,21 +164,21 @@ serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-      const body = req.method === 'POST' ? await req.json() : {};
-      const action = body.action || url.searchParams.get('action') || 'licitaciones';    
-    
-    const MP_API_KEY = Deno.env.get("MERCADOPUBLICO_API_KEY");
+    const body = req.method === 'POST' ? await req.json() : {};
+    const action = body.action || url.searchParams.get('action') || 'licitaciones';
+
+    const MP_API_KEY = getApiKey(body);
     if (!MP_API_KEY) {
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: 'API key de MercadoPúblico no configurada',
-          message: 'Configura MERCADOPUBLICO_API_KEY en los secrets del proyecto'
+          message: 'Configura MERCADOPUBLICO_API_KEY o MP_API_TICKET en los secrets, o envía ticket en el body',
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`MercadoPúblico API - Action: ${action}`);
+    console.log(`[MercadoPúblico API] Action: ${action}`);
 
     // =====================================================
     // Acción especial: sincronizar datos a la base de datos
@@ -192,7 +215,7 @@ serve(async (req) => {
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
-        endpoint = `licitaciones.json`;
+        endpoint = 'licitaciones.json';
         params.set('codigo', body.codigo);
         break;
 
@@ -241,31 +264,31 @@ serve(async (req) => {
     }
 
     const apiUrl = `${MP_API_BASE}/${endpoint}?${params.toString()}`;
-    console.log(`Calling MercadoPúblico API: ${endpoint}`);
+    console.log(`[MercadoPúblico API] Calling: ${endpoint}`);
 
     const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-      }
+      },
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('MercadoPúblico API error:', response.status, errorText);
+      console.error(`[MercadoPúblico API] Error: ${response.status}`, errorText);
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: `Error de API MercadoPúblico: ${response.status}`,
-          details: errorText
+          details: errorText,
         }),
         { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const data = await response.json();
-    
+
     // Transform data for our use case
-    let transformedData: any = data;
+    let transformedData: Record<string, unknown> = data;
 
     if (action === 'licitaciones' || action === 'licitacion-detalle') {
       const licitaciones = data.Listado || [];
@@ -282,19 +305,18 @@ serve(async (req) => {
           fecha_publicacion: lic.FechaPublicacion,
           presupuesto: lic.Estimacion,
           moneda: lic.Moneda,
-          // Campos adicionales
           institucion_rut: lic.RutUnidadCompra,
           unidad_compra: lic.NombreUnidadCompra,
-          items: lic.Items?.map(item => ({
+          items: lic.Items?.map((item) => ({
             correlativo: item.Correlativo,
             codigo_producto: item.CodigoProducto,
             categoria: item.Categoria,
             nombre: item.NombreProducto,
             descripcion: item.Descripcion,
             cantidad: item.Cantidad,
-            unidad: item.UnidadMedida
-          })) || []
-        }))
+            unidad: item.UnidadMedida,
+          })) || [],
+        })),
       };
     }
 
@@ -317,7 +339,7 @@ serve(async (req) => {
           organismo: oc.Organismo,
           rut_organismo: oc.RutOrganismo,
           licitacion_codigo: oc.CodigoLicitacion,
-          items: oc.Items?.map(item => ({
+          items: oc.Items?.map((item) => ({
             correlativo: item.Correlativo,
             codigo_producto: item.CodigoProducto,
             categoria: item.Categoria,
@@ -326,24 +348,23 @@ serve(async (req) => {
             cantidad: item.Cantidad,
             unidad: item.UnidadMedida,
             precio_neto: item.PrecioNeto,
-            total_neto: item.TotalNeto
-          })) || []
-        }))
+            total_neto: item.TotalNeto,
+          })) || [],
+        })),
       };
     }
 
-    console.log(`MercadoPúblico API - Returned ${transformedData.total || 0} items`);
+    console.log(`[MercadoPúblico API] Returned ${(transformedData as Record<string, unknown>).total || 0} items`);
 
     return new Response(
       JSON.stringify(transformedData),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-
   } catch (error) {
-    console.error('Error in mercadopublico-api:', error);
+    console.error('[MercadoPúblico API] Error:', error);
     return new Response(
-      JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Error consultando API de MercadoPúblico'
+      JSON.stringify({
+        error: error instanceof Error ? error.message : 'Error consultando API de MercadoPúblico',
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -354,16 +375,16 @@ serve(async (req) => {
 // Función para sincronizar datos a la base de datos
 // =====================================================
 async function syncDataToDatabase(
-  supabase: any, 
-  action: string, 
-  body: any, 
+  supabase: ReturnType<typeof createClient>,
+  action: string,
+  body: Record<string, unknown>,
   apiKey: string
 ) {
   const results = {
     success: true,
     synced: 0,
     errors: [] as string[],
-    details: {} as any
+    details: {} as Record<string, unknown>,
   };
 
   try {
@@ -372,29 +393,29 @@ async function syncDataToDatabase(
 
     if (action === 'sync-ordenes') {
       // Sincronizar órdenes de compra
-      const fecha = body.fecha || formatDate(new Date());
+      const fecha = (body.fecha as string) || formatDate(new Date());
       params.set('fecha', fecha);
-      
-      if (body.organismo) params.set('CodigoOrganismo', body.organismo);
-      if (body.proveedor) params.set('CodigoProveedor', body.proveedor);
 
-      console.log(`Syncing ordenes de compra for date: ${fecha}`);
-      
+      if (body.organismo) params.set('CodigoOrganismo', body.organismo as string);
+      if (body.proveedor) params.set('CodigoProveedor', body.proveedor as string);
+
+      console.log(`[Sync] Órdenes de compra para fecha: ${fecha}`);
+
       const apiUrl = `${MP_API_BASE}/ordenesdecompra.json?${params.toString()}`;
       const response = await fetch(apiUrl);
-      
+
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        const errText = await response.text();
+        throw new Error(`API error ${response.status}: ${errText}`);
       }
 
       const data: MPResponse<OrdenCompraMP> = await response.json();
       const ordenes = data.Listado || [];
-      
-      console.log(`Found ${ordenes.length} ordenes to sync`);
+
+      console.log(`[Sync] ${ordenes.length} órdenes encontradas`);
 
       for (const oc of ordenes) {
         try {
-          // Upsert orden de compra
           const ordenData = {
             codigo: oc.Codigo,
             nombre: oc.Nombre,
@@ -418,7 +439,7 @@ async function syncDataToDatabase(
             total: oc.Total,
             moneda: oc.Moneda || 'CLP',
             licitacion_codigo: oc.CodigoLicitacion,
-            raw_data: oc
+            raw_data: oc,
           };
 
           const { data: insertedOrden, error: ordenError } = await supabase
@@ -428,13 +449,13 @@ async function syncDataToDatabase(
             .single();
 
           if (ordenError) {
-            console.error(`Error upserting orden ${oc.Codigo}:`, ordenError);
+            console.error(`[Sync] Error upsert orden ${oc.Codigo}:`, ordenError);
             results.errors.push(`Orden ${oc.Codigo}: ${ordenError.message}`);
             continue;
           }
 
           // Upsert items de la orden si existen
-          if (oc.Items && oc.Items.length > 0) {
+          if (oc.Items && oc.Items.length > 0 && insertedOrden) {
             const itemsData = oc.Items.map((item) => ({
               orden_compra_id: insertedOrden.id,
               correlativo: item.Correlativo,
@@ -448,7 +469,7 @@ async function syncDataToDatabase(
               cantidad: item.Cantidad,
               unidad: item.UnidadMedida,
               precio_unitario_neto: item.PrecioNeto,
-              total_neto: item.TotalNeto
+              total_neto: item.TotalNeto,
             }));
 
             // Eliminar items existentes y reinsertar
@@ -462,7 +483,8 @@ async function syncDataToDatabase(
               .insert(itemsData);
 
             if (itemsError) {
-              console.error(`Error inserting items for orden ${oc.Codigo}:`, itemsError);
+              console.error(`[Sync] Error items orden ${oc.Codigo}:`, itemsError);
+              results.errors.push(`Items orden ${oc.Codigo}: ${itemsError.message}`);
             }
           }
 
@@ -470,60 +492,67 @@ async function syncDataToDatabase(
           if (oc.RutProveedor) {
             await supabase
               .from('proveedores')
-              .upsert({
-                rut: oc.RutProveedor,
-                nombre: oc.Proveedor,
-                direccion: oc.DireccionProveedor,
-                comuna: oc.ComunaProveedor,
-                region: oc.RegionProveedor
-              }, { onConflict: 'rut' });
+              .upsert(
+                {
+                  rut: oc.RutProveedor,
+                  nombre: oc.Proveedor,
+                  direccion: oc.DireccionProveedor,
+                  comuna: oc.ComunaProveedor,
+                  region: oc.RegionProveedor,
+                },
+                { onConflict: 'rut' }
+              );
           }
 
           // Upsert institución en tabla maestra
           if (oc.RutOrganismo) {
             await supabase
               .from('instituciones')
-              .upsert({
-                rut: oc.RutOrganismo,
-                nombre: oc.Organismo,
-                codigo: oc.CodigoOrganismo
-              }, { onConflict: 'rut' });
+              .upsert(
+                {
+                  rut: oc.RutOrganismo,
+                  nombre: oc.Organismo,
+                  codigo: oc.CodigoOrganismo,
+                },
+                { onConflict: 'rut' }
+              );
           }
 
           results.synced++;
         } catch (itemError) {
-          console.error(`Error processing orden ${oc.Codigo}:`, itemError);
-          results.errors.push(`Orden ${oc.Codigo}: ${itemError}`);
+          const msg = itemError instanceof Error ? itemError.message : String(itemError);
+          console.error(`[Sync] Error procesando orden ${oc.Codigo}:`, msg);
+          results.errors.push(`Orden ${oc.Codigo}: ${msg}`);
         }
       }
 
       results.details = {
         fecha,
         totalFromApi: ordenes.length,
-        synced: results.synced
+        synced: results.synced,
       };
-
     } else if (action === 'sync-licitaciones') {
       // Sincronizar licitaciones
-      const fecha = body.fecha || formatDate(new Date());
+      const fecha = (body.fecha as string) || formatDate(new Date());
       params.set('fecha', fecha);
-      
-      if (body.organismo) params.set('CodigoOrganismo', body.organismo);
-      if (body.estado) params.set('estado', body.estado);
 
-      console.log(`Syncing licitaciones for date: ${fecha}`);
-      
+      if (body.organismo) params.set('CodigoOrganismo', body.organismo as string);
+      if (body.estado) params.set('estado', body.estado as string);
+
+      console.log(`[Sync] Licitaciones para fecha: ${fecha}`);
+
       const apiUrl = `${MP_API_BASE}/licitaciones.json?${params.toString()}`;
       const response = await fetch(apiUrl);
-      
+
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        const errText = await response.text();
+        throw new Error(`API error ${response.status}: ${errText}`);
       }
 
       const data: MPResponse<LicitacionMP> = await response.json();
       const licitaciones = data.Listado || [];
-      
-      console.log(`Found ${licitaciones.length} licitaciones to sync`);
+
+      console.log(`[Sync] ${licitaciones.length} licitaciones encontradas`);
 
       for (const lic of licitaciones) {
         try {
@@ -549,7 +578,7 @@ async function syncDataToDatabase(
             moneda: lic.Moneda || 'CLP',
             etapas: lic.Etapas,
             tiempo_evaluacion_dias: lic.UnidadTiempoEvaluacion,
-            raw_data: lic
+            raw_data: lic,
           };
 
           const { data: insertedLic, error: licError } = await supabase
@@ -559,13 +588,13 @@ async function syncDataToDatabase(
             .single();
 
           if (licError) {
-            console.error(`Error upserting licitacion ${lic.CodigoExterno}:`, licError);
+            console.error(`[Sync] Error upsert licitación ${lic.CodigoExterno}:`, licError);
             results.errors.push(`Licitación ${lic.CodigoExterno}: ${licError.message}`);
             continue;
           }
 
           // Upsert items de la licitación si existen
-          if (lic.Items && lic.Items.length > 0) {
+          if (lic.Items && lic.Items.length > 0 && insertedLic) {
             const itemsData = lic.Items.map((item) => ({
               licitacion_id: insertedLic.id,
               correlativo: item.Correlativo,
@@ -575,7 +604,7 @@ async function syncDataToDatabase(
               nombre_producto: item.NombreProducto,
               descripcion: item.Descripcion,
               cantidad: item.Cantidad,
-              unidad: item.UnidadMedida
+              unidad: item.UnidadMedida,
             }));
 
             await supabase
@@ -588,54 +617,55 @@ async function syncDataToDatabase(
               .insert(itemsData);
 
             if (itemsError) {
-              console.error(`Error inserting items for licitacion ${lic.CodigoExterno}:`, itemsError);
+              console.error(`[Sync] Error items licitación ${lic.CodigoExterno}:`, itemsError);
+              results.errors.push(`Items licitación ${lic.CodigoExterno}: ${itemsError.message}`);
             }
           }
 
           // Upsert adjudicación si existe
           if (lic.Adjudicacion && lic.Adjudicacion.Items) {
             for (const adj of lic.Adjudicacion.Items) {
-              await supabase
+              const { error: adjError } = await supabase
                 .from('licitaciones_adjudicaciones')
-                .upsert({
-                  licitacion_id: insertedLic.id,
-                  proveedor_nombre: adj.NombreProveedor,
-                  proveedor_rut: adj.RutProveedor,
-                  monto_adjudicado: adj.MontoTotal,
-                  fecha_adjudicacion: parseDate(lic.Adjudicacion.FechaPublicacion)
-                }, { onConflict: 'licitacion_id,proveedor_rut' });
+                .upsert(
+                  {
+                    licitacion_id: insertedLic.id,
+                    proveedor_nombre: adj.NombreProveedor,
+                    proveedor_rut: adj.RutProveedor,
+                    monto_adjudicado: adj.MontoTotal,
+                    fecha_adjudicacion: parseDate(lic.Adjudicacion!.FechaPublicacion),
+                  },
+                  { onConflict: 'licitacion_id,proveedor_rut' }
+                );
+
+              if (adjError) {
+                console.warn(`[Sync] Error adjudicación ${lic.CodigoExterno}:`, adjError.message);
+              }
             }
           }
 
           results.synced++;
         } catch (itemError) {
-          console.error(`Error processing licitacion ${lic.CodigoExterno}:`, itemError);
-          results.errors.push(`Licitación ${lic.CodigoExterno}: ${itemError}`);
+          const msg = itemError instanceof Error ? itemError.message : String(itemError);
+          console.error(`[Sync] Error procesando licitación ${lic.CodigoExterno}:`, msg);
+          results.errors.push(`Licitación ${lic.CodigoExterno}: ${msg}`);
         }
       }
 
       results.details = {
         fecha,
         totalFromApi: licitaciones.length,
-        synced: results.synced
+        synced: results.synced,
       };
     }
 
     results.success = results.errors.length === 0;
-    console.log(`Sync completed: ${results.synced} items synced, ${results.errors.length} errors`);
-
+    console.log(`[Sync] Completado: ${results.synced} registros, ${results.errors.length} errores`);
   } catch (error) {
-    console.error('Error in syncDataToDatabase:', error);
+    console.error('[Sync] Error general:', error);
     results.success = false;
     results.errors.push(error instanceof Error ? error.message : 'Error desconocido');
   }
 
   return results;
-}
-
-function formatDate(date: Date): string {
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
-  return `${day}${month}${year}`;
 }

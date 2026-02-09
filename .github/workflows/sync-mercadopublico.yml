@@ -1,18 +1,18 @@
-# Sincronizacion automatica con API MercadoPublico
-# Trae licitaciones y ordenes de compra diariamente
+# Sincronización automática con API MercadoPúblico (licitaciones y órdenes)
+# Usa la API oficial: api.mercadopublico.cl/servicios/v1/publico
+# Requiere secrets: SUPABASE_URL, SUPABASE_SERVICE_KEY, MP_API_TICKET
 name: Sync MercadoPublico API
 
 on:
   schedule:
-    # Ejecuta 3 veces al dia (hora Chile: 6AM, 12PM, 6PM)
-    - cron: '0 9 * * *'   # 6:00 AM Chile
-    - cron: '0 15 * * *'  # 12:00 PM Chile  
+    # Ejecuta 3 veces al día (hora Chile: 6AM, 12PM, 6PM)
+    - cron: '0 9 * * *'   # 6:00 AM Chile (UTC-3)
+    - cron: '0 15 * * *'  # 12:00 PM Chile
     - cron: '0 21 * * *'  # 6:00 PM Chile
   workflow_dispatch:
-    # Permite ejecutar manualmente
     inputs:
       fecha:
-        description: 'Fecha a consultar (ddmmaaaa)'
+        description: 'Fecha a consultar (ddmmaaaa, vacío=hoy Chile)'
         required: false
         default: ''
       tipo:
@@ -33,50 +33,100 @@ env:
 jobs:
   sync-mercadopublico:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
     steps:
-      - name: Configurar fecha
+      - name: Configurar fecha (timezone Chile)
         id: fecha
         run: |
           if [ -n "${{ github.event.inputs.fecha }}" ]; then
             echo "FECHA=${{ github.event.inputs.fecha }}" >> $GITHUB_OUTPUT
           else
-            # Fecha de hoy en formato ddmmaaaa
-            echo "FECHA=$(date +%d%m%Y)" >> $GITHUB_OUTPUT
+            # Fecha de hoy en formato ddmmaaaa (timezone Chile)
+            echo "FECHA=$(TZ='America/Santiago' date +%d%m%Y)" >> $GITHUB_OUTPUT
           fi
-          echo "Fecha a consultar: $(cat $GITHUB_OUTPUT | grep FECHA)"
+          echo "Fecha a consultar: $(grep FECHA $GITHUB_OUTPUT)"
+
+      - name: Verificar secrets configurados
+        run: |
+          MISSING=""
+          if [ -z "${{ env.SUPABASE_URL }}" ]; then MISSING="$MISSING SUPABASE_URL"; fi
+          if [ -z "${{ env.SUPABASE_SERVICE_KEY }}" ]; then MISSING="$MISSING SUPABASE_SERVICE_KEY"; fi
+          if [ -z "${{ env.MP_API_TICKET }}" ]; then MISSING="$MISSING MP_API_TICKET"; fi
+          if [ -n "$MISSING" ]; then
+            echo "::error::Faltan secrets:$MISSING"
+            exit 1
+          fi
+          echo "Todos los secrets configurados OK"
 
       - name: Sync Licitaciones
+        id: sync-licitaciones
         if: ${{ github.event.inputs.tipo != 'ordenes' }}
         run: |
           echo "=== Sincronizando Licitaciones ==="
           echo "Fecha: ${{ steps.fecha.outputs.FECHA }}"
           
-          response=$(curl -s -X POST \
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
             "${{ env.SUPABASE_URL }}/functions/v1/mercadopublico-api" \
             -H "Authorization: Bearer ${{ env.SUPABASE_SERVICE_KEY }}" \
             -H "Content-Type: application/json" \
-            -d '{"action": "sync-licitaciones", "fecha": "'${{ steps.fecha.outputs.FECHA }}'", "ticket": "'${{ env.MP_API_TICKET }}'"}')
+            -d "{\"action\": \"sync-licitaciones\", \"fecha\": \"${{ steps.fecha.outputs.FECHA }}\", \"ticket\": \"${{ env.MP_API_TICKET }}\"}" \
+            --max-time 300)
           
-          echo "Respuesta: $response"
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Respuesta: $BODY"
+          
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            SYNCED=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('synced',0))" 2>/dev/null || echo "?")
+            ERRORS=$(echo "$BODY" | python3 -c "import sys,json; print(len(json.load(sys.stdin).get('errors',[])))" 2>/dev/null || echo "?")
+            echo "Licitaciones sincronizadas: $SYNCED, errores: $ERRORS"
+            echo "synced=$SYNCED" >> $GITHUB_OUTPUT
+          else
+            echo "::warning::Sync licitaciones falló con HTTP $HTTP_CODE"
+            echo "synced=error" >> $GITHUB_OUTPUT
+          fi
 
       - name: Sync Ordenes de Compra
+        id: sync-ordenes
         if: ${{ github.event.inputs.tipo != 'licitaciones' }}
         run: |
-          echo "=== Sincronizando Ordenes de Compra ==="
+          echo "=== Sincronizando Órdenes de Compra ==="
           echo "Fecha: ${{ steps.fecha.outputs.FECHA }}"
           
-          response=$(curl -s -X POST \
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
             "${{ env.SUPABASE_URL }}/functions/v1/mercadopublico-api" \
             -H "Authorization: Bearer ${{ env.SUPABASE_SERVICE_KEY }}" \
             -H "Content-Type: application/json" \
-            -d '{"action": "sync-ordenes", "fecha": "'${{ steps.fecha.outputs.FECHA }}'", "ticket": "'${{ env.MP_API_TICKET }}'"}')
+            -d "{\"action\": \"sync-ordenes\", \"fecha\": \"${{ steps.fecha.outputs.FECHA }}\", \"ticket\": \"${{ env.MP_API_TICKET }}\"}" \
+            --max-time 300)
           
-          echo "Respuesta: $response"
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Respuesta: $BODY"
+          
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            SYNCED=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('synced',0))" 2>/dev/null || echo "?")
+            ERRORS=$(echo "$BODY" | python3 -c "import sys,json; print(len(json.load(sys.stdin).get('errors',[])))" 2>/dev/null || echo "?")
+            echo "Órdenes sincronizadas: $SYNCED, errores: $ERRORS"
+            echo "synced=$SYNCED" >> $GITHUB_OUTPUT
+          else
+            echo "::warning::Sync órdenes falló con HTTP $HTTP_CODE"
+            echo "synced=error" >> $GITHUB_OUTPUT
+          fi
 
       - name: Resumen
+        if: always()
         run: |
           echo "======================================"
-          echo "SINCRONIZACION COMPLETADA"
-          echo "Fecha: ${{ steps.fecha.outputs.FECHA }}"
-          echo "Hora: $(date)"
+          echo "SINCRONIZACIÓN MERCADOPÚBLICO - RESUMEN"
+          echo "Fecha consultada: ${{ steps.fecha.outputs.FECHA }}"
+          echo "Hora Chile: $(TZ='America/Santiago' date '+%Y-%m-%d %H:%M:%S %Z')"
+          echo "--------------------------------------"
+          echo "Licitaciones: ${{ steps.sync-licitaciones.outputs.synced || 'no ejecutado' }}"
+          echo "Órdenes: ${{ steps.sync-ordenes.outputs.synced || 'no ejecutado' }}"
           echo "======================================"
