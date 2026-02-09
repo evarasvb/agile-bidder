@@ -36,6 +36,7 @@ import {
   DollarSign,
   ChevronRight,
   Eye,
+  UserPlus,
 } from "lucide-react";
 import { useOportunidadesFiltradas, type OportunidadFiltrada } from "@/hooks/useOportunidadesFiltradas";
 import { useClienteFiltros } from "@/hooks/useClienteFiltros";
@@ -43,6 +44,8 @@ import { format, differenceInHours, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { PagadorBadge, calcularPagadorInfo } from "@/components/shared/PagadorBadge";
+import { AsignarVendedorModal } from "@/components/compras-agiles/AsignarVendedorModal";
+import type { CompraAgil } from "@/hooks/useComprasAgiles";
 
 /**
  * Genera link a MercadoPúblico según el tipo y código
@@ -63,6 +66,34 @@ export default function MisOportunidades() {
   const [tipoFilter, setTipoFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
   const pageSize = 25;
+
+  // Modal de asignación
+  const [asignarOpen, setAsignarOpen] = useState(false);
+  const [compraParaAsignar, setCompraParaAsignar] = useState<CompraAgil | null>(null);
+
+  const handleAsignar = (op: OportunidadFiltrada) => {
+    // Mapear OportunidadFiltrada a CompraAgil para el modal
+    const compra: CompraAgil = {
+      id: op.id,
+      codigo: op.codigo,
+      nombre: op.nombre,
+      organismo: op.organismo || op.institucion_nombre || '',
+      monto: op.monto || op.presupuesto_estimado,
+      moneda: 'CLP',
+      fecha_cierre: op.fecha_cierre,
+      fecha_publicacion: null,
+      estado: op.estado,
+      descripcion: op.descripcion,
+      match_encontrado: op.match_encontrado || false,
+      match_score: op.match_score || 0,
+      items: [],
+      datos_json: null,
+      created_at: op.created_at,
+      updated_at: op.created_at,
+    };
+    setCompraParaAsignar(compra);
+    setAsignarOpen(true);
+  };
 
   // Filtros locales
   const filteredOportunidades = oportunidades.filter((op) => {
@@ -273,7 +304,7 @@ export default function MisOportunidades() {
                   <TableHead className="font-semibold w-[110px]">Cierre</TableHead>
                   <TableHead className="text-center font-semibold w-[70px]">Match</TableHead>
                   <TableHead className="text-center font-semibold w-[110px]">Pagador</TableHead>
-                  <TableHead className="text-center font-semibold w-[50px]"></TableHead>
+                  <TableHead className="text-center font-semibold w-[100px]">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -394,22 +425,27 @@ export default function MisOportunidades() {
                           />
                         </TableCell>
 
-                        {/* Ver / Link MP */}
+                        {/* Acciones */}
                         <TableCell>
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-0.5 justify-center">
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                window.open(mpLink, "_blank");
-                              }}
+                              className="h-7 w-7 hover:bg-primary/10 hover:text-primary"
+                              onClick={(e) => { e.stopPropagation(); handleAsignar(op); }}
+                              title="Asignar a ejecutivo"
+                            >
+                              <UserPlus className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 hover:bg-blue-50 hover:text-blue-600"
+                              onClick={(e) => { e.stopPropagation(); window.open(mpLink, "_blank"); }}
                               title="Ver en MercadoPúblico"
                             >
                               <ExternalLink className="h-3.5 w-3.5" />
                             </Button>
-                            <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                           </div>
                         </TableCell>
                       </TableRow>
@@ -456,6 +492,13 @@ export default function MisOportunidades() {
           )}
         </Card>
       )}
+
+      {/* Modal de Asignación */}
+      <AsignarVendedorModal
+        open={asignarOpen}
+        onOpenChange={setAsignarOpen}
+        compra={compraParaAsignar}
+      />
     </div>
   );
 }

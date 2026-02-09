@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Users, CalendarDays, BarChart3, UserPlus, Loader2, Trophy, Target, TrendingUp, DollarSign, CheckCircle2 } from 'lucide-react';
+import { Users, CalendarDays, BarChart3, UserPlus, Loader2, Trophy, Target, TrendingUp, DollarSign, CheckCircle2, Kanban } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PipelineNegocios } from '@/components/vendedores/PipelineNegocios';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -513,21 +514,29 @@ export default function GestionVendedores() {
         </p>
       </div>
 
-      <Tabs defaultValue="calendario" className="w-full">
-        <TabsList>
+      <Tabs defaultValue="pipeline" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="pipeline" className="gap-2">
+            <Kanban className="h-4 w-4" />
+            Pipeline
+          </TabsTrigger>
           <TabsTrigger value="calendario" className="gap-2">
             <CalendarDays className="h-4 w-4" />
             Calendario
           </TabsTrigger>
           <TabsTrigger value="reporte" className="gap-2">
             <BarChart3 className="h-4 w-4" />
-            Reporte de Equipo
+            Reporte
           </TabsTrigger>
           <TabsTrigger value="vendedores" className="gap-2">
             <Users className="h-4 w-4" />
-            Vendedores
+            Equipo
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="pipeline" className="mt-6">
+          <PipelineNegocios />
+        </TabsContent>
 
         <TabsContent value="calendario" className="mt-6">
           <CalendarioVendedores />
