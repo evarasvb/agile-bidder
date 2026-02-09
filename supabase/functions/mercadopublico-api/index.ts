@@ -419,7 +419,6 @@ async function syncDataToDatabase(
           const ordenData = {
             codigo: oc.Codigo,
             nombre: oc.Nombre,
-            descripcion: null,
             estado: oc.Estado,
             tipo: oc.Tipo,
             fecha_envio: parseDate(oc.FechaEnvio),
