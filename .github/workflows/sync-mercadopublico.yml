@@ -1,22 +1,22 @@
-# Sincronizacion automatica con API MercadoPublico
-# Trae licitaciones y ordenes de compra diariamente
+# Sync Licitaciones y Órdenes de Compra desde api.mercadopublico.cl
+# Ejecuta script Node.js directo (NO depende de Edge Functions)
+# Requiere: SUPABASE_URL, SUPABASE_SERVICE_KEY, MP_API_TICKET
 name: Sync MercadoPublico API
 
 on:
   schedule:
-    # Ejecuta 3 veces al dia (hora Chile: 6AM, 12PM, 6PM)
-    - cron: '0 9 * * *'   # 6:00 AM Chile
-    - cron: '0 15 * * *'  # 12:00 PM Chile  
-    - cron: '0 21 * * *'  # 6:00 PM Chile
+    # 3x al día (hora Chile: 6AM, 12PM, 6PM)
+    - cron: '0 9 * * *'
+    - cron: '0 15 * * *'
+    - cron: '0 21 * * *'
   workflow_dispatch:
-    # Permite ejecutar manualmente
     inputs:
       fecha:
-        description: 'Fecha a consultar (ddmmaaaa)'
+        description: 'Fecha ddmmaaaa (vacío=hoy Chile)'
         required: false
         default: ''
       tipo:
-        description: 'Tipo de consulta'
+        description: 'Tipo de sync'
         required: true
         default: 'ambos'
         type: choice
@@ -25,58 +25,29 @@ on:
           - ordenes
           - ambos
 
-env:
-  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-  SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-  MP_API_TICKET: ${{ secrets.MP_API_TICKET }}
-
 jobs:
   sync-mercadopublico:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
     steps:
-      - name: Configurar fecha
-        id: fecha
-        run: |
-          if [ -n "${{ github.event.inputs.fecha }}" ]; then
-            echo "FECHA=${{ github.event.inputs.fecha }}" >> $GITHUB_OUTPUT
-          else
-            # Fecha de hoy en formato ddmmaaaa
-            echo "FECHA=$(date +%d%m%Y)" >> $GITHUB_OUTPUT
-          fi
-          echo "Fecha a consultar: $(cat $GITHUB_OUTPUT | grep FECHA)"
-
-      - name: Sync Licitaciones
-        if: ${{ github.event.inputs.tipo != 'ordenes' }}
-        run: |
-          echo "=== Sincronizando Licitaciones ==="
-          echo "Fecha: ${{ steps.fecha.outputs.FECHA }}"
-          
-          response=$(curl -s -X POST \
-            "${{ env.SUPABASE_URL }}/functions/v1/mercadopublico-api" \
-            -H "Authorization: Bearer ${{ env.SUPABASE_SERVICE_KEY }}" \
-            -H "Content-Type: application/json" \
-            -d '{"action": "sync-licitaciones", "fecha": "'${{ steps.fecha.outputs.FECHA }}'", "ticket": "'${{ env.MP_API_TICKET }}'"}')
-          
-          echo "Respuesta: $response"
-
-      - name: Sync Ordenes de Compra
-        if: ${{ github.event.inputs.tipo != 'licitaciones' }}
-        run: |
-          echo "=== Sincronizando Ordenes de Compra ==="
-          echo "Fecha: ${{ steps.fecha.outputs.FECHA }}"
-          
-          response=$(curl -s -X POST \
-            "${{ env.SUPABASE_URL }}/functions/v1/mercadopublico-api" \
-            -H "Authorization: Bearer ${{ env.SUPABASE_SERVICE_KEY }}" \
-            -H "Content-Type: application/json" \
-            -d '{"action": "sync-ordenes", "fecha": "'${{ steps.fecha.outputs.FECHA }}'", "ticket": "'${{ env.MP_API_TICKET }}'"}')
-          
-          echo "Respuesta: $response"
-
-      - name: Resumen
-        run: |
-          echo "======================================"
-          echo "SINCRONIZACION COMPLETADA"
-          echo "Fecha: ${{ steps.fecha.outputs.FECHA }}"
-          echo "Hora: $(date)"
-          echo "======================================"
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Sync Licitaciones y Órdenes
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          MP_API_TICKET: ${{ secrets.MP_API_TICKET }}
+          FECHA: ${{ github.event.inputs.fecha || '' }}
+          SYNC_TYPE: ${{ github.event.inputs.tipo || 'ambos' }}
+        run: npx tsx scripts/sync-licitaciones-ordenes-standalone.ts

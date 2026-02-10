@@ -7,15 +7,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { format, differenceInDays, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { ShoppingCart, Clock, MapPin, Building2, CheckCircle2, AlertTriangle, ExternalLink, Package, Boxes } from "lucide-react";
+import { ShoppingCart, Clock, MapPin, Building2, CheckCircle2, AlertTriangle, ExternalLink, Package, Boxes, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 import { clasificarProceso, montoEnUTM, formatCurrency } from "@/utils/clasificacion";
 import { cn } from "@/lib/utils";
 import { useLicitacionMatchCounts, type LicitacionBasic } from "@/hooks/useLicitacionProductMatch";
 import { ProductMatchModal } from "./ProductMatchModal";
+import { AsignarVendedorModal } from "./AsignarVendedorModal";
+import { PagadorBadge, calcularPagadorInfo } from "@/components/shared/PagadorBadge";
 
 // Función para extraer el monto de diferentes fuentes
 function extractMonto(compra: CompraAgil): number | null {
@@ -119,6 +122,10 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect, m
   // Estado para el modal de productos match
   const [matchModalOpen, setMatchModalOpen] = useState(false);
   const [selectedLicitacion, setSelectedLicitacion] = useState<{ id: string; nombre: string } | null>(null);
+  
+  // Estado para el modal de asignación
+  const [asignarModalOpen, setAsignarModalOpen] = useState(false);
+  const [compraParaAsignar, setCompraParaAsignar] = useState<CompraAgil | null>(null);
 
   // Obtener IDs de licitaciones para el hook de match counts
   // Preparar datos para matching (necesita id, codigo, titulo)
@@ -165,6 +172,12 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect, m
     e.stopPropagation(); // Evitar navegación
     setSelectedLicitacion({ id: compra.codigo, nombre: compra.nombre });
     setMatchModalOpen(true);
+  };
+
+  const handleAsignarClick = (e: React.MouseEvent, compra: CompraAgil) => {
+    e.stopPropagation(); // Evitar navegación
+    setCompraParaAsignar(compra);
+    setAsignarModalOpen(true);
   };
 
   if (isLoading) {
@@ -228,12 +241,14 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect, m
                 <TableHead className="font-semibold w-[100px]">Cierre</TableHead>
                 <TableHead className="font-semibold w-[100px]">Estado</TableHead>
                 <TableHead className="font-semibold text-center w-[80px]">Match</TableHead>
+                <TableHead className="font-semibold text-center w-[100px]">Pagador</TableHead>
+                <TableHead className="font-semibold text-center w-[70px]">Asignar</TableHead>
               </TableRow>
             </TableHeader>
           <TableBody>
             {compras?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-12">
+                <TableCell colSpan={11} className="text-center py-12">
                   <div className="flex flex-col items-center gap-3 text-muted-foreground">
                     <ShoppingCart className="h-12 w-12 opacity-50" />
                     <div>
@@ -423,6 +438,37 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect, m
                         <span className="text-muted-foreground text-xs">-</span>
                       )}
                     </TableCell>
+                    
+                    {/* Pagador */}
+                    <TableCell className="text-center">
+                      <PagadorBadge
+                        info={calcularPagadorInfo({
+                          buenPagador: compra.datos_json?.buen_pagador,
+                          diasPagoPromedio: compra.datos_json?.dias_pago_promedio,
+                          reclamos12m: compra.datos_json?.reclamos_12m,
+                        })}
+                        size="sm"
+                      />
+                    </TableCell>
+                    
+                    {/* Asignar */}
+                    <TableCell className="text-center">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
+                            onClick={(e) => handleAsignarClick(e, compra)}
+                          >
+                            <UserPlus className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-xs">Asignar a un ejecutivo</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TableCell>
                   </TableRow>
                 );
               })
@@ -438,6 +484,13 @@ export function ComprasAgilesTable({ compras, isLoading, selectedId, onSelect, m
         onClose={() => setMatchModalOpen(false)}
         licitacionId={selectedLicitacion?.id || null}
         licitacionNombre={selectedLicitacion?.nombre || ''}
+      />
+      
+      {/* Modal de asignar vendedor */}
+      <AsignarVendedorModal
+        open={asignarModalOpen}
+        onOpenChange={setAsignarModalOpen}
+        compra={compraParaAsignar}
       />
     </Card>
   );

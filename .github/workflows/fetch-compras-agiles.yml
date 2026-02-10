@@ -1,0 +1,55 @@
+# Sync Compras Ágiles desde buscador.mercadopublico.cl
+# Ejecuta script Node.js directo (NO depende de Edge Functions)
+# Obtiene JWT público → llama API → escribe a Supabase
+name: Fetch Compras Ágiles
+
+on:
+  schedule:
+    # Cada 4 horas (hora Chile)
+    - cron: '0 3 * * *'
+    - cron: '0 7 * * *'
+    - cron: '0 11 * * *'
+    - cron: '0 15 * * *'
+    - cron: '0 19 * * *'
+    - cron: '0 23 * * *'
+  workflow_dispatch:
+    inputs:
+      hours_back:
+        description: 'Horas hacia atrás (default: 48)'
+        required: false
+        default: '48'
+      max_pages:
+        description: 'Max páginas (default: 50)'
+        required: false
+        default: '50'
+      fetch_details:
+        description: 'Obtener fichas detalladas'
+        required: false
+        default: 'true'
+
+jobs:
+  sync-compras-agiles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Sync Compras Ágiles
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          HOURS_BACK: ${{ github.event.inputs.hours_back || '48' }}
+          MAX_PAGES: ${{ github.event.inputs.max_pages || '50' }}
+          FETCH_DETAILS: ${{ github.event.inputs.fetch_details || 'true' }}
+        run: npx tsx scripts/sync-compras-agiles-standalone.ts

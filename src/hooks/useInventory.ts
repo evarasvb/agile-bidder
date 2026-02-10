@@ -52,11 +52,11 @@ function mapRowToInventoryItem(row: any): InventoryItem {
     keywords: row.palabras_clave,
     precio_unitario: row.precio_unitario,
     margen_minimo: row.margen_minimo,
-    margen_objetivo: row.margen_minimo, // Use same value as fallback
+    margen_objetivo: row.margen_objetivo ?? row.margen_minimo,
     stock_disponible: row.stock,
-    unidad_medida: 'unidad', // Default since not in table
+    unidad_medida: row.unidad_medida || 'unidad',
     tiempo_entrega_dias: row.tiempo_entrega_dias,
-    proveedor: null, // Not in table
+    proveedor: row.proveedor || null,
     activo: row.activo,
     imagen_url: row.imagen_url,
     cliente_id: row.cliente_id,
@@ -245,7 +245,7 @@ export function useCreateInventoryItem() {
 
       console.log('[useCreateInventoryItem] Creating product:', item.nombre_producto);
 
-      const insertData = {
+      const insertData: Record<string, any> = {
         cliente_id: clienteId,
         sku: item.sku,
         nombre: item.nombre_producto,
@@ -258,9 +258,12 @@ export function useCreateInventoryItem() {
         tiempo_entrega_dias: item.tiempo_entrega_dias ?? 5,
         activo: item.activo ?? true,
         imagen_url: item.imagen_url,
+        proveedor: item.proveedor || null,
+        unidad_medida: item.unidad_medida || 'unidad',
+        margen_objetivo: item.margen_objetivo ?? item.margen_minimo ?? 15,
       };
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('cliente_inventario')
         .insert(insertData)
         .select()
@@ -306,6 +309,9 @@ export function useUpdateInventoryItem() {
       if (updates.activo !== undefined) updateData.activo = updates.activo;
       if (updates.imagen_url !== undefined) updateData.imagen_url = updates.imagen_url;
       if (updates.sku !== undefined) updateData.sku = updates.sku;
+      if (updates.proveedor !== undefined) updateData.proveedor = updates.proveedor;
+      if (updates.unidad_medida !== undefined) updateData.unidad_medida = updates.unidad_medida;
+      if (updates.margen_objetivo !== undefined) updateData.margen_objetivo = updates.margen_objetivo;
 
       const { data, error } = await supabase
         .from('cliente_inventario')
