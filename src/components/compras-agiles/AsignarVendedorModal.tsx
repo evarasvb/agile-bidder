@@ -64,8 +64,8 @@ export function AsignarVendedorModal({ open, onOpenChange, compra }: AsignarVend
       // Enviar notificación por email al vendedor
       if (vendedorSeleccionado?.email) {
         try {
-          const { supabase } = await import("@/integrations/supabase/client");
-          await supabase.functions.invoke("send-notification", {
+          const { supabase: sbClient } = await import("@/integrations/supabase/client");
+          await sbClient.functions.invoke("send-notification", {
             body: {
               to: vendedorSeleccionado.email,
               tipo: "recordatorio",
