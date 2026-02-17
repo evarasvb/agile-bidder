@@ -35,10 +35,8 @@ export class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
     
-    // Log to external service if configured
-    if (import.meta.env.VITE_SUPABASE_URL) {
-      this.logErrorToService(error, errorInfo);
-    }
+    // Log to Supabase system_logs
+    this.logErrorToService(error, errorInfo);
 
     this.setState({
       error,
@@ -48,15 +46,15 @@ export class ErrorBoundary extends Component<Props, State> {
 
   async logErrorToService(error: Error, errorInfo: ErrorInfo) {
     try {
-      const { supabase } = await import('@/integrations/supabase/client');
-      await (supabase as any).from('error_logs').insert({
-        error_message: error.message,
-        error_stack: error.stack,
+      // Import error logging utility
+      const { logErrorToSupabase } = await import('@/lib/supabaseErrorHandler');
+      await logErrorToSupabase(error, 'error', {
         component_stack: errorInfo.componentStack,
-        timestamp: new Date().toISOString(),
+        error_boundary: true,
       });
     } catch (logError) {
-      console.error('Failed to log error:', logError);
+      // Don't throw if logging fails
+      console.warn('Failed to log error to Supabase:', logError);
     }
   }
 

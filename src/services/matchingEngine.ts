@@ -10,69 +10,23 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { handleSupabaseError } from '@/lib/supabaseErrorHandler';
+import type {
+  InventoryItem,
+  Licitacion,
+  LicitacionItem,
+  ProductMatch,
+  MatchResult,
+} from '@/services/types';
 
-// ============ INTERFACES ============
-
-export interface InventoryItem {
-  id: string;
-  sku: string;
-  nombre_producto: string;
-  descripcion: string | null;
-  categoria: string;
-  keywords: string[];
-  precio_unitario: number;
-  margen_minimo: number;
-  margen_objetivo: number;
-  stock_disponible: number;
-  unidad_medida: string;
-  tiempo_entrega_dias: number;
-  proveedor: string | null;
-  activo: boolean;
-}
-
-export interface Licitacion {
-  id_licitacion: string;
-  titulo: string;
-  organismo: string;
-  presupuesto: number | null;
-  fecha_cierre: string | null;
-  estado: string | null;
-}
-
-export interface LicitacionItem {
-  id: number;
-  licitacion_id: string;
-  nombre_producto: string;
-  descripcion: string | null;
-  cantidad: number | null;
-  unidad: string | null;
-}
-
-export interface ProductMatch {
-  inventory_id: string;
-  sku: string;
-  nombre: string;
-  keywords_matched: string[];
-  similarity_score: number;
-  cantidad_requerida: number;
-  precio_unitario: number;
-  precio_oferta: number;
-  margen_aplicado: number;
-  subtotal: number;
-}
-
-export interface MatchResult {
-  licitacion_id: string;
-  match_score: number; // 0-100
-  productos_matcheados: ProductMatch[];
-  valor_total_estimado: number;
-  margen_estimado: number;
-  confidence_level: 'high' | 'medium' | 'low';
-  razones_match: string[];
-  alertas: string[];
-  presupuesto_licitacion: number | null;
-  cobertura_items: number; // % de items de licitación cubiertos
-}
+// Re-export types for backward compatibility
+export type {
+  InventoryItem,
+  Licitacion,
+  LicitacionItem,
+  ProductMatch,
+  MatchResult,
+};
 
 // ============ UTILIDADES NLP ============
 
@@ -413,7 +367,7 @@ export async function analyzeMatch(
   
   if (invError) {
     console.error('Error obteniendo inventario:', invError);
-    throw new Error(`Error al obtener inventario: ${invError.message}`);
+    throw handleSupabaseError(invError, 'analyzeMatch: obtener inventario');
   }
   
   if (!inventory || inventory.length === 0) {

@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useAuth } from '@/hooks/useAuth';
 import { supabaseClient } from '@/lib/supabaseClient';
@@ -30,12 +32,14 @@ const signupSchema = z.object({
   path: ['confirmPassword'],
 });
 
+type LoginFormData = z.infer<typeof loginSchema>;
+type SignupFormData = z.infer<typeof signupSchema>;
+
 export default function Auth() {
   const navigate = useNavigate();
   const { signIn, signUp, resetPassword, isAuthenticated, loading: authLoading } = useAuth();
   
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -43,12 +47,23 @@ export default function Auth() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   
-  // Form states
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [signupEmail, setSignupEmail] = useState('');
-  const [signupPassword, setSignupPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  // React Hook Form with zodResolver
+  const loginForm = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+    },
+  });
+
+  const signupForm = useForm<SignupFormData>({
+    resolver: zodResolver(signupSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+      confirmPassword: '',
+    },
+  });
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -57,21 +72,11 @@ export default function Auth() {
     }
   }, [isAuthenticated, authLoading, navigate]);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = async (data: LoginFormData) => {
     setError(null);
     setSuccess(null);
 
-    // Validate
-    const result = loginSchema.safeParse({ email: loginEmail, password: loginPassword });
-    if (!result.success) {
-      setError(result.error.issues[0].message);
-      return;
-    }
-
-    setLoading(true);
-    const { error } = await signIn(loginEmail, loginPassword);
-    setLoading(false);
+    const { error } = await signIn(data.email, data.password);
 
     if (error) {
       // Handle specific error messages
@@ -85,19 +90,9 @@ export default function Auth() {
     }
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSignup = async (data: SignupFormData) {
     setError(null);
     setSuccess(null);
-
-    // Validate
-    const result = signupSchema.safeParse({ 
-      email: signupEmail, 
-      password: signupPassword,
-      confirmPassword 
-    });
-    if (!result.success) {
-      setError(result.error.issues[0].message);
       return;
     }
 
@@ -227,7 +222,7 @@ export default function Auth() {
 
                 {/* Login Tab */}
                 <TabsContent value="login">
-                  <form onSubmit={handleLogin} className="space-y-4">
+                  <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="login-email">Email</Label>
                       <div className="relative">
@@ -236,12 +231,14 @@ export default function Auth() {
                           id="login-email"
                           type="email"
                           placeholder="tu@email.com"
-                          value={loginEmail}
-                          onChange={(e) => setLoginEmail(e.target.value)}
+                          {...loginForm.register('email')}
                           className="pl-10"
-                          disabled={loading}
+                          disabled={loginForm.formState.isSubmitting}
                         />
                       </div>
+                      {loginForm.formState.errors.email && (
+                        <p className="text-sm text-destructive">{loginForm.formState.errors.email.message}</p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
@@ -265,19 +262,21 @@ export default function Auth() {
                           id="login-password"
                           type="password"
                           placeholder="••••••••"
-                          value={loginPassword}
-                          onChange={(e) => setLoginPassword(e.target.value)}
+                          {...loginForm.register('password')}
                           className="pl-10"
-                          disabled={loading}
+                          disabled={loginForm.formState.isSubmitting}
                         />
                       </div>
+                      {loginForm.formState.errors.password && (
+                        <p className="text-sm text-destructive">{loginForm.formState.errors.password.message}</p>
+                      )}
                     </div>
                     <Button 
                       type="submit" 
                       className="w-full bg-[hsl(var(--firmavb-blue))] hover:bg-[hsl(var(--firmavb-blue))]/90"
-                      disabled={loading || googleLoading}
+                      disabled={loginForm.formState.isSubmitting || googleLoading}
                     >
-                      {loading ? (
+                      {loginForm.formState.isSubmitting ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           Iniciando sesión...

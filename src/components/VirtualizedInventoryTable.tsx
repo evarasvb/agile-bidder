@@ -4,6 +4,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { handleSupabaseError } from '@/lib/supabaseErrorHandler';
 
 interface Product {
   id: string;
@@ -37,12 +39,10 @@ export function VirtualizedInventoryTable({
   const fetchProducts = useCallback(async (pageNum: number, search: string) => {
     setLoading(true);
     try {
-      const { supabase } = await import('@/integrations/supabase/client');
-      
       const start = (pageNum - 1) * PAGE_SIZE;
       const end = start + PAGE_SIZE - 1;
 
-      let query = (supabase as any)
+      let query = supabase
         .from('cliente_inventario')
         .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
@@ -54,13 +54,19 @@ export function VirtualizedInventoryTable({
 
       const { data, error, count } = await query;
 
-      if (error) throw error;
+      if (error) {
+        throw handleSupabaseError(error, 'VirtualizedInventoryTable.fetchProducts');
+      }
 
       setProducts(data || []);
       setTotalCount(count || 0);
       setHasMore((data?.length || 0) === PAGE_SIZE);
     } catch (error) {
       console.error('Error fetching products:', error);
+      // Show error to user via toast or error state
+      setProducts([]);
+      setTotalCount(0);
+      setHasMore(false);
     } finally {
       setLoading(false);
     }

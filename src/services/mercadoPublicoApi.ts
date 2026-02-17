@@ -7,7 +7,11 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import type { ProductoOfertado } from './ofertaGenerator';
+import { handleSupabaseError } from '@/lib/supabaseErrorHandler';
+import type { ProductoOfertado } from '@/services/types';
+
+// Re-export for compatibility
+export type { ProductoOfertado };
 
 // ============ INTERFACES ============
 
@@ -65,7 +69,7 @@ export async function prepararOfertaParaMP(
     
     if (ofertaError) {
       console.error('Error obteniendo oferta:', ofertaError);
-      throw new Error(`Error al obtener oferta: ${ofertaError.message}`);
+      throw handleSupabaseError(ofertaError, 'prepararOfertaParaMP: obtener oferta');
     }
     
     if (!oferta) {
@@ -234,7 +238,11 @@ async function calcularPlazoEntrega(
  */
 function generarObservaciones(
   productos: ProductoOfertado[], 
-  oferta: any
+  oferta: { 
+    match_score?: number | null;
+    valor_total_oferta?: number | null;
+    notas_internas?: string | null;
+  }
 ): string {
   if (!productos || !Array.isArray(productos) || productos.length === 0) {
     return 'Oferta sin productos';
@@ -413,7 +421,7 @@ export async function registrarRespuestaMP(
     
     if (updateError) {
       console.error('Error actualizando oferta:', updateError);
-      throw new Error(`Error al actualizar oferta: ${updateError.message}`);
+      throw handleSupabaseError(updateError, 'registrarRespuestaMP: actualizar oferta');
     }
     
     // Log del evento (no crítico si falla)
