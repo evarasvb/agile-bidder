@@ -212,7 +212,7 @@ async function calcularPlazoEntrega(
   }
   
   // Crear mapa para búsqueda rápida
-  const tiemposMap = new Map(
+  const tiemposMap = new Map<string, number>(
     (inventarios || []).map(inv => [inv.id, Number(inv.tiempo_entrega_dias) || 7])
   );
   

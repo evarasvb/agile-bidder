@@ -305,7 +305,7 @@ export function findMatches(
   
   // Ordenar por score descendente y limitar resultados
   return matches
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => b.similarity_score - a.similarity_score)
     .slice(0, maxResults);
 }
 
