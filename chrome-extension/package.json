@@ -1,11 +1,13 @@
 {
   "name": "firmavb-postulador-extension",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Chrome Extension para automatizar postulaciones a Compras Ágiles en MercadoPúblico - Conectado con FirmaVB",
   "private": true,
+  "type": "module",
   "scripts": {
+    "test": "node tests/manifest.test.js",
     "build": "echo 'La extensión está lista para usar. Carga el directorio chrome-extension/ en Chrome.'",
-    "package": "zip -r firmavb-extension.zip manifest.json *.js *.css *.html icons/ -x '*.ts' -x '*.tsx' -x 'node_modules/*' -x 'src/*'",
+    "package": "zip -r firmavb-extension.zip manifest.json config.js *.js *.css *.html icons/ modules/ -x '*.ts' -x '*.tsx' -x 'node_modules/*' -x 'tests/*'",
     "clean": "rm -f firmavb-extension.zip"
   },
   "keywords": [
