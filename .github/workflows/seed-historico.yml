@@ -1,0 +1,94 @@
+# Seed histórico de licitaciones y órdenes de compra
+# Ejecución manual para poblar la BD con datos históricos de MercadoPúblico
+name: Seed Histórico MercadoPúblico
+
+on:
+  workflow_dispatch:
+    inputs:
+      meses_atras:
+        description: 'Meses hacia atrás a importar (default: 6)'
+        required: false
+        default: '6'
+      tipo:
+        description: 'Tipo de datos a importar'
+        required: true
+        default: 'ambos'
+        type: choice
+        options:
+          - licitaciones
+          - ordenes
+          - ambos
+      incluir_csv:
+        description: 'También importar CSVs de datos abiertos (compras ágiles)'
+        required: false
+        default: 'true'
+        type: boolean
+
+jobs:
+  seed-historico:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # 6 horas para importaciones masivas históricas
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Validar secrets
+        run: |
+          missing=""
+          if [ -z "${{ secrets.SUPABASE_URL }}" ]; then missing="$missing SUPABASE_URL"; fi
+          if [ -z "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ]; then missing="$missing SUPABASE_SERVICE_ROLE_KEY"; fi
+          if [ -z "${{ secrets.MP_API_TICKET }}" ]; then missing="$missing MP_API_TICKET"; fi
+          if [ -n "$missing" ]; then
+            echo "::error::Missing required secrets:$missing"
+            exit 1
+          fi
+          echo "✅ Secrets configurados correctamente"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Mostrar configuración
+        run: |
+          echo "======================================"
+          echo "SEED HISTÓRICO - CONFIGURACIÓN"
+          echo "Meses atrás : ${{ github.event.inputs.meses_atras || '6' }}"
+          echo "Tipo        : ${{ github.event.inputs.tipo || 'ambos' }}"
+          echo "Incluir CSV : ${{ github.event.inputs.incluir_csv || 'true' }}"
+          echo "Inicio      : $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          echo "======================================"
+
+      - name: Seed histórico API MercadoPúblico
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          MP_API_TICKET: ${{ secrets.MP_API_TICKET }}
+          MESES_ATRAS: ${{ github.event.inputs.meses_atras || '6' }}
+          TIPO: ${{ github.event.inputs.tipo || 'ambos' }}
+        run: npx tsx scripts/seed-historico.ts
+
+      - name: Seed CSV datos abiertos (compras ágiles)
+        if: ${{ github.event.inputs.incluir_csv != 'false' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          MESES_CSV: ${{ github.event.inputs.meses_atras || '6' }}
+        run: npx tsx scripts/seed-csv.ts
+
+      - name: Resumen final
+        if: always()
+        run: |
+          echo "======================================"
+          echo "SEED HISTÓRICO FINALIZADO"
+          echo "Fin: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          echo "======================================"
