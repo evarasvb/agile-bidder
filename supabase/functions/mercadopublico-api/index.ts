@@ -144,12 +144,13 @@ serve(async (req) => {
       const body = req.method === 'POST' ? await req.json() : {};
       const action = body.action || url.searchParams.get('action') || 'licitaciones';    
     
-    const MP_API_KEY = Deno.env.get("MERCADOPUBLICO_API_KEY");
+    // Accept API key from env var or from request body (GitHub Actions passes it as "ticket")
+    const MP_API_KEY = Deno.env.get("MERCADOPUBLICO_API_KEY") || body.ticket;
     if (!MP_API_KEY) {
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: 'API key de MercadoPúblico no configurada',
-          message: 'Configura MERCADOPUBLICO_API_KEY en los secrets del proyecto'
+          message: 'Configura MERCADOPUBLICO_API_KEY en los secrets del proyecto o envía "ticket" en el body'
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

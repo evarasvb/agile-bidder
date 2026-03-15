@@ -1,15 +1,15 @@
-# Sincronizacion automatica con API MercadoPublico
-# Trae licitaciones y ordenes de compra diariamente
-name: Sync MercadoPublico API
+# Sincronización automática con API MercadoPúblico
+# Trae licitaciones y órdenes de compra 3 veces al día
+name: Sync MercadoPúblico API
 
 on:
   schedule:
-    # Ejecuta 3 veces al dia (hora Chile: 6AM, 12PM, 6PM)
-    - cron: '0 9 * * *'   # 6:00 AM Chile
-    - cron: '0 15 * * *'  # 12:00 PM Chile  
-    - cron: '0 21 * * *'  # 6:00 PM Chile
+    # Ejecuta 3 veces al día (hora Chile: 6AM, 12PM, 6PM)
+    # Chile = UTC-3 (CLT) / UTC-4 (CLST)
+    - cron: '0 9 * * *'   # 6:00 AM Chile (CLT) / 5:00 AM (CLST)
+    - cron: '0 15 * * *'  # 12:00 PM Chile (CLT) / 11:00 AM (CLST)
+    - cron: '0 21 * * *'  # 6:00 PM Chile (CLT) / 5:00 PM (CLST)
   workflow_dispatch:
-    # Permite ejecutar manualmente
     inputs:
       fecha:
         description: 'Fecha a consultar (ddmmaaaa)'
@@ -27,56 +27,266 @@ on:
 
 env:
   SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-  SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+  SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
   MP_API_TICKET: ${{ secrets.MP_API_TICKET }}
 
 jobs:
   sync-mercadopublico:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
     steps:
+      - name: Validar secrets
+        run: |
+          missing=""
+          if [ -z "$SUPABASE_URL" ]; then missing="$missing SUPABASE_URL"; fi
+          if [ -z "$SUPABASE_SERVICE_KEY" ]; then missing="$missing SUPABASE_SERVICE_ROLE_KEY"; fi
+          if [ -z "$MP_API_TICKET" ]; then missing="$missing MP_API_TICKET"; fi
+          if [ -n "$missing" ]; then
+            echo "::error::Missing required secrets:$missing"
+            exit 1
+          fi
+          echo "All required secrets are configured"
+
       - name: Configurar fecha
         id: fecha
+        env:
+          INPUT_FECHA: ${{ github.event.inputs.fecha }}
         run: |
-          if [ -n "${{ github.event.inputs.fecha }}" ]; then
-            echo "FECHA=${{ github.event.inputs.fecha }}" >> $GITHUB_OUTPUT
+          if [ -n "$INPUT_FECHA" ]; then
+            # Validate format: exactly 8 digits (ddmmaaaa)
+            if ! echo "$INPUT_FECHA" | grep -qE '^[0-9]{8}$'; then
+              echo "::error::Invalid date format. Expected ddmmaaaa (e.g., 15032026)"
+              exit 1
+            fi
+            echo "FECHA=$INPUT_FECHA" >> "$GITHUB_OUTPUT"
           else
-            # Fecha de hoy en formato ddmmaaaa
-            echo "FECHA=$(date +%d%m%Y)" >> $GITHUB_OUTPUT
+            echo "FECHA=$(date -u +%d%m%Y)" >> "$GITHUB_OUTPUT"
           fi
-          echo "Fecha a consultar: $(cat $GITHUB_OUTPUT | grep FECHA)"
+          echo "Fecha a consultar: $(grep FECHA "$GITHUB_OUTPUT")"
 
       - name: Sync Licitaciones
+        id: sync-licitaciones
         if: ${{ github.event.inputs.tipo != 'ordenes' }}
+        env:
+          FECHA: ${{ steps.fecha.outputs.FECHA }}
         run: |
           echo "=== Sincronizando Licitaciones ==="
-          echo "Fecha: ${{ steps.fecha.outputs.FECHA }}"
-          
-          response=$(curl -s -X POST \
-            "${{ env.SUPABASE_URL }}/functions/v1/mercadopublico-api" \
-            -H "Authorization: Bearer ${{ env.SUPABASE_SERVICE_KEY }}" \
-            -H "Content-Type: application/json" \
-            -d '{"action": "sync-licitaciones", "fecha": "'${{ steps.fecha.outputs.FECHA }}'", "ticket": "'${{ env.MP_API_TICKET }}'"}')
-          
-          echo "Respuesta: $response"
+          echo "Fecha: $FECHA"
 
-      - name: Sync Ordenes de Compra
+          MAX_RETRIES=3
+          RETRY_DELAY=30
+          attempt=0
+          success=false
+
+          while [ $attempt -lt $MAX_RETRIES ]; do
+            attempt=$((attempt + 1))
+            echo "Intento $attempt de $MAX_RETRIES..."
+
+            http_code=$(curl -s -o /tmp/response_lic.json -w "%{http_code}" \
+              --max-time 120 \
+              --retry 2 \
+              --retry-delay 10 \
+              -X POST \
+              "$SUPABASE_URL/functions/v1/mercadopublico-api" \
+              -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+              -H "Content-Type: application/json" \
+              -d "{\"action\": \"sync-licitaciones\", \"fecha\": \"$FECHA\", \"ticket\": \"$MP_API_TICKET\"}")
+
+            echo "HTTP Status: $http_code"
+
+            if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+              response=$(cat /tmp/response_lic.json)
+              echo "Respuesta: $response"
+
+              # Check if sync was successful in the response
+              sync_success=$(echo "$response" | jq -r '.success // empty' 2>/dev/null)
+              synced=$(echo "$response" | jq -r '.synced // 0' 2>/dev/null)
+              errors=$(echo "$response" | jq -r '.errors | length // 0' 2>/dev/null)
+
+              echo "licitaciones_synced=$synced" >> "$GITHUB_OUTPUT"
+              echo "licitaciones_errors=$errors" >> "$GITHUB_OUTPUT"
+              echo "licitaciones_status=success" >> "$GITHUB_OUTPUT"
+
+              if [ "$sync_success" = "false" ] && [ "$errors" -gt 0 ]; then
+                echo "::warning::Sync completed with $errors errors"
+              fi
+
+              success=true
+              break
+            else
+              echo "::warning::Attempt $attempt failed with HTTP $http_code"
+              cat /tmp/response_lic.json 2>/dev/null || true
+              if [ $attempt -lt $MAX_RETRIES ]; then
+                echo "Retrying in ${RETRY_DELAY}s..."
+                sleep $RETRY_DELAY
+                RETRY_DELAY=$((RETRY_DELAY * 2))
+              fi
+            fi
+          done
+
+          if [ "$success" = false ]; then
+            echo "licitaciones_status=failed" >> "$GITHUB_OUTPUT"
+            echo "licitaciones_synced=0" >> "$GITHUB_OUTPUT"
+            echo "licitaciones_errors=1" >> "$GITHUB_OUTPUT"
+            echo "::error::Sync Licitaciones failed after $MAX_RETRIES attempts"
+            exit 1
+          fi
+
+      - name: Sync Órdenes de Compra
+        id: sync-ordenes
         if: ${{ github.event.inputs.tipo != 'licitaciones' }}
+        env:
+          FECHA: ${{ steps.fecha.outputs.FECHA }}
         run: |
-          echo "=== Sincronizando Ordenes de Compra ==="
-          echo "Fecha: ${{ steps.fecha.outputs.FECHA }}"
-          
-          response=$(curl -s -X POST \
-            "${{ env.SUPABASE_URL }}/functions/v1/mercadopublico-api" \
-            -H "Authorization: Bearer ${{ env.SUPABASE_SERVICE_KEY }}" \
+          echo "=== Sincronizando Órdenes de Compra ==="
+          echo "Fecha: $FECHA"
+
+          MAX_RETRIES=3
+          RETRY_DELAY=30
+          attempt=0
+          success=false
+
+          while [ $attempt -lt $MAX_RETRIES ]; do
+            attempt=$((attempt + 1))
+            echo "Intento $attempt de $MAX_RETRIES..."
+
+            http_code=$(curl -s -o /tmp/response_oc.json -w "%{http_code}" \
+              --max-time 120 \
+              --retry 2 \
+              --retry-delay 10 \
+              -X POST \
+              "$SUPABASE_URL/functions/v1/mercadopublico-api" \
+              -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+              -H "Content-Type: application/json" \
+              -d "{\"action\": \"sync-ordenes\", \"fecha\": \"$FECHA\", \"ticket\": \"$MP_API_TICKET\"}")
+
+            echo "HTTP Status: $http_code"
+
+            if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+              response=$(cat /tmp/response_oc.json)
+              echo "Respuesta: $response"
+
+              sync_success=$(echo "$response" | jq -r '.success // empty' 2>/dev/null)
+              synced=$(echo "$response" | jq -r '.synced // 0' 2>/dev/null)
+              errors=$(echo "$response" | jq -r '.errors | length // 0' 2>/dev/null)
+
+              echo "ordenes_synced=$synced" >> "$GITHUB_OUTPUT"
+              echo "ordenes_errors=$errors" >> "$GITHUB_OUTPUT"
+              echo "ordenes_status=success" >> "$GITHUB_OUTPUT"
+
+              if [ "$sync_success" = "false" ] && [ "$errors" -gt 0 ]; then
+                echo "::warning::Sync completed with $errors errors"
+              fi
+
+              success=true
+              break
+            else
+              echo "::warning::Attempt $attempt failed with HTTP $http_code"
+              cat /tmp/response_oc.json 2>/dev/null || true
+              if [ $attempt -lt $MAX_RETRIES ]; then
+                echo "Retrying in ${RETRY_DELAY}s..."
+                sleep $RETRY_DELAY
+                RETRY_DELAY=$((RETRY_DELAY * 2))
+              fi
+            fi
+          done
+
+          if [ "$success" = false ]; then
+            echo "ordenes_status=failed" >> "$GITHUB_OUTPUT"
+            echo "ordenes_synced=0" >> "$GITHUB_OUTPUT"
+            echo "ordenes_errors=1" >> "$GITHUB_OUTPUT"
+            echo "::error::Sync Órdenes de Compra failed after $MAX_RETRIES attempts"
+            exit 1
+          fi
+
+      - name: Actualizar timestamp de sync
+        if: always()
+        env:
+          LIC_STATUS: ${{ steps.sync-licitaciones.outputs.licitaciones_status }}
+          LIC_SYNCED: ${{ steps.sync-licitaciones.outputs.licitaciones_synced }}
+          OC_STATUS: ${{ steps.sync-ordenes.outputs.ordenes_status }}
+          OC_SYNCED: ${{ steps.sync-ordenes.outputs.ordenes_synced }}
+          FECHA: ${{ steps.fecha.outputs.FECHA }}
+        run: |
+          echo "=== Registrando timestamp de sincronización ==="
+          timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          curl -s -o /dev/null -w "HTTP %{http_code}" \
+            --max-time 30 \
+            -X POST \
+            "$SUPABASE_URL/functions/v1/sync-health" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
             -H "Content-Type: application/json" \
-            -d '{"action": "sync-ordenes", "fecha": "'${{ steps.fecha.outputs.FECHA }}'", "ticket": "'${{ env.MP_API_TICKET }}'"}')
-          
-          echo "Respuesta: $response"
+            -d "{
+              \"action\": \"update\",
+              \"sync_type\": \"mercadopublico\",
+              \"timestamp\": \"$timestamp\",
+              \"fecha_consulta\": \"$FECHA\",
+              \"licitaciones_status\": \"${LIC_STATUS:-skipped}\",
+              \"licitaciones_synced\": ${LIC_SYNCED:-0},
+              \"ordenes_status\": \"${OC_STATUS:-skipped}\",
+              \"ordenes_synced\": ${OC_SYNCED:-0},
+              \"run_id\": \"$GITHUB_RUN_ID\",
+              \"run_url\": \"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\"
+            }" || echo "::warning::Failed to update sync health status"
 
       - name: Resumen
+        if: always()
         run: |
           echo "======================================"
-          echo "SINCRONIZACION COMPLETADA"
-          echo "Fecha: ${{ steps.fecha.outputs.FECHA }}"
-          echo "Hora: $(date)"
+          echo "SINCRONIZACIÓN COMPLETADA"
+          echo "Fecha consultada: ${{ steps.fecha.outputs.FECHA }}"
+          echo "Hora: $(date -u)"
+          echo "--------------------------------------"
+          echo "Licitaciones: ${{ steps.sync-licitaciones.outputs.licitaciones_status || 'skipped' }} (synced: ${{ steps.sync-licitaciones.outputs.licitaciones_synced || '0' }})"
+          echo "Órdenes:      ${{ steps.sync-ordenes.outputs.ordenes_status || 'skipped' }} (synced: ${{ steps.sync-ordenes.outputs.ordenes_synced || '0' }})"
           echo "======================================"
+
+  notify-failure:
+    runs-on: ubuntu-latest
+    needs: sync-mercadopublico
+    if: failure()
+    steps:
+      - name: Notificar fallo de sincronización
+        run: |
+          echo "::error::MercadoPúblico sync failed! Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+          # Post failure to sync-health endpoint for monitoring
+          curl -s -o /dev/null \
+            --max-time 30 \
+            -X POST \
+            "${{ secrets.SUPABASE_URL }}/functions/v1/sync-health" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"action\": \"alert\",
+              \"sync_type\": \"mercadopublico\",
+              \"status\": \"failed\",
+              \"message\": \"MercadoPúblico sync workflow failed\",
+              \"run_id\": \"$GITHUB_RUN_ID\",
+              \"run_url\": \"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\"
+            }" || true
+
+      - name: Crear issue de fallo (si no existe uno abierto)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          existing=$(curl -s -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/issues?labels=sync-failure&state=open" \
+            | jq 'length')
+
+          if [ "$existing" = "0" ]; then
+            curl -s -X POST \
+              -H "Authorization: token $GH_TOKEN" \
+              -H "Content-Type: application/json" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/issues" \
+              -d "{
+                \"title\": \"[Auto] Fallo en sync MercadoPúblico - $(date -u +%Y-%m-%d)\",
+                \"body\": \"La sincronización automática con MercadoPúblico ha fallado.\\n\\nRun: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\\n\\nRevisa los logs del workflow para más detalles.\",
+                \"labels\": [\"sync-failure\", \"bug\"]
+              }"
+            echo "Issue de fallo creado"
+          else
+            echo "Ya existe un issue abierto de sync-failure, no se crea otro"
+          fi

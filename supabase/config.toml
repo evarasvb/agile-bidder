@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.mercadopublico-api]
 verify_jwt = false
+
+[functions.sync-health]
+verify_jwt = false
