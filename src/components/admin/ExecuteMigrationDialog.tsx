@@ -156,7 +156,7 @@ export function ExecuteMigrationDialog() {
   const [copied, setCopied] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
 
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://euzqadopjvdszcdjegmo.supabase.co';
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const projectId = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
 
   const executeRPC = useMutation({

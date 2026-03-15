@@ -144,9 +144,12 @@ async function main() {
   // Cargar variables de entorno
   await loadEnv();
   
-  const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || 
-                       Deno.env.get('VITE_SUPABASE_URL') || 
-                       'https://euzqadopjvdszcdjegmo.supabase.co';
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || Deno.env.get('VITE_SUPABASE_URL');
+
+  if (!SUPABASE_URL) {
+    log('❌ Error: SUPABASE_URL no está configurada', 'red');
+    Deno.exit(1);
+  }
   
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || 
                                     Deno.env.get('SUPABASE_KEY');
