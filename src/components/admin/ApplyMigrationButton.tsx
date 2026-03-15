@@ -41,7 +41,7 @@ export function ApplyMigrationButton() {
       }
 
       // Paso 2: Si RPC falla, usar Edge Function
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://euzqadopjvdszcdjegmo.supabase.co';
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const response = await fetch(
         `${supabaseUrl}/functions/v1/apply-rls-fix`,
         {
@@ -156,7 +156,7 @@ USING (public.is_current_user_admin());`;
 
   const openSQLEditor = () => {
     // Obtener el project_id de la URL de Supabase
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://euzqadopjvdszcdjegmo.supabase.co';
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const projectId = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
     
     if (projectId) {

@@ -5,7 +5,12 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || 'https://juiskeeutbaipwbeeezw.supabase.co';
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+
+if (!SUPABASE_URL) {
+  console.error('❌ Error: SUPABASE_URL no está configurada');
+  Deno.exit(1);
+}
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 if (!SUPABASE_SERVICE_ROLE_KEY) {

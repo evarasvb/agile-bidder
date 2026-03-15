@@ -13,7 +13,7 @@ export function ApplyMigrationsButton() {
   const [sql, setSql] = useState<string>('');
   const [copied, setCopied] = useState(false);
 
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://euzqadopjvdszcdjegmo.supabase.co';
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const projectId = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
 
   const applyMigrationsMutation = useMutation({

@@ -226,7 +226,7 @@ export default function Users() {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) throw new Error('Debes estar autenticado');
 
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://euzqadopjvdszcdjegmo.supabase.co';
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 
         const response = await fetch(
           `${supabaseUrl}/functions/v1/delete-user`,

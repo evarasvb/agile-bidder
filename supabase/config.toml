@@ -1,27 +1,68 @@
-project_id = "euzqadopjvdszcdjegmo"
+project_id = "juiskeeutbaipwbeeezw"
 
-[functions.scoring-ai]
-verify_jwt = false
+# --- Edge Functions ---
+# verify_jwt = true requires a valid Supabase JWT (Authorization: Bearer <token>)
+# verify_jwt = false is used for endpoints that authenticate via other means (e.g. x-api-key)
 
-[functions.send-notification]
-verify_jwt = false
+[functions.apply-migration]
+verify_jwt = true
 
-[functions.matching-ai]
-verify_jwt = false
+[functions.apply-migrations-auto]
+verify_jwt = true
 
-[functions.odoo-proxy]
-verify_jwt = false
+[functions.apply-migrations]
+verify_jwt = true
 
-[functions.send-licitacion-to-odoo]
-verify_jwt = false
+[functions.apply-rls-fix]
+verify_jwt = true
 
+[functions.create-user]
+verify_jwt = true
+
+[functions.evaristo-api]
+verify_jwt = true
+
+[functions.evaristo-autonomo]
+verify_jwt = true
+
+# extension-api uses x-api-key header from Chrome extension (not Supabase JWT)
 [functions.extension-api]
 verify_jwt = false
 
-[functions.resumir-bases]
+[functions.fetch-compras-agiles]
+verify_jwt = true
+
+[functions.limpiar-datos-prueba]
+verify_jwt = true
+
+[functions.matching-ai]
+verify_jwt = true
+
+# mercadopublico-api is a public proxy for MercadoPublico data
+[functions.mercadopublico-api]
 verify_jwt = false
 
-[functions.mercadopublico-api]
+[functions.odoo-proxy]
+verify_jwt = true
+
+[functions.resumir-bases]
+verify_jwt = true
+
+[functions.scoring-ai]
+verify_jwt = true
+
+[functions.send-licitacion-to-odoo]
+verify_jwt = true
+
+[functions.send-notification]
+verify_jwt = true
+
+# sync-compras-agiles uses x-api-key header from Chrome extension (not Supabase JWT)
+[functions.sync-compras-agiles]
+verify_jwt = false
+
+# sync-ordenes-compra uses x-api-key header from Chrome extension (not Supabase JWT)
+[functions.sync-ordenes-compra]
 verify_jwt = false
 
 [functions.sync-health]

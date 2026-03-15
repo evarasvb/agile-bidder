@@ -200,7 +200,7 @@ body { width: 380px; min-height: 400px; font-family: -apple-system, BlinkMacSyst
 .checkbox-label input { width: 16px; height: 16px; cursor: pointer; }`,
 
   // SECURITY FIX: popup.js now uses DOM methods instead of innerHTML to prevent XSS
-  'popup.js': `const SUPABASE_URL = 'https://euzqadopjvdszcdjegmo.supabase.co';
+  'popup.js': `const SUPABASE_URL = 'https://juiskeeutbaipwbeeezw.supabase.co';
 const EXTENSION_API_ENDPOINT = SUPABASE_URL + '/functions/v1/extension-api';
 let currentView = 'loading';
 let clienteInfo = null;
@@ -432,7 +432,7 @@ function formatDeadline(dateStr) {
 
 function openLicitacion(url) { if (url) chrome.tabs.create({ url: url }); }`,
 
-  'background.js': `const SUPABASE_URL = 'https://euzqadopjvdszcdjegmo.supabase.co';
+  'background.js': `const SUPABASE_URL = 'https://juiskeeutbaipwbeeezw.supabase.co';
 const EXTENSION_API_ENDPOINT = SUPABASE_URL + '/functions/v1/extension-api';
 const SYNC_ALARM_NAME = 'firmavb-sync';
 

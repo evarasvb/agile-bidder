@@ -5,7 +5,12 @@ import { join } from 'path';
 dotenv.config({ path: join(process.cwd(), '.env.local') });
 dotenv.config({ path: join(process.cwd(), '.env') });
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://euzqadopjvdszcdjegmo.supabase.co';
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+
+if (!supabaseUrl) {
+  console.error('❌ Error: SUPABASE_URL no configurada');
+  process.exit(1);
+}
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseServiceKey) {
@@ -15,7 +20,7 @@ if (!supabaseServiceKey) {
 
 const supabase = supabaseServiceKey 
   ? createClient(supabaseUrl, supabaseServiceKey)
-  : createClient(supabaseUrl, process.env.VITE_SUPABASE_PUBLISHABLE_KEY || '');
+  : createClient(supabaseUrl, process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '');
 
 async function limpiarDatosPrueba() {
   console.log('🧹 LIMPIANDO DATOS DE PRUEBA DE COMPRAS_AGILES\n');
