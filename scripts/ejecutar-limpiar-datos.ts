@@ -3,7 +3,12 @@
  * Llama a la Edge Function que elimina los datos automáticamente
  */
 
-const SUPABASE_URL = 'https://euzqadopjvdszcdjegmo.supabase.co';
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+
+if (!SUPABASE_URL) {
+  console.error('❌ Error: SUPABASE_URL no configurada. Set SUPABASE_URL or VITE_SUPABASE_URL environment variable.');
+  process.exit(1);
+}
 
 async function limpiarDatosPrueba() {
   console.log('🧹 LIMPIANDO DATOS DE PRUEBA...\n');
