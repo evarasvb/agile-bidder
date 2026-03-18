@@ -21,6 +21,7 @@ import {
   type PipelineEtapa,
 } from './pipelineConstants';
 import { useMovePipelineItem } from '@/hooks/usePipeline';
+import { usePipelineAsignaciones } from '@/hooks/useEquipo';
 import { toast } from 'sonner';
 
 interface PipelineBoardProps {
@@ -31,6 +32,19 @@ interface PipelineBoardProps {
 export function PipelineBoard({ items, onCardClick }: PipelineBoardProps) {
   const [activeItem, setActiveItem] = useState<PipelineItem | null>(null);
   const moveItem = useMovePipelineItem();
+  const { data: asignaciones } = usePipelineAsignaciones();
+
+  // Build a map of pipeline_id -> vendor info for quick card lookups
+  const assignmentMap = useMemo(() => {
+    const map: Record<string, { nombre: string; email: string }> = {};
+    for (const a of asignaciones || []) {
+      const vendor = a.vendedores as any;
+      if (vendor) {
+        map[a.pipeline_id] = { nombre: vendor.nombre, email: vendor.email };
+      }
+    }
+    return map;
+  }, [asignaciones]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -116,6 +130,7 @@ export function PipelineBoard({ items, onCardClick }: PipelineBoardProps) {
             config={config}
             items={columnItems[config.key]}
             onCardClick={onCardClick}
+            assignmentMap={assignmentMap}
           />
         ))}
       </div>

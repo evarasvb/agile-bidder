@@ -46,6 +46,10 @@ import Calendar from "./pages/Calendar";
 import CalendarioIntegrado from "./pages/CalendarioIntegrado";
 import GestionVendedores from "./pages/GestionVendedores";
 
+// Equipo
+import Equipo from "./pages/Equipo";
+import VendedorDetalle from "./pages/VendedorDetalle";
+
 // Configuracion
 import ConfiguracionOportunidades from "./pages/ConfiguracionOportunidades";
 import Users from "./pages/Users";
@@ -120,6 +124,10 @@ const App = () => (
 
             {/* ----- PIPELINE ----- */}
             <Route path="/pipeline" element={<Pipeline />} />
+
+            {/* ----- EQUIPO ----- */}
+            <Route path="/equipo" element={<Equipo />} />
+            <Route path="/equipo/:id" element={<VendedorDetalle />} />
 
                         {/* ----- INVENTARIO / LISTA DE PRECIOS ----- */}
             <Route path="/inventario" element={<Inventory />} />
