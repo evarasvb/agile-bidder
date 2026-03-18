@@ -54,8 +54,8 @@ export function useEquipoMembers() {
   return useQuery({
     queryKey: [EQUIPO_KEY, 'members'],
     queryFn: async (): Promise<Vendedor[]> => {
-      const { data, error } = await supabase
-        .from('vendedores')
+      const { data, error } = await (supabase
+        .from as any)('vendedores')
         .select('*')
         .order('nombre');
 
@@ -69,8 +69,8 @@ export function useEquipoDashboard() {
   return useQuery({
     queryKey: [EQUIPO_KEY, 'dashboard'],
     queryFn: async (): Promise<VendedorDashboard[]> => {
-      const { data, error } = await supabase
-        .from('v_equipo_dashboard')
+      const { data, error } = await (supabase
+        .from as any)('v_equipo_dashboard')
         .select('*')
         .order('ingresos_generados', { ascending: false });
 
@@ -85,8 +85,8 @@ export function useVendedorDetail(vendedorId: string | undefined) {
     queryKey: [EQUIPO_KEY, 'detail', vendedorId],
     queryFn: async (): Promise<VendedorDashboard | null> => {
       if (!vendedorId) return null;
-      const { data, error } = await supabase
-        .from('v_equipo_dashboard')
+      const { data, error } = await (supabase
+        .from as any)('v_equipo_dashboard')
         .select('*')
         .eq('vendedor_id', vendedorId)
         .maybeSingle();
@@ -103,8 +103,8 @@ export function useVendedorPipelineItems(vendedorId: string | undefined) {
     queryKey: [EQUIPO_KEY, 'pipeline-items', vendedorId],
     queryFn: async () => {
       if (!vendedorId) return [];
-      const { data, error } = await supabase
-        .from('asignaciones')
+      const { data, error } = await (supabase
+        .from as any)('asignaciones')
         .select(`
           id,
           pipeline_id,
@@ -137,8 +137,8 @@ export function usePipelineAsignaciones() {
   return useQuery({
     queryKey: [ASIGNACIONES_KEY],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('asignaciones')
+      const { data, error } = await (supabase
+        .from as any)('asignaciones')
         .select(`
           id,
           vendedor_id,
@@ -175,15 +175,15 @@ export function useAsignarPipeline() {
       if (!user?.id) throw new Error('No autenticado');
 
       // Upsert: if assignment exists for this pipeline, update it
-      const { data: existing } = await supabase
-        .from('asignaciones')
+      const { data: existing } = await (supabase
+        .from as any)('asignaciones')
         .select('id')
         .eq('pipeline_id', pipelineId)
         .maybeSingle();
 
       if (existing) {
-        const { data, error } = await supabase
-          .from('asignaciones')
+        const { data, error } = await (supabase
+          .from as any)('asignaciones')
           .update({
             vendedor_id: vendedorId,
             asignado_por: user.id,
@@ -197,8 +197,8 @@ export function useAsignarPipeline() {
         return data;
       }
 
-      const { data, error } = await supabase
-        .from('asignaciones')
+      const { data, error } = await (supabase
+        .from as any)('asignaciones')
         .insert({
           pipeline_id: pipelineId,
           vendedor_id: vendedorId,
@@ -245,8 +245,8 @@ export function useInvitarMiembro() {
       rol: string;
       telefono?: string;
     }) => {
-      const { data, error } = await supabase
-        .from('vendedores')
+      const { data, error } = await (supabase
+        .from as any)('vendedores')
         .insert({
           nombre,
           email,
@@ -279,8 +279,8 @@ export function useUpdateVendedor() {
       id,
       ...updates
     }: Partial<Vendedor> & { id: string }) => {
-      const { data, error } = await supabase
-        .from('vendedores')
+      const { data, error } = await (supabase
+        .from as any)('vendedores')
         .update({
           ...updates,
           updated_at: new Date().toISOString(),
@@ -307,8 +307,8 @@ export function useToggleVendedorActivo() {
 
   return useMutation({
     mutationFn: async ({ id, activo }: { id: string; activo: boolean }) => {
-      const { data, error } = await supabase
-        .from('vendedores')
+      const { data, error } = await (supabase
+        .from as any)('vendedores')
         .update({ activo, updated_at: new Date().toISOString() })
         .eq('id', id)
         .select()
