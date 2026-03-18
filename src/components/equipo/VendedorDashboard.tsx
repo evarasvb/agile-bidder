@@ -62,7 +62,7 @@ export function VendedorDashboard({ vendedor }: VendedorDashboardProps) {
     .slice(0, 2);
 
   // Calculate stage distribution for pie chart
-  const stageDistribution = (pipelineItems || []).reduce<Record<string, number>>((acc, item) => {
+  const stageDistribution = ((pipelineItems || []) as any[]).reduce<Record<string, number>>((acc: Record<string, number>, item: any) => {
     const pipeline = item.pipeline as any;
     if (pipeline?.etapa) {
       acc[pipeline.etapa] = (acc[pipeline.etapa] || 0) + 1;
