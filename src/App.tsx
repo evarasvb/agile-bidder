@@ -20,6 +20,10 @@ import MisOportunidades from "./pages/MisOportunidades";
 import LicitacionDetalle from "./pages/LicitacionDetalle";
 import Licitaciones from "./pages/Licitaciones";
 
+// Oportunidades Panel
+import OportunidadesPanel from "./pages/Oportunidades";
+import OportunidadDetalle from "./pages/OportunidadDetalle";
+
 // Mercado
 import Mercado from "./pages/Mercado";
 import Instituciones from "./pages/Instituciones";
@@ -82,7 +86,11 @@ const App = () => (
             <Route path="/mis-oportunidades" element={<MisOportunidades />} />
             <Route path="/licitaciones/:id" element={<LicitacionDetalle />} />
                       <Route path="/licitaciones" element={<Licitaciones />} />
-            
+
+            {/* ----- OPORTUNIDADES PANEL ----- */}
+            <Route path="/oportunidades" element={<OportunidadesPanel />} />
+            <Route path="/oportunidades/:tipo/:id" element={<OportunidadDetalle />} />
+
             {/* ----- MERCADO ----- */}
             <Route path="/mercado" element={<Mercado />} />
             
