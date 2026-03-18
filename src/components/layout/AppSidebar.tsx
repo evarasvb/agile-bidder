@@ -17,6 +17,9 @@ import {
   ChevronDown,
   ChevronRight,
   Crosshair,
+  TrendingUp,
+  Swords,
+  FileCheck,
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -79,6 +82,15 @@ const navItems: NavItem[] = [
     title: "Reportes",
     url: "/reportes",
     icon: BarChart3,
+    children: [
+      { title: "Hub", url: "/reportes", icon: BarChart3 },
+      { title: "Proveedores", url: "/reportes/proveedores", icon: Users },
+      { title: "Productos", url: "/reportes/productos", icon: Package },
+      { title: "Compradores", url: "/reportes/compradores", icon: Building2 },
+      { title: "Mercado", url: "/reportes/mercado", icon: TrendingUp },
+      { title: "Competidores", url: "/reportes/competidores", icon: Swords },
+      { title: "Convenio Marco", url: "/reportes/convenio-marco", icon: FileCheck },
+    ],
   },
   {
     title: "Configuración",
