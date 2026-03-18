@@ -10,7 +10,8 @@ import {
   Calendar,
   Users,
   CreditCard,
-    Package,
+  Package,
+  Kanban,
   ChevronDown,
   ChevronRight,
   Crosshair,
@@ -43,7 +44,12 @@ const navItems: NavItem[] = [
     icon: Crosshair
   },
   {
-    title: "Mercado", 
+    title: "Pipeline",
+    url: "/pipeline",
+    icon: Kanban
+  },
+  {
+    title: "Mercado",
     url: "/mercado", 
     icon: Store,
     children: [
