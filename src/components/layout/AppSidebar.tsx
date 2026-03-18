@@ -56,6 +56,11 @@ const navItems: NavItem[] = [
     icon: Kanban,
   },
   {
+    title: "Calendario",
+    url: "/calendario",
+    icon: Calendar,
+  },
+  {
     title: "Mercado",
     url: "/mercado",
     icon: Store,
