@@ -1488,6 +1488,81 @@ export type Database = {
           },
         ]
       }
+      pipeline: {
+        Row: {
+          id: string
+          user_id: string
+          oportunidad_id: string
+          oportunidad_tipo: string
+          etapa: Database["public"]["Enums"]["pipeline_etapa"]
+          titulo: string
+          institucion: string | null
+          monto_estimado: number | null
+          fecha_cierre: string | null
+          match_score: number | null
+          notas: string | null
+          archivos: Json | null
+          asignado_a: string | null
+          etapa_historial: Json | null
+          posicion: number | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          oportunidad_id: string
+          oportunidad_tipo?: string
+          etapa?: Database["public"]["Enums"]["pipeline_etapa"]
+          titulo: string
+          institucion?: string | null
+          monto_estimado?: number | null
+          fecha_cierre?: string | null
+          match_score?: number | null
+          notas?: string | null
+          archivos?: Json | null
+          asignado_a?: string | null
+          etapa_historial?: Json | null
+          posicion?: number | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          oportunidad_id?: string
+          oportunidad_tipo?: string
+          etapa?: Database["public"]["Enums"]["pipeline_etapa"]
+          titulo?: string
+          institucion?: string | null
+          monto_estimado?: number | null
+          fecha_cierre?: string | null
+          match_score?: number | null
+          notas?: string | null
+          archivos?: Json | null
+          asignado_a?: string | null
+          etapa_historial?: Json | null
+          posicion?: number | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_asignado_a_fkey"
+            columns: ["asignado_a"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ordenes_compra: {
         Row: {
           codigo: string
@@ -2696,6 +2771,7 @@ export type Database = {
     Enums: {
       app_role: "admin" | "user" | "super_admin" | "vendedor" | "visor"
       notification_frequency: "immediate" | "daily" | "weekly"
+      pipeline_etapa: "descubierta" | "seguimiento" | "preparacion" | "postulada" | "evaluacion" | "adjudicada" | "oc_emitida" | "pagada"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2825,6 +2901,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "user", "super_admin", "vendedor", "visor"],
       notification_frequency: ["immediate", "daily", "weekly"],
+      pipeline_etapa: ["descubierta", "seguimiento", "preparacion", "postulada", "evaluacion", "adjudicada", "oc_emitida", "pagada"],
     },
   },
 } as const

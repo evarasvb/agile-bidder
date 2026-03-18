@@ -34,6 +34,9 @@ import OrdenesCompra from "./pages/OrdenesCompra";
 // Inventario / Lista de Precios
 import Inventory from "./pages/Inventory";
 
+// Pipeline
+import Pipeline from "./pages/Pipeline";
+
 // Dashboard
 import Dashboard from "./pages/Dashboard";
 import Calendar from "./pages/Calendar";
@@ -99,6 +102,9 @@ const App = () => (
               <Route path="/compras-agiles/:codigo" element={<CompraAgilDetalle />} />
             <Route path="/mercado/instituciones" element={<Instituciones />} />
             <Route path="/mercado/ordenes" element={<OrdenesCompra />} />
+
+            {/* ----- PIPELINE ----- */}
+            <Route path="/pipeline" element={<Pipeline />} />
 
                         {/* ----- INVENTARIO / LISTA DE PRECIOS ----- */}
             <Route path="/inventario" element={<Inventory />} />
