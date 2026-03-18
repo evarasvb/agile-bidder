@@ -9,6 +9,7 @@ interface PipelineColumnProps {
   config: EtapaConfig;
   items: PipelineItem[];
   onCardClick: (item: PipelineItem) => void;
+  assignmentMap?: Record<string, { nombre: string; email: string }>;
 }
 
 function formatCLP(amount: number): string {
@@ -17,7 +18,7 @@ function formatCLP(amount: number): string {
   return `$${amount}`;
 }
 
-export function PipelineColumn({ config, items, onCardClick }: PipelineColumnProps) {
+export function PipelineColumn({ config, items, onCardClick, assignmentMap }: PipelineColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: config.key,
     data: { etapa: config.key },
@@ -58,7 +59,12 @@ export function PipelineColumn({ config, items, onCardClick }: PipelineColumnPro
       >
         <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
           {items.map((item) => (
-            <PipelineCard key={item.id} item={item} onClick={onCardClick} />
+            <PipelineCard
+              key={item.id}
+              item={item}
+              onClick={onCardClick}
+              assignedVendor={assignmentMap?.[item.id] || null}
+            />
           ))}
         </SortableContext>
 

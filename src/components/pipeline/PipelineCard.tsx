@@ -1,15 +1,20 @@
+import { useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { format, differenceInDays, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Clock, Building2, DollarSign, GripVertical } from 'lucide-react';
+import { Clock, Building2, DollarSign, GripVertical, UserPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { AsignarPipelineModal } from '@/components/equipo/AsignarPipelineModal';
 import type { PipelineItem } from './pipelineConstants';
 
 interface PipelineCardProps {
   item: PipelineItem;
   onClick: (item: PipelineItem) => void;
+  assignedVendor?: { nombre: string; email: string } | null;
 }
 
 function formatCLP(amount: number): string {
@@ -27,7 +32,8 @@ function getDaysInStage(item: PipelineItem): number {
   return differenceInDays(new Date(), parseISO(lastEntry.fecha));
 }
 
-export function PipelineCard({ item, onClick }: PipelineCardProps) {
+export function PipelineCard({ item, onClick, assignedVendor }: PipelineCardProps) {
+  const [assignOpen, setAssignOpen] = useState(false);
   const {
     attributes,
     listeners,
@@ -109,6 +115,54 @@ export function PipelineCard({ item, onClick }: PipelineCardProps) {
             </div>
           )}
 
+          {/* Assigned vendor + assign button */}
+          <div className="flex items-center gap-1.5 pt-1">
+            {assignedVendor ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Avatar className="h-5 w-5 cursor-default">
+                    <AvatarFallback className="text-[9px] bg-primary/15 text-primary font-medium">
+                      {assignedVendor.nombre
+                        .split(' ')
+                        .map((n) => n[0])
+                        .join('')
+                        .slice(0, 2)}
+                    </AvatarFallback>
+                  </Avatar>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p className="text-xs font-medium">{assignedVendor.nombre}</p>
+                  <p className="text-xs text-muted-foreground">{assignedVendor.email}</p>
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAssignOpen(true);
+                }}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                title="Asignar vendedor"
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                <span className="hidden group-hover:inline">Asignar</span>
+              </button>
+            )}
+            <div className="flex-1" />
+            {assignedVendor && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAssignOpen(true);
+                }}
+                className="text-xs text-muted-foreground hover:text-primary transition-colors opacity-0 group-hover:opacity-100"
+                title="Reasignar"
+              >
+                <UserPlus className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+
           {/* Footer: deadline + days in stage */}
           <div className="flex items-center justify-between pt-1">
             {item.fecha_cierre ? (
@@ -131,6 +185,13 @@ export function PipelineCard({ item, onClick }: PipelineCardProps) {
           </div>
         </div>
       </div>
+
+      {/* Assignment modal */}
+      <AsignarPipelineModal
+        open={assignOpen}
+        onOpenChange={setAssignOpen}
+        item={item}
+      />
     </div>
   );
 }

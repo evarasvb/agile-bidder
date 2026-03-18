@@ -76,6 +76,11 @@ const navItems: NavItem[] = [
     icon: Zap,
   },
   {
+    title: "Equipo",
+    url: "/equipo",
+    icon: Users,
+  },
+  {
     title: "Reportes",
     url: "/reportes",
     icon: BarChart3,
