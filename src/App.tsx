@@ -40,6 +40,7 @@ import Pipeline from "./pages/Pipeline";
 // Dashboard
 import Dashboard from "./pages/Dashboard";
 import Calendar from "./pages/Calendar";
+import CalendarioIntegrado from "./pages/CalendarioIntegrado";
 import GestionVendedores from "./pages/GestionVendedores";
 
 // Configuracion
@@ -115,6 +116,7 @@ const App = () => (
             {/* ----- DASHBOARD ----- */}
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/dashboard/calendario" element={<Calendar />} />
+            <Route path="/calendario" element={<CalendarioIntegrado />} />
             <Route path="/dashboard/vendedores" element={<GestionVendedores />} />
             
             {/* ----- REPORTES ----- */}
