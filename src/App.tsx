@@ -50,6 +50,9 @@ import Users from "./pages/Users";
 import Cuenta from "./pages/Cuenta";
 import Billing from "./pages/Billing";
 
+// Reportes
+import Reportes from "./pages/Reportes";
+
 // Admin (oculto)
 import AdminEvaristo from "./pages/AdminEvaristo";
 
@@ -114,6 +117,9 @@ const App = () => (
             <Route path="/dashboard/calendario" element={<Calendar />} />
             <Route path="/dashboard/vendedores" element={<GestionVendedores />} />
             
+            {/* ----- REPORTES ----- */}
+            <Route path="/reportes" element={<Reportes />} />
+
             {/* ----- CONFIGURACION ----- */}
             <Route path="/configuracion" element={<ConfiguracionOportunidades />} />
             <Route path="/configuracion/equipo" element={<Users />} />
@@ -123,8 +129,8 @@ const App = () => (
             <Route path="/cuenta/facturacion" element={<Billing />} />
             
             {/* Redirects de rutas antiguas */}
-            <Route path="/dashboard-old" element={<Navigate to="/mis-oportunidades" replace />} />
-            <Route path="/clientes/*" element={<Navigate to="/mis-oportunidades" replace />} />
+            <Route path="/dashboard-old" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/clientes/*" element={<Navigate to="/dashboard" replace />} />
             
             {/* 404 */}
             <Route path="*" element={<NotFound />} />
