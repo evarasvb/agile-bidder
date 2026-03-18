@@ -1,0 +1,140 @@
+# Seed completo de datos 2026 desde MercadoPúblico
+# Ejecuta los 3 scripts de seed secuencialmente: compras ágiles, licitaciones OCDS, convenio marco
+name: Seed 2026 Complete Data
+
+on:
+  workflow_dispatch:
+    inputs:
+      scripts:
+        description: 'Scripts to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - compras-agiles
+          - licitaciones-ocds
+          - convenio-marco
+      months:
+        description: 'Months to import (comma-separated, e.g. "01,02,03")'
+        required: false
+        default: '01,02'
+      ocds_types:
+        description: 'OCDS types (licitaciones,trato_directo,convenio_marco)'
+        required: false
+        default: 'licitaciones,trato_directo,convenio_marco'
+      skip_details:
+        description: 'Skip fetching OCDS tender details (faster but less data)'
+        required: false
+        default: 'false'
+        type: boolean
+      detail_concurrency:
+        description: 'Concurrent detail fetch requests for OCDS'
+        required: false
+        default: '5'
+
+jobs:
+  seed-compras-agiles:
+    if: ${{ github.event.inputs.scripts == 'all' || github.event.inputs.scripts == 'compras-agiles' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Seed Compras Ágiles
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          MONTHS: ${{ github.event.inputs.months || '01,02' }}
+        run: npx tsx scripts/seed-compras-agiles.ts
+
+  seed-licitaciones-ocds:
+    if: ${{ github.event.inputs.scripts == 'all' || github.event.inputs.scripts == 'licitaciones-ocds' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # OCDS detail fetching can take a long time
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Seed Licitaciones OCDS
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          MONTHS: ${{ github.event.inputs.months || '01,02,03' }}
+          TYPES: ${{ github.event.inputs.ocds_types || 'licitaciones,trato_directo,convenio_marco' }}
+          SKIP_DETAILS: ${{ github.event.inputs.skip_details || 'false' }}
+          DETAIL_CONCURRENCY: ${{ github.event.inputs.detail_concurrency || '5' }}
+        run: npx tsx scripts/seed-licitaciones-ocds.ts
+
+  seed-convenio-marco:
+    if: ${{ github.event.inputs.scripts == 'all' || github.event.inputs.scripts == 'convenio-marco' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Seed Convenio Marco
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npx tsx scripts/seed-convenio-marco.ts
+
+  summary:
+    if: always()
+    needs: [seed-compras-agiles, seed-licitaciones-ocds, seed-convenio-marco]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summary
+        run: |
+          echo "======================================"
+          echo "SEED 2026 COMPLETE — FINISHED"
+          echo "======================================"
+          echo "Scripts requested: ${{ github.event.inputs.scripts || 'all' }}"
+          echo "Months: ${{ github.event.inputs.months || '01,02' }}"
+          echo ""
+          echo "Job statuses:"
+          echo "  Compras Ágiles  : ${{ needs.seed-compras-agiles.result }}"
+          echo "  Licitaciones    : ${{ needs.seed-licitaciones-ocds.result }}"
+          echo "  Convenio Marco  : ${{ needs.seed-convenio-marco.result }}"
+          echo ""
+          echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          echo "======================================"
