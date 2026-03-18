@@ -1,115 +1,141 @@
 import { useState } from "react";
-import { 
-  Search, 
-  Gavel, 
-  Clock, 
-  TrendingUp, 
-  AlertTriangle,
+import {
   Target,
+  Zap,
+  DollarSign,
+  TrendingUp,
+  TrendingDown,
   ArrowRight,
-  Trophy,
-  FileCheck,
+  Clock,
+  Eye,
+  Plus,
   Loader2,
   Sparkles,
   RefreshCw,
   Inbox,
-  BarChart3,
-  Zap,
+  AlertTriangle,
   Info,
-  HelpCircle
+  BarChart3,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { 
-  useDashboardMetrics, 
-  useWeeklyMatchData, 
-  useLicitacionesUrgentes 
-} from "@/hooks/useDashboard";
-import { useOportunidadesStats } from "@/hooks/useOportunidades";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  useDashboardKPIs,
+  usePipelineByStage,
+  useOportunidadesPorTipo,
+  useCierresProximos,
+  useUltimosMatches,
+} from "@/hooks/useDashboardPrincipal";
 import { useMatchingAI } from "@/hooks/useMatching";
-import { 
-  AreaChart, 
-  Area, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip as RechartsTooltip, 
-  ResponsiveContainer,
-  Legend,
+import {
   BarChart,
-  Bar
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
 } from "recharts";
 import { Link } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { 
-  MetricCardSkeleton, 
-  ChartSkeleton, 
-  ValueCardSkeleton, 
-  UrgentListSkeleton, 
-  StatsCardSkeleton 
+import {
+  MetricCardSkeleton,
+  ChartSkeleton,
 } from "@/components/dashboard/DashboardSkeleton";
 import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
-import { OportunidadesTable } from "@/components/dashboard/OportunidadesTable";
 import { FirmaVBHeader } from "@/components/layout/FirmaVBHeader";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+
+const PIE_COLORS = [
+  "hsl(var(--firmavb-blue))",
+  "hsl(var(--firmavb-green))",
+];
+
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat("es-CL", {
+    style: "currency",
+    currency: "CLP",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value);
+
+const formatCompact = (value: number) => {
+  if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
+  if (value >= 1000000) return `$${(value / 1000000).toFixed(0)}M`;
+  return formatCurrency(value);
+};
 
 export default function Dashboard() {
-  const { data: metrics, isLoading: metricsLoading, error: metricsError, refetch: refetchMetrics } = useDashboardMetrics();
-  const { data: weeklyData, isLoading: chartLoading, error: chartError } = useWeeklyMatchData();
-  const { data: urgentes, isLoading: urgentesLoading, error: urgentesError } = useLicitacionesUrgentes();
-  const { data: stats, isLoading: statsLoading } = useOportunidadesStats();
+  const {
+    data: kpis,
+    isLoading: kpisLoading,
+    error: kpisError,
+    refetch: refetchKPIs,
+  } = useDashboardKPIs();
+  const { data: pipelineData, isLoading: pipelineLoading } =
+    usePipelineByStage();
+  const { data: porTipoData, isLoading: porTipoLoading } =
+    useOportunidadesPorTipo();
+  const { data: cierresData, isLoading: cierresLoading } =
+    useCierresProximos();
+  const { data: matchesData, isLoading: matchesLoading } =
+    useUltimosMatches();
   const { mutate: runMatching, isPending: isMatching } = useMatchingAI();
   const [matchingDialogOpen, setMatchingDialogOpen] = useState(false);
-  const [matchingPreview, setMatchingPreview] = useState<{ total: number; comprasAgiles: number; licitaciones: number } | null>(null);
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-CL', {
-      style: 'currency',
-      currency: 'CLP',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const formatCompact = (value: number) => {
-    if (value >= 1000000000) {
-      return `$${(value / 1000000000).toFixed(1)}B`;
-    }
-    if (value >= 1000000) {
-      return `$${(value / 1000000).toFixed(0)}M`;
-    }
-    return formatCurrency(value);
-  };
-
-  if (metricsError) {
-    console.error('[Dashboard] Metrics error:', metricsError);
-  }
+  const [matchingPreview, setMatchingPreview] = useState<{
+    total: number;
+    comprasAgiles: number;
+    licitaciones: number;
+  } | null>(null);
 
   const handleMatchingClick = async () => {
-    // Cargar preview antes de ejecutar
     try {
       const { data: comprasAgiles } = await supabase
-        .from('compras_agiles')
-        .select('codigo', { count: 'exact' })
-        .or('match_encontrado.eq.false,match_encontrado.is.null')
-        .limit(1000);
-      
-      const { data: licitaciones } = await supabase
-        .from('licitaciones')
-        .select('id_licitacion', { count: 'exact' })
-        .eq('procesada', false)
+        .from("compras_agiles")
+        .select("codigo", { count: "exact" })
+        .or("match_encontrado.eq.false,match_encontrado.is.null")
         .limit(1000);
 
-      const total = (comprasAgiles?.length || 0) + (licitaciones?.length || 0);
-      
+      const { data: licitaciones } = await supabase
+        .from("licitaciones")
+        .select("id_licitacion", { count: "exact" })
+        .eq("procesada", false)
+        .limit(1000);
+
+      const total =
+        (comprasAgiles?.length || 0) + (licitaciones?.length || 0);
+
       if (total === 0) {
         toast({
-          title: 'Sin compras ágiles nuevas',
-          description: 'Todas las compras ágiles ya han sido procesadas'
+          title: "Sin oportunidades nuevas",
+          description: "Todas las oportunidades ya han sido procesadas",
         });
         return;
       }
@@ -121,8 +147,7 @@ export default function Dashboard() {
       });
       setMatchingDialogOpen(true);
     } catch (error) {
-      console.error('Error loading preview:', error);
-      // Si falla el preview, ejecutar directamente
+      console.error("Error loading preview:", error);
       runMatching();
     }
   };
@@ -133,7 +158,7 @@ export default function Dashboard() {
   };
 
   const handleForceRefresh = async () => {
-    await refetchMetrics();
+    await refetchKPIs();
     toast({
       title: "Datos actualizados",
       description: "Se han recargado las métricas del dashboard",
@@ -142,9 +167,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header with FirmaVB Branding */}
+      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <FirmaVBHeader 
+        <FirmaVBHeader
           title="Dashboard"
           subtitle="Resumen de oportunidades y rendimiento"
         />
@@ -155,22 +180,29 @@ export default function Dashboard() {
                 variant="outline"
                 size="sm"
                 onClick={handleForceRefresh}
-                disabled={metricsLoading}
+                disabled={kpisLoading}
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${metricsLoading ? 'animate-spin' : ''}`} />
+                <RefreshCw
+                  className={`h-4 w-4 mr-2 ${kpisLoading ? "animate-spin" : ""}`}
+                />
                 Actualizar
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p className="text-xs">Actualiza las métricas del dashboard</p>
+              <p className="text-xs">
+                Actualiza las métricas del dashboard
+              </p>
             </TooltipContent>
           </Tooltip>
 
-          <Dialog open={matchingDialogOpen} onOpenChange={setMatchingDialogOpen}>
+          <Dialog
+            open={matchingDialogOpen}
+            onOpenChange={setMatchingDialogOpen}
+          >
             <Tooltip>
               <TooltipTrigger asChild>
                 <DialogTrigger asChild>
-                  <Button 
+                  <Button
                     onClick={handleMatchingClick}
                     disabled={isMatching}
                     className="bg-firmavb-blue hover:bg-firmavb-blue/90 text-white shadow-lg"
@@ -190,7 +222,10 @@ export default function Dashboard() {
                 </DialogTrigger>
               </TooltipTrigger>
               <TooltipContent>
-                <p className="text-xs">Analiza compras ágiles y encuentra matches con tu inventario usando IA</p>
+                <p className="text-xs">
+                  Analiza oportunidades y encuentra matches con tu inventario
+                  usando IA
+                </p>
               </TooltipContent>
             </Tooltip>
             <DialogContent>
@@ -200,42 +235,61 @@ export default function Dashboard() {
                   Ejecutar Matching con IA
                 </DialogTitle>
                 <DialogDescription>
-                  El sistema analizará las compras ágiles y licitaciones pendientes para encontrar matches con tu inventario.
+                  El sistema analizará las compras ágiles y licitaciones
+                  pendientes para encontrar matches con tu inventario.
                 </DialogDescription>
               </DialogHeader>
               {matchingPreview && (
                 <div className="space-y-4 py-4">
                   <div className="p-4 rounded-lg bg-muted/50 border border-border">
-                    <p className="text-sm font-medium mb-3">Resumen de procesamiento:</p>
+                    <p className="text-sm font-medium mb-3">
+                      Resumen de procesamiento:
+                    </p>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Total a procesar:</span>
-                        <span className="font-semibold">{matchingPreview.total}</span>
+                        <span className="text-muted-foreground">
+                          Total a procesar:
+                        </span>
+                        <span className="font-semibold">
+                          {matchingPreview.total}
+                        </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Compras Ágiles:</span>
-                        <span className="font-medium">{matchingPreview.comprasAgiles}</span>
+                        <span className="text-muted-foreground">
+                          Compras Ágiles:
+                        </span>
+                        <span className="font-medium">
+                          {matchingPreview.comprasAgiles}
+                        </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Licitaciones:</span>
-                        <span className="font-medium">{matchingPreview.licitaciones}</span>
+                        <span className="text-muted-foreground">
+                          Licitaciones:
+                        </span>
+                        <span className="font-medium">
+                          {matchingPreview.licitaciones}
+                        </span>
                       </div>
                     </div>
                   </div>
                   <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
                     <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
                     <p className="text-xs text-blue-900 dark:text-blue-100">
-                      <strong>Nota:</strong> El proceso puede tomar varios minutos dependiendo de la cantidad de compras ágiles. 
-                      Los resultados se mostrarán automáticamente al finalizar.
+                      <strong>Nota:</strong> El proceso puede tomar varios
+                      minutos. Los resultados se mostrarán automáticamente al
+                      finalizar.
                     </p>
                   </div>
                 </div>
               )}
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setMatchingDialogOpen(false)}>
+                <Button
+                  variant="outline"
+                  onClick={() => setMatchingDialogOpen(false)}
+                >
                   Cancelar
                 </Button>
-                <Button 
+                <Button
                   onClick={handleConfirmMatching}
                   disabled={isMatching}
                   className="bg-firmavb-blue hover:bg-firmavb-blue/90"
@@ -246,7 +300,7 @@ export default function Dashboard() {
                       Procesando...
                     </>
                   ) : (
-                    'Ejecutar Matching'
+                    "Ejecutar Matching"
                   )}
                 </Button>
               </div>
@@ -255,29 +309,36 @@ export default function Dashboard() {
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Badge variant="outline" className="gap-1.5 px-3 py-1.5 border-firmavb-green cursor-help">
+              <Badge
+                variant="outline"
+                className="gap-1.5 px-3 py-1.5 border-firmavb-green cursor-help"
+              >
                 <span className="h-2 w-2 rounded-full bg-firmavb-green animate-pulse" />
                 En vivo
               </Badge>
             </TooltipTrigger>
             <TooltipContent>
-              <p className="text-xs">Sistema activo y actualizando datos en tiempo real</p>
+              <p className="text-xs">
+                Sistema activo y actualizando datos en tiempo real
+              </p>
             </TooltipContent>
           </Tooltip>
         </div>
       </div>
 
       {/* Error Banner */}
-      {metricsError && (
+      {kpisError && (
         <div className="bg-firmavb-red/10 border border-firmavb-red/20 rounded-lg px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2 text-firmavb-red">
             <AlertTriangle className="h-4 w-4" />
-            <span className="text-sm font-medium">Error al cargar datos del dashboard</span>
+            <span className="text-sm font-medium">
+              Error al cargar datos del dashboard
+            </span>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => refetchMetrics()}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetchKPIs()}
             className="border-firmavb-red/30 text-firmavb-red hover:bg-firmavb-red/10"
           >
             Reintentar
@@ -285,9 +346,9 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* KPI Metrics Grid */}
+      {/* Row 1: KPI Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {metricsLoading || statsLoading ? (
+        {kpisLoading ? (
           <>
             <MetricCardSkeleton />
             <MetricCardSkeleton />
@@ -296,103 +357,99 @@ export default function Dashboard() {
           </>
         ) : (
           <>
-            <MetricCard
+            <KPICard
               title="Oportunidades Activas"
-              value={stats?.oportunidadesActivas || metrics?.licitacionesActivas || 0}
-              subtitle={`${stats?.totalOportunidades || metrics?.totalLicitaciones || 0} total`}
+              value={kpis?.oportunidadesActivas || 0}
               icon={Target}
               color="blue"
+              trend={kpis?.oportunidadesActivasTrend}
             />
-            <MetricCard
-              title="Match Rate"
-              value={`${stats?.matchRate || metrics?.porcentajeMatches || 0}%`}
-              subtitle={`${stats?.conMatch || metrics?.matchesEncontrados || 0} matches encontrados`}
+            <KPICard
+              title="Match Score Promedio"
+              value={`${kpis?.matchScorePromedio || 0}%`}
               icon={Zap}
               color="green"
-              trend={stats?.matchRate ? `${stats.matchRate}%` : undefined}
+              trend={kpis?.matchScorePromedioTrend}
             />
-            <MetricCard
-              title="Ofertas Enviadas"
-              value={metrics?.ofertasEnviadas || 0}
-              subtitle={`${metrics?.ofertasPendientes || 0} pendientes`}
-              icon={FileCheck}
+            <KPICard
+              title="Monto en Pipeline"
+              value={formatCompact(kpis?.montoEnPipeline || 0)}
+              icon={DollarSign}
               color="amber"
+              trend={kpis?.montoEnPipelineTrend}
             />
-            <MetricCard
-              title="Valor Potencial"
-              value={formatCompact(stats?.valorPotencial || metrics?.valorPotencial || 0)}
-              subtitle="En oportunidades con match"
-              icon={Gavel}
+            <KPICard
+              title="Tasa de Éxito"
+              value={`${kpis?.tasaExito || 0}%`}
+              icon={TrendingUp}
               color="emerald"
+              trend={kpis?.tasaExitoTrend}
             />
           </>
         )}
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        {/* Chart Section - Takes 2 columns */}
-        {chartLoading ? (
+      {/* Row 2: Two Charts Side by Side */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        {/* Pipeline por Etapa */}
+        {pipelineLoading ? (
           <ChartSkeleton />
-        ) : chartError ? (
-          <Card className="xl:col-span-2 border-border/50 shadow-sm">
-            <CardContent className="h-[320px] flex flex-col items-center justify-center text-firmavb-red">
-              <AlertTriangle className="h-10 w-10 mb-3 opacity-70" />
-              <p className="text-sm font-medium">Error al cargar gráfico</p>
-            </CardContent>
-          </Card>
         ) : (
-          <Card className="xl:col-span-2 border-border/50 shadow-sm">
+          <Card className="border-border/50 shadow-sm">
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-heading font-semibold flex items-center gap-2">
                 <BarChart3 className="h-4 w-4 text-firmavb-blue" />
-                Tendencia Semanal
+                Pipeline por Etapa
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {!weeklyData?.length ? (
+              {!pipelineData?.length ? (
                 <div className="h-[280px] flex flex-col items-center justify-center text-muted-foreground">
                   <Inbox className="h-10 w-10 mb-3 opacity-50" />
-                  <p className="text-sm">Sin datos para mostrar</p>
-                  <p className="text-xs">Los datos aparecerán cuando haya actividad</p>
+                  <p className="text-sm">Sin datos de pipeline</p>
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={weeklyData} barCategoryGap="20%">
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
-                    <XAxis 
-                      dataKey="semana" 
+                  <BarChart data={pipelineData} barCategoryGap="20%">
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      className="stroke-muted"
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey="etapa"
+                      tick={{ fontSize: 11 }}
+                      className="text-muted-foreground"
+                      axisLine={false}
+                      tickLine={false}
+                      interval={0}
+                      angle={-20}
+                      textAnchor="end"
+                      height={50}
+                    />
+                    <YAxis
                       tick={{ fontSize: 12 }}
                       className="text-muted-foreground"
                       axisLine={false}
                       tickLine={false}
                     />
-                    <YAxis 
-                      tick={{ fontSize: 12 }}
-                      className="text-muted-foreground"
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <RechartsTooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
-                        boxShadow: 'var(--shadow-md)',
+                    <RechartsTooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
                       }}
-                      labelStyle={{ color: 'hsl(var(--foreground))' }}
+                      formatter={(value: number, name: string) => {
+                        if (name === "monto")
+                          return [formatCompact(value), "Monto"];
+                        return [value, "Cantidad"];
+                      }}
                     />
                     <Legend />
                     <Bar
-                      dataKey="licitaciones"
-                      name="Licitaciones"
-                      fill="hsl(var(--firmavb-celeste))"
-                      radius={[4, 4, 0, 0]}
-                    />
-                    <Bar
-                      dataKey="matches"
-                      name="Matches"
-                      fill="hsl(var(--firmavb-green))"
+                      dataKey="count"
+                      name="Cantidad"
+                      fill="hsl(var(--firmavb-blue))"
                       radius={[4, 4, 0, 0]}
                     />
                   </BarChart>
@@ -402,142 +459,310 @@ export default function Dashboard() {
           </Card>
         )}
 
-        {/* Right Sidebar */}
-        <div className="space-y-4">
-          {/* Value Summary Card */}
-          {metricsLoading ? (
-            <ValueCardSkeleton />
-          ) : (
-            <Card className="border-0 shadow-lg bg-gradient-to-br from-firmavb-blue to-firmavb-blue/80 text-white overflow-hidden relative">
-              <div className="absolute inset-0 bg-[url('/placeholder.svg')] opacity-5" />
-              <CardContent className="pt-6 relative">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium opacity-90">Valor Total Oportunidades</span>
-                  <Gavel className="h-5 w-5 opacity-80" />
+        {/* Oportunidades por Tipo */}
+        {porTipoLoading ? (
+          <Card className="border-border/50 shadow-sm">
+            <CardHeader className="pb-2">
+              <Skeleton className="h-5 w-48" />
+            </CardHeader>
+            <CardContent>
+              <div className="h-[280px] flex items-center justify-center">
+                <Skeleton className="h-40 w-40 rounded-full" />
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-border/50 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-heading font-semibold flex items-center gap-2">
+                <Target className="h-4 w-4 text-firmavb-green" />
+                Oportunidades por Tipo
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!porTipoData?.length ||
+              porTipoData.every((d) => d.count === 0) ? (
+                <div className="h-[280px] flex flex-col items-center justify-center text-muted-foreground">
+                  <Inbox className="h-10 w-10 mb-3 opacity-50" />
+                  <p className="text-sm">Sin datos</p>
                 </div>
-                <p className="text-3xl font-heading font-bold font-mono tracking-tight">
-                  {formatCompact(stats?.valorPotencial || metrics?.valorPotencial || 0)}
-                </p>
-                <p className="text-sm opacity-80 mt-1">
-                  En {stats?.totalOportunidades || metrics?.totalLicitaciones || 0} oportunidades activas
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Urgent Listings */}
-          {urgentesLoading ? (
-            <UrgentListSkeleton />
-          ) : urgentesError ? (
-            <Card className="border-border/50 shadow-sm">
-              <CardContent className="py-6 text-center text-firmavb-red">
-                <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-70" />
-                <p className="text-sm">Error al cargar urgentes</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="border-border/50 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-heading font-semibold flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-firmavb-amber" />
-                  Cierran Pronto
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {!urgentes?.length ? (
-                  <div className="text-center py-4 text-muted-foreground">
-                    <Inbox className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">Sin licitaciones urgentes</p>
-                  </div>
-                ) : (
-                  urgentes.slice(0, 4).map((lic) => (
-                    <div
-                      key={lic.id_licitacion}
-                      className="p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+              ) : (
+                <ResponsiveContainer width="100%" height={280}>
+                  <PieChart>
+                    <Pie
+                      data={porTipoData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={4}
+                      dataKey="count"
+                      nameKey="tipo"
+                      label={({ tipo, count }) => `${tipo}: ${count}`}
+                      labelLine={false}
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{lic.titulo}</p>
-                          <p className="text-xs text-muted-foreground truncate">{lic.organismo}</p>
-                        </div>
-                        <Badge variant="outline" className="shrink-0 text-firmavb-amber border-firmavb-amber/30">
-                          {lic.diasRestantes}d
-                        </Badge>
-                      </div>
-                    </div>
-                  ))
-                )}
-                {urgentes && urgentes.length > 4 && (
-                  <Link to="/licitaciones">
-                    <Button variant="ghost" className="w-full text-firmavb-blue hover:text-firmavb-blue hover:bg-firmavb-blue/10">
-                      Ver todas ({urgentes.length})
-                      <ArrowRight className="h-4 w-4 ml-2" />
-                    </Button>
-                  </Link>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Quick Stats */}
-          {statsLoading ? (
-            <StatsCardSkeleton />
-          ) : (
-            <Card className="border-border/50 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-heading font-semibold flex items-center gap-2">
-                  <Trophy className="h-4 w-4 text-firmavb-green" />
-                  Estadísticas Rápidas
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Tasa de match</span>
-                  <span className="font-semibold text-firmavb-green">{stats?.matchRate || 0}%</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Con match</span>
-                  <span className="font-semibold">{stats?.conMatch || 0}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Valor potencial</span>
-                  <span className="font-semibold font-mono">{formatCompact(stats?.valorPotencial || 0)}</span>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+                      {porTipoData.map((_, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={PIE_COLORS[index % PIE_COLORS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                    />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
-      {/* Activity Feed and Opportunities Table */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <div className="xl:col-span-2">
-          <OportunidadesTable />
-        </div>
-        <div>
-          <ActivityFeed />
-        </div>
+      {/* Row 3: Cierres Próximos + Últimos Matches */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        {/* Cierres Próximos */}
+        <Card className="border-border/50 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-heading font-semibold flex items-center gap-2">
+              <Clock className="h-4 w-4 text-firmavb-amber" />
+              Cierres Próximos (7 días)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {cierresLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-14 w-full" />
+                ))}
+              </div>
+            ) : !cierresData?.length ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Inbox className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                <p className="text-sm">
+                  Sin oportunidades por cerrar esta semana
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="font-semibold">Título</TableHead>
+                      <TableHead className="font-semibold">
+                        Institución
+                      </TableHead>
+                      <TableHead className="font-semibold">Cierre</TableHead>
+                      <TableHead className="font-semibold">Match</TableHead>
+                      <TableHead className="font-semibold">Etapa</TableHead>
+                      <TableHead className="text-right" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {cierresData.map((item) => (
+                      <TableRow key={item.codigo} className="data-row">
+                        <TableCell>
+                          <p className="font-medium text-sm line-clamp-1 max-w-[200px]">
+                            {item.nombre}
+                          </p>
+                        </TableCell>
+                        <TableCell>
+                          <p className="text-sm text-muted-foreground line-clamp-1 max-w-[150px]">
+                            {item.institucion}
+                          </p>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={
+                              item.diasRestantes <= 2
+                                ? "border-firmavb-red text-firmavb-red"
+                                : "border-firmavb-amber text-firmavb-amber"
+                            }
+                          >
+                            {item.diasRestantes === 0
+                              ? "¡Hoy!"
+                              : item.diasRestantes === 1
+                                ? "Mañana"
+                                : `${item.diasRestantes}d`}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {item.match_score ? (
+                            <span className="font-mono text-sm font-medium">
+                              {item.match_score}%
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              —
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="text-xs">
+                            {item.etapa}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Link
+                            to={
+                              item.tipo === "Compra Ágil"
+                                ? `/compras-agiles/${item.codigo}`
+                                : `/licitaciones/${item.codigo}`
+                            }
+                          >
+                            <Button variant="ghost" size="sm">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Últimos Matches */}
+        <Card className="border-border/50 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-heading font-semibold flex items-center gap-2">
+              <Zap className="h-4 w-4 text-firmavb-green" />
+              Últimos Matches
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {matchesLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-14 w-full" />
+                ))}
+              </div>
+            ) : !matchesData?.length ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Inbox className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                <p className="text-sm">Sin matches recientes</p>
+                <p className="text-xs mt-1">
+                  Ejecuta el Matching IA para encontrar oportunidades
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="font-semibold">Título</TableHead>
+                      <TableHead className="font-semibold">Score</TableHead>
+                      <TableHead className="font-semibold">
+                        Institución
+                      </TableHead>
+                      <TableHead className="font-semibold">Tipo</TableHead>
+                      <TableHead className="text-right" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {matchesData.map((item) => (
+                      <TableRow key={item.codigo} className="data-row">
+                        <TableCell>
+                          <p className="font-medium text-sm line-clamp-1 max-w-[200px]">
+                            {item.nombre}
+                          </p>
+                        </TableCell>
+                        <TableCell>
+                          {item.match_score ? (
+                            <div className="flex items-center gap-2">
+                              <div className="w-12 h-2 bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-firmavb-green"
+                                  style={{
+                                    width: `${item.match_score}%`,
+                                  }}
+                                />
+                              </div>
+                              <span className="text-sm font-mono font-medium">
+                                {item.match_score}%
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              —
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <p className="text-sm text-muted-foreground line-clamp-1 max-w-[140px]">
+                            {item.institucion}
+                          </p>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            className={
+                              item.tipo === "Compra Ágil"
+                                ? "bg-firmavb-blue text-white"
+                                : "bg-firmavb-green text-white"
+                            }
+                          >
+                            {item.tipo}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Link
+                              to={
+                                item.tipo === "Compra Ágil"
+                                  ? `/compras-agiles/${item.codigo}`
+                                  : `/licitaciones/${item.codigo}`
+                              }
+                            >
+                              <Button variant="ghost" size="sm">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </Link>
+                            <Link to="/mis-oportunidades">
+                              <Button variant="ghost" size="sm">
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            </Link>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Row 4: Activity Feed */}
+      <ActivityFeed />
     </div>
   );
 }
 
-// Metric Card Component
-interface MetricCardProps {
+// --- KPI Card Component ---
+interface KPICardProps {
   title: string;
   value: string | number;
-  subtitle: string;
   icon: React.ComponentType<{ className?: string }>;
-  color: 'blue' | 'green' | 'amber' | 'emerald';
-  trend?: string;
+  color: "blue" | "green" | "amber" | "emerald";
+  trend: number | null;
 }
 
-function MetricCard({ title, value, subtitle, icon: Icon, color, trend }: MetricCardProps) {
+function KPICard({ title, value, icon: Icon, color, trend }: KPICardProps) {
   const colorClasses = {
-    blue: 'text-firmavb-blue bg-firmavb-blue/10',
-    green: 'text-firmavb-green bg-firmavb-green/10',
-    amber: 'text-firmavb-amber bg-firmavb-amber/10',
-    emerald: 'text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30',
+    blue: "text-firmavb-blue bg-firmavb-blue/10",
+    green: "text-firmavb-green bg-firmavb-green/10",
+    amber: "text-firmavb-amber bg-firmavb-amber/10",
+    emerald: "text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30",
   };
 
   return (
@@ -547,16 +772,27 @@ function MetricCard({ title, value, subtitle, icon: Icon, color, trend }: Metric
           <div className={`p-2.5 rounded-lg ${colorClasses[color]}`}>
             <Icon className="h-5 w-5" />
           </div>
-          {trend && (
-            <Badge variant="outline" className="text-firmavb-green border-firmavb-green/30">
-              <TrendingUp className="h-3 w-3 mr-1" />
-              {trend}
+          {trend !== null && trend !== undefined && (
+            <Badge
+              variant="outline"
+              className={
+                trend >= 0
+                  ? "text-firmavb-green border-firmavb-green/30"
+                  : "text-firmavb-red border-firmavb-red/30"
+              }
+            >
+              {trend >= 0 ? (
+                <TrendingUp className="h-3 w-3 mr-1" />
+              ) : (
+                <TrendingDown className="h-3 w-3 mr-1" />
+              )}
+              {trend >= 0 ? "+" : ""}
+              {trend}%
             </Badge>
           )}
         </div>
         <p className="text-2xl font-heading font-bold">{value}</p>
         <p className="text-sm text-muted-foreground mt-1">{title}</p>
-        <p className="text-xs text-muted-foreground/70 mt-0.5">{subtitle}</p>
       </CardContent>
     </Card>
   );

@@ -1,8 +1,12 @@
 import {
-  Star,
-  Store,
   LayoutDashboard,
+  Star,
+  Kanban,
+  Package,
+  Zap,
+  BarChart3,
   Settings,
+  Store,
   User,
   LogOut,
   Building2,
@@ -10,8 +14,6 @@ import {
   Calendar,
   Users,
   CreditCard,
-  Package,
-  Kanban,
   ChevronDown,
   ChevronRight,
   Crosshair,
@@ -31,65 +33,61 @@ interface NavItem {
   children?: { title: string; url: string; icon?: React.ElementType }[];
 }
 
-// Navigation items - 5 main sections with submenus
+// Navigation items - organized per requirements
 const navItems: NavItem[] = [
+  {
+    title: "Dashboard",
+    url: "/dashboard",
+    icon: LayoutDashboard,
+  },
   {
     title: "Mis Oportunidades",
     url: "/mis-oportunidades",
-    icon: Star
+    icon: Star,
   },
   {
     title: "Oportunidades",
     url: "/oportunidades",
-    icon: Crosshair
+    icon: Crosshair,
   },
   {
     title: "Pipeline",
     url: "/pipeline",
-    icon: Kanban
+    icon: Kanban,
   },
   {
     title: "Mercado",
-    url: "/mercado", 
+    url: "/mercado",
     icon: Store,
     children: [
       { title: "Explorador", url: "/mercado", icon: Store },
       { title: "Instituciones", url: "/mercado/instituciones", icon: Building2 },
       { title: "Ordenes de Compra", url: "/mercado/ordenes", icon: FileText },
-    ]
+    ],
   },
-    { 
-    title: "Lista de Precios", 
-    url: "/inventario", 
-    icon: Package
+  {
+    title: "Inventario",
+    url: "/inventario",
+    icon: Package,
   },
-  { 
-    title: "Dashboard", 
-    url: "/dashboard", 
-    icon: LayoutDashboard,
-    children: [
-      { title: "Resumen", url: "/dashboard", icon: LayoutDashboard },
-      { title: "Calendario", url: "/dashboard/calendario", icon: Calendar },
-      { title: "Vendedores", url: "/dashboard/vendedores", icon: Users },
-    ]
+  {
+    title: "Compras Ágiles",
+    url: "/compras-agiles",
+    icon: Zap,
   },
-  { 
-    title: "Configuracion", 
-    url: "/configuracion", 
+  {
+    title: "Reportes",
+    url: "/reportes",
+    icon: BarChart3,
+  },
+  {
+    title: "Configuración",
+    url: "/configuracion",
     icon: Settings,
     children: [
       { title: "Oportunidades", url: "/configuracion", icon: Settings },
       { title: "Equipo", url: "/configuracion/equipo", icon: Users },
-    ]
-  },
-  { 
-    title: "Cuenta", 
-    url: "/cuenta", 
-    icon: User,
-    children: [
-      { title: "Mi Perfil", url: "/cuenta", icon: User },
-      { title: "Facturacion", url: "/cuenta/facturacion", icon: CreditCard },
-    ]
+    ],
   },
 ];
 
@@ -128,6 +126,10 @@ export function AppSidebar() {
     if (url === "/oportunidades") {
       return location.pathname === "/oportunidades" ||
              location.pathname.startsWith("/oportunidades/");
+    }
+    if (url === "/compras-agiles") {
+      return location.pathname === url ||
+             location.pathname.startsWith("/compras-agiles/");
     }
     return location.pathname === url ||
            (url !== '/' && location.pathname.startsWith(url + '/'));
