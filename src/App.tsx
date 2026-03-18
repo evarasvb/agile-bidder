@@ -55,7 +55,13 @@ import Cuenta from "./pages/Cuenta";
 import Billing from "./pages/Billing";
 
 // Reportes
-import Reportes from "./pages/Reportes";
+import ReportesHub from "./pages/reportes/ReportesHub";
+import ReporteProveedores from "./pages/reportes/ReporteProveedores";
+import ReporteProductos from "./pages/reportes/ReporteProductos";
+import ReporteCompradores from "./pages/reportes/ReporteCompradores";
+import ReporteMercado from "./pages/reportes/ReporteMercado";
+import ReporteCompetidores from "./pages/reportes/ReporteCompetidores";
+import ReporteConvenioMarco from "./pages/reportes/ReporteConvenioMarco";
 
 // Admin (oculto)
 import AdminEvaristo from "./pages/AdminEvaristo";
@@ -125,7 +131,13 @@ const App = () => (
             <Route path="/dashboard/vendedores" element={<GestionVendedores />} />
             
             {/* ----- REPORTES ----- */}
-            <Route path="/reportes" element={<Reportes />} />
+            <Route path="/reportes" element={<ReportesHub />} />
+            <Route path="/reportes/proveedores" element={<ReporteProveedores />} />
+            <Route path="/reportes/productos" element={<ReporteProductos />} />
+            <Route path="/reportes/compradores" element={<ReporteCompradores />} />
+            <Route path="/reportes/mercado" element={<ReporteMercado />} />
+            <Route path="/reportes/competidores" element={<ReporteCompetidores />} />
+            <Route path="/reportes/convenio-marco" element={<ReporteConvenioMarco />} />
 
             {/* ----- CONFIGURACION ----- */}
             <Route path="/configuracion" element={<ConfiguracionOportunidades />} />
