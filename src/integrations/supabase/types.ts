@@ -1774,31 +1774,58 @@ export type Database = {
       }
       profiles: {
         Row: {
+          about_me: string | null
           avatar_url: string | null
+          company_name: string | null
           created_at: string
           email: string | null
+          first_name: string | null
           full_name: string | null
           id: string
+          instagram_username: string | null
+          instagram_verified: boolean | null
+          last_name: string | null
+          phone: string | null
+          rut: string | null
           updated_at: string
           user_id: string
+          website: string | null
         }
         Insert: {
+          about_me?: string | null
           avatar_url?: string | null
+          company_name?: string | null
           created_at?: string
           email?: string | null
+          first_name?: string | null
           full_name?: string | null
           id?: string
+          instagram_username?: string | null
+          instagram_verified?: boolean | null
+          last_name?: string | null
+          phone?: string | null
+          rut?: string | null
           updated_at?: string
           user_id: string
+          website?: string | null
         }
         Update: {
+          about_me?: string | null
           avatar_url?: string | null
+          company_name?: string | null
           created_at?: string
           email?: string | null
+          first_name?: string | null
           full_name?: string | null
           id?: string
+          instagram_username?: string | null
+          instagram_verified?: boolean | null
+          last_name?: string | null
+          phone?: string | null
+          rut?: string | null
           updated_at?: string
           user_id?: string
+          website?: string | null
         }
         Relationships: []
       }

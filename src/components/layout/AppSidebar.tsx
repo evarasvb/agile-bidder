@@ -10,9 +10,10 @@ import {
   Calendar,
   Users,
   CreditCard,
-    Package,
+  Package,
   ChevronDown,
   ChevronRight,
+  Shield,
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -75,7 +76,8 @@ const navItems: NavItem[] = [
     url: "/cuenta", 
     icon: User,
     children: [
-      { title: "Mi Perfil", url: "/cuenta", icon: User },
+      { title: "Mi Cuenta", url: "/cuenta", icon: User },
+      { title: "Perfil y Confianza", url: "/cuenta/perfil", icon: Shield },
       { title: "Facturacion", url: "/cuenta/facturacion", icon: CreditCard },
     ]
   },
