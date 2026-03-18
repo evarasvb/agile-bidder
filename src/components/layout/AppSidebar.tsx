@@ -13,6 +13,7 @@ import {
     Package,
   ChevronDown,
   ChevronRight,
+  Crosshair,
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -31,12 +32,17 @@ interface NavItem {
 
 // Navigation items - 5 main sections with submenus
 const navItems: NavItem[] = [
-  { 
-    title: "Mis Oportunidades", 
-    url: "/mis-oportunidades", 
-    icon: Star 
+  {
+    title: "Mis Oportunidades",
+    url: "/mis-oportunidades",
+    icon: Star
   },
-  { 
+  {
+    title: "Oportunidades",
+    url: "/oportunidades",
+    icon: Crosshair
+  },
+  {
     title: "Mercado", 
     url: "/mercado", 
     icon: Store,
@@ -109,11 +115,15 @@ export function AppSidebar() {
 
   const isActive = (url: string) => {
     if (url === "/mis-oportunidades") {
-      return location.pathname === url || 
+      return location.pathname === url ||
              location.pathname.startsWith("/licitaciones/") ||
              location.pathname.startsWith("/compras-agiles/");
     }
-    return location.pathname === url || 
+    if (url === "/oportunidades") {
+      return location.pathname === "/oportunidades" ||
+             location.pathname.startsWith("/oportunidades/");
+    }
+    return location.pathname === url ||
            (url !== '/' && location.pathname.startsWith(url + '/'));
   };
 
