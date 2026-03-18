@@ -13,6 +13,7 @@ import {
   Loader2,
   Copy,
   CheckCircle2,
+  Sparkles,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -33,6 +34,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabaseClient } from '@/lib/supabaseClient';
 import { useLicitacionItemsReal } from '@/hooks/useLicitacionItemsReal';
 import LicitacionesSimilares from '@/components/licitaciones/LicitacionesSimilares';
+import { useDocumentosLicitacion } from '@/hooks/useChatIA';
 
 interface LicitacionBIItem {
   id: string;
@@ -172,6 +174,7 @@ export default function LicitacionDetalle() {
   const { data: licitacion, isLoading, error } = useLicitacionDetalle(id);
   const { data: itemsFromDB } = useLicitacionItemsReal(licitacion?.id || licitacion?.codigo);
   const { data: itemsBI } = useLicitacionBIItems(licitacion?.id || null, licitacion?.tipo);
+  const { data: chatDocs = [] } = useDocumentosLicitacion(id || null);
   const [copied, setCopied] = useState(false);
 
   // Extract items from datos_json for compras_agiles
@@ -327,6 +330,19 @@ export default function LicitacionDetalle() {
               Ver en MercadoPúblico
             </Button>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(`/licitaciones/${id}/chat`)}
+          >
+            <Sparkles className="h-4 w-4 mr-2" />
+            Chat IA
+            {chatDocs.filter(d => d.status === 'ready').length > 0 && (
+              <Badge variant="secondary" className="ml-1 text-[10px] h-4 px-1">
+                {chatDocs.filter(d => d.status === 'ready').length}
+              </Badge>
+            )}
+          </Button>
           <Button
             size="sm"
             className="bg-firmavb-blue hover:bg-firmavb-blue/90"

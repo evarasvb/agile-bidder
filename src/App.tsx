@@ -20,6 +20,9 @@ import MisOportunidades from "./pages/MisOportunidades";
 import LicitacionDetalle from "./pages/LicitacionDetalle";
 import Licitaciones from "./pages/Licitaciones";
 
+// Chat IA
+import ChatIA from "./pages/ChatIA";
+
 // Oportunidades Panel
 import OportunidadesPanel from "./pages/Oportunidades";
 import OportunidadDetalle from "./pages/OportunidadDetalle";
@@ -92,11 +95,13 @@ const App = () => (
             {/* ----- MIS OPORTUNIDADES ----- */}
             <Route path="/mis-oportunidades" element={<MisOportunidades />} />
             <Route path="/licitaciones/:id" element={<LicitacionDetalle />} />
-                      <Route path="/licitaciones" element={<Licitaciones />} />
+            <Route path="/licitaciones/:id/chat" element={<ChatIA />} />
+            <Route path="/licitaciones" element={<Licitaciones />} />
 
             {/* ----- OPORTUNIDADES PANEL ----- */}
             <Route path="/oportunidades" element={<OportunidadesPanel />} />
             <Route path="/oportunidades/:tipo/:id" element={<OportunidadDetalle />} />
+            <Route path="/oportunidades/:tipo/:id/chat" element={<ChatIA />} />
 
             {/* ----- MERCADO ----- */}
             <Route path="/mercado" element={<Mercado />} />

@@ -28,6 +28,7 @@ import {
   Hash,
   TrendingUp,
   CreditCard,
+  Sparkles,
 } from "lucide-react";
 import {
   useOportunidadDetalle,
@@ -425,6 +426,14 @@ export default function OportunidadDetalle() {
 
           {/* Actions */}
           <div className="flex flex-wrap gap-3">
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => navigate(`/oportunidades/${tipo}/${id}/chat`)}
+            >
+              <Sparkles className="h-4 w-4" />
+              Chat IA
+            </Button>
             <Button className="gap-2" onClick={handleCotizar}>
               <FileText className="h-4 w-4" />
               Cotizar en 2 Clicks
