@@ -4,7 +4,6 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { OdooSyncErrorNotification } from "@/components/odoo/OdooSyncErrorNotification";
 import { useExtensionStatus } from "@/hooks/useExtensionStatus";
 import { SystemHealthIndicator } from "@/components/dashboard/SystemHealthIndicator";
 import { formatDistanceToNow } from "date-fns";
@@ -84,9 +83,6 @@ export function StatusBar() {
             activeText="Activa"
             inactiveText="Expirada"
           />
-
-          {/* Odoo Sync Error Notifications */}
-          <OdooSyncErrorNotification />
 
           {/* Auto-Bid Toggle */}
           <div className="flex items-center gap-3 pl-4 border-l border-border">

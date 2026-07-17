@@ -241,13 +241,7 @@ export default function Settings() {
         </div>
         {activeTab === 'general' && (
           <div className="flex items-center gap-3">
-            <Link to="/admin">
-              <Button variant="outline" className="gap-2">
-                <SettingsIcon className="h-4 w-4" />
-                Configurar Odoo
-              </Button>
-            </Link>
-            <Button 
+            <Button
               className="gap-2 bg-primary hover:bg-primary/90"
               onClick={handleSaveAllChanges}
               disabled={saveSettingsMutation.isPending || !hasChanges}
