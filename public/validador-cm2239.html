@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+  <html lang="es">
+  <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Validador de Convenio Marco CM 2239-2-LR26 - FirmaVB">
+  <title>Validador CM 2239 - FirmaVB</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+background: linear-gradient(135deg, #0051BA 0%, #003D8A 100%);
+min-height: 100vh;
+padding: 20px;
+}
+.container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden; }
+.header { background: linear-gradient(135deg, #0051BA 0%, #003D8A 100%); color: white; padding: 40px 30px; text-align: center; }
+.header h1 { font-size: 32px; margin-bottom: 5px; }
+.header p { font-size: 14px; opacity: 0.9; }
+.content { padding: 40px; max-height: 80vh; overflow-y: auto; }
+.seccion { margin-bottom: 30px; border: 2px solid #f0f0f0; border-radius: 8px; padding: 20px; background: #fafafa; }
+.seccion-titulo { font-size: 16px; font-weight: 700; color: #0051BA; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 3px solid #0051BA; }
+.campo-grupo { margin-bottom: 12px; }
+.campo-grupo label { display: block; font-weight: 600; color: #333; margin-bottom: 6px; font-size: 13px; }
+.campo-grupo input, .campo-grupo select { width: 100%; padding: 8px; border: 2px solid #ddd; border-radius: 6px; font-size: 13px; font-family: inherit; }
+.campo-grupo input:focus, .campo-grupo select:focus { outline: none; border-color: #0051BA; box-shadow: 0 0 0 3px rgba(0,81,186,0.1); }
+.checkbox-grupo { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 10px; background: white; border-radius: 6px; border: 1px solid #ddd; cursor: pointer; }
+  .checkbox-grupo input { width: 16px; height: 16px; cursor: pointer; }
+  .checkbox-label { cursor: pointer; }
+.multi-col { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+    .botones { display: flex; gap: 10px; margin-top: 30px; }
+  button { flex: 1; padding: 12px; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-validar { background: #0051BA; color: white; }
+    .btn-validar:hover:not(:disabled) { background: #003D8A; transform: translateY(-2px); }
+.btn-limpiar { background: #f0f0f0; color: #333; }
+.resultados { display: none; margin-top: 30px; padding: 20px; border-radius: 8px; background: #f9f9f9; animation: slideIn 0.3s ease; }
+.resultados.activo { display: block; }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; } }
+  .score-circle { width: 120px; height: 120px; border-radius: 50%; background: linear-gradient(135deg, #0051BA 0%, #003D8A 100%); color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 20px auto; }
+  .score-numero { font-size: 40px; font-weight: 700; }
+  .requisito-item { background: white; padding: 12px; margin-bottom: 10px; border-radius: 6px; border-left: 4px solid; display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+.requisito-item.cumple { border-left-color: #27ae60; background: #f0fdf4; }
+.requisito-item.no-cumple { border-left-color: #e74c3c; background: #fef2f2; }
+.estado { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+.estado.cumple { background: #d1f2d1; color: #27ae60; }
+    .estado.no-cumple { background: #ffd1d1; color: #e74c3c; }
+.info-box { background: #e3f2fd; border-left: 4px solid #0051BA; padding: 12px; border-radius: 6px; margin-bottom: 15px; font-size: 12px; color: #0051BA; }
+.error-box { background: #fef2f2; border-left: 4px solid #e74c3c; padding: 12px; border-radius: 6px; margin-bottom: 15px; font-size: 12px; color: #c0392b; }
+      .success-box { background: #f0fdf4; border-left: 4px solid #27ae60; padding: 12px; border-radius: 6px; margin-bottom: 15px; font-size: 12px; color: #155724; }
+      .btn-agendarMeet { background: linear-gradient(135deg, #27ae60 0%, #229954 100%); color: white; margin-top: 20px; padding: 15px; }
+      .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center; }
+.modal.activo { display: flex; }
+.modal-contenido { background: white; padding: 30px; border-radius: 12px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; position: relative; }
+.modal-titulo { font-size: 20px; font-weight: 700; color: #0051BA; margin-bottom: 20px; }
+.modal-close { position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: #999; }
+.gap-item { background: #fef2f2; padding: 12px; border-radius: 6px; margin-bottom: 8px; border-left: 3px solid #e74c3c; font-size: 12px; }
+  .loader { display: none; text-align: center; }
+.spinner { border: 3px solid #f3f3f3; border-top: 3px solid #0051BA; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@media (max-width: 768px) { .multi-col { grid-template-columns: 1fr; } .header h1 { font-size: 24px; } }
+</style>
+  </head>
+  <body>
+  <div class="container">
+  <div class="header">
+  <h1>Validador CM 2239-2-LR26</h1>
+  <p>Asesoria en Compras Publicas - FirmaVB</p>
+  <p style="font-size: 12px; opacity: 0.8; margin-top: 5px;">Convenio Marco - Software y Servicios TI</p>
+</div>
+<div class="content">
+<div class="info-box">
+Completa este validador en 2 minutos. Te mostraremos si cumples requisitos.
+  </div>
+  <div id="errorContainer"></div>
+  <form id="validadorForm">
+  <div class="seccion">
+  <div class="seccion-titulo">Tus Datos</div>
+  <div class="multi-col">
+  <div class="campo-grupo">
+  <label>Nombre Completo *</label>
+  <input type="text" id="nombre" maxlength="100" required>
+  </div>
+  <div class="campo-grupo">
+  <label>Email *</label>
+  <input type="email" id="email" maxlength="100" required>
+  </div>
+  <div class="campo-grupo">
+  <label>Empresa *</label>
+  <input type="text" id="empresa" maxlength="150" required>
+  </div>
+  <div class="campo-grupo">
+  <label>RUT *</label>
+  <input type="text" id="rut" maxlength="12" placeholder="12345678-9" required>
+  </div>
+  <div class="campo-grupo">
+  <label>Telefono *</label>
+  <input type="tel" id="telefono" maxlength="20" placeholder="+56 9 XXXX XXXX" required>
+  </div>
+  <div class="campo-grupo">
+  <label>Sector *</label>
+  <select id="sector" required>
+  <option value="">Seleccionar...</option>
+  <option value="software">Software / IT Services</option>
+  <option value="consulting">Consultoria</option>
+  <option value="cloud">Cloud Computing</option>
+  <option value="otro">Otro</option>
+  </select>
+  </div>
+  </div>
+  </div>
+  <div class="seccion">
+  <div class="seccion-titulo">Requisitos Legales</div>
+  <div class="checkbox-grupo">
+  <input type="checkbox" id="habil">
+  <label for="habil" class="checkbox-label">Registrado en ChileCompra (Estado HABIL)</label>
+  </div>
+  <div class="checkbox-grupo">
+  <input type="checkbox" id="deudas">
+  <label for="deudas" class="checkbox-label">Sin deudas previsionales (ultimos 2 anios)</label>
+  </div>
+  </div>
+  <div class="seccion">
+  <div class="seccion-titulo">Requisitos Tecnicos</div>
+  <div class="multi-col">
+  <div class="campo-grupo">
+  <label>Descuento (%) - 2% a 10% *</label>
+  <input type="number" id="descuento" min="2" max="10" step="0.1" required>
+  </div>
+  <div class="campo-grupo">
+  <label>Garantia (meses) - Min. 6 *</label>
+  <input type="number" id="garantia" min="6" max="60" step="1" required>
+  </div>
+  </div>
+  </div>
+  <div class="botones">
+  <button type="button" id="btnValidar" class="btn-validar" onclick="validar()">Validar</button>
+  <button type="button" class="btn-limpiar" onclick="limpiar()">Limpiar</button>
+  </div>
+  <div class="loader" id="loader">
+  <div class="spinner"></div>
+  <p style="margin-top: 10px; color: #666; font-size: 12px;">Validando...</p>
+  </div>
+  </form>
+  <div class="resultados" id="resultados">
+  <div class="score-circle">
+  <div class="score-numero" id="score">0</div>
+  <div>Cumplimiento</div>
+  </div>
+  <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+  <p style="font-size: 14px; margin-bottom: 10px;">
+  <strong>Estado:</strong> <span id="estado" style="font-weight: 700; color: #0051BA;"></span>
+  </p>
+  <div id="requisitos"></div>
+  </div>
+  <div id="gapsContainer" style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; display: none;">
+  <h3 style="color: #e74c3c; margin-bottom: 15px; font-size: 14px;">Areas a Mejorar</h3>
+<div id="gaps"></div>
+</div>
+  <button type="button" class="btn-agendarMeet" onclick="agendar()">Agendar Asesoria</button>
+  </div>
+  </div>
+  </div>
+  <div class="modal" id="modalMeet">
+  <div class="modal-contenido">
+  <button class="modal-close" onclick="cerrarModal()">x</button>
+  <div class="modal-titulo">Agendar Asesoria</div>
+  <form onsubmit="guardarAgenda(event)">
+  <div class="campo-grupo">
+  <label>Nombre</label>
+  <input type="text" id="meetNombre" readonly>
+  </div>
+  <div class="campo-grupo">
+  <label>Email</label>
+  <input type="email" id="meetEmail" readonly>
+  </div>
+  <div class="campo-grupo">
+  <label>Fecha y Hora *</label>
+<input type="datetime-local" id="fecha" required>
+</div>
+<div class="campo-grupo">
+<label>Preferencia *</label>
+<select id="pref" required>
+  <option value="">Seleccionar...</option>
+  <option value="whatsapp">WhatsApp</option>
+  <option value="email">Email</option>
+  <option value="meet">Google Meet</option>
+  </select>
+  </div>
+  <div style="display: flex; gap: 10px; margin-top: 20px;">
+  <button type="submit" class="btn-agendarMeet" style="flex: 1;">Confirmar</button>
+  <button type="button" onclick="cerrarModal()" style="flex: 1; background: #f0f0f0; color: #333;">Cancelar</button>
+  </div>
+  </form>
+  </div>
+  </div>
+  
+  <script>
+  const SUPABASE_URL = 'https://juiskeeutbaipwbeeezw.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1aXNrZWV1dGJhaXB3YmVlZXp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc4OTg2ODQsImV4cCI6MjA4MzQ3NDY4NH0.RLiTsgTl5Xbh1NetQIOB3tBH1EQa9ehcHfWIa4MJWf4';
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let resultado = null;
+
+function validarEmail(e) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
+function validarRUT(r) { return /^[0-9]{7,8}-[0-9kK]$/.test(r); }
+
+function mostrarError(msg) {
+  const c = document.getElementById('errorContainer');
+c.innerHTML = '<div class="error-box">' + msg + '</div>';
+setTimeout(function() { c.innerHTML = ''; }, 5000);
+  }
+
+function mostrarExito(msg) {
+  const c = document.getElementById('errorContainer');
+c.innerHTML = '<div class="success-box">' + msg + '</div>';
+setTimeout(function() { c.innerHTML = ''; }, 5000);
+  }
+
+async function validar() {
+const nombre = document.getElementById('nombre').value.trim();
+const email = document.getElementById('email').value.trim();
+const empresa = document.getElementById('empresa').value.trim();
+const rut = document.getElementById('rut').value.trim();
+const telefono = document.getElementById('telefono').value.trim();
+const sector = document.getElementById('sector').value;
+
+if (!nombre || nombre.length < 3) { mostrarError('Nombre invalido'); return; }
+if (!validarEmail(email)) { mostrarError('Email invalido'); return; }
+if (!validarRUT(rut)) { mostrarError('RUT invalido, formato 12345678-9'); return; }
+if (!empresa || empresa.length < 3) { mostrarError('Empresa invalida'); return; }
+if (!sector) { mostrarError('Selecciona sector'); return; }
+
+document.getElementById('loader').style.display = 'block';
+document.getElementById('btnValidar').disabled = true;
+
+try {
+let pts = 0;
+const gaps = [];
+
+if (document.getElementById('habil').checked) { pts += 25; } else { gaps.push('Registrarse en ChileCompra'); }
+if (document.getElementById('deudas').checked) { pts += 25; } else { gaps.push('Regularizar deudas previsionales'); }
+
+const desc = parseFloat(document.getElementById('descuento').value) || 0;
+if (desc >= 2 && desc <= 10) { pts += 25; } else { gaps.push('Ajustar descuento entre 2% y 10%'); }
+
+const garen = parseInt(document.getElementById('garantia').value) || 0;
+if (garen >= 6) { pts += 25; } else { gaps.push('Aumentar garantia a 6 meses o mas'); }
+
+resultado = { nombre: nombre, email: email, empresa: empresa, rut: rut, telefono: telefono, sector: sector, score: pts, gaps: gaps };
+
+const insertResp = await supabase.from('prospectos_cm2239').insert([{
+nombre: nombre,
+  email: email,
+  empresa: empresa,
+  rut: rut,
+  telefono: telefono,
+  sector: sector,
+  score: pts,
+  gaps: gaps,
+  estado: 'nuevo'
+  }]);
+
+if (insertResp.error) {
+if (insertResp.error.code === '23505') { mostrarError('Este email ya fue registrado anteriormente'); }
+else { console.log('Error Supabase:', insertResp.error); }
+} else {
+mostrarExito('Datos guardados correctamente');
+}
+
+mostrarResultados(pts, gaps);
+} catch (e) {
+mostrarError('Error: ' + e.message);
+} finally {
+  document.getElementById('loader').style.display = 'none';
+document.getElementById('btnValidar').disabled = false;
+}
+}
+
+function mostrarResultados(s, g) {
+  document.getElementById('score').textContent = s;
+let est = s >= 80 ? 'CUMPLE' : (s >= 60 ? 'PARCIAL' : 'MEJORA');
+document.getElementById('estado').textContent = est;
+
+let h = '';
+const reqs = [
+{ t: 'Habil en ChileCompra', c: document.getElementById('habil').checked },
+{ t: 'Sin Deudas Previsionales', c: document.getElementById('deudas').checked },
+{ t: 'Descuento 2-10%', c: parseFloat(document.getElementById('descuento').value) >= 2 && parseFloat(document.getElementById('descuento').value) <= 10 },
+{ t: 'Garantia 6+ meses', c: parseInt(document.getElementById('garantia').value) >= 6 }
+];
+
+reqs.forEach(function(r) {
+h += '<div class="requisito-item ' + (r.c ? 'cumple' : 'no-cumple') + '"><span>' + r.t + '</span><span class="estado ' + (r.c ? 'cumple' : 'no-cumple') + '">' + (r.c ? 'OK' : 'NO') + '</span></div>';
+});
+document.getElementById('requisitos').innerHTML = h;
+
+if (g.length > 0) {
+document.getElementById('gaps').innerHTML = g.map(function(x) { return '<div class="gap-item">' + x + '</div>'; }).join('');
+document.getElementById('gapsContainer').style.display = 'block';
+} else {
+document.getElementById('gapsContainer').style.display = 'none';
+}
+
+document.getElementById('resultados').classList.add('activo');
+}
+
+function agendar() {
+if (!resultado) { return; }
+document.getElementById('meetNombre').value = resultado.nombre;
+document.getElementById('meetEmail').value = resultado.email;
+document.getElementById('modalMeet').classList.add('activo');
+}
+
+function cerrarModal() {
+document.getElementById('modalMeet').classList.remove('activo');
+}
+
+async function guardarAgenda(e) {
+e.preventDefault();
+const fecha = document.getElementById('fecha').value;
+if (!fecha) { mostrarError('Selecciona una fecha'); return; }
+
+const agResp = await supabase.from('agendamientos_meet').insert([{
+nombre: resultado.nombre,
+  email: resultado.email,
+  empresa: resultado.empresa,
+  telefono: resultado.telefono,
+  fecha_meet: fecha,
+  preferencia_comunicacion: document.getElementById('pref').value,
+  temas: resultado.gaps,
+  estado: 'pendiente'
+  }]);
+
+if (agResp.error) {
+if (agResp.error.code === '23505') { mostrarError('Esa fecha ya fue agendada para este email'); }
+else { mostrarError('Error: ' + agResp.error.message); }
+} else {
+mostrarExito('Reunion agendada con exito');
+setTimeout(function() { cerrarModal(); limpiar(); }, 1500);
+}
+}
+
+function limpiar() {
+  document.getElementById('validadorForm').reset();
+document.getElementById('resultados').classList.remove('activo');
+document.getElementById('errorContainer').innerHTML = '';
+  resultado = null;
+}
+
+window.onclick = function(e) {
+if (e.target.id === 'modalMeet') { cerrarModal(); }
+};
+</script>
+  </body>
+  </html>
+  
