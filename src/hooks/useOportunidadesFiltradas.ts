@@ -64,7 +64,7 @@ export function useOportunidadesFiltradas() {
         (supabaseClient as any)
           .from('compras_agiles')
           .select('*')
-        .eq('estado', 'Publicada').order('created_at', { ascending: false })
+        .eq('estado', 'Publicada').or(`fecha_cierre.is.null,fecha_cierre.gt.${new Date().toISOString()}`).order('created_at', { ascending: false })
           .limit(2000),
         (supabaseClient as any)
           .from('licitaciones')
