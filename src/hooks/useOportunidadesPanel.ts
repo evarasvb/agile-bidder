@@ -93,6 +93,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
           compras_agiles_items(id)
         `)
         .eq('estado', 'Publicada')
+        .or(`fecha_cierre.is.null,fecha_cierre.gt.${new Date().toISOString()}`)
         .order('created_at', { ascending: false });
 
       if (caError) {
