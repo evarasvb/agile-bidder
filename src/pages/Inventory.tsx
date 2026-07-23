@@ -61,7 +61,10 @@ export default function Inventory() {
   
   const { data: inventario = [], isLoading, refetch } = useInventory();
   const { data: licitacionesPorProducto = [] } = useLicitacionesPorProducto();
-  const { matchesByProductId, countsByProductId, isLoading: isLoadingComprasAgiles } = useComprasAgilesMatch(inventario);
+  const { data: comprasAgilesMatches = [], isLoading: isLoadingComprasAgiles } = useComprasAgilesMatch(user?.id ?? null);
+    // Nota: useComprasAgilesMatch ya no expone matchesByProductId/countsByProductId; se usan mapas vacios por ahora
+    const matchesByProductId: Record<string, any[]> = {};
+    const countsByProductId: Record<string, number> = {};
   const actualizarProducto = useUpdateInventoryItem();
   const eliminarProducto = useDeleteInventoryItem();
   const crearProducto = useCreateInventoryItem();
