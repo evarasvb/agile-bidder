@@ -193,7 +193,7 @@
     const existingModal = document.getElementById(MODAL_ID);
     if (existingModal) existingModal.remove();
     
-    const productos = oferta.productos_ofertados || [];
+    const productos = oferta.productos || oferta.productos_ofertados || [];
     const valorTotal = oferta.valor_total || productos.reduce((sum, p) => sum + (p.precio_total || 0), 0);
     
     // Create modal overlay
@@ -388,7 +388,7 @@
   // Ejecutar autofill en el formulario
   function performAutofill(oferta) {
     try {
-      const productos = oferta.productos_ofertados || [];
+      const productos = oferta.productos || oferta.productos_ofertados || [];
       let filledFields = 0;
       
       // Buscar y llenar campos de precio
@@ -403,15 +403,30 @@
           `tr:nth-child(${index + 2}) input[type="number"]`
         ];
         
-        for (const selector of priceSelectors) {
-          const input = document.querySelector(selector);
-          if (input) {
-            input.value = producto.precio_unitario || '';
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-            filledFields++;
-            break;
+        let input = null;
+          for (const selector of priceSelectors) {
+          input = document.querySelector(selector);
+          if (input) break;
+        }
+
+        if (!input) {
+          const nombreProducto = (producto.nombre || producto.sku || '').trim().toLowerCase();
+          if (nombreProducto) {
+            const rows = document.querySelectorAll('table tr');
+            for (const row of rows) {
+              if (row.textContent.trim().toLowerCase().includes(nombreProducto)) {
+                input = row.querySelector('input[type="text"], input[type="number"], input:not([type])');
+                if (input) break;
+              }
+            }
           }
+        }
+
+        if (input) {
+          input.value = producto.precio_unitario || producto.precio || '';
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+          filledFields++;
         }
       });
       
@@ -427,7 +442,7 @@
       for (const selector of obsSelectors) {
         const textarea = document.querySelector(selector);
         if (textarea) {
-          textarea.value = oferta.notas || 'Oferta generada con FirmaVB';
+          textarea.value = oferta.observaciones || oferta.notas || 'Oferta generada con FirmaVB';
           textarea.dispatchEvent(new Event('input', { bubbles: true }));
           textarea.dispatchEvent(new Event('change', { bubbles: true }));
           filledFields++;
