@@ -53,11 +53,11 @@ function mapRowToInventoryItem(row: any): InventoryItem {
     precio_unitario: row.precio_unitario,
     margen_minimo: row.margen_minimo,
     margen_objetivo: row.margen_minimo, // Use same value as fallback
-    stock_disponible: row.stock,
+    stock_disponible: row.stock_disponible,
     unidad_medida: 'unidad', // Default since not in table
-    tiempo_entrega_dias: row.tiempo_entrega_dias,
+    tiempo_entrega_dias: row.tiempo_entrega,
     proveedor: null, // Not in table
-    activo: row.activo,
+    activo: true, /* no existe columna activo en cliente_inventario */
     imagen_url: row.imagen_url,
     cliente_id: row.cliente_id,
     created_at: row.created_at,
@@ -176,8 +176,7 @@ export function useInventoryActivo() {
           .from('cliente_inventario')
           .select('*')
           .eq('cliente_id', clienteId)
-          .eq('activo', true)
-          .order('nombre')
+                    .order('nombre')
           .range(from, to);
 
         if (error) {
@@ -254,10 +253,9 @@ export function useCreateInventoryItem() {
         palabras_clave: item.keywords,
         precio_unitario: item.precio_unitario,
         margen_minimo: item.margen_minimo ?? item.margen_objetivo ?? 15,
-        stock: item.stock_disponible ?? 0,
-        tiempo_entrega_dias: item.tiempo_entrega_dias ?? 5,
-        activo: item.activo ?? true,
-        imagen_url: item.imagen_url,
+        stock_disponible: item.stock_disponible ?? 0,
+        tiempo_entrega: item.tiempo_entrega_dias ?? 5,
+                imagen_url: item.imagen_url,
       };
 
       const { data, error } = await supabase
@@ -301,10 +299,9 @@ export function useUpdateInventoryItem() {
       if (updates.keywords !== undefined) updateData.palabras_clave = updates.keywords;
       if (updates.precio_unitario !== undefined) updateData.precio_unitario = updates.precio_unitario;
       if (updates.margen_minimo !== undefined) updateData.margen_minimo = updates.margen_minimo;
-      if (updates.stock_disponible !== undefined) updateData.stock = updates.stock_disponible;
-      if (updates.tiempo_entrega_dias !== undefined) updateData.tiempo_entrega_dias = updates.tiempo_entrega_dias;
-      if (updates.activo !== undefined) updateData.activo = updates.activo;
-      if (updates.imagen_url !== undefined) updateData.imagen_url = updates.imagen_url;
+      if (updates.stock_disponible !== undefined) updateData.stock_disponible = updates.stock_disponible;
+      if (updates.tiempo_entrega_dias !== undefined) updateData.tiempo_entrega = updates.tiempo_entrega_dias;
+            if (updates.imagen_url !== undefined) updateData.imagen_url = updates.imagen_url;
       if (updates.sku !== undefined) updateData.sku = updates.sku;
 
       const { data, error } = await supabase
@@ -405,7 +402,7 @@ export function useInventoryStats() {
 
         const { data, error } = await supabase
           .from('cliente_inventario')
-          .select('activo, stock, precio_unitario, categoria')
+          .select('stock_disponible, precio_unitario, categoria'')
           .eq('cliente_id', clienteId)
           .range(from, to);
 
@@ -423,12 +420,12 @@ export function useInventoryStats() {
         }
       }
 
-      const activos = allItems.filter(i => i.activo);
-      const sinStock = allItems.filter(i => i.stock === 0 || i.stock === null);
-      const stockBajo = allItems.filter(i => i.stock !== null && i.stock > 0 && i.stock < 10);
+      const activos = allItems; // 'activo' no existe en cliente_inventario; se tratan todos como activos
+      const sinStock = allItems.filter(i => i.stock_disponible === 0 || i.stock_disponible === null);
+      const stockBajo = allItems.filter(i => i.stock_disponible !== null && i.stock_disponible > 0 && i.stock_disponible < 10);
 
       const valorTotal = activos.reduce(
-        (sum, i) => sum + ((i.precio_unitario || 0) * (i.stock || 0)),
+                (sum, i) => sum + ((i.precio_unitario || 0) * (i.stock_disponible || 0)),
         0
       );
 
