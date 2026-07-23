@@ -402,7 +402,7 @@ export function useInventoryStats() {
 
         const { data, error } = await supabase
           .from('cliente_inventario')
-          .select('stock_disponible, precio_unitario, categoria'')
+          .select('stock_disponible, precio_unitario, categoria')
           .eq('cliente_id', clienteId)
           .range(from, to);
 
