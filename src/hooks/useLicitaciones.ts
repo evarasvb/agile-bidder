@@ -164,40 +164,79 @@ export function useAnalizarMatch() {
         
         const { data: compra, error: fetchError } = await supabase
           .from('compras_agiles')
-          .select('nombre, descripcion')
+          .select('id, nombre, descripcion, organismo, monto')
           .eq('codigo', validId)
           .single();
-        
+
         if (fetchError) {
           console.error('Error obteniendo compra ágil:', fetchError);
           throw new Error(`Error al obtener compra ágil: ${fetchError.message}`);
         }
-        
+
         if (!compra) {
           throw new Error('Compra ágil no encontrada');
         }
-        
+
         const titulo = (compra.nombre || '').slice(0, 500);
         const descripcion = (compra.descripcion || '').slice(0, 5000);
-        
+
+        // Cargar los ítems reales de la compra ágil (tabla correcta: compras_agiles_items)
+        const { data: itemsCA } = await supabase
+          .from('compras_agiles_items')
+          .select('nombre_producto, descripcion, cantidad')
+          .eq('compra_agil_id', compra.id);
+
+        // Cargar el inventario activo del cliente para comparar
+        const { data: inventario, error: invError } = await supabase
+          .from('inventory')
+          .select('id, sku, nombre_producto, descripcion, categoria, keywords, precio_unitario, stock_disponible')
+          .eq('activo', true);
+
+        if (invError) throw invError;
+        if (!inventario || inventario.length === 0) {
+          throw new Error('No hay productos en el inventario para comparar. Carga tu lista de precios primero.');
+        }
+
+        // Invocar matching-ai con el contrato correcto: { licitaciones[], inventario[] }
         const { data: matchResult, error: matchError } = await supabase.functions.invoke('matching-ai', {
           body: {
-            licitacion: {
+            licitaciones: [{
               id_licitacion: validId,
-              titulo: titulo,
-              descripcion: descripcion,
-            },
+              titulo,
+              descripcion,
+              organismo: compra.organismo,
+              presupuesto: compra.monto,
+              items: (itemsCA || []).map((i: any) => ({
+                nombre_producto: i.nombre_producto,
+                descripcion: i.descripcion,
+                cantidad: i.cantidad,
+              })),
+            }],
+            inventario: inventario.map((p: any) => ({
+              id: p.id,
+              sku: p.sku,
+              nombre: p.nombre_producto,
+              descripcion: p.descripcion,
+              categoria: p.categoria,
+              palabras_clave: p.keywords || [],
+              precio_unitario: p.precio_unitario,
+              stock: p.stock_disponible || 0,
+            })),
           },
         });
-        
+
         if (matchError) {
           console.error('Error en matching AI:', matchError);
           throw new Error(`Error en análisis de matching: ${matchError.message}`);
         }
-        
-        const matchScore = typeof matchResult?.matchScore === 'number' 
-          ? Math.max(0, Math.min(100, matchResult.matchScore))
-          : Math.floor(Math.random() * 41) + 60;
+
+        // Leer el score REAL que devuelve matching-ai (results[0].match_score).
+        // Sin puntajes inventados: si no hay resultado válido, es un error explícito.
+        const resultado = matchResult?.results?.[0];
+        if (!resultado || typeof resultado.match_score !== 'number') {
+          throw new Error('El análisis de matching no devolvió un resultado válido. Revisa la configuración de IA.');
+        }
+        const matchScore = Math.max(0, Math.min(100, resultado.match_score));
         const matchEncontrado = matchScore >= 50;
         
         const { error: updateError } = await supabase

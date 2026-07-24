@@ -33,7 +33,7 @@ export function useMatchingAI() {
       // 1. Cargar compras ágiles no procesadas
       const { data: comprasAgiles, error: caError } = await supabase
         .from('compras_agiles')
-        .select('codigo, nombre, organismo, monto, descripcion')
+        .select('id, codigo, nombre, organismo, monto, descripcion')
         .or('match_encontrado.eq.false,match_encontrado.is.null')
         .limit(10);
 
@@ -76,8 +76,8 @@ export function useMatchingAI() {
         console.warn('Error obteniendo items (continuando sin items):', itemsError);
       }
       
-      // Crear mapa de items por licitación
-      const itemsMap = new Map<string, typeof todosItems>();
+      // Crear mapa de items por licitación (legacy licitaciones)
+      const itemsMap = new Map<string, any[]>();
       (todosItems || []).forEach(item => {
         const codigo = item.licitacion_id;
         if (codigo) {
@@ -87,7 +87,37 @@ export function useMatchingAI() {
           itemsMap.get(codigo)!.push(item);
         }
       });
-      
+
+      // Cargar ítems de compras ágiles desde su tabla correcta (compras_agiles_items),
+      // que se relaciona por compra_agil_id (UUID), no por código.
+      const caIdToCodigo = new Map<string, string>(
+        (comprasAgiles || []).map(ca => [ca.id, ca.codigo])
+      );
+      if (caIdToCodigo.size > 0) {
+        const { data: caItems, error: caItemsError } = await supabase
+          .from('compras_agiles_items')
+          .select('compra_agil_id, nombre_producto, descripcion, cantidad')
+          .in('compra_agil_id', Array.from(caIdToCodigo.keys()));
+
+        if (caItemsError) {
+          console.warn('Error obteniendo ítems de compras ágiles (continuando sin ellos):', caItemsError);
+        }
+
+        (caItems || []).forEach(item => {
+          const codigo = caIdToCodigo.get(item.compra_agil_id);
+          if (codigo) {
+            if (!itemsMap.has(codigo)) {
+              itemsMap.set(codigo, []);
+            }
+            itemsMap.get(codigo)!.push({
+              nombre_producto: item.nombre_producto,
+              descripcion: item.descripcion,
+              cantidad: item.cantidad,
+            });
+          }
+        });
+      }
+
       // Asignar items a cada licitación
       const licitacionesConItems = todasLicitaciones.map(lic => ({
         ...lic,

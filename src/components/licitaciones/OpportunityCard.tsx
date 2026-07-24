@@ -57,7 +57,8 @@ export function OpportunityCard({ licitacion, onGenerarOferta }: OpportunityCard
   const [showAsignarModal, setShowAsignarModal] = useState(false);
   const { data: asignacion } = useLicitacionAsignacion(licitacion.id_licitacion);
   const financialHealth = getFinancialHealth(licitacion.organismo);
-  const winScore = licitacion.match_score ?? Math.floor(Math.random() * 40) + 60;
+  // Sin puntaje real de matching, mostrar 0 (aún no analizado) en vez de un número inventado.
+  const winScore = licitacion.match_score ?? 0;
   
   const riskColors = {
     good: 'bg-risk-low text-white',

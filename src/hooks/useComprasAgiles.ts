@@ -55,11 +55,11 @@ function mapRowToCompraAgil(row: any): CompraAgil {
     id: row.id,
     codigo: row.codigo,
     nombre: row.nombre || 'Sin título',
-    organismo: row.nombre_organismo || row.organismo || 'Sin organismo',
-    monto: row.monto_estimado ?? row.monto_disponible ?? null,
-    moneda: row.moneda ?? null,
+    organismo: row.organismo || row.nombre_organismo || 'Sin organismo',
+    monto: row.monto ?? row.monto_estimado ?? row.monto_disponible ?? null,
+    moneda: row.moneda ?? row.datos_json?.moneda ?? null,
     fecha_cierre: row.fecha_cierre || null,
-    fecha_publicacion: row.fecha_publicacion || null,
+    fecha_publicacion: row.fecha_publicacion || row.datos_json?.fecha_publicacion || null,
     estado: row.estado || null,
     descripcion: row.descripcion || null,
     match_encontrado: row.match_encontrado ?? false,
@@ -69,7 +69,7 @@ function mapRowToCompraAgil(row: any): CompraAgil {
       compra_agil_id: i.compra_agil_id,
       codigo_producto: i.codigo_producto,
       nombre_producto: i.nombre_producto,
-      descripcion_producto: i.descripcion_producto,
+      descripcion_producto: i.descripcion ?? i.descripcion_producto,
       cantidad: i.cantidad,
       unidad: i.unidad,
     })),
@@ -106,11 +106,11 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
       }
 
       if (filters?.montoMin) {
-        query = query.gte('monto_estimado', filters.montoMin);
+        query = query.gte('monto', filters.montoMin);
       }
 
       if (filters?.montoMax) {
-        query = query.lte('monto_estimado', filters.montoMax);
+        query = query.lte('monto', filters.montoMax);
       }
 
       // Filtro de fecha de cierre
@@ -206,10 +206,10 @@ export function useComprasAgilesStats() {
 
       const { data: montoData } = await supabase
         .from('compras_agiles')
-        .select('monto_estimado');
+        .select('monto');
 
       const montoTotal = (montoData || []).reduce(
-        (sum, c) => sum + (c.monto_estimado || 0),
+        (sum, c) => sum + (c.monto || 0),
         0
       );
 
