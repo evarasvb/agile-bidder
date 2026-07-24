@@ -193,7 +193,7 @@
     const existingModal = document.getElementById(MODAL_ID);
     if (existingModal) existingModal.remove();
     
-    const productos = oferta.productos_ofertados || [];
+    const productos = oferta.productos || oferta.productos_ofertados || [];
     const valorTotal = oferta.valor_total || productos.reduce((sum, p) => sum + (p.precio_total || 0), 0);
     
     // Create modal overlay
@@ -388,7 +388,7 @@
   // Ejecutar autofill en el formulario
   function performAutofill(oferta) {
     try {
-      const productos = oferta.productos_ofertados || [];
+      const productos = oferta.productos || oferta.productos_ofertados || [];
       let filledFields = 0;
       
       // Buscar y llenar campos de precio
@@ -427,7 +427,7 @@
       for (const selector of obsSelectors) {
         const textarea = document.querySelector(selector);
         if (textarea) {
-          textarea.value = oferta.notas || 'Oferta generada con FirmaVB';
+          textarea.value = oferta.observaciones || oferta.notas || 'Oferta generada con FirmaVB';
           textarea.dispatchEvent(new Event('input', { bubbles: true }));
           textarea.dispatchEvent(new Event('change', { bubbles: true }));
           filledFields++;
@@ -442,7 +442,8 @@
         chrome.runtime.sendMessage({
           action: 'SUBMIT_RESULT',
           data: {
-            ofertaId: oferta.id,
+            // get-offer devuelve la clave como 'oferta_id' (no 'id')
+            ofertaId: oferta.oferta_id || oferta.id,
             exito: true,
             mensaje: `Autofill completado: ${filledFields} campos`,
             datosAdicionales: { filledFields }

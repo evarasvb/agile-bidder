@@ -4,28 +4,101 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>FirmaVB Postulador</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    
-    body {
-      width: 380px;
-      min-height: 500px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f8fafc;
-    }
-    
-    #root {
-      width: 100%;
-      min-height: 500px;
-    }
-  </style>
+  <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div id="root"></div>
+  <!-- ===== LOADING ===== -->
+  <div id="loading-view" class="view">
+    <div class="loading-container">
+      <div class="spinner"></div>
+    </div>
+  </div>
+
+  <!-- ===== LOGIN ===== -->
+  <div id="login-view" class="view hidden">
+    <div class="header">
+      <img src="icons/logo-firmavb.png" alt="FirmaVB" class="header-logo">
+      <h1>FirmaVB Postulador</h1>
+      <p class="subtitle">Conecta tu cuenta para postular en Mercado Público</p>
+    </div>
+
+    <div class="login-form">
+      <label for="api-key">API Key</label>
+      <input
+        type="password"
+        id="api-key"
+        placeholder="fvb_ext_..."
+        autocomplete="off"
+      >
+      <p class="help-text">
+        Genera tu API Key en FirmaVB → Configuración de Extensión.
+      </p>
+      <p id="login-error" class="error-text hidden"></p>
+      <button id="login-btn" class="btn-primary">Conectar</button>
+    </div>
+  </div>
+
+  <!-- ===== MAIN ===== -->
+  <div id="main-view" class="view hidden">
+    <div class="header">
+      <div class="header-top">
+        <img src="icons/logo-firmavb.png" alt="FirmaVB" class="header-logo">
+        <button id="settings-btn" class="btn-icon" title="Configuración">⚙️</button>
+      </div>
+      <div class="client-info">
+        <span id="client-name">Empresa</span>
+        <span id="client-plan" class="badge">Básico</span>
+      </div>
+    </div>
+
+    <div class="sync-bar">
+      <span id="last-sync">Última sincronización: --</span>
+      <button id="sync-btn" class="btn-secondary">🔄 Sincronizar</button>
+    </div>
+
+    <div class="matches-section">
+      <h2>Oportunidades para postular</h2>
+      <div id="matches-list"></div>
+      <div id="no-matches" class="empty-state hidden">
+        No hay oportunidades pendientes.<br>
+        Genera ofertas en FirmaVB y aparecerán aquí.
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SETTINGS ===== -->
+  <div id="settings-view" class="view hidden">
+    <div class="header">
+      <div class="header-top">
+        <h1>Configuración</h1>
+        <button id="back-btn" class="btn-icon" title="Volver">←</button>
+      </div>
+    </div>
+
+    <div class="settings-content">
+      <div class="setting-group">
+        <h3>Cuenta</h3>
+        <p><strong>Empresa:</strong> <span id="settings-empresa">-</span></p>
+        <p><strong>RUT:</strong> <span id="settings-rut">-</span></p>
+        <p><strong>Plan:</strong> <span id="settings-plan">Básico</span></p>
+      </div>
+
+      <div class="setting-group">
+        <h3>Preferencias</h3>
+        <label class="checkbox-label">
+          <input type="checkbox" id="notifications-enabled" checked>
+          Mostrar notificaciones
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="auto-sync-enabled" checked>
+          Sincronizar automáticamente al abrir
+        </label>
+      </div>
+
+      <button id="logout-btn" class="btn-danger">Cerrar sesión</button>
+    </div>
+  </div>
+
   <script src="popup.js" type="module"></script>
 </body>
 </html>
