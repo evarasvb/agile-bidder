@@ -200,6 +200,64 @@ jobs:
             exit 1
           fi
 
+      - name: Sync Compras Ágiles
+        id: sync-compras-agiles
+        if: ${{ github.event.inputs.tipo != 'licitaciones' && github.event.inputs.tipo != 'ordenes' }}
+        run: |
+          echo "=== Sincronizando Compras Ágiles ==="
+
+          MAX_RETRIES=3
+          RETRY_DELAY=30
+          attempt=0
+          success=false
+
+          while [ $attempt -lt $MAX_RETRIES ]; do
+            attempt=$((attempt + 1))
+            echo "Intento $attempt de $MAX_RETRIES..."
+
+            http_code=$(curl -s -o /tmp/response_ca.json -w "%{http_code}" \
+              --max-time 180 \
+              --retry 2 \
+              --retry-delay 10 \
+              -X POST \
+              "$SUPABASE_URL/functions/v1/fetch-compras-agiles" \
+              -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+              -H "Content-Type: application/json" \
+              -d "{}")
+
+            echo "HTTP Status: $http_code"
+
+            if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+              response=$(cat /tmp/response_ca.json)
+              echo "Respuesta: $response"
+
+              synced=$(echo "$response" | jq -r '.stats.compras_synced // 0' 2>/dev/null)
+              fuente=$(echo "$response" | jq -r '.data_source // "api"' 2>/dev/null)
+
+              echo "compras_synced=$synced" >> "$GITHUB_OUTPUT"
+              echo "compras_status=success" >> "$GITHUB_OUTPUT"
+              echo "Compras ágiles sincronizadas: $synced (fuente: $fuente)"
+
+              success=true
+              break
+            else
+              echo "::warning::Attempt $attempt failed with HTTP $http_code"
+              cat /tmp/response_ca.json 2>/dev/null || true
+              if [ $attempt -lt $MAX_RETRIES ]; then
+                echo "Retrying in ${RETRY_DELAY}s..."
+                sleep $RETRY_DELAY
+                RETRY_DELAY=$((RETRY_DELAY * 2))
+              fi
+            fi
+          done
+
+          if [ "$success" = false ]; then
+            echo "compras_status=failed" >> "$GITHUB_OUTPUT"
+            echo "compras_synced=0" >> "$GITHUB_OUTPUT"
+            echo "::error::Sync Compras Ágiles failed after $MAX_RETRIES attempts"
+            exit 1
+          fi
+
       - name: Actualizar timestamp de sync
         if: always()
         env:
