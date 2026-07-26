@@ -21,6 +21,7 @@ export interface OrdenCompra {
   fecha_envio: string | null;
   fecha_aceptacion: string | null;
   estado: string | null;
+    tipo: string | null;
   created_at: string;
   updated_at: string;
   // Items asociados (se cargan por separado)
