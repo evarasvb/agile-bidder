@@ -12,7 +12,15 @@ on:
   workflow_dispatch:
     inputs:
       fecha:
-        description: 'Fecha a consultar (ddmmaaaa)'
+        description: 'Fecha a consultar (ddmmaaaa). Ignorada si se usa rango.'
+        required: false
+        default: ''
+      fecha_inicio:
+        description: 'Fecha inicio rango (ddmmaaaa), ej: 01072026'
+        required: false
+        default: ''
+      fecha_fin:
+        description: 'Fecha fin rango (ddmmaaaa), ej: 26072026'
         required: false
         default: ''
       tipo:
@@ -33,7 +41,7 @@ env:
 jobs:
   sync-mercadopublico:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 120
 
     steps:
       - name: Validar secrets
@@ -48,88 +56,131 @@ jobs:
           fi
           echo "All required secrets are configured"
 
-      - name: Configurar fecha
+      - name: Configurar fechas
         id: fecha
         env:
           INPUT_FECHA: ${{ github.event.inputs.fecha }}
+          INPUT_FECHA_INICIO: ${{ github.event.inputs.fecha_inicio }}
+          INPUT_FECHA_FIN: ${{ github.event.inputs.fecha_fin }}
         run: |
-          if [ -n "$INPUT_FECHA" ]; then
-            # Validate format: exactly 8 digits (ddmmaaaa)
-            if ! echo "$INPUT_FECHA" | grep -qE '^[0-9]{8}$'; then
-              echo "::error::Invalid date format. Expected ddmmaaaa (e.g., 15032026)"
+          validate_date() {
+            if ! echo "$1" | grep -qE '^[0-9]{8}$'; then
+              echo "::error::Formato de fecha inválido: $1. Se esperaba ddmmaaaa (ej: 01072026)"
               exit 1
             fi
+          }
+
+          if [ -n "$INPUT_FECHA_INICIO" ] && [ -n "$INPUT_FECHA_FIN" ]; then
+            validate_date "$INPUT_FECHA_INICIO"
+            validate_date "$INPUT_FECHA_FIN"
+            # Convertir ddmmaaaa → aaaa-mm-dd para date
+            d_i="${INPUT_FECHA_INICIO:4:4}-${INPUT_FECHA_INICIO:2:2}-${INPUT_FECHA_INICIO:0:2}"
+            d_f="${INPUT_FECHA_FIN:4:4}-${INPUT_FECHA_FIN:2:2}-${INPUT_FECHA_FIN:0:2}"
+            if [ "$(date -d "$d_i" +%s)" -gt "$(date -d "$d_f" +%s)" ]; then
+              echo "::error::fecha_inicio ($d_i) es posterior a fecha_fin ($d_f)"
+              exit 1
+            fi
+            # Construir lista de fechas en formato ddmmaaaa
+            lista=""
+            current="$d_i"
+            ts_f=$(date -d "$d_f" +%s)
+            while [ "$(date -d "$current" +%s)" -le "$ts_f" ]; do
+              dd=$(date -d "$current" +%d)
+              mm=$(date -d "$current" +%m)
+              aaaa=$(date -d "$current" +%Y)
+              lista="$lista ${dd}${mm}${aaaa}"
+              current=$(date -d "$current + 1 day" +%Y-%m-%d)
+            done
+            echo "FECHAS=$lista" >> "$GITHUB_OUTPUT"
+            echo "FECHA=$INPUT_FECHA_INICIO" >> "$GITHUB_OUTPUT"
+            echo "Rango de fechas: $INPUT_FECHA_INICIO → $INPUT_FECHA_FIN"
+            echo "Fechas a procesar:$lista"
+          elif [ -n "$INPUT_FECHA" ]; then
+            validate_date "$INPUT_FECHA"
+            echo "FECHAS=$INPUT_FECHA" >> "$GITHUB_OUTPUT"
             echo "FECHA=$INPUT_FECHA" >> "$GITHUB_OUTPUT"
+            echo "Fecha a consultar: $INPUT_FECHA"
           else
-            echo "FECHA=$(date -u +%d%m%Y)" >> "$GITHUB_OUTPUT"
+            hoy=$(date -u +%d%m%Y)
+            echo "FECHAS=$hoy" >> "$GITHUB_OUTPUT"
+            echo "FECHA=$hoy" >> "$GITHUB_OUTPUT"
+            echo "Fecha a consultar: $hoy (hoy)"
           fi
-          echo "Fecha a consultar: $(grep FECHA "$GITHUB_OUTPUT")"
 
       - name: Sync Licitaciones
         id: sync-licitaciones
         if: ${{ github.event.inputs.tipo != 'ordenes' }}
         env:
-          FECHA: ${{ steps.fecha.outputs.FECHA }}
+          FECHAS: ${{ steps.fecha.outputs.FECHAS }}
         run: |
           echo "=== Sincronizando Licitaciones ==="
-          echo "Fecha: $FECHA"
+          total_synced=0
+          total_errors=0
+          global_status=success
 
-          MAX_RETRIES=3
-          RETRY_DELAY=30
-          attempt=0
-          success=false
+          sync_fecha() {
+            local FECHA="$1"
+            echo "--- Licitaciones para fecha: $FECHA ---"
+            MAX_RETRIES=3
+            RETRY_DELAY=30
+            attempt=0
+            success=false
 
-          while [ $attempt -lt $MAX_RETRIES ]; do
-            attempt=$((attempt + 1))
-            echo "Intento $attempt de $MAX_RETRIES..."
+            while [ $attempt -lt $MAX_RETRIES ]; do
+              attempt=$((attempt + 1))
+              echo "Intento $attempt de $MAX_RETRIES..."
 
-            http_code=$(curl -s -o /tmp/response_lic.json -w "%{http_code}" \
-              --max-time 120 \
-              --retry 2 \
-              --retry-delay 10 \
-              -X POST \
-              "$SUPABASE_URL/functions/v1/mercadopublico-api" \
-              -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
-              -H "Content-Type: application/json" \
-              -d "{\"action\": \"sync-licitaciones\", \"fecha\": \"$FECHA\", \"ticket\": \"$MP_API_TICKET\"}")
+              http_code=$(curl -s -o /tmp/response_lic.json -w "%{http_code}" \
+                --max-time 120 \
+                --retry 2 \
+                --retry-delay 10 \
+                -X POST \
+                "$SUPABASE_URL/functions/v1/mercadopublico-api" \
+                -H "Authorization: ******" \
+                -H "Content-Type: application/json" \
+                -d "{\"action\": \"sync-licitaciones\", \"fecha\": \"$FECHA\", \"ticket\": \"$MP_API_TICKET\"}")
 
-            echo "HTTP Status: $http_code"
+              echo "HTTP Status: $http_code"
 
-            if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
-              response=$(cat /tmp/response_lic.json)
-              echo "Respuesta: $response"
-
-              # Check if sync was successful in the response
-              sync_success=$(echo "$response" | jq -r '.success // empty' 2>/dev/null)
-              synced=$(echo "$response" | jq -r '.synced // 0' 2>/dev/null)
-              errors=$(echo "$response" | jq -r '.errors | length // 0' 2>/dev/null)
-
-              echo "licitaciones_synced=$synced" >> "$GITHUB_OUTPUT"
-              echo "licitaciones_errors=$errors" >> "$GITHUB_OUTPUT"
-              echo "licitaciones_status=success" >> "$GITHUB_OUTPUT"
-
-              if [ "$sync_success" = "false" ] && [ "$errors" -gt 0 ]; then
-                echo "::warning::Sync completed with $errors errors"
+              if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+                response=$(cat /tmp/response_lic.json)
+                echo "Respuesta: $response"
+                sync_success=$(echo "$response" | jq -r '.success // empty' 2>/dev/null)
+                synced=$(echo "$response" | jq -r '.synced // 0' 2>/dev/null)
+                errors=$(echo "$response" | jq -r '.errors | length // 0' 2>/dev/null)
+                total_synced=$((total_synced + synced))
+                total_errors=$((total_errors + errors))
+                if [ "$sync_success" = "false" ] && [ "$errors" -gt 0 ]; then
+                  echo "::warning::Sync $FECHA completado con $errors errores"
+                fi
+                success=true
+                break
+              else
+                echo "::warning::Intento $attempt fallido HTTP $http_code"
+                cat /tmp/response_lic.json 2>/dev/null || true
+                if [ $attempt -lt $MAX_RETRIES ]; then
+                  echo "Reintentando en ${RETRY_DELAY}s..."
+                  sleep $RETRY_DELAY
+                  RETRY_DELAY=$((RETRY_DELAY * 2))
+                fi
               fi
+            done
 
-              success=true
-              break
-            else
-              echo "::warning::Attempt $attempt failed with HTTP $http_code"
-              cat /tmp/response_lic.json 2>/dev/null || true
-              if [ $attempt -lt $MAX_RETRIES ]; then
-                echo "Retrying in ${RETRY_DELAY}s..."
-                sleep $RETRY_DELAY
-                RETRY_DELAY=$((RETRY_DELAY * 2))
-              fi
+            if [ "$success" = false ]; then
+              echo "::error::Sync Licitaciones para $FECHA falló después de $MAX_RETRIES intentos"
+              global_status=failed
             fi
+          }
+
+          for FECHA in $FECHAS; do
+            sync_fecha "$FECHA"
           done
 
-          if [ "$success" = false ]; then
-            echo "licitaciones_status=failed" >> "$GITHUB_OUTPUT"
-            echo "licitaciones_synced=0" >> "$GITHUB_OUTPUT"
-            echo "licitaciones_errors=1" >> "$GITHUB_OUTPUT"
-            echo "::error::Sync Licitaciones failed after $MAX_RETRIES attempts"
+          echo "licitaciones_synced=$total_synced" >> "$GITHUB_OUTPUT"
+          echo "licitaciones_errors=$total_errors" >> "$GITHUB_OUTPUT"
+          echo "licitaciones_status=$global_status" >> "$GITHUB_OUTPUT"
+
+          if [ "$global_status" = "failed" ]; then
             exit 1
           fi
 
@@ -137,66 +188,76 @@ jobs:
         id: sync-ordenes
         if: ${{ github.event.inputs.tipo != 'licitaciones' }}
         env:
-          FECHA: ${{ steps.fecha.outputs.FECHA }}
+          FECHAS: ${{ steps.fecha.outputs.FECHAS }}
         run: |
           echo "=== Sincronizando Órdenes de Compra ==="
-          echo "Fecha: $FECHA"
+          total_synced=0
+          total_errors=0
+          global_status=success
 
-          MAX_RETRIES=3
-          RETRY_DELAY=30
-          attempt=0
-          success=false
+          sync_fecha() {
+            local FECHA="$1"
+            echo "--- Órdenes de Compra para fecha: $FECHA ---"
+            MAX_RETRIES=3
+            RETRY_DELAY=30
+            attempt=0
+            success=false
 
-          while [ $attempt -lt $MAX_RETRIES ]; do
-            attempt=$((attempt + 1))
-            echo "Intento $attempt de $MAX_RETRIES..."
+            while [ $attempt -lt $MAX_RETRIES ]; do
+              attempt=$((attempt + 1))
+              echo "Intento $attempt de $MAX_RETRIES..."
 
-            http_code=$(curl -s -o /tmp/response_oc.json -w "%{http_code}" \
-              --max-time 120 \
-              --retry 2 \
-              --retry-delay 10 \
-              -X POST \
-              "$SUPABASE_URL/functions/v1/mercadopublico-api" \
-              -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
-              -H "Content-Type: application/json" \
-              -d "{\"action\": \"sync-ordenes\", \"fecha\": \"$FECHA\", \"ticket\": \"$MP_API_TICKET\"}")
+              http_code=$(curl -s -o /tmp/response_oc.json -w "%{http_code}" \
+                --max-time 120 \
+                --retry 2 \
+                --retry-delay 10 \
+                -X POST \
+                "$SUPABASE_URL/functions/v1/mercadopublico-api" \
+                -H "Authorization: ******" \
+                -H "Content-Type: application/json" \
+                -d "{\"action\": \"sync-ordenes\", \"fecha\": \"$FECHA\", \"ticket\": \"$MP_API_TICKET\"}")
 
-            echo "HTTP Status: $http_code"
+              echo "HTTP Status: $http_code"
 
-            if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
-              response=$(cat /tmp/response_oc.json)
-              echo "Respuesta: $response"
-
-              sync_success=$(echo "$response" | jq -r '.success // empty' 2>/dev/null)
-              synced=$(echo "$response" | jq -r '.synced // 0' 2>/dev/null)
-              errors=$(echo "$response" | jq -r '.errors | length // 0' 2>/dev/null)
-
-              echo "ordenes_synced=$synced" >> "$GITHUB_OUTPUT"
-              echo "ordenes_errors=$errors" >> "$GITHUB_OUTPUT"
-              echo "ordenes_status=success" >> "$GITHUB_OUTPUT"
-
-              if [ "$sync_success" = "false" ] && [ "$errors" -gt 0 ]; then
-                echo "::warning::Sync completed with $errors errors"
+              if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+                response=$(cat /tmp/response_oc.json)
+                echo "Respuesta: $response"
+                sync_success=$(echo "$response" | jq -r '.success // empty' 2>/dev/null)
+                synced=$(echo "$response" | jq -r '.synced // 0' 2>/dev/null)
+                errors=$(echo "$response" | jq -r '.errors | length // 0' 2>/dev/null)
+                total_synced=$((total_synced + synced))
+                total_errors=$((total_errors + errors))
+                if [ "$sync_success" = "false" ] && [ "$errors" -gt 0 ]; then
+                  echo "::warning::Sync $FECHA completado con $errors errores"
+                fi
+                success=true
+                break
+              else
+                echo "::warning::Intento $attempt fallido HTTP $http_code"
+                cat /tmp/response_oc.json 2>/dev/null || true
+                if [ $attempt -lt $MAX_RETRIES ]; then
+                  echo "Reintentando en ${RETRY_DELAY}s..."
+                  sleep $RETRY_DELAY
+                  RETRY_DELAY=$((RETRY_DELAY * 2))
+                fi
               fi
+            done
 
-              success=true
-              break
-            else
-              echo "::warning::Attempt $attempt failed with HTTP $http_code"
-              cat /tmp/response_oc.json 2>/dev/null || true
-              if [ $attempt -lt $MAX_RETRIES ]; then
-                echo "Retrying in ${RETRY_DELAY}s..."
-                sleep $RETRY_DELAY
-                RETRY_DELAY=$((RETRY_DELAY * 2))
-              fi
+            if [ "$success" = false ]; then
+              echo "::error::Sync Órdenes para $FECHA falló después de $MAX_RETRIES intentos"
+              global_status=failed
             fi
+          }
+
+          for FECHA in $FECHAS; do
+            sync_fecha "$FECHA"
           done
 
-          if [ "$success" = false ]; then
-            echo "ordenes_status=failed" >> "$GITHUB_OUTPUT"
-            echo "ordenes_synced=0" >> "$GITHUB_OUTPUT"
-            echo "ordenes_errors=1" >> "$GITHUB_OUTPUT"
-            echo "::error::Sync Órdenes de Compra failed after $MAX_RETRIES attempts"
+          echo "ordenes_synced=$total_synced" >> "$GITHUB_OUTPUT"
+          echo "ordenes_errors=$total_errors" >> "$GITHUB_OUTPUT"
+          echo "ordenes_status=$global_status" >> "$GITHUB_OUTPUT"
+
+          if [ "$global_status" = "failed" ]; then
             exit 1
           fi
 
@@ -216,7 +277,7 @@ jobs:
             --max-time 30 \
             -X POST \
             "$SUPABASE_URL/functions/v1/sync-health" \
-            -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+            -H "Authorization: ******" \
             -H "Content-Type: application/json" \
             -d "{
               \"action\": \"update\",
@@ -257,7 +318,7 @@ jobs:
             --max-time 30 \
             -X POST \
             "${{ secrets.SUPABASE_URL }}/functions/v1/sync-health" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Authorization: ****** secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             -H "Content-Type: application/json" \
             -d "{
               \"action\": \"alert\",
