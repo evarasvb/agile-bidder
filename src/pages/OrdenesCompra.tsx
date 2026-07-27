@@ -74,7 +74,7 @@ export default function OrdenesCompra() {
                           Ordenar por Monto
           </Button>
                       <Button
-            onClick={() => descargarTopOrdenesCompraPDF(ordenesMostradas.slice(0, 20), "Top Ordenes de Compra")}
+            onClick={() => descargarTopOrdenesCompraPDF([...ordenes].sort((a, b) => (b.total ?? 0) - (a.total ?? 0)).slice(0, 20), "Top Ordenes de Compra")}
             disabled={ordenesMostradas.length === 0}
             variant="outline"
             className="gap-2"
