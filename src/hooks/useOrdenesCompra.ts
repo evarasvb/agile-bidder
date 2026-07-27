@@ -21,6 +21,7 @@ export interface OrdenCompra {
   fecha_envio: string | null;
   fecha_aceptacion: string | null;
   estado: string | null;
+    tipo: string | null;
   created_at: string;
   updated_at: string;
   // Items asociados (se cargan por separado)
@@ -160,6 +161,7 @@ export function useOrdenesCompra(filters?: OrdenesCompraFilters, includeItems = 
               fecha_envio: orden.fecha_envio,
               fecha_aceptacion: orden.fecha_aceptacion,
               estado: orden.estado,
+              tipo: orden.tipo,
               created_at: orden.created_at,
               updated_at: orden.updated_at,
               items: itemsMap.get(orden.id) || [],
@@ -182,6 +184,7 @@ export function useOrdenesCompra(filters?: OrdenesCompraFilters, includeItems = 
           fecha_envio: orden.fecha_envio,
           fecha_aceptacion: orden.fecha_aceptacion,
           estado: orden.estado,
+          tipo: orden.tipo,
           created_at: orden.created_at,
           updated_at: orden.updated_at,
           items: undefined,
@@ -259,6 +262,7 @@ export function useOrdenCompra(codigo: string | null, includeItems = true) {
           fecha_envio: orden.fecha_envio,
           fecha_aceptacion: orden.fecha_aceptacion,
           estado: orden.estado,
+          tipo: orden.tipo,
           created_at: orden.created_at,
           updated_at: orden.updated_at,
           items,
