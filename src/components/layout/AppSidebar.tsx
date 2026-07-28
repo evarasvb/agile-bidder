@@ -20,6 +20,7 @@ import {
   TrendingUp,
   Swords,
   FileCheck,
+  FileSearch,
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -52,6 +53,11 @@ const navItems: NavItem[] = [
     title: "Oportunidades",
     url: "/oportunidades",
     icon: Crosshair,
+  },
+  {
+    title: "Licitaciones",
+    url: "/licitaciones-nuevas",
+    icon: FileSearch,
   },
   {
     title: "Pipeline",
