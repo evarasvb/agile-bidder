@@ -4,22 +4,10 @@
  * Incluye diccionario de sinónimos y matching por categoría
  */
 
-import type { InventoryItem } from "@/hooks/useInventory";
+import type { InventoryItem, ProductMatch, ItemRequerido } from '@/services/types';
 
-export interface ProductMatch {
-  inventoryItem: InventoryItem;
-  score: number; // 0-100
-  matchType: 'exact' | 'partial' | 'keyword' | 'fuzzy' | 'category';
-  matchedTerms: string[];
-}
-
-export interface ItemRequerido {
-  id: string;
-  nombre: string;
-  descripcion?: string;
-  cantidad?: number;
-  unidad?: string;
-}
+// Re-export types for backward compatibility
+export type { InventoryItem, ProductMatch, ItemRequerido };
 
 /**
  * Diccionario de sinónimos y términos relacionados por categoría
@@ -184,10 +172,18 @@ function calculateMatch(itemRequerido: ItemRequerido, producto: InventoryItem): 
   // 1. Match exacto por nombre (100%)
   if (nombreRequerido === nombreProducto) {
     return {
-      inventoryItem: producto,
-      score: 100,
-      matchType: 'exact',
-      matchedTerms: [itemRequerido.nombre]
+      inventory_id: producto.id,
+      sku: producto.sku,
+      nombre: producto.nombre_producto,
+      keywords_matched: [itemRequerido.nombre],
+      similarity_score: 100,
+      match_type: 'exact',
+      cantidad_requerida: itemRequerido.cantidad || 1,
+      precio_unitario: producto.precio_unitario,
+      precio_oferta: producto.precio_unitario * (1 + producto.margen_objetivo / 100),
+      margen_aplicado: producto.margen_objetivo,
+      subtotal: (itemRequerido.cantidad || 1) * producto.precio_unitario * (1 + producto.margen_objetivo / 100),
+      inventory_item: producto,
     };
   }
   
@@ -268,11 +264,22 @@ function calculateMatch(itemRequerido: ItemRequerido, producto: InventoryItem): 
   // Umbral mínimo de 25% (reducido para mejor cobertura)
   if (score < 25) return null;
   
+  const cantidad = itemRequerido.cantidad || 1;
+  const precioConMargen = producto.precio_unitario * (1 + producto.margen_objetivo / 100);
+  
   return {
-    inventoryItem: producto,
-    score: Math.round(score),
-    matchType,
-    matchedTerms: [...new Set(matchedTerms)]
+    inventory_id: producto.id,
+    sku: producto.sku,
+    nombre: producto.nombre_producto,
+    keywords_matched: [...new Set(matchedTerms)],
+    similarity_score: Math.round(score),
+    match_type: matchType,
+    cantidad_requerida: cantidad,
+    precio_unitario: producto.precio_unitario,
+    precio_oferta: precioConMargen,
+    margen_aplicado: producto.margen_objetivo,
+    subtotal: cantidad * precioConMargen,
+    inventory_item: producto,
   };
 }
 
@@ -298,7 +305,7 @@ export function findMatches(
   
   // Ordenar por score descendente y limitar resultados
   return matches
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => b.similarity_score - a.similarity_score)
     .slice(0, maxResults);
 }
 
