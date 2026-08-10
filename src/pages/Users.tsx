@@ -34,7 +34,6 @@ interface UserWithProfile {
   roles: { role: AppRole }[];
   cliente: {
     empresa_nombre: string | null;
-    odoo_enabled: boolean;
   } | null;
 }
 
@@ -71,7 +70,7 @@ export default function Users() {
       // Get all clientes
       const { data: clientes, error: clientesError } = await supabase
         .from('clientes')
-        .select('user_id, empresa_nombre, odoo_enabled');
+        .select('user_id, empresa_nombre');
 
       if (clientesError) throw clientesError;
 
@@ -105,7 +104,6 @@ export default function Users() {
           if (user) {
             user.cliente = {
               empresa_nombre: cliente.empresa_nombre,
-              odoo_enabled: cliente.odoo_enabled || false,
             };
           }
         }
@@ -286,62 +284,6 @@ export default function Users() {
     },
   });
 
-  // Toggle Odoo enabled
-  const toggleOdooMutation = useMutation({
-    mutationFn: async ({ userId, enabled }: { userId: string; enabled: boolean }) => {
-      // Verificar si existe el registro en clientes
-      const { data: existingCliente, error: checkError } = await supabase
-        .from('clientes')
-        .select('user_id')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
-        throw checkError;
-      }
-
-      if (existingCliente) {
-        // Actualizar si existe
-        const { error } = await supabase
-          .from('clientes')
-          .update({ odoo_enabled: enabled })
-          .eq('user_id', userId);
-        if (error) throw error;
-      } else {
-        // Crear si no existe - need to provide all required fields
-        const user = users?.find(u => u.id === userId);
-        const { error } = await supabase
-          .from('clientes')
-          .insert({
-            user_id: userId,
-            empresa_nombre: user?.profile?.full_name || 'Sin nombre',
-            rut: '00.000.000-0',
-            email: user?.email || '',
-            nombre_responsable: user?.profile?.full_name || 'Sin nombre',
-            region: 'Metropolitana',
-            odoo_enabled: enabled,
-          });
-        if (error) throw error;
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-      toast.success('Configuración de Odoo actualizada');
-    },
-    onError: (error: any) => {
-      console.error('Error toggling Odoo:', error);
-      const errorMessage = error?.message || error?.error_description || 'Error al actualizar Odoo';
-      toast.error(errorMessage);
-      // Log detallado para debugging
-      console.error('Error completo:', {
-        code: error?.code,
-        details: error?.details,
-        hint: error?.hint,
-        message: error?.message,
-      });
-    },
-  });
-
   // Create new user - Método simplificado y mejorado
   const createUserMutation = useMutation({
     mutationFn: async () => {
@@ -451,7 +393,6 @@ export default function Users() {
           region: 'Metropolitana',
           rut: '00.000.000-0',
           user_id: userId,
-          odoo_enabled: false,
         }, {
           onConflict: 'user_id'
         });
@@ -803,16 +744,6 @@ export default function Users() {
             </p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Con Odoo</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">
-              {users?.filter(u => u.cliente?.odoo_enabled).length || 0}
-            </p>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Users Table */}
@@ -830,7 +761,6 @@ export default function Users() {
                 <TableHead>Usuario</TableHead>
                 <TableHead>Empresa</TableHead>
                 <TableHead>Rol</TableHead>
-                <TableHead>Odoo</TableHead>
                 <TableHead>Registro</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
@@ -902,20 +832,6 @@ export default function Users() {
                           className="data-[state=checked]:bg-firmavb-blue"
                         />
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      {user.cliente ? (
-                        <Switch
-                          checked={user.cliente.odoo_enabled}
-                          onCheckedChange={(enabled) => toggleOdooMutation.mutate({ 
-                            userId: user.id, 
-                            enabled 
-                          })}
-                          disabled={toggleOdooMutation.isPending}
-                        />
-                      ) : (
-                        <span className="text-muted-foreground text-sm">Sin empresa</span>
-                      )}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {format(new Date(user.created_at), 'dd MMM yyyy', { locale: es })}

@@ -237,13 +237,13 @@ function mapCSVRecord(record: Record<string, string>) {
     nombre,
     descripcion: record['Descripcion'] || record['descripcion'] || nombre,
     estado: record['Estado'] || record['estado'] || 'activa',
-    fecha_publicacion: record['FechaPublicacion'] || record['fecha_publicacion'] || null,
     fecha_cierre: record['FechaCierre'] || record['fecha_cierre'] || null,
-    monto_estimado: monto,
-    moneda: record['Moneda'] || record['moneda'] || 'CLP',
-    nombre_organismo: organismo,
+    monto,
+    organismo,
     datos_json: {
       source: 'csv_datos_abiertos',
+      fecha_publicacion: record['FechaPublicacion'] || record['fecha_publicacion'] || null,
+      moneda: record['Moneda'] || record['moneda'] || 'CLP',
       raw: record,
     },
     updated_at: new Date().toISOString(),
@@ -324,21 +324,22 @@ Deno.serve(async (req) => {
             // Detalle no es crítico, continuar sin él
           }
 
-          // Upsert en compras_agiles
+          // Upsert en compras_agiles (columnas reales: monto, organismo).
+          // Campos sin columna propia (fecha_publicacion, moneda, etc.) van en datos_json.
           const compraData = {
             codigo: item.codigo,
             nombre: detalle?.nombre || item.nombre,
             descripcion: detalle?.descripcion || item.nombre,
             estado: item.estado,
-            fecha_publicacion: item.fecha_publicacion,
             fecha_cierre: item.fecha_cierre,
-            monto_estimado: detalle?.presupuesto_estimado || item.monto_disponible,
-            moneda: item.moneda,
-            nombre_organismo: detalle?.informacion_institucion?.organismo_comprador || item.organismo,
+            monto: detalle?.presupuesto_estimado || item.monto_disponible,
+            organismo: detalle?.informacion_institucion?.organismo_comprador || item.organismo,
             datos_json: {
               ...item,
               source: 'api_buscador',
               detalle: detalle,
+              fecha_publicacion: item.fecha_publicacion,
+              moneda: item.moneda,
               direccion_entrega: detalle?.direccion_entrega,
               plazo_entrega: detalle?.plazo_entrega,
               rut_organismo: detalle?.informacion_institucion?.rut_organismo_comprador,
@@ -372,7 +373,7 @@ Deno.serve(async (req) => {
               compra_agil_id: compraId,
               codigo_producto: String(p.codigo_producto),
               nombre_producto: p.nombre,
-              descripcion_producto: p.descripcion,
+              descripcion: p.descripcion,
               cantidad: p.cantidad,
               unidad: p.unidad_medida,
             }));

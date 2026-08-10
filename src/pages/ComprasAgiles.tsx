@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useState, useCallback, useMemo } from "react";
-import { ShoppingCart, RefreshCw, AlertCircle } from "lucide-react";
+import { ShoppingCart, RefreshCw, AlertCircle, DownloadCloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -13,6 +13,7 @@ import { useComprasAgiles, type CompraAgil, type ComprasAgilesFilters as Filters
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useClienteFiltros } from "@/hooks/useClienteFiltros";
+import { supabaseClient as supabase } from "@/lib/supabaseClient";
 
 interface ItemParaPropuesta {
   itemId: string;
@@ -38,6 +39,7 @@ export default function ComprasAgiles() {
   const [selectedCompra, setSelectedCompra] = useState<CompraAgil | null>(null);
   const [propuestaModalOpen, setPropuestaModalOpen] = useState(false);
   const [productosParaPropuesta, setProductosParaPropuesta] = useState<ItemParaPropuesta[]>([]);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Obtener filtros personalizados del cliente
   const { filtros: clienteFiltros } = useClienteFiltros();
@@ -59,6 +61,50 @@ export default function ComprasAgiles() {
     } catch (err) {
       console.error('Error al actualizar:', err);
       toast.error('Error al actualizar las compras ágiles');
+    }
+  }, [queryClient, refetch]);
+
+  // Sincroniza en vivo desde MercadoPúblico (invoca la Edge Function fetch-compras-agiles)
+  const handleSync = useCallback(async () => {
+    setIsSyncing(true);
+    const toastId = toast.loading('Sincronizando compras ágiles desde MercadoPúblico...');
+    try {
+      const { data, error } = await supabase.functions.invoke('fetch-compras-agiles');
+      if (error) throw error;
+
+      const synced = data?.stats?.compras_synced ?? 0;
+      const fuente = data?.data_source === 'csv_fallback' ? ' (fuente: CSV datos abiertos)' : '';
+
+      // La Edge Function puede responder 200 con success:false (fallo parcial o total).
+      // En ese caso NO tratamos la operación como exitosa.
+      if (data?.success === false) {
+        const errCount = data?.stats?.errors_count ?? (data?.errors?.length ?? 0);
+        console.warn('Errores de sincronización de compras ágiles:', data?.errors);
+
+        // Refrescamos igual por si alcanzó a guardar algunas.
+        queryClient.invalidateQueries({ queryKey: ['compras_agiles'] });
+        queryClient.invalidateQueries({ queryKey: ['compras_agiles_stats'] });
+        await refetch();
+
+        if (synced > 0) {
+          toast.warning(`Sincronización con problemas: ${synced} guardadas, ${errCount} con error.`, { id: toastId });
+        } else {
+          toast.error('No se pudo sincronizar: Mercado Público no respondió. Intenta más tarde.', { id: toastId });
+        }
+        return;
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['compras_agiles'] });
+      queryClient.invalidateQueries({ queryKey: ['compras_agiles_stats'] });
+      await refetch();
+
+      toast.success(`${synced} compras ágiles sincronizadas${fuente}`, { id: toastId });
+    } catch (err) {
+      console.error('Error al sincronizar compras ágiles:', err);
+      const msg = err instanceof Error ? err.message : 'Error desconocido';
+      toast.error(`No se pudo sincronizar: ${msg}`, { id: toastId });
+    } finally {
+      setIsSyncing(false);
     }
   }, [queryClient, refetch]);
 
@@ -101,24 +147,43 @@ export default function ComprasAgiles() {
             </p>
           </div>
         </div>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button 
-              variant="outline" 
-              onClick={handleRefresh} 
-              className="gap-2 border-firmavb-blue/30 hover:bg-firmavb-blue/10 hover:border-firmavb-blue transition-colors"
-              disabled={isLoading}
-              aria-label="Actualizar lista de compras ágiles"
-            >
-              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Actualizar</span>
-              <span className="sm:hidden">Refrescar</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p className="text-xs">Actualiza la lista de compras ágiles desde MercadoPúblico</p>
-          </TooltipContent>
-        </Tooltip>
+        <div className="flex items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                onClick={handleRefresh}
+                className="gap-2 border-firmavb-blue/30 hover:bg-firmavb-blue/10 hover:border-firmavb-blue transition-colors"
+                disabled={isLoading || isSyncing}
+                aria-label="Actualizar lista de compras ágiles"
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Actualizar</span>
+                <span className="sm:hidden">Refrescar</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">Recarga la lista desde la base de datos</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                onClick={handleSync}
+                className="gap-2 bg-firmavb-blue hover:bg-firmavb-blue/90 text-white transition-colors"
+                disabled={isSyncing}
+                aria-label="Sincronizar compras ágiles desde MercadoPúblico"
+              >
+                <DownloadCloud className={`h-4 w-4 ${isSyncing ? 'animate-pulse' : ''}`} />
+                <span className="hidden sm:inline">{isSyncing ? 'Sincronizando...' : 'Sincronizar'}</span>
+                <span className="sm:hidden">Sync</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">Trae compras ágiles nuevas en vivo desde MercadoPúblico</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
       </header>
 
       {/* Error Alert */}

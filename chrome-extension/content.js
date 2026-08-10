@@ -385,88 +385,87 @@
     document.body.appendChild(modal);
   }
 
-  // Ejecutar autofill en el formulario
+  // Ejecutar autofill en el formulario (formulario React/MUI de Compra Ágil)
   function performAutofill(oferta) {
     try {
       const productos = oferta.productos || oferta.productos_ofertados || [];
-      let filledFields = 0;
-      
-      // Buscar y llenar campos de precio
-      productos.forEach((producto, index) => {
-        // Buscar campos de precio por diferentes selectores
-        const priceSelectors = [
-          `input[name*="precio"][name*="${index}"]`,
-          `input[id*="precio"][id*="${index}"]`,
-          `input[name*="price"][name*="${index}"]`,
-          `.item-precio:nth-child(${index + 1}) input`,
-          `tr:nth-child(${index + 2}) input[type="text"]`,
-          `tr:nth-child(${index + 2}) input[type="number"]`
-        ];
-        
-        let input = null;
-          for (const selector of priceSelectors) {
-          input = document.querySelector(selector);
-          if (input) break;
-        }
+      if (!productos.length) {
+        showMessage('error', 'La oferta no tiene productos con precio.');
+        return;
+      }
 
-        if (!input) {
-          const nombreProducto = (producto.nombre || producto.sku || '').trim().toLowerCase();
-          if (nombreProducto) {
-            const rows = document.querySelectorAll('table tr');
-            for (const row of rows) {
-              if (row.textContent.trim().toLowerCase().includes(nombreProducto)) {
-                input = row.querySelector('input[type="text"], input[type="number"], input:not([type])');
-                if (input) break;
-              }
-            }
-          }
-        }
+      // Los inputs de MUI son controlados por React: asignar .value directo NO
+      // actualiza el estado. Hay que usar el setter nativo y luego disparar 'input'.
+      const setReactValue = (el, value) => {
+        const proto = el.tagName === 'TEXTAREA'
+          ? window.HTMLTextAreaElement.prototype
+          : window.HTMLInputElement.prototype;
+        const setter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+        setter.call(el, String(value));
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        el.dispatchEvent(new Event('blur', { bubbles: true }));
+      };
 
-        if (input) {
-          input.value = producto.precio_unitario || producto.precio || '';
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          input.dispatchEvent(new Event('change', { bubbles: true }));
-          filledFields++;
-        }
+      // Índice de precio por código de producto (probamos varios nombres de campo).
+      const precioPorCodigo = new Map();
+      productos.forEach((p) => {
+        const codigo = String(
+          p.codigo_producto ?? p.codigo ?? p.id_producto ?? p.item_id ?? p.id ?? ''
+        ).trim();
+        const precio = p.precio_unitario ?? p.precio ?? p.valor_unitario ?? p.precioUnitario;
+        if (codigo && precio != null && precio !== '') precioPorCodigo.set(codigo, precio);
       });
-      
-      // Buscar y llenar campo de observaciones
-      const obsSelectors = [
-        'textarea[name*="observ"]',
-        'textarea[id*="observ"]',
-        'textarea[name*="notas"]',
-        '#observaciones',
-        '.observaciones textarea'
-      ];
-      
-      for (const selector of obsSelectors) {
-        const textarea = document.querySelector(selector);
-        if (textarea) {
-          textarea.value = oferta.observaciones || oferta.notas || 'Oferta generada con FirmaVB';
-          textarea.dispatchEvent(new Event('input', { bubbles: true }));
-          textarea.dispatchEvent(new Event('change', { bubbles: true }));
-          filledFields++;
-          break;
+
+      // Ubicar cada casilla "Valor unitario": es el <input> que sigue a un
+      // <label>Valor unitario</label> dentro de la tarjeta del producto.
+      const labels = Array.from(document.querySelectorAll('label'))
+        .filter((l) => /valor\s*unitario/i.test(l.textContent || ''));
+
+      let filledFields = 0;
+
+      labels.forEach((label, index) => {
+        const container = label.parentElement;
+        const input = container ? container.querySelector('input') : null;
+        if (!input) return;
+
+        // Código del producto de esta tarjeta: buscar "ID: <numero>" en ancestros.
+        let codigo = '';
+        let node = label;
+        for (let k = 0; k < 14 && node; k++) {
+          node = node.parentElement;
+          const m = node && (node.textContent || '').match(/ID:\s*(\d+)/);
+          if (m) { codigo = m[1]; break; }
         }
-      }
-      
+
+        // Precio: por código si lo tenemos; si no, por posición (mismo orden).
+        let precio;
+        if (codigo && precioPorCodigo.has(codigo)) {
+          precio = precioPorCodigo.get(codigo);
+        } else if (productos[index]) {
+          const p = productos[index];
+          precio = p.precio_unitario ?? p.precio ?? p.valor_unitario ?? p.precioUnitario;
+        }
+        if (precio == null || precio === '') return;
+
+        setReactValue(input, precio);
+        filledFields++;
+      });
+
       if (filledFields > 0) {
-        showMessage('success', `✓ Se completaron ${filledFields} campos automáticamente`);
-        
-        // Registrar resultado exitoso
-        chrome.runtime.sendMessage({
-          action: 'SUBMIT_RESULT',
-          data: {
-            ofertaId: oferta.id,
-            exito: true,
-            mensaje: `Autofill completado: ${filledFields} campos`,
-            datosAdicionales: { filledFields }
-          }
-        });
+        showMessage(
+          'success',
+          `✓ ${filledFields} precios completados. Revisa los montos, adjunta tu documento, resuelve el captcha y presiona "Enviar cotización".`
+        );
       } else {
-        showMessage('info', 'No se encontraron campos para completar. Completa el formulario manualmente.');
+        showMessage(
+          'info',
+          'No se encontraron las casillas de "Valor unitario". El formulario pudo haber cambiado; complétalo manualmente.'
+        );
       }
-      
+      // Nota: NO se marca la oferta como "enviada" automáticamente. El formulario
+      // tiene reCAPTCHA y adjunto obligatorio, así que el envío final lo realiza la
+      // persona; de este modo el estado de la oferta refleja la realidad.
     } catch (error) {
       console.error('Autofill error:', error);
       showMessage('error', 'Error al completar el formulario');

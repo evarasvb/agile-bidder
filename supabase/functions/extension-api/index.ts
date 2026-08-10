@@ -336,17 +336,21 @@ Deno.serve(async (req) => {
         // Get client info
         const { data: cliente } = await supabase
           .from('clientes')
-          .select('id, empresa_nombre, categoria_negocio')
+          .select('id, empresa_nombre, categoria_negocio, plan, rut')
           .eq('id', clienteId)
           .single();
 
         return new Response(
-          JSON.stringify({ 
-            success: true, 
+          JSON.stringify({
+            success: true,
             cliente: {
               id: cliente?.id,
+              // 'empresa' se mantiene por retrocompatibilidad; el popup lee empresa_nombre/plan/rut
               empresa: cliente?.empresa_nombre,
-              categoria: cliente?.categoria_negocio
+              empresa_nombre: cliente?.empresa_nombre,
+              categoria: cliente?.categoria_negocio,
+              plan: cliente?.plan,
+              rut: cliente?.rut
             }
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

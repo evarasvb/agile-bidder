@@ -5,9 +5,6 @@ import { useAuth } from './useAuth';
 interface ClienteConfig {
   id: string;
   empresa_nombre: string;
-  odoo_enabled: boolean;
-  odoo_url: string | null;
-  odoo_db: string | null;
   plan: string | null;
 }
 
@@ -21,7 +18,7 @@ export function useClienteConfig() {
 
       const { data, error } = await supabase
         .from('clientes')
-        .select('id, empresa_nombre, odoo_enabled, odoo_url, odoo_db, plan')
+        .select('id, empresa_nombre, plan')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -37,7 +34,6 @@ export function useClienteConfig() {
 
   return {
     clienteConfig,
-    hasOdoo: clienteConfig?.odoo_enabled || false,
     isLoading,
     error,
   };

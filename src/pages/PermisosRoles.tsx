@@ -52,7 +52,6 @@ const ALL_SECTIONS = [
   { key: 'bi_advanced', name: 'BI Avanzado', description: 'Análisis avanzado de datos' },
   { key: 'calendar', name: 'Calendario', description: 'Calendario de eventos y vencimientos' },
   { key: 'inventory', name: 'Inventario', description: 'Gestionar productos e inventario' },
-  { key: 'odoo', name: 'Odoo CRM', description: 'Integración con Odoo' },
   { key: 'extension', name: 'Extensión Chrome', description: 'Configuración de extensión' },
   { key: 'history', name: 'Historial', description: 'Historial de acciones' },
   { key: 'settings', name: 'Configuración', description: 'Configuración del sistema' },

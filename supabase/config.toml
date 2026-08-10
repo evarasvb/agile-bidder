@@ -42,16 +42,10 @@ verify_jwt = true
 [functions.mercadopublico-api]
 verify_jwt = false
 
-[functions.odoo-proxy]
-verify_jwt = true
-
 [functions.resumir-bases]
 verify_jwt = true
 
 [functions.scoring-ai]
-verify_jwt = true
-
-[functions.send-licitacion-to-odoo]
 verify_jwt = true
 
 [functions.send-notification]

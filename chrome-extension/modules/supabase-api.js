@@ -161,8 +161,11 @@ export async function submitResult(data) {
 
   const response = await supabaseApiRequest(apiKey, 'submit-result', {
     oferta_id: data.ofertaId,
-    exito: data.exito,
+    // El backend espera 'success' (no 'exito') y opcionalmente el número de oferta MP.
+    success: data.exito,
+    numero_oferta_mp: data.numeroOfertaMp,
     mensaje: data.mensaje,
+    error_detalle: data.errorDetalle,
     datos_adicionales: data.datosAdicionales
   });
 
