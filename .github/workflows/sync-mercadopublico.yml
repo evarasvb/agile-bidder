@@ -231,15 +231,26 @@ jobs:
               response=$(cat /tmp/response_ca.json)
               echo "Respuesta: $response"
 
+              # fetch-compras-agiles puede responder 200 con success:false cuando
+              # la API y el fallback CSV fallan. Solo se considera éxito si success=true.
+              sync_success=$(echo "$response" | jq -r '.success // false' 2>/dev/null)
               synced=$(echo "$response" | jq -r '.stats.compras_synced // 0' 2>/dev/null)
               fuente=$(echo "$response" | jq -r '.data_source // "api"' 2>/dev/null)
 
-              echo "compras_synced=$synced" >> "$GITHUB_OUTPUT"
-              echo "compras_status=success" >> "$GITHUB_OUTPUT"
-              echo "Compras ágiles sincronizadas: $synced (fuente: $fuente)"
-
-              success=true
-              break
+              if [ "$sync_success" = "true" ]; then
+                echo "compras_synced=$synced" >> "$GITHUB_OUTPUT"
+                echo "compras_status=success" >> "$GITHUB_OUTPUT"
+                echo "Compras ágiles sincronizadas: $synced (fuente: $fuente)"
+                success=true
+                break
+              else
+                echo "::warning::Respuesta con success=false (synced=$synced). Reintentando..."
+                if [ $attempt -lt $MAX_RETRIES ]; then
+                  echo "Retrying in ${RETRY_DELAY}s..."
+                  sleep $RETRY_DELAY
+                  RETRY_DELAY=$((RETRY_DELAY * 2))
+                fi
+              fi
             else
               echo "::warning::Attempt $attempt failed with HTTP $http_code"
               cat /tmp/response_ca.json 2>/dev/null || true

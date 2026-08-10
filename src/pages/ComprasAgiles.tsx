@@ -75,6 +75,25 @@ export default function ComprasAgiles() {
       const synced = data?.stats?.compras_synced ?? 0;
       const fuente = data?.data_source === 'csv_fallback' ? ' (fuente: CSV datos abiertos)' : '';
 
+      // La Edge Function puede responder 200 con success:false (fallo parcial o total).
+      // En ese caso NO tratamos la operación como exitosa.
+      if (data?.success === false) {
+        const errCount = data?.stats?.errors_count ?? (data?.errors?.length ?? 0);
+        console.warn('Errores de sincronización de compras ágiles:', data?.errors);
+
+        // Refrescamos igual por si alcanzó a guardar algunas.
+        queryClient.invalidateQueries({ queryKey: ['compras_agiles'] });
+        queryClient.invalidateQueries({ queryKey: ['compras_agiles_stats'] });
+        await refetch();
+
+        if (synced > 0) {
+          toast.warning(`Sincronización con problemas: ${synced} guardadas, ${errCount} con error.`, { id: toastId });
+        } else {
+          toast.error('No se pudo sincronizar: Mercado Público no respondió. Intenta más tarde.', { id: toastId });
+        }
+        return;
+      }
+
       queryClient.invalidateQueries({ queryKey: ['compras_agiles'] });
       queryClient.invalidateQueries({ queryKey: ['compras_agiles_stats'] });
       await refetch();
