@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useState, useCallback, useMemo } from "react";
-import { ShoppingCart, RefreshCw, AlertCircle, DownloadCloud } from "lucide-react";
+import { ShoppingCart, RefreshCw, AlertCircle, DownloadCloud, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -40,6 +40,7 @@ export default function ComprasAgiles() {
   const [propuestaModalOpen, setPropuestaModalOpen] = useState(false);
   const [productosParaPropuesta, setProductosParaPropuesta] = useState<ItemParaPropuesta[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Obtener filtros personalizados del cliente
   const { filtros: clienteFiltros } = useClienteFiltros();
@@ -107,6 +108,38 @@ export default function ComprasAgiles() {
       setIsSyncing(false);
     }
   }, [queryClient, refetch]);
+
+  // Genera ofertas automáticamente cruzando las compras ágiles a la vista con el inventario
+  const handleGenerarOfertas = useCallback(async () => {
+    const codigos = (compras || []).slice(0, 20).map((c) => c.codigo).filter(Boolean);
+    if (codigos.length === 0) {
+      toast.warning('No hay compras ágiles en la lista para generar ofertas.');
+      return;
+    }
+    setIsGenerating(true);
+    const toastId = toast.loading(`Generando ofertas para ${codigos.length} compras ágiles...`);
+    try {
+      const { data, error } = await supabase.functions.invoke('generar-ofertas-auto', {
+        body: { codigos },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const creadas = data?.ofertas_creadas ?? 0;
+      if (creadas > 0) {
+        toast.success(`${creadas} oferta(s) generada(s). Ya aparecen en la extensión para postular.`, { id: toastId });
+      } else {
+        toast.info('No se generaron ofertas (sin ítems o sin coincidencias con tu inventario).', { id: toastId });
+      }
+      queryClient.invalidateQueries({ queryKey: ['compras_agiles'] });
+    } catch (err) {
+      console.error('Error generando ofertas:', err);
+      const msg = err instanceof Error ? err.message : 'Error desconocido';
+      toast.error(`No se pudieron generar las ofertas: ${msg}`, { id: toastId });
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [compras, queryClient]);
 
   const handleSelectCompra = useCallback((compra: CompraAgil) => {
     setSelectedCompra(compra);
@@ -181,6 +214,23 @@ export default function ComprasAgiles() {
             </TooltipTrigger>
             <TooltipContent>
               <p className="text-xs">Trae compras ágiles nuevas en vivo desde MercadoPúblico</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                onClick={handleGenerarOfertas}
+                className="gap-2 bg-firmavb-red hover:bg-firmavb-red/90 text-white transition-colors"
+                disabled={isGenerating || isSyncing}
+                aria-label="Generar ofertas automáticamente con el inventario"
+              >
+                <Sparkles className={`h-4 w-4 ${isGenerating ? 'animate-pulse' : ''}`} />
+                <span className="hidden sm:inline">{isGenerating ? 'Generando...' : 'Generar ofertas'}</span>
+                <span className="sm:hidden">Ofertas</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">Crea ofertas automáticamente cruzando estas compras ágiles con tu inventario</p>
             </TooltipContent>
           </Tooltip>
         </div>
