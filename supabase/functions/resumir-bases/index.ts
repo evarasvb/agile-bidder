@@ -84,10 +84,12 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) {
+      throw new Error("GEMINI_API_KEY is not configured");
     }
+    const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+    const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash";
 
     // Truncate text if too long (max ~30k chars to stay within token limits)
     const textoTruncado = texto.length > 30000 ? texto.substring(0, 30000) + '...' : texto;
@@ -111,16 +113,16 @@ DEBES responder SOLO con un JSON válido sin ningún texto adicional. El JSON de
       ? `Extrae SOLO los productos o servicios solicitados de este documento:\n\n${textoTruncado}`
       : `Analiza completamente este documento de bases de licitación:\n\n${textoTruncado}`;
 
-    console.log(`User ${userId} calling Lovable AI to summarize bases (${texto.length} chars)`);
+    console.log(`User ${userId} calling Gemini to summarize bases (${texto.length} chars)`);
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch(GEMINI_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${GEMINI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: GEMINI_MODEL,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
@@ -137,10 +139,10 @@ DEBES responder SOLO con un JSON válido sin ningún texto adicional. El JSON de
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      if (response.status === 402) {
+      if (response.status === 402 || response.status === 403) {
         return new Response(
-          JSON.stringify({ error: "Payment required, please add funds to your Lovable AI workspace." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ error: "Error de autenticación o cuota con la API de Gemini." }),
+          { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       console.error("AI gateway error:", response.status);
