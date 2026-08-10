@@ -53,6 +53,7 @@ import VendedorDetalle from "./pages/VendedorDetalle";
 // Configuracion
 import ConfiguracionOportunidades from "./pages/ConfiguracionOportunidades";
 import Users from "./pages/Users";
+import ExtensionConfig from "./pages/ExtensionConfig";
 
 // Cuenta
 import Cuenta from "./pages/Cuenta";
@@ -150,6 +151,7 @@ const App = () => (
             {/* ----- CONFIGURACION ----- */}
             <Route path="/configuracion" element={<ConfiguracionOportunidades />} />
             <Route path="/configuracion/equipo" element={<Users />} />
+            <Route path="/configuracion/extension" element={<ExtensionConfig />} />
             
             {/* ----- CUENTA ----- */}
             <Route path="/cuenta" element={<Cuenta />} />

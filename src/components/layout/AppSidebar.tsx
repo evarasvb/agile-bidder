@@ -20,6 +20,7 @@ import {
   TrendingUp,
   Swords,
   FileCheck,
+  Puzzle,
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -109,6 +110,7 @@ const navItems: NavItem[] = [
     children: [
       { title: "Oportunidades", url: "/configuracion", icon: Settings },
       { title: "Equipo", url: "/configuracion/equipo", icon: Users },
+      { title: "Extensión Chrome", url: "/configuracion/extension", icon: Puzzle },
     ],
   },
 ];
