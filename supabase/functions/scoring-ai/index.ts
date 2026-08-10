@@ -68,10 +68,13 @@ serve(async (req) => {
   try {
     const { cliente, licitacion }: ScoringRequest = await req.json();
     
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) {
+      throw new Error("GEMINI_API_KEY is not configured");
     }
+    // Endpoint compatible con OpenAI de Google Gemini (soporta tool-calling).
+    const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+    const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash";
 
     const prompt = `Analiza la compatibilidad entre este cliente y esta licitación.
 
@@ -87,14 +90,14 @@ LICITACIÓN:
 
 Responde SOLO con un JSON usando la función proporcionada.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch(GEMINI_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${GEMINI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: GEMINI_MODEL,
         messages: [
           { role: "system", content: "Eres un experto en licitaciones públicas chilenas. Analiza compatibilidad entre proveedores y licitaciones." },
           { role: "user", content: prompt }
@@ -148,15 +151,15 @@ Responde SOLO con un JSON usando la función proporcionada.`;
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Payment required" }), {
-          status: 402,
+      if (response.status === 402 || response.status === 403) {
+        return new Response(JSON.stringify({ error: "Error de autenticación o cuota con la API de Gemini" }), {
+          status: response.status,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      throw new Error(`AI gateway error: ${response.status}`);
+      console.error("Gemini API error:", response.status, errorText);
+      throw new Error(`Gemini API error: ${response.status}`);
     }
 
     const data = await response.json();

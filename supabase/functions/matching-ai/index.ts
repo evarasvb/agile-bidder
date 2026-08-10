@@ -98,10 +98,13 @@ serve(async (req) => {
     
     console.log(`Procesando ${licitaciones.length} licitaciones contra ${inventario.length} productos`);
     
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) {
+      throw new Error("GEMINI_API_KEY is not configured");
     }
+    // Endpoint compatible con OpenAI de Google Gemini (soporta tool-calling).
+    const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+    const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash";
 
     const results: MatchResult[] = [];
 
@@ -137,14 +140,14 @@ Analiza semánticamente qué productos del inventario coinciden con lo solicitad
 Considera sinónimos, variaciones y productos relacionados.
 Responde usando la función proporcionada.`;
 
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetch(GEMINI_URL, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          Authorization: `Bearer ${GEMINI_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
+          model: GEMINI_MODEL,
           messages: [
             { 
               role: "system", 
@@ -222,12 +225,12 @@ Sé riguroso pero no descartes productos que podrían servir con pequeñas varia
           });
           continue;
         }
-        if (response.status === 402) {
-          console.error("Payment required");
-          throw new Error("Créditos insuficientes para análisis IA");
+        if (response.status === 402 || response.status === 403) {
+          console.error("Gemini API auth/quota error");
+          throw new Error("Error de autenticación o cuota con la API de Gemini");
         }
         const errorText = await response.text();
-        console.error("AI gateway error:", response.status, errorText);
+        console.error("Gemini API error:", response.status, errorText);
         continue;
       }
 
