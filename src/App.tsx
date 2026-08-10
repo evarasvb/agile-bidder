@@ -19,6 +19,7 @@ import NotFound from "./pages/NotFound";
 import MisOportunidades from "./pages/MisOportunidades";
 import LicitacionDetalle from "./pages/LicitacionDetalle";
 import Licitaciones from "./pages/Licitaciones";
+import LicitacionesMP from "./pages/LicitacionesMP";
 
 // Chat IA
 import ChatIA from "./pages/ChatIA";
@@ -108,6 +109,7 @@ const App = () => (
             <Route path="/licitaciones/:id" element={<LicitacionDetalle />} />
             <Route path="/licitaciones/:id/chat" element={<ChatIA />} />
             <Route path="/licitaciones" element={<Licitaciones />} />
+            <Route path="/licitaciones-nuevas" element={<LicitacionesMP />} />
 
             {/* ----- OPORTUNIDADES PANEL ----- */}
             <Route path="/oportunidades" element={<OportunidadesPanel />} />

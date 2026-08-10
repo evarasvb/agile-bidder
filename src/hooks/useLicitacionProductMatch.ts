@@ -150,11 +150,11 @@ function mapRowToInventoryItem(row: any): InventoryItem {
     precio_unitario: row.precio_unitario,
     margen_minimo: row.margen_minimo,
     margen_objetivo: row.margen_minimo, // Use same value as fallback
-    stock_disponible: row.stock,
+    stock_disponible: row.stock_disponible,
     unidad_medida: 'unidad', // Default
-    tiempo_entrega_dias: row.tiempo_entrega_dias,
+    tiempo_entrega_dias: row.tiempo_entrega,
     proveedor: null, // Not in table
-    activo: row.activo,
+          activo: true, /* no existe columna activo en cliente_inventario */
     imagen_url: row.imagen_url,
     cliente_id: row.cliente_id,
     created_at: row.created_at,
@@ -267,8 +267,7 @@ export function useLicitacionProductMatch(licitacionId: string | null, licitacio
           .from('cliente_inventario')
           .select('*')
           .eq('cliente_id', clienteId)
-          .eq('activo', true)
-          .range(from, to);
+                    .range(from, to);
 
         if (error) {
           console.error('[useLicitacionProductMatch] Error:', error);
@@ -446,10 +445,9 @@ export function useLicitacionMatchCounts(licitaciones: LicitacionBasic[], thresh
 
         const { data, error } = await supabase
           .from('cliente_inventario')
-          .select('id, nombre, descripcion, palabras_clave, activo')
+                    .select('id, nombre, descripcion, palabras_clave')
           .eq('cliente_id', clienteId)
-          .eq('activo', true)
-          .range(from, to);
+                    .range(from, to);
 
         if (error) {
           console.error('[useLicitacionMatchCounts] Error:', error);

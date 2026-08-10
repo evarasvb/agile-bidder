@@ -85,13 +85,15 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
   return useQuery({
     queryKey: ['oportunidades-panel', filters],
     queryFn: async (): Promise<{ data: OportunidadPanel[]; stats: PanelStats }> => {
-      // Fetch compras_agiles with items count
+      // Fetch compras_agiles with items count (solo publicadas / abiertas)
       const { data: comprasRaw, error: caError } = await supabase
         .from('compras_agiles')
         .select(`
           *,
           compras_agiles_items(id)
         `)
+        .eq('estado', 'Publicada')
+        .or(`fecha_cierre.is.null,fecha_cierre.gt.${new Date().toISOString()}`)
         .order('created_at', { ascending: false });
 
       if (caError) {

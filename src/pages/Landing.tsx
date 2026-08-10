@@ -181,7 +181,39 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Dashboard Comparativo */}
+      {/* Banner Validador CM2239 */}
+<section className="py-10 px-6">
+<div className="max-w-4xl mx-auto">
+<Card className="p-8 bg-gradient-to-br from-firmavb-blue/10 to-transparent border-firmavb-blue/30 shadow-md">
+<div className="flex flex-col md:flex-row items-center justify-between gap-6">
+<div>
+<Badge className="mb-3 bg-firmavb-blue/10 text-firmavb-blue border-firmavb-blue/20">
+<Shield className="h-3 w-3 mr-1" />
+Convenio Marco CM 2239-2-LR26
+</Badge>
+<h3 className="text-xl md:text-2xl font-bold text-foreground mb-2">
+Puedes postular al Convenio Marco de Software y Servicios TI?
+</h3>
+<p className="text-muted-foreground">
+Valida en 2 minutos si tu empresa cumple los requisitos de admisibilidad y que puntaje tecnico podrias alcanzar.
+</p>
+</div>
+<Button
+size="lg"
+asChild
+className="bg-firmavb-blue hover:bg-firmavb-blue/90 shadow-lg shadow-firmavb-blue/25 text-base h-12 px-8 whitespace-nowrap transition-all hover:scale-105 active:scale-95"
+>
+<a href="/validador-cm2239.html">
+Validar Admisibilidad Gratis
+<ArrowRight className="ml-2 h-5 w-5" />
+</a>
+</Button>
+</div>
+</Card>
+</div>
+</section>
+
+{/* Dashboard Comparativo */}
       <section className="py-16 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-10">

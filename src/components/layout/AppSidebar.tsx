@@ -20,6 +20,7 @@ import {
   TrendingUp,
   Swords,
   FileCheck,
+  FileSearch,
   Puzzle,
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
@@ -40,29 +41,31 @@ interface NavItem {
 // Navigation items - organized per requirements
 const navItems: NavItem[] = [
   {
-    title: "Dashboard",
+    title: "Inicio",
     url: "/dashboard",
     icon: LayoutDashboard,
-  },
-  {
-    title: "Mis Oportunidades",
-    url: "/mis-oportunidades",
-    icon: Star,
   },
   {
     title: "Oportunidades",
     url: "/oportunidades",
     icon: Crosshair,
+    children: [
+      { title: "Panel", url: "/oportunidades", icon: Crosshair },
+      { title: "Licitaciones", url: "/licitaciones-nuevas", icon: FileSearch },
+      { title: "Compras Ágiles", url: "/compras-agiles", icon: Zap },
+      { title: "Mis Oportunidades", url: "/mis-oportunidades", icon: Star },
+      { title: "Calendario", url: "/calendario", icon: Calendar },
+    ],
   },
   {
-    title: "Pipeline",
+    title: "Postulaciones",
     url: "/pipeline",
     icon: Kanban,
   },
   {
-    title: "Calendario",
-    url: "/calendario",
-    icon: Calendar,
+    title: "Inventario",
+    url: "/inventario",
+    icon: Package,
   },
   {
     title: "Mercado",
@@ -71,36 +74,8 @@ const navItems: NavItem[] = [
     children: [
       { title: "Explorador", url: "/mercado", icon: Store },
       { title: "Instituciones", url: "/mercado/instituciones", icon: Building2 },
-      { title: "Ordenes de Compra", url: "/mercado/ordenes", icon: FileText },
-    ],
-  },
-  {
-    title: "Inventario",
-    url: "/inventario",
-    icon: Package,
-  },
-  {
-    title: "Compras Ágiles",
-    url: "/compras-agiles",
-    icon: Zap,
-  },
-  {
-    title: "Equipo",
-    url: "/equipo",
-    icon: Users,
-  },
-  {
-    title: "Reportes",
-    url: "/reportes",
-    icon: BarChart3,
-    children: [
-      { title: "Hub", url: "/reportes", icon: BarChart3 },
-      { title: "Proveedores", url: "/reportes/proveedores", icon: Users },
-      { title: "Productos", url: "/reportes/productos", icon: Package },
-      { title: "Compradores", url: "/reportes/compradores", icon: Building2 },
-      { title: "Mercado", url: "/reportes/mercado", icon: TrendingUp },
-      { title: "Competidores", url: "/reportes/competidores", icon: Swords },
-      { title: "Convenio Marco", url: "/reportes/convenio-marco", icon: FileCheck },
+      { title: "Órdenes de Compra", url: "/mercado/ordenes", icon: FileText },
+      { title: "Reportes", url: "/reportes", icon: BarChart3 },
     ],
   },
   {
@@ -108,8 +83,8 @@ const navItems: NavItem[] = [
     url: "/configuracion",
     icon: Settings,
     children: [
-      { title: "Oportunidades", url: "/configuracion", icon: Settings },
-      { title: "Equipo", url: "/configuracion/equipo", icon: Users },
+      { title: "Ajustes", url: "/configuracion", icon: Settings },
+      { title: "Equipo", url: "/equipo", icon: Users },
       { title: "Extensión Chrome", url: "/configuracion/extension", icon: Puzzle },
     ],
   },

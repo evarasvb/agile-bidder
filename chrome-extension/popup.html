@@ -7,47 +7,46 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <!-- ===== LOADING ===== -->
+
+  <!-- ===== CARGANDO ===== -->
   <div id="loading-view" class="view">
     <div class="loading-container">
       <div class="spinner"></div>
+      <p>Cargando…</p>
     </div>
   </div>
 
   <!-- ===== LOGIN ===== -->
   <div id="login-view" class="view hidden">
     <div class="header">
-      <img src="icons/logo-firmavb.png" alt="FirmaVB" class="header-logo">
-      <h1>FirmaVB Postulador</h1>
-      <p class="subtitle">Conecta tu cuenta para postular en Mercado Público</p>
+      <div class="header-top">
+        <img src="icons/logo-firmavb.png" class="header-logo" alt="FirmaVB">
+        <h1>FirmaVB Postulador</h1>
+      </div>
+      <p class="subtitle">Conecta tu cuenta para postular a compras ágiles</p>
     </div>
-
     <div class="login-form">
-      <label for="api-key">API Key</label>
-      <input
-        type="password"
-        id="api-key"
-        placeholder="fvb_ext_..."
-        autocomplete="off"
-      >
-      <p class="help-text">
-        Genera tu API Key en FirmaVB → Configuración de Extensión.
-      </p>
+      <label for="api-key">API Key de FirmaVB</label>
+      <input type="password" id="api-key" placeholder="Pega aquí tu API key…" autocomplete="off">
       <p id="login-error" class="error-text hidden"></p>
       <button id="login-btn" class="btn-primary">Conectar</button>
+      <p class="help-text">La encuentras en firmavb.cl → Configuración → Extensión.</p>
     </div>
   </div>
 
-  <!-- ===== MAIN ===== -->
+  <!-- ===== PRINCIPAL ===== -->
   <div id="main-view" class="view hidden">
     <div class="header">
       <div class="header-top">
-        <img src="icons/logo-firmavb.png" alt="FirmaVB" class="header-logo">
-        <button id="settings-btn" class="btn-icon" title="Configuración">⚙️</button>
-      </div>
-      <div class="client-info">
-        <span id="client-name">Empresa</span>
-        <span id="client-plan" class="badge">Básico</span>
+        <img src="icons/logo-firmavb.png" class="header-logo" alt="FirmaVB">
+        <div class="client-info">
+          <span id="client-name">Empresa</span>
+          <span id="client-plan" class="badge">Básico</span>
+        </div>
+        <div class="header-actions">
+          <button id="settings-btn" class="btn-icon" title="Configuración">⚙️</button>
+          <button id="logout-btn" class="btn-icon" title="Cerrar sesión">⎋</button>
+        </div>
       </div>
     </div>
 
@@ -57,45 +56,43 @@
     </div>
 
     <div class="matches-section">
-      <h2>Oportunidades para postular</h2>
       <div id="matches-list"></div>
       <div id="no-matches" class="empty-state hidden">
-        No hay oportunidades pendientes.<br>
-        Genera ofertas en FirmaVB y aparecerán aquí.
+        <p>Aún no hay coincidencias con tu inventario.</p>
+        <p class="help-text">Pulsa "Sincronizar" para buscar oportunidades.</p>
       </div>
     </div>
   </div>
 
-  <!-- ===== SETTINGS ===== -->
+  <!-- ===== CONFIGURACIÓN ===== -->
   <div id="settings-view" class="view hidden">
     <div class="header">
       <div class="header-top">
-        <h1>Configuración</h1>
         <button id="back-btn" class="btn-icon" title="Volver">←</button>
+        <h1>Configuración</h1>
       </div>
     </div>
-
     <div class="settings-content">
       <div class="setting-group">
-        <h3>Cuenta</h3>
-        <p><strong>Empresa:</strong> <span id="settings-empresa">-</span></p>
-        <p><strong>RUT:</strong> <span id="settings-rut">-</span></p>
-        <p><strong>Plan:</strong> <span id="settings-plan">Básico</span></p>
+        <span>Empresa</span>
+        <span id="settings-empresa">-</span>
       </div>
-
       <div class="setting-group">
-        <h3>Preferencias</h3>
-        <label class="checkbox-label">
-          <input type="checkbox" id="notifications-enabled" checked>
-          Mostrar notificaciones
-        </label>
-        <label class="checkbox-label">
-          <input type="checkbox" id="auto-sync-enabled" checked>
-          Sincronizar automáticamente al abrir
-        </label>
+        <span>RUT</span>
+        <span id="settings-rut">-</span>
       </div>
-
-      <button id="logout-btn" class="btn-danger">Cerrar sesión</button>
+      <div class="setting-group">
+        <span>Plan</span>
+        <span id="settings-plan">Básico</span>
+      </div>
+      <label class="checkbox-label">
+        <input type="checkbox" id="notifications-enabled">
+        Notificaciones de nuevas oportunidades
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" id="auto-sync-enabled">
+        Sincronización automática
+      </label>
     </div>
   </div>
 
