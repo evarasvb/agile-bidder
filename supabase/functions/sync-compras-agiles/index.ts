@@ -77,6 +77,9 @@ Deno.serve(async (req) => {
     // Parse request body
     const body = await req.json();
     const comprasToProcess = body.licitaciones || body.compras_agiles || body.compras || [];
+    // La extensión envía los items del detalle a nivel raíz del payload
+    // (`{ compras_agiles: [compra], items: [...] }`), no dentro de cada compra.
+    const topLevelItems = Array.isArray(body.items) ? body.items : [];
 
     if (!comprasToProcess || !Array.isArray(comprasToProcess) || comprasToProcess.length === 0) {
       return new Response(
@@ -160,8 +163,8 @@ Deno.serve(async (req) => {
           datos_json: datosCompletos,
         };
 
-        // Upsert compra ágil
-        const { error: compraError } = await supabase
+        // Upsert compra ágil (capturamos el id para asociar los items)
+        const { data: compraRow, error: compraError } = await supabase
           .from('compras_agiles')
           .upsert(compraData, { onConflict: 'codigo' })
           .select('id')
@@ -173,26 +176,34 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Si hay items en la licitación, guardarlos
-        const itemsToSave = lic.items || [];
-        if (Array.isArray(itemsToSave) && itemsToSave.length > 0) {
-          // Eliminar items existentes para esta compra ágil
-          await supabase
-            .from('licitacion_items')
-            .delete()
-            .eq('licitacion_id', lic.codigo);
+        // Items del detalle. Pueden venir dentro de la compra (`lic.items`) o,
+        // como hace la extensión, a nivel raíz del payload (`topLevelItems`);
+        // en ese caso corresponden a la compra cuando se envía de a una.
+        const nestedItems = Array.isArray(lic.items) ? lic.items : [];
+        const itemsToSave = nestedItems.length > 0
+          ? nestedItems
+          : (comprasToProcess.length === 1 ? topLevelItems : []);
 
-          // Insertar nuevos items
+        // Se guardan en compras_agiles_items (la tabla que consume el matching),
+        // asociados por compra_agil_id. Antes se guardaban en licitacion_items,
+        // por eso el match nunca los veía.
+        if (compraRow?.id && Array.isArray(itemsToSave) && itemsToSave.length > 0) {
+          await supabase
+            .from('compras_agiles_items')
+            .delete()
+            .eq('compra_agil_id', compraRow.id);
+
           const itemsData = (itemsToSave as Record<string, unknown>[]).map((item) => ({
-            licitacion_id: lic.codigo,
+            compra_agil_id: compraRow.id,
+            codigo_producto: (item.codigo_producto as string) || (item.codigo as string) || null,
             nombre_producto: (item.nombre_producto as string) || (item.nombre as string) || 'Producto sin nombre',
-            descripcion: (item.descripcion as string) || null,
-            cantidad: (item.cantidad as number) || 1,
-            unidad: (item.unidad as string) || (item.unidadMedida as string) || 'UN'
+            descripcion_producto: (item.descripcion as string) || (item.descripcion_producto as string) || null,
+            cantidad: (item.cantidad as number) ?? null,
+            unidad: (item.unidad as string) || (item.unidadMedida as string) || null,
           }));
 
           const { error: itemsError } = await supabase
-            .from('licitacion_items')
+            .from('compras_agiles_items')
             .insert(itemsData);
 
           if (itemsError) {
