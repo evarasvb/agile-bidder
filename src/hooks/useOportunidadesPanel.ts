@@ -147,6 +147,41 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         console.error('[OportunidadesPanel] Error fetching licitaciones:', licError);
       }
 
+      // Traer los matches REALES (tabla ca_matches) de las compras ágiles
+      // mostradas y quedarnos con el mejor score por código. Antes el Panel
+      // leía compras_agiles.match_score, que está vacío en toda la tabla, por
+      // eso "el match no aparecía". Los datos de ca_matches están duplicados
+      // entre clientes con el mismo score, así que tomamos el mejor por código.
+      const codigosCompras = (comprasRaw || [])
+        .map((c: any) => c.codigo)
+        .filter(Boolean)
+        .slice(0, 300);
+      const bestMatchByCodigo: Record<string, { score: number; producto: string | null; count: number }> = {};
+      if (codigosCompras.length > 0) {
+        // ca_matches no está en los tipos generados de Supabase; usamos any.
+        const { data: matchesRaw, error: matchErr } = await (supabase as any)
+          .from('ca_matches')
+          .select('compra_agil_codigo, score, nombre_producto')
+          .in('compra_agil_codigo', codigosCompras);
+        if (matchErr) {
+          console.error('[OportunidadesPanel] Error fetching ca_matches:', matchErr);
+        }
+        for (const m of (matchesRaw || []) as any[]) {
+          const k = (m as any).compra_agil_codigo as string;
+          const score = Math.round(Number((m as any).score) || 0);
+          const prev = bestMatchByCodigo[k];
+          if (!prev) {
+            bestMatchByCodigo[k] = { score, producto: (m as any).nombre_producto ?? null, count: 1 };
+          } else {
+            prev.count += 1;
+            if (score > prev.score) {
+              prev.score = score;
+              prev.producto = (m as any).nombre_producto ?? null;
+            }
+          }
+        }
+      }
+
       // Map compras_agiles
       const compras: OportunidadPanel[] = (comprasRaw || []).map((c: any) => ({
         id: c.id,
@@ -161,10 +196,10 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         estado: c.estado,
         tipo: 'compra_agil' as const,
         link_oficial: c.link_oficial,
-        match_score: c.match_score,
-        match_encontrado: c.match_encontrado ?? false,
+        match_score: bestMatchByCodigo[c.codigo]?.score ?? c.match_score ?? null,
+        match_encontrado: bestMatchByCodigo[c.codigo] ? true : (c.match_encontrado ?? false),
         items_count: c.compras_agiles_items?.length || 0,
-        items_matched: 0,
+        items_matched: bestMatchByCodigo[c.codigo]?.count ?? 0,
         created_at: c.created_at,
       }));
 
