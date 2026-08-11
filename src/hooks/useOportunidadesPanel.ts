@@ -79,6 +79,9 @@ export interface PanelFilters {
 // Máximo de filas traídas del servidor al incluir cerradas (evita descargar
 // las decenas de miles de oportunidades terminadas al navegador).
 const MAX_CERRADAS = 500;
+// Tope de seguridad para la vista de activas (hoy son decenas; el límite evita
+// sorpresas si alguna carga futura deja muchas con fecha futura).
+const MAX_ACTIVAS = 500;
 
 export interface PanelStats {
   totalActivas: number;
@@ -112,11 +115,14 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       if (incluirCerradas) {
         comprasQuery = comprasQuery.limit(MAX_CERRADAS);
       } else {
-        // Estados "abiertos" comparados sin distinguir mayúsculas: la extensión
-        // guarda 'publicada' en minúscula y el default histórico es 'activa'.
+        // "Activa" = estado abierto Y con fecha de cierre futura REAL. Antes se
+        // incluía `fecha_cierre.is.null`, pero ~4.573 compras de una carga
+        // histórica (2026-03-20) no tienen fecha y quedaban marcadas como
+        // activas => ensuciaban el panel. Se exige fecha futura (excluye nulos).
         comprasQuery = comprasQuery
           .or('estado.ilike.publicada,estado.ilike.activa')
-          .or(`fecha_cierre.is.null,fecha_cierre.gt.${nowIso}`);
+          .gt('fecha_cierre', nowIso)
+          .limit(MAX_ACTIVAS);
       }
 
       const { data: comprasRaw, error: caError } = await comprasQuery;
@@ -136,9 +142,12 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       if (incluirCerradas) {
         licitacionesQuery = licitacionesQuery.limit(MAX_CERRADAS);
       } else {
+        // Igual que compras: exigir fecha de cierre futura real. Sin esto,
+        // ~92.000 licitaciones históricas sin fecha se mostraban como "activas".
         licitacionesQuery = licitacionesQuery
           .or('estado.ilike.publicada,estado.ilike.activa')
-          .or(`fecha_cierre.is.null,fecha_cierre.gt.${nowIso}`);
+          .gt('fecha_cierre', nowIso)
+          .limit(MAX_ACTIVAS);
       }
 
       const { data: licitacionesRaw, error: licError } = await licitacionesQuery;
