@@ -101,8 +101,20 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
         .order('fecha_cierre', { ascending: true });
 
       // Filtros opcionales
-      if (filters?.estado && filters.estado !== 'todas') {
-        query = query.eq('estado', filters.estado);
+      const estadoElegido = filters?.estado && filters.estado !== 'todas';
+      const verTodosLosEstados = filters?.estado === 'todas'; // elección explícita
+      const fechaElegida = filters?.fechaCierre && filters.fechaCierre !== 'todas';
+
+      if (estadoElegido) {
+        query = query.eq('estado', filters!.estado!);
+      } else if (!verTodosLosEstados && !fechaElegida) {
+        // Default inicial (sin estado ni fecha elegidos): mostrar solo ACTIVAS
+        // (publicadas y con cierre futuro). Antes traía las 77 mil filas
+        // (casi todas cerradas) con todos sus items => muy lento.
+        // El usuario puede elegir "Todos los estados" para ver también cerradas.
+        query = query
+          .eq('estado', 'Publicada')
+          .or(`fecha_cierre.is.null,fecha_cierre.gt.${new Date().toISOString()}`);
       }
 
       if (filters?.montoMin) {
@@ -135,6 +147,10 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
             .lte('fecha_cierre', in7.toISOString());
         }
       }
+
+      // Tope de filas para no descargar decenas de miles de registros al
+      // navegador (cada uno con sus items). 500 cubre de sobra las activas.
+      query = query.limit(500);
 
       const { data, error } = await query;
       if (error) {
