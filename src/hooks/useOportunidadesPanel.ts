@@ -112,8 +112,10 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       if (incluirCerradas) {
         comprasQuery = comprasQuery.limit(MAX_CERRADAS);
       } else {
+        // Estados "abiertos" comparados sin distinguir mayúsculas: la extensión
+        // guarda 'publicada' en minúscula y el default histórico es 'activa'.
         comprasQuery = comprasQuery
-          .eq('estado', 'Publicada')
+          .or('estado.ilike.publicada,estado.ilike.activa')
           .or(`fecha_cierre.is.null,fecha_cierre.gt.${nowIso}`);
       }
 
@@ -135,7 +137,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         licitacionesQuery = licitacionesQuery.limit(MAX_CERRADAS);
       } else {
         licitacionesQuery = licitacionesQuery
-          .eq('estado', 'Publicada')
+          .or('estado.ilike.publicada,estado.ilike.activa')
           .or(`fecha_cierre.is.null,fecha_cierre.gt.${nowIso}`);
       }
 

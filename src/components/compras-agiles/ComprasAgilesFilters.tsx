@@ -15,11 +15,12 @@ interface ComprasAgilesFiltersProps {
 }
 
 const ESTADOS = [
+  { value: 'activas', label: 'Activas (abiertas)' },
   { value: 'todas', label: 'Todos los estados' },
-  { value: 'activa', label: 'Activa' },
-  { value: 'urgente', label: 'Urgente' },
-  { value: 'cerrada', label: 'Cerrada' },
-  { value: 'adjudicada', label: 'Adjudicada' },
+  { value: 'Cerrada', label: 'Cerrada' },
+  { value: 'Desierta', label: 'Desierta' },
+  { value: 'Cancelada', label: 'Cancelada' },
+  { value: 'Proveedor seleccionado', label: 'Adjudicada' },
 ];
 
 const REGIONES = [
