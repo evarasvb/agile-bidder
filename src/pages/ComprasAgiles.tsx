@@ -35,7 +35,7 @@ interface ItemParaPropuesta {
 
 export default function ComprasAgiles() {
   const queryClient = useQueryClient();
-  const [filters, setFilters] = useState<Filters>({ matchThreshold: 70 });
+  const [filters, setFilters] = useState<Filters>({ matchThreshold: 70, estado: 'activas' });
   const [selectedCompra, setSelectedCompra] = useState<CompraAgil | null>(null);
   const [propuestaModalOpen, setPropuestaModalOpen] = useState(false);
   const [productosParaPropuesta, setProductosParaPropuesta] = useState<ItemParaPropuesta[]>([]);

@@ -68,7 +68,17 @@ export interface PanelFilters {
   search?: string;
   sortBy?: 'match_score' | 'fecha_cierre' | 'monto';
   sortAsc?: boolean;
+  /**
+   * Cuando es false (por defecto) solo se traen oportunidades ACTIVAS
+   * (estado 'Publicada' y con cierre futuro). Al activarlo se incluyen las
+   * cerradas/terminadas, limitadas a las más recientes para no saturar.
+   */
+  incluirCerradas?: boolean;
 }
+
+// Máximo de filas traídas del servidor al incluir cerradas (evita descargar
+// las decenas de miles de oportunidades terminadas al navegador).
+const MAX_CERRADAS = 500;
 
 export interface PanelStats {
   totalActivas: number;
@@ -85,27 +95,53 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
   return useQuery({
     queryKey: ['oportunidades-panel', filters],
     queryFn: async (): Promise<{ data: OportunidadPanel[]; stats: PanelStats }> => {
-      // Fetch compras_agiles with items count (solo publicadas / abiertas)
-      const { data: comprasRaw, error: caError } = await supabase
+      const nowIso = new Date().toISOString();
+      const incluirCerradas = filters.incluirCerradas ?? false;
+
+      // Fetch compras_agiles with items count.
+      // Por defecto solo activas (Publicada + cierre futuro). Con "incluir
+      // cerradas" se traen las más recientes con límite para no saturar.
+      let comprasQuery = supabase
         .from('compras_agiles')
         .select(`
           *,
           compras_agiles_items(id)
         `)
-        .eq('estado', 'Publicada')
-        .or(`fecha_cierre.is.null,fecha_cierre.gt.${new Date().toISOString()}`)
         .order('created_at', { ascending: false });
+
+      if (incluirCerradas) {
+        comprasQuery = comprasQuery.limit(MAX_CERRADAS);
+      } else {
+        // Estados "abiertos" comparados sin distinguir mayúsculas: la extensión
+        // guarda 'publicada' en minúscula y el default histórico es 'activa'.
+        comprasQuery = comprasQuery
+          .or('estado.ilike.publicada,estado.ilike.activa')
+          .or(`fecha_cierre.is.null,fecha_cierre.gt.${nowIso}`);
+      }
+
+      const { data: comprasRaw, error: caError } = await comprasQuery;
 
       if (caError) {
         console.error('[OportunidadesPanel] Error fetching compras:', caError);
         throw caError;
       }
 
-      // Fetch licitaciones
-      const { data: licitacionesRaw, error: licError } = await supabase
+      // Fetch licitaciones. Antes traía TODAS (decenas de miles, casi todas
+      // cerradas) => lentitud. Ahora, por defecto, solo activas.
+      let licitacionesQuery = supabase
         .from('licitaciones')
         .select('*')
         .order('created_at', { ascending: false });
+
+      if (incluirCerradas) {
+        licitacionesQuery = licitacionesQuery.limit(MAX_CERRADAS);
+      } else {
+        licitacionesQuery = licitacionesQuery
+          .or('estado.ilike.publicada,estado.ilike.activa')
+          .or(`fecha_cierre.is.null,fecha_cierre.gt.${nowIso}`);
+      }
+
+      const { data: licitacionesRaw, error: licError } = await licitacionesQuery;
 
       if (licError) {
         console.error('[OportunidadesPanel] Error fetching licitaciones:', licError);

@@ -365,6 +365,17 @@ export default function Oportunidades() {
               <SelectItem value="monto">Monto estimado</SelectItem>
             </SelectContent>
           </Select>
+
+          <Button
+            type="button"
+            variant={filters.incluirCerradas ? "default" : "outline"}
+            onClick={() => updateFilter("incluirCerradas", !filters.incluirCerradas)}
+            className="gap-2"
+            title="Por defecto solo se muestran oportunidades activas. Actívalo para ver también las cerradas/terminadas."
+          >
+            <CalendarClock className="h-4 w-4" />
+            {filters.incluirCerradas ? "Mostrando cerradas" : "Solo activas"}
+          </Button>
         </CardContent>
       </Card>
 

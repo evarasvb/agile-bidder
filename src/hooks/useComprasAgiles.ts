@@ -101,8 +101,30 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
         .order('fecha_cierre', { ascending: true });
 
       // Filtros opcionales
-      if (filters?.estado && filters.estado !== 'todas') {
-        query = query.eq('estado', filters.estado);
+      const estado = filters?.estado;
+      const verTodosLosEstados = estado === 'todas'; // elección explícita "todo"
+      const estadoEspecifico = !!estado && estado !== 'todas' && estado !== 'activas';
+      const fechaElegida = filters?.fechaCierre && filters.fechaCierre !== 'todas';
+
+      if (estadoEspecifico) {
+        query = query.eq('estado', estado!);
+      } else if (!verTodosLosEstados && !fechaElegida) {
+        // Default (o estado 'activas'): mostrar solo ACTIVAS (abiertas y con
+        // cierre futuro). Antes traía las 77 mil filas (casi todas cerradas)
+        // con todos sus items => muy lento. "Todos los estados" ve también
+        // cerradas. Comparación case-insensitive: la extensión guarda
+        // 'publicada' en minúscula y el default histórico es 'activa'.
+        query = query
+          .or('estado.ilike.publicada,estado.ilike.activa')
+          .or(`fecha_cierre.is.null,fecha_cierre.gt.${new Date().toISOString()}`);
+      }
+
+      // Filtro de match aplicado EN EL SERVIDOR (antes del limit) para no
+      // perder coincidencias que queden fuera de las primeras filas.
+      if (filters?.matchStatus === 'con_match') {
+        query = query.eq('match_encontrado', true);
+      } else if (filters?.matchStatus === 'sin_match') {
+        query = query.or('match_encontrado.is.null,match_encontrado.eq.false');
       }
 
       if (filters?.montoMin) {
@@ -136,20 +158,18 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
         }
       }
 
+      // Tope de filas para no descargar decenas de miles de registros al
+      // navegador (cada uno con sus items). 500 cubre de sobra las activas.
+      query = query.limit(500);
+
       const { data, error } = await query;
       if (error) {
         console.error('Error fetching compras_agiles:', error);
         throw error;
       }
 
-      let compras = (data || []).map(mapRowToCompraAgil);
-
-      // Filtro de match en memoria
-      if (filters?.matchStatus === 'con_match') {
-        compras = compras.filter(c => c.match_encontrado);
-      } else if (filters?.matchStatus === 'sin_match') {
-        compras = compras.filter(c => !c.match_encontrado);
-      }
+      const compras = (data || []).map(mapRowToCompraAgil);
+      // (El filtro de match ya se aplicó en el servidor, antes del limit.)
 
       console.log(`[useComprasAgiles] Loaded ${compras.length} compras ágiles`);
       return compras;
