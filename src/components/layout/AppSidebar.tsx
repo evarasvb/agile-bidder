@@ -22,6 +22,7 @@ import {
   FileCheck,
   FileSearch,
   Puzzle,
+  GraduationCap,
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -66,6 +67,11 @@ const navItems: NavItem[] = [
     title: "Inventario",
     url: "/inventario",
     icon: Package,
+  },
+  {
+    title: "Asesorías",
+    url: "/academia/leads",
+    icon: GraduationCap,
   },
   {
     title: "Mercado",
