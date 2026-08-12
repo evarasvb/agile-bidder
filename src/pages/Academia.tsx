@@ -158,8 +158,8 @@ const CONTENIDO = {
     titulo: "Asesoría 1:1 personalizada",
     descripcion:
       "Una sesión enfocada 100% en tu empresa: revisamos tu caso y armamos tu plan para venderle al Estado.",
-    precio: "", // ← pon el precio, ej. "$49.990"
-    pagoUrl: "", // ← pega aquí tu link de pago de Mercado Pago
+    precio: "", // ← pon el precio, ej. "$49.990" (el monto también se ve en Mercado Pago)
+    pagoUrl: "https://mpago.la/1vWkLkD", // link de pago de Mercado Pago
   },
 
   // --- Grupo de WhatsApp de proveedores del Estado --------------------------
