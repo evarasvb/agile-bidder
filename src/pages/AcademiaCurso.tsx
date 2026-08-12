@@ -11,7 +11,7 @@ import {
   ClipboardList,
 } from "lucide-react";
 import logoFirmavbOriginal from "@/assets/logo-firmavb-original.png";
-import { getCursoBySlug, type Bloque } from "@/data/academiaCursos";
+import { getCursoBySlug, ACENTO, type Bloque } from "@/data/academiaCursos";
 
 function BloqueView({ bloque }: { bloque: Bloque }) {
   switch (bloque.tipo) {
@@ -81,29 +81,44 @@ export default function AcademiaCurso() {
       </header>
 
       {/* Hero del curso */}
-      <section className="pt-32 pb-8 px-6">
+      <section className="pt-24 px-6">
         <div className="max-w-4xl mx-auto">
-          <Badge className="mb-4 bg-firmavb-blue/10 text-firmavb-blue border-firmavb-blue/20">
-            Academia FirmaVB · Curso gratuito
-          </Badge>
-          <div className="flex items-start gap-4">
-            <span className="text-5xl leading-none">{curso.emoji}</span>
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
-                {curso.titulo}
-              </h1>
-              <p className="text-lg text-muted-foreground">{curso.descripcion}</p>
-              <div className="flex flex-wrap gap-3 mt-4">
-                <Badge variant="outline" className="gap-1">
-                  <BarChart3 className="h-3 w-3" />
-                  {curso.nivel}
-                </Badge>
-                <Badge variant="outline" className="gap-1">
-                  <Clock className="h-3 w-3" />
-                  {curso.duracion}
-                </Badge>
+          <div
+            className={`${ACENTO[curso.acento].portada} rounded-2xl p-8 md:p-10 text-white shadow-lg`}
+          >
+            <Badge className="mb-4 bg-white/20 text-white border-white/30 hover:bg-white/30">
+              Academia FirmaVB · Curso gratuito
+            </Badge>
+            <div className="flex items-start gap-4">
+              <span className="text-5xl leading-none">{curso.emoji}</span>
+              <div>
+                <h1 className="text-3xl md:text-4xl font-bold mb-2">{curso.titulo}</h1>
+                <p className="text-lg text-white/90">{curso.descripcion}</p>
+                <div className="flex flex-wrap gap-3 mt-4">
+                  <Badge className="bg-white/20 text-white border-white/30 gap-1 hover:bg-white/30">
+                    <BarChart3 className="h-3 w-3" />
+                    {curso.nivel}
+                  </Badge>
+                  <Badge className="bg-white/20 text-white border-white/30 gap-1 hover:bg-white/30">
+                    <Clock className="h-3 w-3" />
+                    {curso.duracion}
+                  </Badge>
+                </div>
               </div>
             </div>
+          </div>
+
+          {/* Índice del curso */}
+          <div className="mt-6 rounded-xl border border-border/50 bg-card p-5">
+            <p className="text-sm font-semibold text-foreground mb-3">En este curso verás:</p>
+            <ol className="space-y-2">
+              {curso.modulos.map((m, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <span className={`font-bold ${ACENTO[curso.acento].texto}`}>{i + 1}.</span>
+                  {m.titulo}
+                </li>
+              ))}
+            </ol>
           </div>
         </div>
       </section>
