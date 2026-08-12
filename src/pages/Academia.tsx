@@ -62,7 +62,7 @@ const CONTENIDO = {
 
   // --- Posts de LinkedIn ----------------------------------------------------
   linkedin: {
-    perfilUrl: "", // ← tu perfil de LinkedIn (ej. https://www.linkedin.com/in/tu-usuario)
+    perfilUrl: "https://www.linkedin.com/in/evaras", // ← tu perfil de LinkedIn
     posts: [
       { titulo: "Post destacado 1", resumen: "Breve descripción del post.", url: "" },
       { titulo: "Post destacado 2", resumen: "Breve descripción del post.", url: "" },
