@@ -35,6 +35,12 @@ export interface Curso {
   nivel: string;
   duracion: string;
   acento: Acento;
+  // --- Monetización (opcional) ---------------------------------------------
+  // Si premium = true, el curso se vende: en el lector se muestra una página
+  // de venta (temario + precio + botón Comprar) en vez del contenido completo.
+  premium?: boolean;
+  precio?: string; // ej. "$29.990"
+  pagoUrl?: string; // link de pago de Mercado Pago (déjalo "" hasta tenerlo)
   modulos: Modulo[];
 }
 
@@ -575,6 +581,119 @@ export const CURSOS: Curso[] = [
                   "Mantén tu empresa 'hábil' y tus documentos vigentes.",
                   "Cuida tu evaluación: cada compra bien hecha es marketing para la siguiente.",
                 ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+
+  // ===========================================================================
+  // CURSO PREMIUM (de pago)
+  // ===========================================================================
+  {
+    slug: "programa-pro-adjudica-al-estado",
+    emoji: "💎",
+    titulo: "Programa Pro: Adjudica al Estado como Experto",
+    descripcion:
+      "El método completo para participar y adjudicar de forma constante: licitaciones, convenios marco, estrategia de precios y automatización.",
+    nivel: "Intermedio · Avanzado",
+    duracion: "Programa completo",
+    acento: "azul",
+    premium: true,
+    precio: "", // ← pon el precio, ej. "$29.990"
+    pagoUrl: "", // ← pega aquí tu link de pago de Mercado Pago
+    modulos: [
+      {
+        titulo: "Módulo 1 · Estrategia de participación",
+        lecciones: [
+          {
+            titulo: "Elige dónde competir (y dónde no)",
+            bloques: [
+              {
+                tipo: "parrafo",
+                texto:
+                  "Cómo priorizar oportunidades por rentabilidad y probabilidad real de adjudicar.",
+              },
+            ],
+          },
+          {
+            titulo: "Analiza compradores y competidores",
+            bloques: [
+              {
+                tipo: "parrafo",
+                texto:
+                  "Usa el historial de compras del Estado para anticipar precios y decidir tu jugada.",
+              },
+            ],
+          },
+        ],
+      },
+      {
+        titulo: "Módulo 2 · Licitaciones que se ganan",
+        lecciones: [
+          {
+            titulo: "Lee las bases como un experto",
+            bloques: [
+              {
+                tipo: "parrafo",
+                texto: "Identifica requisitos, criterios de evaluación y trampas antes de ofertar.",
+              },
+            ],
+          },
+          {
+            titulo: "Arma una oferta técnica y económica ganadora",
+            bloques: [
+              {
+                tipo: "parrafo",
+                texto: "Estructura tu propuesta para maximizar puntaje sin sacrificar margen.",
+              },
+            ],
+          },
+        ],
+      },
+      {
+        titulo: "Módulo 3 · Convenios Marco y escala",
+        lecciones: [
+          {
+            titulo: "Entra y vende en la Tienda",
+            bloques: [
+              {
+                tipo: "parrafo",
+                texto: "Postulación, fichas y precios que efectivamente venden en el catálogo.",
+              },
+            ],
+          },
+          {
+            titulo: "Gestiona órdenes de compra y cumplimiento",
+            bloques: [
+              {
+                tipo: "parrafo",
+                texto: "Mantén tu reputación y un flujo constante de órdenes de compra.",
+              },
+            ],
+          },
+        ],
+      },
+      {
+        titulo: "Módulo 4 · Automatiza con FirmaVB",
+        lecciones: [
+          {
+            titulo: "Match y ofertas automáticas con IA",
+            bloques: [
+              {
+                tipo: "parrafo",
+                texto: "Deja que la IA cruce tu inventario y prepare las ofertas por ti.",
+              },
+            ],
+          },
+          {
+            titulo: "Postula en minutos con la extensión",
+            bloques: [
+              {
+                tipo: "parrafo",
+                texto: "Autocompleta el portal de Mercado Público y ahorra horas cada semana.",
               },
             ],
           },
