@@ -71,8 +71,9 @@ const CONTENIDO = {
   // --- Libros a la venta ----------------------------------------------------
   libros: [
     {
-      titulo: "Mi libro", // ← reemplaza por el título exacto
-      resena: "Disponible ahora en Amazon.", // ← reemplaza por una reseña breve
+      titulo: "Véndele al Estado y No Mueras en el Intento",
+      resena:
+        "Por Enrique Evaristo Varas Bahamonde. Serie de 7 volúmenes que te guía paso a paso en el mundo de las licitaciones públicas y las ventas al Estado: desde los fundamentos hasta estrategias avanzadas para convertirte en un proveedor exitoso del sector público, sin morir en el intento.",
       precio: "", // ← opcional (ej. "$12.000"); si lo dejas vacío no se muestra
       portadaUrl: null as string | null, // url de la portada (opcional)
       comprarUrl: "https://www.amazon.com/-/es/dp/B0G4NLY5TL", // link de compra
@@ -91,7 +92,7 @@ const CONTENIDO = {
   // --- Asesoría gratuita (Google Form) --------------------------------------
   asesoria: {
     descripcion:
-      "Completa este breve cuestionario y te contacto para una asesoría gratuita sobre cómo vender al Estado.",
+      "¿Cómo quieres venderle al Estado y no morir en el intento? Cuéntame tu situación en 1 minuto y te contacto para orientarte, gratis.",
     formUrl: "", // ← link de tu Google Form
   },
 
