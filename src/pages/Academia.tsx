@@ -67,8 +67,11 @@ const CONTENIDO = {
   linkedin: {
     perfilUrl: "https://www.linkedin.com/in/evaras", // ← tu perfil de LinkedIn
     posts: [
-      { titulo: "Post destacado 1", resumen: "Breve descripción del post.", url: "" },
-      { titulo: "Post destacado 2", resumen: "Breve descripción del post.", url: "" },
+      {
+        titulo: "Se abrió el Convenio Marco de Desarrollo",
+        resumen: "Mi publicación sobre la apertura de este Convenio Marco en Mercado Público.",
+        url: "https://www.linkedin.com/posts/evaras_se-abri%C3%B3-el-convenio-marco-de-desarrollo-ugcPost-7485053898337218560-oIVj/",
+      },
     ],
   },
 
