@@ -88,10 +88,10 @@ jobs:
               --retry 2 \
               --retry-delay 10 \
               -X POST \
-              "$SUPABASE_URL/functions/v1/mercadopublico-api" \
+              "$SUPABASE_URL/functions/v1/sync-licitaciones-bi" \
               -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
               -H "Content-Type: application/json" \
-              -d "{\"action\": \"sync-licitaciones\", \"fecha\": \"$FECHA\", \"ticket\": \"$MP_API_TICKET\"}")
+              -d "{\"fecha\": \"$FECHA\", \"ticket\": \"$MP_API_TICKET\"}")
 
             echo "HTTP Status: $http_code"
 
