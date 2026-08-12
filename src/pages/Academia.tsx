@@ -57,10 +57,11 @@ const CONTENIDO = {
   youtube: {
     canalUrl: "https://youtube.com/@firmavb", // ← tu canal
     videos: [
-      // Pega el ID de cada video (la parte después de watch?v= ). Ej: { id: "dQw4w9WgXcQ", titulo: "..." }
-      { id: "", titulo: "" },
-      { id: "", titulo: "" },
-      { id: "", titulo: "" },
+      // Pega el ID de cada video (la parte después de watch?v= o youtu.be/ ).
+      { id: "ktBYadx4CD4", titulo: "" },
+      { id: "OuTCy3DESxQ", titulo: "" },
+      { id: "SJ7PZZw1vNM", titulo: "" },
+      { id: "kxpU_2H1J_Y", titulo: "" },
     ],
   },
 
