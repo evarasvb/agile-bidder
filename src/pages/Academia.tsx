@@ -17,6 +17,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import logoFirmavbOriginal from "@/assets/logo-firmavb-original.png";
+import { AcademiaLeadForm } from "@/components/academia/AcademiaLeadForm";
 
 // =============================================================================
 //  CONTENIDO DE LA ACADEMIA  ← EDITA AQUÍ TUS LINKS Y TEXTOS
@@ -512,7 +513,11 @@ export default function Academia() {
             </iframe>
           </Card>
         ) : (
-          <PendientePorCargar texto="Aún no hay cuestionario cargado. Pega el link de tu Google Form en el bloque CONTENIDO." />
+          <Card className="border-border/50">
+            <CardContent className="py-8">
+              <AcademiaLeadForm />
+            </CardContent>
+          </Card>
         )}
       </Seccion>
 

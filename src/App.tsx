@@ -11,6 +11,7 @@ import { ChatWidget } from "@/components/support/ChatWidget";
 // Auth
 import Index from "./pages/Index";
 import Academia from "./pages/Academia";
+import AcademiaLeads from "./pages/AcademiaLeads";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
 import Onboarding from "./pages/Onboarding";
@@ -129,6 +130,9 @@ const App = () => (
 
             {/* ----- PIPELINE ----- */}
             <Route path="/pipeline" element={<Pipeline />} />
+
+            {/* ----- ACADEMIA (contactos del formulario público) ----- */}
+            <Route path="/academia/leads" element={<AcademiaLeads />} />
 
             {/* ----- EQUIPO ----- */}
             <Route path="/equipo" element={<Equipo />} />
