@@ -45,11 +45,12 @@ const CONTENIDO = {
   // --- Videos de YouTube ----------------------------------------------------
   // Pega el ID de cada video (la parte después de watch?v= )
   youtube: {
-    canalUrl: "https://www.youtube.com/@firmavb", // ← tu canal
+    canalUrl: "https://youtube.com/@firmavb", // ← tu canal
     videos: [
-      { id: "", titulo: "Mi primer video" },
-      { id: "", titulo: "Segundo video" },
-      { id: "", titulo: "Tercer video" },
+      // Pega el ID de cada video (la parte después de watch?v= ). Ej: { id: "dQw4w9WgXcQ", titulo: "..." }
+      { id: "", titulo: "" },
+      { id: "", titulo: "" },
+      { id: "", titulo: "" },
     ],
   },
 
@@ -70,11 +71,11 @@ const CONTENIDO = {
   // --- Libros a la venta ----------------------------------------------------
   libros: [
     {
-      titulo: "Título del libro",
-      resena: "Reseña breve del libro: de qué trata y a quién le sirve.",
-      precio: "$12.000",
+      titulo: "Mi libro", // ← reemplaza por el título exacto
+      resena: "Disponible ahora en Amazon.", // ← reemplaza por una reseña breve
+      precio: "", // ← opcional (ej. "$12.000"); si lo dejas vacío no se muestra
       portadaUrl: null as string | null, // url de la portada (opcional)
-      comprarUrl: "", // link de compra
+      comprarUrl: "https://www.amazon.com/-/es/dp/B0G4NLY5TL", // link de compra
     },
   ],
 
@@ -98,7 +99,7 @@ const CONTENIDO = {
   whatsappGrupo: {
     descripcion:
       "Únete a la comunidad de proveedores del Estado: dudas, oportunidades y novedades de Mercado Público.",
-    invitacionUrl: "", // ← link de invitación al grupo (https://chat.whatsapp.com/...)
+    invitacionUrl: "https://chat.whatsapp.com/GL4VBjnNpck9uLYiNltNic", // ← link de invitación al grupo
   },
 
   // --- Contacto directo -----------------------------------------------------
@@ -282,40 +283,43 @@ export default function Academia() {
         alt
       >
         {videosCargados.length > 0 ? (
-          <>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {videosCargados.map((v, i) => (
-                <Card key={i} className="overflow-hidden border-border/50">
-                  <div className="aspect-video bg-black">
-                    <iframe
-                      className="w-full h-full"
-                      src={`https://www.youtube.com/embed/${youtubeId(v.id)}`}
-                      title={v.titulo}
-                      loading="lazy"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
-                  </div>
-                  {v.titulo && (
-                    <CardContent className="py-3">
-                      <p className="font-medium text-sm text-foreground">{v.titulo}</p>
-                    </CardContent>
-                  )}
-                </Card>
-              ))}
-            </div>
-            <div className="mt-6">
-              <Button variant="outline" asChild className="gap-2">
-                <a href={youtube.canalUrl} target="_blank" rel="noopener noreferrer">
-                  <Youtube className="h-4 w-4" />
-                  Ver todo mi canal
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              </Button>
-            </div>
-          </>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {videosCargados.map((v, i) => (
+              <Card key={i} className="overflow-hidden border-border/50">
+                <div className="aspect-video bg-black">
+                  <iframe
+                    className="w-full h-full"
+                    src={`https://www.youtube.com/embed/${youtubeId(v.id)}`}
+                    title={v.titulo || `Video ${i + 1}`}
+                    loading="lazy"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+                {v.titulo && (
+                  <CardContent className="py-3">
+                    <p className="font-medium text-sm text-foreground">{v.titulo}</p>
+                  </CardContent>
+                )}
+              </Card>
+            ))}
+          </div>
         ) : (
-          <PendientePorCargar texto="Aún no hay videos cargados. Agrega los IDs de tus videos de YouTube en el bloque CONTENIDO." />
+          <PendientePorCargar texto="Aún no hay videos individuales seleccionados. Mientras tanto, entra a mi canal 👇" />
+        )}
+        {youtube.canalUrl && (
+          <div className="mt-6">
+            <Button
+              asChild
+              className="bg-firmavb-red hover:bg-firmavb-red/90 gap-2"
+            >
+              <a href={youtube.canalUrl} target="_blank" rel="noopener noreferrer">
+                <Youtube className="h-4 w-4" />
+                Ver mi canal en YouTube
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            </Button>
+          </div>
         )}
       </Seccion>
 
@@ -431,11 +435,16 @@ export default function Academia() {
                   <h3 className="font-semibold text-foreground mb-1">{l.titulo}</h3>
                   <p className="text-sm text-muted-foreground mb-4 flex-1">{l.resena}</p>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-lg font-bold text-firmavb-blue">{l.precio}</span>
+                    {l.precio ? (
+                      <span className="text-lg font-bold text-firmavb-blue">{l.precio}</span>
+                    ) : (
+                      <span />
+                    )}
                     {l.comprarUrl && (
-                      <Button size="sm" asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90">
+                      <Button size="sm" asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2">
                         <a href={l.comprarUrl} target="_blank" rel="noopener noreferrer">
-                          Comprar
+                          Comprar en Amazon
+                          <ExternalLink className="h-3 w-3" />
                         </a>
                       </Button>
                     )}
