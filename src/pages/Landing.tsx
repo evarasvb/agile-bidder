@@ -76,7 +76,7 @@ export default function Landing() {
             />
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="ghost" asChild className="hidden sm:inline-flex hover:bg-muted/50 transition-colors">
+            <Button variant="ghost" asChild className="hidden md:inline-flex hover:bg-muted/50 transition-colors">
               <Link to="/academia">Academia</Link>
             </Button>
             {isAuthenticated ? (

@@ -60,7 +60,7 @@ const CONTENIDO = {
 
   // --- Posts de LinkedIn ----------------------------------------------------
   linkedin: {
-    perfilUrl: "https://www.linkedin.com/in/", // ← tu perfil
+    perfilUrl: "", // ← tu perfil de LinkedIn (ej. https://www.linkedin.com/in/tu-usuario)
     posts: [
       { titulo: "Post destacado 1", resumen: "Breve descripción del post.", url: "" },
       { titulo: "Post destacado 2", resumen: "Breve descripción del post.", url: "" },
@@ -396,13 +396,15 @@ export default function Academia() {
         ) : (
           <div className="flex flex-col items-start gap-4">
             <PendientePorCargar texto="Aún no hay posts cargados. Pega los links de tus publicaciones de LinkedIn en el bloque CONTENIDO." />
-            <Button variant="outline" asChild className="gap-2">
-              <a href={linkedin.perfilUrl} target="_blank" rel="noopener noreferrer">
-                <Linkedin className="h-4 w-4" />
-                Ver mi perfil de LinkedIn
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            </Button>
+            {linkedin.perfilUrl && (
+              <Button variant="outline" asChild className="gap-2">
+                <a href={linkedin.perfilUrl} target="_blank" rel="noopener noreferrer">
+                  <Linkedin className="h-4 w-4" />
+                  Ver mi perfil de LinkedIn
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </Button>
+            )}
           </div>
         )}
       </Seccion>
