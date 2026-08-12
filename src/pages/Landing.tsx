@@ -76,6 +76,9 @@ export default function Landing() {
             />
           </div>
           <div className="flex items-center gap-3">
+            <Button variant="ghost" asChild className="hidden sm:inline-flex hover:bg-muted/50 transition-colors">
+              <Link to="/academia">Academia</Link>
+            </Button>
             {isAuthenticated ? (
               <>
                 <span className="text-sm text-muted-foreground hidden sm:inline">
@@ -516,6 +519,7 @@ Validar Admisibilidad Gratis
               </a>
             </div>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <Link to="/academia" className="hover:text-foreground transition-colors">Academia</Link>
               <span className="hover:text-foreground cursor-pointer">Términos</span>
               <span className="hover:text-foreground cursor-pointer">Privacidad</span>
             </div>
