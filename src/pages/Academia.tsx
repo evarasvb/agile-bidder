@@ -130,7 +130,7 @@ const CONTENIDO = {
       resena:
         "Por Enrique Evaristo Varas Bahamonde. Serie de 7 volúmenes que te guía paso a paso en el mundo de las licitaciones públicas y las ventas al Estado: desde los fundamentos hasta estrategias avanzadas para convertirte en un proveedor exitoso del sector público, sin morir en el intento.",
       precio: "", // ← opcional (ej. "$12.000"); si lo dejas vacío no se muestra
-      portadaUrl: null as string | null, // url de la portada (opcional)
+      portadaUrl: "/media/academia/libro-portada.jpg" as string | null,
       comprarUrl: "https://www.amazon.com/-/es/dp/B0G4NLY5TL", // link de compra
     },
   ],

@@ -24,7 +24,8 @@ import {
   Scale,
   LogOut,
   Play,
-  Bot
+  Bot,
+  GraduationCap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -75,9 +76,16 @@ export default function Landing() {
               style={{ padding: '2px' }}
             />
           </div>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" asChild className="hidden md:inline-flex hover:bg-muted/50 transition-colors">
-              <Link to="/academia">Academia</Link>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Button
+              variant="outline"
+              asChild
+              className="gap-1.5 border-firmavb-blue/30 text-firmavb-blue hover:bg-firmavb-blue/10 transition-colors px-2.5 sm:px-4"
+            >
+              <Link to="/academia">
+                <GraduationCap className="h-4 w-4" />
+                Academia
+              </Link>
             </Button>
             {isAuthenticated ? (
               <>
@@ -98,10 +106,10 @@ export default function Landing() {
               </>
             ) : (
               <>
-                <Button variant="ghost" asChild className="hover:bg-muted/50 transition-colors">
+                <Button variant="ghost" asChild className="hidden sm:inline-flex hover:bg-muted/50 transition-colors">
                   <Link to="/auth">Iniciar Sesión</Link>
                 </Button>
-                <Button asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90 transition-all hover:scale-105 active:scale-95">
+                <Button asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90 transition-all hover:scale-105 active:scale-95 px-3 sm:px-4">
                   <Link to="/auth">
                     Comenzar Gratis
                     <ArrowRight className="ml-2 h-4 w-4" />
@@ -215,6 +223,44 @@ Validar Admisibilidad Gratis
 </Card>
 </div>
 </section>
+
+{/* Invitación a la Academia FirmaVB */}
+      <section className="py-10 px-6">
+        <div className="max-w-5xl mx-auto">
+          <Card className="overflow-hidden border-firmavb-blue/20 shadow-lg">
+            <div className="grid md:grid-cols-[auto_1fr] items-center gap-6 p-6 md:p-8 bg-gradient-to-br from-firmavb-blue/10 to-transparent">
+              <img
+                src="/media/academia/foto-enrique.jpg"
+                alt="Enrique Varas"
+                className="h-24 w-24 md:h-28 md:w-28 rounded-full object-cover border-4 border-white shadow-md mx-auto"
+              />
+              <div className="text-center md:text-left">
+                <Badge className="mb-2 bg-firmavb-blue/10 text-firmavb-blue border-firmavb-blue/20">
+                  <GraduationCap className="h-3 w-3 mr-1" />
+                  Nuevo · 100% gratis
+                </Badge>
+                <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
+                  Academia FirmaVB
+                </h2>
+                <p className="text-muted-foreground mb-5 max-w-xl">
+                  Cursos gratuitos paso a paso, videos, mi libro y una comunidad para
+                  aprender a venderle al Estado. Todo en un solo lugar.
+                </p>
+                <Button
+                  asChild
+                  size="lg"
+                  className="bg-firmavb-blue hover:bg-firmavb-blue/90 shadow-lg shadow-firmavb-blue/25 gap-2 transition-all hover:scale-105 active:scale-95"
+                >
+                  <Link to="/academia">
+                    Entrar a la Academia
+                    <ArrowRight className="h-5 w-5" />
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </section>
 
 {/* Dashboard Comparativo */}
       <section className="py-16 px-6">
