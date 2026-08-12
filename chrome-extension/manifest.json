@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "FirmaVB Postulador",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Automatiza postulaciones a Compras Ágiles en MercadoPúblico.cl - Conectado con FirmaVB",
   "author": "FirmaVB",
   
