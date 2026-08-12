@@ -25,6 +25,8 @@ export interface Modulo {
   lecciones: Leccion[];
 }
 
+export type Acento = "azul" | "verde" | "ambar";
+
 export interface Curso {
   slug: string;
   emoji: string;
@@ -32,8 +34,31 @@ export interface Curso {
   descripcion: string;
   nivel: string;
   duracion: string;
+  acento: Acento;
   modulos: Modulo[];
 }
+
+// Clases de color por acento (fijas, para que Tailwind no las purgue).
+export const ACENTO: Record<
+  Acento,
+  { portada: string; texto: string; chip: string }
+> = {
+  azul: {
+    portada: "bg-gradient-to-br from-firmavb-blue to-header-dark",
+    texto: "text-firmavb-blue",
+    chip: "bg-firmavb-blue/10 text-firmavb-blue border-firmavb-blue/20",
+  },
+  verde: {
+    portada: "bg-gradient-to-br from-[hsl(var(--success))] to-firmavb-blue",
+    texto: "text-[hsl(var(--success))]",
+    chip: "bg-[hsl(var(--success))]/10 text-[hsl(var(--success))] border-[hsl(var(--success))]/20",
+  },
+  ambar: {
+    portada: "bg-gradient-to-br from-[hsl(var(--warning))] to-firmavb-red",
+    texto: "text-[hsl(var(--warning))]",
+    chip: "bg-[hsl(var(--warning))]/10 text-[hsl(var(--warning))] border-[hsl(var(--warning))]/20",
+  },
+};
 
 export const CURSOS: Curso[] = [
   // ===========================================================================
@@ -47,6 +72,7 @@ export const CURSOS: Curso[] = [
       "Entiende cómo compra el Estado, deja tu empresa lista para vender y encuentra tu primera oportunidad.",
     nivel: "Principiante",
     duracion: "≈ 45 min",
+    acento: "azul",
     modulos: [
       {
         titulo: "Módulo 1 · El mapa del juego",
@@ -253,6 +279,7 @@ export const CURSOS: Curso[] = [
       "La puerta de entrada más rápida: aprende a cotizar, poner el precio ganador y adjudicar Compras Ágiles.",
     nivel: "Principiante · Intermedio",
     duracion: "≈ 40 min",
+    acento: "ambar",
     modulos: [
       {
         titulo: "Módulo 1 · Entiende la Compra Ágil",
@@ -411,6 +438,7 @@ export const CURSOS: Curso[] = [
       "El 'supermercado del Estado': cómo postular, publicar tus productos y recibir órdenes de compra.",
     nivel: "Intermedio",
     duracion: "≈ 40 min",
+    acento: "verde",
     modulos: [
       {
         titulo: "Módulo 1 · Qué es un Convenio Marco",

@@ -18,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import logoFirmavbOriginal from "@/assets/logo-firmavb-original.png";
 import { AcademiaLeadForm } from "@/components/academia/AcademiaLeadForm";
-import { CURSOS } from "@/data/academiaCursos";
+import { CURSOS, ACENTO } from "@/data/academiaCursos";
 
 // =============================================================================
 //  CONTENIDO DE LA ACADEMIA  ← EDITA AQUÍ TUS LINKS Y TEXTOS
@@ -566,10 +566,12 @@ export default function Academia() {
           {CURSOS.map((c) => (
             <Card
               key={c.slug}
-              className="border-border/50 hover:shadow-md transition-shadow flex flex-col"
+              className="border-border/50 hover:shadow-md transition-shadow flex flex-col overflow-hidden"
             >
+              <div className={`${ACENTO[c.acento].portada} h-24 flex items-center justify-center`}>
+                <span className="text-5xl drop-shadow-md">{c.emoji}</span>
+              </div>
               <CardContent className="py-6 flex flex-col flex-1">
-                <span className="text-3xl mb-3">{c.emoji}</span>
                 <h3 className="font-semibold text-foreground mb-1">{c.titulo}</h3>
                 <p className="text-sm text-muted-foreground mb-4 flex-1">{c.descripcion}</p>
                 <div className="flex flex-wrap gap-2 mb-4">
