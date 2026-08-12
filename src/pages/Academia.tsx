@@ -56,8 +56,11 @@ const CONTENIDO = {
   },
 
   // --- Música / canciones ---------------------------------------------------
+  // Puedes poner el link de tu perfil (Suno) o links de canciones sueltas
+  // (Spotify/YouTube). Los de Spotify se reproducen incrustados; el resto
+  // se muestran con un botón "Escuchar".
   musica: [
-    { titulo: "Mi canción", url: "" }, // ← link de Spotify / YouTube
+    { titulo: "Escucha todas mis canciones en Suno", url: "https://suno.com/@eevb" },
   ],
 
   // --- Posts de LinkedIn ----------------------------------------------------
