@@ -365,27 +365,48 @@ export default function Academia() {
         alt
       >
         {videosCargados.length > 0 ? (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {videosCargados.map((v, i) => (
-              <Card key={i} className="overflow-hidden border-border/50">
-                <div className="aspect-video bg-black">
-                  <iframe
-                    className="w-full h-full"
-                    src={`https://www.youtube.com/embed/${youtubeId(v.id)}`}
-                    title={v.titulo || `Video ${i + 1}`}
-                    loading="lazy"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
-                </div>
-                {v.titulo && (
-                  <CardContent className="py-3">
-                    <p className="font-medium text-sm text-foreground">{v.titulo}</p>
-                  </CardContent>
-                )}
-              </Card>
-            ))}
-          </div>
+          <>
+            {/* Video destacado */}
+            <div className="rounded-2xl overflow-hidden shadow-lg border border-border/50 bg-black mb-6 max-w-3xl">
+              <div className="aspect-video">
+                <iframe
+                  className="w-full h-full"
+                  src={`https://www.youtube.com/embed/${youtubeId(videosCargados[0].id)}?rel=0`}
+                  title={videosCargados[0].titulo || "Video destacado"}
+                  loading="lazy"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            </div>
+            {/* Resto de videos */}
+            {videosCargados.length > 1 && (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {videosCargados.slice(1).map((v, i) => (
+                  <Card
+                    key={i}
+                    className="overflow-hidden border-border/50 hover:shadow-md transition-shadow"
+                  >
+                    <div className="aspect-video bg-black">
+                      <iframe
+                        className="w-full h-full"
+                        src={`https://www.youtube.com/embed/${youtubeId(v.id)}?rel=0`}
+                        title={v.titulo || `Video ${i + 2}`}
+                        loading="lazy"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                    {v.titulo && (
+                      <CardContent className="py-3">
+                        <p className="font-medium text-sm text-foreground">{v.titulo}</p>
+                      </CardContent>
+                    )}
+                  </Card>
+                ))}
+              </div>
+            )}
+          </>
         ) : (
           <PendientePorCargar texto="Aún no hay videos individuales seleccionados. Mientras tanto, entra a mi canal 👇" />
         )}
