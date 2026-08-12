@@ -80,14 +80,14 @@ const CONTENIDO = {
     posts: [
       {
         titulo: "Postula al Convenio Marco de Software",
-        resumen: "Oportunidades que impulsan la innovación y el crecimiento.",
-        url: "",
+        resumen: "Cómo se vende por Convenio Marco de Software: oportunidades que impulsan la innovación.",
+        url: "https://www.linkedin.com/posts/evaras_como-se-vende-por-convenio-marco-se-software-activity-7490531320801062913-j55j",
         imagenUrl: "/media/academia/convenio-software.jpg",
       },
       {
         titulo: "¿Tu empresa quiere aterrizar en Chile?",
-        resumen: "Softlanding en Chile: acompaño a empresas extranjeras a instalarse y crecer.",
-        url: "",
+        resumen: "Se buscan empresas expertas en Softlanding para acompañar a compañías extranjeras.",
+        url: "https://www.linkedin.com/posts/evaras_se-busca-empresas-expertas-en-softlanding-activity-7491291813044076544-Tbep",
         imagenUrl: "/media/academia/softlanding.jpg",
       },
       {
@@ -97,10 +97,28 @@ const CONTENIDO = {
         imagenUrl: "/media/academia/gracias-comunidad.jpg",
       },
       {
+        titulo: "Cómo estudiar un Convenio Marco con IA",
+        resumen: "Usa la inteligencia artificial para analizar un Convenio Marco antes de postular.",
+        url: "https://www.linkedin.com/posts/evaras_c%C3%B3mo-estudiar-un-convenio-marco-con-ia-activity-7492799322430967808-yz0X",
+        imagenUrl: null as string | null,
+      },
+      {
+        titulo: "¿Qué tal este Trato Directo?",
+        resumen: "Un caso de trato directo que vale la pena mirar de cerca.",
+        url: "https://www.linkedin.com/posts/evaras_que-tal-este-trato-directo-activity-7490290661707956225-KnbH",
+        imagenUrl: null,
+      },
+      {
+        titulo: "Un Trato Directo de $67.990.000.000",
+        resumen: "El llamativo trato directo del 30 de julio.",
+        url: "https://www.linkedin.com/posts/evaras_un-trato-directo-de-67990000000-30-julio-activity-7490245431042555904-77hL",
+        imagenUrl: null,
+      },
+      {
         titulo: "Se abrió el Convenio Marco de Desarrollo",
         resumen: "Mi publicación sobre la apertura de este Convenio Marco en Mercado Público.",
         url: "https://www.linkedin.com/posts/evaras_se-abri%C3%B3-el-convenio-marco-de-desarrollo-ugcPost-7485053898337218560-oIVj/",
-        imagenUrl: null as string | null,
+        imagenUrl: null,
       },
     ],
   },
