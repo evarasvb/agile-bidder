@@ -10,6 +10,7 @@ import { ChatWidget } from "@/components/support/ChatWidget";
 
 // Auth
 import Index from "./pages/Index";
+import Academia from "./pages/Academia";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
 import Onboarding from "./pages/Onboarding";
@@ -92,6 +93,7 @@ const App = () => (
         <Routes>
           {/* ========== RUTAS PUBLICAS ========== */}
           <Route path="/" element={<Index />} />
+          <Route path="/academia" element={<Academia />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           
