@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import logoFirmavbOriginal from "@/assets/logo-firmavb-original.png";
 import { AcademiaLeadForm } from "@/components/academia/AcademiaLeadForm";
+import { CURSOS } from "@/data/academiaCursos";
 
 // =============================================================================
 //  CONTENIDO DE LA ACADEMIA  ← EDITA AQUÍ TUS LINKS Y TEXTOS
@@ -558,32 +559,32 @@ export default function Academia() {
         id="cursos"
         icon={GraduationCap}
         titulo="Mis cursos"
-        subtitulo="Formación para vender al Estado. Accede o inscríbete."
+        subtitulo="Cursos gratuitos, paso a paso, para venderle al Estado. Ábrelos y aprende a tu ritmo."
         alt
       >
-        {cursosCargados.length > 0 ? (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {cursosCargados.map((c, i) => (
-              <Card key={i} className="border-border/50 hover:shadow-md transition-shadow flex flex-col">
-                <CardContent className="py-6 flex flex-col flex-1">
-                  <GraduationCap className="h-8 w-8 text-firmavb-blue mb-3" />
-                  <h3 className="font-semibold text-foreground mb-1">{c.titulo}</h3>
-                  <p className="text-sm text-muted-foreground mb-4 flex-1">{c.descripcion}</p>
-                  {c.accesoUrl && (
-                    <Button asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2 w-full">
-                      <a href={c.accesoUrl} target="_blank" rel="noopener noreferrer">
-                        Acceder al curso
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <PendientePorCargar texto="Aún no hay cursos cargados. Agrega tus cursos (título, descripción y link de acceso) en el bloque CONTENIDO." />
-        )}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {CURSOS.map((c) => (
+            <Card
+              key={c.slug}
+              className="border-border/50 hover:shadow-md transition-shadow flex flex-col"
+            >
+              <CardContent className="py-6 flex flex-col flex-1">
+                <span className="text-3xl mb-3">{c.emoji}</span>
+                <h3 className="font-semibold text-foreground mb-1">{c.titulo}</h3>
+                <p className="text-sm text-muted-foreground mb-4 flex-1">{c.descripcion}</p>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <Badge variant="outline" className="text-xs">{c.nivel}</Badge>
+                  <Badge variant="outline" className="text-xs">{c.duracion}</Badge>
+                </div>
+                <Button asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2 w-full">
+                  <Link to={`/academia/curso/${c.slug}`}>
+                    Ver curso gratis
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </Seccion>
 
       {/* Asesoría gratuita */}
