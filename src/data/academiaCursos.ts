@@ -602,8 +602,8 @@ export const CURSOS: Curso[] = [
     duracion: "Programa completo",
     acento: "azul",
     premium: true,
-    precio: "", // ← pon el precio, ej. "$29.990"
-    pagoUrl: "", // ← pega aquí tu link de pago de Mercado Pago
+    precio: "", // ← pon el precio, ej. "$29.990" (el monto también se ve en Mercado Pago)
+    pagoUrl: "https://mpago.la/345ua7Y", // link de pago de Mercado Pago
     modulos: [
       {
         titulo: "Módulo 1 · Estrategia de participación",
