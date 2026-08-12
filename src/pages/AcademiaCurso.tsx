@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { Link, useParams, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   ArrowLeft,
   BarChart3,
@@ -12,17 +14,25 @@ import {
   ShoppingCart,
   Lock,
   Check,
+  KeyRound,
+  Loader2,
+  Unlock,
 } from "lucide-react";
 import logoFirmavbOriginal from "@/assets/logo-firmavb-original.png";
-import { getCursoBySlug, ACENTO, type Bloque } from "@/data/academiaCursos";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import {
+  getCursoBySlug,
+  ACENTO,
+  type Bloque,
+  type Modulo,
+} from "@/data/academiaCursos";
 
 function BloqueView({ bloque }: { bloque: Bloque }) {
   switch (bloque.tipo) {
     case "subtitulo":
       return (
-        <h4 className="text-lg font-semibold text-foreground mt-6 mb-2">
-          {bloque.texto}
-        </h4>
+        <h4 className="text-lg font-semibold text-foreground mt-6 mb-2">{bloque.texto}</h4>
       );
     case "lista":
       return (
@@ -51,15 +61,97 @@ function BloqueView({ bloque }: { bloque: Bloque }) {
   }
 }
 
+// Render de los módulos con lecciones numeradas (cursos gratis y premium ya desbloqueados)
+function ModulosContenido({ modulos }: { modulos: Modulo[] }) {
+  let leccionNum = 0;
+  return (
+    <>
+      {modulos.map((modulo, mi) => (
+        <Card key={mi} className="border-border/50">
+          <CardContent className="py-6">
+            <h2 className="text-xl font-bold text-firmavb-blue mb-4 pb-3 border-b border-border/50">
+              {modulo.titulo}
+            </h2>
+            <div className="space-y-8">
+              {modulo.lecciones.map((leccion, li) => {
+                leccionNum += 1;
+                return (
+                  <article key={li}>
+                    <h3 className="text-lg font-semibold text-foreground flex items-center gap-3">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-firmavb-blue text-white text-sm font-bold">
+                        {leccionNum}
+                      </span>
+                      {leccion.titulo}
+                    </h3>
+                    <div className="mt-2 sm:pl-10">
+                      {leccion.bloques.map((bloque, bi) => (
+                        <BloqueView key={bi} bloque={bloque} />
+                      ))}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </>
+  );
+}
+
 export default function AcademiaCurso() {
   const { slug } = useParams<{ slug: string }>();
   const curso = slug ? getCursoBySlug(slug) : undefined;
+
+  const [codigo, setCodigo] = useState("");
+  const [cargando, setCargando] = useState(false);
+  const [desbloqueado, setDesbloqueado] = useState<Modulo[] | null>(null);
+  const [email, setEmail] = useState("");
+  const [recuperando, setRecuperando] = useState(false);
 
   if (!curso) {
     return <Navigate to="/academia" replace />;
   }
 
-  let leccionNum = 0;
+  const validarCodigo = async () => {
+    if (!codigo.trim()) {
+      toast.error("Ingresa tu código de acceso.");
+      return;
+    }
+    setCargando(true);
+    const { data, error } = await supabase.functions.invoke("academia-premium", {
+      body: { action: "validar", slug: curso.slug, codigo: codigo.trim() },
+    });
+    setCargando(false);
+    if (error || !data?.ok) {
+      toast.error(data?.error || "No pudimos validar el código. Intenta nuevamente.");
+      return;
+    }
+    setDesbloqueado(data.modulos as Modulo[]);
+    toast.success("¡Acceso desbloqueado! 🎉");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const recuperarPorCorreo = async () => {
+    if (!email.trim()) {
+      toast.error("Ingresa el correo de tu pago.");
+      return;
+    }
+    setRecuperando(true);
+    const { data, error } = await supabase.functions.invoke("academia-premium", {
+      body: { action: "recuperar", slug: curso.slug, email: email.trim() },
+    });
+    setRecuperando(false);
+    if (error || !data?.ok) {
+      toast.error(data?.error || "No encontramos tu compra con ese correo.");
+      return;
+    }
+    setDesbloqueado(data.modulos as Modulo[]);
+    toast.success("¡Acceso recuperado! 🎉");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const esPremiumBloqueado = curso.premium && !desbloqueado;
 
   return (
     <div className="min-h-screen bg-firmavb-gray">
@@ -86,11 +178,9 @@ export default function AcademiaCurso() {
       {/* Hero del curso */}
       <section className="pt-24 px-6">
         <div className="max-w-4xl mx-auto">
-          <div
-            className={`${ACENTO[curso.acento].portada} rounded-2xl p-8 md:p-10 text-white shadow-lg`}
-          >
+          <div className={`${ACENTO[curso.acento].portada} rounded-2xl p-8 md:p-10 text-white shadow-lg`}>
             <Badge className="mb-4 bg-white/20 text-white border-white/30 hover:bg-white/30">
-              Academia FirmaVB · Curso gratuito
+              Academia FirmaVB · {curso.premium ? "Programa premium" : "Curso gratuito"}
             </Badge>
             <div className="flex items-start gap-4">
               <span className="text-5xl leading-none">{curso.emoji}</span>
@@ -129,8 +219,22 @@ export default function AcademiaCurso() {
       {/* Contenido */}
       <section className="px-6 pb-12">
         <div className="max-w-4xl mx-auto space-y-8">
-          {/* Curso premium: página de venta (temario + precio + comprar) */}
-          {curso.premium && (
+          {/* Curso gratis: contenido completo */}
+          {!curso.premium && <ModulosContenido modulos={curso.modulos} />}
+
+          {/* Curso premium ya desbloqueado */}
+          {curso.premium && desbloqueado && (
+            <>
+              <div className="flex items-center gap-2 rounded-xl border border-[hsl(var(--success))]/30 bg-[hsl(var(--success))]/10 p-4 text-sm text-foreground">
+                <Unlock className="h-5 w-5 text-[hsl(var(--success))]" />
+                Acceso desbloqueado. ¡Disfruta el programa!
+              </div>
+              <ModulosContenido modulos={desbloqueado} />
+            </>
+          )}
+
+          {/* Curso premium bloqueado: página de venta + desbloqueo por código */}
+          {esPremiumBloqueado && (
             <>
               <Card className="border-firmavb-blue/30 shadow-lg">
                 <CardContent className="py-8 text-center">
@@ -162,6 +266,7 @@ export default function AcademiaCurso() {
                 </CardContent>
               </Card>
 
+              {/* Temario */}
               <Card className="border-border/50">
                 <CardContent className="py-6">
                   <h2 className="text-xl font-bold text-firmavb-blue mb-4">Temario del programa</h2>
@@ -185,40 +290,80 @@ export default function AcademiaCurso() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Ya compré: desbloquear con código */}
+              <Card className="border-border/50">
+                <CardContent className="py-6">
+                  <div className="flex items-center gap-2 mb-3">
+                    <KeyRound className="h-5 w-5 text-firmavb-blue" />
+                    <h3 className="font-semibold text-foreground">¿Ya lo compraste? Ingresa tu código</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Después de pagar recibirás un código de acceso. Ingrésalo aquí para leer el
+                    programa completo.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Input
+                      value={codigo}
+                      onChange={(e) => setCodigo(e.target.value)}
+                      placeholder="Ej: PRO-XXXXXX"
+                      className="sm:max-w-xs"
+                      onKeyDown={(e) => e.key === "Enter" && validarCodigo()}
+                    />
+                    <Button
+                      onClick={validarCodigo}
+                      disabled={cargando}
+                      className="bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2"
+                    >
+                      {cargando ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Validando…
+                        </>
+                      ) : (
+                        <>
+                          <Unlock className="h-4 w-4" />
+                          Desbloquear
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  <div className="mt-5 pt-5 border-t border-border/50">
+                    <p className="text-sm text-muted-foreground mb-3">
+                      ¿Pagaste y no tienes el código? Recupéralo con el correo que usaste en
+                      Mercado Pago:
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <Input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="tu@correo.cl"
+                        className="sm:max-w-xs"
+                        onKeyDown={(e) => e.key === "Enter" && recuperarPorCorreo()}
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={recuperarPorCorreo}
+                        disabled={recuperando}
+                        className="gap-2"
+                      >
+                        {recuperando ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Buscando…
+                          </>
+                        ) : (
+                          "Recuperar acceso"
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </>
           )}
-
-          {/* Curso gratis: contenido completo */}
-          {!curso.premium &&
-            curso.modulos.map((modulo, mi) => (
-            <Card key={mi} className="border-border/50">
-              <CardContent className="py-6">
-                <h2 className="text-xl font-bold text-firmavb-blue mb-4 pb-3 border-b border-border/50">
-                  {modulo.titulo}
-                </h2>
-                <div className="space-y-8">
-                  {modulo.lecciones.map((leccion, li) => {
-                    leccionNum += 1;
-                    return (
-                      <article key={li}>
-                        <h3 className="text-lg font-semibold text-foreground flex items-center gap-3">
-                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-firmavb-blue text-white text-sm font-bold">
-                            {leccionNum}
-                          </span>
-                          {leccion.titulo}
-                        </h3>
-                        <div className="mt-2 sm:pl-10">
-                          {leccion.bloques.map((bloque, bi) => (
-                            <BloqueView key={bi} bloque={bloque} />
-                          ))}
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
 
           {/* CTA final */}
           <Card className="border-0 bg-gradient-to-br from-firmavb-blue to-header-dark text-white shadow-xl">
@@ -226,14 +371,14 @@ export default function AcademiaCurso() {
               <ClipboardList className="h-10 w-10 mx-auto mb-3 opacity-90" />
               <h3 className="text-2xl font-bold mb-2">¿Quieres ayuda personalizada?</h3>
               <p className="opacity-90 mb-6 max-w-xl mx-auto">
-                Cuéntame tu caso y te oriento para vender al Estado, sin costo.
+                Cuéntame tu caso y te oriento para vender al Estado.
               </p>
               <Button
                 asChild
                 size="lg"
                 className="bg-white text-firmavb-blue hover:bg-white/90 font-semibold"
               >
-                <Link to="/academia#asesoria">Pedir asesoría gratuita</Link>
+                <Link to="/academia#asesoria">Ir a asesoría</Link>
               </Button>
             </CardContent>
           </Card>

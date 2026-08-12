@@ -608,234 +608,32 @@ export const CURSOS: Curso[] = [
       {
         titulo: "Módulo 1 · Los mecanismos y cuál te conviene",
         lecciones: [
-          {
-            titulo: "La Compra Ágil a fondo",
-            bloques: [
-              {
-                tipo: "parrafo",
-                texto:
-                  "La Compra Ágil es el mecanismo rápido para montos de hasta 100 UTM: el organismo pide cotizaciones y adjudica sin bases complejas ni garantías. Es tu puerta de entrada y tu fábrica de flujo de caja.",
-              },
-              {
-                tipo: "lista",
-                items: [
-                  "Cuándo conviene: montos bajos, necesidad rápida, sin trámites pesados.",
-                  "Su ritmo: se publican muchas al día y cierran pronto, así que la velocidad manda.",
-                  "Tu ventaja: cotizar bien y a tiempo, con precio rentable, gana.",
-                ],
-              },
-              {
-                tipo: "tip",
-                texto:
-                  "Usa las Compras Ágiles para generar historial y reputación mientras preparas las licitaciones grandes.",
-              },
-            ],
-          },
-          {
-            titulo: "Licitación vs Compra Ágil: cuándo usar cada una",
-            bloques: [
-              {
-                tipo: "parrafo",
-                texto:
-                  "La diferencia no es solo el monto: cambia el nivel de formalidad, los plazos, los criterios y el esfuerzo. Elegir bien dónde competir es media adjudicación.",
-              },
-              {
-                tipo: "lista",
-                items: [
-                  "Compra Ágil: bajo monto, rápida, sin garantías. Ideal para volumen.",
-                  "Licitación: mayor monto, bases formales, criterios de evaluación y a veces garantías.",
-                  "Regla práctica: no gastes horas en una licitación grande si una Compra Ágil te da el mismo negocio con menos esfuerzo.",
-                ],
-              },
-            ],
-          },
-          {
-            titulo: "Convenios de suministro y Convenio Marco",
-            bloques: [
-              {
-                tipo: "parrafo",
-                texto:
-                  "Los convenios de suministro te dejan vender de forma repetida a un organismo durante un periodo. El Convenio Marco es el catálogo central (la Tienda) donde muchos organismos compran directo. Ambos sirven para tener ventas recurrentes, no de una sola vez.",
-              },
-              {
-                tipo: "tip",
-                texto:
-                  "Piensa en recurrencia: un convenio bien trabajado te da ventas mes a mes sin volver a competir cada vez.",
-              },
-            ],
-          },
+          { titulo: "La Compra Ágil a fondo", bloques: [] },
+          { titulo: "Licitación vs Compra Ágil: cuándo usar cada una", bloques: [] },
+          { titulo: "Convenios de suministro y Convenio Marco", bloques: [] },
         ],
       },
       {
         titulo: "Módulo 2 · Cómo estudiar una licitación como experto",
         lecciones: [
-          {
-            titulo: "Anatomía de una licitación: lee las bases con método",
-            bloques: [
-              {
-                tipo: "parrafo",
-                texto:
-                  "No leas las bases de corrido: léelas con un método para extraer lo que decide si ganas o pierdes.",
-              },
-              {
-                tipo: "lista",
-                items: [
-                  "Objeto y especificaciones: ¿qué piden exactamente? (marca, modelo, cantidades).",
-                  "Requisitos de admisibilidad: lo que te deja fuera antes de evaluar.",
-                  "Criterios de evaluación y sus pesos: dónde se ganan los puntos (precio, plazo, técnico).",
-                  "Plazos, garantías y forma de entrega.",
-                ],
-              },
-              {
-                tipo: "tip",
-                texto:
-                  "Marca en las bases cada requisito y responde punto por punto. La mayoría pierde por no responder algo que sí pedían.",
-              },
-            ],
-          },
-          {
-            titulo: "Estudia el pasado: adjudicados y ofertas técnicas anteriores",
-            bloques: [
-              {
-                tipo: "parrafo",
-                texto:
-                  "El pasado te dice el futuro. Antes de ofertar, revisa procesos anteriores de la misma institución por el mismo producto o servicio: quién ganó, a qué precio y con qué propuesta técnica.",
-              },
-              {
-                tipo: "lista",
-                items: [
-                  "Revisa los adjudicados anteriores: precio ganador y proveedor.",
-                  "Estudia las ofertas técnicas anteriores: qué presentaron y qué valoró el comprador.",
-                  "Identifica al 'incumbente' (el que suele ganar) y cómo diferenciarte.",
-                ],
-              },
-              {
-                tipo: "tip",
-                texto:
-                  "Si el año pasado adjudicaron a X precio, ya sabes el rango en el que debes moverte para competir.",
-              },
-            ],
-          },
-          {
-            titulo: "Investiga a la institución (situación pública actual)",
-            bloques: [
-              {
-                tipo: "parrafo",
-                texto:
-                  "Detrás de cada compra hay una institución con un contexto. Conocerla te ayuda a anticipar cómo decide y qué le importa hoy.",
-              },
-              {
-                tipo: "lista",
-                items: [
-                  "Su situación pública actual: noticias, presupuesto, prioridades del momento.",
-                  "LinkedIn: quiénes son los responsables de compra y qué publican.",
-                  "Comentarios y señales en redes sobre la institución y sus procesos.",
-                ],
-              },
-            ],
-          },
+          { titulo: "Anatomía de una licitación: lee las bases con método", bloques: [] },
+          { titulo: "Estudia el pasado: adjudicados y ofertas técnicas anteriores", bloques: [] },
+          { titulo: "Investiga a la institución (situación pública actual)", bloques: [] },
         ],
       },
       {
         titulo: "Módulo 3 · Inteligencia competitiva (tu diferencial)",
         lecciones: [
-          {
-            titulo: "Conductas de pago: ¿este comprador paga bien?",
-            bloques: [
-              {
-                tipo: "parrafo",
-                texto:
-                  "Ganar no sirve si te pagan tarde. Antes de comprometer tu capital, revisa cómo paga esa institución: plazos reales y comportamiento histórico.",
-              },
-              {
-                tipo: "lista",
-                items: [
-                  "Revisa el historial de pagos del organismo (plazos promedio).",
-                  "Prioriza compradores que pagan a tiempo para cuidar tu flujo de caja.",
-                  "Si paga muy lento, ajusta tu precio o tu decisión de participar.",
-                ],
-              },
-            ],
-          },
-          {
-            titulo: "Detecta fragmentación: ¿hay una compra ágil de lo mismo?",
-            bloques: [
-              {
-                tipo: "parrafo",
-                texto:
-                  "Una señal clave: revisa si la misma institución tiene, en paralelo, una Compra Ágil por lo mismo que está licitando. Puede indicar fragmentación de la compra, urgencias, o una vía más rápida para entrar.",
-              },
-              {
-                tipo: "lista",
-                items: [
-                  "Cruza la licitación con las Compras Ágiles recientes de la misma institución.",
-                  "Si compra lo mismo por varias vías, entiende por qué (urgencia, fragmentación).",
-                  "Úsalo a tu favor: a veces la Compra Ágil es la puerta más rápida al mismo cliente.",
-                ],
-              },
-              {
-                tipo: "tip",
-                texto:
-                  "Este cruce es un diferencial: la mayoría mira solo la licitación y no ve el panorama completo de esa institución.",
-              },
-            ],
-          },
-          {
-            titulo: "Simula tu presentación antes de ofertar",
-            bloques: [
-              {
-                tipo: "parrafo",
-                texto:
-                  "Antes de enviar, simula tu oferta como si fueras el evaluador: ¿cumple todo?, ¿cuántos puntos saca?, ¿qué le falta? Ensayar evita los errores que te dejan fuera.",
-              },
-              {
-                tipo: "lista",
-                items: [
-                  "Arma la oferta completa y revísala contra cada criterio de evaluación.",
-                  "Ponte nota tú mismo: si no llegas al puntaje ganador, ajusta antes de enviar.",
-                  "Verifica adjuntos, formatos y firmas: lo formal también descarta.",
-                ],
-              },
-            ],
-          },
+          { titulo: "Conductas de pago: ¿este comprador paga bien?", bloques: [] },
+          { titulo: "Detecta fragmentación: ¿hay una compra ágil de lo mismo?", bloques: [] },
+          { titulo: "Simula tu presentación antes de ofertar", bloques: [] },
         ],
       },
       {
         titulo: "Módulo 4 · Ejecuta y automatiza con FirmaVB",
         lecciones: [
-          {
-            titulo: "Arma tu oferta ganadora (técnica + precio)",
-            bloques: [
-              {
-                tipo: "parrafo",
-                texto:
-                  "Con todo lo estudiado, construye una oferta que maximice puntaje sin regalar margen: precio competitivo respaldado por el análisis del pasado, y una propuesta técnica que responda exactamente lo que valoran.",
-              },
-              {
-                tipo: "tip",
-                texto:
-                  "Tu precio no se inventa: sale del análisis de adjudicados y de tu costo real. Así compites con datos, no con corazonadas.",
-              },
-            ],
-          },
-          {
-            titulo: "Automatiza búsqueda, match y postulación",
-            bloques: [
-              {
-                tipo: "parrafo",
-                texto:
-                  "Lo que aprendiste a mano, FirmaVB lo hace a escala: escanea Mercado Público, cruza con tu inventario, prepara ofertas automáticas y te ayuda a postular en minutos con la extensión.",
-              },
-              {
-                tipo: "lista",
-                items: [
-                  "Búsqueda y match 24/7 de oportunidades que calzan contigo.",
-                  "Ofertas automáticas listas para revisar.",
-                  "Postulación asistida en el portal con la extensión de FirmaVB.",
-                ],
-              },
-            ],
-          },
+          { titulo: "Arma tu oferta ganadora (técnica + precio)", bloques: [] },
+          { titulo: "Automatiza búsqueda, match y postulación", bloques: [] },
         ],
       },
     ],
