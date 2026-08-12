@@ -132,20 +132,31 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         throw caError;
       }
 
-      // Fetch licitaciones. Antes traía TODAS (decenas de miles, casi todas
-      // cerradas) => lentitud. Ahora, por defecto, solo activas.
-      let licitacionesQuery = supabase
-        .from('licitaciones')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Fetch licitaciones desde `licitaciones_bi` (tabla fresca alimentada por
+      // el sync oficial de Mercado Público). La antigua tabla `licitaciones`
+      // quedó congelada en 2026-04 (0 activas) — por eso el panel no mostraba
+      // ninguna licitación abierta. `licitaciones_bi` tiene ~2.000 activas al día.
+      // No está en los tipos generados de Supabase => usamos any.
+      // Columnas explícitas (NO `raw_data`, que es un jsonb enorme por fila) para
+      // no descargar megas al navegador.
+      const LIC_COLS =
+        'id, codigo, nombre, descripcion, estado, fecha_cierre, fecha_publicacion, ' +
+        'institucion_nombre, unidad_compra_region, presupuesto_estimado, created_at, ' +
+        'match_score, match_encontrado';
+      let licitacionesQuery = (supabase as any)
+        .from('licitaciones_bi')
+        .select(LIC_COLS)
+        .order('fecha_publicacion', { ascending: false, nullsFirst: false });
 
       if (incluirCerradas) {
         licitacionesQuery = licitacionesQuery.limit(MAX_CERRADAS);
       } else {
         // Igual que compras: exigir fecha de cierre futura real. Sin esto,
         // ~92.000 licitaciones históricas sin fecha se mostraban como "activas".
+        // Se incluye `estado.is.null` porque el endpoint estado=activas de la API
+        // no manda el texto Estado (defensa por si algún código nuevo no se mapea).
         licitacionesQuery = licitacionesQuery
-          .or('estado.ilike.publicada,estado.ilike.activa')
+          .or('estado.is.null,estado.ilike.publicada,estado.ilike.activa')
           .gt('fecha_cierre', nowIso)
           .limit(MAX_ACTIVAS);
       }
@@ -212,25 +223,27 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         created_at: c.created_at,
       }));
 
-      // Map licitaciones
+      // Map licitaciones (columnas de licitaciones_bi)
       const licitaciones: OportunidadPanel[] = (licitacionesRaw || []).map((l: any) => ({
-        id: l.id_licitacion || l.id,
-        codigo: l.id_licitacion || l.codigo,
-        nombre: l.titulo || l.nombre || 'Sin título',
-        descripcion: null,
-        organismo: l.organismo || 'Sin organismo',
-        region: null,
-        monto: l.presupuesto || l.presupuesto_estimado,
+        id: l.codigo || l.id,
+        codigo: l.codigo,
+        nombre: l.nombre || l.titulo || 'Sin título',
+        descripcion: l.descripcion ?? null,
+        organismo: l.institucion_nombre || l.organismo || 'Sin organismo',
+        region: l.unidad_compra_region ?? null,
+        monto: l.presupuesto_estimado ?? null,
         fecha_cierre: l.fecha_cierre,
-        fecha_publicacion: l.created_at,
+        fecha_publicacion: l.fecha_publicacion || l.created_at,
         estado: l.estado,
         tipo: 'licitacion' as const,
-        link_oficial: l.link_oficial,
-        match_score: l.match_score,
+        link_oficial: l.codigo
+          ? `https://www.mercadopublico.cl/Procurement/Modules/RFB/DetailsAcquisition.aspx?idlicitacion=${l.codigo}`
+          : null,
+        match_score: l.match_score ?? null,
         match_encontrado: l.match_encontrado ?? false,
         items_count: 0,
         items_matched: 0,
-        created_at: l.created_at,
+        created_at: l.created_at || l.fecha_publicacion,
       }));
 
       let all = [...compras, ...licitaciones];
@@ -280,8 +293,31 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       const now = Date.now();
       const oneWeek = 7 * 24 * 60 * 60 * 1000;
       const activas = all.filter(o => o.fecha_cierre && new Date(o.fecha_cierre).getTime() > now);
+
+      // El total real de activas puede superar el límite renderizado (MAX_ACTIVAS),
+      // así que lo contamos aparte en el servidor (head:true = sin traer filas).
+      // Sin esto, "totalActivas" mostraría 500 aunque hubiera miles.
+      let totalActivasReal = activas.length;
+      if (!incluirCerradas) {
+        const [licCount, caCount] = await Promise.all([
+          (supabase as any)
+            .from('licitaciones_bi')
+            .select('codigo', { count: 'exact', head: true })
+            .or('estado.is.null,estado.ilike.publicada,estado.ilike.activa')
+            .gt('fecha_cierre', nowIso),
+          supabase
+            .from('compras_agiles')
+            .select('codigo', { count: 'exact', head: true })
+            .or('estado.ilike.publicada,estado.ilike.activa')
+            .gt('fecha_cierre', nowIso),
+        ]);
+        const licN = (licCount as any)?.count ?? 0;
+        const caN = (caCount as any)?.count ?? 0;
+        if (licN || caN) totalActivasReal = licN + caN;
+      }
+
       const stats: PanelStats = {
-        totalActivas: activas.length,
+        totalActivas: totalActivasReal,
         avgMatchScore: all.length > 0
           ? Math.round(all.reduce((sum, o) => sum + (o.match_score || 0), 0) / all.length)
           : 0,
@@ -397,20 +433,33 @@ export function useOportunidadDetalle(id: string | null, tipo: 'compra_agil' | '
         };
       }
 
-      // Licitacion
-      const { data: lic, error } = await supabase
-        .from('licitaciones')
-        .select('*')
-        .or(`id_licitacion.eq.${id},id.eq.${id}`)
-        .maybeSingle();
-
-      if (error) throw error;
+      // Licitacion (desde licitaciones_bi). Se busca por `codigo`; como fallback
+      // por `id` (uuid) por si llega un id antiguo.
+      let licRow: any = null;
+      {
+        const { data: byCodigo } = await (supabase as any)
+          .from('licitaciones_bi')
+          .select('*, licitaciones_bi_items(*)')
+          .eq('codigo', id)
+          .maybeSingle();
+        licRow = byCodigo;
+        if (!licRow && /^[0-9a-f-]{36}$/i.test(id)) {
+          const { data: byId } = await (supabase as any)
+            .from('licitaciones_bi')
+            .select('*, licitaciones_bi_items(*)')
+            .eq('id', id)
+            .maybeSingle();
+          licRow = byId;
+        }
+      }
+      const lic = licRow;
       if (!lic) return null;
 
+      const organismoLic = (lic as any).institucion_nombre || (lic as any).organismo || '';
       const { data: institucion } = await supabase
         .from('instituciones')
         .select('*')
-        .ilike('nombre', `%${(lic as any).organismo || ''}%`)
+        .ilike('nombre', `%${organismoLic}%`)
         .maybeSingle();
 
       let scorePago: number | null = null;
@@ -442,25 +491,40 @@ export function useOportunidadDetalle(id: string | null, tipo: 'compra_agil' | '
         promedio_dias_pago: promedioDiasPago,
       } : null;
 
+      const licItems: OportunidadItem[] = ((lic as any).licitaciones_bi_items || []).map((i: any) => ({
+        id: i.id,
+        nombre_producto: i.nombre_producto || i.descripcion || 'Ítem',
+        descripcion: i.descripcion ?? null,
+        cantidad: i.cantidad ?? null,
+        unidad: i.unidad ?? null,
+        codigo_producto: i.codigo_producto ?? null,
+        precio_unitario: null,
+        match_score: null,
+        producto_match: null,
+        precio_sugerido: null,
+      }));
+
       return {
-        id: (lic as any).id_licitacion || (lic as any).id,
-        codigo: (lic as any).id_licitacion || (lic as any).codigo,
-        nombre: (lic as any).titulo || (lic as any).nombre || 'Sin título',
-        descripcion: null,
-        organismo: (lic as any).organismo || 'Sin organismo',
-        region: null,
-        monto: (lic as any).presupuesto || (lic as any).presupuesto_estimado,
+        id: (lic as any).codigo || (lic as any).id,
+        codigo: (lic as any).codigo,
+        nombre: (lic as any).nombre || (lic as any).titulo || 'Sin título',
+        descripcion: (lic as any).descripcion ?? null,
+        organismo: (lic as any).institucion_nombre || (lic as any).organismo || 'Sin organismo',
+        region: (lic as any).unidad_compra_region ?? null,
+        monto: (lic as any).presupuesto_estimado ?? null,
         fecha_cierre: (lic as any).fecha_cierre,
-        fecha_publicacion: (lic as any).created_at,
+        fecha_publicacion: (lic as any).fecha_publicacion || (lic as any).created_at,
         estado: (lic as any).estado,
         tipo: 'licitacion',
-        link_oficial: (lic as any).link_oficial,
-        match_score: (lic as any).match_score,
+        link_oficial: (lic as any).codigo
+          ? `https://www.mercadopublico.cl/Procurement/Modules/RFB/DetailsAcquisition.aspx?idlicitacion=${(lic as any).codigo}`
+          : null,
+        match_score: (lic as any).match_score ?? null,
         match_encontrado: (lic as any).match_encontrado ?? false,
-        items_count: 0,
+        items_count: licItems.length,
         items_matched: 0,
-        created_at: (lic as any).created_at,
-        items: [],
+        created_at: (lic as any).created_at || (lic as any).fecha_publicacion,
+        items: licItems,
         buyer,
       };
     },
@@ -484,10 +548,10 @@ export function useDescartarOportunidad() {
           .eq('codigo', codigo);
         if (error) throw error;
       } else {
-        const { error } = await supabase
-          .from('licitaciones')
-          .update({ match_encontrado: false, match_score: 0 } as any)
-          .eq('id_licitacion', codigo);
+        const { error } = await (supabase as any)
+          .from('licitaciones_bi')
+          .update({ match_encontrado: false, match_score: 0 })
+          .eq('codigo', codigo);
         if (error) throw error;
       }
     },
