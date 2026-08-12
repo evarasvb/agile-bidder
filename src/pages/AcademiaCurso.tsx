@@ -9,6 +9,9 @@ import {
   Lightbulb,
   CheckCircle2,
   ClipboardList,
+  ShoppingCart,
+  Lock,
+  Check,
 } from "lucide-react";
 import logoFirmavbOriginal from "@/assets/logo-firmavb-original.png";
 import { getCursoBySlug, ACENTO, type Bloque } from "@/data/academiaCursos";
@@ -126,7 +129,68 @@ export default function AcademiaCurso() {
       {/* Contenido */}
       <section className="px-6 pb-12">
         <div className="max-w-4xl mx-auto space-y-8">
-          {curso.modulos.map((modulo, mi) => (
+          {/* Curso premium: página de venta (temario + precio + comprar) */}
+          {curso.premium && (
+            <>
+              <Card className="border-firmavb-blue/30 shadow-lg">
+                <CardContent className="py-8 text-center">
+                  <div className="text-4xl mb-2">{curso.emoji}</div>
+                  <h2 className="text-2xl font-bold text-foreground mb-2">Programa premium</h2>
+                  <p className="text-muted-foreground max-w-xl mx-auto mb-4">
+                    Accede al método completo, paso a paso, para adjudicar de forma constante.
+                  </p>
+                  {curso.precio && (
+                    <p className="text-3xl font-bold text-firmavb-blue mb-5">{curso.precio}</p>
+                  )}
+                  {curso.pagoUrl ? (
+                    <Button
+                      asChild
+                      size="lg"
+                      className="bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2"
+                    >
+                      <a href={curso.pagoUrl} target="_blank" rel="noopener noreferrer">
+                        <ShoppingCart className="h-5 w-5" />
+                        Comprar con Mercado Pago
+                      </a>
+                    </Button>
+                  ) : (
+                    <Button size="lg" disabled className="gap-2">
+                      <Lock className="h-5 w-5" />
+                      Disponible muy pronto
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/50">
+                <CardContent className="py-6">
+                  <h2 className="text-xl font-bold text-firmavb-blue mb-4">Temario del programa</h2>
+                  <div className="space-y-5">
+                    {curso.modulos.map((m, mi) => (
+                      <div key={mi}>
+                        <h3 className="font-semibold text-foreground mb-2">{m.titulo}</h3>
+                        <ul className="space-y-1.5 sm:pl-4">
+                          {m.lecciones.map((l, li) => (
+                            <li
+                              key={li}
+                              className="flex items-start gap-2 text-sm text-muted-foreground"
+                            >
+                              <Check className="h-4 w-4 text-firmavb-blue shrink-0 mt-0.5" />
+                              {l.titulo}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
+
+          {/* Curso gratis: contenido completo */}
+          {!curso.premium &&
+            curso.modulos.map((modulo, mi) => (
             <Card key={mi} className="border-border/50">
               <CardContent className="py-6">
                 <h2 className="text-xl font-bold text-firmavb-blue mb-4 pb-3 border-b border-border/50">

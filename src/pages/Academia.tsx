@@ -152,6 +152,16 @@ const CONTENIDO = {
     formUrl: "", // ← link de tu Google Form
   },
 
+  // --- Asesoría 1:1 de pago (opcional) --------------------------------------
+  asesoriaPago: {
+    activo: true,
+    titulo: "Asesoría 1:1 personalizada",
+    descripcion:
+      "Una sesión enfocada 100% en tu empresa: revisamos tu caso y armamos tu plan para venderle al Estado.",
+    precio: "", // ← pon el precio, ej. "$49.990"
+    pagoUrl: "", // ← pega aquí tu link de pago de Mercado Pago
+  },
+
   // --- Grupo de WhatsApp de proveedores del Estado --------------------------
   whatsappGrupo: {
     descripcion:
@@ -228,7 +238,7 @@ function PendientePorCargar({ texto }: { texto: string }) {
 }
 
 export default function Academia() {
-  const { perfil, banner, youtube, musica, linkedin, libros, cursos, asesoria, whatsappGrupo, contacto } =
+  const { perfil, banner, youtube, musica, linkedin, libros, cursos, asesoria, asesoriaPago, whatsappGrupo, contacto } =
     CONTENIDO;
 
   const videosCargados = youtube.videos.filter((v) => v.id.trim() !== "");
@@ -599,7 +609,7 @@ export default function Academia() {
         id="cursos"
         icon={GraduationCap}
         titulo="Mis cursos"
-        subtitulo="Cursos gratuitos, paso a paso, para venderle al Estado. Ábrelos y aprende a tu ritmo."
+        subtitulo="Cursos gratuitos paso a paso, y un programa premium para llevarte al siguiente nivel."
         alt
       >
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -608,8 +618,17 @@ export default function Academia() {
               key={c.slug}
               className="border-border/50 hover:shadow-md transition-shadow flex flex-col overflow-hidden"
             >
-              <div className={`${ACENTO[c.acento].portada} h-24 flex items-center justify-center`}>
+              <div className={`relative ${ACENTO[c.acento].portada} h-24 flex items-center justify-center`}>
                 <span className="text-5xl drop-shadow-md">{c.emoji}</span>
+                {c.premium ? (
+                  <span className="absolute top-2 right-2 bg-white/90 text-firmavb-blue text-xs font-bold px-2 py-0.5 rounded-full shadow">
+                    💎 Premium
+                  </span>
+                ) : (
+                  <span className="absolute top-2 right-2 bg-white/90 text-[hsl(var(--success))] text-xs font-bold px-2 py-0.5 rounded-full shadow">
+                    Gratis
+                  </span>
+                )}
               </div>
               <CardContent className="py-6 flex flex-col flex-1">
                 <h3 className="font-semibold text-foreground mb-1">{c.titulo}</h3>
@@ -617,10 +636,15 @@ export default function Academia() {
                 <div className="flex flex-wrap gap-2 mb-4">
                   <Badge variant="outline" className="text-xs">{c.nivel}</Badge>
                   <Badge variant="outline" className="text-xs">{c.duracion}</Badge>
+                  {c.premium && c.precio && (
+                    <Badge className="text-xs bg-firmavb-blue/10 text-firmavb-blue border-firmavb-blue/20">
+                      {c.precio}
+                    </Badge>
+                  )}
                 </div>
                 <Button asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2 w-full">
                   <Link to={`/academia/curso/${c.slug}`}>
-                    Ver curso gratis
+                    {c.premium ? "Ver programa" : "Ver curso gratis"}
                   </Link>
                 </Button>
               </CardContent>
@@ -633,28 +657,64 @@ export default function Academia() {
       <Seccion
         id="asesoria"
         icon={ClipboardList}
-        titulo="Asesoría gratuita"
-        subtitulo={asesoria.descripcion}
+        titulo="Asesoría"
+        subtitulo="Elige cómo avanzar: una asesoría 1:1 personalizada, o cuéntame tu caso gratis y te contacto."
       >
-        {asesoria.formUrl ? (
-          <Card className="border-border/50 overflow-hidden">
-            <iframe
-              src={asesoria.formUrl}
-              title="Cuestionario de asesoría gratuita"
-              className="w-full"
-              style={{ height: 720 }}
-              loading="lazy"
-            >
-              Cargando cuestionario…
-            </iframe>
-          </Card>
-        ) : (
-          <Card className="border-border/50">
-            <CardContent className="py-8">
-              <AcademiaLeadForm />
-            </CardContent>
-          </Card>
-        )}
+        <div className="space-y-6">
+          {asesoriaPago.activo && (
+            <Card className="border-firmavb-blue/30 bg-gradient-to-br from-firmavb-blue/5 to-transparent">
+              <CardContent className="py-6 md:flex items-center justify-between gap-6">
+                <div>
+                  <Badge className="mb-2 bg-firmavb-blue/10 text-firmavb-blue border-firmavb-blue/20">
+                    Recomendado · 1:1
+                  </Badge>
+                  <h3 className="text-lg font-semibold text-foreground">{asesoriaPago.titulo}</h3>
+                  <p className="text-sm text-muted-foreground max-w-xl">
+                    {asesoriaPago.descripcion}
+                  </p>
+                </div>
+                <div className="mt-4 md:mt-0 text-center shrink-0">
+                  {asesoriaPago.precio && (
+                    <p className="text-2xl font-bold text-firmavb-blue mb-2">{asesoriaPago.precio}</p>
+                  )}
+                  {asesoriaPago.pagoUrl ? (
+                    <Button asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2">
+                      <a href={asesoriaPago.pagoUrl} target="_blank" rel="noopener noreferrer">
+                        Agendar (con pago)
+                      </a>
+                    </Button>
+                  ) : (
+                    <Button disabled>Muy pronto</Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="text-center text-sm text-muted-foreground">
+            — o cuéntame tu caso gratis —
+          </div>
+
+          {asesoria.formUrl ? (
+            <Card className="border-border/50 overflow-hidden">
+              <iframe
+                src={asesoria.formUrl}
+                title="Cuestionario de asesoría gratuita"
+                className="w-full"
+                style={{ height: 720 }}
+                loading="lazy"
+              >
+                Cargando cuestionario…
+              </iframe>
+            </Card>
+          ) : (
+            <Card className="border-border/50">
+              <CardContent className="py-8">
+                <AcademiaLeadForm />
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </Seccion>
 
       {/* Comunidad WhatsApp + Contacto */}
