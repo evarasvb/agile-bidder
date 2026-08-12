@@ -40,7 +40,15 @@ const CONTENIDO = {
     titulo: "Fundador de FirmaVB · Experto en Compras Públicas",
     bio: "Ayudo a empresas a vender al Estado de forma constante y rentable. Aquí reúno mis videos, mi música, mis libros, mis cursos y la comunidad de proveedores del Estado.",
     // Reemplaza por la url de tu foto (o déjalo en null para usar las iniciales)
-    fotoUrl: null as string | null,
+    fotoUrl: "/media/academia/foto-enrique.jpg" as string | null,
+  },
+
+  // --- Banner destacado -----------------------------------------------------
+  // Imagen grande destacada. Deja imagenUrl en "" para ocultarlo.
+  banner: {
+    imagenUrl: "/media/academia/convenio-software.jpg",
+    alt: "Postula al Convenio Marco de Software",
+    enlaceUrl: "#asesoria", // a dónde lleva al hacer clic (# = sección de esta página)
   },
 
   // --- Videos de YouTube ----------------------------------------------------
@@ -66,11 +74,32 @@ const CONTENIDO = {
   // --- Posts de LinkedIn ----------------------------------------------------
   linkedin: {
     perfilUrl: "https://www.linkedin.com/in/evaras", // ← tu perfil de LinkedIn
+    // Cada post puede tener una imagen (imagenUrl) y/o un enlace a la
+    // publicación (url). Si no hay url, la tarjeta solo muestra la imagen.
     posts: [
+      {
+        titulo: "Postula al Convenio Marco de Software",
+        resumen: "Oportunidades que impulsan la innovación y el crecimiento.",
+        url: "",
+        imagenUrl: "/media/academia/convenio-software.jpg",
+      },
+      {
+        titulo: "¿Tu empresa quiere aterrizar en Chile?",
+        resumen: "Softlanding en Chile: acompaño a empresas extranjeras a instalarse y crecer.",
+        url: "",
+        imagenUrl: "/media/academia/softlanding.jpg",
+      },
+      {
+        titulo: "Gracias, comunidad: 31.355 seguidores",
+        resumen: "Seguimos creciendo, aprendiendo y compartiendo valor juntos.",
+        url: "",
+        imagenUrl: "/media/academia/gracias-comunidad.jpg",
+      },
       {
         titulo: "Se abrió el Convenio Marco de Desarrollo",
         resumen: "Mi publicación sobre la apertura de este Convenio Marco en Mercado Público.",
         url: "https://www.linkedin.com/posts/evaras_se-abri%C3%B3-el-convenio-marco-de-desarrollo-ugcPost-7485053898337218560-oIVj/",
+        imagenUrl: null as string | null,
       },
     ],
   },
@@ -179,12 +208,14 @@ function PendientePorCargar({ texto }: { texto: string }) {
 }
 
 export default function Academia() {
-  const { perfil, youtube, musica, linkedin, libros, cursos, asesoria, whatsappGrupo, contacto } =
+  const { perfil, banner, youtube, musica, linkedin, libros, cursos, asesoria, whatsappGrupo, contacto } =
     CONTENIDO;
 
   const videosCargados = youtube.videos.filter((v) => v.id.trim() !== "");
   const musicaCargada = musica.filter((m) => m.url.trim() !== "");
-  const postsCargados = linkedin.posts.filter((p) => p.url.trim() !== "");
+  const postsCargados = linkedin.posts.filter(
+    (p) => (p.url && p.url.trim() !== "") || p.imagenUrl
+  );
   const librosCargados = libros.filter((l) => l.titulo.trim() !== "" && l.titulo !== "Título del libro");
   const cursosCargados = cursos.filter((c) => c.titulo.trim() !== "" && c.titulo !== "Nombre del curso");
 
@@ -281,6 +312,29 @@ export default function Academia() {
           </div>
         </div>
       </section>
+
+      {/* Banner destacado */}
+      {banner.imagenUrl && (
+        <section className="px-6 pb-6">
+          <div className="max-w-3xl mx-auto">
+            {banner.enlaceUrl ? (
+              <a href={banner.enlaceUrl} className="block group">
+                <img
+                  src={banner.imagenUrl}
+                  alt={banner.alt}
+                  className="w-full rounded-2xl shadow-lg border border-border/50 transition-transform group-hover:scale-[1.01]"
+                />
+              </a>
+            ) : (
+              <img
+                src={banner.imagenUrl}
+                alt={banner.alt}
+                className="w-full rounded-2xl shadow-lg border border-border/50"
+              />
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Videos de YouTube */}
       <Seccion
@@ -385,26 +439,59 @@ export default function Academia() {
         alt
       >
         {postsCargados.length > 0 ? (
-          <div className="grid sm:grid-cols-2 gap-6">
-            {postsCargados.map((p, i) => (
-              <Card key={i} className="border-border/50 hover:shadow-md transition-shadow">
-                <CardContent className="py-5">
-                  <div className="flex items-center gap-2 mb-2 text-firmavb-blue">
-                    <Linkedin className="h-4 w-4" />
-                    <span className="text-xs font-medium uppercase tracking-wide">LinkedIn</span>
-                  </div>
-                  <h3 className="font-semibold text-foreground mb-1">{p.titulo}</h3>
-                  <p className="text-sm text-muted-foreground mb-4">{p.resumen}</p>
-                  <Button size="sm" variant="outline" asChild className="gap-2">
-                    <a href={p.url} target="_blank" rel="noopener noreferrer">
-                      Ver publicación
-                      <ExternalLink className="h-3 w-3" />
+          <>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {postsCargados.map((p, i) => (
+                <Card
+                  key={i}
+                  className="border-border/50 hover:shadow-md transition-shadow overflow-hidden flex flex-col"
+                >
+                  {p.imagenUrl && (
+                    <a
+                      href={p.url || linkedin.perfilUrl || undefined}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block bg-muted"
+                    >
+                      <img
+                        src={p.imagenUrl}
+                        alt={p.titulo}
+                        loading="lazy"
+                        className="w-full aspect-square object-cover hover:opacity-95 transition-opacity"
+                      />
                     </a>
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  )}
+                  <CardContent className="py-5 flex flex-col flex-1">
+                    <div className="flex items-center gap-2 mb-2 text-firmavb-blue">
+                      <Linkedin className="h-4 w-4" />
+                      <span className="text-xs font-medium uppercase tracking-wide">LinkedIn</span>
+                    </div>
+                    <h3 className="font-semibold text-foreground mb-1">{p.titulo}</h3>
+                    <p className="text-sm text-muted-foreground mb-4 flex-1">{p.resumen}</p>
+                    {p.url && (
+                      <Button size="sm" variant="outline" asChild className="gap-2 self-start">
+                        <a href={p.url} target="_blank" rel="noopener noreferrer">
+                          Ver publicación
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            {linkedin.perfilUrl && (
+              <div className="mt-6">
+                <Button variant="outline" asChild className="gap-2">
+                  <a href={linkedin.perfilUrl} target="_blank" rel="noopener noreferrer">
+                    <Linkedin className="h-4 w-4" />
+                    Ver mi perfil de LinkedIn
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </Button>
+              </div>
+            )}
+          </>
         ) : (
           <div className="flex flex-col items-start gap-4">
             <PendientePorCargar texto="Aún no hay posts cargados. Pega los links de tus publicaciones de LinkedIn en el bloque CONTENIDO." />
