@@ -262,43 +262,61 @@
     const productsSection = document.createElement('div');
     productsSection.style.cssText = 'margin-bottom: 20px;';
     
+    const conMatch = productos.filter(p => p.nombre_producto && (p.precio_unitario || 0) > 0).length;
     const productsTitle = document.createElement('h3');
     productsTitle.style.cssText = 'font-size: 14px; color: #374151; margin-bottom: 12px;';
-    productsTitle.textContent = `Productos a Ofertar (${productos.length})`;
-    
+    productsTitle.textContent = `Match por producto (${conMatch}/${productos.length} desde tu inventario)`;
+
     const productsList = document.createElement('div');
-    productsList.style.cssText = 'max-height: 200px; overflow-y: auto;';
-    
-    // Build product items safely with textContent
+    productsList.style.cssText = 'max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;';
+
+    // Cada ítem muestra: lo solicitado → el producto de tu inventario que hizo match → precio
     productos.forEach(p => {
+      const tieneMatch = !!p.nombre_producto && (p.precio_unitario || 0) > 0;
+
       const productItem = document.createElement('div');
-      productItem.style.cssText = `
-        background: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 12px;
-        margin-bottom: 8px;
-      `;
-      
-      const productName = document.createElement('div');
-      productName.style.cssText = 'font-weight: 600; font-size: 13px; color: #1e293b; margin-bottom: 4px;';
-      productName.textContent = p.nombre || p.sku || 'Producto';
-      
-      const productDetails = document.createElement('div');
-      productDetails.style.cssText = 'display: flex; justify-content: space-between; font-size: 12px; color: #64748b;';
-      
-      const quantitySpan = document.createElement('span');
-      quantitySpan.textContent = `${p.cantidad || 1} ${p.unidad || 'UN'}`;
-      
-      const priceSpan = document.createElement('span');
-      priceSpan.style.cssText = 'color: #059669; font-weight: 600;';
-      priceSpan.textContent = `$${(p.precio_total || 0).toLocaleString('es-CL')}`;
-      
-      productDetails.appendChild(quantitySpan);
-      productDetails.appendChild(priceSpan);
-      
-      productItem.appendChild(productName);
-      productItem.appendChild(productDetails);
+      productItem.style.cssText = `background: white; border: 1px solid #e2e8f0; border-left: 4px solid ${tieneMatch ? '#22c55e' : '#f59e0b'}; border-radius: 8px; padding: 10px 12px;`;
+
+      // Lo que pide Mercado Público
+      const solicitado = document.createElement('div');
+      solicitado.style.cssText = 'font-size: 12px; color: #64748b; margin-bottom: 3px;';
+      solicitado.textContent = `Solicitado: ${p.nombre_solicitado || 'Producto'}`;
+      productItem.appendChild(solicitado);
+
+      // El match de tu inventario (o aviso si no hubo)
+      const matchLine = document.createElement('div');
+      matchLine.style.cssText = 'font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;';
+      if (tieneMatch) {
+        matchLine.style.color = '#1e293b';
+        const name = document.createElement('span');
+        name.textContent = `→ ${p.nombre_producto}${p.sku ? ' · ' + p.sku : ''}`;
+        matchLine.appendChild(name);
+        if (p.match_score != null) {
+          const score = p.match_score;
+          const badge = document.createElement('span');
+          const c = score >= 60 ? ['#dcfce7', '#166534'] : ['#fef9c3', '#854d0e'];
+          badge.style.cssText = `font-size: 11px; padding: 1px 7px; border-radius: 8px; background: ${c[0]}; color: ${c[1]}; font-weight: 600;`;
+          badge.textContent = `match ${score}%`;
+          matchLine.appendChild(badge);
+        }
+      } else {
+        matchLine.style.color = '#b45309';
+        matchLine.textContent = '⚠ Sin coincidencia en tu inventario — ponle precio en el portal';
+      }
+      productItem.appendChild(matchLine);
+
+      // Cantidad × precio unitario = subtotal
+      const precios = document.createElement('div');
+      precios.style.cssText = 'display: flex; justify-content: space-between; font-size: 12px; color: #64748b; margin-top: 5px;';
+      const cant = document.createElement('span');
+      cant.textContent = `${p.cantidad || 1} × $${(p.precio_unitario || 0).toLocaleString('es-CL')}`;
+      const tot = document.createElement('span');
+      tot.style.cssText = 'color: #059669; font-weight: 700;';
+      tot.textContent = `$${(p.precio_total || 0).toLocaleString('es-CL')}`;
+      precios.appendChild(cant);
+      precios.appendChild(tot);
+      productItem.appendChild(precios);
+
       productsList.appendChild(productItem);
     });
     
