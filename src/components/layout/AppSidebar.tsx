@@ -96,7 +96,12 @@ const navItems: NavItem[] = [
   },
 ];
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  open?: boolean;
+  onClose?: () => void;
+}
+
+export function AppSidebar({ open = false, onClose }: AppSidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
@@ -141,7 +146,21 @@ export function AppSidebar() {
   };
 
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
+    <>
+      {/* Fondo oscuro al abrir el menú en móvil */}
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        className={cn(
+          "fixed left-0 top-0 z-50 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col transition-transform duration-200 lg:translate-x-0",
+          open ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
       {/* Logo Header */}
       <div className="flex h-16 items-center justify-center px-5 border-b border-sidebar-border bg-sidebar">
         <img 
@@ -209,6 +228,7 @@ export function AppSidebar() {
                             <li key={child.url}>
                               <NavLink
                                 to={child.url}
+                                onClick={() => onClose?.()}
                                 className={cn(
                                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
                                   isChildActive
@@ -228,6 +248,7 @@ export function AppSidebar() {
                 ) : (
                   <NavLink
                     to={item.url}
+                    onClick={() => onClose?.()}
                     className={cn(
                       "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150",
                       isItemActive
@@ -258,6 +279,7 @@ export function AppSidebar() {
           Cerrar Sesion
         </button>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

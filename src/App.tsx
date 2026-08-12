@@ -7,6 +7,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AdminOnlyRoute } from "@/components/auth/AdminOnlyRoute";
 import { ChatWidget } from "@/components/support/ChatWidget";
+import { ScrollToTop } from "@/components/ScrollToTop";
 
 // Auth
 import Index from "./pages/Index";
@@ -92,6 +93,7 @@ const App = () => (
       <Sonner />
       <ChatWidget />
       <BrowserRouter>
+        <ScrollToTop />
         <Routes>
           {/* ========== RUTAS PUBLICAS ========== */}
           <Route path="/" element={<Index />} />

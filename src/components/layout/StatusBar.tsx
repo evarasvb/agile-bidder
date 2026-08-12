@@ -21,15 +21,15 @@ export function StatusBar() {
 
   return (
     <header className="sticky top-0 z-30 h-16 border-b border-border bg-white/95 backdrop-blur-sm shadow-sm">
-      <div className="flex h-full items-center justify-between px-6">
+      <div className="flex h-full items-center justify-between px-4 sm:px-6">
         {/* Left: Page Title Area */}
         <div className="flex items-center gap-4">
-          <h2 className="text-lg font-semibold text-foreground">Centro de Control</h2>
+          <h2 className="text-base sm:text-lg font-semibold text-foreground">Centro de Control</h2>
           <SystemHealthIndicator />
         </div>
 
-        {/* Right: Status Indicators */}
-        <div className="flex items-center gap-6">
+        {/* Right: Status Indicators (ocultos en móvil para no desbordar) */}
+        <div className="hidden lg:flex items-center gap-6">
           {/* Extension Status with Realtime */}
           <Tooltip>
             <TooltipTrigger asChild>
@@ -110,10 +110,10 @@ export function StatusBar() {
 
       {/* Alert Banner */}
       {!isLoading && !isConnected && (
-        <div className="bg-warning/10 border-b border-warning/20 px-6 py-2 flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-warning" />
-          <span className="text-sm text-warning font-medium">
-            ⚠️ Extensión no detectada. Por favor, inicia sesión en Mercado Público para activar Auto-Bids.
+        <div className="bg-warning/10 border-b border-warning/20 px-4 sm:px-6 py-2 flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
+          <span className="text-xs sm:text-sm text-warning font-medium">
+            ⚠️ Extensión no detectada. Inicia sesión en Mercado Público para activar Auto-Bids.
           </span>
         </div>
       )}
