@@ -71,8 +71,11 @@ jobs:
         env:
           FECHA: ${{ steps.fecha.outputs.FECHA }}
         run: |
-          echo "=== Sincronizando Licitaciones ==="
-          echo "Fecha: $FECHA"
+          echo "=== Sincronizando Licitaciones ACTIVAS ==="
+          # Antes se sincronizaba por fecha del día (mayormente cerradas). El panel
+          # necesita las ACTIVAS, así que pedimos estado=activas: trae TODAS las
+          # licitaciones abiertas hoy (~4.500). El upsert por lotes lo hace en
+          # segundos. La función ignora `fecha` cuando se manda `estado`.
 
           MAX_RETRIES=3
           RETRY_DELAY=30
@@ -84,14 +87,14 @@ jobs:
             echo "Intento $attempt de $MAX_RETRIES..."
 
             http_code=$(curl -s -o /tmp/response_lic.json -w "%{http_code}" \
-              --max-time 120 \
+              --max-time 180 \
               --retry 2 \
               --retry-delay 10 \
               -X POST \
               "$SUPABASE_URL/functions/v1/sync-licitaciones-bi" \
               -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
               -H "Content-Type: application/json" \
-              -d "{\"fecha\": \"$FECHA\", \"ticket\": \"$MP_API_TICKET\"}")
+              -d "{\"estado\": \"activas\", \"ticket\": \"$MP_API_TICKET\"}")
 
             echo "HTTP Status: $http_code"
 
