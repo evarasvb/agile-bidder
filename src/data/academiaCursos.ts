@@ -14,7 +14,13 @@ export type Bloque =
   | { tipo: "subtitulo"; texto: string }
   | { tipo: "lista"; items: string[] }
   | { tipo: "tip"; texto: string }
-  | { tipo: "descarga"; texto: string; url: string };
+  | { tipo: "descarga"; texto: string; url: string }
+  // Caso de éxito / ejemplo real para ilustrar el punto.
+  | { tipo: "caso"; titulo?: string; texto: string }
+  // Dato duro (ej. cifras reales de ChileCompra), con fuente opcional.
+  | { tipo: "dato"; texto: string; fuente?: string }
+  // Llamado a la acción (ej. agendar una sesión en vivo). url externa.
+  | { tipo: "cta"; texto: string; url: string };
 
 export interface Leccion {
   titulo: string;

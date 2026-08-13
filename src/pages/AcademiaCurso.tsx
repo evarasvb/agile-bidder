@@ -19,6 +19,8 @@ import {
   Unlock,
   Download,
   Video,
+  TrendingUp,
+  Calendar,
 } from "lucide-react";
 import logoFirmavbOriginal from "@/assets/logo-firmavb-original.png";
 import { supabase } from "@/integrations/supabase/client";
@@ -66,6 +68,45 @@ function BloqueView({ bloque }: { bloque: Bloque }) {
           className="my-4 inline-flex items-center gap-2 rounded-xl border border-[hsl(var(--success))]/30 bg-[hsl(var(--success))]/10 px-4 py-3 text-sm font-semibold text-[hsl(var(--success))] hover:bg-[hsl(var(--success))]/20 transition-colors"
         >
           <Download className="h-4 w-4" />
+          {bloque.texto}
+        </a>
+      );
+    case "caso":
+      return (
+        <div className="my-4 rounded-xl border border-[hsl(var(--success))]/25 bg-[hsl(var(--success))]/5 p-4">
+          <div className="flex items-center gap-2 mb-1.5">
+            <TrendingUp className="h-4 w-4 text-[hsl(var(--success))] shrink-0" />
+            <span className="text-xs font-bold uppercase tracking-wide text-[hsl(var(--success))]">
+              {bloque.titulo || "Caso real"}
+            </span>
+          </div>
+          <p className="text-sm text-foreground leading-relaxed">{bloque.texto}</p>
+        </div>
+      );
+    case "dato":
+      return (
+        <div className="my-4 flex items-start gap-3 rounded-xl border border-firmavb-blue/20 bg-firmavb-blue/[0.07] p-4">
+          <BarChart3 className="h-5 w-5 text-firmavb-blue shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm text-foreground leading-relaxed">
+              <span className="font-semibold text-firmavb-blue">Dato: </span>
+              {bloque.texto}
+            </p>
+            {bloque.fuente && (
+              <p className="text-xs text-muted-foreground mt-1">Fuente: {bloque.fuente}</p>
+            )}
+          </div>
+        </div>
+      );
+    case "cta":
+      return (
+        <a
+          href={bloque.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="my-4 inline-flex items-center gap-2 rounded-xl bg-firmavb-blue px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-firmavb-blue/90 transition-colors"
+        >
+          <Calendar className="h-4 w-4" />
           {bloque.texto}
         </a>
       );
