@@ -706,6 +706,84 @@ export const CURSOS: Curso[] = [
       },
     ],
   },
+
+  // ===========================================================================
+  // SAGA "VÉNDELE AL ESTADO" (cursos premium por libro)
+  // ===========================================================================
+  {
+    slug: "saga-1-fundamentos",
+    emoji: "📘",
+    titulo: "Saga 1 · Fundamentos del Sistema",
+    descripcion:
+      "El punto de partida: cómo funciona ChileCompra, el marco legal (Ley 19.886), cómo inscribirte y quedar hábil, y dejar tu perfil listo para vender.",
+    nivel: "Principiante",
+    duracion: "Curso 1 de la saga",
+    acento: "azul",
+    premium: true,
+    precio: "$45.000",
+    pagoUrl: "", // ← pega tu link de pago de Mercado Pago ($45.000)
+    modulos: [
+      {
+        titulo: "Módulo 0 · Bienvenida y mentalidad",
+        lecciones: [
+          { titulo: "Bienvenida: lo que vas a lograr", bloques: [] },
+          { titulo: "Los 3 mitos y la mentalidad ganadora", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Módulo 1 · Cómo funciona el sistema",
+        lecciones: [
+          { titulo: "Cómo funciona ChileCompra", bloques: [] },
+          { titulo: "Marco legal y umbrales (Ley 19.886)", bloques: [] },
+          { titulo: "Los organismos que te compran", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Módulo 2 · Cómo entrar al sistema",
+        lecciones: [
+          { titulo: "Regístrate en ChileProveedores", bloques: [] },
+          { titulo: "Estado hábil: tu pasaporte para cotizar", bloques: [] },
+          { titulo: "Configura tu perfil", bloques: [] },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "saga-2-oportunidades",
+    emoji: "🔎",
+    titulo: "Saga 2 · Encontrar Oportunidades",
+    descripcion:
+      "Cómo navegar y filtrar Mercado Público, decidir qué licitaciones valen la pena, leer las bases con método y usar el foro de preguntas a tu favor.",
+    nivel: "Principiante · Intermedio",
+    duracion: "Curso 2 de la saga",
+    acento: "verde",
+    premium: true,
+    precio: "$45.000",
+    pagoUrl: "", // ← pega tu link de pago de Mercado Pago ($45.000)
+    modulos: [
+      {
+        titulo: "Módulo 1 · Navega y filtra",
+        lecciones: [
+          { titulo: "Navegando Mercado Público", bloques: [] },
+          { titulo: "¿Vale la pena esta licitación?", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Módulo 2 · Lee bases y usa el foro",
+        lecciones: [
+          { titulo: "Leer bases sin morir", bloques: [] },
+          { titulo: "El foro de preguntas: tu arma secreta", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Módulo 3 · Estrategia de selección",
+        lecciones: [
+          { titulo: "Participar o no: criterios de decisión", bloques: [] },
+          { titulo: "Analiza la competencia y el historial", bloques: [] },
+        ],
+      },
+    ],
+  },
 ];
 
 export function getCursoBySlug(slug: string): Curso | undefined {
