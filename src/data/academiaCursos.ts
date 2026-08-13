@@ -611,19 +611,19 @@ export const CURSOS: Curso[] = [
     sesionEnVivo: { incluida: true, minutos: 45, agendarUrl: "https://calendar.app.google/ccFTxwSnuHJbnsda8" },
     modulos: [
       {
-        titulo: "Módulo 1 · Los mecanismos y cuál te conviene",
+        titulo: "Módulo 1 · El terreno de juego (y cómo pensar)",
         lecciones: [
-          { titulo: "La Compra Ágil a fondo", bloques: [] },
-          { titulo: "Licitación vs Compra Ágil: cuándo usar cada una", bloques: [] },
-          { titulo: "Convenios de suministro y Convenio Marco", bloques: [] },
+          { titulo: "Los 3 mitos que matan al proveedor nuevo", bloques: [] },
+          { titulo: "Compra Ágil, Licitación, Convenio Marco y Trato Directo", bloques: [] },
+          { titulo: "Empieza donde hay menos pelea", bloques: [] },
         ],
       },
       {
-        titulo: "Módulo 2 · Cómo estudiar una licitación como experto",
+        titulo: "Módulo 2 · Estudia la licitación como experto",
         lecciones: [
-          { titulo: "Anatomía de una licitación: lee las bases con método", bloques: [] },
-          { titulo: "Estudia el pasado: adjudicados y ofertas técnicas anteriores", bloques: [] },
-          { titulo: "Investiga a la institución (situación pública actual)", bloques: [] },
+          { titulo: "Lee las bases con método (y el foro como arma secreta)", bloques: [] },
+          { titulo: "Estudia el pasado: adjudicados y ofertas técnicas", bloques: [] },
+          { titulo: "Investiga a la institución", bloques: [] },
         ],
       },
       {
@@ -631,14 +631,15 @@ export const CURSOS: Curso[] = [
         lecciones: [
           { titulo: "Conductas de pago: ¿este comprador paga bien?", bloques: [] },
           { titulo: "Detecta fragmentación: ¿hay una compra ágil de lo mismo?", bloques: [] },
-          { titulo: "Simula tu presentación antes de ofertar", bloques: [] },
+          { titulo: "Arma tus 3 sobres y simula antes de enviar", bloques: [] },
         ],
       },
       {
-        titulo: "Módulo 4 · Ejecuta y automatiza con FirmaVB",
+        titulo: "Módulo 4 · Precio ganador, garantías y automatización",
         lecciones: [
-          { titulo: "Arma tu oferta ganadora (técnica + precio)", bloques: [] },
-          { titulo: "Automatiza búsqueda, match y postulación", bloques: [] },
+          { titulo: "Estrategia de precio (sin regalar tu margen)", bloques: [] },
+          { titulo: "Garantías, adjudicación y ejecución sin morir", bloques: [] },
+          { titulo: "Automatiza con FirmaVB (y con IA)", bloques: [] },
         ],
       },
     ],
