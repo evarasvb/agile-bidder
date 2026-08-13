@@ -857,6 +857,42 @@ export const CURSOS: Curso[] = [
       },
     ],
   },
+  {
+    slug: "saga-5-ejecutar",
+    emoji: "🤝",
+    titulo: "Saga 5 · Ejecutar Contratos",
+    descripcion:
+      "Ganaste, ahora cumple: firma de contrato y garantías, ejecución sin morir (plazos, entregas, facturación) y cómo resolver problemas y modificaciones.",
+    nivel: "Intermedio",
+    duracion: "Curso 5 de la saga",
+    acento: "verde",
+    premium: true,
+    precio: "$45.000",
+    pagoUrl: "", // ← pega tu link de pago de Mercado Pago ($45.000)
+    modulos: [
+      {
+        titulo: "Módulo 1 · Firma de contrato y garantías",
+        lecciones: [
+          { titulo: "Firma el contrato a tiempo", bloques: [] },
+          { titulo: "Garantías y boletas", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Módulo 2 · Ejecución sin morir",
+        lecciones: [
+          { titulo: "Cumple plazos y entrega exacto", bloques: [] },
+          { titulo: "Documenta todo y factura bien", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Módulo 3 · Problemas comunes",
+        lecciones: [
+          { titulo: "Resolver incumplimientos", bloques: [] },
+          { titulo: "Modificaciones al contrato", bloques: [] },
+        ],
+      },
+    ],
+  },
 ];
 
 export function getCursoBySlug(slug: string): Curso | undefined {
