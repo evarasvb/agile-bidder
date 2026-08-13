@@ -608,7 +608,7 @@ export const CURSOS: Curso[] = [
     premium: true,
     precio: "$45.000",
     pagoUrl: "https://mpago.la/345ua7Y", // link de pago de Mercado Pago
-    sesionEnVivo: { incluida: true, minutos: 45, agendarUrl: "" }, // agendarUrl "" = coordinar por WhatsApp
+    sesionEnVivo: { incluida: true, minutos: 45, agendarUrl: "https://calendar.app.google/ccFTxwSnuHJbnsda8" },
     modulos: [
       {
         titulo: "Módulo 1 · Los mecanismos y cuál te conviene",
