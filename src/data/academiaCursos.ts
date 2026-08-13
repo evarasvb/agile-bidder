@@ -821,6 +821,42 @@ export const CURSOS: Curso[] = [
       },
     ],
   },
+  {
+    slug: "saga-4-ganar",
+    emoji: "🏅",
+    titulo: "Saga 4 · Ganar Licitaciones",
+    descripcion:
+      "La recta final: firma electrónica y verificación, cómo te evalúan, responder aclaraciones a tiempo, entender el acta de adjudicación y qué hacer si no ganas.",
+    nivel: "Intermedio",
+    duracion: "Curso 4 de la saga",
+    acento: "azul",
+    premium: true,
+    precio: "$45.000",
+    pagoUrl: "", // ← pega tu link de pago de Mercado Pago ($45.000)
+    modulos: [
+      {
+        titulo: "Módulo 1 · La presentación final",
+        lecciones: [
+          { titulo: "Firma electrónica: tu sello legal", bloques: [] },
+          { titulo: "Verificación final antes de enviar", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Módulo 2 · El proceso de evaluación",
+        lecciones: [
+          { titulo: "Cómo evalúan tu oferta", bloques: [] },
+          { titulo: "Responder aclaraciones a tiempo", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Módulo 3 · Adjudicación",
+        lecciones: [
+          { titulo: "Entender el acta de adjudicación", bloques: [] },
+          { titulo: "Qué hacer si no ganas", bloques: [] },
+        ],
+      },
+    ],
+  },
 ];
 
 export function getCursoBySlug(slug: string): Curso | undefined {
