@@ -929,6 +929,42 @@ export const CURSOS: Curso[] = [
       },
     ],
   },
+  {
+    slug: "saga-7-automatizacion",
+    emoji: "🤖",
+    titulo: "Saga 7 · Automatización y Tecnología",
+    descripcion:
+      "El cierre: alertas automáticas, plantillas y dashboard, IA para analizar bases y preparar ofertas, y tu sistema completo con FirmaVB (búsqueda, match y postulación).",
+    nivel: "Todos los niveles",
+    duracion: "Curso 7 de la saga",
+    acento: "azul",
+    premium: true,
+    precio: "$45.000",
+    pagoUrl: "", // ← pega tu link de pago de Mercado Pago ($45.000)
+    modulos: [
+      {
+        titulo: "Módulo 1 · Herramientas para no quemarte",
+        lecciones: [
+          { titulo: "Alertas automáticas de oportunidades", bloques: [] },
+          { titulo: "Plantillas, checklists y dashboard", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Módulo 2 · IA para licitaciones",
+        lecciones: [
+          { titulo: "Usa IA para analizar bases", bloques: [] },
+          { titulo: "Genera y revisa propuestas con IA", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Módulo 3 · Tu sistema completo con FirmaVB",
+        lecciones: [
+          { titulo: "Búsqueda, match y ofertas automáticas", bloques: [] },
+          { titulo: "Postula en minutos con la extensión", bloques: [] },
+        ],
+      },
+    ],
+  },
 ];
 
 export function getCursoBySlug(slug: string): Curso | undefined {
