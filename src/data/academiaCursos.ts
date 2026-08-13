@@ -893,6 +893,42 @@ export const CURSOS: Curso[] = [
       },
     ],
   },
+  {
+    slug: "saga-6-escalar",
+    emoji: "📈",
+    titulo: "Saga 6 · Escalar tu Negocio",
+    descripcion:
+      "De proveedor a empresa: las etapas de crecimiento y métricas, construir equipo y sistematizar, gestionar múltiples contratos y flujo de caja, y entrar al Convenio Marco.",
+    nivel: "Intermedio · Avanzado",
+    duracion: "Curso 6 de la saga",
+    acento: "ambar",
+    premium: true,
+    precio: "$45.000",
+    pagoUrl: "", // ← pega tu link de pago de Mercado Pago ($45.000)
+    modulos: [
+      {
+        titulo: "Módulo 1 · De proveedor a empresa",
+        lecciones: [
+          { titulo: "Las 3 etapas de crecimiento", bloques: [] },
+          { titulo: "Construye equipo y sistematiza", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Módulo 2 · Gestiona múltiples contratos",
+        lecciones: [
+          { titulo: "Control de contratos activos", bloques: [] },
+          { titulo: "Flujo de caja y capital de trabajo", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Módulo 3 · Convenio Marco y relaciones",
+        lecciones: [
+          { titulo: "Convenio Marco: el santo grial", bloques: [] },
+          { titulo: "Relaciones de largo plazo (con límites)", bloques: [] },
+        ],
+      },
+    ],
+  },
 ];
 
 export function getCursoBySlug(slug: string): Curso | undefined {
