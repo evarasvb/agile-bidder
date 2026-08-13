@@ -110,6 +110,18 @@ export const CURSOS: Curso[] = [
                 ],
               },
               {
+                tipo: "subtitulo",
+                texto: "Los 3 mitos que frenan a todos",
+              },
+              {
+                tipo: "lista",
+                items: [
+                  "\"El Estado paga tarde y mal\": falso. Paga en plazos definidos por ley (30 días); suele ser más predecible que un cliente privado.",
+                  "\"Solo ganan los que tienen pituto\": falso. ChileCompra es de los sistemas más transparentes del mundo; todo queda registrado y gana la mejor oferta.",
+                  "\"Necesitas ser grande\": falso. El 70% de las compras del Estado son de menos de 100 UTM. Ahí está tu oportunidad.",
+                ],
+              },
+              {
                 tipo: "tip",
                 texto:
                   "La clave del negocio no es ganar una vez, es ganar de forma constante. Por eso conviene sistematizar: buscar, ofertar y hacer seguimiento como un proceso, no como algo ocasional.",
@@ -122,7 +134,17 @@ export const CURSOS: Curso[] = [
               {
                 tipo: "parrafo",
                 texto:
-                  "No todas las compras funcionan igual. Según el monto y la urgencia, el Estado usa distintos mecanismos. Conocerlos te permite elegir por dónde entrar.",
+                  "No todas las compras funcionan igual. Según el monto y la urgencia, el Estado usa distintos mecanismos (todo bajo la Ley 19.886 y sus principios: libre concurrencia, igualdad, transparencia y probidad). Conocerlos te permite elegir por dónde entrar.",
+              },
+              {
+                tipo: "lista",
+                items: [
+                  "Menos de 3 UTM: compra directa, sin cotizar.",
+                  "3 a 10 UTM: mínimo 3 cotizaciones.",
+                  "10 a 100 UTM: licitación privada o convenio (aquí vive la Compra Ágil).",
+                  "100 a 1.000 UTM: licitación pública. Más de 1.000 UTM: con más requisitos y garantías.",
+                  "Referencia: la UTM vale aprox. $65.000, así que 100 UTM ≈ $6,5 millones (verifica el valor vigente).",
+                ],
               },
               {
                 tipo: "subtitulo",
@@ -300,7 +322,7 @@ export const CURSOS: Curso[] = [
               {
                 tipo: "parrafo",
                 texto:
-                  "La Compra Ágil es un mecanismo simple y rápido para compras de bajo monto (hasta 100 UTM). El organismo publica lo que necesita, los proveedores cotizan, y se adjudica a la mejor oferta. Sin bases complejas ni garantías.",
+                  "La Compra Ágil es un mecanismo simple y rápido para compras de bajo monto (hasta 100 UTM ≈ $6,5 millones). El organismo publica lo que necesita, los proveedores cotizan, y se adjudica a la mejor oferta. Sin bases complejas ni garantías. Dato clave: el 70% de las compras del Estado son bajo 100 UTM, así que aquí está la mayor cantidad de oportunidades.",
               },
               {
                 tipo: "lista",
@@ -472,7 +494,7 @@ export const CURSOS: Curso[] = [
               {
                 tipo: "tip",
                 texto:
-                  "Estar en un Convenio Marco es como tener tu producto en la góndola: la clave luego es tener buena ficha, buen precio y cumplir.",
+                  "El Convenio Marco es el 'santo grial': ventas constantes sin cotizar cada vez. Estar ahí es como tener tu producto en la góndola oficial del Estado; la clave luego es tener buena ficha, buen precio y cumplir.",
               },
             ],
           },
