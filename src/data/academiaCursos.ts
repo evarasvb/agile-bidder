@@ -13,7 +13,8 @@ export type Bloque =
   | { tipo: "parrafo"; texto: string }
   | { tipo: "subtitulo"; texto: string }
   | { tipo: "lista"; items: string[] }
-  | { tipo: "tip"; texto: string };
+  | { tipo: "tip"; texto: string }
+  | { tipo: "descarga"; texto: string; url: string };
 
 export interface Leccion {
   titulo: string;
@@ -41,6 +42,9 @@ export interface Curso {
   premium?: boolean;
   precio?: string; // ej. "$29.990"
   pagoUrl?: string; // link de pago de Mercado Pago (déjalo "" hasta tenerlo)
+  // Sesión en vivo incluida (opcional). agendarUrl: link de agenda (Calendly/
+  // Google) o déjalo "" para coordinar por WhatsApp.
+  sesionEnVivo?: { incluida: boolean; minutos: number; agendarUrl?: string };
   modulos: Modulo[];
 }
 
@@ -597,13 +601,14 @@ export const CURSOS: Curso[] = [
     emoji: "💎",
     titulo: "Programa Pro: Estudia y Gana Licitaciones como Experto",
     descripcion:
-      "El método completo para estudiar una licitación de punta a cabo: analizar el pasado y los adjudicados, investigar a la institución, revisar conductas de pago, detectar fragmentación, simular tu presentación y adjudicar con estrategia.",
+      "El método completo y accionable para estudiar una licitación de punta a cabo: analizar el pasado y los adjudicados, investigar a la institución, revisar conductas de pago, detectar fragmentación, simular tu presentación y adjudicar con estrategia. Incluye planillas Excel de control y una sesión en vivo de 45 min.",
     nivel: "Intermedio · Avanzado",
-    duracion: "Programa completo",
+    duracion: "Programa completo + planillas + sesión en vivo",
     acento: "azul",
     premium: true,
     precio: "$45.000",
     pagoUrl: "https://mpago.la/345ua7Y", // link de pago de Mercado Pago
+    sesionEnVivo: { incluida: true, minutos: 45, agendarUrl: "" }, // agendarUrl "" = coordinar por WhatsApp
     modulos: [
       {
         titulo: "Módulo 1 · Los mecanismos y cuál te conviene",

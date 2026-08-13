@@ -17,6 +17,8 @@ import {
   KeyRound,
   Loader2,
   Unlock,
+  Download,
+  Video,
 } from "lucide-react";
 import logoFirmavbOriginal from "@/assets/logo-firmavb-original.png";
 import { supabase } from "@/integrations/supabase/client";
@@ -54,6 +56,18 @@ function BloqueView({ bloque }: { bloque: Bloque }) {
             {bloque.texto}
           </p>
         </div>
+      );
+    case "descarga":
+      return (
+        <a
+          href={bloque.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="my-4 inline-flex items-center gap-2 rounded-xl border border-[hsl(var(--success))]/30 bg-[hsl(var(--success))]/10 px-4 py-3 text-sm font-semibold text-[hsl(var(--success))] hover:bg-[hsl(var(--success))]/20 transition-colors"
+        >
+          <Download className="h-4 w-4" />
+          {bloque.texto}
+        </a>
       );
     case "parrafo":
     default:
@@ -153,6 +167,11 @@ export default function AcademiaCurso() {
 
   const esPremiumBloqueado = curso.premium && !desbloqueado;
 
+  const agendarUrl =
+    curso.sesionEnVivo?.agendarUrl ||
+    "https://wa.me/56994259157?text=" +
+      encodeURIComponent(`Hola, compré "${curso.titulo}" y quiero agendar mi sesión en vivo.`);
+
   return (
     <div className="min-h-screen bg-firmavb-gray">
       {/* Header */}
@@ -229,6 +248,35 @@ export default function AcademiaCurso() {
                 <Unlock className="h-5 w-5 text-[hsl(var(--success))]" />
                 Acceso desbloqueado. ¡Disfruta el programa!
               </div>
+
+              {curso.sesionEnVivo?.incluida && (
+                <Card className="border-firmavb-blue/30 bg-gradient-to-br from-firmavb-blue/5 to-transparent">
+                  <CardContent className="py-6 md:flex items-center justify-between gap-6">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Video className="h-5 w-5 text-firmavb-blue" />
+                        <h3 className="font-semibold text-foreground">
+                          Tu sesión en vivo de {curso.sesionEnVivo.minutos} min está incluida
+                        </h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground max-w-xl">
+                        Agéndala por Google Meet para que te explique el programa y resuelvas tus
+                        dudas 1 a 1.
+                      </p>
+                    </div>
+                    <Button
+                      asChild
+                      className="mt-4 md:mt-0 bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2 shrink-0"
+                    >
+                      <a href={agendarUrl} target="_blank" rel="noopener noreferrer">
+                        <Video className="h-4 w-4" />
+                        Agendar mi sesión
+                      </a>
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
               <ModulosContenido modulos={desbloqueado} />
             </>
           )}
@@ -245,6 +293,25 @@ export default function AcademiaCurso() {
                   </p>
                   {curso.precio && (
                     <p className="text-3xl font-bold text-firmavb-blue mb-5">{curso.precio}</p>
+                  )}
+                  {curso.sesionEnVivo?.incluida && (
+                    <div className="mb-5 mx-auto max-w-md text-left rounded-xl border border-border/50 bg-muted/30 p-4">
+                      <p className="text-sm font-semibold text-foreground mb-2">Incluye:</p>
+                      <ul className="space-y-1.5 text-sm text-muted-foreground">
+                        <li className="flex items-center gap-2">
+                          <Video className="h-4 w-4 text-firmavb-blue shrink-0" />
+                          Sesión en vivo de {curso.sesionEnVivo.minutos} min por Google Meet
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Download className="h-4 w-4 text-[hsl(var(--success))] shrink-0" />
+                          Planillas Excel de control descargables
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Unlock className="h-4 w-4 text-firmavb-blue shrink-0" />
+                          Acceso al curso completo online
+                        </li>
+                      </ul>
+                    </div>
                   )}
                   {curso.pagoUrl ? (
                     <Button
