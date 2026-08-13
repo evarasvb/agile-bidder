@@ -721,7 +721,7 @@ export const CURSOS: Curso[] = [
     acento: "azul",
     premium: true,
     precio: "$45.000",
-    pagoUrl: "", // ← pega tu link de pago de Mercado Pago ($45.000)
+    pagoUrl: "https://mpago.la/29ytx5k",
     modulos: [
       {
         titulo: "Módulo 0 · Bienvenida y mentalidad",
@@ -759,7 +759,7 @@ export const CURSOS: Curso[] = [
     acento: "verde",
     premium: true,
     precio: "$45.000",
-    pagoUrl: "", // ← pega tu link de pago de Mercado Pago ($45.000)
+    pagoUrl: "https://mpago.la/1QbyRwc",
     modulos: [
       {
         titulo: "Módulo 1 · Navega y filtra",
@@ -795,7 +795,7 @@ export const CURSOS: Curso[] = [
     acento: "ambar",
     premium: true,
     precio: "$45.000",
-    pagoUrl: "", // ← pega tu link de pago de Mercado Pago ($45.000)
+    pagoUrl: "https://mpago.la/2zyzrhd",
     modulos: [
       {
         titulo: "Módulo 1 · Estructura de una oferta ganadora",
@@ -832,7 +832,7 @@ export const CURSOS: Curso[] = [
     acento: "azul",
     premium: true,
     precio: "$45.000",
-    pagoUrl: "", // ← pega tu link de pago de Mercado Pago ($45.000)
+    pagoUrl: "https://mpago.la/2mZkbyA",
     modulos: [
       {
         titulo: "Módulo 1 · La presentación final",
@@ -868,7 +868,7 @@ export const CURSOS: Curso[] = [
     acento: "verde",
     premium: true,
     precio: "$45.000",
-    pagoUrl: "", // ← pega tu link de pago de Mercado Pago ($45.000)
+    pagoUrl: "https://mpago.la/19xncEk",
     modulos: [
       {
         titulo: "Módulo 1 · Firma de contrato y garantías",
@@ -904,7 +904,7 @@ export const CURSOS: Curso[] = [
     acento: "ambar",
     premium: true,
     precio: "$45.000",
-    pagoUrl: "", // ← pega tu link de pago de Mercado Pago ($45.000)
+    pagoUrl: "https://mpago.la/2Q2HuBr",
     modulos: [
       {
         titulo: "Módulo 1 · De proveedor a empresa",
@@ -940,7 +940,7 @@ export const CURSOS: Curso[] = [
     acento: "azul",
     premium: true,
     precio: "$45.000",
-    pagoUrl: "", // ← pega tu link de pago de Mercado Pago ($45.000)
+    pagoUrl: "https://mpago.la/1JUUQqx",
     modulos: [
       {
         titulo: "Módulo 1 · Herramientas para no quemarte",
@@ -966,6 +966,16 @@ export const CURSOS: Curso[] = [
     ],
   },
 ];
+
+// Pack de la saga completa (7 cursos) con descuento.
+export const SAGA_BUNDLE = {
+  activo: true,
+  titulo: "Saga Completa 7x1",
+  descripcion:
+    "Los 7 cursos de la saga Véndele al Estado en un solo pack, con descuento. El camino completo, de cero a experto.",
+  precio: "$250.000",
+  pagoUrl: "https://mpago.li/1sf5rNp",
+};
 
 export function getCursoBySlug(slug: string): Curso | undefined {
   return CURSOS.find((c) => c.slug === slug);

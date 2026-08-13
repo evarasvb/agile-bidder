@@ -18,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import logoFirmavbOriginal from "@/assets/logo-firmavb-original.png";
 import { AcademiaLeadForm } from "@/components/academia/AcademiaLeadForm";
-import { CURSOS, ACENTO } from "@/data/academiaCursos";
+import { CURSOS, ACENTO, SAGA_BUNDLE } from "@/data/academiaCursos";
 
 // =============================================================================
 //  CONTENIDO DE LA ACADEMIA  ← EDITA AQUÍ TUS LINKS Y TEXTOS
@@ -612,6 +612,38 @@ export default function Academia() {
         subtitulo="Cursos gratuitos paso a paso, y un programa premium para llevarte al siguiente nivel."
         alt
       >
+        {SAGA_BUNDLE.activo && (
+          <Card className="mb-6 overflow-hidden border-0 bg-gradient-to-br from-firmavb-blue to-header-dark text-white shadow-xl">
+            <CardContent className="py-6 md:flex items-center justify-between gap-6">
+              <div>
+                <Badge className="mb-2 bg-white/20 text-white border-white/30 hover:bg-white/30">
+                  🎁 Pack con descuento
+                </Badge>
+                <h3 className="text-xl md:text-2xl font-bold">{SAGA_BUNDLE.titulo}</h3>
+                <p className="text-white/90 max-w-xl">{SAGA_BUNDLE.descripcion}</p>
+              </div>
+              <div className="mt-4 md:mt-0 text-center shrink-0">
+                <p className="text-3xl font-bold mb-2">{SAGA_BUNDLE.precio}</p>
+                {SAGA_BUNDLE.pagoUrl ? (
+                  <Button
+                    asChild
+                    size="lg"
+                    className="bg-white text-firmavb-blue hover:bg-white/90 font-semibold gap-2"
+                  >
+                    <a href={SAGA_BUNDLE.pagoUrl} target="_blank" rel="noopener noreferrer">
+                      Comprar la saga completa
+                    </a>
+                  </Button>
+                ) : (
+                  <Button size="lg" disabled>
+                    Muy pronto
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {CURSOS.map((c) => (
             <Card
