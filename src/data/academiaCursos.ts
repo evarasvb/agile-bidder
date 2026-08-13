@@ -784,6 +784,43 @@ export const CURSOS: Curso[] = [
       },
     ],
   },
+  {
+    slug: "saga-3-ofertas",
+    emoji: "📝",
+    titulo: "Saga 3 · Cotizar y Preparar Ofertas",
+    descripcion:
+      "Arma ofertas que ganan: los 3 sobres (administrativo, técnico y económico), cómo calcular tu precio protegiendo el margen, y cómo enviar sin errores que te descalifiquen.",
+    nivel: "Intermedio",
+    duracion: "Curso 3 de la saga",
+    acento: "ambar",
+    premium: true,
+    precio: "$45.000",
+    pagoUrl: "", // ← pega tu link de pago de Mercado Pago ($45.000)
+    modulos: [
+      {
+        titulo: "Módulo 1 · Estructura de una oferta ganadora",
+        lecciones: [
+          { titulo: "Los 3 sobres: visión general", bloques: [] },
+          { titulo: "Sobre administrativo (no te descalifiques)", bloques: [] },
+          { titulo: "Sobre técnico y económico", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Módulo 2 · Estrategia de precios",
+        lecciones: [
+          { titulo: "Cómo calcular tu precio", bloques: [] },
+          { titulo: "Márgenes y rentabilidad", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Módulo 3 · Envía sin errores",
+        lecciones: [
+          { titulo: "Subir tu oferta paso a paso", bloques: [] },
+          { titulo: "Los errores que te descalifican", bloques: [] },
+        ],
+      },
+    ],
+  },
 ];
 
 export function getCursoBySlug(slug: string): Curso | undefined {
