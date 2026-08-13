@@ -638,6 +638,46 @@ export const CURSOS: Curso[] = [
       },
     ],
   },
+
+  // ===========================================================================
+  // CURSO PREMIUM DE ENTRADA (de pago, económico)
+  // ===========================================================================
+  {
+    slug: "iniciar-en-mercado-publico",
+    emoji: "🚀",
+    titulo: "Inicia en Mercado Público (Curso Express)",
+    descripcion:
+      "En pocos pasos: inscríbete, entiende cómo se compra y consigue tu primera venta al Estado. El empujón para partir hoy.",
+    nivel: "Principiante",
+    duracion: "Curso express",
+    acento: "verde",
+    premium: true,
+    precio: "$5.000",
+    pagoUrl: "", // ← pega aquí tu link de pago de Mercado Pago ($5.000)
+    modulos: [
+      {
+        titulo: "Módulo 1 · Prepárate para vender",
+        lecciones: [
+          { titulo: "Crea tu cuenta y entiende Mercado Público", bloques: [] },
+          { titulo: "Inscríbete en ChileProveedores (paso a paso)", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Módulo 2 · Tu primera venta",
+        lecciones: [
+          { titulo: "Encuentra tu primera oportunidad (Compra Ágil)", bloques: [] },
+          { titulo: "Cotiza y postula sin miedo", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Módulo 3 · No te frenes",
+        lecciones: [
+          { titulo: "Los errores típicos del que recién parte", bloques: [] },
+          { titulo: "Qué hacer después de tu primera oferta", bloques: [] },
+        ],
+      },
+    ],
+  },
 ];
 
 export function getCursoBySlug(slug: string): Curso | undefined {
