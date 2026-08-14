@@ -199,6 +199,18 @@ export default function Oportunidades() {
   const totalPages = Math.ceil(oportunidades.length / pageSize);
   const paginatedOps = oportunidades.slice((page - 1) * pageSize, page * pageSize);
 
+  // ¿Hay filtros activos? (sortBy/sortAsc no cuentan) — sirve para mostrar el
+  // empty-state correcto: "ajusta los filtros" vs "carga tu inventario".
+  const hasActiveFilters = Boolean(
+    filters.search ||
+    (filters.tipo && filters.tipo !== "all") ||
+    filters.scoreMin ||
+    filters.estado ||
+    filters.institucion ||
+    filters.incluirCerradas
+  );
+  const clearFilters = () => setFilters({ sortBy: "match_score", sortAsc: false });
+
   const handleDescartar = (op: OportunidadPanel) => {
     descartar.mutate(
       { codigo: op.codigo, tipo: op.tipo },
@@ -404,14 +416,30 @@ export default function Oportunidades() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Package className="h-12 w-12 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-medium">No hay oportunidades</h3>
-            <p className="text-sm text-muted-foreground max-w-md">
-              El match usa tu inventario: mientras más productos cargues, más
-              oportunidades relevantes verás aquí.
-            </p>
-            <Button className="mt-5" onClick={() => navigate("/inventario")}>
-              Cargar mi inventario
-            </Button>
+            {hasActiveFilters ? (
+              // Hay filtros aplicados que dejaron la lista vacía.
+              <>
+                <h3 className="text-lg font-medium">Sin resultados</h3>
+                <p className="text-sm text-muted-foreground max-w-md">
+                  Ninguna oportunidad coincide con los filtros seleccionados.
+                </p>
+                <Button variant="outline" className="mt-5" onClick={clearFilters}>
+                  Limpiar filtros
+                </Button>
+              </>
+            ) : (
+              // Sin filtros y sin oportunidades: guiar a cargar inventario.
+              <>
+                <h3 className="text-lg font-medium">No hay oportunidades activas</h3>
+                <p className="text-sm text-muted-foreground max-w-md">
+                  El match usa tu inventario: mientras más productos cargues, más
+                  oportunidades relevantes verás aquí.
+                </p>
+                <Button className="mt-5" onClick={() => navigate("/inventario")}>
+                  Cargar mi inventario
+                </Button>
+              </>
+            )}
           </CardContent>
         </Card>
       ) : (

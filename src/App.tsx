@@ -1,3 +1,5 @@
+import { lazy, Suspense } from "react";
+import { Loader2 } from "lucide-react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,73 +11,64 @@ import { AdminOnlyRoute } from "@/components/auth/AdminOnlyRoute";
 import { ChatWidget } from "@/components/support/ChatWidget";
 import { ScrollToTop } from "@/components/ScrollToTop";
 
-// Auth
-import Index from "./pages/Index";
-import Academia from "./pages/Academia";
-import AcademiaCurso from "./pages/AcademiaCurso";
-import AcademiaLeads from "./pages/AcademiaLeads";
-import Auth from "./pages/Auth";
-import AuthCallback from "./pages/AuthCallback";
-import ClienteOnboarding from "./pages/ClienteOnboarding";
 import { useCliente } from "@/hooks/useCliente";
-import NotFound from "./pages/NotFound";
 
-// Mis Oportunidades
-import MisOportunidades from "./pages/MisOportunidades";
-import LicitacionDetalle from "./pages/LicitacionDetalle";
-import Licitaciones from "./pages/Licitaciones";
-import LicitacionesMP from "./pages/LicitacionesMP";
+// Páginas con carga diferida (code-splitting): aligera el bundle inicial
+// (~3.3MB en un solo chunk) y acelera el primer render. Cada página se descarga
+// recién cuando se visita su ruta.
+const Index = lazy(() => import("./pages/Index"));
+const Academia = lazy(() => import("./pages/Academia"));
+const AcademiaCurso = lazy(() => import("./pages/AcademiaCurso"));
+const AcademiaLeads = lazy(() => import("./pages/AcademiaLeads"));
+const Auth = lazy(() => import("./pages/Auth"));
+const AuthCallback = lazy(() => import("./pages/AuthCallback"));
+const ClienteOnboarding = lazy(() => import("./pages/ClienteOnboarding"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
-// Chat IA
-import ChatIA from "./pages/ChatIA";
+const MisOportunidades = lazy(() => import("./pages/MisOportunidades"));
+const LicitacionDetalle = lazy(() => import("./pages/LicitacionDetalle"));
+const Licitaciones = lazy(() => import("./pages/Licitaciones"));
+const LicitacionesMP = lazy(() => import("./pages/LicitacionesMP"));
 
-// Oportunidades Panel
-import OportunidadesPanel from "./pages/Oportunidades";
-import OportunidadDetalle from "./pages/OportunidadDetalle";
+const ChatIA = lazy(() => import("./pages/ChatIA"));
 
-// Mercado
-import Mercado from "./pages/Mercado";
-import Instituciones from "./pages/Instituciones";
-import ComprasAgiles from "./pages/ComprasAgiles";
-import CompraAgilDetalle from "./pages/CompraAgilDetalle";
-import OrdenesCompra from "./pages/OrdenesCompra";
+const OportunidadesPanel = lazy(() => import("./pages/Oportunidades"));
+const OportunidadDetalle = lazy(() => import("./pages/OportunidadDetalle"));
 
-// Inventario / Lista de Precios
-import Inventory from "./pages/Inventory";
+const Mercado = lazy(() => import("./pages/Mercado"));
+const Instituciones = lazy(() => import("./pages/Instituciones"));
+const ComprasAgiles = lazy(() => import("./pages/ComprasAgiles"));
+const CompraAgilDetalle = lazy(() => import("./pages/CompraAgilDetalle"));
+const OrdenesCompra = lazy(() => import("./pages/OrdenesCompra"));
 
-// Pipeline
-import Pipeline from "./pages/Pipeline";
+const Inventory = lazy(() => import("./pages/Inventory"));
 
-// Dashboard
-import Dashboard from "./pages/Dashboard";
-import Calendar from "./pages/Calendar";
-import CalendarioIntegrado from "./pages/CalendarioIntegrado";
-import GestionVendedores from "./pages/GestionVendedores";
+const Pipeline = lazy(() => import("./pages/Pipeline"));
 
-// Equipo
-import Equipo from "./pages/Equipo";
-import VendedorDetalle from "./pages/VendedorDetalle";
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Calendar = lazy(() => import("./pages/Calendar"));
+const CalendarioIntegrado = lazy(() => import("./pages/CalendarioIntegrado"));
+const GestionVendedores = lazy(() => import("./pages/GestionVendedores"));
 
-// Configuracion
-import ConfiguracionOportunidades from "./pages/ConfiguracionOportunidades";
-import Users from "./pages/Users";
-import ExtensionConfig from "./pages/ExtensionConfig";
+const Equipo = lazy(() => import("./pages/Equipo"));
+const VendedorDetalle = lazy(() => import("./pages/VendedorDetalle"));
 
-// Cuenta
-import Cuenta from "./pages/Cuenta";
-import Billing from "./pages/Billing";
+const ConfiguracionOportunidades = lazy(() => import("./pages/ConfiguracionOportunidades"));
+const Users = lazy(() => import("./pages/Users"));
+const ExtensionConfig = lazy(() => import("./pages/ExtensionConfig"));
 
-// Reportes
-import ReportesHub from "./pages/reportes/ReportesHub";
-import ReporteProveedores from "./pages/reportes/ReporteProveedores";
-import ReporteProductos from "./pages/reportes/ReporteProductos";
-import ReporteCompradores from "./pages/reportes/ReporteCompradores";
-import ReporteMercado from "./pages/reportes/ReporteMercado";
-import ReporteCompetidores from "./pages/reportes/ReporteCompetidores";
-import ReporteConvenioMarco from "./pages/reportes/ReporteConvenioMarco";
+const Cuenta = lazy(() => import("./pages/Cuenta"));
+const Billing = lazy(() => import("./pages/Billing"));
 
-// Admin (oculto)
-import AdminEvaristo from "./pages/AdminEvaristo";
+const ReportesHub = lazy(() => import("./pages/reportes/ReportesHub"));
+const ReporteProveedores = lazy(() => import("./pages/reportes/ReporteProveedores"));
+const ReporteProductos = lazy(() => import("./pages/reportes/ReporteProductos"));
+const ReporteCompradores = lazy(() => import("./pages/reportes/ReporteCompradores"));
+const ReporteMercado = lazy(() => import("./pages/reportes/ReporteMercado"));
+const ReporteCompetidores = lazy(() => import("./pages/reportes/ReporteCompetidores"));
+const ReporteConvenioMarco = lazy(() => import("./pages/reportes/ReporteConvenioMarco"));
+
+const AdminEvaristo = lazy(() => import("./pages/AdminEvaristo"));
 
 const queryClient = new QueryClient();
 
@@ -108,6 +101,13 @@ const App = () => (
       <ChatWidget />
       <BrowserRouter>
         <ScrollToTop />
+        <Suspense
+          fallback={
+            <div className="min-h-screen flex items-center justify-center bg-background">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          }
+        >
         <Routes>
           {/* ========== RUTAS PUBLICAS ========== */}
           <Route path="/" element={<Index />} />
@@ -191,6 +191,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>
+        </Suspense>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
