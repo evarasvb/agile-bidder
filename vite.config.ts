@@ -68,23 +68,15 @@ VitePWA({
     },
   },
   build: {
-    rollupOptions: {
-      output: {
-        // Sólo separamos las librerías del "shell" (que la app siempre necesita)
-        // en chunks propios cacheables entre deploys. Todo lo demás —incluidas las
-        // pesadas (pdf/excel/gráficos/calendario)— NO se agrupa aquí a propósito:
-        // así Rollup las co-ubica con la página lazy que las usa y sólo se
-        // descargan al visitar esa ruta (nada de un mega-chunk "vendor" eager).
-        manualChunks(id) {
-          if (!id.includes("node_modules")) return undefined;
-          if (id.includes("react-router")) return "react-router";
-          if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return "react";
-          if (id.includes("@supabase")) return "supabase";
-          if (id.includes("@radix-ui")) return "radix";
-          if (id.includes("@tanstack")) return "tanstack";
-          return undefined;
-        },
-      },
-    },
+    // NOTA: NO usar manualChunks para separar react/react-dom de las librerías
+    // que dependen de él (radix, react-router, tanstack, etc.). Separarlos en
+    // chunks propios rompe el ORDEN DE INICIALIZACIÓN de los módulos ES: un chunk
+    // (p.ej. Radix, que llama a React.forwardRef en su nivel superior) se evalúa
+    // cuando el binding de React todavía es undefined ->
+    //   "TypeError: Cannot read properties of undefined (reading 'forwardRef')"
+    // -> la app NUNCA monta -> pantalla en blanco para TODOS. Causó una caída de
+    // producción. El code-splitting real ya lo da el lazy-loading por ruta
+    // (React.lazy en App.tsx); dejamos que Vite/Rollup arme los vendor chunks con
+    // su default, que respeta el orden de init.
   },
 }));
