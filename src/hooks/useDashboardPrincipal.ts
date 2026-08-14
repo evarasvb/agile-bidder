@@ -53,72 +53,18 @@ export function useDashboardKPIs() {
   return useQuery({
     queryKey: ['dashboard-principal', 'kpis'],
     queryFn: async (): Promise<DashboardKPIs> => {
-      const now = new Date();
-
-      // Fetch compras_agiles
-      const { data: comprasAgiles, error: caError } = await supabase
-        .from('compras_agiles')
-        .select('codigo, estado, match_encontrado, match_score, monto, fecha_cierre');
-      if (caError) throw caError;
-
-      // Fetch licitaciones
-      const { data: licitaciones, error: licError } = await supabase
-        .from('licitaciones')
-        .select('id_licitacion, estado, match_encontrado, match_score, presupuesto, fecha_cierre, procesada');
-      if (licError) throw licError;
-
-      // Fetch ofertas for success rate
-      const { data: ofertas, error: ofError } = await supabase
-        .from('ofertas')
-        .select('estado');
-      if (ofError) throw ofError;
-
-      // Combine opportunities
-      const todas = [
-        ...(comprasAgiles || []).map(ca => ({
-          estado: ca.estado,
-          match_encontrado: ca.match_encontrado,
-          match_score: ca.match_score,
-          monto: ca.monto,
-          fecha_cierre: ca.fecha_cierre,
-        })),
-        ...(licitaciones || []).map(l => ({
-          estado: l.estado,
-          match_encontrado: l.match_encontrado,
-          match_score: l.match_score,
-          monto: l.presupuesto,
-          fecha_cierre: l.fecha_cierre,
-        })),
-      ];
-
-      // Oportunidades Activas: not expired and not in terminal states
-      const activas = todas.filter(o =>
-        o.fecha_cierre && new Date(o.fecha_cierre) > now &&
-        o.estado !== 'adjudicada' && o.estado !== 'desierta' && o.estado !== 'descartada'
-      );
-
-      // Match Score Promedio (of items with match)
-      const conMatch = todas.filter(o => o.match_encontrado && o.match_score != null);
-      const matchScorePromedio = conMatch.length > 0
-        ? Math.round(conMatch.reduce((sum, o) => sum + (o.match_score || 0), 0) / conMatch.length)
-        : 0;
-
-      // Monto en Pipeline (all active opportunities)
-      const montoEnPipeline = activas.reduce((sum, o) => sum + (o.monto || 0), 0);
-
-      // Tasa de Éxito: ofertas ganadas / ofertas enviadas+ganadas+perdidas
-      const ofertasList = ofertas || [];
-      const postuladas = ofertasList.filter(o =>
-        ['enviada', 'ganada', 'perdida'].includes(o.estado)
-      ).length;
-      const ganadas = ofertasList.filter(o => o.estado === 'ganada').length;
-      const tasaExito = postuladas > 0 ? Math.round((ganadas / postuladas) * 100) : 0;
+      // Todo el cálculo se hace en la BD (RPC dashboard_kpis): antes se bajaban
+      // TODAS las filas de compras_agiles y licitaciones al navegador cada 30s
+      // sólo para contar/sumar. Ahora es una sola llamada sin transferir filas.
+      const { data, error } = await (supabase as any).rpc('dashboard_kpis');
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
 
       return {
-        oportunidadesActivas: activas.length,
-        matchScorePromedio,
-        montoEnPipeline,
-        tasaExito,
+        oportunidadesActivas: Number(row?.oportunidades_activas ?? 0),
+        matchScorePromedio: Number(row?.match_score_promedio ?? 0),
+        montoEnPipeline: Number(row?.monto_en_pipeline ?? 0),
+        tasaExito: Number(row?.tasa_exito ?? 0),
         // Trends would require historical data, for now show null
         oportunidadesActivasTrend: null,
         matchScorePromedioTrend: null,
@@ -126,8 +72,8 @@ export function useDashboardKPIs() {
         tasaExitoTrend: null,
       };
     },
-    refetchInterval: 30000,
-    staleTime: 10000,
+    refetchInterval: 60000,
+    staleTime: 30000,
   });
 }
 
@@ -137,30 +83,17 @@ export function usePipelineByStage() {
   return useQuery({
     queryKey: ['dashboard-principal', 'pipeline-stages'],
     queryFn: async (): Promise<PipelineStage[]> => {
-      const now = new Date();
+      // Agregación en la BD (RPC): antes bajaba todas las filas para agrupar en
+      // el navegador. La RPC ya devuelve estado (en minúscula), cantidad y monto.
+      const { data, error } = await (supabase as any).rpc('dashboard_pipeline_por_estado');
+      if (error) throw error;
 
-      const { data: comprasAgiles, error: caError } = await supabase
-        .from('compras_agiles')
-        .select('estado, monto');
-      if (caError) throw caError;
-
-      const { data: licitaciones, error: licError } = await supabase
-        .from('licitaciones')
-        .select('estado, presupuesto');
-      if (licError) throw licError;
-
-      // Combine and group by estado
       const stageMap: Record<string, { count: number; monto: number }> = {};
-      const allItems = [
-        ...(comprasAgiles || []).map(ca => ({ estado: ca.estado || 'sin_estado', monto: ca.monto || 0 })),
-        ...(licitaciones || []).map(l => ({ estado: l.estado || 'sin_estado', monto: l.presupuesto || 0 })),
-      ];
-
-      for (const item of allItems) {
-        const key = item.estado;
-        if (!stageMap[key]) stageMap[key] = { count: 0, monto: 0 };
-        stageMap[key].count += 1;
-        stageMap[key].monto += item.monto;
+      for (const r of (data || []) as Array<{ estado: string; cantidad: number; monto: number }>) {
+        stageMap[r.estado || 'sin_estado'] = {
+          count: Number(r.cantidad) || 0,
+          monto: Number(r.monto) || 0,
+        };
       }
 
       // Define pipeline order
