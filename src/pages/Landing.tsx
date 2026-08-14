@@ -36,12 +36,14 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { DemoModal } from "@/components/landing/DemoModal";
 import { LandingChat, LandingChatButton } from "@/components/landing/LandingChat";
+import { TeaserResultados } from "@/components/landing/TeaserResultados";
 import logoFirmavbOriginal from "@/assets/logo-firmavb-original.png";
 import { toast } from "sonner";
 
 export default function Landing() {
   const [chatOpen, setChatOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [teaserTermino, setTeaserTermino] = useState("");
   const [demoOpen, setDemoOpen] = useState(false);
   const { isAuthenticated, signOut, user } = useAuth();
   const navigate = useNavigate();
@@ -52,12 +54,19 @@ export default function Landing() {
   };
 
   const handleSearch = () => {
-    if (!searchQuery.trim()) {
+    const q = searchQuery.trim();
+    if (!q) {
       toast.error("Ingresa un producto o servicio para buscar");
       return;
     }
-    // Navigate to licitaciones with search query
-    navigate(`/licitaciones?search=${encodeURIComponent(searchQuery)}`);
+    if (isAuthenticated) {
+      // Ya tiene sesión: lo llevamos directo a la lista completa.
+      navigate(`/licitaciones?search=${encodeURIComponent(q)}`);
+      return;
+    }
+    // Visitante anónimo: mostramos el teaser público aquí mismo (engancha) y
+    // el candado para registrarse. No lo mandamos al login en seco.
+    setTeaserTermino(q);
   };
 
   return (
@@ -166,6 +175,9 @@ export default function Landing() {
                 Nuestra IA analizará tu intención comercial y te mostrará oportunidades relevantes
               </p>
             </div>
+
+            {/* Resultados teaser (visitante anónimo): oportunidades reales + candado */}
+            <TeaserResultados termino={teaserTermino} />
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button 
