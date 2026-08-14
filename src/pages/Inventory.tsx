@@ -506,18 +506,29 @@ export default function Inventory() {
         ) : filteredInventory.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <Inbox className="h-12 w-12 mb-4 opacity-50" />
-            <p className="text-lg font-medium">No hay productos en el inventario</p>
-            <p className="text-sm">Agrega tus productos para empezar a recibir oportunidades que hagan match</p>
-            <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
-              <Button onClick={() => setAddDialogOpen(true)}>
-                <Plus className="h-4 w-4" />
-                Agrega tu primer producto
-              </Button>
-              <Button variant="outline" onClick={() => setBulkUploadOpen(true)}>
-                <Upload className="h-4 w-4" />
-                Cargar desde Excel
-              </Button>
-            </div>
+            {inventario.length === 0 ? (
+              // Inventario realmente vacío: CTA de onboarding.
+              <>
+                <p className="text-lg font-medium">No hay productos en el inventario</p>
+                <p className="text-sm">Agrega tus productos para empezar a recibir oportunidades que hagan match</p>
+                <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
+                  <Button onClick={() => setAddDialogOpen(true)}>
+                    <Plus className="h-4 w-4" />
+                    Agrega tu primer producto
+                  </Button>
+                  <Button variant="outline" onClick={() => setBulkUploadOpen(true)}>
+                    <Upload className="h-4 w-4" />
+                    Cargar desde Excel
+                  </Button>
+                </div>
+              </>
+            ) : (
+              // Hay inventario, pero la BÚSQUEDA no arrojó resultados.
+              <>
+                <p className="text-lg font-medium">Sin resultados</p>
+                <p className="text-sm">Ningún producto coincide con tu búsqueda</p>
+              </>
+            )}
           </div>
         ) : (
           <Table>
