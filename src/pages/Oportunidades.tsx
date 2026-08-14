@@ -405,9 +405,13 @@ export default function Oportunidades() {
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Package className="h-12 w-12 text-muted-foreground/50 mb-4" />
             <h3 className="text-lg font-medium">No hay oportunidades</h3>
-            <p className="text-sm text-muted-foreground">
-              No se encontraron oportunidades con los filtros seleccionados
+            <p className="text-sm text-muted-foreground max-w-md">
+              El match usa tu inventario: mientras más productos cargues, más
+              oportunidades relevantes verás aquí.
             </p>
+            <Button className="mt-5" onClick={() => navigate("/inventario")}>
+              Cargar mi inventario
+            </Button>
           </CardContent>
         </Card>
       ) : (
