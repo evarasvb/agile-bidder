@@ -52,12 +52,19 @@ BEGIN
   PERFORM set_config('pg_trgm.word_similarity_threshold', p_umbral::text, true);
 
   -- Frases negativas del cliente (a través de sus perfiles de búsqueda).
-  neg := ARRAY(
-    SELECT DISTINCT lower(trim(k.keyword))
-    FROM public.client_negative_keywords k
-    JOIN public.client_search_profiles pr ON pr.id = k.profile_id
-    WHERE pr.client_id = p_cliente AND coalesce(trim(k.keyword), '') <> ''
-  );
+  -- Se consultan sólo si las tablas existen: así una base reconstruida sólo
+  -- desde estas migraciones (donde esas tablas todavía no están) no aborta el
+  -- job horario; simplemente no hay negativas.
+  neg := ARRAY[]::text[];
+  IF to_regclass('public.client_negative_keywords') IS NOT NULL
+     AND to_regclass('public.client_search_profiles') IS NOT NULL THEN
+    neg := ARRAY(
+      SELECT DISTINCT lower(trim(k.keyword))
+      FROM public.client_negative_keywords k
+      JOIN public.client_search_profiles pr ON pr.id = k.profile_id
+      WHERE pr.client_id = p_cliente AND coalesce(trim(k.keyword), '') <> ''
+    );
+  END IF;
 
   INSERT INTO public.ca_matches (compra_agil_codigo, cliente_id, inventario_id, score, listo,
                                  nombre_pedido, nombre_producto, precio_unitario, fecha_cierre)
@@ -117,12 +124,30 @@ BEGIN
       LIMIT 1
     ) m
     WHERE NOT t.titulo_neg
-    ORDER BY t.codigo, m.sim DESC
+    -- Se elige el mejor ítem por compra usando el puntaje YA penalizado, para que
+    -- un ítem con frase negativa (sim alta pero penalizada) no le gane a otro
+    -- ítem limpio con sim algo menor.
+    ORDER BY t.codigo, (m.sim * CASE WHEN t.item_neg THEN 0.5 ELSE 1 END) DESC
   ) b
   ON CONFLICT (compra_agil_codigo, cliente_id) DO UPDATE
     SET inventario_id=excluded.inventario_id, score=excluded.score, listo=excluded.listo,
         nombre_producto=excluded.nombre_producto, precio_unitario=excluded.precio_unitario,
         fecha_cierre=excluded.fecha_cierre;
   GET DIAGNOSTICS n = ROW_COUNT;
+
+  -- Al agregar una frase negativa que ahora excluye una compra ya matcheada, el
+  -- upsert de arriba sólo la omite; la fila vieja en ca_matches quedaría visible.
+  -- La borramos explícitamente para que la exclusión tome efecto.
+  IF cardinality(neg) > 0 THEN
+    DELETE FROM public.ca_matches cm
+    USING public.compras_agiles ca
+    WHERE cm.cliente_id = p_cliente
+      AND ca.codigo = cm.compra_agil_codigo
+      AND EXISTS (
+        SELECT 1 FROM unnest(neg) g
+        WHERE position(g IN lower(coalesce(ca.nombre, '') || ' ' || coalesce(ca.descripcion, ''))) > 0
+      );
+  END IF;
+
   RETURN n;
 END $function$;
