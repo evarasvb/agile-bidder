@@ -51,4 +51,24 @@ VitePWA({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Sólo separamos las librerías del "shell" (que la app siempre necesita)
+        // en chunks propios cacheables entre deploys. Todo lo demás —incluidas las
+        // pesadas (pdf/excel/gráficos/calendario)— NO se agrupa aquí a propósito:
+        // así Rollup las co-ubica con la página lazy que las usa y sólo se
+        // descargan al visitar esa ruta (nada de un mega-chunk "vendor" eager).
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          if (id.includes("react-router")) return "react-router";
+          if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return "react";
+          if (id.includes("@supabase")) return "supabase";
+          if (id.includes("@radix-ui")) return "radix";
+          if (id.includes("@tanstack")) return "tanstack";
+          return undefined;
+        },
+      },
+    },
+  },
 }));
