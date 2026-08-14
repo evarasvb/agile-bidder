@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { useClienteInventario, useAgregarProducto, useActualizarProducto, useEliminarProducto, getClienteId } from '@/hooks/useCliente';
+import { useCliente, useClienteInventario, useAgregarProducto, useActualizarProducto, useEliminarProducto } from '@/hooks/useCliente';
 
 interface ProductoForm {
   sku: string;
@@ -34,7 +34,8 @@ const defaultForm: ProductoForm = {
 };
 
 export default function OnboardingStep2() {
-  const clienteId = getClienteId();
+  const { data: cliente } = useCliente();
+  const clienteId = cliente?.id ?? null;
   const { data: inventario = [], isLoading } = useClienteInventario();
   const agregarProducto = useAgregarProducto();
   const actualizarProducto = useActualizarProducto();
@@ -53,24 +54,26 @@ export default function OnboardingStep2() {
       .map(p => p.trim().toLowerCase())
       .filter(Boolean);
 
-    const data = {
+    // Columnas REALES de cliente_inventario. Clave: `nombre_producto` es lo que
+    // lee el match (antes se guardaba sólo `nombre`, por eso no matcheaba).
+    const data: Record<string, unknown> = {
       cliente_id: clienteId,
       sku: form.sku,
+      nombre_producto: form.nombre,
       nombre: form.nombre,
-      descripcion: form.descripcion || undefined,
-      categoria: form.categoria || undefined,
+      descripcion: form.descripcion || null,
+      categoria: form.categoria || null,
       precio_unitario: form.precio_unitario,
       margen_minimo: form.margen_minimo,
-      stock: form.stock,
-      tiempo_entrega_dias: form.tiempo_entrega_dias,
-      palabras_clave: palabras.length > 0 ? palabras : undefined,
-      activo: true,
+      stock_disponible: form.stock,
+      tiempo_entrega: form.tiempo_entrega_dias,
+      palabras_clave: palabras.length > 0 ? palabras : null,
     };
 
     if (editingId) {
-      await actualizarProducto.mutateAsync({ id: editingId, ...data });
+      await actualizarProducto.mutateAsync({ id: editingId, ...(data as any) });
     } else {
-      await agregarProducto.mutateAsync(data);
+      await agregarProducto.mutateAsync(data as any);
     }
 
     setForm(defaultForm);
@@ -79,16 +82,17 @@ export default function OnboardingStep2() {
   };
 
   const handleEdit = (producto: typeof inventario[0]) => {
+    const p = producto as any;
     setForm({
-      sku: producto.sku,
-      nombre: producto.nombre,
-      descripcion: producto.descripcion || '',
-      categoria: producto.categoria || '',
-      precio_unitario: producto.precio_unitario,
-      margen_minimo: producto.margen_minimo,
-      stock: producto.stock,
-      tiempo_entrega_dias: producto.tiempo_entrega_dias,
-      palabras_clave: producto.palabras_clave?.join(', ') || '',
+      sku: p.sku ?? '',
+      nombre: p.nombre_producto ?? p.nombre ?? '',
+      descripcion: p.descripcion || '',
+      categoria: p.categoria || '',
+      precio_unitario: p.precio_unitario ?? 0,
+      margen_minimo: p.margen_minimo ?? 10,
+      stock: p.stock_disponible ?? 0,
+      tiempo_entrega_dias: p.tiempo_entrega ?? 3,
+      palabras_clave: (p.palabras_clave ?? []).join(', '),
     });
     setEditingId(producto.id);
     setIsDialogOpen(true);
@@ -270,15 +274,17 @@ export default function OnboardingStep2() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {inventario.map((prod) => (
+                {inventario.map((prod) => {
+                  const p = prod as any;
+                  return (
                   <TableRow key={prod.id}>
-                    <TableCell className="font-mono text-sm">{prod.sku}</TableCell>
-                    <TableCell>{prod.nombre}</TableCell>
-                    <TableCell>{prod.categoria || '-'}</TableCell>
+                    <TableCell className="font-mono text-sm">{p.sku}</TableCell>
+                    <TableCell>{p.nombre_producto ?? p.nombre ?? '-'}</TableCell>
+                    <TableCell>{p.categoria || '-'}</TableCell>
                     <TableCell className="text-right">
-                      ${prod.precio_unitario.toLocaleString('es-CL')}
+                      ${Number(p.precio_unitario ?? 0).toLocaleString('es-CL')}
                     </TableCell>
-                    <TableCell className="text-right">{prod.stock}</TableCell>
+                    <TableCell className="text-right">{p.stock_disponible ?? 0}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
                         <Button
@@ -298,7 +304,8 @@ export default function OnboardingStep2() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

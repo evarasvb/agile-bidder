@@ -16,7 +16,8 @@ import AcademiaCurso from "./pages/AcademiaCurso";
 import AcademiaLeads from "./pages/AcademiaLeads";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
-import Onboarding from "./pages/Onboarding";
+import ClienteOnboarding from "./pages/ClienteOnboarding";
+import { useCliente } from "@/hooks/useCliente";
 import NotFound from "./pages/NotFound";
 
 // Mis Oportunidades
@@ -78,11 +79,24 @@ import AdminEvaristo from "./pages/AdminEvaristo";
 
 const queryClient = new QueryClient();
 
+// Manda al onboarding a los clientes que aún no lo completaron. No genera bucle
+// porque la ruta /onboarding está FUERA de este wrapper. Si el cliente aún no
+// cargó (o no existe), no redirige: deja pasar (evita lockouts).
+const OnboardingGate = ({ children }: { children: React.ReactNode }) => {
+  const { data: cliente, isLoading } = useCliente();
+  if (!isLoading && cliente && cliente.onboarding_completado === false) {
+    return <Navigate to="/onboarding" replace />;
+  }
+  return <>{children}</>;
+};
+
 const ProtectedLayoutWrapper = () => (
   <ProtectedRoute>
-    <AppLayout>
-      <Outlet />
-    </AppLayout>
+    <OnboardingGate>
+      <AppLayout>
+        <Outlet />
+      </AppLayout>
+    </OnboardingGate>
   </ProtectedRoute>
 );
 
@@ -103,7 +117,7 @@ const App = () => (
           <Route path="/auth/callback" element={<AuthCallback />} />
           
           {/* Onboarding - sin sidebar */}
-          <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
+          <Route path="/onboarding" element={<ProtectedRoute><ClienteOnboarding /></ProtectedRoute>} />
           
           {/* Admin oculto */}
           <Route path="/admin/evaristo" element={<AdminOnlyRoute><AdminEvaristo /></AdminOnlyRoute>} />
