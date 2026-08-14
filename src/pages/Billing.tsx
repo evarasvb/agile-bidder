@@ -20,13 +20,14 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
-import { 
-  useBillingStats, 
-  useMonthlyBillingData, 
-  useCurrentMonthSales, 
-  useInvoiceHistory, 
-  useBillingSettings 
+import {
+  useBillingStats,
+  useMonthlyBillingData,
+  useCurrentMonthSales,
+  useInvoiceHistory,
+  useBillingSettings
 } from "@/hooks/useBilling";
+import { SuscripcionProCard } from "@/components/pro/SuscripcionProCard";
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("es-CL", {
@@ -103,9 +104,12 @@ export default function Billing() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Facturación y Comisiones</h1>
         <p className="text-muted-foreground">
-          Plan Enterprise - Comisión del 2% sobre ventas adjudicadas
+          Tu plan y suscripción
         </p>
       </div>
+
+      {/* Suscripción / Plan Pro */}
+      <SuscripcionProCard />
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
