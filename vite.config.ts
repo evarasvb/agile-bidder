@@ -27,6 +27,12 @@ VitePWA({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB limit
+        // El SW nuevo toma control de inmediato y limpia las precachés viejas.
+        // Sin esto, tras un deploy el SW viejo puede servir un shell que apunta a
+        // archivos JS que ya no existen -> pantalla en blanco.
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/juiskeeutbaipwbeeezw\.supabase\.co\/.*/i,

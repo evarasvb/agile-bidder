@@ -34,7 +34,19 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
-    
+
+    // Error de carga de "chunk": pasa cuando un deploy nuevo renombró los
+    // archivos JS y el navegador (o el Service Worker) tiene el shell viejo que
+    // pide un archivo que ya no existe -> pantalla en blanco. Recargamos UNA vez
+    // para traer los archivos frescos (flag para no entrar en bucle).
+    const msg = `${error?.message || ''} ${error?.name || ''}`;
+    const isChunkError = /dynamically imported module|Importing a module script failed|Loading chunk|ChunkLoadError|Failed to fetch dynamically imported|error loading dynamically imported module/i.test(msg);
+    if (isChunkError && !sessionStorage.getItem('fvb-chunk-reload')) {
+      try { sessionStorage.setItem('fvb-chunk-reload', '1'); } catch { /* ignore */ }
+      window.location.reload();
+      return;
+    }
+
     // Log to external service if configured
     if (import.meta.env.VITE_SUPABASE_URL) {
       this.logErrorToService(error, errorInfo);
