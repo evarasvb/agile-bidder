@@ -104,10 +104,13 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       // Fetch compras_agiles with items count.
       // Por defecto solo activas (Publicada + cierre futuro). Con "incluir
       // cerradas" se traen las más recientes con límite para no saturar.
+      // Columnas explícitas (NO `datos_json`, un jsonb pesado por fila) para no
+      // saturar el navegador con hasta 500 filas de blobs.
       let comprasQuery = supabase
         .from('compras_agiles')
         .select(`
-          *,
+          id, codigo, nombre, descripcion, region, monto_estimado, fecha_cierre,
+          created_at, estado, match_score, match_encontrado,
           compras_agiles_items(id)
         `)
         .order('created_at', { ascending: false });
@@ -210,7 +213,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         descripcion: c.descripcion,
         organismo: c.organismo || 'Sin organismo',
         region: c.region,
-        monto: c.monto,
+        monto: c.monto_estimado ?? c.monto ?? null,
         fecha_cierre: c.fecha_cierre,
         fecha_publicacion: c.created_at,
         estado: c.estado,
