@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useRequirePro } from "@/components/pro/UpgradeProProvider";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
@@ -182,6 +183,7 @@ function OpportunityCard({
 
 export default function Oportunidades() {
   const navigate = useNavigate();
+  const { requirePro } = useRequirePro();
   const [filters, setFilters] = useState<PanelFilters>({
     sortBy: "match_score",
     sortAsc: false,
@@ -212,21 +214,27 @@ export default function Oportunidades() {
   const clearFilters = () => setFilters({ sortBy: "match_score", sortAsc: false });
 
   const handleDescartar = (op: OportunidadPanel) => {
-    descartar.mutate(
-      { codigo: op.codigo, tipo: op.tipo },
-      {
-        onSuccess: () => toast.success("Oportunidad descartada"),
-        onError: () => toast.error("Error al descartar"),
-      }
-    );
+    // Gestionar (descartar) es Pro; en free abre el modal de upgrade.
+    requirePro(() => {
+      descartar.mutate(
+        { codigo: op.codigo, tipo: op.tipo },
+        {
+          onSuccess: () => toast.success("Oportunidad descartada"),
+          onError: () => toast.error("Error al descartar"),
+        }
+      );
+    }, "Descartar y gestionar oportunidades es parte del plan Pro.");
   };
 
   const handleCotizar = (op: OportunidadPanel) => {
-    if (op.tipo === "compra_agil") {
-      navigate(`/compras-agiles/${op.codigo}`);
-    } else {
-      navigate(`/licitaciones/${op.codigo}`);
-    }
+    // Cotizar/postular es Pro; en free abre el modal de upgrade.
+    requirePro(() => {
+      if (op.tipo === "compra_agil") {
+        navigate(`/compras-agiles/${op.codigo}`);
+      } else {
+        navigate(`/licitaciones/${op.codigo}`);
+      }
+    }, "Cotizar y postular a oportunidades es parte del plan Pro.");
   };
 
   const handleViewDetail = (op: OportunidadPanel) => {

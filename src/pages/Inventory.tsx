@@ -32,6 +32,7 @@ import { ImportScriptDialog } from "@/components/inventory/ImportScriptDialog";
 import { AddProductDialog } from "@/components/inventory/AddProductDialog";
 import { BulkDeleteDialog } from "@/components/inventory/BulkDeleteDialog";
 import { BulkUploadDialog } from "@/components/inventory/BulkUploadDialog";
+import { useRequirePro } from "@/components/pro/UpgradeProProvider";
 import { DownloadTemplateButton } from "@/components/inventory/DownloadTemplateButton";
 import { ProductGallery } from "@/components/inventory/ProductGallery";
 import { ImportHistoryPanel } from "@/components/inventory/ImportHistoryPanel";
@@ -60,6 +61,19 @@ export default function Inventory() {
   const pageSize = 100; // Show 100 products per page to prevent performance issues
   
   const { data: inventario = [], isLoading, refetch } = useInventory();
+  const { requirePro, isPro } = useRequirePro();
+  const FREE_INV_LIMIT = 20;
+  const handleAgregarClick = () => {
+    // Free: puede cargar hasta el límite; al llegar, ofrece Pro.
+    if (!isPro && inventario.length >= FREE_INV_LIMIT) {
+      requirePro(
+        undefined,
+        `El plan gratuito permite hasta ${FREE_INV_LIMIT} productos. Hazte Pro para inventario ilimitado.`,
+      );
+      return;
+    }
+    setAddDialogOpen(true);
+  };
   const { data: licitacionesPorProducto = [] } = useLicitacionesPorProducto();
   const { data: comprasAgilesMatches = [], isLoading: isLoadingComprasAgiles } = useComprasAgilesMatch(user?.id ?? null);
     // Nota: useComprasAgilesMatch ya no expone matchesByProductId/countsByProductId; se usan mapas vacios por ahora
@@ -399,9 +413,9 @@ export default function Inventory() {
           
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button 
+              <Button
                 className="gap-2 bg-primary hover:bg-primary/90"
-                onClick={() => setAddDialogOpen(true)}
+                onClick={handleAgregarClick}
               >
                 <Plus className="h-4 w-4" />
                 Agregar Producto
