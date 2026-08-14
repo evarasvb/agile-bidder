@@ -95,16 +95,42 @@ export function useCliente() {
     queryKey: ['cliente', user?.id],
     queryFn: async () => {
       if (!user) return null;
-      
+
       // Find cliente by user_id (auth.uid())
       const { data, error } = await supabase
         .from('clientes')
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
-      
+
       if (error) throw error;
-      return data as Cliente | null;
+      if (data) return data as Cliente;
+
+      // Cliente nuevo sin fila todavía: creamos una mínima para que el onboarding
+      // (y el resto de la app) tengan un cliente con el que trabajar.
+      const { data: creado, error: insError } = await supabase
+        .from('clientes')
+        .insert({
+          user_id: user.id,
+          email: user.email ?? '',
+          empresa_nombre: user.email?.split('@')[0] || 'Mi empresa',
+        })
+        .select()
+        .single();
+
+      if (insError) {
+        // Posible carrera (otra pestaña lo creó): reintentamos el select.
+        const { data: retry } = await supabase
+          .from('clientes')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        return (retry as Cliente) ?? null;
+      }
+
+      // Registro de notificaciones por defecto (mejor esfuerzo).
+      await supabase.from('cliente_notificaciones').insert({ cliente_id: creado.id });
+      return creado as Cliente;
     },
     enabled: !authLoading && !!user,
   });

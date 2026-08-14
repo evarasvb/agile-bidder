@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Check, Building2, Package, Ban, Bell, Loader2 } 
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useCliente, useActualizarCliente } from '@/hooks/useCliente';
+import { supabase } from '@/integrations/supabase/client';
 import OnboardingStep1 from '@/components/cliente-onboarding/OnboardingStep1';
 import OnboardingStep2 from '@/components/cliente-onboarding/OnboardingStep2';
 import OnboardingStep3 from '@/components/cliente-onboarding/OnboardingStep3';
@@ -26,7 +27,7 @@ export default function ClienteOnboarding() {
   useEffect(() => {
     if (cliente) {
       if (cliente.onboarding_completado) {
-        navigate('/clientes/dashboard');
+        navigate('/dashboard');
       } else {
         setCurrentStep(cliente.onboarding_step || 1);
       }
@@ -49,7 +50,14 @@ export default function ClienteOnboarding() {
         id: cliente.id,
         onboarding_completado: true,
       });
-      navigate('/clientes/dashboard');
+      // Disparar el primer match para que el cliente vea sus PRIMERAS
+      // oportunidades de inmediato (además del cron horario). Best-effort.
+      try {
+        await (supabase as any).rpc('generar_matches_ca_para_mi');
+      } catch {
+        // el cron horario lo generará igual
+      }
+      navigate('/oportunidades');
     }
   };
 
