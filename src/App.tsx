@@ -12,6 +12,7 @@ import { ChatWidget } from "@/components/support/ChatWidget";
 import { ScrollToTop } from "@/components/ScrollToTop";
 
 import { useCliente } from "@/hooks/useCliente";
+import { UpgradeProProvider } from "@/components/pro/UpgradeProProvider";
 
 // Páginas con carga diferida (code-splitting): aligera el bundle inicial
 // (~3.3MB en un solo chunk) y acelera el primer render. Cada página se descarga
@@ -86,9 +87,11 @@ const OnboardingGate = ({ children }: { children: React.ReactNode }) => {
 const ProtectedLayoutWrapper = () => (
   <ProtectedRoute>
     <OnboardingGate>
-      <AppLayout>
-        <Outlet />
-      </AppLayout>
+      <UpgradeProProvider>
+        <AppLayout>
+          <Outlet />
+        </AppLayout>
+      </UpgradeProProvider>
     </OnboardingGate>
   </ProtectedRoute>
 );
