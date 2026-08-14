@@ -110,11 +110,13 @@ export function useCliente() {
       // (y el resto de la app) tengan un cliente con el que trabajar.
       const { data: creado, error: insError } = await supabase
         .from('clientes')
+        // Cast: los tipos generados exigen rut/region/nombre_responsable, pero en
+        // la BD son nulos; sólo sembramos lo mínimo del usuario nuevo.
         .insert({
           user_id: user.id,
           email: user.email ?? '',
           empresa_nombre: user.email?.split('@')[0] || 'Mi empresa',
-        })
+        } as any)
         .select()
         .single();
 
