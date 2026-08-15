@@ -15,6 +15,8 @@ export interface Cliente {
   region: string;
   telefono?: string;
   categoria_negocio?: string;
+  industrias?: string[];
+  palabras_clave_busqueda?: string[];
   plan: string;
   activo: boolean;
   onboarding_completado: boolean;

@@ -1,20 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check, Building2, Package, Ban, Bell, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Tag, Ban, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useCliente, useActualizarCliente } from '@/hooks/useCliente';
 import { supabase } from '@/integrations/supabase/client';
 import OnboardingStep1 from '@/components/cliente-onboarding/OnboardingStep1';
-import OnboardingStep2 from '@/components/cliente-onboarding/OnboardingStep2';
 import OnboardingStep3 from '@/components/cliente-onboarding/OnboardingStep3';
-import OnboardingStep4 from '@/components/cliente-onboarding/OnboardingStep4';
+import OnboardingResultados from '@/components/cliente-onboarding/OnboardingResultados';
 
 const STEPS = [
-  { id: 1, title: 'Tu empresa', icon: Building2 },
-  { id: 2, title: 'Inventario', icon: Package },
-  { id: 3, title: 'Exclusiones', icon: Ban },
-  { id: 4, title: 'Notificaciones', icon: Bell },
+  { id: 1, title: '¿Qué vendes?', icon: Tag },
+  { id: 2, title: '¿Qué NO vendes?', icon: Ban },
+  { id: 3, title: 'Tus oportunidades', icon: Sparkles },
 ];
 
 export default function ClienteOnboarding() {
@@ -29,7 +27,8 @@ export default function ClienteOnboarding() {
       if (cliente.onboarding_completado) {
         navigate('/dashboard');
       } else {
-        setCurrentStep(cliente.onboarding_step || 1);
+        // Clamp: clientes viejos podían tener onboarding_step hasta 4.
+        setCurrentStep(Math.min(cliente.onboarding_step || 1, STEPS.length));
       }
     }
   }, [cliente, navigate]);
@@ -37,7 +36,7 @@ export default function ClienteOnboarding() {
   const handleNext = async () => {
     if (!cliente?.id) return;
 
-    if (currentStep < 4) {
+    if (currentStep < STEPS.length) {
       const nextStep = currentStep + 1;
       await actualizarCliente.mutateAsync({
         id: cliente.id,
@@ -130,9 +129,8 @@ export default function ClienteOnboarding() {
         {/* Step content */}
         <div className="max-w-3xl mx-auto">
           {currentStep === 1 && <OnboardingStep1 cliente={cliente} />}
-          {currentStep === 2 && <OnboardingStep2 />}
-          {currentStep === 3 && <OnboardingStep3 />}
-          {currentStep === 4 && <OnboardingStep4 />}
+          {currentStep === 2 && <OnboardingStep3 />}
+          {currentStep === 3 && <OnboardingResultados cliente={cliente} />}
 
           {/* Navigation */}
           <div className="flex justify-between mt-8 pt-6 border-t">
@@ -149,9 +147,9 @@ export default function ClienteOnboarding() {
               onClick={handleNext}
               disabled={actualizarCliente.isPending}
             >
-              {currentStep === 4 ? (
+              {currentStep === STEPS.length ? (
                 <>
-                  Finalizar <Check className="w-4 h-4 ml-2" />
+                  Entrar a mi panel <Check className="w-4 h-4 ml-2" />
                 </>
               ) : (
                 <>
