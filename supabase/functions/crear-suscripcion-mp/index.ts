@@ -2,8 +2,10 @@
 // La llama el frontend con el JWT del usuario logueado. Devuelve el init_point
 // (URL de checkout de MercadoPago) al que se redirige al usuario.
 //
-// Requiere el secreto MERCADOPAGO_ACCESS_TOKEN (Access Token de producción),
-// configurado en Supabase (Edge Functions -> Secrets). NUNCA va en el código.
+// El token de MercadoPago se lee del secreto MERCADOPAGO_ACCESS_TOKEN y, si no
+// está en el entorno, de la tabla app_secrets (mismo mecanismo que la webhook de
+// Academia). Así reutiliza el token ya configurado en cualquiera de los dos
+// lugares. NUNCA va escrito en el código.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -19,19 +21,29 @@ function json(obj: unknown, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 }
 
+async function getMpToken(admin: ReturnType<typeof createClient>): Promise<string> {
+  let token = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN') || '';
+  if (!token) {
+    const { data: sec } = await admin.from('app_secrets').select('value').eq('key', 'MERCADOPAGO_ACCESS_TOKEN').maybeSingle();
+    token = (sec as { value?: string } | null)?.value || '';
+  }
+  return token;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   try {
-    const token = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN');
-    if (!token) {
-      return json({ error: 'Falta MERCADOPAGO_ACCESS_TOKEN. Configúralo como secreto en Supabase.' }, 500);
-    }
-
-    const jwt = (req.headers.get('Authorization') || '').replace('Bearer ', '');
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
+
+    const token = await getMpToken(supabase);
+    if (!token) {
+      return json({ error: 'Falta MERCADOPAGO_ACCESS_TOKEN (ni en secretos ni en app_secrets).' }, 500);
+    }
+
+    const jwt = (req.headers.get('Authorization') || '').replace('Bearer ', '');
     const { data: userData, error: uerr } = await supabase.auth.getUser(jwt);
     if (uerr || !userData?.user) return json({ error: 'No autenticado' }, 401);
     const user = userData.user;
@@ -45,14 +57,14 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const backUrl: string = body.back_url || 'https://firmavb.cl/cuenta/facturacion';
-    const payerEmail: string = cliente.email || user.email || '';
+    const payerEmail: string = (cliente as { email?: string }).email || user.email || '';
 
     const resp = await fetch('https://api.mercadopago.com/preapproval', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         reason: 'FirmaVB Pro — Suscripción mensual',
-        external_reference: cliente.id,
+        external_reference: (cliente as { id: string }).id,
         payer_email: payerEmail,
         notification_url: WEBHOOK_URL,
         back_url: backUrl,
@@ -69,7 +81,7 @@ Deno.serve(async (req) => {
     if (!resp.ok) return json({ error: 'MercadoPago rechazó la suscripción', details: data }, 502);
 
     await supabase.from('suscripciones').upsert({
-      cliente_id: cliente.id,
+      cliente_id: (cliente as { id: string }).id,
       mp_preapproval_id: data.id,
       estado: data.status,
       monto: MONTO_CLP,
