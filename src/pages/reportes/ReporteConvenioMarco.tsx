@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowLeft, Download, Search, Package, Building2, Trophy, Users,
-  TrendingDown, Tag, Loader2, Inbox, Crown,
+  TrendingDown, Tag, Inbox, Crown, Activity,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,11 +15,23 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip as RechartsTooltip, ResponsiveContainer,
+} from "recharts";
 import { FirmaVBHeader } from "@/components/layout/FirmaVBHeader";
 import { formatCurrency, formatCompact, formatNumber, exportToCSV } from "@/hooks/useReportes";
 import {
-  useCMProductos, useCMProductoDetalle, type TipoOrigenCM, type CMProducto,
+  useCMProductos, useCMProductoDetalle, useCMProductoTendencia,
+  type TipoOrigenCM, type CMProducto,
 } from "@/hooks/useConvenioMarco";
+
+const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+function labelMes(mes: string): string {
+  const d = new Date(mes);
+  if (isNaN(d.getTime())) return mes;
+  return `${MESES[d.getUTCMonth()]} ${String(d.getUTCFullYear()).slice(2)}`;
+}
 
 const TIPOS: { value: string; label: string }[] = [
   { value: "convenio_marco", label: "Convenio Marco" },
@@ -61,6 +73,8 @@ export default function ReporteConvenioMarco() {
   const total = data?.total ?? 0;
 
   const { data: detalle, isLoading: detalleLoading } = useCMProductoDetalle(selected?.producto_key ?? null, tipo);
+  const { data: tendencia = [], isLoading: tendenciaLoading } = useCMProductoTendencia(selected?.producto_key ?? null, tipo);
+  const serie = tendencia.map((t) => ({ ...t, label: labelMes(t.mes) }));
 
   // El proveedor con menor precio promedio = el precio a vencer.
   const mejorPrecio = detalle?.proveedores?.length
@@ -198,6 +212,52 @@ export default function ReporteConvenioMarco() {
                 <KPI label="Competidores" value={formatNumber(selected.proveedores)} icon={Trophy} />
                 <KPI label="Monto transado" value={formatCompact(selected.monto_total)} icon={Building2} />
               </div>
+
+              {/* Tendencia de precio */}
+              <Card className="border-border/50 shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2"><Activity className="h-4 w-4" /> Tendencia de precio</CardTitle>
+                  <CardDescription>Precio promedio por mes (banda: mínimo–máximo pagado).</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {tendenciaLoading ? (
+                    <Skeleton className="h-[240px] w-full" />
+                  ) : serie.length >= 2 ? (
+                    <ResponsiveContainer width="100%" height={240}>
+                      <ComposedChart data={serie} margin={{ left: 4, right: 8, top: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
+                        <XAxis dataKey="label" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                        <YAxis
+                          tick={{ fontSize: 11 }} axisLine={false} tickLine={false} width={54}
+                          tickFormatter={(v) => formatCompact(Number(v))}
+                        />
+                        <RechartsTooltip
+                          formatter={(value: number, name: string) => [formatCurrency(Number(value)),
+                            name === "precio_prom" ? "Promedio" : name === "precio_max" ? "Máximo" : "Mínimo"]}
+                          labelFormatter={(l) => `Mes: ${l}`}
+                          contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
+                        />
+                        <Area type="monotone" dataKey="precio_max" stroke="none" fill="hsl(var(--primary))" fillOpacity={0.08} />
+                        <Area type="monotone" dataKey="precio_min" stroke="none" fill="hsl(var(--card))" fillOpacity={1} />
+                        <Line type="monotone" dataKey="precio_prom" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  ) : serie.length === 1 ? (
+                    <div className="py-6 text-center">
+                      <p className="text-2xl font-bold">{formatCurrency(serie[0].precio_prom)}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Promedio de {serie[0].label} · {serie[0].ordenes} orden{serie[0].ordenes === 1 ? "" : "es"} · rango{" "}
+                        {formatCurrency(serie[0].precio_min ?? serie[0].precio_prom)}–{formatCurrency(serie[0].precio_max ?? serie[0].precio_prom)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-2">La curva aparece cuando haya compras en más de un mes.</p>
+                    </div>
+                  ) : (
+                    <div className="py-8 text-center text-muted-foreground text-sm flex items-center justify-center gap-2">
+                      <Inbox className="h-4 w-4" /> Sin historial de precio aún
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
               {/* Competidores */}
               <Card className="border-border/50 shadow-sm">

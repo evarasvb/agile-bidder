@@ -38,6 +38,15 @@ export interface CMDetalle {
   compradores: CMComprador[];
 }
 
+export interface CMTendenciaPunto {
+  mes: string;
+  ordenes: number;
+  monto_total: number;
+  precio_prom: number;
+  precio_min: number | null;
+  precio_max: number | null;
+}
+
 // Búsqueda de productos (lee la MV pre-agregada vía RPC; muy rápida).
 export function useCMProductos(termino: string, tipo: TipoOrigenCM = 'convenio_marco') {
   return useQuery({
@@ -68,6 +77,23 @@ export function useCMProductoDetalle(productoKey: string | null, tipo: TipoOrige
       });
       if (error) throw error;
       return (data ?? { resumen: null, proveedores: [], compradores: [] }) as CMDetalle;
+    },
+    staleTime: 60_000,
+  });
+}
+
+// Tendencia de precio en el tiempo (serie mensual).
+export function useCMProductoTendencia(productoKey: string | null, tipo: TipoOrigenCM = 'convenio_marco') {
+  return useQuery({
+    queryKey: ['cm-tendencia', productoKey, tipo],
+    enabled: !!productoKey,
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)('cm_producto_tendencia', {
+        p_producto_key: productoKey,
+        p_tipo: tipo,
+      });
+      if (error) throw error;
+      return (data ?? []) as CMTendenciaPunto[];
     },
     staleTime: 60_000,
   });
