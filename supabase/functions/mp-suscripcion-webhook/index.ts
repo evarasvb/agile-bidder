@@ -1,20 +1,29 @@
-// Webhook de MercadoPago para suscripciones (preapproval). MercadoPago lo llama
-// cuando cambia el estado de una suscripción. Consulta el estado real en la API y
-// activa/desactiva el Pro del cliente en consecuencia.
+// Webhook de MercadoPago para SUSCRIPCIONES (preapproval). MP la llama cuando
+// cambia el estado de la suscripción; consultamos el estado real y activamos
+// (authorized -> plan pro) o desactivamos (cancelled/paused -> free) al cliente.
 //
-// verify_jwt = false (lo llama MercadoPago, no un usuario). Siempre responde 200
-// para que MercadoPago no reintente en bucle.
+// El token se lee del secreto MERCADOPAGO_ACCESS_TOKEN o, si no está, de la tabla
+// app_secrets (mismo mecanismo que la webhook de Academia).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+async function getMpToken(admin: ReturnType<typeof createClient>): Promise<string> {
+  let token = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN') || '';
+  if (!token) {
+    const { data: sec } = await admin.from('app_secrets').select('value').eq('key', 'MERCADOPAGO_ACCESS_TOKEN').maybeSingle();
+    token = (sec as { value?: string } | null)?.value || '';
+  }
+  return token;
+}
 
 Deno.serve(async (req) => {
   const ok = () => new Response('ok', { status: 200 });
   try {
-    const token = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN');
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
+    const token = await getMpToken(supabase);
 
     const url = new URL(req.url);
     let type = url.searchParams.get('type') || url.searchParams.get('topic') || '';
@@ -26,7 +35,6 @@ Deno.serve(async (req) => {
     }
     if (!id || !token) return ok();
 
-    // Sólo suscripciones (preapproval). Ignoramos otros topics (payment, etc.).
     if (type && !`${type}`.includes('preapproval') && !`${type}`.includes('subscription')) {
       return ok();
     }
@@ -50,8 +58,6 @@ Deno.serve(async (req) => {
       updated_at: new Date().toISOString(),
     }, { onConflict: 'mp_preapproval_id' });
 
-    // Sólo cambiamos el plan en estados definitivos (evita bajar a free durante
-    // "pending").
     let nuevoPlan: string | null = null;
     if (estado === 'authorized') nuevoPlan = 'pro';
     else if (estado === 'cancelled' || estado === 'paused') nuevoPlan = 'free';
