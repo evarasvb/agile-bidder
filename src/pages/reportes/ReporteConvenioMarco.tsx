@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowLeft, Download, Search, Package, Building2, Trophy, Users,
-  TrendingDown, Tag, Inbox, Crown, Activity,
+  TrendingDown, Tag, Inbox, Crown, Activity, ArrowLeftRight,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -67,8 +67,12 @@ export default function ReporteConvenioMarco() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<CMProducto | null>(null);
   const [miPrecio, setMiPrecio] = useState<string>("");
+  const [compareSearch, setCompareSearch] = useState("");
+  const [compareSel, setCompareSel] = useState<CMProducto | null>(null);
 
-  const seleccionar = (p: CMProducto | null) => { setSelected(p); setMiPrecio(""); };
+  const seleccionar = (p: CMProducto | null) => {
+    setSelected(p); setMiPrecio(""); setCompareSel(null); setCompareSearch("");
+  };
 
   const tipo: TipoOrigenCM = tipoSel === "__all__" ? null : (tipoSel as TipoOrigenCM);
   const { data, isLoading } = useCMProductos(search, tipo);
@@ -78,6 +82,10 @@ export default function ReporteConvenioMarco() {
   const { data: detalle, isLoading: detalleLoading } = useCMProductoDetalle(selected?.producto_key ?? null, tipo);
   const { data: tendencia = [], isLoading: tendenciaLoading } = useCMProductoTendencia(selected?.producto_key ?? null, tipo);
   const serie = tendencia.map((t) => ({ ...t, label: labelMes(t.mes) }));
+
+  // Comparador: resultados para elegir el 2º producto (excluye el ya seleccionado).
+  const { data: compareData } = useCMProductos(compareSearch, tipo);
+  const compareOpciones = (compareData?.items ?? []).filter((p) => p.producto_key !== selected?.producto_key).slice(0, 6);
 
   // El proveedor con menor precio promedio = el precio a vencer.
   const mejorPrecio = detalle?.proveedores?.length
@@ -402,6 +410,79 @@ export default function ReporteConvenioMarco() {
                   ) : (
                     <div className="py-6 text-center text-muted-foreground text-sm flex items-center justify-center gap-2">
                       <Inbox className="h-4 w-4" /> Sin compradores registrados aún
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Comparador de 2 productos */}
+              <Card className="border-border/50 shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2"><ArrowLeftRight className="h-4 w-4" /> Comparar con otro producto</CardTitle>
+                  <CardDescription>Busca un segundo producto para verlos lado a lado.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar producto a comparar…"
+                      value={compareSearch}
+                      onChange={(e) => { setCompareSearch(e.target.value); setCompareSel(null); }}
+                      className="pl-9 h-10"
+                    />
+                  </div>
+
+                  {compareSearch && !compareSel && (
+                    <div className="space-y-1 max-h-52 overflow-auto">
+                      {compareOpciones.length ? compareOpciones.map((p) => (
+                        <button
+                          type="button"
+                          key={p.producto_key}
+                          onClick={() => { setCompareSel(p); }}
+                          className="w-full text-left rounded-md border border-border/60 p-2 text-sm hover:border-primary/50 hover:bg-muted/40"
+                        >
+                          <span className="line-clamp-1">{p.producto}</span>
+                        </button>
+                      )) : <p className="text-sm text-muted-foreground px-1">Sin coincidencias.</p>}
+                    </div>
+                  )}
+
+                  {compareSel && (
+                    <div className="rounded-lg border overflow-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead>Métrica</TableHead>
+                            <TableHead className="text-right max-w-[160px] truncate">{selected.producto}</TableHead>
+                            <TableHead className="text-right max-w-[160px] truncate">{compareSel.producto}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {([
+                            ["Precio promedio", (p: CMProducto) => p.precio_prom, true],
+                            ["Precio mínimo", (p: CMProducto) => p.precio_min, true],
+                            ["Precio máximo", (p: CMProducto) => p.precio_max, true],
+                            ["Competidores", (p: CMProducto) => p.proveedores, false],
+                            ["Compradores", (p: CMProducto) => p.compradores, false],
+                            ["Monto transado", (p: CMProducto) => p.monto_total, false],
+                          ] as [string, (p: CMProducto) => number | null, boolean][]).map(([label, get, esPrecio]) => {
+                            const a = get(selected); const b = get(compareSel);
+                            const aMenor = esPrecio && a != null && b != null && a < b;
+                            const bMenor = esPrecio && a != null && b != null && b < a;
+                            const fmt = (v: number | null) => v == null ? "—" : esPrecio ? formatCurrency(Math.round(v)) : formatNumber(v);
+                            return (
+                              <TableRow key={label}>
+                                <TableCell className="text-muted-foreground">{label}</TableCell>
+                                <TableCell className={`text-right font-mono ${aMenor ? "text-emerald-600 font-semibold" : ""}`}>{fmt(a)}</TableCell>
+                                <TableCell className={`text-right font-mono ${bMenor ? "text-emerald-600 font-semibold" : ""}`}>{fmt(b)}</TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                      <div className="p-2 text-right">
+                        <Button variant="ghost" size="sm" onClick={() => { setCompareSel(null); setCompareSearch(""); }}>Limpiar</Button>
+                      </div>
                     </div>
                   )}
                 </CardContent>
