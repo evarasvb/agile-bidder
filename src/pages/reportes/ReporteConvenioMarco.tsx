@@ -22,7 +22,7 @@ import {
 import { FirmaVBHeader } from "@/components/layout/FirmaVBHeader";
 import { formatCurrency, formatCompact, formatNumber, exportToCSV } from "@/hooks/useReportes";
 import {
-  useCMProductos, useCMProductoDetalle, useCMProductoTendencia,
+  useCMProductos, useCMProductoDetalle, useCMProductoTendencia, useMiCompetitividad,
   type TipoOrigenCM, type CMProducto,
 } from "@/hooks/useConvenioMarco";
 
@@ -63,6 +63,7 @@ function KPI({ label, value, icon: Icon }: { label: string; value: string; icon:
 }
 
 export default function ReporteConvenioMarco() {
+  const [modo, setModo] = useState<"explorar" | "mia">("explorar");
   const [tipoSel, setTipoSel] = useState<string>("convenio_marco");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<CMProducto | null>(null);
@@ -86,6 +87,8 @@ export default function ReporteConvenioMarco() {
   // Comparador: resultados para elegir el 2º producto (excluye el ya seleccionado).
   const { data: compareData } = useCMProductos(compareSearch, tipo);
   const compareOpciones = (compareData?.items ?? []).filter((p) => p.producto_key !== selected?.producto_key).slice(0, 6);
+
+  const { data: miComp = [], isLoading: miCompLoading } = useMiCompetitividad(tipo, modo === "mia");
 
   // El proveedor con menor precio promedio = el precio a vencer.
   const mejorPrecio = detalle?.proveedores?.length
@@ -127,7 +130,11 @@ export default function ReporteConvenioMarco() {
             subtitle="Explora productos: precios, competidores y compradores del mercado público"
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="inline-flex rounded-lg border p-0.5">
+            <Button variant={modo === "explorar" ? "default" : "ghost"} size="sm" className="h-8" onClick={() => setModo("explorar")}>Explorar</Button>
+            <Button variant={modo === "mia" ? "default" : "ghost"} size="sm" className="h-8" onClick={() => setModo("mia")}>Mi competitividad</Button>
+          </div>
           <Select value={tipoSel} onValueChange={(v) => { setTipoSel(v); seleccionar(null); }}>
             <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -140,6 +147,77 @@ export default function ReporteConvenioMarco() {
         </div>
       </div>
 
+      {/* Vista: Mi competitividad */}
+      {modo === "mia" && (
+        <Card className="border-border/50 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Crown className="h-5 w-5 text-amber-500" /> Mi competitividad</CardTitle>
+            <CardDescription>
+              Cruzamos tu inventario con el mercado y te decimos dónde ganas o estás caro. Revisa que el
+              “producto en el mercado” corresponda (coincidencia aproximada por nombre).
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {miCompLoading ? (
+              <div className="space-y-2">{[...Array(6)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+            ) : miComp.length === 0 ? (
+              <div className="py-12 text-center text-muted-foreground">
+                <Package className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                <p className="font-medium">Sin coincidencias todavía</p>
+                <p className="text-sm max-w-md mx-auto">
+                  Carga tu inventario con precios y aquí verás, producto por producto, si le ganas al mejor del
+                  mercado. También crece a medida que ingresamos más órdenes de compra.
+                </p>
+                <Button asChild variant="outline" size="sm" className="mt-3"><Link to="/inventario">Ir a mi inventario</Link></Button>
+              </div>
+            ) : (
+              <div className="rounded-lg border overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead>Mi producto</TableHead>
+                      <TableHead>Producto en el mercado</TableHead>
+                      <TableHead className="text-right">Mi precio</TableHead>
+                      <TableHead className="text-right">Mejor del mercado</TableHead>
+                      <TableHead className="text-right">Dif.</TableHead>
+                      <TableHead>Estado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {miComp.map((r, i) => {
+                      const gana = r.diff_pct != null && r.diff_pct <= 0;
+                      const cerca = r.diff_pct != null && r.diff_pct > 0 && r.diff_pct <= 8;
+                      const caro = r.diff_pct != null && r.diff_pct > 8;
+                      const badge = gana ? { t: "Ganas", c: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" }
+                        : cerca ? { t: "Competitivo", c: "bg-amber-500/10 text-amber-600 border-amber-500/20" }
+                        : caro ? { t: "Caro", c: "bg-destructive/10 text-destructive border-destructive/20" }
+                        : { t: "—", c: "" };
+                      return (
+                        <TableRow key={i}>
+                          <TableCell className="font-medium max-w-[200px] truncate">{r.mi_producto}</TableCell>
+                          <TableCell className="max-w-[240px]">
+                            <span className="line-clamp-1 text-sm">{r.producto_cm}</span>
+                            <span className="text-[11px] text-muted-foreground">{Math.round(r.similitud * 100)}% coincidencia</span>
+                          </TableCell>
+                          <TableCell className="text-right font-mono">{formatCurrency(Math.round(r.mi_precio))}</TableCell>
+                          <TableCell className="text-right font-mono">{r.precio_ganador != null ? formatCurrency(Math.round(r.precio_ganador)) : "—"}</TableCell>
+                          <TableCell className={`text-right font-mono ${gana ? "text-emerald-600" : caro ? "text-destructive" : ""}`}>
+                            {r.diff_pct == null ? "—" : `${r.diff_pct > 0 ? "+" : ""}${r.diff_pct}%`}
+                          </TableCell>
+                          <TableCell><Badge variant="outline" className={badge.c}>{badge.t}</Badge></TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {modo === "explorar" && (
+        <>
       {/* Buscador */}
       <div className="relative max-w-xl">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -491,6 +569,8 @@ export default function ReporteConvenioMarco() {
           )}
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 }

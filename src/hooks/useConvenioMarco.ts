@@ -82,6 +82,33 @@ export function useCMProductoDetalle(productoKey: string | null, tipo: TipoOrige
   });
 }
 
+export interface CMCompetitividad {
+  mi_producto: string;
+  mi_precio: number;
+  producto_cm: string;
+  producto_key: string;
+  precio_ganador: number | null;
+  precio_prom: number | null;
+  proveedores: number;
+  similitud: number;
+  diff_pct: number | null;
+}
+
+// Cruza el inventario del cliente con el mercado (match por nombre) y devuelve
+// su posición de precio vs. el ganador.
+export function useMiCompetitividad(tipo: TipoOrigenCM = 'convenio_marco', enabled = true) {
+  return useQuery({
+    queryKey: ['cm-mi-competitividad', tipo],
+    enabled,
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)('cm_mi_competitividad', { p_tipo: tipo, umbral: 0.6 });
+      if (error) throw error;
+      return (data ?? []) as CMCompetitividad[];
+    },
+    staleTime: 60_000,
+  });
+}
+
 // Tendencia de precio en el tiempo (serie mensual).
 export function useCMProductoTendencia(productoKey: string | null, tipo: TipoOrigenCM = 'convenio_marco') {
   return useQuery({
