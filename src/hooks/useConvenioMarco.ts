@@ -47,6 +47,26 @@ export interface CMTendenciaPunto {
   precio_max: number | null;
 }
 
+export interface CMStats {
+  productos: number;
+  monto_total: number;
+  proveedores: number;
+  compradores: number;
+}
+
+// Totales del módulo por origen (para el header).
+export function useCMStats(tipo: TipoOrigenCM = 'convenio_marco') {
+  return useQuery({
+    queryKey: ['cm-stats', tipo],
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)('cm_stats', { p_tipo: tipo });
+      if (error) throw error;
+      return (data ?? { productos: 0, monto_total: 0, proveedores: 0, compradores: 0 }) as CMStats;
+    },
+    staleTime: 5 * 60_000,
+  });
+}
+
 // Búsqueda de productos (lee la MV pre-agregada vía RPC; muy rápida).
 export function useCMProductos(termino: string, tipo: TipoOrigenCM = 'convenio_marco') {
   return useQuery({

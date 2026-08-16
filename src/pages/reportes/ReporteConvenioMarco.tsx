@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowLeft, Download, Search, Package, Building2, Trophy, Users,
-  TrendingDown, Tag, Inbox, Crown, Activity, ArrowLeftRight,
+  TrendingDown, Tag, Inbox, Crown, Activity, ArrowLeftRight, Landmark, DollarSign,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,10 +19,9 @@ import {
   ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, ResponsiveContainer,
 } from "recharts";
-import { FirmaVBHeader } from "@/components/layout/FirmaVBHeader";
 import { formatCurrency, formatCompact, formatNumber, exportToCSV } from "@/hooks/useReportes";
 import {
-  useCMProductos, useCMProductoDetalle, useCMProductoTendencia, useMiCompetitividad,
+  useCMProductos, useCMProductoDetalle, useCMProductoTendencia, useMiCompetitividad, useCMStats,
   type TipoOrigenCM, type CMProducto,
 } from "@/hooks/useConvenioMarco";
 
@@ -46,19 +45,31 @@ function precioRango(p: { precio_min: number | null; precio_max: number | null; 
   return `${formatCurrency(p.precio_min)} – ${formatCurrency(p.precio_max ?? p.precio_min)}`;
 }
 
-function KPI({ label, value, icon: Icon }: { label: string; value: string; icon: React.ElementType }) {
+function KPI({ label, value, icon: Icon, iconClass = "bg-primary/10 text-primary" }: {
+  label: string; value: string; icon: React.ElementType; iconClass?: string;
+}) {
   return (
     <Card className="border-border/50 shadow-sm">
-      <CardContent className="pt-4">
-        <div className="flex items-center justify-between">
-          <div className="min-w-0">
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="text-lg font-bold truncate">{value}</p>
-          </div>
-          <Icon className="h-5 w-5 text-muted-foreground shrink-0" />
+      <CardContent className="p-4 flex items-center gap-3">
+        <div className={`p-2.5 rounded-xl shrink-0 ${iconClass}`}><Icon className="h-5 w-5" /></div>
+        <div className="min-w-0">
+          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className="text-lg font-bold truncate leading-tight">{value}</p>
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function StatChip({ label, value, icon: Icon }: { label: string; value: string; icon: React.ElementType }) {
+  return (
+    <div className="rounded-xl bg-white/10 backdrop-blur-sm px-4 py-3 flex items-center gap-3">
+      <Icon className="h-5 w-5 text-white/80 shrink-0" />
+      <div className="min-w-0">
+        <p className="text-[11px] uppercase tracking-wide text-white/70">{label}</p>
+        <p className="text-lg font-bold leading-tight truncate">{value}</p>
+      </div>
+    </div>
   );
 }
 
@@ -89,6 +100,7 @@ export default function ReporteConvenioMarco() {
   const compareOpciones = (compareData?.items ?? []).filter((p) => p.producto_key !== selected?.producto_key).slice(0, 6);
 
   const { data: miComp = [], isLoading: miCompLoading } = useMiCompetitividad(tipo, modo === "mia");
+  const { data: stats } = useCMStats(tipo);
 
   // El proveedor con menor precio promedio = el precio a vencer.
   const mejorPrecio = detalle?.proveedores?.length
@@ -119,22 +131,33 @@ export default function ReporteConvenioMarco() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-4">
+      {/* Hero con identidad de marca + KPIs del módulo */}
+      <div className="rounded-2xl bg-gradient-to-br from-firmavb-blue to-firmavb-blue/80 text-white p-6 shadow-lg">
+        <div className="flex items-start gap-3">
           <Link to="/reportes">
-            <Button variant="ghost" size="icon"><ArrowLeft className="h-5 w-5" /></Button>
+            <Button variant="ghost" size="icon" className="text-white hover:bg-white/15 -ml-2"><ArrowLeft className="h-5 w-5" /></Button>
           </Link>
-          <FirmaVBHeader
-            title="Convenio Marco"
-            subtitle="Explora productos: precios, competidores y compradores del mercado público"
-          />
+          <div className="p-2.5 rounded-xl bg-white/10 hidden sm:block"><Landmark className="h-6 w-6" /></div>
+          <div>
+            <h1 className="text-2xl font-bold leading-tight">Convenio Marco</h1>
+            <p className="text-white/80 text-sm mt-0.5">Inteligencia de precios, competidores y compradores del mercado público</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-5">
+          <StatChip label="Productos" value={stats ? formatNumber(stats.productos) : "…"} icon={Package} />
+          <StatChip label="Transado" value={stats ? formatCompact(stats.monto_total) : "…"} icon={DollarSign} />
+          <StatChip label="Proveedores" value={stats ? formatNumber(stats.proveedores) : "…"} icon={Trophy} />
+          <StatChip label="Compradores" value={stats ? formatNumber(stats.compradores) : "…"} icon={Users} />
+        </div>
+      </div>
+
+      {/* Controles */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="inline-flex rounded-lg border bg-card p-0.5">
+          <Button variant={modo === "explorar" ? "default" : "ghost"} size="sm" className="h-8" onClick={() => setModo("explorar")}>Explorar</Button>
+          <Button variant={modo === "mia" ? "default" : "ghost"} size="sm" className="h-8" onClick={() => setModo("mia")}>Mi competitividad</Button>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="inline-flex rounded-lg border p-0.5">
-            <Button variant={modo === "explorar" ? "default" : "ghost"} size="sm" className="h-8" onClick={() => setModo("explorar")}>Explorar</Button>
-            <Button variant={modo === "mia" ? "default" : "ghost"} size="sm" className="h-8" onClick={() => setModo("mia")}>Mi competitividad</Button>
-          </div>
           <Select value={tipoSel} onValueChange={(v) => { setTipoSel(v); seleccionar(null); }}>
             <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -302,10 +325,10 @@ export default function ReporteConvenioMarco() {
 
               {/* KPIs */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <KPI label="Precio sugerido" value={selected.precio_prom ? formatCurrency(Math.round(selected.precio_prom)) : "—"} icon={TrendingDown} />
-                <KPI label="Rango" value={precioRango(selected)} icon={Tag} />
-                <KPI label="Competidores" value={formatNumber(selected.proveedores)} icon={Trophy} />
-                <KPI label="Monto transado" value={formatCompact(selected.monto_total)} icon={Building2} />
+                <KPI label="Precio sugerido" value={selected.precio_prom ? formatCurrency(Math.round(selected.precio_prom)) : "—"} icon={TrendingDown} iconClass="bg-emerald-500/10 text-emerald-600" />
+                <KPI label="Rango" value={precioRango(selected)} icon={Tag} iconClass="bg-primary/10 text-primary" />
+                <KPI label="Competidores" value={formatNumber(selected.proveedores)} icon={Trophy} iconClass="bg-amber-500/10 text-amber-600" />
+                <KPI label="Monto transado" value={formatCompact(selected.monto_total)} icon={Building2} iconClass="bg-blue-500/10 text-blue-600" />
               </div>
 
               {/* Tu precio vs. el ganador */}
@@ -369,6 +392,12 @@ export default function ReporteConvenioMarco() {
                   ) : serie.length >= 2 ? (
                     <ResponsiveContainer width="100%" height={240}>
                       <ComposedChart data={serie} margin={{ left: 4, right: 8, top: 8 }}>
+                        <defs>
+                          <linearGradient id="cmBanda" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.22} />
+                            <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.02} />
+                          </linearGradient>
+                        </defs>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
                         <XAxis dataKey="label" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
                         <YAxis
@@ -381,9 +410,9 @@ export default function ReporteConvenioMarco() {
                           labelFormatter={(l) => `Mes: ${l}`}
                           contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
                         />
-                        <Area type="monotone" dataKey="precio_max" stroke="none" fill="hsl(var(--primary))" fillOpacity={0.08} />
+                        <Area type="monotone" dataKey="precio_max" stroke="none" fill="url(#cmBanda)" />
                         <Area type="monotone" dataKey="precio_min" stroke="none" fill="hsl(var(--card))" fillOpacity={1} />
-                        <Line type="monotone" dataKey="precio_prom" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} />
+                        <Line type="monotone" dataKey="precio_prom" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 3, fill: "hsl(var(--primary))" }} activeDot={{ r: 5 }} />
                       </ComposedChart>
                     </ResponsiveContainer>
                   ) : serie.length === 1 ? (
