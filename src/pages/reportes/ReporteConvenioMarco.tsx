@@ -66,6 +66,9 @@ export default function ReporteConvenioMarco() {
   const [tipoSel, setTipoSel] = useState<string>("convenio_marco");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<CMProducto | null>(null);
+  const [miPrecio, setMiPrecio] = useState<string>("");
+
+  const seleccionar = (p: CMProducto | null) => { setSelected(p); setMiPrecio(""); };
 
   const tipo: TipoOrigenCM = tipoSel === "__all__" ? null : (tipoSel as TipoOrigenCM);
   const { data, isLoading } = useCMProductos(search, tipo);
@@ -80,6 +83,12 @@ export default function ReporteConvenioMarco() {
   const mejorPrecio = detalle?.proveedores?.length
     ? Math.min(...detalle.proveedores.map((p) => p.precio_prom ?? Infinity))
     : null;
+  // Precio "ganador" de referencia: el más bajo entre competidores (o el mínimo histórico).
+  const precioGanador =
+    mejorPrecio != null && isFinite(mejorPrecio) ? mejorPrecio : (selected?.precio_min ?? null);
+  const miPrecioNum = Number((miPrecio || "").replace(/[^\d]/g, ""));
+  const compara = miPrecioNum > 0 && precioGanador != null && precioGanador > 0;
+  const diffPct = compara ? ((miPrecioNum - precioGanador!) / precioGanador!) * 100 : null;
 
   const handleExport = () => {
     exportToCSV(
@@ -111,7 +120,7 @@ export default function ReporteConvenioMarco() {
           />
         </div>
         <div className="flex items-center gap-2">
-          <Select value={tipoSel} onValueChange={(v) => { setTipoSel(v); setSelected(null); }}>
+          <Select value={tipoSel} onValueChange={(v) => { setTipoSel(v); seleccionar(null); }}>
             <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               {TIPOS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
@@ -161,7 +170,7 @@ export default function ReporteConvenioMarco() {
                   <button
                     type="button"
                     key={p.producto_key}
-                    onClick={() => setSelected(p)}
+                    onClick={() => seleccionar(p)}
                     className={`w-full text-left rounded-lg border p-3 transition-all hover:border-primary/50 hover:bg-muted/40 ${
                       active ? "border-primary bg-primary/5" : "border-border/60"
                     }`}
@@ -212,6 +221,55 @@ export default function ReporteConvenioMarco() {
                 <KPI label="Competidores" value={formatNumber(selected.proveedores)} icon={Trophy} />
                 <KPI label="Monto transado" value={formatCompact(selected.monto_total)} icon={Building2} />
               </div>
+
+              {/* Tu precio vs. el ganador */}
+              <Card className="border-primary/30 bg-primary/[0.03] shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2"><Crown className="h-4 w-4 text-amber-500" /> ¿Ganas con tu precio?</CardTitle>
+                  <CardDescription>Ingresa tu precio neto y compáralo con el mejor precio del mercado.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex flex-wrap items-end gap-4">
+                    <div className="flex-1 min-w-[180px]">
+                      <label className="text-xs text-muted-foreground">Tu precio neto (CLP)</label>
+                      <Input
+                        inputMode="numeric"
+                        placeholder="Ej: 8000"
+                        value={miPrecio}
+                        onChange={(e) => setMiPrecio(e.target.value)}
+                        className="mt-1 h-10"
+                      />
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground">Precio a vencer</p>
+                      <p className="text-lg font-bold">{precioGanador != null ? formatCurrency(Math.round(precioGanador)) : "—"}</p>
+                    </div>
+                  </div>
+
+                  {compara && diffPct != null && (
+                    (() => {
+                      const abs = Math.abs(diffPct);
+                      const gana = diffPct <= 0;
+                      const cerca = diffPct > 0 && diffPct <= 8;
+                      const color = gana ? "text-emerald-600 bg-emerald-500/10 border-emerald-500/20"
+                        : cerca ? "text-amber-600 bg-amber-500/10 border-amber-500/20"
+                        : "text-destructive bg-destructive/10 border-destructive/20";
+                      const titulo = gana ? "¡Eres el más barato! 🏆" : cerca ? "Competitivo" : "Estás caro";
+                      const msg = gana
+                        ? `Tu precio está ${abs.toFixed(1)}% por debajo del mejor del mercado. Muy buena posición para ganar.`
+                        : cerca
+                        ? `Estás ${abs.toFixed(1)}% sobre el ganador. Ajustando un poco puedes quedar imbatible.`
+                        : `Estás ${abs.toFixed(1)}% sobre el ganador. Para competir, ofrece ${formatCurrency(Math.round(precioGanador!))} o menos.`;
+                      return (
+                        <div className={`rounded-lg border p-3 ${color}`}>
+                          <p className="font-semibold text-sm">{titulo}</p>
+                          <p className="text-sm mt-0.5 text-foreground/80">{msg}</p>
+                        </div>
+                      );
+                    })()
+                  )}
+                </CardContent>
+              </Card>
 
               {/* Tendencia de precio */}
               <Card className="border-border/50 shadow-sm">
