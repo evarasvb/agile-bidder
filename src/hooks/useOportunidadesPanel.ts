@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { aplicarFiltrosCliente, type ClienteFiltros } from '@/hooks/useClienteFiltros';
 
 // =============================================================================
 // INTERFACES
@@ -250,6 +251,17 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       }));
 
       let all = [...compras, ...licitaciones];
+
+      // Filtros del cliente (onboarding + IA): no mostrar lo que no cumple.
+      // RLS restringe la fila al propio cliente, así que un maybeSingle basta.
+      // Si el cliente no configuró filtros, es un no-op.
+      const { data: filtrosRow } = await (supabase as any)
+        .from('cliente_filtros_oportunidades')
+        .select('palabras_incluir, palabras_excluir, regiones_activas, monto_min, monto_max')
+        .maybeSingle();
+      if (filtrosRow) {
+        all = aplicarFiltrosCliente(all, filtrosRow as Partial<ClienteFiltros>);
+      }
 
       // Apply filters
       if (filters.tipo && filters.tipo !== 'all') {

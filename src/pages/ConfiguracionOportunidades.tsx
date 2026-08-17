@@ -7,17 +7,19 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  Save, 
-  ArrowLeft, 
-  Plus, 
-  X, 
-  MapPin, 
+import {
+  Save,
+  ArrowLeft,
+  Plus,
+  X,
+  MapPin,
   DollarSign,
   Search,
-  Ban
+  Ban,
+  Sparkles,
+  Loader2
 } from "lucide-react";
-import { useClienteFiltros } from "@/hooks/useClienteFiltros";
+import { useClienteFiltros, useSugerirFiltros } from "@/hooks/useClienteFiltros";
 import { RecargosRegion } from '@/components/settings/RecargosRegion';
 import { toast } from "sonner";
 
@@ -43,13 +45,15 @@ const REGIONES_CHILE = [
 export default function ConfiguracionOportunidades() {
   const navigate = useNavigate();
   const { filtros, isLoading, updateFiltros, isUpdating } = useClienteFiltros();
-  
+  const sugerir = useSugerirFiltros();
+
   const [palabrasIncluir, setPalabrasIncluir] = useState<string[]>([]);
   const [palabrasExcluir, setPalabrasExcluir] = useState<string[]>([]);
   const [regionesActivas, setRegionesActivas] = useState<string[]>([]);
   const [montoMin, setMontoMin] = useState<string>("");
   const [montoMax, setMontoMax] = useState<string>("");
-  
+  const [fuenteIA, setFuenteIA] = useState<string | null>(null);
+
   const [newPalabraIncluir, setNewPalabraIncluir] = useState("");
   const [newPalabraExcluir, setNewPalabraExcluir] = useState("");
 
@@ -102,6 +106,25 @@ export default function ConfiguracionOportunidades() {
     setRegionesActivas([]);
   };
 
+  const handleSugerirIA = async () => {
+    const res = await sugerir.mutateAsync();
+    setFuenteIA(res.fuente);
+    // Fusiona con lo existente (sin duplicar) para no perder lo que ya definió.
+    const merge = (a: string[], b: string[]) =>
+      Array.from(new Set([...a, ...b.map((s) => s.trim()).filter(Boolean)]));
+    setPalabrasIncluir((prev) => merge(prev, res.palabras_incluir));
+    setPalabrasExcluir((prev) => merge(prev, res.palabras_excluir));
+    if (res.fuente === "sin_inventario") {
+      toast.info("Aún no tienes inventario cargado: carga productos para mejores sugerencias.");
+    } else {
+      toast.success(
+        res.fuente === "ia"
+          ? "La IA sugirió palabras según tu inventario. Revísalas y guarda."
+          : "Sugerencias según las palabras más frecuentes de tu inventario. Revísalas y guarda."
+      );
+    }
+  };
+
   const handleSave = () => {
     updateFiltros({
       palabras_incluir: palabrasIncluir.length > 0 ? palabrasIncluir : null,
@@ -146,11 +169,31 @@ export default function ConfiguracionOportunidades() {
             </p>
           </div>
         </div>
-        <Button onClick={handleSave} disabled={isUpdating}>
-          <Save className="h-4 w-4 mr-2" />
-          {isUpdating ? "Guardando..." : "Guardar Cambios"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleSugerirIA} disabled={sugerir.isPending}>
+            {sugerir.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4 mr-2" />
+            )}
+            Sugerir con IA
+          </Button>
+          <Button onClick={handleSave} disabled={isUpdating}>
+            <Save className="h-4 w-4 mr-2" />
+            {isUpdating ? "Guardando..." : "Guardar Cambios"}
+          </Button>
+        </div>
       </div>
+
+      {fuenteIA && (
+        <p className="text-sm text-muted-foreground -mt-2">
+          {fuenteIA === "ia"
+            ? "✨ Palabras sugeridas por IA a partir de tu inventario. Ajústalas y guarda."
+            : fuenteIA === "sin_inventario"
+            ? "Carga tu inventario para obtener sugerencias personalizadas."
+            : "Sugerencias según las palabras más frecuentes de tu inventario. Ajústalas y guarda."}
+        </p>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Palabras a Incluir */}
