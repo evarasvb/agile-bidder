@@ -22,6 +22,7 @@ import {
 import { useClienteFiltros, useSugerirFiltros } from "@/hooks/useClienteFiltros";
 import { RecargosRegion } from '@/components/settings/RecargosRegion';
 import { InfoHint } from "@/components/ui/info-hint";
+import AprendizajeIA from "@/components/oportunidades/AprendizajeIA";
 import { toast } from "sonner";
 
 const REGIONES_CHILE = [
@@ -196,6 +197,14 @@ export default function ConfiguracionOportunidades() {
             : "Sugerencias según las palabras más frecuentes de tu inventario. Ajústalas y guarda."}
         </p>
       )}
+
+      {/* Nivel 2: lo que la IA aprendió del comportamiento del cliente */}
+      <AprendizajeIA
+        yaIncluidas={palabrasIncluir}
+        yaExcluidas={palabrasExcluir}
+        onAgregarIncluir={(w) => setPalabrasIncluir((prev) => (prev.includes(w) ? prev : [...prev, w]))}
+        onAgregarExcluir={(w) => setPalabrasExcluir((prev) => (prev.includes(w) ? prev : [...prev, w]))}
+      />
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Palabras a Incluir */}
