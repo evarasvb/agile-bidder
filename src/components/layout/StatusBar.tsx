@@ -20,11 +20,11 @@ export function StatusBar() {
   };
 
   return (
-    <header className="sticky top-0 z-30 h-16 border-b border-border bg-white/95 backdrop-blur-sm shadow-sm">
+    <header className="lg:sticky lg:top-0 z-20 h-12 lg:h-16 border-b border-border bg-white/95 backdrop-blur-sm shadow-sm">
       <div className="flex h-full items-center justify-between px-4 sm:px-6">
         {/* Left: Page Title Area */}
-        <div className="flex items-center gap-4">
-          <h2 className="text-base sm:text-lg font-semibold text-foreground">Centro de Control</h2>
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+          <h2 className="text-sm sm:text-lg font-semibold text-foreground truncate">Centro de Control</h2>
           <SystemHealthIndicator />
         </div>
 

@@ -352,7 +352,7 @@ export default function Oportunidades() {
             value={filters.tipo || "all"}
             onValueChange={(v) => updateFilter("tipo", v === "all" ? undefined : v)}
           >
-            <SelectTrigger className="w-[160px]">
+            <SelectTrigger className="w-full sm:w-[160px]">
               <SelectValue placeholder="Tipo" />
             </SelectTrigger>
             <SelectContent>
@@ -366,7 +366,7 @@ export default function Oportunidades() {
             value={String(filters.scoreMin || 0)}
             onValueChange={(v) => updateFilter("scoreMin", Number(v) || undefined)}
           >
-            <SelectTrigger className="w-[160px]">
+            <SelectTrigger className="w-full sm:w-[160px]">
               <SelectValue placeholder="Score mínimo" />
             </SelectTrigger>
             <SelectContent>
@@ -381,7 +381,7 @@ export default function Oportunidades() {
             value={filters.sortBy || "match_score"}
             onValueChange={(v) => updateFilter("sortBy", v)}
           >
-            <SelectTrigger className="w-[170px]">
+            <SelectTrigger className="w-full sm:w-[170px]">
               <ArrowUpDown className="mr-2 h-4 w-4" />
               <SelectValue placeholder="Ordenar" />
             </SelectTrigger>
