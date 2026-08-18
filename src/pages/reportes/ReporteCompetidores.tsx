@@ -32,6 +32,7 @@ export default function ReporteCompetidores() {
         title="Competidores"
         subtitle="Inteligencia competitiva: quién domina el mercado público y qué tan concentrado está"
         icon={Swords}
+        accent="red"
         kpis={[
           { label: "Competidores", value: stats ? formatNumber(stats.proveedores) : "…", icon: Swords },
           { label: "Concentración top 5", value: top5 != null ? `${top5.toFixed(1)}%` : "—", icon: PieChart },
@@ -99,7 +100,7 @@ export default function ReporteCompetidores() {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-4">
+            <div key={sel.proveedor} className="space-y-4 animate-slide-in">
               <div>
                 <h2 className="text-lg font-bold leading-tight">{sel.proveedor}</h2>
                 <p className="text-sm text-muted-foreground">

@@ -30,6 +30,7 @@ export default function ReporteCompradores() {
         title="Compradores"
         subtitle="Instituciones que compran: ranking por volumen, a quién le compran y qué compran"
         icon={Landmark}
+        accent="orange"
         kpis={[
           { label: "Instituciones", value: stats ? formatNumber(stats.compradores) : "…", icon: Building2 },
           { label: "Transado", value: stats ? formatCompact(stats.monto_total) : "…", icon: DollarSign },
@@ -104,7 +105,7 @@ export default function ReporteCompradores() {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-4">
+            <div key={sel.comprador} className="space-y-4 animate-slide-in">
               <div>
                 <h2 className="text-lg font-bold leading-tight">{sel.comprador}</h2>
                 <p className="text-sm text-muted-foreground">

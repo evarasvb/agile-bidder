@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  ArrowLeft, Download, Search, Package, Building2, Trophy, Users,
+  Download, Search, Package, Building2, Trophy, Users,
   TrendingDown, Tag, Inbox, Crown, Activity, ArrowLeftRight, Landmark, DollarSign,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -20,6 +20,7 @@ import {
   Tooltip as RechartsTooltip, ResponsiveContainer,
 } from "recharts";
 import { formatCurrency, formatCompact, formatNumber, exportToCSV } from "@/hooks/useReportes";
+import { ReportHero } from "@/components/reportes/ReportHero";
 import {
   useCMProductos, useCMProductoDetalle, useCMProductoTendencia, useMiCompetitividad, useCMStats,
   type TipoOrigenCM, type CMProducto,
@@ -58,18 +59,6 @@ function KPI({ label, value, icon: Icon, iconClass = "bg-primary/10 text-primary
         </div>
       </CardContent>
     </Card>
-  );
-}
-
-function StatChip({ label, value, icon: Icon }: { label: string; value: string; icon: React.ElementType }) {
-  return (
-    <div className="rounded-xl bg-white/10 backdrop-blur-sm px-4 py-3 flex items-center gap-3">
-      <Icon className="h-5 w-5 text-white/80 shrink-0" />
-      <div className="min-w-0">
-        <p className="text-[11px] uppercase tracking-wide text-white/70">{label}</p>
-        <p className="text-lg font-bold leading-tight truncate">{value}</p>
-      </div>
-    </div>
   );
 }
 
@@ -131,25 +120,19 @@ export default function ReporteConvenioMarco() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Hero con identidad de marca + KPIs del módulo */}
-      <div className="rounded-2xl bg-gradient-to-br from-firmavb-blue to-firmavb-blue/80 text-white p-6 shadow-lg">
-        <div className="flex items-start gap-3">
-          <Link to="/reportes">
-            <Button variant="ghost" size="icon" className="text-white hover:bg-white/15 -ml-2"><ArrowLeft className="h-5 w-5" /></Button>
-          </Link>
-          <div className="p-2.5 rounded-xl bg-white/10 hidden sm:block"><Landmark className="h-6 w-6" /></div>
-          <div>
-            <h1 className="text-2xl font-bold leading-tight">Convenio Marco</h1>
-            <p className="text-white/80 text-sm mt-0.5">Inteligencia de precios, competidores y compradores del mercado público</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-5">
-          <StatChip label="Productos" value={stats ? formatNumber(stats.productos) : "…"} icon={Package} />
-          <StatChip label="Transado" value={stats ? formatCompact(stats.monto_total) : "…"} icon={DollarSign} />
-          <StatChip label="Proveedores" value={stats ? formatNumber(stats.proveedores) : "…"} icon={Trophy} />
-          <StatChip label="Compradores" value={stats ? formatNumber(stats.compradores) : "…"} icon={Users} />
-        </div>
-      </div>
+      {/* Hero unificado (ReportHero) con identidad Convenio Marco */}
+      <ReportHero
+        title="Convenio Marco"
+        subtitle="Inteligencia de precios, competidores y compradores del mercado público"
+        icon={Landmark}
+        accent="celeste"
+        kpis={[
+          { label: "Productos", value: stats ? formatNumber(stats.productos) : "…", icon: Package },
+          { label: "Transado", value: stats ? formatCompact(stats.monto_total) : "…", icon: DollarSign },
+          { label: "Proveedores", value: stats ? formatNumber(stats.proveedores) : "…", icon: Trophy },
+          { label: "Compradores", value: stats ? formatNumber(stats.compradores) : "…", icon: Users },
+        ]}
+      />
 
       {/* Controles */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -314,7 +297,7 @@ export default function ReporteConvenioMarco() {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-4">
+            <div key={selected.producto_key} className="space-y-4 animate-slide-in">
               <div>
                 <h2 className="text-xl font-bold leading-tight">{selected.producto}</h2>
                 <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-muted-foreground">
