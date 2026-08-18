@@ -129,13 +129,6 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
           .limit(MAX_ACTIVAS);
       }
 
-      const { data: comprasRaw, error: caError } = await comprasQuery;
-
-      if (caError) {
-        console.error('[OportunidadesPanel] Error fetching compras:', caError);
-        throw caError;
-      }
-
       // Fetch licitaciones desde `licitaciones_bi` (tabla fresca alimentada por
       // el sync oficial de Mercado Público). La antigua tabla `licitaciones`
       // quedó congelada en 2026-04 (0 activas) — por eso el panel no mostraba
@@ -165,11 +158,31 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
           .limit(MAX_ACTIVAS);
       }
 
-      const { data: licitacionesRaw, error: licError } = await licitacionesQuery;
+      // Filtros del cliente (onboarding + IA): se piden en paralelo. RLS restringe
+      // la fila al propio cliente, así que un maybeSingle basta.
+      const filtrosQuery = (supabase as any)
+        .from('cliente_filtros_oportunidades')
+        .select('palabras_incluir, palabras_excluir, regiones_activas, monto_min, monto_max')
+        .maybeSingle();
 
+      // Consultas independientes en PARALELO (antes eran en serie: 3 idas y vueltas
+      // secuenciales). compras, licitaciones y filtros no dependen entre sí.
+      const [comprasRes, licitacionesRes, filtrosRes] = await Promise.all([
+        comprasQuery,
+        licitacionesQuery,
+        filtrosQuery,
+      ]);
+
+      const { data: comprasRaw, error: caError } = comprasRes as any;
+      if (caError) {
+        console.error('[OportunidadesPanel] Error fetching compras:', caError);
+        throw caError;
+      }
+      const { data: licitacionesRaw, error: licError } = licitacionesRes as any;
       if (licError) {
         console.error('[OportunidadesPanel] Error fetching licitaciones:', licError);
       }
+      const filtrosRow = (filtrosRes as any)?.data ?? null;
 
       // Traer los matches REALES (tabla ca_matches) de las compras ágiles
       // mostradas y quedarnos con el mejor score por código. Antes el Panel
@@ -253,12 +266,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       let all = [...compras, ...licitaciones];
 
       // Filtros del cliente (onboarding + IA): no mostrar lo que no cumple.
-      // RLS restringe la fila al propio cliente, así que un maybeSingle basta.
-      // Si el cliente no configuró filtros, es un no-op.
-      const { data: filtrosRow } = await (supabase as any)
-        .from('cliente_filtros_oportunidades')
-        .select('palabras_incluir, palabras_excluir, regiones_activas, monto_min, monto_max')
-        .maybeSingle();
+      // filtrosRow ya se trajo en paralelo arriba. Si no hay filtros, es un no-op.
       if (filtrosRow) {
         all = aplicarFiltrosCliente(all, filtrosRow as Partial<ClienteFiltros>);
       }
