@@ -63,6 +63,9 @@ export interface OrdenesCompraFilters {
   fecha_desde?: string;
   fecha_hasta?: string;
   search?: string; // Búsqueda general en código, nombre, RUTs
+  /** Tipo de adquisición por sufijo del código: TD (Trato Directo), AG (Compra
+   *  Ágil), SE (por licitación), CM (Convenio Marco), CC (Compra Coordinada). */
+  tipo?: string;
 }
 
 // El "tipo" de OC no es una columna: se codifica en el sufijo del código
@@ -131,9 +134,14 @@ function mapItem(i: RawOC): OrdenCompraItem {
   };
 }
 
-export function useOrdenesCompra(filters?: OrdenesCompraFilters, includeItems = false) {
+export function useOrdenesCompra(
+  filters?: OrdenesCompraFilters,
+  includeItems = false,
+  options?: { enabled?: boolean },
+) {
   return useQuery({
     queryKey: ['ordenes_compra', filters, includeItems],
+    enabled: options?.enabled ?? true,
     queryFn: async (): Promise<OrdenCompra[]> => {
       let query = (supabase as any)
         .from('ordenes_compra')
@@ -170,6 +178,9 @@ export function useOrdenesCompra(filters?: OrdenesCompraFilters, includeItems = 
 
       if (filters?.fecha_desde) query = query.gte('fecha_emision', filters.fecha_desde);
       if (filters?.fecha_hasta) query = query.lte('fecha_emision', filters.fecha_hasta);
+
+      // Tipo de adquisición: el código termina en el sufijo (ej. ...-TD26, ...-CM26).
+      if (filters?.tipo) query = query.ilike('codigo', `%-${filters.tipo}%`);
 
       // Búsqueda general por texto.
       if (filters?.search) {
