@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { aplicarFiltrosCliente, type ClienteFiltros } from '@/hooks/useClienteFiltros';
+import { aplicarFiltrosCliente, normalizar, type ClienteFiltros } from '@/hooks/useClienteFiltros';
 
 // =============================================================================
 // INTERFACES
@@ -165,12 +165,17 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         .select('palabras_incluir, palabras_excluir, regiones_activas, monto_min, monto_max')
         .maybeSingle();
 
+      // Afinidad aprendida del comportamiento (lo que cotiza sube, lo que
+      // descarta baja). Resuelve el cliente por auth.uid() dentro de la función.
+      const afinidadQuery = (supabase as any).rpc('cliente_afinidad');
+
       // Consultas independientes en PARALELO (antes eran en serie: 3 idas y vueltas
       // secuenciales). compras, licitaciones y filtros no dependen entre sí.
-      const [comprasRes, licitacionesRes, filtrosRes] = await Promise.all([
+      const [comprasRes, licitacionesRes, filtrosRes, afinidadRes] = await Promise.all([
         comprasQuery,
         licitacionesQuery,
         filtrosQuery,
+        afinidadQuery,
       ]);
 
       const { data: comprasRaw, error: caError } = comprasRes as any;
@@ -183,6 +188,17 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         console.error('[OportunidadesPanel] Error fetching licitaciones:', licError);
       }
       const filtrosRow = (filtrosRes as any)?.data ?? null;
+      const afinidadData = (afinidadRes as any)?.data ?? { afinidad: [], aversion: [] };
+      const afinWords: string[] = (afinidadData.afinidad ?? []).map(normalizar).filter(Boolean);
+      const averWords: string[] = (afinidadData.aversion ?? []).map(normalizar).filter(Boolean);
+      const boostDe = (o: { nombre: string; descripcion?: string | null }): number => {
+        if (!afinWords.length && !averWords.length) return 0;
+        const t = normalizar(`${o.nombre || ''} ${o.descripcion || ''}`);
+        let b = 0;
+        for (const w of afinWords) if (t.includes(w)) b += 10;
+        for (const w of averWords) if (t.includes(w)) b -= 10;
+        return Math.max(-30, Math.min(30, b));
+      };
 
       // Traer los matches REALES (tabla ca_matches) de las compras ágiles
       // mostradas y quedarnos con el mejor score por código. Antes el Panel
@@ -297,11 +313,16 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       // Sort
       const sortBy = filters.sortBy || 'match_score';
       const sortAsc = filters.sortAsc ?? false;
+      // Boost por afinidad/aversión aprendida (solo afecta el orden por match).
+      const boostByCodigo: Record<string, number> = {};
+      if (sortBy === 'match_score') {
+        for (const o of all) boostByCodigo[o.codigo] = boostDe(o);
+      }
       all.sort((a, b) => {
         let valA: number, valB: number;
         if (sortBy === 'match_score') {
-          valA = a.match_score || 0;
-          valB = b.match_score || 0;
+          valA = (a.match_score || 0) + (boostByCodigo[a.codigo] || 0);
+          valB = (b.match_score || 0) + (boostByCodigo[b.codigo] || 0);
         } else if (sortBy === 'fecha_cierre') {
           valA = a.fecha_cierre ? new Date(a.fecha_cierre).getTime() : Infinity;
           valB = b.fecha_cierre ? new Date(b.fecha_cierre).getTime() : Infinity;
