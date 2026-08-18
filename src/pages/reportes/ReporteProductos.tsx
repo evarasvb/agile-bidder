@@ -1,296 +1,137 @@
-import { useState, useMemo } from "react";
-import { Link } from "react-router-dom";
-import { ArrowLeft, Download, Package, Inbox } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
+import { Package, Download, Search, Trophy, Users, DollarSign, Building2, Tag } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-} from "recharts";
-import { FirmaVBHeader } from "@/components/layout/FirmaVBHeader";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  useProductosReport,
-  formatCurrency,
-  formatCompact,
-  formatNumber,
-  exportToCSV,
-} from "@/hooks/useReportes";
+import { ReportHero } from "@/components/reportes/ReportHero";
+import { formatCurrency, formatCompact, formatNumber, exportToCSV } from "@/hooks/useReportes";
+import { useCMStats, useCMProductos, useCMProductoDetalle, type CMProducto } from "@/hooks/useConvenioMarco";
 
 export default function ReporteProductos() {
-  const { data: productos, isLoading } = useProductosReport();
   const [search, setSearch] = useState("");
-  const [categoriaFilter, setCategoriaFilter] = useState("");
+  const [sel, setSel] = useState<CMProducto | null>(null);
 
-  const categorias = useMemo(() => {
-    if (!productos) return [];
-    const set = new Set(productos.map((p) => p.categoria));
-    return Array.from(set).sort();
-  }, [productos]);
+  const { data: stats } = useCMStats(null);            // todos los orígenes
+  const { data, isLoading } = useCMProductos(search, null);
+  const productos = data?.items ?? [];
+  const { data: detalle, isLoading: detalleLoading } = useCMProductoDetalle(sel?.producto_key ?? null, null);
 
-  const filtered = useMemo(() => {
-    if (!productos) return [];
-    let result = productos;
-    if (search) {
-      const q = search.toLowerCase();
-      result = result.filter((p) => p.nombre.toLowerCase().includes(q));
-    }
-    if (categoriaFilter) {
-      result = result.filter((p) => p.categoria === categoriaFilter);
-    }
-    return result;
-  }, [productos, search, categoriaFilter]);
-
-  const top10 = useMemo(
-    () =>
-      (productos || []).slice(0, 10).map((p) => ({
-        nombre: p.nombre.length > 30 ? p.nombre.slice(0, 30) + "…" : p.nombre,
-        monto: p.montoTotal,
-      })),
-    [productos]
-  );
-
-  const handleExport = () => {
-    exportToCSV(
-      filtered.map((p) => ({
-        Producto: p.nombre,
-        Categoría: p.categoria,
-        "Cantidad Total": p.cantidadTotal,
-        "Monto Total": p.montoTotal,
-        "Precio Promedio": p.precioPromedio,
-        "Precio Mín": p.precioMin,
-        "Precio Máx": p.precioMax,
-        Compras: p.compras,
-      })),
-      "reporte_productos"
-    );
-  };
+  const handleExport = () => exportToCSV(productos.map((p) => ({
+    Producto: p.producto, Código: p.codigo_producto || "—", Proveedores: p.proveedores,
+    Compradores: p.compradores, "Precio prom": p.precio_prom ? Math.round(p.precio_prom) : "", "Monto total": p.monto_total,
+  })), "reporte_productos");
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-4">
-          <Link to="/reportes">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
-          <FirmaVBHeader
-            title="Productos"
-            subtitle="Análisis de productos en compras públicas"
-          />
+      <ReportHero
+        title="Productos"
+        subtitle="Qué demanda el Estado: productos por monto transado, precio de referencia y quién los vende y compra"
+        icon={Package}
+        kpis={[
+          { label: "Productos", value: stats ? formatNumber(stats.productos) : "…", icon: Package },
+          { label: "Transado", value: stats ? formatCompact(stats.monto_total) : "…", icon: DollarSign },
+          { label: "Proveedores", value: stats ? formatNumber(stats.proveedores) : "…", icon: Trophy },
+          { label: "Compradores", value: stats ? formatNumber(stats.compradores) : "…", icon: Building2 },
+        ]}
+      />
+
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="relative max-w-md w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Buscar producto (ej: papel, notebook, guantes)…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-10" />
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleExport}
-          disabled={!filtered.length}
-        >
-          <Download className="h-4 w-4 mr-2" />
-          Exportar CSV
+        <Button variant="outline" size="sm" onClick={handleExport} disabled={!productos.length}>
+          <Download className="h-4 w-4 mr-2" /> CSV
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="space-y-4">
-          <Skeleton className="h-10 w-full max-w-sm" />
-          <Skeleton className="h-[340px]" />
-          <Skeleton className="h-[400px]" />
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <div className="lg:col-span-2 space-y-2">
+          <p className="text-sm text-muted-foreground px-1">
+            {isLoading ? "Buscando…" : <><span className="font-semibold text-foreground">{formatNumber(data?.total ?? 0)}</span> productos</>}
+          </p>
+          {isLoading ? (
+            <div className="space-y-2">{[...Array(7)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}</div>
+          ) : productos.length === 0 ? (
+            <Card className="border-dashed"><CardContent className="py-10 text-center text-muted-foreground text-sm">Sin productos para “{search}”.</CardContent></Card>
+          ) : (
+            <div className="space-y-2 max-h-[70vh] overflow-auto pr-1">
+              {productos.map((p) => {
+                const active = sel?.producto_key === p.producto_key;
+                return (
+                  <button key={p.producto_key} type="button" onClick={() => setSel(p)}
+                    className={`w-full text-left rounded-lg border p-3 transition-all hover:border-primary/50 ${active ? "border-primary bg-primary/5" : "border-border/60"}`}>
+                    <p className="font-medium text-sm line-clamp-2">{p.producto}</p>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1"><Trophy className="h-3 w-3" />{p.proveedores}</span>
+                      <span className="flex items-center gap-1"><Users className="h-3 w-3" />{p.compradores}</span>
+                      <span className="font-medium text-foreground ml-auto">{formatCompact(p.monto_total)}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
-      ) : !productos?.length ? (
-        <Card className="border-border/50 shadow-sm">
-          <CardContent className="py-16 text-center">
-            <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-            <h3 className="text-lg font-heading font-semibold text-foreground mb-2">
-              No hay datos suficientes
-            </h3>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Aún no se han registrado productos en compras ágiles. Los datos
-              aparecerán cuando se importen compras con detalle de ítems.
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          {/* KPIs */}
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-            <Card className="border-border/50 shadow-sm">
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Productos Únicos</p>
-                <p className="text-2xl font-heading font-bold">{formatNumber(productos.length)}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-border/50 shadow-sm">
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Monto Total</p>
-                <p className="text-2xl font-heading font-bold">
-                  {formatCompact(productos.reduce((s, p) => s + p.montoTotal, 0))}
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="border-border/50 shadow-sm">
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Categorías</p>
-                <p className="text-2xl font-heading font-bold">{categorias.length}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-border/50 shadow-sm">
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Total Compras</p>
-                <p className="text-2xl font-heading font-bold">
-                  {formatNumber(productos.reduce((s, p) => s + p.compras, 0))}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
 
-          {/* Chart */}
-          <Card className="border-border/50 shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-heading font-semibold">
-                Top 10 Productos por Volumen
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={top10} layout="vertical" margin={{ left: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
-                  <XAxis
-                    type="number"
-                    tick={{ fontSize: 11 }}
-                    tickFormatter={(v) => formatCompact(v)}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="nombre"
-                    tick={{ fontSize: 11 }}
-                    width={180}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <RechartsTooltip
-                    formatter={(value: number) => [formatCurrency(value), "Monto"]}
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Bar dataKey="monto" fill="hsl(var(--firmavb-green))" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          {/* Filter + Table */}
-          <Card className="border-border/50 shadow-sm">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between flex-wrap gap-3">
-                <CardTitle className="text-base font-heading font-semibold">
-                  Tabla de Productos
-                </CardTitle>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={categoriaFilter}
-                    onChange={(e) => setCategoriaFilter(e.target.value)}
-                    className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                  >
-                    <option value="">Todas las categorías</option>
-                    {categorias.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                  <Input
-                    placeholder="Buscar producto..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="max-w-xs"
-                  />
+        <div className="lg:col-span-3">
+          {!sel ? (
+            <Card className="border-dashed h-full">
+              <CardContent className="py-20 text-center text-muted-foreground">
+                <Package className="h-12 w-12 mx-auto mb-4 opacity-40" />
+                <h3 className="text-lg font-semibold text-foreground mb-1">Elige un producto</h3>
+                <p className="text-sm max-w-md mx-auto">Verás su precio de referencia, quién lo vende y quién lo compra.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-lg font-bold leading-tight">{sel.producto}</h2>
+                <div className="flex flex-wrap items-center gap-3 mt-1 text-sm text-muted-foreground">
+                  {sel.codigo_producto && <span className="inline-flex items-center gap-1"><Tag className="h-3 w-3" />{sel.codigo_producto}</span>}
+                  <span>Precio prom: <b className="text-foreground">{sel.precio_prom ? formatCurrency(Math.round(sel.precio_prom)) : "—"}</b></span>
+                  <span>{formatCompact(sel.monto_total)} transado</span>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-lg border overflow-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="font-semibold">Producto</TableHead>
-                      <TableHead className="font-semibold">Categoría</TableHead>
-                      <TableHead className="font-semibold text-right">Cantidad</TableHead>
-                      <TableHead className="font-semibold text-right">Monto Total</TableHead>
-                      <TableHead className="font-semibold text-right">Precio Prom.</TableHead>
-                      <TableHead className="font-semibold text-right">Rango Precio</TableHead>
-                      <TableHead className="font-semibold text-right">Compras</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filtered.slice(0, 50).map((p, i) => (
-                      <TableRow key={i} className="data-row">
-                        <TableCell className="font-medium max-w-[200px] truncate">
-                          {p.nombre}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className="text-xs">
-                            {p.categoria}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-sm">
-                          {formatNumber(p.cantidadTotal)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-sm">
-                          {formatCurrency(p.montoTotal)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-sm">
-                          {p.precioPromedio > 0 ? formatCurrency(p.precioPromedio) : "—"}
-                        </TableCell>
-                        <TableCell className="text-right text-xs text-muted-foreground">
-                          {p.precioMin > 0
-                            ? `${formatCurrency(p.precioMin)} – ${formatCurrency(p.precioMax)}`
-                            : "—"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Badge variant="outline">{p.compras}</Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {!filtered.length && (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                          No se encontraron productos
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Card className="border-border/50 shadow-sm">
+                  <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Trophy className="h-4 w-4" /> Quién lo vende</CardTitle></CardHeader>
+                  <CardContent>
+                    {detalleLoading ? <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
+                      : detalle?.proveedores?.length ? (
+                        <div className="space-y-1.5">
+                          {detalle.proveedores.slice(0, 8).map((pr, i) => (
+                            <div key={i} className="flex items-center justify-between gap-2 text-sm">
+                              <span className="truncate">{pr.proveedor}</span>
+                              <span className="font-mono text-muted-foreground shrink-0">{pr.precio_prom ? formatCurrency(Math.round(pr.precio_prom)) : "—"}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : <p className="text-sm text-muted-foreground py-4 text-center">Sin datos</p>}
+                  </CardContent>
+                </Card>
+                <Card className="border-border/50 shadow-sm">
+                  <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Building2 className="h-4 w-4" /> Quién lo compra</CardTitle></CardHeader>
+                  <CardContent>
+                    {detalleLoading ? <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
+                      : detalle?.compradores?.length ? (
+                        <div className="space-y-1.5">
+                          {detalle.compradores.slice(0, 8).map((c, i) => (
+                            <div key={i} className="flex items-center justify-between gap-2 text-sm">
+                              <span className="truncate">{c.comprador}</span>
+                              <span className="font-mono text-muted-foreground shrink-0">{formatCompact(c.monto_total)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : <p className="text-sm text-muted-foreground py-4 text-center">Sin datos</p>}
+                  </CardContent>
+                </Card>
               </div>
-              {filtered.length > 50 && (
-                <p className="text-xs text-muted-foreground mt-2 text-center">
-                  Mostrando 50 de {filtered.length} productos
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </>
-      )}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
