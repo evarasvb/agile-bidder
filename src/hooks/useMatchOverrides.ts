@@ -37,8 +37,7 @@ export function useMatchOverrides(codigo: string | null | undefined) {
     enabled: !!clienteId && !!codigo,
     queryFn: async (): Promise<Record<string, MatchOverride>> => {
       if (!clienteId || !codigo) return {};
-      const { data, error } = await supabase
-        .from('match_overrides')
+      const { data, error } = await (supabase.from as any)('match_overrides')
         .select('*')
         .eq('codigo', codigo);
       if (error) {
@@ -71,8 +70,7 @@ export function useUpsertMatchOverride() {
         score_manual: input.scoreManual ?? null,
         updated_at: new Date().toISOString(),
       };
-      const { data, error } = await supabase
-        .from('match_overrides')
+      const { data, error } = await (supabase.from as any)('match_overrides')
         .upsert(row, { onConflict: 'cliente_id,proceso_tipo,codigo,item_ref' })
         .select()
         .single();
@@ -93,8 +91,7 @@ export function useClearMatchOverride() {
   return useMutation({
     mutationFn: async (input: { codigo: string; itemRef: string; procesoTipo?: string }) => {
       if (!clienteId) throw new Error('No hay sesión activa');
-      const { error } = await supabase
-        .from('match_overrides')
+      const { error } = await (supabase.from as any)('match_overrides')
         .delete()
         .eq('codigo', input.codigo)
         .eq('item_ref', input.itemRef)
