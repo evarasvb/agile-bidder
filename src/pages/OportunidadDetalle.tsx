@@ -35,6 +35,7 @@ import {
   useDescartarOportunidad,
   type BuyerProfile,
 } from "@/hooks/useOportunidadesPanel";
+import InteligenciaMercado from "@/components/oportunidades/InteligenciaMercado";
 import { format, differenceInHours, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -385,6 +386,9 @@ export default function OportunidadDetalle() {
               )}
             </CardContent>
           </Card>
+
+          {/* Inteligencia de mercado (match ↔ OC ↔ reportes) */}
+          <InteligenciaMercado codigo={oportunidad.codigo} tipo={oportunidad.tipo} />
 
           {/* Timeline */}
           <Card>
