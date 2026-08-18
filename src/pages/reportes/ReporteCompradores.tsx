@@ -1,365 +1,152 @@
-import { useState, useMemo } from "react";
-import { Link } from "react-router-dom";
-import { ArrowLeft, Download, Building2, Inbox } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
+import { Building2, Download, Search, Package, Users, DollarSign, FileText, Crown, Landmark } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-} from "recharts";
-import { FirmaVBHeader } from "@/components/layout/FirmaVBHeader";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  useCompradoresReport,
-  formatCurrency,
-  formatCompact,
-  formatNumber,
-  exportToCSV,
-  CHART_COLORS,
-} from "@/hooks/useReportes";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ReportHero } from "@/components/reportes/ReportHero";
+import { formatCompact, formatNumber, exportToCSV } from "@/hooks/useReportes";
+import { useBIStats, useTopCompradores, useCompradorDetalle, type BIComprador } from "@/hooks/useBI";
 
 export default function ReporteCompradores() {
-  const { data: compradores, isLoading } = useCompradoresReport();
   const [search, setSearch] = useState("");
-  const [tipoFilter, setTipoFilter] = useState("");
+  const [sel, setSel] = useState<BIComprador | null>(null);
 
-  const tipos = useMemo(() => {
-    if (!compradores) return [];
-    const set = new Set(compradores.map((c) => c.tipo));
-    return Array.from(set).sort();
-  }, [compradores]);
+  const { data: stats } = useBIStats();
+  const { data, isLoading } = useTopCompradores(search, 80);
+  const items = data?.items ?? [];
+  const { data: detalle, isLoading: detalleLoading } = useCompradorDetalle(sel?.comprador ?? null);
 
-  const filtered = useMemo(() => {
-    if (!compradores) return [];
-    let result = compradores;
-    if (search) {
-      const q = search.toLowerCase();
-      result = result.filter(
-        (c) =>
-          c.nombre.toLowerCase().includes(q) || c.rut.toLowerCase().includes(q)
-      );
-    }
-    if (tipoFilter) {
-      result = result.filter((c) => c.tipo === tipoFilter);
-    }
-    return result;
-  }, [compradores, search, tipoFilter]);
-
-  const top10 = useMemo(
-    () =>
-      (compradores || []).slice(0, 10).map((c) => ({
-        nombre: c.nombre.length > 25 ? c.nombre.slice(0, 25) + "…" : c.nombre,
-        monto: c.montoTotal,
-      })),
-    [compradores]
-  );
-
-  const tipoPie = useMemo(() => {
-    if (!compradores) return [];
-    const map = new Map<string, number>();
-    for (const c of compradores) {
-      map.set(c.tipo, (map.get(c.tipo) || 0) + c.montoTotal);
-    }
-    return Array.from(map.entries())
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 8);
-  }, [compradores]);
-
-  const handleExport = () => {
-    exportToCSV(
-      filtered.map((c) => ({
-        Institución: c.nombre,
-        RUT: c.rut,
-        Tipo: c.tipo,
-        Región: c.region,
-        "Monto Total": c.montoTotal,
-        Licitaciones: c.totalLicitaciones,
-        Órdenes: c.totalOrdenes,
-        "Score Pago": c.scorePago ?? "—",
-      })),
-      "reporte_compradores"
-    );
-  };
+  const handleExport = () => exportToCSV(items.map((c) => ({
+    Institución: c.comprador, Órdenes: c.ordenes, Proveedores: c.proveedores,
+    "Monto total": c.monto_total, "Participación %": c.share ?? "",
+  })), "reporte_compradores");
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-4">
-          <Link to="/reportes">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
-          <FirmaVBHeader
-            title="Compradores"
-            subtitle="Análisis de instituciones compradoras"
-          />
+      <ReportHero
+        title="Compradores"
+        subtitle="Instituciones que compran: ranking por volumen, a quién le compran y qué compran"
+        icon={Landmark}
+        kpis={[
+          { label: "Instituciones", value: stats ? formatNumber(stats.compradores) : "…", icon: Building2 },
+          { label: "Transado", value: stats ? formatCompact(stats.monto_total) : "…", icon: DollarSign },
+          { label: "Órdenes", value: stats ? formatNumber(stats.ordenes) : "…", icon: FileText },
+          { label: "Proveedores", value: stats ? formatNumber(stats.proveedores) : "…", icon: Users },
+        ]}
+      />
+
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="relative max-w-md w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Buscar institución…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-10" />
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleExport}
-          disabled={!filtered.length}
-        >
-          <Download className="h-4 w-4 mr-2" />
-          Exportar CSV
+        <Button variant="outline" size="sm" onClick={handleExport} disabled={!items.length}>
+          <Download className="h-4 w-4 mr-2" /> CSV
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="space-y-4">
-          <Skeleton className="h-10 w-full max-w-sm" />
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <Skeleton className="h-[340px]" />
-            <Skeleton className="h-[340px]" />
-          </div>
-          <Skeleton className="h-[400px]" />
-        </div>
-      ) : !compradores?.length ? (
-        <Card className="border-border/50 shadow-sm">
-          <CardContent className="py-16 text-center">
-            <Building2 className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-            <h3 className="text-lg font-heading font-semibold text-foreground mb-2">
-              No hay datos suficientes
-            </h3>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Aún no se han registrado instituciones compradoras en el sistema.
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          {/* KPIs */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Card className="border-border/50 shadow-sm">
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Total Instituciones</p>
-                <p className="text-2xl font-heading font-bold">{formatNumber(compradores.length)}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-border/50 shadow-sm">
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Monto Total Comprado</p>
-                <p className="text-2xl font-heading font-bold">
-                  {formatCompact(compradores.reduce((s, c) => s + c.montoTotal, 0))}
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="border-border/50 shadow-sm">
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Tipos de Institución</p>
-                <p className="text-2xl font-heading font-bold">{tipos.length}</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Charts */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <Card className="border-border/50 shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-heading font-semibold">
-                  Top 10 Compradores por Monto
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={top10} layout="vertical" margin={{ left: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
-                    <XAxis
-                      type="number"
-                      tick={{ fontSize: 11 }}
-                      tickFormatter={(v) => formatCompact(v)}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      type="category"
-                      dataKey="nombre"
-                      tick={{ fontSize: 11 }}
-                      width={150}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <RechartsTooltip
-                      formatter={(value: number) => [formatCurrency(value), "Monto"]}
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                    />
-                    <Bar dataKey="monto" fill="hsl(var(--firmavb-amber))" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border/50 shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-heading font-semibold">
-                  Distribución por Tipo de Institución
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {tipoPie.length ? (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={tipoPie}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
-                        paddingAngle={3}
-                        dataKey="value"
-                        nameKey="name"
-                      >
-                        {tipoPie.map((_, i) => (
-                          <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <RechartsTooltip
-                        formatter={(value: number) => [formatCurrency(value), "Monto"]}
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px",
-                        }}
-                      />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                    <Inbox className="h-8 w-8 mr-2 opacity-50" />
-                    Sin datos
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Filter + Table */}
-          <Card className="border-border/50 shadow-sm">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between flex-wrap gap-3">
-                <CardTitle className="text-base font-heading font-semibold">
-                  Tabla de Instituciones
-                </CardTitle>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={tipoFilter}
-                    onChange={(e) => setTipoFilter(e.target.value)}
-                    className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                  >
-                    <option value="">Todos los tipos</option>
-                    {tipos.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                  <Input
-                    placeholder="Buscar institución..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="max-w-xs"
-                  />
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-lg border overflow-auto">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <Card className="lg:col-span-3 border-border/50 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Ranking de compradores</CardTitle>
+            <CardDescription>Instituciones por monto comprado. Haz clic para el detalle.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-2">{[...Array(8)].map((_, i) => <Skeleton key={i} className="h-11 w-full" />)}</div>
+            ) : items.length === 0 ? (
+              <p className="py-8 text-center text-muted-foreground text-sm">Sin instituciones para “{search}”.</p>
+            ) : (
+              <div className="rounded-lg border overflow-auto max-h-[68vh]">
                 <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="font-semibold">Institución</TableHead>
-                      <TableHead className="font-semibold">Tipo</TableHead>
-                      <TableHead className="font-semibold">Región</TableHead>
-                      <TableHead className="font-semibold text-right">Monto Total</TableHead>
-                      <TableHead className="font-semibold text-right">Licitaciones</TableHead>
-                      <TableHead className="font-semibold text-right">Órdenes</TableHead>
-                      <TableHead className="font-semibold text-right">Score Pago</TableHead>
+                  <TableHeader className="sticky top-0 bg-muted/60 backdrop-blur">
+                    <TableRow>
+                      <TableHead className="w-8">#</TableHead>
+                      <TableHead>Institución</TableHead>
+                      <TableHead className="text-right">Monto</TableHead>
+                      <TableHead className="w-[130px]">Mercado</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filtered.slice(0, 50).map((c) => (
-                      <TableRow key={c.id} className="data-row">
-                        <TableCell className="font-medium max-w-[200px] truncate">
-                          {c.nombre}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className="text-xs">
-                            {c.tipo}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {c.region}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-sm">
-                          {formatCurrency(c.montoTotal)}
-                        </TableCell>
-                        <TableCell className="text-right">{c.totalLicitaciones}</TableCell>
-                        <TableCell className="text-right">{c.totalOrdenes}</TableCell>
-                        <TableCell className="text-right">
-                          {c.scorePago !== null ? (
-                            <Badge
-                              variant="outline"
-                              className={
-                                c.scorePago >= 80
-                                  ? "border-firmavb-green text-firmavb-green"
-                                  : c.scorePago >= 50
-                                    ? "border-firmavb-amber text-firmavb-amber"
-                                    : "border-firmavb-red text-firmavb-red"
-                              }
-                            >
-                              {c.scorePago}
-                            </Badge>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {!filtered.length && (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                          No se encontraron instituciones
-                        </TableCell>
-                      </TableRow>
-                    )}
+                    {items.map((c, i) => {
+                      const active = sel?.comprador === c.comprador;
+                      return (
+                        <TableRow key={c.comprador} onClick={() => setSel(c)} className={`cursor-pointer ${active ? "bg-primary/5" : ""}`}>
+                          <TableCell className="text-muted-foreground">{i === 0 ? <Crown className="h-4 w-4 text-amber-500" /> : i + 1}</TableCell>
+                          <TableCell className="font-medium max-w-[240px] truncate">{c.comprador}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{formatCompact(c.monto_total)}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Progress value={Math.min(100, c.share ?? 0)} className="h-1.5 w-16" />
+                              <span className="text-xs text-muted-foreground w-10">{(c.share ?? 0).toFixed(1)}%</span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
-              {filtered.length > 50 && (
-                <p className="text-xs text-muted-foreground mt-2 text-center">
-                  Mostrando 50 de {filtered.length} instituciones
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="lg:col-span-2">
+          {!sel ? (
+            <Card className="border-dashed h-full">
+              <CardContent className="py-20 text-center text-muted-foreground">
+                <Building2 className="h-12 w-12 mx-auto mb-4 opacity-40" />
+                <h3 className="text-lg font-semibold text-foreground mb-1">Elige una institución</h3>
+                <p className="text-sm max-w-xs mx-auto">Verás qué compra y a qué proveedores les compra más (tu competencia).</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-lg font-bold leading-tight">{sel.comprador}</h2>
+                <p className="text-sm text-muted-foreground">
+                  {formatCompact(sel.monto_total)} · {formatNumber(sel.ordenes)} órdenes · {formatNumber(sel.proveedores)} proveedores
                 </p>
-              )}
-            </CardContent>
-          </Card>
-        </>
-      )}
+              </div>
+              <Card className="border-border/50 shadow-sm">
+                <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Package className="h-4 w-4" /> Qué compra</CardTitle></CardHeader>
+                <CardContent>
+                  {detalleLoading ? <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
+                    : detalle?.productos?.length ? (
+                      <div className="space-y-1.5">
+                        {detalle.productos.map((pr, i) => (
+                          <div key={i} className="flex items-center justify-between gap-2 text-sm">
+                            <span className="truncate">{pr.producto}</span>
+                            <span className="font-mono text-muted-foreground shrink-0">{formatCompact(pr.monto)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : <p className="text-sm text-muted-foreground py-4 text-center">Sin datos aún</p>}
+                </CardContent>
+              </Card>
+              <Card className="border-border/50 shadow-sm">
+                <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Users className="h-4 w-4" /> A quién le compra</CardTitle></CardHeader>
+                <CardContent>
+                  {detalleLoading ? <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
+                    : detalle?.proveedores?.length ? (
+                      <div className="space-y-1.5">
+                        {detalle.proveedores.map((p, i) => (
+                          <div key={i} className="flex items-center justify-between gap-2 text-sm">
+                            <span className="truncate">{p.proveedor}</span>
+                            <span className="font-mono text-muted-foreground shrink-0">{formatCompact(p.monto)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : <p className="text-sm text-muted-foreground py-4 text-center">Sin datos aún</p>}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
