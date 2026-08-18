@@ -33,16 +33,21 @@ export default function Activar() {
     let vivo = true;
     (async () => {
       if (!token) { setErrorCarga("El enlace no es válido."); setCargando(false); return; }
-      const { data, error } = await supabase.functions.invoke("activar-miembro", {
-        body: { action: "info", token },
-      });
-      if (!vivo) return;
-      if (error || data?.error || !data?.ok) {
-        setErrorCarga(data?.error || "No pudimos encontrar esta invitación.");
-      } else {
-        setInvite(data as Invite);
+      try {
+        const { data, error } = await supabase.functions.invoke("activar-miembro", {
+          body: { action: "info", token },
+        });
+        if (!vivo) return;
+        if (error || data?.error || !data?.ok) {
+          setErrorCarga(data?.error || "No pudimos encontrar esta invitación.");
+        } else {
+          setInvite(data as Invite);
+        }
+      } catch (e) {
+        if (vivo) setErrorCarga("No pudimos conectar. Revisa tu internet e intenta de nuevo.");
+      } finally {
+        if (vivo) setCargando(false);
       }
-      setCargando(false);
     })();
     return () => { vivo = false; };
   }, [token]);
@@ -51,9 +56,17 @@ export default function Activar() {
     if (password.length < 6) { toast.error("La contraseña debe tener al menos 6 caracteres."); return; }
     if (password !== password2) { toast.error("Las contraseñas no coinciden."); return; }
     setActivando(true);
-    const { data, error } = await supabase.functions.invoke("activar-miembro", {
-      body: { action: "activar", token, password },
-    });
+    let data: any; let error: any;
+    try {
+      const res = await supabase.functions.invoke("activar-miembro", {
+        body: { action: "activar", token, password },
+      });
+      data = res.data; error = res.error;
+    } catch (e) {
+      setActivando(false);
+      toast.error("No pudimos conectar. Intenta de nuevo.");
+      return;
+    }
     if (error || data?.error || !data?.ok) {
       setActivando(false);
       toast.error(data?.error || "No se pudo activar la cuenta.");

@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Check, Plus, X, Tag } from 'lucide-react';
+import { InfoHint } from '@/components/ui/info-hint';
 import { useActualizarCliente, Cliente } from '@/hooks/useCliente';
 import { INDUSTRIAS } from './industrias';
 
@@ -84,7 +85,10 @@ export default function OnboardingStep1({ cliente }: OnboardingStep1Props) {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>¿Qué vende tu empresa?</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            ¿Qué vende tu empresa?
+            <InfoHint text="Toca una o varias industrias (puedes elegir todas las que apliquen). Si no estás seguro, marca la más cercana — abajo aparecerán palabras clave sugeridas según lo que elijas. Todo se puede cambiar después." />
+          </CardTitle>
           <CardDescription>
             Elige <strong>una o varias</strong> industrias. Con esto la IA busca licitaciones para ti.
           </CardDescription>
@@ -125,6 +129,7 @@ export default function OnboardingStep1({ cliente }: OnboardingStep1Props) {
           <CardTitle className="flex items-center gap-2">
             <Tag className="w-5 h-5 text-primary" />
             Palabras clave de tus productos
+            <InfoHint text="Escribe productos como los busca el Estado (ej: toner, resma, notebook) y presiona Enter. ¿No sabes qué poner? Usa las sugerencias de abajo — salen de las industrias que elegiste." />
           </CardTitle>
           <CardDescription>
             Agrega términos que describan lo que vendes (ej: <em>toner, resma, notebook</em>). Mientras más
