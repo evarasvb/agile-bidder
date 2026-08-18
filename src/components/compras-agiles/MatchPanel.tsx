@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,10 +12,14 @@ import {
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
+import { CheckCircle, Repeat2, Ban } from "lucide-react";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 import { useProductMatching, type ItemConMatch } from "@/hooks/useProductMatching";
 import { clasificarProceso, formatCurrency, montoEnUTM } from "@/utils/clasificacion";
 import { useLicitacionItems, type LicitacionItem } from '@/hooks/useLicitacionItems';
+import { useInventoryActivo, type InventoryItem } from "@/hooks/useInventory";
+import { useMatchOverrides } from "@/hooks/useMatchOverrides";
+import { MatchItemActions } from "./MatchItemActions";
 
 interface MatchPanelProps {
   compra: CompraAgil | null;
@@ -33,7 +37,16 @@ procesarCompra,
 
     // Obtener items de la DB directamente (igual que Vista Detalle)
   const { data: licitacionItems, isLoading: isLoadingItems } = useLicitacionItems(compra?.codigo || '');
-  
+
+  // Correcciones manuales del match (por cliente) + inventario para resolver reasignaciones.
+  const { data: overrides = {} } = useMatchOverrides(compra?.codigo);
+  const { data: inventarioActivo = [] } = useInventoryActivo();
+  const inventarioById = useMemo(() => {
+    const m = new Map<string, InventoryItem>();
+    (inventarioActivo as InventoryItem[]).forEach((p) => m.set(p.id, p));
+    return m;
+  }, [inventarioActivo]);
+
   const [itemsConMatch, setItemsConMatch] = useState<ItemConMatch[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [scorePromedio, setScorePromedio] = useState(0);
@@ -94,26 +107,59 @@ procesarCompra,
     );
   }
 
-  // Preparar items para la propuesta con info de match
-  const productosParaPropuesta = itemsConMatch.map(item => ({
-    itemId: item.id,
-    itemIndex: item.id,
-    nombre: item.nombre,
-    descripcion: item.descripcion || '',
-    cantidadSolicitada: item.cantidad || 1,
-    unidadMedida: item.unidad || 'UN',
-    match: item.bestMatch ? {
-      id: item.bestMatch.inventoryItem.id,
-      sku: item.bestMatch.inventoryItem.sku,
-      nombre: item.bestMatch.inventoryItem.nombre_producto,
-      precio_unitario: item.bestMatch.inventoryItem.precio_unitario,
-      stock: item.bestMatch.inventoryItem.stock_disponible,
-      matchScore: item.bestMatch.score,
-      margen_estimado: item.bestMatch.inventoryItem.margen_objetivo / 100,
-    } : null,
-  }));
-  
-  const itemsConMatchExitoso = itemsConMatch.filter(i => i.bestMatch !== null);
+  // Resuelve el match efectivo de un ítem aplicando la corrección manual del cliente.
+  //   estado: 'auto' | 'confirmado' | 'reasignado' | 'descartado'
+  const resolverItem = (item: ItemConMatch) => {
+    const ov = overrides[String(item.id)];
+    if (ov?.accion === 'descartado') {
+      return { estado: 'descartado' as const, match: null, override: ov };
+    }
+    if (ov?.accion === 'reasignado' && ov.inventario_id) {
+      const prod = inventarioById.get(ov.inventario_id);
+      if (prod) {
+        return {
+          estado: 'reasignado' as const,
+          override: ov,
+          match: {
+            inventoryItem: prod,
+            score: ov.score_manual ?? 100,
+            matchType: 'manual',
+            matchedTerms: [] as string[],
+          },
+        };
+      }
+    }
+    return {
+      estado: (ov?.accion === 'confirmado' ? 'confirmado' : 'auto') as 'confirmado' | 'auto',
+      match: item.bestMatch,
+      override: ov,
+    };
+  };
+
+  const itemsResueltos = itemsConMatch.map((item) => ({ item, ...resolverItem(item) }));
+
+  // Preparar items para la propuesta (excluye descartados, usa el match efectivo)
+  const productosParaPropuesta = itemsResueltos
+    .filter((r) => r.estado !== 'descartado' && r.match)
+    .map(({ item, match }) => ({
+      itemId: item.id,
+      itemIndex: item.id,
+      nombre: item.nombre,
+      descripcion: item.descripcion || '',
+      cantidadSolicitada: item.cantidad || 1,
+      unidadMedida: item.unidad || 'UN',
+      match: {
+        id: match!.inventoryItem.id,
+        sku: match!.inventoryItem.sku,
+        nombre: match!.inventoryItem.nombre_producto,
+        precio_unitario: match!.inventoryItem.precio_unitario,
+        stock: match!.inventoryItem.stock_disponible,
+        matchScore: match!.score,
+        margen_estimado: (match!.inventoryItem.margen_objetivo ?? 0) / 100,
+      },
+    }));
+
+  const itemsConMatchExitoso = itemsResueltos.filter((r) => r.estado !== 'descartado' && r.match);
 
   const getMatchBadgeColor = (score: number) => {
     if (score >= 85) return 'bg-green-100 text-green-800 border-green-200';
@@ -260,92 +306,91 @@ procesarCompra,
           ) : itemsConMatch.length > 0 ? (
             <>
               <ScrollArea className="flex-1 -mx-4 px-4">
-                <div className="space-y-3">
-                  {itemsConMatch.map((item) => (
-                    <div
-                      key={item.id}
-                      className={`border rounded-lg p-3 transition-colors ${
-                        item.bestMatch 
-                          ? 'border-green-200 bg-green-50/50' 
-                          : 'border-border bg-background'
-                      }`}
-                    >
-                      <div className="space-y-2">
+                <div className="space-y-4">
+                  {itemsResueltos.map(({ item, estado, match }) => {
+                    const descartado = estado === 'descartado';
+                    const cardTone =
+                      descartado ? 'border-dashed border-border bg-muted/30 opacity-70'
+                      : estado === 'reasignado' ? 'border-firmavb-blue/40 bg-firmavb-blue/5'
+                      : estado === 'confirmado' ? 'border-green-300 bg-green-50/70'
+                      : match ? 'border-green-200 bg-green-50/40'
+                      : 'border-amber-200 bg-amber-50/40';
+                    return (
+                      <div key={item.id} className={`border rounded-xl p-4 transition-colors ${cardTone}`}>
+                        {/* Encabezado: ítem solicitado + acciones */}
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-xs font-medium text-muted-foreground">
-                                Item
-                              </span>
-                              {item.bestMatch ? (
-                                <Badge className={`text-xs ${getMatchBadgeColor(item.bestMatch.score)}`}>
-                                  <TrendingUp className="h-3 w-3 mr-1" />
-                                  {item.bestMatch.score}% match
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline" className="text-xs text-muted-foreground">
-                                  Sin match
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="font-medium text-sm">
-                              {item.nombre}
-                            </p>
+                            <span className="text-[11px] uppercase tracking-wide font-medium text-muted-foreground">Ítem solicitado</span>
+                            <p className={`font-medium text-sm mt-0.5 ${descartado ? 'line-through' : ''}`}>{item.nombre}</p>
                             {item.descripcion && (
-                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                                {item.descripcion}
-                              </p>
+                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{item.descripcion}</p>
                             )}
-                            <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                              {item.cantidad && (
-                                <span>Cantidad: {item.cantidad}</span>
-                              )}
-                              {item.unidad && (
-                                <span>Unidad: {item.unidad}</span>
-                              )}
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-muted-foreground">
+                              {item.cantidad && <span>Cantidad: {item.cantidad}</span>}
+                              {item.unidad && <span>Unidad: {item.unidad}</span>}
                             </div>
                           </div>
+                          <MatchItemActions
+                            codigo={compra.codigo}
+                            itemRef={String(item.id)}
+                            itemNombre={item.nombre}
+                            hasSuggestion={!!match}
+                            override={overrides[String(item.id)]}
+                          />
                         </div>
-                        
-                        {/* Producto match sugerido */}
-                        {item.bestMatch && (
-                          <div className="mt-2 p-2 bg-white rounded border border-green-200">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-xs font-medium text-green-800">
-                                  {item.bestMatch.inventoryItem.nombre_producto}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  SKU: {item.bestMatch.inventoryItem.sku} | 
-                                  Stock: {item.bestMatch.inventoryItem.stock_disponible}
+
+                        {/* Estado del match */}
+                        <div className="flex flex-wrap items-center gap-1.5 mt-3">
+                          {match ? (
+                            <Badge className={`text-xs ${getMatchBadgeColor(match.score)}`}>
+                              <TrendingUp className="h-3 w-3 mr-1" />
+                              {Math.round(match.score)}% match
+                            </Badge>
+                          ) : !descartado ? (
+                            <Badge variant="outline" className="text-xs text-amber-700 border-amber-300">Sin match — corrige →</Badge>
+                          ) : null}
+                          {estado === 'confirmado' && (
+                            <Badge variant="outline" className="text-xs text-green-700 border-green-300"><CheckCircle className="h-3 w-3 mr-1" />Confirmado por ti</Badge>
+                          )}
+                          {estado === 'reasignado' && (
+                            <Badge variant="outline" className="text-xs text-firmavb-blue border-firmavb-blue/40"><Repeat2 className="h-3 w-3 mr-1" />Elegido por ti</Badge>
+                          )}
+                          {descartado && (
+                            <Badge variant="outline" className="text-xs text-muted-foreground"><Ban className="h-3 w-3 mr-1" />Descartado</Badge>
+                          )}
+                        </div>
+
+                        {/* Producto del inventario (match efectivo) */}
+                        {!descartado && match && (
+                          <div className="mt-3 p-3 bg-background rounded-lg border border-border/70">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-foreground line-clamp-1">{match.inventoryItem.nombre_producto}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  SKU: {match.inventoryItem.sku || '—'} · Stock: {match.inventoryItem.stock_disponible ?? '—'}
                                 </p>
                               </div>
-                              <div className="text-right">
-                                <p className="text-sm font-bold text-green-700">
-                                  {formatCurrency(item.bestMatch.inventoryItem.precio_unitario)}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {item.bestMatch.matchType}
-                                </p>
+                              <div className="text-right shrink-0">
+                                <p className="text-sm font-bold text-foreground">{formatCurrency(match.inventoryItem.precio_unitario)}</p>
+                                <p className="text-[11px] text-muted-foreground">{match.matchType}</p>
                               </div>
                             </div>
-                            {item.bestMatch.matchedTerms.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {item.bestMatch.matchedTerms.slice(0, 3).map((term, idx) => (
-                                  <span 
-                                    key={idx}
-                                    className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded"
-                                  >
-                                    {term}
-                                  </span>
+                            {match.matchedTerms && match.matchedTerms.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {match.matchedTerms.slice(0, 4).map((term, idx) => (
+                                  <span key={idx} className="text-[11px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded">{term}</span>
                                 ))}
                               </div>
                             )}
                           </div>
                         )}
+
+                        {descartado && (
+                          <p className="mt-2 text-xs text-muted-foreground">No aparecerá en la cotización. Puedes revertirlo desde el menú.</p>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </ScrollArea>
 

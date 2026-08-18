@@ -275,7 +275,7 @@ export default function ComprasAgiles() {
         </div>
 
         {/* Match Panel */}
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 lg:sticky lg:top-4 lg:self-start">
           <MatchPanel
             compra={selectedCompra}
             onGenerarPropuesta={handleGenerarPropuesta}
