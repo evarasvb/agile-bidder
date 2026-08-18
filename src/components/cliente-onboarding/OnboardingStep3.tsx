@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
+import { InfoHint } from '@/components/ui/info-hint';
 import { useClienteExclusiones, useToggleExclusion } from '@/hooks/useCliente';
 import { Pill, Apple, Truck, Wrench, Settings, Shield, UserCog, FileSearch } from 'lucide-react';
 
@@ -38,10 +38,12 @@ export default function OnboardingStep3() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>¿Qué NO vendes?</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          ¿Qué NO vendes?
+          <InfoHint text="Marca lo que tu empresa NO hace (ej: si no instalas ni das mantención). Así el panel deja de mostrarte esas oportunidades. Si tienes dudas, no marques nada: puedes ajustarlo después en Configuración." />
+        </CardTitle>
         <CardDescription>
-          Selecciona los tipos de productos o servicios que NO ofreces. 
-          Las licitaciones que incluyan estos items no aparecerán en tus resultados.
+          Toca las tarjetas de lo que NO ofreces. Las oportunidades con esos ítems no aparecerán en tus resultados.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -51,29 +53,35 @@ export default function OnboardingStep3() {
             const isSelected = exclusionesActivas.has(excl.id);
 
             return (
-              <div
+              // Toda la tarjeta es el botón de selección. El Checkbox es solo
+              // visual (pointer-events-none) para que un clic dispare UN solo
+              // toggle — antes el div y el Checkbox se disparaban a la vez y el
+              // doble toggle se anulaba (no se podía seleccionar).
+              <button
+                type="button"
                 key={excl.id}
-                className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all hover:bg-muted/50 ${
+                role="checkbox"
+                aria-checked={isSelected}
+                disabled={toggleExclusion.isPending}
+                onClick={() => handleToggle(excl.id)}
+                className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer text-left transition-all hover:bg-muted/50 disabled:opacity-60 ${
                   isSelected ? 'border-destructive/50 bg-destructive/5' : 'border-muted'
                 }`}
-                onClick={() => handleToggle(excl.id)}
               >
                 <Checkbox
-                  id={excl.id}
                   checked={isSelected}
-                  onCheckedChange={() => handleToggle(excl.id)}
-                  className="mt-1"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  className="mt-1 pointer-events-none"
                 />
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <Icon className={`w-4 h-4 ${isSelected ? 'text-destructive' : 'text-muted-foreground'}`} />
-                    <Label htmlFor={excl.id} className="font-medium cursor-pointer">
-                      {excl.label}
-                    </Label>
+                    <span className="font-medium">{excl.label}</span>
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">{excl.description}</p>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
