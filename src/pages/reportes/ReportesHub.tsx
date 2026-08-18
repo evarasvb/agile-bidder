@@ -6,10 +6,10 @@ import {
   TrendingUp,
   Swords,
   FileCheck,
+  BarChart3,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FirmaVBHeader } from "@/components/layout/FirmaVBHeader";
 
 const reports = [
   {
@@ -59,10 +59,15 @@ const reports = [
 export default function ReportesHub() {
   return (
     <div className="space-y-6 animate-fade-in">
-      <FirmaVBHeader
-        title="Reportes"
-        subtitle="Análisis e inteligencia de mercado público"
-      />
+      <div className="rounded-2xl bg-gradient-to-br from-firmavb-blue to-firmavb-blue/80 text-white p-6 shadow-lg">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-white/10"><BarChart3 className="h-6 w-6" /></div>
+          <div>
+            <h1 className="text-2xl font-bold leading-tight">Reportes</h1>
+            <p className="text-white/80 text-sm mt-0.5">Inteligencia de mercado público: proveedores, productos, compradores y competidores</p>
+          </div>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {reports.map((report) => (
