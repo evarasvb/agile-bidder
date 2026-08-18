@@ -60,6 +60,7 @@ export default function ReporteMercado() {
         title="Mercado"
         subtitle="Vista general del mercado público: volúmenes, tendencia, regiones y tipos"
         icon={TrendingUp}
+        accent="violet"
         kpis={[
           { label: "Oportunidades", value: mercado ? formatNumber(mercado.kpis.totalOportunidades) : "…", icon: Zap },
           { label: "Valor estimado", value: mercado ? formatCompact(mercado.kpis.valorTotal) : "…", icon: DollarSign },

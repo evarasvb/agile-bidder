@@ -28,6 +28,7 @@ export default function ReporteProductos() {
         title="Productos"
         subtitle="Qué demanda el Estado: productos por monto transado, precio de referencia y quién los vende y compra"
         icon={Package}
+        accent="green"
         kpis={[
           { label: "Productos", value: stats ? formatNumber(stats.productos) : "…", icon: Package },
           { label: "Transado", value: stats ? formatCompact(stats.monto_total) : "…", icon: DollarSign },
@@ -85,7 +86,7 @@ export default function ReporteProductos() {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-4">
+            <div key={sel.producto_key} className="space-y-4 animate-slide-in">
               <div>
                 <h2 className="text-lg font-bold leading-tight">{sel.producto}</h2>
                 <div className="flex flex-wrap items-center gap-3 mt-1 text-sm text-muted-foreground">

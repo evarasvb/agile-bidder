@@ -110,7 +110,7 @@ export default function ReporteProveedores() {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-4">
+            <div key={sel.proveedor} className="space-y-4 animate-slide-in">
               <div>
                 <h2 className="text-lg font-bold leading-tight">{sel.proveedor}</h2>
                 <p className="text-sm text-muted-foreground">
