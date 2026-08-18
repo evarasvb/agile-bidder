@@ -22,11 +22,12 @@ interface Props {
   itemNombre: string;
   hasSuggestion: boolean;
   override?: MatchOverride;
+  procesoTipo?: string;
 }
 
 /** Menú de correcciones del match por ítem: confirmar, reasignar producto,
  *  descartar, editar producto, o quitar la corrección. */
-export function MatchItemActions({ codigo, itemRef, itemNombre, hasSuggestion, override }: Props) {
+export function MatchItemActions({ codigo, itemRef, itemNombre, hasSuggestion, override, procesoTipo }: Props) {
   const navigate = useNavigate();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -48,19 +49,19 @@ export function MatchItemActions({ codigo, itemRef, itemNombre, hasSuggestion, o
 
   const confirmar = () =>
     upsert.mutate(
-      { codigo, itemRef, itemNombre, accion: "confirmado" },
+      { codigo, itemRef, itemNombre, accion: "confirmado", procesoTipo },
       { onSuccess: () => toast.success("Match confirmado") }
     );
 
   const descartar = () =>
     upsert.mutate(
-      { codigo, itemRef, itemNombre, accion: "descartado" },
+      { codigo, itemRef, itemNombre, accion: "descartado", procesoTipo },
       { onSuccess: () => toast.success("Ítem descartado de la propuesta") }
     );
 
   const reasignar = (p: InventoryItem) =>
     upsert.mutate(
-      { codigo, itemRef, itemNombre, accion: "reasignado", inventarioId: p.id, scoreManual: 100 },
+      { codigo, itemRef, itemNombre, accion: "reasignado", inventarioId: p.id, scoreManual: 100, procesoTipo },
       {
         onSuccess: () => {
           toast.success(`Reasignado a “${p.nombre_producto}”`);
@@ -71,7 +72,7 @@ export function MatchItemActions({ codigo, itemRef, itemNombre, hasSuggestion, o
     );
 
   const quitar = () =>
-    clear.mutate({ codigo, itemRef }, { onSuccess: () => toast.success("Corrección quitada") });
+    clear.mutate({ codigo, itemRef, procesoTipo }, { onSuccess: () => toast.success("Corrección quitada") });
 
   return (
     <>

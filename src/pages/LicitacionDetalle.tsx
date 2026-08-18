@@ -8,7 +8,6 @@ import {
   DollarSign,
   ExternalLink,
   FileText,
-  Package,
   Target,
   Loader2,
   Copy,
@@ -19,14 +18,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { format, differenceInDays, differenceInHours } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -34,6 +25,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabaseClient } from '@/lib/supabaseClient';
 import { useLicitacionItemsReal } from '@/hooks/useLicitacionItemsReal';
 import LicitacionesSimilares from '@/components/licitaciones/LicitacionesSimilares';
+import { LicitacionItemsMatch } from '@/components/licitaciones/LicitacionItemsMatch';
 import { useDocumentosLicitacion } from '@/hooks/useChatIA';
 
 interface LicitacionBIItem {
@@ -372,57 +364,8 @@ export default function LicitacionDetalle() {
             </Card>
           )}
 
-          {/* Items Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Package className="h-5 w-5 text-firmavb-blue" />
-                Productos Solicitados ({items?.length || 0})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[5%]">#</TableHead>
-                    <TableHead className="w-[30%]">Nombre</TableHead>
-                    <TableHead className="w-[40%]">Descripción</TableHead>
-                    <TableHead className="text-right w-[12%]">Cantidad</TableHead>
-                    <TableHead className="w-[13%]">Unidad</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {items && items.length > 0 ? (
-                    items.map((item: any, index: number) => (
-                      <TableRow key={item.id || index}>
-                        <TableCell className="text-muted-foreground font-mono text-xs">
-                          {index + 1}
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {item.nombre_producto}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {item.descripcion || '-'}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {item.cantidad || 1}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {item.unidad || 'unidad'}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                        No hay items detallados para esta licitación
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          {/* Productos solicitados con match e corrección por ítem */}
+          <LicitacionItemsMatch codigo={licitacion.codigo} items={items} />
 
           {/* Similar Tenders */}
           <LicitacionesSimilares 
