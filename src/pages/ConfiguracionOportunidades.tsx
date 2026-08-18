@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useClienteFiltros, useSugerirFiltros } from "@/hooks/useClienteFiltros";
 import { RecargosRegion } from '@/components/settings/RecargosRegion';
+import { InfoHint } from "@/components/ui/info-hint";
 import { toast } from "sonner";
 
 const REGIONES_CHILE = [
@@ -178,6 +179,7 @@ export default function ConfiguracionOportunidades() {
             )}
             Sugerir con IA
           </Button>
+          <InfoHint text="La IA analiza los nombres de los productos de tu inventario, detecta tu rubro y propone palabras genéricas para incluir (y descartar marcas, colores y medidas). Tú revisas y guardas: nada se aplica sin tu confirmación." />
           <Button onClick={handleSave} disabled={isUpdating}>
             <Save className="h-4 w-4 mr-2" />
             {isUpdating ? "Guardando..." : "Guardar Cambios"}

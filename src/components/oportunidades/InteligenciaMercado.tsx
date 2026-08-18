@@ -6,10 +6,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { BarChart3, Building2, Swords, TrendingUp, FileText, Store } from "lucide-react";
+import { BarChart3, Building2, Swords, TrendingUp, FileText, Store, Lock, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useInteligenciaOC } from "@/hooks/useInteligenciaOC";
+import { usePlan } from "@/hooks/usePlan";
+import { InfoHint } from "@/components/ui/info-hint";
 
 function fmt(value: number | null | undefined) {
   if (!value) return "-";
@@ -24,6 +26,7 @@ export default function InteligenciaMercado({
   tipo: "compra_agil" | "licitacion" | null;
 }) {
   const navigate = useNavigate();
+  const { isFree } = usePlan();
   const { data, isLoading } = useInteligenciaOC(codigo, tipo);
 
   const Header = (
@@ -31,6 +34,7 @@ export default function InteligenciaMercado({
       <CardTitle className="text-base flex items-center gap-2">
         <BarChart3 className="h-4 w-4 text-primary" />
         Inteligencia de mercado
+        <InfoHint text="Cruzamos los productos de esta oportunidad con órdenes de compra reales del Estado (por código ONU o nombre similar) para mostrarte a qué precio se ha comprado, quién gana y quién compra." />
       </CardTitle>
       <p className="text-xs text-muted-foreground">
         Precios, competidores y compradores según órdenes de compra reales del Estado.
@@ -78,6 +82,7 @@ export default function InteligenciaMercado({
           <div>
             <p className="text-xs font-medium uppercase text-muted-foreground mb-2 flex items-center gap-1">
               <TrendingUp className="h-3.5 w-3.5" /> Precio de referencia (unitario)
+              <InfoHint text={`Promedio, mínimo y máximo del precio unitario pagado en ${total} líneas de OC de productos similares. Úsalo como referencia para posicionar tu oferta.`} />
             </p>
             <div className="grid grid-cols-3 gap-3">
               <div className="rounded-lg border bg-muted/30 p-3 text-center">
@@ -96,6 +101,23 @@ export default function InteligenciaMercado({
           </div>
         )}
 
+        {isFree ? (
+          /* Teaser: el free ve el precio de referencia; el resto es Pro. */
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-center space-y-2">
+            <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
+              <Lock className="h-4 w-4 text-primary" />
+            </div>
+            <p className="text-sm font-medium">Desbloquea la inteligencia completa</p>
+            <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+              Con Pro ves <strong>quién gana</strong> estas OC (competidores), <strong>qué organismos compran</strong> esto
+              y el detalle de precios de las {total} órdenes comparables.
+            </p>
+            <Button size="sm" className="gap-1.5 mt-1" onClick={() => navigate("/cuenta/facturacion")}>
+              <Sparkles className="h-3.5 w-3.5" /> Ver planes Pro
+            </Button>
+          </div>
+        ) : (
+        <>
         {/* Competidores y Compradores */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -158,20 +180,24 @@ export default function InteligenciaMercado({
             </Table>
           </div>
         </div>
+        </>
+        )}
 
         {/* Footer: fuente + enlaces (intercomunicación) */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           <p className="text-xs text-muted-foreground">
             Basado en <span className="font-medium text-foreground">{total}</span> líneas de OC reales comparables.
           </p>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => navigate("/mercado/ordenes")}>
-              <FileText className="h-3.5 w-3.5" /> Ver OC
-            </Button>
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => navigate("/reportes")}>
-              <BarChart3 className="h-3.5 w-3.5" /> Reportes
-            </Button>
-          </div>
+          {!isFree && (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => navigate("/mercado/ordenes")}>
+                <FileText className="h-3.5 w-3.5" /> Ver OC
+              </Button>
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => navigate("/reportes")}>
+                <BarChart3 className="h-3.5 w-3.5" /> Reportes
+              </Button>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

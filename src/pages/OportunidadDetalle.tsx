@@ -36,6 +36,7 @@ import {
   type BuyerProfile,
 } from "@/hooks/useOportunidadesPanel";
 import InteligenciaMercado from "@/components/oportunidades/InteligenciaMercado";
+import { InfoHint } from "@/components/ui/info-hint";
 import { format, differenceInHours, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -474,6 +475,7 @@ export default function OportunidadDetalle() {
               <CardTitle className="text-base flex items-center gap-2">
                 <TrendingUp className="h-4 w-4" />
                 Match Score
+                <InfoHint text="Mide qué tan parecidos son los productos de esta oportunidad a los de tu inventario (por código ONU exacto o similitud de nombre, ignorando acentos). 100% = producto idéntico en tu inventario." />
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
