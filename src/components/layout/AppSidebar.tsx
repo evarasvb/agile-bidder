@@ -23,6 +23,7 @@ import {
   FileSearch,
   Puzzle,
   GraduationCap,
+  Sparkles,
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -30,7 +31,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import logoFirmavbBlanco from "@/assets/logo-firmavb-blanco.png";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface NavItem {
   title: string;
@@ -51,7 +52,8 @@ const navItems: NavItem[] = [
     url: "/oportunidades",
     icon: Crosshair,
     children: [
-      { title: "Panel", url: "/oportunidades", icon: Crosshair },
+      { title: "Panel de Match", url: "/oportunidades", icon: Crosshair },
+      { title: "Filtros con IA", url: "/configuracion", icon: Sparkles },
       { title: "Licitaciones", url: "/licitaciones-nuevas", icon: FileSearch },
       { title: "Compras Ágiles", url: "/compras-agiles", icon: Zap },
       { title: "Mis Oportunidades", url: "/mis-oportunidades", icon: Star },
@@ -89,7 +91,7 @@ const navItems: NavItem[] = [
     url: "/configuracion",
     icon: Settings,
     children: [
-      { title: "Ajustes", url: "/configuracion", icon: Settings },
+      { title: "Filtros con IA", url: "/configuracion", icon: Sparkles },
       { title: "Equipo", url: "/equipo", icon: Users },
       { title: "Extensión Chrome", url: "/configuracion/extension", icon: Puzzle },
     ],
@@ -105,7 +107,28 @@ export function AppSidebar({ open = false, onClose }: AppSidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
-  const [expandedItems, setExpandedItems] = useState<string[]>([]);
+
+  // Grupo que contiene la ruta actual (por url propia o de un hijo, incluyendo
+  // sub-rutas). Sirve para abrirlo automáticamente: antes los submenús arrancaban
+  // colapsados y había que abrirlos a mano en cada navegación.
+  const pathMatches = (url: string) =>
+    location.pathname === url || (url !== "/" && location.pathname.startsWith(url + "/"));
+  const activeGroup = navItems.find(
+    (it) => pathMatches(it.url) || it.children?.some((c) => pathMatches(c.url))
+  )?.title;
+
+  const [expandedItems, setExpandedItems] = useState<string[]>(
+    activeGroup ? [activeGroup] : []
+  );
+
+  // Mantener abierto el grupo activo al navegar (sin cerrar los que el usuario abrió).
+  useEffect(() => {
+    if (activeGroup) {
+      setExpandedItems((prev) =>
+        prev.includes(activeGroup) ? prev : [...prev, activeGroup]
+      );
+    }
+  }, [activeGroup]);
 
   const toggleExpanded = (title: string) => {
     setExpandedItems((prev) =>
