@@ -1,324 +1,160 @@
-import { useState, useMemo } from "react";
-import { Link } from "react-router-dom";
-import { ArrowLeft, Download, Users, Inbox } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
+import {
+  Users, Download, Search, Package, Building2, DollarSign, FileText,
+  Trophy, Crown,
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-} from "recharts";
-import { FirmaVBHeader } from "@/components/layout/FirmaVBHeader";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  useProveedoresReport,
-  formatCurrency,
-  formatCompact,
-  formatPercent,
-  exportToCSV,
-  CHART_COLORS,
-} from "@/hooks/useReportes";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ReportHero } from "@/components/reportes/ReportHero";
+import { formatCurrency, formatCompact, formatNumber, exportToCSV } from "@/hooks/useReportes";
+import { useBIStats, useTopProveedores, useProveedorDetalle, type BIProveedor } from "@/hooks/useBI";
 
 export default function ReporteProveedores() {
-  const { data: proveedores, isLoading } = useProveedoresReport();
   const [search, setSearch] = useState("");
+  const [sel, setSel] = useState<BIProveedor | null>(null);
 
-  const filtered = useMemo(() => {
-    if (!proveedores) return [];
-    if (!search) return proveedores;
-    const q = search.toLowerCase();
-    return proveedores.filter(
-      (p) =>
-        p.nombre.toLowerCase().includes(q) || p.rut.toLowerCase().includes(q)
-    );
-  }, [proveedores, search]);
+  const { data: stats } = useBIStats();
+  const { data, isLoading } = useTopProveedores(search, 80);
+  const items = data?.items ?? [];
+  const { data: detalle, isLoading: detalleLoading } = useProveedorDetalle(sel?.proveedor ?? null);
 
-  const top10 = useMemo(
-    () =>
-      (proveedores || []).slice(0, 10).map((p) => ({
-        nombre: p.nombre.length > 25 ? p.nombre.slice(0, 25) + "…" : p.nombre,
-        monto: p.montoTotal,
-      })),
-    [proveedores]
-  );
-
-  const pieData = useMemo(() => {
-    if (!proveedores?.length) return [];
-    const top5 = proveedores.slice(0, 5).map((p) => ({
-      name: p.nombre.length > 20 ? p.nombre.slice(0, 20) + "…" : p.nombre,
-      value: p.montoTotal,
-    }));
-    const rest = proveedores.slice(5).reduce((sum, p) => sum + p.montoTotal, 0);
-    if (rest > 0) top5.push({ name: "Otros", value: rest });
-    return top5;
-  }, [proveedores]);
-
-  const handleExport = () => {
-    exportToCSV(
-      filtered.map((p) => ({
-        Proveedor: p.nombre,
-        RUT: p.rut,
-        Adjudicaciones: p.adjudicaciones,
-        "Monto Total": p.montoTotal,
-        "Participación %": p.participacion.toFixed(1),
-      })),
-      "reporte_proveedores"
-    );
-  };
+  const handleExport = () => exportToCSV(items.map((p) => ({
+    Proveedor: p.proveedor, Órdenes: p.ordenes, Compradores: p.compradores,
+    "Monto total": p.monto_total, "Participación %": p.share ?? "",
+  })), "reporte_proveedores");
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-4">
-          <Link to="/reportes">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
-          <FirmaVBHeader
-            title="Proveedores"
-            subtitle="Análisis de proveedores adjudicados"
-          />
+      <ReportHero
+        title="Proveedores"
+        subtitle="Quién le vende al Estado: ranking por monto adjudicado, participación de mercado y a quién le venden"
+        icon={Users}
+        kpis={[
+          { label: "Proveedores", value: stats ? formatNumber(stats.proveedores) : "…", icon: Users },
+          { label: "Transado", value: stats ? formatCompact(stats.monto_total) : "…", icon: DollarSign },
+          { label: "Órdenes", value: stats ? formatNumber(stats.ordenes) : "…", icon: FileText },
+          { label: "Compradores", value: stats ? formatNumber(stats.compradores) : "…", icon: Building2 },
+        ]}
+      />
+
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="relative max-w-md w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Buscar proveedor…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-10" />
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleExport}
-          disabled={!filtered.length}
-        >
-          <Download className="h-4 w-4 mr-2" />
-          Exportar CSV
+        <Button variant="outline" size="sm" onClick={handleExport} disabled={!items.length}>
+          <Download className="h-4 w-4 mr-2" /> CSV
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="space-y-4">
-          <Skeleton className="h-10 w-full max-w-sm" />
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <Skeleton className="h-[340px]" />
-            <Skeleton className="h-[340px]" />
-          </div>
-          <Skeleton className="h-[400px]" />
-        </div>
-      ) : !proveedores?.length ? (
-        <Card className="border-border/50 shadow-sm">
-          <CardContent className="py-16 text-center">
-            <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-            <h3 className="text-lg font-heading font-semibold text-foreground mb-2">
-              No hay datos suficientes
-            </h3>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Aún no se han registrado adjudicaciones de proveedores. Los datos
-              se llenarán automáticamente cuando se procesen licitaciones.
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          {/* KPI row */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Card className="border-border/50 shadow-sm">
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Total Proveedores</p>
-                <p className="text-2xl font-heading font-bold">{proveedores.length}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-border/50 shadow-sm">
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Total Adjudicado</p>
-                <p className="text-2xl font-heading font-bold">
-                  {formatCompact(proveedores.reduce((s, p) => s + p.montoTotal, 0))}
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="border-border/50 shadow-sm">
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Total Adjudicaciones</p>
-                <p className="text-2xl font-heading font-bold">
-                  {proveedores.reduce((s, p) => s + p.adjudicaciones, 0)}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Charts */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <Card className="border-border/50 shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-heading font-semibold">
-                  Top 10 Proveedores por Monto
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={top10} layout="vertical" margin={{ left: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
-                    <XAxis
-                      type="number"
-                      tick={{ fontSize: 11 }}
-                      tickFormatter={(v) => formatCompact(v)}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      type="category"
-                      dataKey="nombre"
-                      tick={{ fontSize: 11 }}
-                      width={140}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <RechartsTooltip
-                      formatter={(value: number) => [formatCurrency(value), "Monto"]}
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                    />
-                    <Bar dataKey="monto" fill="hsl(var(--firmavb-blue))" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border/50 shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-heading font-semibold">
-                  Concentración de Mercado
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {pieData.length ? (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
-                        paddingAngle={3}
-                        dataKey="value"
-                        nameKey="name"
-                      >
-                        {pieData.map((_, i) => (
-                          <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <RechartsTooltip
-                        formatter={(value: number) => [formatCurrency(value), "Monto"]}
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px",
-                        }}
-                      />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                    <Inbox className="h-8 w-8 mr-2 opacity-50" />
-                    Sin datos
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Filter + Table */}
-          <Card className="border-border/50 shadow-sm">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between flex-wrap gap-3">
-                <CardTitle className="text-base font-heading font-semibold">
-                  Tabla de Proveedores
-                </CardTitle>
-                <Input
-                  placeholder="Buscar por nombre o RUT..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="max-w-xs"
-                />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-lg border overflow-auto">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* Ranking */}
+        <Card className="lg:col-span-3 border-border/50 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Ranking de proveedores</CardTitle>
+            <CardDescription>Por monto adjudicado y participación de mercado. Haz clic para ver el detalle.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-2">{[...Array(8)].map((_, i) => <Skeleton key={i} className="h-11 w-full" />)}</div>
+            ) : items.length === 0 ? (
+              <p className="py-8 text-center text-muted-foreground text-sm">Sin proveedores para “{search}”.</p>
+            ) : (
+              <div className="rounded-lg border overflow-auto max-h-[68vh]">
                 <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="font-semibold">Proveedor</TableHead>
-                      <TableHead className="font-semibold">RUT</TableHead>
-                      <TableHead className="font-semibold text-right">Adjudicaciones</TableHead>
-                      <TableHead className="font-semibold text-right">Monto Total</TableHead>
-                      <TableHead className="font-semibold text-right">Participación</TableHead>
+                  <TableHeader className="sticky top-0 bg-muted/60 backdrop-blur">
+                    <TableRow>
+                      <TableHead className="w-8">#</TableHead>
+                      <TableHead>Proveedor</TableHead>
+                      <TableHead className="text-right">Monto</TableHead>
+                      <TableHead className="w-[130px]">Mercado</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filtered.slice(0, 50).map((p, i) => (
-                      <TableRow key={i} className="data-row">
-                        <TableCell className="font-medium max-w-[250px] truncate">
-                          {p.nombre}
-                        </TableCell>
-                        <TableCell className="font-mono text-sm">{p.rut}</TableCell>
-                        <TableCell className="text-right">
-                          <Badge variant="secondary">{p.adjudicaciones}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-sm">
-                          {formatCurrency(p.montoTotal)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
-                              <div
-                                className="h-full rounded-full bg-firmavb-blue"
-                                style={{ width: `${Math.min(p.participacion, 100)}%` }}
-                              />
+                    {items.map((p, i) => {
+                      const active = sel?.proveedor === p.proveedor;
+                      return (
+                        <TableRow key={p.proveedor} onClick={() => setSel(p)}
+                          className={`cursor-pointer ${active ? "bg-primary/5" : ""}`}>
+                          <TableCell className="text-muted-foreground">{i === 0 ? <Crown className="h-4 w-4 text-amber-500" /> : i + 1}</TableCell>
+                          <TableCell className="font-medium max-w-[220px] truncate">{p.proveedor}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{formatCompact(p.monto_total)}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Progress value={Math.min(100, p.share ?? 0)} className="h-1.5 w-16" />
+                              <span className="text-xs text-muted-foreground w-10">{(p.share ?? 0).toFixed(1)}%</span>
                             </div>
-                            <span className="text-sm font-mono">
-                              {formatPercent(p.participacion)}
-                            </span>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {!filtered.length && (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                          No se encontraron proveedores
-                        </TableCell>
-                      </TableRow>
-                    )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
-              {filtered.length > 50 && (
-                <p className="text-xs text-muted-foreground mt-2 text-center">
-                  Mostrando 50 de {filtered.length} proveedores
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Detalle */}
+        <div className="lg:col-span-2">
+          {!sel ? (
+            <Card className="border-dashed h-full">
+              <CardContent className="py-20 text-center text-muted-foreground">
+                <Trophy className="h-12 w-12 mx-auto mb-4 opacity-40" />
+                <h3 className="text-lg font-semibold text-foreground mb-1">Elige un proveedor</h3>
+                <p className="text-sm max-w-xs mx-auto">Verás qué productos vende y a qué instituciones les vende más.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-lg font-bold leading-tight">{sel.proveedor}</h2>
+                <p className="text-sm text-muted-foreground">
+                  {formatCompact(sel.monto_total)} · {formatNumber(sel.ordenes)} órdenes · {formatNumber(sel.compradores)} compradores · {(sel.share ?? 0).toFixed(1)}% del mercado
                 </p>
-              )}
-            </CardContent>
-          </Card>
-        </>
-      )}
+              </div>
+
+              <Card className="border-border/50 shadow-sm">
+                <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Package className="h-4 w-4" /> Qué vende</CardTitle></CardHeader>
+                <CardContent>
+                  {detalleLoading ? <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
+                    : detalle?.productos?.length ? (
+                      <div className="space-y-1.5">
+                        {detalle.productos.map((pr, i) => (
+                          <div key={i} className="flex items-center justify-between gap-2 text-sm">
+                            <span className="truncate">{pr.producto}</span>
+                            <span className="font-mono text-muted-foreground shrink-0">{formatCompact(pr.monto)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : <p className="text-sm text-muted-foreground py-4 text-center">Sin líneas de producto aún</p>}
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/50 shadow-sm">
+                <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Building2 className="h-4 w-4" /> A quién le vende</CardTitle></CardHeader>
+                <CardContent>
+                  {detalleLoading ? <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
+                    : detalle?.compradores?.length ? (
+                      <div className="space-y-1.5">
+                        {detalle.compradores.map((c, i) => (
+                          <div key={i} className="flex items-center justify-between gap-2 text-sm">
+                            <span className="truncate">{c.comprador}</span>
+                            <span className="font-mono text-muted-foreground shrink-0">{formatCompact(c.monto)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : <p className="text-sm text-muted-foreground py-4 text-center">Sin compradores aún</p>}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
