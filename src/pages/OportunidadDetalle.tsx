@@ -37,6 +37,7 @@ import {
 } from "@/hooks/useOportunidadesPanel";
 import InteligenciaMercado from "@/components/oportunidades/InteligenciaMercado";
 import { InfoHint } from "@/components/ui/info-hint";
+import { useRegistrarSenal } from "@/hooks/useSenales";
 import { format, differenceInHours, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -191,6 +192,7 @@ export default function OportunidadDetalle() {
     tipoNormalized as "compra_agil" | "licitacion" | null
   );
   const descartar = useDescartarOportunidad();
+  const registrarSenal = useRegistrarSenal();
 
   if (isLoading) {
     return (
@@ -226,6 +228,7 @@ export default function OportunidadDetalle() {
   const deadline = getDeadlineInfo(oportunidad.fecha_cierre);
 
   const handleDescartar = () => {
+    registrarSenal({ tipo: "descartada", oportunidad_tipo: oportunidad.tipo, codigo: oportunidad.codigo, titulo: oportunidad.nombre });
     descartar.mutate(
       { codigo: oportunidad.codigo, tipo: oportunidad.tipo },
       {
@@ -239,6 +242,7 @@ export default function OportunidadDetalle() {
   };
 
   const handleCotizar = () => {
+    registrarSenal({ tipo: "cotizada", oportunidad_tipo: oportunidad.tipo, codigo: oportunidad.codigo, titulo: oportunidad.nombre });
     if (oportunidad.tipo === "compra_agil") {
       navigate(`/compras-agiles/${oportunidad.codigo}`);
     } else {

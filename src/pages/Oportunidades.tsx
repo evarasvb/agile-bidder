@@ -36,6 +36,7 @@ import {
   type OportunidadPanel,
   type PanelFilters,
 } from "@/hooks/useOportunidadesPanel";
+import { useRegistrarSenal } from "@/hooks/useSenales";
 import { format, differenceInDays, differenceInHours } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -193,6 +194,7 @@ export default function Oportunidades() {
 
   const { data, isLoading, refetch } = useOportunidadesPanel(filters);
   const descartar = useDescartarOportunidad();
+  const registrarSenal = useRegistrarSenal();
 
   const oportunidades = data?.data || [];
   const stats = data?.stats || { totalActivas: 0, avgMatchScore: 0, cierranEstaSemana: 0, valorTotal: 0 };
@@ -216,6 +218,8 @@ export default function Oportunidades() {
   const handleDescartar = (op: OportunidadPanel) => {
     // Gestionar (descartar) es Pro; en free abre el modal de upgrade.
     requirePro(() => {
+      // Señal para que la IA aprenda qué NO le sirve al cliente.
+      registrarSenal({ tipo: "descartada", oportunidad_tipo: op.tipo, codigo: op.codigo, titulo: op.nombre });
       descartar.mutate(
         { codigo: op.codigo, tipo: op.tipo },
         {
@@ -229,6 +233,8 @@ export default function Oportunidades() {
   const handleCotizar = (op: OportunidadPanel) => {
     // Cotizar/postular es Pro; en free abre el modal de upgrade.
     requirePro(() => {
+      // Señal para que la IA aprenda qué SÍ trabaja el cliente.
+      registrarSenal({ tipo: "cotizada", oportunidad_tipo: op.tipo, codigo: op.codigo, titulo: op.nombre });
       if (op.tipo === "compra_agil") {
         navigate(`/compras-agiles/${op.codigo}`);
       } else {
