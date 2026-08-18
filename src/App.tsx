@@ -24,6 +24,7 @@ const AcademiaLeads = lazy(() => import("./pages/AcademiaLeads"));
 const Auth = lazy(() => import("./pages/Auth"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const ClienteOnboarding = lazy(() => import("./pages/ClienteOnboarding"));
+const Activar = lazy(() => import("./pages/Activar"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const MisOportunidades = lazy(() => import("./pages/MisOportunidades"));
@@ -118,6 +119,7 @@ const App = () => (
           <Route path="/academia/curso/:slug" element={<AcademiaCurso />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/activar" element={<Activar />} />
           
           {/* Onboarding - sin sidebar */}
           <Route path="/onboarding" element={<ProtectedRoute><ClienteOnboarding /></ProtectedRoute>} />

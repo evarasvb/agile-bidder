@@ -230,6 +230,14 @@ export function useAsignarPipeline() {
   });
 }
 
+export interface InvitacionResultado {
+  ok: boolean;
+  email: string;
+  activation_url: string;
+  email_enviado: boolean;
+  email_error?: string | null;
+}
+
 export function useInvitarMiembro() {
   const queryClient = useQueryClient();
 
@@ -244,28 +252,27 @@ export function useInvitarMiembro() {
       email: string;
       rol: string;
       telefono?: string;
-    }) => {
-      const { data, error } = await (supabase
-        .from as any)('vendedores')
-        .insert({
-          nombre,
-          email,
-          rol,
-          telefono: telefono || null,
-          activo: true,
-          user_id: null,
-        })
-        .select()
-        .single();
-
+    }): Promise<InvitacionResultado> => {
+      // La edge function crea el miembro (pendiente + token), envía el email de
+      // activación y devuelve el enlace para compartir. Pasamos el origin actual
+      // para construir el enlace correcto (localhost/preview/producción).
+      const appUrl = typeof window !== 'undefined' ? window.location.origin : '';
+      const { data, error } = await supabase.functions.invoke('invitar-miembro', {
+        body: { nombre, email, rol, telefono, app_url: appUrl },
+      });
       if (error) throw error;
-      return data;
+      if (data?.error) throw new Error(data.error);
+      return data as InvitacionResultado;
     },
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: [EQUIPO_KEY] });
-      toast.success('Miembro invitado exitosamente');
+      if (res.email_enviado) {
+        toast.success('Invitación enviada por email');
+      } else {
+        toast.warning('Miembro creado. No se pudo enviar el email — comparte el enlace manualmente.');
+      }
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast.error('Error al invitar: ' + error.message);
     },
   });
