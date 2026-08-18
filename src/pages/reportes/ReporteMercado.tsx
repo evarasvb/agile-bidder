@@ -1,5 +1,4 @@
-import { Link } from "react-router-dom";
-import { ArrowLeft, Download, TrendingUp, Inbox } from "lucide-react";
+import { Download, TrendingUp, Inbox, FileText, DollarSign, Landmark, Zap } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +16,7 @@ import {
   Cell,
   Legend,
 } from "recharts";
-import { FirmaVBHeader } from "@/components/layout/FirmaVBHeader";
+import { ReportHero } from "@/components/reportes/ReportHero";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   useMercadoReport,
@@ -57,29 +56,27 @@ export default function ReporteMercado() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-4">
-          <Link to="/reportes">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-5 w-5" />
+      <ReportHero
+        title="Mercado"
+        subtitle="Vista general del mercado público: volúmenes, tendencia, regiones y tipos"
+        icon={TrendingUp}
+        kpis={[
+          { label: "Oportunidades", value: mercado ? formatNumber(mercado.kpis.totalOportunidades) : "…", icon: Zap },
+          { label: "Valor estimado", value: mercado ? formatCompact(mercado.kpis.valorTotal) : "…", icon: DollarSign },
+          { label: "Licitaciones", value: mercado ? formatNumber(mercado.kpis.totalLicitaciones) : "…", icon: Landmark },
+          { label: "Compras ágiles", value: mercado ? formatNumber(mercado.kpis.totalCompras) : "…", icon: FileText },
+        ]}
+        right={
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" className="text-white hover:bg-white/15" onClick={handleExportRegion} disabled={!mercado}>
+              <Download className="h-4 w-4 mr-2" /> Regiones
             </Button>
-          </Link>
-          <FirmaVBHeader
-            title="Mercado"
-            subtitle="Vista general del mercado público"
-          />
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleExportRegion} disabled={!mercado}>
-            <Download className="h-4 w-4 mr-2" />
-            Regiones CSV
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleExportMensual} disabled={!mercado}>
-            <Download className="h-4 w-4 mr-2" />
-            Tendencia CSV
-          </Button>
-        </div>
-      </div>
+            <Button variant="ghost" size="sm" className="text-white hover:bg-white/15" onClick={handleExportMensual} disabled={!mercado}>
+              <Download className="h-4 w-4 mr-2" /> Tendencia
+            </Button>
+          </div>
+        }
+      />
 
       {isLoading ? (
         <div className="space-y-4">
@@ -107,48 +104,6 @@ export default function ReporteMercado() {
         </Card>
       ) : (
         <>
-          {/* KPI Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            <Card className="border-border/50 shadow-sm">
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Total Oportunidades</p>
-                <p className="text-2xl font-heading font-bold">
-                  {formatNumber(mercado.kpis.totalOportunidades)}
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="border-border/50 shadow-sm">
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Valor Total Estimado</p>
-                <p className="text-2xl font-heading font-bold">
-                  {formatCompact(mercado.kpis.valorTotal)}
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="border-border/50 shadow-sm">
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Licitaciones</p>
-                <p className="text-2xl font-heading font-bold">
-                  {formatNumber(mercado.kpis.totalLicitaciones)}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {formatCompact(mercado.kpis.valorLicitaciones)}
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="border-border/50 shadow-sm">
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Compras Ágiles</p>
-                <p className="text-2xl font-heading font-bold">
-                  {formatNumber(mercado.kpis.totalCompras)}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {formatCompact(mercado.kpis.valorCompras)}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
           {/* Licitaciones vs Compras Ágiles split */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <Card className="border-border/50 shadow-sm">
