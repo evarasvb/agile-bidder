@@ -1,6 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabaseClient as supabase } from '@/lib/supabaseClient';
+import { supabaseClient } from '@/lib/supabaseClient';
 import { useAuth } from '@/hooks/useAuth';
+
+// La tabla match_overrides es nueva y aún no está en los tipos generados de
+// Supabase (Database). Usamos un handle sin tipar para estas llamadas, igual
+// que otros hooks del proyecto.
+const sb = supabaseClient as any;
 
 export type MatchAccion = 'descartado' | 'confirmado' | 'reasignado';
 
@@ -37,7 +42,7 @@ export function useMatchOverrides(codigo: string | null | undefined) {
     enabled: !!clienteId && !!codigo,
     queryFn: async (): Promise<Record<string, MatchOverride>> => {
       if (!clienteId || !codigo) return {};
-      const { data, error } = await supabase
+      const { data, error } = await sb
         .from('match_overrides')
         .select('*')
         .eq('codigo', codigo);
@@ -71,7 +76,7 @@ export function useUpsertMatchOverride() {
         score_manual: input.scoreManual ?? null,
         updated_at: new Date().toISOString(),
       };
-      const { data, error } = await supabase
+      const { data, error } = await sb
         .from('match_overrides')
         .upsert(row, { onConflict: 'cliente_id,proceso_tipo,codigo,item_ref' })
         .select()
@@ -93,7 +98,7 @@ export function useClearMatchOverride() {
   return useMutation({
     mutationFn: async (input: { codigo: string; itemRef: string; procesoTipo?: string }) => {
       if (!clienteId) throw new Error('No hay sesión activa');
-      const { error } = await supabase
+      const { error } = await sb
         .from('match_overrides')
         .delete()
         .eq('codigo', input.codigo)
