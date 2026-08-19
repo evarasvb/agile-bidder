@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useState } from "react";
-import { Plus, Upload, Search, MoreHorizontal, Edit2, Trash2, Package, Inbox, Loader2, RefreshCw, FileJson, Download, Trash, Image, FileText, CheckSquare, Square, FileSpreadsheet, Images, HelpCircle, Info } from "lucide-react";
+import { Plus, Upload, Search, MoreHorizontal, Edit2, Trash2, Package, Inbox, Loader2, RefreshCw, FileJson, Download, Trash, Image, FileText, CheckSquare, Square, FileSpreadsheet, Images, HelpCircle, Info, Sparkles } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useInventory, useUpdateInventoryItem, useDeleteInventoryItem, useCreateInventoryItem, InventoryItem, InventoryInput } from "@/hooks/useInventory";
+import { useEnriquecerInventario } from "@/hooks/useEnriquecerInventario";
 import { useLicitacionesPorProducto } from "@/hooks/useLicitacionesPorProducto";
 import { useComprasAgilesMatch } from "@/hooks/useComprasAgilesMatch";
 import { EditProductDialog } from "@/components/inventory/EditProductDialog";
@@ -61,6 +62,31 @@ export default function Inventory() {
   const pageSize = 100; // Show 100 products per page to prevent performance issues
   
   const { data: inventario = [], isLoading, refetch } = useInventory();
+  const enriquecer = useEnriquecerInventario();
+
+  // Enriquecer con IA: completa descripción, palabras clave y foto (Pexels) de
+  // los productos seleccionados; si no hay selección, de los que estén incompletos.
+  const handleEnriquecer = () => {
+    const ids = selectedIds.size > 0 ? Array.from(selectedIds) : undefined;
+    toast.loading('Enriqueciendo con IA…', { id: 'enriquecer' });
+    enriquecer.mutate(
+      { ids },
+      {
+        onSuccess: (res) => {
+          toast.dismiss('enriquecer');
+          if (!res || res.procesados === 0) {
+            toast.info(res?.mensaje || 'No hay productos para enriquecer (ya están completos).');
+            return;
+          }
+          const partes = [`${res.procesados} producto${res.procesados === 1 ? '' : 's'} actualizados`];
+          if (res.fuente_imagen === 'pexels') partes.push(`${res.con_imagen} con foto nueva`);
+          else partes.push('sin fotos (falta configurar la API de imágenes)');
+          toast.success(partes.join(' · '));
+        },
+        onSettled: () => toast.dismiss('enriquecer'),
+      }
+    );
+  };
   const { requirePro, isPro } = useRequirePro();
   const FREE_INV_LIMIT = 20;
   const handleAgregarClick = () => {
@@ -398,7 +424,31 @@ export default function Inventory() {
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant="outline" 
+                variant="outline"
+                className="gap-2 border-firmavb-blue text-firmavb-blue hover:bg-firmavb-blue/10"
+                onClick={handleEnriquecer}
+                disabled={enriquecer.isPending}
+              >
+                {enriquecer.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                Enriquecer con IA
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">
+                Completa con IA la descripción, palabras clave y una foto (banco) de los productos
+                seleccionados. Sin selección, completa los que estén incompletos. No pisa lo que ya tengas.
+              </p>
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
                 className="gap-2 border-firmavb-blue text-firmavb-blue hover:bg-firmavb-blue/10"
                 onClick={() => setImportDialogOpen(true)}
               >
