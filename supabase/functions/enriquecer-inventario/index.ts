@@ -117,6 +117,31 @@ async function buscarFotosPexels(query: string, n = 3): Promise<string[]> {
   }
 }
 
+// Fallback: Unsplash cuando Pexels no trae fotos (o no hay key de Pexels).
+async function buscarFotosUnsplash(query: string, n: number): Promise<string[]> {
+  const key = Deno.env.get('UNSPLASH_ACCESS_KEY');
+  if (!key || !query) return [];
+  try {
+    const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=${n}`;
+    const r = await fetch(url, { headers: { Authorization: `Client-ID ${key}` } });
+    if (!r.ok) return [];
+    const j = await r.json();
+    return ((j?.results || []) as Array<{ urls?: Record<string, string> }>)
+      .map((p) => p?.urls?.regular || p?.urls?.full || '')
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+// Pexels primero; si no alcanza, completamos con Unsplash.
+async function buscarFotos(query: string, n: number): Promise<string[]> {
+  const p = await buscarFotosPexels(query, n);
+  if (p.length >= n) return p;
+  const u = await buscarFotosUnsplash(query, n - p.length);
+  return [...p, ...u].slice(0, n);
+}
+
 // Baja una imagen y la sube a nuestro bucket; devuelve { url, path } o null.
 async function subirImagen(
   admin: any,
@@ -230,7 +255,7 @@ serve(async (req) => {
 
         if (overwrite || !yaTiene) {
           const query = ia.query_imagen || p.nombre_producto || p.nombre || p.categoria || '';
-          const urls = await buscarFotosPexels(query, 3);
+          const urls = await buscarFotos(query, 3);
           for (let k = 0; k < urls.length; k++) {
             const subida = await subirImagen(admin, cli.id, p.sku || p.id, urls[k], k);
             if (!subida) continue;
@@ -273,7 +298,7 @@ serve(async (req) => {
         procesados: resultados.length,
         con_imagen: conImagen,
         fuente_texto: fuenteTexto,
-        fuente_imagen: Deno.env.get('PEXELS_API_KEY') ? 'pexels' : 'sin_api',
+        fuente_imagen: (Deno.env.get('PEXELS_API_KEY') || Deno.env.get('UNSPLASH_ACCESS_KEY')) ? 'pexels' : 'sin_api',
         resultados,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

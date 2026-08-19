@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useInventory, useUpdateInventoryItem, useDeleteInventoryItem, useCreateInventoryItem, InventoryItem, InventoryInput } from "@/hooks/useInventory";
 import { useEnriquecerInventario } from "@/hooks/useEnriquecerInventario";
+import { BuscarFotosDialog } from "@/components/inventory/BuscarFotosDialog";
 import { useLicitacionesPorProducto } from "@/hooks/useLicitacionesPorProducto";
 import { useComprasAgilesMatch } from "@/hooks/useComprasAgilesMatch";
 import { EditProductDialog } from "@/components/inventory/EditProductDialog";
@@ -56,6 +57,8 @@ export default function Inventory() {
   const [galleryProduct, setGalleryProduct] = useState<InventoryItem | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; nombre: string } | null>(null);
   const [oportunidadesProducto, setOportunidadesProducto] = useState<InventoryItem | null>(null);
+  const [soloIncompletos, setSoloIncompletos] = useState(false);
+  const [fotosProducto, setFotosProducto] = useState<InventoryItem | null>(null);
   
   // Pagination state for UI performance
   const [currentPage, setCurrentPage] = useState(1);
@@ -64,13 +67,18 @@ export default function Inventory() {
   const { data: inventario = [], isLoading, refetch } = useInventory();
   const enriquecer = useEnriquecerInventario();
 
-  // Enriquecer con IA: completa descripción, palabras clave y foto (Pexels) de
-  // los productos seleccionados; si no hay selección, de los que estén incompletos.
-  const handleEnriquecer = () => {
-    const ids = selectedIds.size > 0 ? Array.from(selectedIds) : undefined;
+  // Enriquecer con IA: completa descripción, palabras clave y fotos de los
+  // productos indicados. Sin ids, procesa los que estén incompletos.
+  // overwrite=true rehace aunque ya tengan datos (solo con selección).
+  const handleEnriquecer = (opts?: { overwrite?: boolean; ids?: string[] }) => {
+    const ids = opts?.ids ?? (selectedIds.size > 0 ? Array.from(selectedIds) : undefined);
+    if (opts?.overwrite && !ids) {
+      toast.warning('Selecciona productos para rehacer (evita sobrescribir todo por accidente).');
+      return;
+    }
     toast.loading('Enriqueciendo con IA…', { id: 'enriquecer' });
     enriquecer.mutate(
-      { ids },
+      { ids, overwrite: opts?.overwrite },
       {
         onSuccess: (res) => {
           toast.dismiss('enriquecer');
@@ -155,12 +163,21 @@ export default function Inventory() {
     refetch();
   };
 
-  const filteredInventory = inventario.filter(
-    (item) =>
-      item.nombre_producto.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.proveedor && item.proveedor.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  // Un producto está "incompleto" si le falta descripción o imagen (lo que
+  // resta calidad al matching y a la ficha técnica del PDF).
+  const esIncompleto = (item: InventoryItem) => !item.descripcion?.trim() || !item.imagen_url;
+  const incompleteCount = inventario.filter(esIncompleto).length;
+
+  const filteredInventory = inventario.filter((item) => {
+    const q = searchQuery.toLowerCase();
+    const matchQ =
+      item.nombre_producto.toLowerCase().includes(q) ||
+      item.sku.toLowerCase().includes(q) ||
+      (item.proveedor && item.proveedor.toLowerCase().includes(q));
+    if (!matchQ) return false;
+    if (soloIncompletos && !esIncompleto(item)) return false;
+    return true;
+  });
 
   // Reset to page 1 when search changes
   const handleSearchChange = (value: string) => {
@@ -421,29 +438,46 @@ export default function Inventory() {
             </TooltipContent>
           </Tooltip>
           
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                className="gap-2 border-firmavb-blue text-firmavb-blue hover:bg-firmavb-blue/10"
-                onClick={handleEnriquecer}
-                disabled={enriquecer.isPending}
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="gap-2 border-firmavb-blue text-firmavb-blue hover:bg-firmavb-blue/10"
+                    disabled={enriquecer.isPending}
+                  >
+                    {enriquecer.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4" />
+                    )}
+                    Enriquecer con IA
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">
+                  Completa con IA la descripción, palabras clave y fotos (banco). Sin selección, procesa los
+                  incompletos.
+                </p>
+              </TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleEnriquecer()} className="gap-2 cursor-pointer">
+                <Sparkles className="h-4 w-4" />
+                {selectedIds.size > 0 ? `Completar seleccionados (${selectedIds.size})` : 'Completar incompletos'}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleEnriquecer({ overwrite: true })}
+                className="gap-2 cursor-pointer"
+                disabled={selectedIds.size === 0}
               >
-                {enriquecer.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4" />
-                )}
-                Enriquecer con IA
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="text-xs">
-                Completa con IA la descripción, palabras clave y una foto (banco) de los productos
-                seleccionados. Sin selección, completa los que estén incompletos. No pisa lo que ya tengas.
-              </p>
-            </TooltipContent>
-          </Tooltip>
+                <RefreshCw className="h-4 w-4" />
+                Rehacer seleccionados (sobrescribir)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <Tooltip>
             <TooltipTrigger asChild>
@@ -540,6 +574,17 @@ export default function Inventory() {
             className="pl-10"
           />
         </div>
+        <Button
+          variant={soloIncompletos ? 'default' : 'outline'}
+          size="sm"
+          className="gap-2"
+          onClick={() => { setSoloIncompletos((v) => !v); setCurrentPage(1); }}
+          disabled={incompleteCount === 0 && !soloIncompletos}
+        >
+          <Info className="h-4 w-4" />
+          {soloIncompletos ? 'Ver todos' : `Incompletos (${incompleteCount})`}
+        </Button>
+
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Package className="h-4 w-4" />
           <span>
@@ -772,14 +817,29 @@ export default function Inventory() {
                         </Button>
                       </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-popover">
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             className="gap-2 cursor-pointer"
                             onClick={() => setEditingProduct(item)}
                           >
                             <Edit2 className="h-4 w-4" />
                             Editar
                           </DropdownMenuItem>
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
+                            className="gap-2 cursor-pointer"
+                            onClick={() => handleEnriquecer({ ids: [item.id] })}
+                            disabled={enriquecer.isPending}
+                          >
+                            <Sparkles className="h-4 w-4" />
+                            Enriquecer con IA
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="gap-2 cursor-pointer"
+                            onClick={() => setFotosProducto(item)}
+                          >
+                            <Images className="h-4 w-4" />
+                            Buscar fotos
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
                             className="gap-2 text-destructive cursor-pointer"
                             onClick={() => setConfirmDelete({ id: item.id, nombre: item.nombre_producto })}
                           >
@@ -821,6 +881,13 @@ export default function Inventory() {
           </Button>
         </div>
       )}
+
+      {/* Buscar fotos (banco) */}
+      <BuscarFotosDialog
+        open={!!fotosProducto}
+        onOpenChange={(o) => !o && setFotosProducto(null)}
+        producto={fotosProducto ? { id: fotosProducto.id, nombre: fotosProducto.nombre_producto } : null}
+      />
 
       {/* Edit Dialog */}
       <EditProductDialog
