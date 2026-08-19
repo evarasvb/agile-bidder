@@ -15,10 +15,11 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import { aplicarRecargoPorRegion, obtenerRecargoRegion } from "@/utils/regiones";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useInventoryActivo } from "@/hooks/useInventory";
-import { useTodoElInventario } from "@/hooks/useCliente";
+import { useTodoElInventario, useCliente } from "@/hooks/useCliente";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { descargarCotizacionPDF, type ItemCotizacion, type DatosCotizacion } from "@/services/pdfGenerator";
+import { useFichaTecnica, type ProductoFicha } from "@/hooks/useFichaTecnica";
 
 interface ItemParaPropuesta {
   itemId: string;
@@ -72,6 +73,8 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
   const { data: userSettings } = useUserSettings();
   const { data: inventario } = useInventoryActivo();
   const { data: clienteInventario } = useTodoElInventario();
+  const { data: cliente } = useCliente();
+  const fichaTecnica = useFichaTecnica();
   const [productoSeleccionando, setProductoSeleccionando] = useState<string | null>(null);
   const [mostrarAgregarManual, setMostrarAgregarManual] = useState(false);
   
@@ -230,6 +233,51 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
     return <Badge variant="secondary" className="text-xs">Sin info</Badge>;
   };
 
+  // Datos de la empresa para los PDF (desde el cliente; respaldo FirmaVB).
+  const empresaFicha = {
+    nombre: cliente?.empresa_nombre || 'FirmaVB',
+    rut: cliente?.rut || undefined,
+    telefono: cliente?.telefono || undefined,
+    email: cliente?.email || 'contacto@firmavb.cl',
+  };
+
+  // Productos ofertados -> insumo para la ficha técnica.
+  const construirProductosFicha = (): ProductoFicha[] =>
+    itemsActivos.map((item) => ({
+      nombre: item.match?.nombre || item.nombre,
+      sku: item.match?.sku,
+      descripcion: item.descripcion,
+      unidad: item.unidadMedida,
+      cantidad: item.cantidad,
+      precio: item.precioUnitario,
+    }));
+
+  // Botón manual: genera la ficha técnica con IA, la descarga y la deja guardada.
+  const handleFichaTecnica = () => {
+    if (!compra) return;
+    fichaTecnica.mutate(
+      {
+        compra: {
+          id: compra.id,
+          codigo: compra.codigo,
+          nombre: compra.nombre,
+          organismo: compra.organismo,
+          datos_json: compra.datos_json,
+        },
+        productos: construirProductosFicha(),
+        empresa: empresaFicha,
+      },
+      {
+        onSuccess: (r) =>
+          toast.success(
+            r.fuente === 'ia'
+              ? 'Ficha técnica generada con IA y guardada'
+              : 'Ficha técnica generada y guardada'
+          ),
+      }
+    );
+  };
+
   const handleGuardarPropuesta = async () => {
     if (!compra) return;
 
@@ -253,12 +301,47 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
       estado: 'borrador',
     };
 
+    // Automático: al guardar la propuesta también generamos la ficha técnica
+    // (sin forzar descarga) y la dejamos guardada junto a la propuesta en una
+    // sola escritura, para no pisar datos_json.
+    let ficha_tecnica: Record<string, unknown> | null = null;
+    try {
+      const res = await fichaTecnica.mutateAsync({
+        compra: {
+          id: compra.id,
+          codigo: compra.codigo,
+          nombre: compra.nombre,
+          organismo: compra.organismo,
+          datos_json: compra.datos_json,
+        },
+        productos: construirProductosFicha(),
+        empresa: empresaFicha,
+        descargar: false,
+        persistir: false,
+      });
+      ficha_tecnica = {
+        generada_en: new Date().toISOString(),
+        fuente: res.fuente,
+        fichas: res.fichas,
+      };
+    } catch {
+      // Si la IA falla, guardamos igual la propuesta sin ficha.
+    }
+
     try {
       await updateCompra.mutateAsync({
         id: compra.id,
-        datos_json: { propuesta },
+        datos_json: {
+          ...(compra.datos_json ?? {}),
+          propuesta,
+          ...(ficha_tecnica ? { ficha_tecnica } : {}),
+        },
       });
-      toast.success('Propuesta guardada exitosamente');
+      toast.success(
+        ficha_tecnica
+          ? 'Propuesta y ficha técnica guardadas'
+          : 'Propuesta guardada exitosamente'
+      );
       onOpenChange(false);
     } catch (error) {
       console.error('Error saving proposal:', error);
@@ -613,11 +696,23 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
               disabled={itemsActivos.length === 0}
             >
               <Download className="h-4 w-4 mr-2" />
-              Descargar PDF
+              Cotización PDF
             </Button>
-            <Button 
+            <Button
+              variant="secondary"
+              onClick={handleFichaTecnica}
+              disabled={itemsActivos.length === 0 || fichaTecnica.isPending}
+            >
+              {fichaTecnica.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <FileText className="h-4 w-4 mr-2" />
+              )}
+              Ficha técnica
+            </Button>
+            <Button
               onClick={handleGuardarPropuesta}
-              disabled={itemsActivos.length === 0 || updateCompra.isPending}
+              disabled={itemsActivos.length === 0 || updateCompra.isPending || fichaTecnica.isPending}
             >
               {updateCompra.isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

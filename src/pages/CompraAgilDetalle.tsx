@@ -13,14 +13,17 @@ import {
   TableRow,
   TableCell,
 } from '@/components/ui/table';
-import { ArrowLeft, Building2, Calendar, DollarSign, Package, Clock } from 'lucide-react';
+import { ArrowLeft, Building2, Calendar, DollarSign, Package, Clock, FileText, Download, Sparkles } from 'lucide-react';
 import { format, parseISO, differenceInHours } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useCliente } from '@/hooks/useCliente';
+import { descargarFichaTecnicaPDF } from '@/services/fichaTecnicaPdf';
 
 export default function CompraAgilDetalle() {
   const { codigo } = useParams<{ codigo: string }>();
   const navigate = useNavigate();
   const { data: compra, isLoading, error } = useCompraAgil(codigo || null);
+  const { data: cliente } = useCliente();
 
   if (isLoading) {
     return (
@@ -48,6 +51,24 @@ export default function CompraAgilDetalle() {
   }
 
   const isUrgent = compra.fecha_cierre && differenceInHours(parseISO(compra.fecha_cierre), new Date()) < 24;
+
+  // Ficha técnica generada por el robot (IA) y guardada en la compra ágil.
+  const fichaTecnica = (compra.datos_json as any)?.ficha_tecnica ?? null;
+
+  const descargarFicha = () => {
+    if (!fichaTecnica?.fichas?.length) return;
+    descargarFichaTecnicaPDF({
+      compra: { codigo: compra.codigo, nombre: compra.nombre, organismo: compra.organismo },
+      empresa: {
+        nombre: cliente?.empresa_nombre || 'FirmaVB',
+        rut: cliente?.rut || undefined,
+        telefono: cliente?.telefono || undefined,
+        email: cliente?.email || 'contacto@firmavb.cl',
+      },
+      fecha: fichaTecnica.generada_en ? new Date(fichaTecnica.generada_en) : new Date(),
+      fichas: fichaTecnica.fichas,
+    });
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -182,6 +203,42 @@ export default function CompraAgilDetalle() {
               <p className="text-muted-foreground">
                 Esta compra coincide con productos de tu inventario.
               </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Ficha técnica (generada por IA y guardada en la compra ágil) */}
+      {fichaTecnica?.fichas?.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-semibold">Ficha técnica</h2>
+                {fichaTecnica.fuente === 'ia' && (
+                  <Badge variant="secondary" className="gap-1">
+                    <Sparkles className="h-3 w-3" /> Generada con IA
+                  </Badge>
+                )}
+              </div>
+              <Button onClick={descargarFicha} className="gap-2">
+                <Download className="h-4 w-4" />
+                Descargar PDF
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-3">
+              {fichaTecnica.fichas.length} producto{fichaTecnica.fichas.length === 1 ? '' : 's'} documentado
+              {fichaTecnica.fichas.length === 1 ? '' : 's'}. Lista para descargar y adjuntar en Mercado Público.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {fichaTecnica.fichas.map((f: any, i: number) => (
+                <Badge key={i} variant="outline" className="font-normal">
+                  {f.nombre}
+                </Badge>
+              ))}
             </div>
           </CardContent>
         </Card>
