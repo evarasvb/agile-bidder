@@ -22,6 +22,7 @@ import {
 import { useClienteFiltros, useSugerirFiltros } from "@/hooks/useClienteFiltros";
 import { RecargosRegion } from '@/components/settings/RecargosRegion';
 import { DatosEmpresaCard } from '@/components/settings/DatosEmpresaCard';
+import { OdooConexionCard } from '@/components/settings/OdooConexionCard';
 import { InfoHint } from "@/components/ui/info-hint";
 import AprendizajeIA from "@/components/oportunidades/AprendizajeIA";
 import { toast } from "sonner";
@@ -191,6 +192,9 @@ export default function ConfiguracionOportunidades() {
 
       {/* Datos de la empresa (para los PDF): nombre, RUT, dirección, contacto y logo */}
       <DatosEmpresaCard />
+
+      {/* Conexión con Odoo (opcional): importar fotos de producto por SKU */}
+      <OdooConexionCard />
 
       {fuenteIA && (
         <p className="text-sm text-muted-foreground -mt-2">
