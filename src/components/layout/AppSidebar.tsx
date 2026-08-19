@@ -91,7 +91,7 @@ const navItems: NavItem[] = [
     url: "/configuracion",
     icon: Settings,
     children: [
-      { title: "Filtros con IA", url: "/configuracion", icon: Sparkles },
+      { title: "Mi empresa", url: "/configuracion/empresa", icon: Building2 },
       { title: "Equipo", url: "/equipo", icon: Users },
       { title: "Extensión Chrome", url: "/configuracion/extension", icon: Puzzle },
     ],

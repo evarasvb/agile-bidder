@@ -17,7 +17,7 @@ import { ArrowLeft, Building2, Calendar, DollarSign, Package, Clock, FileText, D
 import { format, parseISO, differenceInHours } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useCliente } from '@/hooks/useCliente';
-import { descargarFichaTecnicaPDF } from '@/services/fichaTecnicaPdf';
+import { descargarFichaTecnicaPDF, verFichaTecnicaPDF } from '@/services/fichaTecnicaPdf';
 
 export default function CompraAgilDetalle() {
   const { codigo } = useParams<{ codigo: string }>();
@@ -55,21 +55,27 @@ export default function CompraAgilDetalle() {
   // Ficha técnica generada por el robot (IA) y guardada en la compra ágil.
   const fichaTecnica = (compra.datos_json as any)?.ficha_tecnica ?? null;
 
+  const datosFicha = () => ({
+    compra: { codigo: compra.codigo, nombre: compra.nombre, organismo: compra.organismo },
+    empresa: {
+      nombre: cliente?.empresa_nombre || 'FirmaVB',
+      rut: cliente?.rut || undefined,
+      direccion: cliente?.direccion || undefined,
+      telefono: cliente?.telefono || undefined,
+      email: cliente?.email || 'contacto@firmavb.cl',
+      logoUrl: cliente?.logo_url || undefined,
+    },
+    fecha: fichaTecnica?.generada_en ? new Date(fichaTecnica.generada_en) : new Date(),
+    fichas: fichaTecnica?.fichas ?? [],
+  });
+
+  const verFicha = () => {
+    if (!fichaTecnica?.fichas?.length) return;
+    void verFichaTecnicaPDF(datosFicha());
+  };
   const descargarFicha = () => {
     if (!fichaTecnica?.fichas?.length) return;
-    void descargarFichaTecnicaPDF({
-      compra: { codigo: compra.codigo, nombre: compra.nombre, organismo: compra.organismo },
-      empresa: {
-        nombre: cliente?.empresa_nombre || 'FirmaVB',
-        rut: cliente?.rut || undefined,
-        direccion: cliente?.direccion || undefined,
-        telefono: cliente?.telefono || undefined,
-        email: cliente?.email || 'contacto@firmavb.cl',
-        logoUrl: cliente?.logo_url || undefined,
-      },
-      fecha: fichaTecnica.generada_en ? new Date(fichaTecnica.generada_en) : new Date(),
-      fichas: fichaTecnica.fichas,
-    });
+    void descargarFichaTecnicaPDF(datosFicha());
   };
 
   return (
@@ -224,10 +230,16 @@ export default function CompraAgilDetalle() {
                   </Badge>
                 )}
               </div>
-              <Button onClick={descargarFicha} className="gap-2">
-                <Download className="h-4 w-4" />
-                Descargar PDF
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={verFicha} className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  Ver PDF
+                </Button>
+                <Button onClick={descargarFicha} variant="outline" className="gap-2">
+                  <Download className="h-4 w-4" />
+                  Descargar
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>

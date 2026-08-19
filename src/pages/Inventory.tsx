@@ -25,7 +25,6 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useInventory, useUpdateInventoryItem, useDeleteInventoryItem, useCreateInventoryItem, InventoryItem, InventoryInput } from "@/hooks/useInventory";
 import { useEnriquecerInventario } from "@/hooks/useEnriquecerInventario";
-import { useImportarOdoo } from "@/hooks/useImportarOdoo";
 import { BuscarFotosDialog } from "@/components/inventory/BuscarFotosDialog";
 import { useLicitacionesPorProducto } from "@/hooks/useLicitacionesPorProducto";
 import { useComprasAgilesMatch } from "@/hooks/useComprasAgilesMatch";
@@ -67,26 +66,6 @@ export default function Inventory() {
   
   const { data: inventario = [], isLoading, refetch } = useInventory();
   const enriquecer = useEnriquecerInventario();
-  const importarOdoo = useImportarOdoo();
-
-  const handleImportarOdoo = () => {
-    const ids = selectedIds.size > 0 ? Array.from(selectedIds) : undefined;
-    toast.loading('Importando fotos de Odoo…', { id: 'odoo' });
-    importarOdoo.mutate(
-      { ids },
-      {
-        onSuccess: (res) => {
-          toast.dismiss('odoo');
-          if (!res || res.procesados === 0) {
-            toast.info('No hay productos sin foto para importar.');
-            return;
-          }
-          toast.success(`${res.con_imagen} de ${res.procesados} productos con foto desde Odoo`);
-        },
-        onSettled: () => toast.dismiss('odoo'),
-      }
-    );
-  };
 
   // Enriquecer con IA: completa descripción, palabras clave y fotos de los
   // productos indicados. Sin ids, procesa los que estén incompletos.
@@ -496,14 +475,6 @@ export default function Inventory() {
               >
                 <RefreshCw className="h-4 w-4" />
                 Rehacer seleccionados (sobrescribir)
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={handleImportarOdoo}
-                className="gap-2 cursor-pointer"
-                disabled={importarOdoo.isPending}
-              >
-                <FileJson className="h-4 w-4" />
-                Importar fotos de Odoo
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

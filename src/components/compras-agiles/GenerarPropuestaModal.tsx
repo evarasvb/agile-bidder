@@ -20,6 +20,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { descargarCotizacionPDF, type ItemCotizacion, type DatosCotizacion } from "@/services/pdfGenerator";
 import { useFichaTecnica, type ProductoFicha } from "@/hooks/useFichaTecnica";
+import { blobFichaTecnicaPDF, type DatosFichaTecnica } from "@/services/fichaTecnicaPdf";
 
 interface ItemParaPropuesta {
   itemId: string;
@@ -263,11 +264,14 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
     });
   };
 
-  // Botón manual: genera la ficha técnica con IA, la descarga y la deja guardada.
-  const handleFichaTecnica = () => {
+  // Botón manual: genera la ficha técnica con IA, la ABRE para verla y la deja
+  // guardada. Abrimos la pestaña de inmediato (gesto del usuario) para que el
+  // navegador no bloquee el popup, y luego le cargamos el PDF.
+  const handleFichaTecnica = async () => {
     if (!compra) return;
-    fichaTecnica.mutate(
-      {
+    const win = window.open('', '_blank');
+    try {
+      const r = await fichaTecnica.mutateAsync({
         compra: {
           id: compra.id,
           codigo: compra.codigo,
@@ -277,16 +281,22 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
         },
         productos: construirProductosFicha(),
         empresa: empresaFicha,
-      },
-      {
-        onSuccess: (r) =>
-          toast.success(
-            r.fuente === 'ia'
-              ? 'Ficha técnica generada con IA y guardada'
-              : 'Ficha técnica generada y guardada'
-          ),
-      }
-    );
+        descargar: false,
+        persistir: true,
+      });
+      const datos: DatosFichaTecnica = {
+        compra: { codigo: compra.codigo, nombre: compra.nombre, organismo: compra.organismo },
+        empresa: empresaFicha,
+        fecha: new Date(),
+        fichas: r.fichas,
+      };
+      const url = await blobFichaTecnicaPDF(datos);
+      if (win) win.location.href = url;
+      else window.location.href = url;
+      toast.success(r.fuente === 'ia' ? 'Ficha técnica lista (IA)' : 'Ficha técnica lista');
+    } catch (e) {
+      if (win) win.close();
+    }
   };
 
   const handleGuardarPropuesta = async () => {
@@ -719,7 +729,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
               ) : (
                 <FileText className="h-4 w-4 mr-2" />
               )}
-              Ficha técnica
+              Ver ficha técnica
             </Button>
             <Button
               onClick={handleGuardarPropuesta}

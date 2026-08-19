@@ -290,16 +290,41 @@ function generarPDF(
   return doc;
 }
 
-/**
- * Precarga logo + fotos y descarga el PDF de ficha técnica. Es async porque
- * baja las imágenes desde el storage antes de construir el documento.
- */
-export async function descargarFichaTecnicaPDF(datos: DatosFichaTecnica): Promise<void> {
+// Precarga logo + fotos y construye el documento (async: baja imágenes primero).
+async function construirDoc(datos: DatosFichaTecnica): Promise<jsPDF> {
   const [logo, ...productos] = await Promise.all([
     cargarImagen(datos.empresa.logoUrl),
     ...datos.fichas.map((f) => cargarImagen(f.imagen_url)),
   ]);
-  const doc = generarPDF(datos, { logo, productos });
+  return generarPDF(datos, { logo, productos });
+}
+
+/** Descarga el PDF de ficha técnica. */
+export async function descargarFichaTecnicaPDF(datos: DatosFichaTecnica): Promise<void> {
+  const doc = await construirDoc(datos);
   const codigo = (datos.compra.codigo || 'compra').replace(/[^a-zA-Z0-9]/g, '_');
   doc.save(`ficha_tecnica_${codigo}.pdf`);
+}
+
+/** Construye el PDF y devuelve un object URL (para abrirlo en una pestaña ya abierta). */
+export async function blobFichaTecnicaPDF(datos: DatosFichaTecnica): Promise<string> {
+  const doc = await construirDoc(datos);
+  return URL.createObjectURL(doc.output('blob'));
+}
+
+/**
+ * Abre el PDF en una pestaña nueva para VERLO (no descargarlo). Para evitar el
+ * bloqueo de popups, abrimos la pestaña de inmediato y luego le cargamos el PDF.
+ */
+export async function verFichaTecnicaPDF(datos: DatosFichaTecnica): Promise<void> {
+  const win = window.open('', '_blank');
+  const doc = await construirDoc(datos);
+  const url = URL.createObjectURL(doc.output('blob'));
+  if (win) {
+    win.location.href = url;
+  } else {
+    // Popup bloqueado: caemos a navegar en la misma pestaña.
+    window.location.href = url;
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
