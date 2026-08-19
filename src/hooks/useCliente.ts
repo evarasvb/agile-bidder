@@ -14,6 +14,8 @@ export interface Cliente {
   nombre_responsable: string;
   region: string;
   telefono?: string;
+  direccion?: string;
+  logo_url?: string;
   categoria_negocio?: string;
   industrias?: string[];
   palabras_clave_busqueda?: string[];

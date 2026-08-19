@@ -237,20 +237,31 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
   const empresaFicha = {
     nombre: cliente?.empresa_nombre || 'FirmaVB',
     rut: cliente?.rut || undefined,
+    direccion: cliente?.direccion || undefined,
     telefono: cliente?.telefono || undefined,
     email: cliente?.email || 'contacto@firmavb.cl',
+    logoUrl: cliente?.logo_url || undefined,
   };
 
-  // Productos ofertados -> insumo para la ficha técnica.
-  const construirProductosFicha = (): ProductoFicha[] =>
-    itemsActivos.map((item) => ({
-      nombre: item.match?.nombre || item.nombre,
-      sku: item.match?.sku,
-      descripcion: item.descripcion,
-      unidad: item.unidadMedida,
-      cantidad: item.cantidad,
-      precio: item.precioUnitario,
-    }));
+  // Productos ofertados -> insumo para la ficha técnica. Buscamos en el
+  // inventario (por SKU) la foto, categoría y descripción del producto.
+  const construirProductosFicha = (): ProductoFicha[] => {
+    const invBySku = new Map((inventario || []).map((p: any) => [p.sku, p]));
+    return itemsActivos.map((item) => {
+      const inv: any = item.match?.sku ? invBySku.get(item.match.sku) : undefined;
+      return {
+        nombre: item.match?.nombre || item.nombre,
+        sku: item.match?.sku,
+        codigo: item.match?.sku,
+        imagenUrl: inv?.imagen_url ?? null,
+        descripcion: item.descripcion || inv?.descripcion || null,
+        categoria: inv?.categoria ?? null,
+        unidad: item.unidadMedida,
+        cantidad: item.cantidad,
+        precio: item.precioUnitario,
+      };
+    });
+  };
 
   // Botón manual: genera la ficha técnica con IA, la descarga y la deja guardada.
   const handleFichaTecnica = () => {

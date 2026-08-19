@@ -106,12 +106,23 @@ export function useUploadProductImage() {
         .single();
       
       if (error) throw error;
+
+      // Si es la imagen principal (o la primera), la reflejamos también en la
+      // columna imagen_url del producto, que es la que usan la tabla y los PDF
+      // (ficha técnica). Antes sólo se hacía al marcar "principal" a mano.
+      if (esPrincipal || nextOrden === 0) {
+        const table = productType === 'inventory' ? 'inventory' : 'cliente_inventario';
+        await supabase.from(table).update({ imagen_url: urlData.publicUrl }).eq('id', productId);
+      }
+
       return data as ProductImage;
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ 
-        queryKey: ['product-images', variables.productId, variables.productType] 
+      queryClient.invalidateQueries({
+        queryKey: ['product-images', variables.productId, variables.productType]
       });
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['cliente-inventario'] });
       toast.success('Imagen subida correctamente');
     },
     onError: (error: Error) => {

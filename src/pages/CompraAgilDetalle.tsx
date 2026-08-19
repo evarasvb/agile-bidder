@@ -57,13 +57,15 @@ export default function CompraAgilDetalle() {
 
   const descargarFicha = () => {
     if (!fichaTecnica?.fichas?.length) return;
-    descargarFichaTecnicaPDF({
+    void descargarFichaTecnicaPDF({
       compra: { codigo: compra.codigo, nombre: compra.nombre, organismo: compra.organismo },
       empresa: {
         nombre: cliente?.empresa_nombre || 'FirmaVB',
         rut: cliente?.rut || undefined,
+        direccion: cliente?.direccion || undefined,
         telefono: cliente?.telefono || undefined,
         email: cliente?.email || 'contacto@firmavb.cl',
+        logoUrl: cliente?.logo_url || undefined,
       },
       fecha: fichaTecnica.generada_en ? new Date(fichaTecnica.generada_en) : new Date(),
       fichas: fichaTecnica.fichas,

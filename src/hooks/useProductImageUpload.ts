@@ -35,6 +35,29 @@ export async function uploadProductImage(
   }
 }
 
+/**
+ * Sube el logo de la empresa (reutiliza el bucket público product-images bajo
+ * la carpeta logos/) y devuelve su URL pública para guardarla en el cliente.
+ */
+export async function uploadCompanyLogo(file: File, userId: string): Promise<string | null> {
+  try {
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'png';
+    const fileName = `logos/${userId}-${Date.now()}.${fileExt}`;
+    const { data, error } = await supabase.storage
+      .from('product-images')
+      .upload(fileName, file, { cacheControl: '3600', upsert: true });
+    if (error) {
+      console.error('Error uploading logo:', error);
+      return null;
+    }
+    const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(data.path);
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error('Logo upload error:', error);
+    return null;
+  }
+}
+
 export function validateImageUrl(url: string): boolean {
   if (!url || url.trim() === '') return true; // Empty is valid (optional field)
   

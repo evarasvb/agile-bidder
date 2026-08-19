@@ -11,6 +11,8 @@ import {
 export interface ProductoFicha {
   nombre: string;
   sku?: string;
+  codigo?: string;
+  imagenUrl?: string | null;
   descripcion?: string | null;
   categoria?: string | null;
   unidad?: string | null;
@@ -22,8 +24,10 @@ export interface ProductoFicha {
 export interface EmpresaFicha {
   nombre: string;
   rut?: string;
+  direccion?: string;
   telefono?: string;
   email?: string;
+  logoUrl?: string | null;
 }
 
 interface GenerarArgs {
@@ -36,8 +40,8 @@ interface GenerarArgs {
 
 /**
  * Genera la ficha técnica (IA + inventario) de los productos de una compra
- * ágil, arma el PDF y —por defecto— lo descarga y lo deja guardado en la
- * compra (datos_json.ficha_tecnica) para poder re-descargarlo o adjuntarlo.
+ * ágil, arma el PDF (con logo y fotos) y —por defecto— lo descarga y lo deja
+ * guardado en la compra (datos_json.ficha_tecnica) para re-descargarlo o adjuntarlo.
  */
 export function useFichaTecnica() {
   return useMutation({
@@ -62,7 +66,7 @@ export function useFichaTecnica() {
       const fichasIA: FichaProducto[] = data?.fichas ?? [];
       const fuente: 'ia' | 'inventario' = data?.fuente ?? 'inventario';
 
-      // 2) Enriquecemos cada ficha con sku/cantidad/unidad del ítem ofertado.
+      // 2) Enriquecemos cada ficha con código, foto, sku, cantidad y unidad.
       const fichas: FichaProducto[] = productos.map((p, i) => ({
         ...(fichasIA[i] ?? {
           nombre: p.nombre,
@@ -73,6 +77,8 @@ export function useFichaTecnica() {
         }),
         nombre: fichasIA[i]?.nombre || p.nombre,
         sku: p.sku,
+        codigo: p.codigo || p.sku,
+        imagen_url: p.imagenUrl ?? null,
         cantidad: p.cantidad,
         unidad: p.unidad ?? undefined,
       }));
@@ -85,6 +91,7 @@ export function useFichaTecnica() {
       };
 
       // 3) La dejamos guardada en la compra ágil (merge, sin pisar la propuesta).
+      //    Sólo guardamos URLs de imagen (no base64), así datos_json queda liviano.
       if (persistir) {
         try {
           const base = (compra.datos_json ?? {}) as Record<string, unknown>;
@@ -106,7 +113,7 @@ export function useFichaTecnica() {
       }
 
       // 4) Descargamos el PDF listo para adjuntar en Mercado Público.
-      if (descargar) descargarFichaTecnicaPDF(datosPDF);
+      if (descargar) await descargarFichaTecnicaPDF(datosPDF);
 
       return { fichas, fuente };
     },
