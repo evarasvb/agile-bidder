@@ -99,17 +99,44 @@ Responde SOLO con un JSON valido, sin texto extra, con esta forma EXACTA y EN EL
   return null;
 }
 
-// Busca una foto de banco en Pexels y devuelve la URL de la imagen (o null).
-async function buscarFotoPexels(query: string): Promise<string | null> {
+// Busca hasta N fotos de banco en Pexels y devuelve sus URLs (para armar galería).
+async function buscarFotosPexels(query: string, n = 3): Promise<string[]> {
   const PEXELS_API_KEY = Deno.env.get('PEXELS_API_KEY');
-  if (!PEXELS_API_KEY || !query) return null;
+  if (!PEXELS_API_KEY || !query) return [];
   try {
-    const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=1&orientation=square`;
+    const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=${n}&orientation=square`;
     const resp = await fetch(url, { headers: { Authorization: PEXELS_API_KEY } });
-    if (!resp.ok) return null;
+    if (!resp.ok) return [];
     const j = await resp.json();
-    const foto = j?.photos?.[0]?.src;
-    return foto?.large || foto?.medium || foto?.original || null;
+    const fotos = (j?.photos || []) as Array<{ src?: Record<string, string> }>;
+    return fotos
+      .map((f) => f?.src?.large || f?.src?.medium || f?.src?.original || '')
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+// Baja una imagen y la sube a nuestro bucket; devuelve { url, path } o null.
+async function subirImagen(
+  admin: any,
+  clienteId: string,
+  base: string,
+  imgUrl: string,
+  idx: number
+): Promise<{ url: string; path: string } | null> {
+  try {
+    const imgResp = await fetch(imgUrl);
+    if (!imgResp.ok) return null;
+    const bytes = new Uint8Array(await imgResp.arrayBuffer());
+    const safe = base.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const path = `enriquecidas/${clienteId}/${safe}-${Date.now()}-${idx}.jpg`;
+    const { error } = await admin.storage
+      .from('product-images')
+      .upload(path, bytes, { contentType: 'image/jpeg', upsert: true });
+    if (error) return null;
+    const { data: pub } = admin.storage.from('product-images').getPublicUrl(path);
+    return { url: pub.publicUrl, path };
   } catch {
     return null;
   }
@@ -133,7 +160,9 @@ serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({})) as { ids?: string[]; overwrite?: boolean; limite?: number };
     const overwrite = body.overwrite ?? false;
-    const limite = Math.min(Math.max(body.limite ?? 12, 1), 20);
+    // Con galería (hasta 3 fotos por producto) bajamos el lote para no exceder
+    // el tiempo de la función; el usuario puede volver a ejecutarlo.
+    const limite = Math.min(Math.max(body.limite ?? 8, 1), 12);
 
     // Cliente del usuario (para no tocar inventario ajeno).
     const { data: cli } = await admin.from('clientes').select('id').eq('user_id', userId).maybeSingle();
@@ -187,33 +216,40 @@ serve(async (req) => {
         update.marca = ia.marca;
       }
 
-      // Imagen: solo si falta (o overwrite). Bajamos de Pexels y subimos a
-      // nuestro bucket para que quede estable y sin problemas de CORS.
+      // Imagen(es): armamos una galería de hasta 3 fotos. Solo si el producto no
+      // tiene imagen (o overwrite). Bajamos de Pexels y subimos a nuestro bucket.
       let nuevaImagen: string | null = null;
+      let fotosAgregadas = 0;
       if (overwrite || !p.imagen_url) {
-        const query = ia.query_imagen || p.nombre_producto || p.nombre || p.categoria || '';
-        const pexelsUrl = await buscarFotoPexels(query);
-        if (pexelsUrl) {
-          try {
-            const imgResp = await fetch(pexelsUrl);
-            if (imgResp.ok) {
-              const bytes = new Uint8Array(await imgResp.arrayBuffer());
-              const path = `enriquecidas/${cli.id}/${(p.sku || p.id).replace(/[^a-zA-Z0-9_-]/g, '_')}-${Date.now()}.jpg`;
-              const { error: upErr } = await admin.storage
-                .from('product-images')
-                .upload(path, bytes, { contentType: 'image/jpeg', upsert: true });
-              if (!upErr) {
-                const { data: pub } = admin.storage.from('product-images').getPublicUrl(path);
-                nuevaImagen = pub.publicUrl;
-              }
-            }
-          } catch (_e) {
-            // sin imagen si falla la descarga/subida
+        // Evitamos duplicar: si ya tiene galería y no es overwrite, no agregamos.
+        const { count: yaTiene } = await admin
+          .from('product_images')
+          .select('id', { count: 'exact', head: true })
+          .eq('product_id', p.id)
+          .eq('product_type', 'cliente_inventario');
+
+        if (overwrite || !yaTiene) {
+          const query = ia.query_imagen || p.nombre_producto || p.nombre || p.categoria || '';
+          const urls = await buscarFotosPexels(query, 3);
+          for (let k = 0; k < urls.length; k++) {
+            const subida = await subirImagen(admin, cli.id, p.sku || p.id, urls[k], k);
+            if (!subida) continue;
+            const esPrincipal = fotosAgregadas === 0;
+            await admin.from('product_images').insert({
+              product_id: p.id,
+              product_type: 'cliente_inventario',
+              image_url: subida.url,
+              storage_path: subida.path,
+              orden: k,
+              es_principal: esPrincipal,
+            });
+            if (esPrincipal) nuevaImagen = subida.url;
+            fotosAgregadas++;
           }
-        }
-        if (nuevaImagen) {
-          update.imagen_url = nuevaImagen;
-          conImagen++;
+          if (nuevaImagen) {
+            update.imagen_url = nuevaImagen;
+            conImagen++;
+          }
         }
       }
 
@@ -227,6 +263,7 @@ serve(async (req) => {
         descripcion: (update.descripcion as string) ?? p.descripcion ?? null,
         imagen_url: nuevaImagen ?? p.imagen_url ?? null,
         con_imagen_nueva: !!nuevaImagen,
+        fotos_agregadas: fotosAgregadas,
         actualizado: Object.keys(update).length > 0,
       });
     }

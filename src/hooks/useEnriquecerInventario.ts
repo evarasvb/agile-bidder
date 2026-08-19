@@ -31,7 +31,7 @@ export function useEnriquecerInventario() {
   return useMutation({
     mutationFn: async (opts?: { ids?: string[]; overwrite?: boolean; limite?: number }) => {
       const { data, error } = await supabase.functions.invoke('enriquecer-inventario', {
-        body: { ids: opts?.ids, overwrite: opts?.overwrite ?? false, limite: opts?.limite ?? 20 },
+        body: { ids: opts?.ids, overwrite: opts?.overwrite ?? false, limite: opts?.limite },
       });
       if (error) throw error;
       return data as EnriquecerResumen;

@@ -233,6 +233,12 @@ export function AddProductDialog({
                 <p className="text-xs text-muted-foreground mt-1">Aparecerá en la ficha técnica del PDF.</p>
               </div>
             </div>
+            <Input
+              placeholder="…o pega la URL de una imagen (https://…)"
+              value={formData.imagen_url || ''}
+              onChange={(e) => setFormData({ ...formData, imagen_url: e.target.value })}
+              className="mt-1"
+            />
           </div>
 
           <div className="space-y-2">
