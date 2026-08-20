@@ -57,6 +57,7 @@ import {
   ChartSkeleton,
 } from "@/components/dashboard/DashboardSkeleton";
 import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
+import { PrimerosPasos } from "@/components/dashboard/PrimerosPasos";
 import { ResumenEjecutivo } from "@/components/dashboard/ResumenEjecutivo";
 import { FirmaVBHeader } from "@/components/layout/FirmaVBHeader";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -168,6 +169,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Guía de primeros pasos para clientes nuevos (se auto-oculta al completar) */}
+      <PrimerosPasos />
+
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <FirmaVBHeader
