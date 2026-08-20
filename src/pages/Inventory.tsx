@@ -26,8 +26,6 @@ import { toast } from "sonner";
 import { useInventory, useUpdateInventoryItem, useDeleteInventoryItem, useCreateInventoryItem, InventoryItem, InventoryInput } from "@/hooks/useInventory";
 import { useEnriquecerInventario } from "@/hooks/useEnriquecerInventario";
 import { BuscarFotosDialog } from "@/components/inventory/BuscarFotosDialog";
-import { useLicitacionesPorProducto } from "@/hooks/useLicitacionesPorProducto";
-import { useComprasAgilesMatch } from "@/hooks/useComprasAgilesMatch";
 import { EditProductDialog } from "@/components/inventory/EditProductDialog";
 import { DeleteProductDialog } from "@/components/inventory/DeleteProductDialog";
 import { ImportScriptDialog } from "@/components/inventory/ImportScriptDialog";
@@ -56,7 +54,6 @@ export default function Inventory() {
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
   const [galleryProduct, setGalleryProduct] = useState<InventoryItem | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; nombre: string } | null>(null);
-  const [oportunidadesProducto, setOportunidadesProducto] = useState<InventoryItem | null>(null);
   const [soloIncompletos, setSoloIncompletos] = useState(false);
   const [fotosProducto, setFotosProducto] = useState<InventoryItem | null>(null);
   
@@ -108,23 +105,9 @@ export default function Inventory() {
     }
     setAddDialogOpen(true);
   };
-  const { data: licitacionesPorProducto = [] } = useLicitacionesPorProducto();
-  const { data: comprasAgilesMatches = [], isLoading: isLoadingComprasAgiles } = useComprasAgilesMatch(user?.id ?? null);
-    // Nota: useComprasAgilesMatch ya no expone matchesByProductId/countsByProductId; se usan mapas vacios por ahora
-    const matchesByProductId: Record<string, any[]> = {};
-    const countsByProductId: Record<string, number> = {};
   const actualizarProducto = useUpdateInventoryItem();
   const eliminarProducto = useDeleteInventoryItem();
   const crearProducto = useCreateInventoryItem();
-  
-  // Crear mapa de licitaciones por producto_id para acceso rápido
-  const licitacionesMap = new Map(
-    licitacionesPorProducto.map(lpp => [lpp.producto_id, lpp])
-  );
-
-  const oportunidadesSeleccionadas = oportunidadesProducto
-    ? matchesByProductId[oportunidadesProducto.id] ?? []
-    : [];
 
   const handleRefresh = () => {
     toast.info('Actualizando inventario...');
@@ -657,17 +640,12 @@ export default function Inventory() {
                 <TableHead className="font-semibold text-right">Precio</TableHead>
                 <TableHead className="font-semibold text-right">Margen</TableHead>
                 <TableHead className="font-semibold text-right">Stock</TableHead>
-                <TableHead className="font-semibold text-center">Oportunidades</TableHead>
-                <TableHead className="font-semibold">Ficha</TableHead>
-                <TableHead className="font-semibold text-center">Oportunidades</TableHead>
                 <TableHead className="font-semibold">Estado</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {paginatedInventory.map((item) => {
-                const oportunidadesCount = countsByProductId[item.id] ?? 0;
-
                 return (
                 <TableRow key={item.id} className="data-row">
                   <TableCell>
@@ -729,84 +707,6 @@ export default function Inventory() {
                     item.stock_disponible > 0 && item.stock_disponible < 50 && "text-warning"
                   )}>
                     {item.stock_disponible.toLocaleString("es-CL")}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {(() => {
-                      const licitaciones = licitacionesMap.get(item.id);
-                      if (!licitaciones || licitaciones.total_licitaciones_abiertas === 0) {
-                        return (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="text-xs text-muted-foreground cursor-help inline-flex items-center gap-1">
-                                <HelpCircle className="h-3 w-3" />
-                                Sin oportunidades
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="text-xs">No hay licitaciones activas que coincidan con este producto</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        );
-                      }
-                      return (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Link
-                              to={`/compras-agiles?producto=${item.id}`}
-                              className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-firmavb-blue/10 text-firmavb-blue hover:bg-firmavb-blue/20 transition-colors text-xs font-medium"
-                            >
-                              <Gavel className="h-3 w-3" />
-                              {licitaciones.total_licitaciones_abiertas}
-                              {licitaciones.mejor_match_score && (
-                                <span className="text-firmavb-green">
-                                  ({licitaciones.mejor_match_score}%)
-                                </span>
-                              )}
-                            </Link>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <div className="text-xs space-y-1">
-                              <p className="font-medium">{licitaciones.total_licitaciones_abiertas} licitaciones activas</p>
-                              {licitaciones.mejor_match_score && (
-                                <p>Mejor match: {licitaciones.mejor_match_score}%</p>
-                              )}
-                              <p className="text-muted-foreground">Click para ver detalles</p>
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      );
-                    })()}
-                  </TableCell>
-                  <TableCell>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="text-xs">Ver ficha técnica del producto</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <button
-                      type="button"
-                      onClick={() => setOportunidadesProducto(item)}
-                      className="inline-flex items-center justify-center"
-                      aria-label={`Ver oportunidades de ${item.nombre_producto}`}
-                    >
-                      <Badge
-                        variant={oportunidadesCount > 0 ? "success" : "secondary"}
-                        className={cn("cursor-pointer", isLoadingComprasAgiles && "opacity-70")}
-                      >
-                        {isLoadingComprasAgiles ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          oportunidadesCount
-                        )}
-                      </Badge>
-                    </button>
                   </TableCell>
                   <TableCell>{getStatusBadge(item.stock_disponible, item.activo)}</TableCell>
                   <TableCell>
@@ -974,15 +874,6 @@ export default function Inventory() {
         open={bulkUploadOpen}
         onOpenChange={setBulkUploadOpen}
         onSuccess={refetch}
-      />
-
-      {/* Oportunidades Modal */}
-      <OportunidadesModal
-        open={!!oportunidadesProducto}
-        onOpenChange={(open) => !open && setOportunidadesProducto(null)}
-        producto={oportunidadesProducto}
-        compras={oportunidadesSeleccionadas}
-        isLoading={isLoadingComprasAgiles}
       />
 
       {/* Product Gallery Dialog */}
