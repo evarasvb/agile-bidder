@@ -76,22 +76,21 @@ const navItems: NavItem[] = [
     icon: GraduationCap,
   },
   {
-    title: "Mercado",
-    url: "/mercado",
-    icon: Store,
-    children: [
-      { title: "Explorador", url: "/mercado", icon: Store },
-      { title: "Instituciones", url: "/mercado/instituciones", icon: Building2 },
-      { title: "Órdenes de Compra", url: "/mercado/ordenes", icon: FileText },
-      { title: "Reportes", url: "/reportes", icon: BarChart3 },
-    ],
+    title: "Reportes",
+    url: "/reportes",
+    icon: BarChart3,
+  },
+  {
+    title: "Órdenes de Compra",
+    url: "/mercado/ordenes",
+    icon: FileText,
   },
   {
     title: "Configuración",
     url: "/configuracion",
     icon: Settings,
     children: [
-      { title: "Filtros con IA", url: "/configuracion", icon: Sparkles },
+      { title: "Mi empresa", url: "/configuracion/empresa", icon: Building2 },
       { title: "Equipo", url: "/equipo", icon: Users },
       { title: "Extensión Chrome", url: "/configuracion/extension", icon: Puzzle },
     ],

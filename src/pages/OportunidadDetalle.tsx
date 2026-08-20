@@ -38,6 +38,8 @@ import {
 import InteligenciaMercado from "@/components/oportunidades/InteligenciaMercado";
 import { InfoHint } from "@/components/ui/info-hint";
 import { useRegistrarSenal } from "@/hooks/useSenales";
+import { useCreatePipelineItem } from "@/hooks/usePipeline";
+import { supabase } from "@/integrations/supabase/client";
 import { format, differenceInHours, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -193,6 +195,7 @@ export default function OportunidadDetalle() {
   );
   const descartar = useDescartarOportunidad();
   const registrarSenal = useRegistrarSenal();
+  const crearPipeline = useCreatePipelineItem();
 
   if (isLoading) {
     return (
@@ -237,6 +240,40 @@ export default function OportunidadDetalle() {
           navigate("/oportunidades");
         },
         onError: () => toast.error("Error al descartar"),
+      }
+    );
+  };
+
+  // Antes esto solo mostraba un toast falso. Ahora crea de verdad la fila en el
+  // pipeline (postulaciones), evitando duplicar si ya está.
+  const handleAgregarPipeline = async () => {
+    try {
+      const { data: existe } = await supabase
+        .from("pipeline")
+        .select("id")
+        .eq("oportunidad_id", oportunidad.codigo)
+        .limit(1);
+      if (existe && existe.length > 0) {
+        toast.info("Esta oportunidad ya está en tu pipeline");
+        navigate("/pipeline");
+        return;
+      }
+    } catch { /* si falla la verificación, intentamos crear igual */ }
+
+    crearPipeline.mutate(
+      {
+        oportunidad_id: oportunidad.codigo,
+        oportunidad_tipo: oportunidad.tipo,
+        titulo: oportunidad.nombre,
+        institucion: oportunidad.organismo || undefined,
+        monto_estimado: oportunidad.monto ?? undefined,
+        fecha_cierre: oportunidad.fecha_cierre ?? undefined,
+        match_score: oportunidad.match_score ?? undefined,
+        etapa: "descubierta",
+      },
+      {
+        onSuccess: () => toast.success("Agregado al pipeline"),
+        onError: () => toast.error("No se pudo agregar al pipeline"),
       }
     );
   };
@@ -447,7 +484,12 @@ export default function OportunidadDetalle() {
               <FileText className="h-4 w-4" />
               Cotizar en 2 Clicks
             </Button>
-            <Button variant="outline" className="gap-2" onClick={() => toast.info("Agregado al pipeline")}>
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={handleAgregarPipeline}
+              disabled={crearPipeline.isPending}
+            >
               <PlusCircle className="h-4 w-4" />
               Agregar al Pipeline
             </Button>

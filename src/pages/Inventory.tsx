@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useState } from "react";
-import { Plus, Upload, Search, MoreHorizontal, Edit2, Trash2, Package, Inbox, Loader2, RefreshCw, FileJson, Download, Trash, Image, FileText, CheckSquare, Square, FileSpreadsheet, Images, HelpCircle, Info } from "lucide-react";
+import { Plus, Upload, Search, MoreHorizontal, Edit2, Trash2, Package, Inbox, Loader2, RefreshCw, FileJson, Download, Trash, Image, FileText, CheckSquare, Square, FileSpreadsheet, Images, HelpCircle, Info, Sparkles } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
@@ -24,8 +24,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useInventory, useUpdateInventoryItem, useDeleteInventoryItem, useCreateInventoryItem, InventoryItem, InventoryInput } from "@/hooks/useInventory";
-import { useLicitacionesPorProducto } from "@/hooks/useLicitacionesPorProducto";
-import { useComprasAgilesMatch } from "@/hooks/useComprasAgilesMatch";
+import { useEnriquecerInventario } from "@/hooks/useEnriquecerInventario";
+import { BuscarFotosDialog } from "@/components/inventory/BuscarFotosDialog";
 import { EditProductDialog } from "@/components/inventory/EditProductDialog";
 import { DeleteProductDialog } from "@/components/inventory/DeleteProductDialog";
 import { ImportScriptDialog } from "@/components/inventory/ImportScriptDialog";
@@ -54,13 +54,44 @@ export default function Inventory() {
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
   const [galleryProduct, setGalleryProduct] = useState<InventoryItem | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; nombre: string } | null>(null);
-  const [oportunidadesProducto, setOportunidadesProducto] = useState<InventoryItem | null>(null);
+  const [soloIncompletos, setSoloIncompletos] = useState(false);
+  const [fotosProducto, setFotosProducto] = useState<InventoryItem | null>(null);
   
   // Pagination state for UI performance
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 100; // Show 100 products per page to prevent performance issues
   
   const { data: inventario = [], isLoading, refetch } = useInventory();
+  const enriquecer = useEnriquecerInventario();
+
+  // Enriquecer con IA: completa descripción, palabras clave y fotos de los
+  // productos indicados. Sin ids, procesa los que estén incompletos.
+  // overwrite=true rehace aunque ya tengan datos (solo con selección).
+  const handleEnriquecer = (opts?: { overwrite?: boolean; ids?: string[] }) => {
+    const ids = opts?.ids ?? (selectedIds.size > 0 ? Array.from(selectedIds) : undefined);
+    if (opts?.overwrite && !ids) {
+      toast.warning('Selecciona productos para rehacer (evita sobrescribir todo por accidente).');
+      return;
+    }
+    toast.loading('Enriqueciendo con IA…', { id: 'enriquecer' });
+    enriquecer.mutate(
+      { ids, overwrite: opts?.overwrite },
+      {
+        onSuccess: (res) => {
+          toast.dismiss('enriquecer');
+          if (!res || res.procesados === 0) {
+            toast.info(res?.mensaje || 'No hay productos para enriquecer (ya están completos).');
+            return;
+          }
+          const partes = [`${res.procesados} producto${res.procesados === 1 ? '' : 's'} actualizados`];
+          if (res.fuente_imagen === 'pexels') partes.push(`${res.con_imagen} con foto nueva`);
+          else partes.push('sin fotos (falta configurar la API de imágenes)');
+          toast.success(partes.join(' · '));
+        },
+        onSettled: () => toast.dismiss('enriquecer'),
+      }
+    );
+  };
   const { requirePro, isPro } = useRequirePro();
   const FREE_INV_LIMIT = 20;
   const handleAgregarClick = () => {
@@ -74,23 +105,9 @@ export default function Inventory() {
     }
     setAddDialogOpen(true);
   };
-  const { data: licitacionesPorProducto = [] } = useLicitacionesPorProducto();
-  const { data: comprasAgilesMatches = [], isLoading: isLoadingComprasAgiles } = useComprasAgilesMatch(user?.id ?? null);
-    // Nota: useComprasAgilesMatch ya no expone matchesByProductId/countsByProductId; se usan mapas vacios por ahora
-    const matchesByProductId: Record<string, any[]> = {};
-    const countsByProductId: Record<string, number> = {};
   const actualizarProducto = useUpdateInventoryItem();
   const eliminarProducto = useDeleteInventoryItem();
   const crearProducto = useCreateInventoryItem();
-  
-  // Crear mapa de licitaciones por producto_id para acceso rápido
-  const licitacionesMap = new Map(
-    licitacionesPorProducto.map(lpp => [lpp.producto_id, lpp])
-  );
-
-  const oportunidadesSeleccionadas = oportunidadesProducto
-    ? matchesByProductId[oportunidadesProducto.id] ?? []
-    : [];
 
   const handleRefresh = () => {
     toast.info('Actualizando inventario...');
@@ -129,12 +146,21 @@ export default function Inventory() {
     refetch();
   };
 
-  const filteredInventory = inventario.filter(
-    (item) =>
-      item.nombre_producto.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.proveedor && item.proveedor.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  // Un producto está "incompleto" si le falta descripción o imagen (lo que
+  // resta calidad al matching y a la ficha técnica del PDF).
+  const esIncompleto = (item: InventoryItem) => !item.descripcion?.trim() || !item.imagen_url;
+  const incompleteCount = inventario.filter(esIncompleto).length;
+
+  const filteredInventory = inventario.filter((item) => {
+    const q = searchQuery.toLowerCase();
+    const matchQ =
+      item.nombre_producto.toLowerCase().includes(q) ||
+      item.sku.toLowerCase().includes(q) ||
+      (item.proveedor && item.proveedor.toLowerCase().includes(q));
+    if (!matchQ) return false;
+    if (soloIncompletos && !esIncompleto(item)) return false;
+    return true;
+  });
 
   // Reset to page 1 when search changes
   const handleSearchChange = (value: string) => {
@@ -395,10 +421,51 @@ export default function Inventory() {
             </TooltipContent>
           </Tooltip>
           
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="gap-2 border-firmavb-blue text-firmavb-blue hover:bg-firmavb-blue/10"
+                    disabled={enriquecer.isPending}
+                  >
+                    {enriquecer.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4" />
+                    )}
+                    Enriquecer con IA
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">
+                  Completa con IA la descripción, palabras clave y fotos (banco). Sin selección, procesa los
+                  incompletos.
+                </p>
+              </TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleEnriquecer()} className="gap-2 cursor-pointer">
+                <Sparkles className="h-4 w-4" />
+                {selectedIds.size > 0 ? `Completar seleccionados (${selectedIds.size})` : 'Completar incompletos'}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleEnriquecer({ overwrite: true })}
+                className="gap-2 cursor-pointer"
+                disabled={selectedIds.size === 0}
+              >
+                <RefreshCw className="h-4 w-4" />
+                Rehacer seleccionados (sobrescribir)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant="outline" 
+                variant="outline"
                 className="gap-2 border-firmavb-blue text-firmavb-blue hover:bg-firmavb-blue/10"
                 onClick={() => setImportDialogOpen(true)}
               >
@@ -490,6 +557,17 @@ export default function Inventory() {
             className="pl-10"
           />
         </div>
+        <Button
+          variant={soloIncompletos ? 'default' : 'outline'}
+          size="sm"
+          className="gap-2"
+          onClick={() => { setSoloIncompletos((v) => !v); setCurrentPage(1); }}
+          disabled={incompleteCount === 0 && !soloIncompletos}
+        >
+          <Info className="h-4 w-4" />
+          {soloIncompletos ? 'Ver todos' : `Incompletos (${incompleteCount})`}
+        </Button>
+
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Package className="h-4 w-4" />
           <span>
@@ -562,17 +640,12 @@ export default function Inventory() {
                 <TableHead className="font-semibold text-right">Precio</TableHead>
                 <TableHead className="font-semibold text-right">Margen</TableHead>
                 <TableHead className="font-semibold text-right">Stock</TableHead>
-                <TableHead className="font-semibold text-center">Oportunidades</TableHead>
-                <TableHead className="font-semibold">Ficha</TableHead>
-                <TableHead className="font-semibold text-center">Oportunidades</TableHead>
                 <TableHead className="font-semibold">Estado</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {paginatedInventory.map((item) => {
-                const oportunidadesCount = countsByProductId[item.id] ?? 0;
-
                 return (
                 <TableRow key={item.id} className="data-row">
                   <TableCell>
@@ -635,84 +708,6 @@ export default function Inventory() {
                   )}>
                     {item.stock_disponible.toLocaleString("es-CL")}
                   </TableCell>
-                  <TableCell className="text-center">
-                    {(() => {
-                      const licitaciones = licitacionesMap.get(item.id);
-                      if (!licitaciones || licitaciones.total_licitaciones_abiertas === 0) {
-                        return (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="text-xs text-muted-foreground cursor-help inline-flex items-center gap-1">
-                                <HelpCircle className="h-3 w-3" />
-                                Sin oportunidades
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="text-xs">No hay licitaciones activas que coincidan con este producto</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        );
-                      }
-                      return (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Link
-                              to={`/compras-agiles?producto=${item.id}`}
-                              className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-firmavb-blue/10 text-firmavb-blue hover:bg-firmavb-blue/20 transition-colors text-xs font-medium"
-                            >
-                              <Gavel className="h-3 w-3" />
-                              {licitaciones.total_licitaciones_abiertas}
-                              {licitaciones.mejor_match_score && (
-                                <span className="text-firmavb-green">
-                                  ({licitaciones.mejor_match_score}%)
-                                </span>
-                              )}
-                            </Link>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <div className="text-xs space-y-1">
-                              <p className="font-medium">{licitaciones.total_licitaciones_abiertas} licitaciones activas</p>
-                              {licitaciones.mejor_match_score && (
-                                <p>Mejor match: {licitaciones.mejor_match_score}%</p>
-                              )}
-                              <p className="text-muted-foreground">Click para ver detalles</p>
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      );
-                    })()}
-                  </TableCell>
-                  <TableCell>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="text-xs">Ver ficha técnica del producto</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <button
-                      type="button"
-                      onClick={() => setOportunidadesProducto(item)}
-                      className="inline-flex items-center justify-center"
-                      aria-label={`Ver oportunidades de ${item.nombre_producto}`}
-                    >
-                      <Badge
-                        variant={oportunidadesCount > 0 ? "success" : "secondary"}
-                        className={cn("cursor-pointer", isLoadingComprasAgiles && "opacity-70")}
-                      >
-                        {isLoadingComprasAgiles ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          oportunidadesCount
-                        )}
-                      </Badge>
-                    </button>
-                  </TableCell>
                   <TableCell>{getStatusBadge(item.stock_disponible, item.activo)}</TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -722,14 +717,29 @@ export default function Inventory() {
                         </Button>
                       </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-popover">
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             className="gap-2 cursor-pointer"
                             onClick={() => setEditingProduct(item)}
                           >
                             <Edit2 className="h-4 w-4" />
                             Editar
                           </DropdownMenuItem>
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
+                            className="gap-2 cursor-pointer"
+                            onClick={() => handleEnriquecer({ ids: [item.id] })}
+                            disabled={enriquecer.isPending}
+                          >
+                            <Sparkles className="h-4 w-4" />
+                            Enriquecer con IA
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="gap-2 cursor-pointer"
+                            onClick={() => setFotosProducto(item)}
+                          >
+                            <Images className="h-4 w-4" />
+                            Buscar fotos
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
                             className="gap-2 text-destructive cursor-pointer"
                             onClick={() => setConfirmDelete({ id: item.id, nombre: item.nombre_producto })}
                           >
@@ -771,6 +781,13 @@ export default function Inventory() {
           </Button>
         </div>
       )}
+
+      {/* Buscar fotos (banco) */}
+      <BuscarFotosDialog
+        open={!!fotosProducto}
+        onOpenChange={(o) => !o && setFotosProducto(null)}
+        producto={fotosProducto ? { id: fotosProducto.id, nombre: fotosProducto.nombre_producto } : null}
+      />
 
       {/* Edit Dialog */}
       <EditProductDialog
@@ -857,15 +874,6 @@ export default function Inventory() {
         open={bulkUploadOpen}
         onOpenChange={setBulkUploadOpen}
         onSuccess={refetch}
-      />
-
-      {/* Oportunidades Modal */}
-      <OportunidadesModal
-        open={!!oportunidadesProducto}
-        onOpenChange={(open) => !open && setOportunidadesProducto(null)}
-        producto={oportunidadesProducto}
-        compras={oportunidadesSeleccionadas}
-        isLoading={isLoadingComprasAgiles}
       />
 
       {/* Product Gallery Dialog */}

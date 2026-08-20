@@ -1,19 +1,23 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { 
-  Package, 
-  Loader2, 
-  Calendar, 
+import {
+  Package,
+  Loader2,
+  Calendar,
   Building2,
   TrendingUp,
   CheckCircle,
   XCircle,
   Clock,
-  Info
+  Info,
+  Search,
+  X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
@@ -32,6 +36,14 @@ import {
 } from '@/components/ui/dialog';
 import { useLicitaciones, useLicitacionItemsById, type Licitacion } from '@/hooks/useLicitaciones';
 import { cn } from '@/lib/utils';
+
+// Normaliza para buscar sin distinguir acentos ni mayúsculas.
+function normalizar(texto: string): string {
+  return texto
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+}
 
 function formatCurrency(value: number | null): string {
   if (value === null) return '-';
@@ -311,6 +323,32 @@ function LicitacionRow({ licitacion }: { licitacion: Licitacion }) {
 
 export function LicitacionesTable() {
   const { data: licitaciones, isLoading, error } = useLicitaciones();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Término inicial: viene del buscador del landing (?search=silla).
+  const [q, setQ] = useState(searchParams.get('search') ?? '');
+
+  // Si el término de la URL cambia (navegación externa), lo reflejamos.
+  useEffect(() => {
+    const urlQ = searchParams.get('search') ?? '';
+    setQ((prev) => (prev === urlQ ? prev : urlQ));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const filtradas = useMemo(() => {
+    if (!licitaciones) return [];
+    const term = normalizar(q.trim());
+    if (!term) return licitaciones;
+    return licitaciones.filter((l) =>
+      normalizar(`${l.titulo ?? ''} ${l.organismo ?? ''}`).includes(term)
+    );
+  }, [licitaciones, q]);
+
+  const limpiar = () => {
+    setQ('');
+    const next = new URLSearchParams(searchParams);
+    next.delete('search');
+    setSearchParams(next, { replace: true });
+  };
 
   if (isLoading) {
     return (
@@ -341,34 +379,63 @@ export function LicitacionesTable() {
   return (
     <Card className="overflow-hidden">
       <CardHeader className="bg-header-dark text-white py-4">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Package className="h-5 w-5" />
-          Todas las Compras Ágiles
-          <Badge variant="secondary" className="ml-2 bg-white/20 text-white">
-            {licitaciones.length} registros
-          </Badge>
+        <CardTitle className="flex flex-col sm:flex-row sm:items-center gap-3 text-lg">
+          <span className="flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            Todas las Compras Ágiles
+            <Badge variant="secondary" className="ml-1 bg-white/20 text-white">
+              {q.trim() ? `${filtradas.length} de ${licitaciones.length}` : `${licitaciones.length} registros`}
+            </Badge>
+          </span>
+          <div className="relative sm:ml-auto w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/60" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Buscar producto u organismo…"
+              className="pl-9 pr-9 h-9 bg-white/10 border-white/20 text-white placeholder:text-white/60 focus-visible:ring-white/40"
+            />
+            {q && (
+              <button
+                type="button"
+                onClick={limpiar}
+                aria-label="Limpiar búsqueda"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-white/70 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/50 hover:bg-muted/50">
-              <TableHead className="font-semibold">Licitación</TableHead>
-              <TableHead className="font-semibold">Organismo</TableHead>
-              <TableHead className="font-semibold">Monto Estimado</TableHead>
-              <TableHead className="font-semibold">Fecha Cierre</TableHead>
-              <TableHead className="font-semibold">Estado</TableHead>
-              <TableHead className="font-semibold">Match</TableHead>
-              <TableHead className="font-semibold">Productos</TableHead>
-              <TableHead className="w-12"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {licitaciones.map((licitacion) => (
-              <LicitacionRow key={licitacion.id_licitacion} licitacion={licitacion} />
-            ))}
-          </TableBody>
-        </Table>
+        {filtradas.length === 0 ? (
+          <div className="py-12 text-center text-muted-foreground">
+            <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p className="text-lg font-medium">Sin resultados para "{q.trim()}"</p>
+            <p className="text-sm mt-1">Prueba con otra palabra o limpia la búsqueda.</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50 hover:bg-muted/50">
+                <TableHead className="font-semibold">Licitación</TableHead>
+                <TableHead className="font-semibold">Organismo</TableHead>
+                <TableHead className="font-semibold">Monto Estimado</TableHead>
+                <TableHead className="font-semibold">Fecha Cierre</TableHead>
+                <TableHead className="font-semibold">Estado</TableHead>
+                <TableHead className="font-semibold">Match</TableHead>
+                <TableHead className="font-semibold">Productos</TableHead>
+                <TableHead className="w-12"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtradas.map((licitacion) => (
+                <LicitacionRow key={licitacion.id_licitacion} licitacion={licitacion} />
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </CardContent>
     </Card>
   );

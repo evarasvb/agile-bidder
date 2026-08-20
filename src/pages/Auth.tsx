@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 import { useAuth } from '@/hooks/useAuth';
 import { supabaseClient } from '@/lib/supabaseClient';
@@ -32,9 +32,14 @@ const signupSchema = z.object({
 
 export default function Auth() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { signIn, signUp, resetPassword, isAuthenticated, loading: authLoading } = useAuth();
-  
-  const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
+
+  // Los CTA de "Crear cuenta" del landing traen ?tab=signup para aterrizar en la
+  // pestaña correcta (antes todos caían en Iniciar sesión).
+  const [activeTab, setActiveTab] = useState<'login' | 'signup'>(
+    searchParams.get('tab') === 'signup' ? 'signup' : 'login'
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -103,16 +108,34 @@ export default function Auth() {
 
     setLoading(true);
     const { error } = await signUp(signupEmail, signupPassword);
-    setLoading(false);
 
     if (error) {
+      setLoading(false);
       if (error.message.includes('User already registered')) {
         setError('Este email ya está registrado. Intenta iniciar sesión.');
       } else {
         setError(error.message);
       }
+      return;
+    }
+
+    // Con auto-confirmación activada, el registro ya deja la sesión iniciada:
+    // entramos directo al onboarding en vez de mandar de vuelta al login (eso
+    // hacía sentir que "no partía" / se quedaba en un loop). Si el proyecto pide
+    // confirmar el correo, no habrá sesión: mostramos el aviso correspondiente.
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    setLoading(false);
+
+    if (session) {
+      // Arrastramos el término que buscó en el landing para precargarlo como
+      // palabra clave en el onboarding (continuidad = activación).
+      const buscar = searchParams.get('buscar');
+      if (buscar) {
+        try { localStorage.setItem('fvb_onboarding_kw', buscar); } catch { /* noop */ }
+      }
+      navigate('/onboarding', { replace: true });
     } else {
-      setSuccess('¡Cuenta creada exitosamente! Ya puedes iniciar sesión.');
+      setSuccess('¡Cuenta creada! Te enviamos un correo para confirmar tu cuenta. Revisa tu bandeja de entrada (y spam).');
       setActiveTab('login');
       setLoginEmail(signupEmail);
       setSignupEmail('');

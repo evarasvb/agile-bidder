@@ -15,10 +15,14 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import { aplicarRecargoPorRegion, obtenerRecargoRegion } from "@/utils/regiones";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useInventoryActivo } from "@/hooks/useInventory";
-import { useTodoElInventario } from "@/hooks/useCliente";
+import { useTodoElInventario, useCliente } from "@/hooks/useCliente";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { descargarCotizacionPDF, type ItemCotizacion, type DatosCotizacion } from "@/services/pdfGenerator";
+import { useFichaTecnica, type ProductoFicha } from "@/hooks/useFichaTecnica";
+import { blobFichaTecnicaPDF, type DatosFichaTecnica } from "@/services/fichaTecnicaPdf";
+import { useCreatePipelineItem } from "@/hooks/usePipeline";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ItemParaPropuesta {
   itemId: string;
@@ -72,6 +76,9 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
   const { data: userSettings } = useUserSettings();
   const { data: inventario } = useInventoryActivo();
   const { data: clienteInventario } = useTodoElInventario();
+  const { data: cliente } = useCliente();
+  const fichaTecnica = useFichaTecnica();
+  const crearPipeline = useCreatePipelineItem();
   const [productoSeleccionando, setProductoSeleccionando] = useState<string | null>(null);
   const [mostrarAgregarManual, setMostrarAgregarManual] = useState(false);
   
@@ -230,6 +237,71 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
     return <Badge variant="secondary" className="text-xs">Sin info</Badge>;
   };
 
+  // Datos de la empresa para los PDF (desde el cliente; respaldo FirmaVB).
+  const empresaFicha = {
+    nombre: cliente?.empresa_nombre || 'FirmaVB',
+    rut: cliente?.rut || undefined,
+    direccion: cliente?.direccion || undefined,
+    telefono: cliente?.telefono || undefined,
+    email: cliente?.email || 'contacto@firmavb.cl',
+    logoUrl: cliente?.logo_url || undefined,
+  };
+
+  // Productos ofertados -> insumo para la ficha técnica. Buscamos en el
+  // inventario (por SKU) la foto, categoría y descripción del producto.
+  const construirProductosFicha = (): ProductoFicha[] => {
+    const invBySku = new Map((inventario || []).map((p: any) => [p.sku, p]));
+    return itemsActivos.map((item) => {
+      const inv: any = item.match?.sku ? invBySku.get(item.match.sku) : undefined;
+      return {
+        nombre: item.match?.nombre || item.nombre,
+        sku: item.match?.sku,
+        codigo: item.match?.sku,
+        imagenUrl: inv?.imagen_url ?? null,
+        descripcion: item.descripcion || inv?.descripcion || null,
+        categoria: inv?.categoria ?? null,
+        unidad: item.unidadMedida,
+        cantidad: item.cantidad,
+        precio: item.precioUnitario,
+      };
+    });
+  };
+
+  // Botón manual: genera la ficha técnica con IA, la ABRE para verla y la deja
+  // guardada. Abrimos la pestaña de inmediato (gesto del usuario) para que el
+  // navegador no bloquee el popup, y luego le cargamos el PDF.
+  const handleFichaTecnica = async () => {
+    if (!compra) return;
+    const win = window.open('', '_blank');
+    try {
+      const r = await fichaTecnica.mutateAsync({
+        compra: {
+          id: compra.id,
+          codigo: compra.codigo,
+          nombre: compra.nombre,
+          organismo: compra.organismo,
+          datos_json: compra.datos_json,
+        },
+        productos: construirProductosFicha(),
+        empresa: empresaFicha,
+        descargar: false,
+        persistir: true,
+      });
+      const datos: DatosFichaTecnica = {
+        compra: { codigo: compra.codigo, nombre: compra.nombre, organismo: compra.organismo },
+        empresa: empresaFicha,
+        fecha: new Date(),
+        fichas: r.fichas,
+      };
+      const url = await blobFichaTecnicaPDF(datos);
+      if (win) win.location.href = url;
+      else window.location.href = url;
+      toast.success(r.fuente === 'ia' ? 'Ficha técnica lista (IA)' : 'Ficha técnica lista');
+    } catch (e) {
+      if (win) win.close();
+    }
+  };
+
   const handleGuardarPropuesta = async () => {
     if (!compra) return;
 
@@ -253,12 +325,70 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
       estado: 'borrador',
     };
 
+    // Automático: al guardar la propuesta también generamos la ficha técnica
+    // (sin forzar descarga) y la dejamos guardada junto a la propuesta en una
+    // sola escritura, para no pisar datos_json.
+    let ficha_tecnica: Record<string, unknown> | null = null;
+    try {
+      const res = await fichaTecnica.mutateAsync({
+        compra: {
+          id: compra.id,
+          codigo: compra.codigo,
+          nombre: compra.nombre,
+          organismo: compra.organismo,
+          datos_json: compra.datos_json,
+        },
+        productos: construirProductosFicha(),
+        empresa: empresaFicha,
+        descargar: false,
+        persistir: false,
+      });
+      ficha_tecnica = {
+        generada_en: new Date().toISOString(),
+        fuente: res.fuente,
+        fichas: res.fichas,
+      };
+    } catch {
+      // Si la IA falla, guardamos igual la propuesta sin ficha.
+    }
+
     try {
       await updateCompra.mutateAsync({
         id: compra.id,
-        datos_json: { propuesta },
+        datos_json: {
+          ...(compra.datos_json ?? {}),
+          propuesta,
+          ...(ficha_tecnica ? { ficha_tecnica } : {}),
+        },
       });
-      toast.success('Propuesta guardada exitosamente');
+      // Conectar con el pipeline: al guardar la propuesta la oportunidad avanza
+      // a "preparación" en Postulaciones (si no estaba ya). Antes la propuesta
+      // quedaba aislada y el pipeline no se enteraba.
+      try {
+        const { data: existe } = await supabase
+          .from('pipeline')
+          .select('id')
+          .eq('oportunidad_id', compra.codigo)
+          .limit(1);
+        if (!existe || existe.length === 0) {
+          await crearPipeline.mutateAsync({
+            oportunidad_id: compra.codigo,
+            oportunidad_tipo: 'compra_agil',
+            titulo: compra.nombre,
+            institucion: compra.organismo || undefined,
+            monto_estimado: montoTotal || undefined,
+            fecha_cierre: compra.fecha_cierre || undefined,
+            match_score: compra.match_score || undefined,
+            etapa: 'preparacion',
+          });
+        }
+      } catch { /* no bloqueamos el guardado si el pipeline falla */ }
+
+      toast.success(
+        ficha_tecnica
+          ? 'Propuesta y ficha técnica guardadas · en tu pipeline'
+          : 'Propuesta guardada · en tu pipeline'
+      );
       onOpenChange(false);
     } catch (error) {
       console.error('Error saving proposal:', error);
@@ -613,11 +743,23 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
               disabled={itemsActivos.length === 0}
             >
               <Download className="h-4 w-4 mr-2" />
-              Descargar PDF
+              Cotización PDF
             </Button>
-            <Button 
+            <Button
+              variant="secondary"
+              onClick={handleFichaTecnica}
+              disabled={itemsActivos.length === 0 || fichaTecnica.isPending}
+            >
+              {fichaTecnica.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <FileText className="h-4 w-4 mr-2" />
+              )}
+              Ver ficha técnica
+            </Button>
+            <Button
               onClick={handleGuardarPropuesta}
-              disabled={itemsActivos.length === 0 || updateCompra.isPending}
+              disabled={itemsActivos.length === 0 || updateCompra.isPending || fichaTecnica.isPending}
             >
               {updateCompra.isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

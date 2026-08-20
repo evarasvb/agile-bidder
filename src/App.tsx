@@ -61,6 +61,7 @@ const ExtensionConfig = lazy(() => import("./pages/ExtensionConfig"));
 
 const Cuenta = lazy(() => import("./pages/Cuenta"));
 const Billing = lazy(() => import("./pages/Billing"));
+const MiEmpresa = lazy(() => import("./pages/MiEmpresa"));
 
 const ReportesHub = lazy(() => import("./pages/reportes/ReportesHub"));
 const ReporteProveedores = lazy(() => import("./pages/reportes/ReporteProveedores"));
@@ -72,7 +73,19 @@ const ReporteConvenioMarco = lazy(() => import("./pages/reportes/ReporteConvenio
 
 const AdminEvaristo = lazy(() => import("./pages/AdminEvaristo"));
 
-const queryClient = new QueryClient();
+// Defaults de React Query para que la app se sienta más rápida: cachea 1 min,
+// no re-consulta al volver a la pestaña y reintenta solo 1 vez. Antes cada
+// navegación volvía a pedir todo (staleTime 0), lo que se sentía lento.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 // Manda al onboarding a los clientes que aún no lo completaron. No genera bucle
 // porque la ruta /onboarding está FUERA de este wrapper. Si el cliente aún no
@@ -102,9 +115,9 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <ChatWidget />
       <BrowserRouter>
         <ScrollToTop />
+        <ChatWidget />
         <Suspense
           fallback={
             <div className="min-h-screen flex items-center justify-center bg-background">
@@ -181,6 +194,7 @@ const App = () => (
 
             {/* ----- CONFIGURACION ----- */}
             <Route path="/configuracion" element={<ConfiguracionOportunidades />} />
+            <Route path="/configuracion/empresa" element={<MiEmpresa />} />
             <Route path="/configuracion/equipo" element={<Users />} />
             <Route path="/configuracion/extension" element={<ExtensionConfig />} />
             

@@ -69,6 +69,10 @@ export default function Landing() {
     setTeaserTermino(q);
   };
 
+  // CTA de registro: aterriza en la pestaña "Registrarse" y arrastra el término
+  // buscado para precargarlo en el onboarding.
+  const signupHref = `/auth?tab=signup${searchQuery.trim() ? `&buscar=${encodeURIComponent(searchQuery.trim())}` : ''}`;
+
   return (
     <div className="min-h-screen bg-firmavb-gray">
       {/* Demo Modal */}
@@ -119,7 +123,7 @@ export default function Landing() {
                   <Link to="/auth">Iniciar Sesión</Link>
                 </Button>
                 <Button asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90 transition-all hover:scale-105 active:scale-95 px-3 sm:px-4">
-                  <Link to="/auth">
+                  <Link to={signupHref}>
                     Comenzar Gratis
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
@@ -185,7 +189,7 @@ export default function Landing() {
                 asChild
                 className="bg-firmavb-blue hover:bg-firmavb-blue/90 shadow-lg shadow-firmavb-blue/25 text-base h-12 px-8 transition-all hover:scale-105 active:scale-95"
               >
-                <Link to="/auth">
+                <Link to={signupHref}>
                   Configurar mi empresa
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
@@ -274,51 +278,7 @@ Validar Admisibilidad Gratis
         </div>
       </section>
 
-{/* Dashboard Comparativo */}
-      <section className="py-16 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-10">
-            <h2 className="text-3xl font-bold text-foreground mb-4">
-              Resultados que transforman tu negocio
-            </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Empresas que usan FirmaVB vs competidores tradicionales
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6">
-            <ComparisonCard
-              metric="Días Promedio de Pago"
-              withFirma={45}
-              withoutFirma={65}
-              unit="días"
-              icon={Clock}
-              better="lower"
-              description="Mejores términos de pago con licitaciones seleccionadas"
-            />
-            <ComparisonCard
-              metric="Tasa de Éxito"
-              withFirma={7}
-              withoutFirma={5}
-              unit="%"
-              icon={Target}
-              better="higher"
-              description="Mayor porcentaje de adjudicación con IA optimizada"
-            />
-            <ComparisonCard
-              metric="Utilidad Neta Promedio"
-              withFirma={25}
-              withoutFirma={15}
-              unit="%"
-              icon={TrendingUp}
-              better="higher"
-              description="Márgenes protegidos con análisis automático"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Inteligencia Generativa - 3 Pilares */}
+{/* Inteligencia Generativa - 3 Pilares */}
       <section className="py-20 px-6 bg-gradient-to-b from-muted/30 to-background">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
@@ -372,33 +332,6 @@ Validar Admisibilidad Gratis
         </div>
       </section>
 
-      {/* 10 Herramientas de IA */}
-      <section className="py-20 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-foreground mb-4">
-              10 Herramientas de IA a tu servicio
-            </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Cada herramienta está diseñada para darte una ventaja competitiva única
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            <ToolCard icon={Search} title="Scanner de Mercado" description="Monitoreo 24/7" />
-            <ToolCard icon={Brain} title="Matching IA" description="95% precisión" />
-            <ToolCard icon={FileText} title="Generador de Ofertas" description="30 segundos" />
-            <ToolCard icon={Calculator} title="Calculadora de Márgenes" description="Automática" />
-            <ToolCard icon={LineChart} title="Predictor de Éxito" description="Machine Learning" />
-            <ToolCard icon={FileSearch} title="Análisis de Bases" description="Extracción de requisitos" />
-            <ToolCard icon={Users} title="Perfil de Compradores" description="Historial completo" />
-            <ToolCard icon={Scale} title="Comparador de Precios" description="Benchmark automático" />
-            <ToolCard icon={Lightbulb} title="Recomendador" description="Sugerencias IA" />
-            <ToolCard icon={Shield} title="Validador Legal" description="Cumplimiento normativo" />
-          </div>
-        </div>
-      </section>
-
       {/* How it works */}
       <section className="py-20 px-6 bg-muted/30">
         <div className="max-w-7xl mx-auto">
@@ -437,86 +370,6 @@ Validar Admisibilidad Gratis
         </div>
       </section>
 
-      {/* Benefits */}
-      <section className="py-20 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div>
-              <h2 className="text-3xl font-bold text-foreground mb-6">
-                Deja de perder oportunidades
-              </h2>
-              <div className="space-y-4">
-                <BenefitItem 
-                  text="Nunca más te pierdas una licitación por falta de tiempo" 
-                />
-                <BenefitItem 
-                  text="Ahorra horas de trabajo manual revisando el portal" 
-                />
-                <BenefitItem 
-                  text="Aumenta tu tasa de adjudicación con ofertas optimizadas" 
-                />
-                <BenefitItem 
-                  text="Controla márgenes mínimos y regiones de despacho" 
-                />
-                <BenefitItem 
-                  text="Historial completo de todas tus participaciones" 
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <Card className="p-6 bg-gradient-to-br from-firmavb-blue/10 to-transparent border-firmavb-blue/20 shadow-sm">
-                <BarChart3 className="h-10 w-10 text-firmavb-blue mb-4" />
-                <h3 className="font-medium text-foreground mb-1">Dashboard en Tiempo Real</h3>
-                <p className="text-sm text-muted-foreground font-light">Métricas y KPIs actualizados al instante</p>
-              </Card>
-              <Card className="p-6 bg-gradient-to-br from-success/10 to-transparent border-success/20 shadow-sm">
-                <Shield className="h-10 w-10 text-success mb-4" />
-                <h3 className="font-medium text-foreground mb-1">100% Seguro</h3>
-                <p className="text-sm text-muted-foreground font-light">Tus datos protegidos con encriptación</p>
-              </Card>
-              <Card className="p-6 bg-gradient-to-br from-warning/10 to-transparent border-warning/20 shadow-sm">
-                <Clock className="h-10 w-10 text-warning mb-4" />
-                <h3 className="font-medium text-foreground mb-1">24/7 Activo</h3>
-                <p className="text-sm text-muted-foreground font-light">Nunca se pierde una oportunidad</p>
-              </Card>
-              <Card className="p-6 bg-gradient-to-br from-firmavb-red/10 to-transparent border-firmavb-red/20 shadow-sm">
-                <Zap className="h-10 w-10 text-firmavb-red mb-4" />
-                <h3 className="font-medium text-foreground mb-1">Ultra Rápido</h3>
-                <p className="text-sm text-muted-foreground font-light">Respuestas en segundos, no horas</p>
-              </Card>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials */}
-      <section className="py-20 px-6 bg-muted/30">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-foreground mb-4">
-              Empresas que confían en FirmaVB
-            </h2>
-          </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            <TestimonialCard
-              quote="Aumentamos nuestras adjudicaciones en un 40% el primer mes. El matching de IA es increíblemente preciso."
-              author="María González"
-              company="Suministros Oficina SpA"
-            />
-            <TestimonialCard
-              quote="Antes revisaba el portal 3 horas diarias. Ahora solo reviso las alertas y envío ofertas con un clic."
-              author="Carlos Muñoz"
-              company="TechPro Ltda"
-            />
-            <TestimonialCard
-              quote="La generación automática de ofertas nos ahorra muchísimo tiempo. ROI positivo desde la primera semana."
-              author="Ana Rodríguez"
-              company="Distribuidora Central"
-            />
-          </div>
-        </div>
-      </section>
-
       {/* CTA Final */}
       <section className="py-20 px-6">
         <div className="max-w-4xl mx-auto">
@@ -534,7 +387,7 @@ Validar Admisibilidad Gratis
                 asChild
                 className="bg-white text-firmavb-blue hover:bg-white/90 shadow-lg text-base h-12 px-8 transition-all hover:scale-105 active:scale-95 font-semibold"
               >
-                <Link to="/auth">
+                <Link to={signupHref}>
                   Comenzar Configuración
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
@@ -583,7 +436,7 @@ Validar Admisibilidad Gratis
             </div>
           </div>
           <p className="text-center text-sm text-muted-foreground">
-            © 2024 FirmaVB - Inteligencia para Ganar Más. Todos los derechos reservados.
+            © {new Date().getFullYear()} FirmaVB - Inteligencia para Ganar Más. Todos los derechos reservados.
           </p>
         </div>
       </footer>
@@ -592,60 +445,6 @@ Validar Admisibilidad Gratis
       <LandingChat open={chatOpen} onClose={() => setChatOpen(false)} />
       <LandingChatButton onClick={() => setChatOpen(true)} />
     </div>
-  );
-}
-
-// Comparison Card for Dashboard
-function ComparisonCard({ 
-  metric, 
-  withFirma, 
-  withoutFirma, 
-  unit, 
-  icon: Icon, 
-  better,
-  description 
-}: { 
-  metric: string; 
-  withFirma: number; 
-  withoutFirma: number; 
-  unit: string;
-  icon: React.ElementType;
-  better: 'higher' | 'lower';
-  description: string;
-}) {
-  const improvement = better === 'higher' 
-    ? ((withFirma - withoutFirma) / withoutFirma * 100).toFixed(0)
-    : ((withoutFirma - withFirma) / withoutFirma * 100).toFixed(0);
-
-  return (
-    <Card className="p-6 border-border/50 bg-card hover:shadow-lg transition-shadow">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="h-10 w-10 rounded-lg bg-[hsl(var(--firmavb-blue))]/10 flex items-center justify-center">
-          <Icon className="h-5 w-5 text-[hsl(var(--firmavb-blue))]" />
-        </div>
-        <h3 className="font-semibold text-foreground">{metric}</h3>
-      </div>
-      
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <div className="text-center p-3 rounded-lg bg-[hsl(var(--success))]/10">
-          <p className="text-2xl font-bold text-[hsl(var(--success))]">{withFirma}{unit}</p>
-          <p className="text-xs text-muted-foreground">Con FirmaVB</p>
-        </div>
-        <div className="text-center p-3 rounded-lg bg-muted/50">
-          <p className="text-2xl font-bold text-muted-foreground">{withoutFirma}{unit}</p>
-          <p className="text-xs text-muted-foreground">Sin FirmaVB</p>
-        </div>
-      </div>
-      
-      <div className="flex items-center justify-center gap-2 mb-2">
-        <Badge className="bg-[hsl(var(--success))]/10 text-[hsl(var(--success))] border-0">
-          <TrendingUp className="h-3 w-3 mr-1" />
-          +{improvement}% mejor
-        </Badge>
-      </div>
-      
-      <p className="text-xs text-center text-muted-foreground">{description}</p>
-    </Card>
   );
 }
 
@@ -692,30 +491,7 @@ function PillarCard({
   );
 }
 
-// Tool Card for 10 tools grid
-function ToolCard({ icon: Icon, title, description }: { icon: React.ElementType; title: string; description: string }) {
-  return (
-    <Card className="p-4 text-center hover:shadow-md transition-shadow cursor-pointer group border-border/50">
-      <div className="h-12 w-12 rounded-xl bg-[hsl(var(--firmavb-blue))]/10 flex items-center justify-center mx-auto mb-3 group-hover:bg-[hsl(var(--firmavb-blue))]/20 transition-colors">
-        <Icon className="h-6 w-6 text-[hsl(var(--firmavb-blue))]" />
-      </div>
-      <h4 className="font-medium text-foreground text-sm mb-1">{title}</h4>
-      <p className="text-xs text-muted-foreground">{description}</p>
-    </Card>
-  );
-}
-
-function StatCard({ value, label, icon: Icon }: { value: string; label: string; icon: React.ElementType }) {
-  return (
-    <Card className="p-4 text-center border-border/50 bg-card/50 backdrop-blur-sm">
-      <Icon className="h-5 w-5 text-[hsl(var(--firmavb-blue))] mx-auto mb-2" />
-      <p className="text-2xl font-bold text-foreground">{value}</p>
-      <p className="text-sm text-muted-foreground">{label}</p>
-    </Card>
-  );
-}
-
-function FeatureCard({ 
+function FeatureCard({
   step, 
   icon: Icon, 
   title, 
@@ -746,41 +522,3 @@ function FeatureCard({
   );
 }
 
-function BenefitItem({ text }: { text: string }) {
-  return (
-    <div className="flex items-start gap-3">
-      <CheckCircle2 className="h-5 w-5 text-[hsl(var(--success))] shrink-0 mt-0.5" />
-      <span className="text-foreground">{text}</span>
-    </div>
-  );
-}
-
-function TestimonialCard({ 
-  quote, 
-  author, 
-  company 
-}: { 
-  quote: string; 
-  author: string; 
-  company: string;
-}) {
-  return (
-    <Card className="p-6 border-border/50">
-      <div className="flex gap-1 mb-4">
-        {[...Array(5)].map((_, i) => (
-          <Star key={i} className="h-4 w-4 fill-[hsl(var(--warning))] text-[hsl(var(--warning))]" />
-        ))}
-      </div>
-      <p className="text-foreground mb-4 italic">"{quote}"</p>
-      <div className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-          <Building2 className="h-5 w-5 text-muted-foreground" />
-        </div>
-        <div>
-          <p className="font-medium text-foreground">{author}</p>
-          <p className="text-sm text-muted-foreground">{company}</p>
-        </div>
-      </div>
-    </Card>
-  );
-}

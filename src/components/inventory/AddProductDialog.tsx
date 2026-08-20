@@ -19,8 +19,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Upload, Image as ImageIcon } from 'lucide-react';
 import { InventoryInput } from '@/hooks/useInventory';
+import { useAuthUser } from '@/hooks/useCliente';
+import { uploadProductImage, isValidImageFile } from '@/hooks/useProductImageUpload';
+import { toast } from 'sonner';
 
 interface AddProductDialogProps {
   open: boolean;
@@ -76,6 +79,26 @@ export function AddProductDialog({
   });
 
   const [keywordsInput, setKeywordsInput] = useState('');
+  const { user } = useAuthUser();
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
+
+  const handleFoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?.id) return;
+    if (!isValidImageFile(file)) {
+      toast.error('Sube una imagen (JPG/PNG/WEBP) de máximo 5MB');
+      return;
+    }
+    setSubiendoFoto(true);
+    const url = await uploadProductImage(file, user.id, formData.sku || `nuevo-${Date.now()}`);
+    setSubiendoFoto(false);
+    if (!url) {
+      toast.error('No se pudo subir la foto');
+      return;
+    }
+    setFormData((prev) => ({ ...prev, imagen_url: url }));
+    toast.success('Foto agregada');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,6 +199,45 @@ export function AddProductDialog({
               value={formData.descripcion || ''}
               onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
               rows={2}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Foto del producto</Label>
+            <div className="flex items-center gap-4">
+              <div className="h-16 w-16 rounded-lg border bg-muted/40 flex items-center justify-center overflow-hidden shrink-0">
+                {formData.imagen_url ? (
+                  <img src={formData.imagen_url} alt="Producto" className="h-full w-full object-contain" />
+                ) : (
+                  <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                )}
+              </div>
+              <div>
+                <input
+                  id="foto-producto"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={handleFoto}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => document.getElementById('foto-producto')?.click()}
+                  disabled={subiendoFoto}
+                >
+                  {subiendoFoto ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                  {formData.imagen_url ? 'Cambiar foto' : 'Subir foto'}
+                </Button>
+                <p className="text-xs text-muted-foreground mt-1">Aparecerá en la ficha técnica del PDF.</p>
+              </div>
+            </div>
+            <Input
+              placeholder="…o pega la URL de una imagen (https://…)"
+              value={formData.imagen_url || ''}
+              onChange={(e) => setFormData({ ...formData, imagen_url: e.target.value })}
+              className="mt-1"
             />
           </div>
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { MessageCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -32,6 +33,7 @@ export function ChatWidget({
 }: ChatWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showFallback, setShowFallback] = useState(fallbackEnabled);
+  const location = useLocation();
 
   // Load Tawk.to script
   useEffect(() => {
@@ -79,6 +81,12 @@ export function ChatWidget({
     return null;
   }
 
+  // En el landing público ("/") ya existe el asistente LandingChat con la info
+  // de contacto correcta; no montamos este botón ahí para no duplicar el chat.
+  if (location.pathname === '/') {
+    return null;
+  }
+
   return (
     <>
       {/* Fallback Chat Panel */}
@@ -105,18 +113,18 @@ export function ChatWidget({
               ¡Hola! 👋 ¿En qué podemos ayudarte?
             </p>
             <div className="space-y-3">
-              <a 
-                href="mailto:soporte@firmavb.cl" 
+              <a
+                href="mailto:contacto@firmavb.cl"
                 className="flex items-center gap-2 p-3 rounded-lg bg-muted hover:bg-muted/80 transition-colors"
               >
                 <span className="text-lg">📧</span>
                 <div>
                   <p className="text-sm font-medium">Email</p>
-                  <p className="text-xs text-muted-foreground">soporte@firmavb.cl</p>
+                  <p className="text-xs text-muted-foreground">contacto@firmavb.cl</p>
                 </div>
               </a>
-              <a 
-                href="https://wa.me/56912345678" 
+              <a
+                href="https://wa.me/56994259157"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 p-3 rounded-lg bg-muted hover:bg-muted/80 transition-colors"
@@ -124,7 +132,7 @@ export function ChatWidget({
                 <span className="text-lg">💬</span>
                 <div>
                   <p className="text-sm font-medium">WhatsApp</p>
-                  <p className="text-xs text-muted-foreground">+56 9 1234 5678</p>
+                  <p className="text-xs text-muted-foreground">+56 9 9425 9157</p>
                 </div>
               </a>
               <div className="pt-2 border-t">

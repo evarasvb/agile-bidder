@@ -57,6 +57,7 @@ import {
   ChartSkeleton,
 } from "@/components/dashboard/DashboardSkeleton";
 import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
+import { ResumenEjecutivo } from "@/components/dashboard/ResumenEjecutivo";
 import { FirmaVBHeader } from "@/components/layout/FirmaVBHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -325,6 +326,9 @@ export default function Dashboard() {
           </Tooltip>
         </div>
       </div>
+
+      {/* Resumen ejecutivo del negocio (datos reales del pipeline) */}
+      <ResumenEjecutivo />
 
       {/* Error Banner */}
       {kpisError && (

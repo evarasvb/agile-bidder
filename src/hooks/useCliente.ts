@@ -14,6 +14,12 @@ export interface Cliente {
   nombre_responsable: string;
   region: string;
   telefono?: string;
+  direccion?: string;
+  logo_url?: string;
+  odoo_url?: string;
+  odoo_db?: string;
+  odoo_user?: string;
+  odoo_api_key?: string;
   categoria_negocio?: string;
   industrias?: string[];
   palabras_clave_busqueda?: string[];
