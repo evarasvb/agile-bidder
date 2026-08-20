@@ -115,6 +115,11 @@ export default function ReporteCompradores() {
                 <p className="text-sm text-muted-foreground">
                   {formatCompact(sel.monto_total)} · {formatNumber(sel.ordenes)} órdenes · {formatNumber(sel.proveedores)} proveedores
                 </p>
+                {periodo && (
+                  <p className="text-xs text-muted-foreground/70 mt-1">
+                    El desglose de qué compra y a quién le compra es histórico total (no filtrado por período).
+                  </p>
+                )}
               </div>
               <Card className="border-border/50 shadow-sm">
                 <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Package className="h-4 w-4" /> Qué compra</CardTitle></CardHeader>

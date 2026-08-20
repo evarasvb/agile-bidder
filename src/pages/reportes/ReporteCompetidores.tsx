@@ -110,6 +110,11 @@ export default function ReporteCompetidores() {
                 <p className="text-sm text-muted-foreground">
                   {formatCompact(sel.monto_total)} · {(sel.share ?? 0).toFixed(1)}% del mercado · {formatNumber(sel.compradores)} clientes
                 </p>
+                {periodo && (
+                  <p className="text-xs text-muted-foreground/70 mt-1">
+                    El desglose de productos y clientes es histórico total (no filtrado por período).
+                  </p>
+                )}
               </div>
               <Card className="border-border/50 shadow-sm">
                 <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Package className="h-4 w-4" /> Sus productos fuertes</CardTitle></CardHeader>

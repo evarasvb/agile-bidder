@@ -120,6 +120,11 @@ export default function ReporteProveedores() {
                 <p className="text-sm text-muted-foreground">
                   {formatCompact(sel.monto_total)} · {formatNumber(sel.ordenes)} órdenes · {formatNumber(sel.compradores)} compradores · {(sel.share ?? 0).toFixed(1)}% del mercado
                 </p>
+                {periodo && (
+                  <p className="text-xs text-muted-foreground/70 mt-1">
+                    El desglose de productos y compradores es histórico total (no filtrado por período).
+                  </p>
+                )}
               </div>
 
               <Card className="border-border/50 shadow-sm">
