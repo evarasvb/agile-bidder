@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { InfoHint } from '@/components/ui/info-hint';
-import { useClienteExclusiones, useToggleExclusion } from '@/hooks/useCliente';
+import { useCliente, useClienteExclusiones, useToggleExclusion } from '@/hooks/useCliente';
 import { Pill, Apple, Truck, Wrench, Settings, Shield, UserCog, FileSearch } from 'lucide-react';
 
 const EXCLUSIONES = [
@@ -16,20 +16,27 @@ const EXCLUSIONES = [
 ];
 
 export default function OnboardingStep3() {
-  const { data: exclusiones = [], isLoading } = useClienteExclusiones();
+  // Importante: en la PRIMERA configuración la fila del cliente se crea de forma
+  // asíncrona. Hasta que exista, no se puede guardar la exclusión (antes las
+  // tarjetas se renderizaban igual y el clic fallaba en silencio -> "no se marcan").
+  const { data: cliente, isLoading: clienteLoading } = useCliente();
+  const { data: exclusiones = [], isLoading: exclusionesLoading } = useClienteExclusiones();
   const toggleExclusion = useToggleExclusion();
 
   const exclusionesActivas = new Set(exclusiones.map(e => e.tipo_exclusion));
 
-  const handleToggle = async (id: string) => {
-    await toggleExclusion.mutateAsync(id);
+  const handleToggle = (id: string) => {
+    if (!cliente?.id) return;      // aún preparando el cliente; evita el fallo silencioso
+    toggleExclusion.mutate(id);    // optimista: se marca al instante
   };
+
+  const isLoading = clienteLoading || !cliente?.id || exclusionesLoading;
 
   if (isLoading) {
     return (
       <Card>
         <CardContent className="py-8 text-center text-muted-foreground">
-          Cargando...
+          Preparando tu configuración…
         </CardContent>
       </Card>
     );
@@ -62,9 +69,8 @@ export default function OnboardingStep3() {
                 key={excl.id}
                 role="checkbox"
                 aria-checked={isSelected}
-                disabled={toggleExclusion.isPending}
                 onClick={() => handleToggle(excl.id)}
-                className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer text-left transition-all hover:bg-muted/50 disabled:opacity-60 ${
+                className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer text-left transition-all hover:bg-muted/50 ${
                   isSelected ? 'border-destructive/50 bg-destructive/5' : 'border-muted'
                 }`}
               >

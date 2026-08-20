@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Wifi, WifiOff, Shield, ShieldOff, Power, AlertTriangle, RefreshCw } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { InfoHint } from "@/components/ui/info-hint";
 import { cn } from "@/lib/utils";
 import { useExtensionStatus } from "@/hooks/useExtensionStatus";
 import { SystemHealthIndicator } from "@/components/dashboard/SystemHealthIndicator";
@@ -24,7 +26,10 @@ export function StatusBar() {
       <div className="flex h-full items-center justify-between px-4 sm:px-6">
         {/* Left: Page Title Area */}
         <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-          <h2 className="text-sm sm:text-lg font-semibold text-foreground truncate">Centro de Control</h2>
+          <h2 className="text-sm sm:text-lg font-semibold text-foreground truncate flex items-center gap-1.5">
+            Centro de Control
+            <InfoHint text="Estado en vivo de tu conexión con Mercado Público: si la extensión de Chrome de firmavb está conectada, si tu sesión de MP está activa y si el Auto-Bid (ofertas automáticas) está encendido." />
+          </h2>
           <SystemHealthIndicator />
         </div>
 
@@ -41,6 +46,7 @@ export function StatusBar() {
                     isConnected ? "bg-online animate-pulse-soft" : "bg-offline"
                   )} />
                   <span className="text-xs text-muted-foreground">Extensión:</span>
+                  <InfoHint text="La extensión de firmavb para Chrome conecta la plataforma con tu sesión de Mercado Público para leer y postular ofertas por ti. 'Desconectada' = no está instalada o no has iniciado sesión en MP en este navegador." />
                 </div>
                 <div className="flex items-center gap-1">
                   {isConnected ? (
@@ -92,6 +98,7 @@ export function StatusBar() {
                 autoBidEnabled ? "text-success" : "text-muted-foreground"
               )} />
               <span className="text-sm font-medium text-foreground">Auto-Bid</span>
+              <InfoHint text="Auto-Bid genera y envía ofertas automáticamente a las licitaciones que calzan con tus productos (según tus precios y márgenes). Necesita la extensión conectada. Configúralo en la sección Auto-Bids." />
             </div>
             <Switch
               checked={autoBidEnabled}
@@ -110,11 +117,17 @@ export function StatusBar() {
 
       {/* Alert Banner */}
       {!isLoading && !isConnected && (
-        <div className="bg-warning/10 border-b border-warning/20 px-4 sm:px-6 py-2 flex items-center gap-2">
+        <div className="bg-warning/10 border-b border-warning/20 px-4 sm:px-6 py-2 flex flex-wrap items-center gap-x-2 gap-y-1">
           <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
           <span className="text-xs sm:text-sm text-warning font-medium">
-            ⚠️ Extensión no detectada. Inicia sesión en Mercado Público para activar Auto-Bids.
+            La extensión de Chrome no está conectada, por eso el Auto-Bid está apagado.
           </span>
+          <Link
+            to="/configuracion/extension"
+            className="text-xs sm:text-sm font-semibold text-warning underline underline-offset-2 hover:opacity-80"
+          >
+            Ver cómo conectarla →
+          </Link>
         </div>
       )}
     </header>
