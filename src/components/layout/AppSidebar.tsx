@@ -117,14 +117,23 @@ export function AppSidebar({ open = false, onClose }: AppSidebarProps) {
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
 
-  // Grupo que contiene la ruta actual (por url propia o de un hijo, incluyendo
-  // sub-rutas). Sirve para abrirlo automáticamente: antes los submenús arrancaban
-  // colapsados y había que abrirlos a mano en cada navegación.
-  const pathMatches = (url: string) =>
-    location.pathname === url || (url !== "/" && location.pathname.startsWith(url + "/"));
-  const activeGroup = navItems.find(
-    (it) => pathMatches(it.url) || it.children?.some((c) => pathMatches(c.url))
-  )?.title;
+  // Destino activo = la URL de nav MÁS ESPECÍFICA que calza con la ruta actual
+  // (por igualdad o como prefijo de sub-ruta). Usar el match más largo evita que
+  // /dashboard/vendedores active "Inicio" (/dashboard) o /configuracion/equipo
+  // active "Configuración": gana el hijo exacto, no el prefijo del padre.
+  const matchLen = (url: string) =>
+    location.pathname === url
+      ? url.length
+      : url !== "/" && location.pathname.startsWith(url + "/")
+      ? url.length
+      : -1;
+  const allDests = navItems.flatMap((it) => (it.children?.length ? it.children.map((c) => c.url) : [it.url]));
+  const bestUrl = allDests.reduce((best, url) => (matchLen(url) > matchLen(best) ? url : best), "");
+  const bestLen = matchLen(bestUrl);
+  const activeGroup =
+    bestLen < 0
+      ? undefined
+      : navItems.find((it) => (it.children?.length ? it.children : [it]).some((c) => c.url === bestUrl))?.title;
 
   const [expandedItems, setExpandedItems] = useState<string[]>(
     activeGroup ? [activeGroup] : []
@@ -224,8 +233,9 @@ export function AppSidebar({ open = false, onClose }: AppSidebarProps) {
           {navItems.map((item) => {
             const hasChildren = item.children && item.children.length > 0;
             const isExpanded = expandedItems.includes(item.title);
-            const isItemActive = isActive(item.url) || 
-              (hasChildren && item.children?.some(child => location.pathname === child.url));
+            const isItemActive = hasChildren
+              ? activeGroup === item.title
+              : item.url === bestUrl && bestLen >= 0;
             
             return (
               <li key={item.title}>
@@ -255,7 +265,7 @@ export function AppSidebar({ open = false, onClose }: AppSidebarProps) {
                       <ul className="mt-1 ml-4 space-y-1">
                         {item.children?.map((child) => {
                           const ChildIcon = child.icon;
-                          const isChildActive = location.pathname === child.url;
+                          const isChildActive = child.url === bestUrl && bestLen >= 0;
                           return (
                             <li key={child.url}>
                               <NavLink

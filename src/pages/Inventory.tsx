@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Plus, Upload, Search, MoreHorizontal, Edit2, Trash2, Package, Inbox, Loader2, RefreshCw, FileJson, Download, Trash, Image, FileText, CheckSquare, Square, FileSpreadsheet, Images, HelpCircle, Info, Sparkles } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -37,7 +37,8 @@ import { DownloadTemplateButton } from "@/components/inventory/DownloadTemplateB
 import { ProductGallery } from "@/components/inventory/ProductGallery";
 import { ImportHistoryPanel } from "@/components/inventory/ImportHistoryPanel";
 import { OportunidadesModal } from "@/components/inventory/OportunidadesModal";
-import { useAuthUser } from "@/hooks/useCliente";
+import { useAuthUser, useCliente } from "@/hooks/useCliente";
+import { useComprasAgilesMatch } from "@/hooks/useComprasAgilesMatch";
 import { Link } from "react-router-dom";
 import { Gavel } from "lucide-react";
 import * as XLSX from 'xlsx';
@@ -62,7 +63,25 @@ export default function Inventory() {
   const pageSize = 100; // Show 100 products per page to prevent performance issues
   
   const { data: inventario = [], isLoading, refetch } = useInventory();
+  const { data: cliente } = useCliente();
   const enriquecer = useEnriquecerInventario();
+  const [oportunidadesProducto, setOportunidadesProducto] = useState<InventoryItem | null>(null);
+
+  // Demanda REAL por producto: cruza el inventario con las compras ágiles activas
+  // (mismo motor de match). Antes esta columna era un stub siempre en 0.
+  const { data: comprasMatches = [], isLoading: isLoadingComprasAgiles } = useComprasAgilesMatch(cliente?.id ?? null);
+  const matchesByProductId = useMemo(() => {
+    const map: Record<string, typeof comprasMatches> = {};
+    for (const c of comprasMatches) {
+      for (const pid of c.matched_product_ids || []) {
+        (map[pid] ||= []).push(c);
+      }
+    }
+    return map;
+  }, [comprasMatches]);
+  const oportunidadesSeleccionadas = oportunidadesProducto
+    ? matchesByProductId[oportunidadesProducto.id] ?? []
+    : [];
 
   // Enriquecer con IA: completa descripción, palabras clave y fotos de los
   // productos indicados. Sin ids, procesa los que estén incompletos.
@@ -640,6 +659,7 @@ export default function Inventory() {
                 <TableHead className="font-semibold text-right">Precio</TableHead>
                 <TableHead className="font-semibold text-right">Margen</TableHead>
                 <TableHead className="font-semibold text-right">Stock</TableHead>
+                <TableHead className="font-semibold text-center">Oportunidades</TableHead>
                 <TableHead className="font-semibold">Estado</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
@@ -707,6 +727,24 @@ export default function Inventory() {
                     item.stock_disponible > 0 && item.stock_disponible < 50 && "text-warning"
                   )}>
                     {item.stock_disponible.toLocaleString("es-CL")}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {isLoadingComprasAgiles ? (
+                      <Loader2 className="h-3 w-3 animate-spin inline text-muted-foreground" />
+                    ) : (matchesByProductId[item.id]?.length ?? 0) === 0 ? (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setOportunidadesProducto(item)}
+                        aria-label={`Ver oportunidades de ${item.nombre_producto}`}
+                      >
+                        <Badge variant="success" className="cursor-pointer gap-1">
+                          <Gavel className="h-3 w-3" />
+                          {matchesByProductId[item.id].length}
+                        </Badge>
+                      </button>
+                    )}
                   </TableCell>
                   <TableCell>{getStatusBadge(item.stock_disponible, item.activo)}</TableCell>
                   <TableCell>
@@ -874,6 +912,15 @@ export default function Inventory() {
         open={bulkUploadOpen}
         onOpenChange={setBulkUploadOpen}
         onSuccess={refetch}
+      />
+
+      {/* Oportunidades reales por producto */}
+      <OportunidadesModal
+        open={!!oportunidadesProducto}
+        onOpenChange={(open) => !open && setOportunidadesProducto(null)}
+        producto={oportunidadesProducto}
+        compras={oportunidadesSeleccionadas as any}
+        isLoading={isLoadingComprasAgiles}
       />
 
       {/* Product Gallery Dialog */}
