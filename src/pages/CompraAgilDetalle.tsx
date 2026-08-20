@@ -1,6 +1,8 @@
 // @ts-nocheck
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCompraAgil } from '@/hooks/useComprasAgiles';
+import { GenerarPropuestaModal } from '@/components/compras-agiles/GenerarPropuestaModal';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +26,7 @@ export default function CompraAgilDetalle() {
   const navigate = useNavigate();
   const { data: compra, isLoading, error } = useCompraAgil(codigo || null);
   const { data: cliente } = useCliente();
+  const [propuestaOpen, setPropuestaOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -78,6 +81,18 @@ export default function CompraAgilDetalle() {
     void descargarFichaTecnicaPDF(datosFicha());
   };
 
+  // Ítems de la compra ágil en el formato que espera el modal de propuesta.
+  // El modal permite asignar productos del inventario a cada ítem (match null).
+  const productosPropuesta = (compra.items || []).map((it: any, idx: number) => ({
+    itemId: it.id,
+    itemIndex: idx,
+    nombre: it.nombre_producto,
+    descripcion: it.descripcion_producto || '',
+    cantidadSolicitada: it.cantidad || 1,
+    unidadMedida: it.unidad || 'UN',
+    match: null,
+  }));
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -85,10 +100,17 @@ export default function CompraAgilDetalle() {
         <Button variant="ghost" size="icon" onClick={() => navigate('/compras-agiles')}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <div>
+        <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold">{compra.nombre}</h1>
           <p className="text-sm text-muted-foreground">Código: {compra.codigo}</p>
         </div>
+        {/* CTA principal: generar la propuesta + ficha técnica desde el detalle
+            (antes esta pantalla no tenía cómo generar oferta: la bandeja de
+            oportunidades quedaba sin salida hacia el constructor de propuesta). */}
+        <Button onClick={() => setPropuestaOpen(true)} className="gap-2 shrink-0">
+          <Sparkles className="h-4 w-4" />
+          Generar propuesta
+        </Button>
       </div>
 
       {/* Info General */}
@@ -256,6 +278,17 @@ export default function CompraAgilDetalle() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Constructor de propuesta + ficha técnica. Se monta al abrir para que
+          tome los ítems de esta compra al inicializar su estado. */}
+      {propuestaOpen && (
+        <GenerarPropuestaModal
+          open={propuestaOpen}
+          onOpenChange={setPropuestaOpen}
+          compra={compra}
+          productos={productosPropuesta}
+        />
       )}
     </div>
   );

@@ -19,11 +19,11 @@ const BOT_RESPONSES: Record<string, string[]> = {
     "Hola, ¿cómo estás? Estoy aquí para ayudarte con cualquier pregunta sobre FirmaVB.",
   ],
   "precio": [
-    "Nuestros planes están diseñados para empresas de todos los tamaños. ¿Te gustaría que te contactemos para una cotización personalizada? Puedes escribirnos a contacto@firmavb.cl o WhatsApp +56 994259157",
+    "Nuestros planes están diseñados para empresas de todos los tamaños. ¿Te gustaría que te contactemos para una cotización personalizada? Puedes escribirnos a contacto@firmavb.cl o WhatsApp +56 9 9425 9157",
     "Tenemos diferentes planes según tus necesidades. ¿Quieres conocer más detalles? Contáctanos en contacto@firmavb.cl",
   ],
   "costo": [
-    "Los precios varían según el plan que elijas. Te recomiendo contactarnos directamente para una cotización personalizada: contacto@firmavb.cl o WhatsApp +56 994259157",
+    "Los precios varían según el plan que elijas. Te recomiendo contactarnos directamente para una cotización personalizada: contacto@firmavb.cl o WhatsApp +56 9 9425 9157",
   ],
   "como funciona": [
     "FirmaVB funciona en 3 pasos simples:\n1. Monitoreo automático de Mercado Público\n2. Matching inteligente con tu inventario\n3. Generación automática de ofertas\n\n¿Te gustaría ver una demostración?",
@@ -32,13 +32,13 @@ const BOT_RESPONSES: Record<string, string[]> = {
     "¡Por supuesto! Puedes ver una demostración haciendo clic en el botón 'Ver demostración' en la página principal, o contactarnos directamente: contacto@firmavb.cl",
   ],
   "contacto": [
-    "Puedes contactarnos de las siguientes formas:\n📧 Email: contacto@firmavb.cl\n💬 WhatsApp: +56 994259157\n\nEstamos disponibles de Lunes a Viernes de 9:00 a 18:00",
+    "Puedes contactarnos de las siguientes formas:\n📧 Email: contacto@firmavb.cl\n💬 WhatsApp: +56 9 9425 9157\n\nEstamos disponibles de Lunes a Viernes de 9:00 a 18:00",
   ],
   "email": [
-    "Nuestro email de contacto es: contacto@firmavb.cl\n\nTambién puedes escribirnos por WhatsApp: +56 994259157",
+    "Nuestro email de contacto es: contacto@firmavb.cl\n\nTambién puedes escribirnos por WhatsApp: +56 9 9425 9157",
   ],
   "whatsapp": [
-    "Nuestro WhatsApp es: +56 994259157\n\nTambién puedes escribirnos a: contacto@firmavb.cl",
+    "Nuestro WhatsApp es: +56 9 9425 9157\n\nTambién puedes escribirnos a: contacto@firmavb.cl",
   ],
   "licitaciones": [
     "FirmaVB te ayuda a encontrar y participar en licitaciones públicas de forma automatizada. Nuestra IA analiza Mercado Público 24/7 y encuentra oportunidades que coinciden con tu inventario.",
@@ -50,8 +50,8 @@ const BOT_RESPONSES: Record<string, string[]> = {
     "Generamos ofertas automáticamente con precios optimizados según tus márgenes. Puedes revisar, editar y enviar con un solo clic.",
   ],
   "default": [
-    "Entiendo tu pregunta. Para información más detallada, te recomiendo contactarnos directamente:\n📧 contacto@firmavb.cl\n💬 WhatsApp: +56 994259157\n\n¿Hay algo más en lo que pueda ayudarte?",
-    "Gracias por tu consulta. Para respuestas más específicas, contáctanos:\n📧 contacto@firmavb.cl\n💬 +56 994259157\n\n¿Tienes otra pregunta?",
+    "Entiendo tu pregunta. Para información más detallada, te recomiendo contactarnos directamente:\n📧 contacto@firmavb.cl\n💬 WhatsApp: +56 9 9425 9157\n\n¿Hay algo más en lo que pueda ayudarte?",
+    "Gracias por tu consulta. Para respuestas más específicas, contáctanos:\n📧 contacto@firmavb.cl\n💬 +56 9 9425 9157\n\n¿Tienes otra pregunta?",
   ],
 };
 
@@ -163,7 +163,7 @@ export function LandingChat({ open, onClose }: LandingChatProps) {
           </div>
           <div>
             <p className="font-medium text-white text-sm">Asistente FirmaVB</p>
-            <p className="text-xs text-white/70">En línea</p>
+            <p className="text-xs text-white/70">Respuestas automáticas</p>
           </div>
         </div>
         <Button
@@ -236,7 +236,7 @@ export function LandingChat({ open, onClose }: LandingChatProps) {
             rel="noopener noreferrer"
             className="hover:text-foreground transition-colors"
           >
-            💬 +56 994259157
+            💬 +56 9 9425 9157
           </a>
         </div>
       </div>

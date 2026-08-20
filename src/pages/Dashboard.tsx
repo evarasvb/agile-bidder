@@ -366,25 +366,28 @@ export default function Dashboard() {
         ) : (
           <>
             <KPICard
-              title="Oportunidades Activas"
+              title="Oportunidades activas"
               value={kpis?.oportunidadesActivas || 0}
               icon={Target}
               color="blue"
               trend={kpis?.oportunidadesActivasTrend}
+              subtitle="Abiertas hoy en el mercado (MP)"
             />
             <KPICard
-              title="Match Score Promedio"
+              title="Match promedio"
               value={`${kpis?.matchScorePromedio || 0}%`}
               icon={Zap}
               color="green"
               trend={kpis?.matchScorePromedioTrend}
+              subtitle="Afinidad con tu catálogo"
             />
             <KPICard
-              title="Monto en Pipeline"
+              title="Valor de mercado activo"
               value={formatCompact(kpis?.montoEnPipeline || 0)}
               icon={DollarSign}
               color="amber"
               trend={kpis?.montoEnPipelineTrend}
+              subtitle="Suma de oportunidades abiertas"
             />
             <KPICard
               title="Tasa de Éxito"
@@ -392,6 +395,7 @@ export default function Dashboard() {
               icon={TrendingUp}
               color="emerald"
               trend={kpis?.tasaExitoTrend}
+              subtitle="Ofertas ganadas / enviadas"
             />
           </>
         )}
@@ -763,9 +767,10 @@ interface KPICardProps {
   icon: React.ComponentType<{ className?: string }>;
   color: "blue" | "green" | "amber" | "emerald";
   trend: number | null;
+  subtitle?: string;
 }
 
-function KPICard({ title, value, icon: Icon, color, trend }: KPICardProps) {
+function KPICard({ title, value, icon: Icon, color, trend, subtitle }: KPICardProps) {
   const colorClasses = {
     blue: "text-firmavb-blue bg-firmavb-blue/10",
     green: "text-firmavb-green bg-firmavb-green/10",
@@ -801,6 +806,9 @@ function KPICard({ title, value, icon: Icon, color, trend }: KPICardProps) {
         </div>
         <p className="text-2xl font-heading font-bold">{value}</p>
         <p className="text-sm text-muted-foreground mt-1">{title}</p>
+        {subtitle && (
+          <p className="text-xs text-muted-foreground/70 mt-0.5">{subtitle}</p>
+        )}
       </CardContent>
     </Card>
   );

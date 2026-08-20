@@ -514,13 +514,13 @@ export default function Auth() {
 
               <p className="text-center text-sm text-muted-foreground mt-6">
                 Al continuar, aceptas nuestros{' '}
-                <a href="#" className="text-[hsl(var(--firmavb-blue))] hover:underline">
+                <span className="font-medium text-foreground">
                   Términos de Servicio
-                </a>{' '}
+                </span>{' '}
                 y{' '}
-                <a href="#" className="text-[hsl(var(--firmavb-blue))] hover:underline">
+                <span className="font-medium text-foreground">
                   Política de Privacidad
-                </a>
+                </span>
               </p>
             </CardContent>
           </Card>

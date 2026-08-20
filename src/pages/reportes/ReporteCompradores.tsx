@@ -63,7 +63,7 @@ export default function ReporteCompradores() {
             {isLoading ? (
               <div className="space-y-2">{[...Array(8)].map((_, i) => <Skeleton key={i} className="h-11 w-full" />)}</div>
             ) : items.length === 0 ? (
-              <p className="py-8 text-center text-muted-foreground text-sm">Sin instituciones para “{search}”.</p>
+              <p className="py-8 text-center text-muted-foreground text-sm">{search ? `Sin instituciones para “${search}”.` : "Aún no hay datos para mostrar."}</p>
             ) : (
               <div className="rounded-lg border overflow-auto max-h-[68vh]">
                 <Table>
