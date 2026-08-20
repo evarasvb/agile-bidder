@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { User } from '@supabase/supabase-js';
 
 // Tipos
@@ -361,32 +362,51 @@ export function useToggleExclusion() {
   const queryClient = useQueryClient();
   const { data: cliente } = useCliente();
 
+  const key = ['cliente-exclusiones', cliente?.id];
+
   return useMutation({
     mutationFn: async (tipoExclusion: string) => {
       if (!cliente?.id) throw new Error('No hay cliente');
 
-      // Verificar si existe
+      // Verificar si existe (maybeSingle: 0 filas no es error)
       const { data: existing } = await supabase
         .from('cliente_exclusiones')
         .select('id')
         .eq('cliente_id', cliente.id)
         .eq('tipo_exclusion', tipoExclusion)
-        .single();
+        .maybeSingle();
 
       if (existing) {
-        // Eliminar
-        await supabase
+        const { error } = await supabase
           .from('cliente_exclusiones')
           .delete()
           .eq('id', existing.id);
+        if (error) throw error;
       } else {
-        // Agregar
-        await supabase
+        const { error } = await supabase
           .from('cliente_exclusiones')
           .insert({ cliente_id: cliente.id, tipo_exclusion: tipoExclusion });
+        if (error) throw error;
       }
     },
-    onSuccess: () => {
+    // Optimista: la tarjeta se marca/desmarca al instante (sin esperar al server).
+    onMutate: async (tipoExclusion: string) => {
+      if (!cliente?.id) return { prev: undefined as any };
+      await queryClient.cancelQueries({ queryKey: key });
+      const prev = queryClient.getQueryData<ClienteExclusion[]>(key);
+      queryClient.setQueryData<ClienteExclusion[]>(key, (old = []) => {
+        const existe = old.some((e) => e.tipo_exclusion === tipoExclusion);
+        return existe
+          ? old.filter((e) => e.tipo_exclusion !== tipoExclusion)
+          : [...old, { id: `temp-${tipoExclusion}`, cliente_id: cliente.id, tipo_exclusion: tipoExclusion, created_at: new Date().toISOString() }];
+      });
+      return { prev };
+    },
+    onError: (_err, _tipo, context: any) => {
+      if (context?.prev !== undefined) queryClient.setQueryData(key, context.prev);
+      toast.error('No se pudo guardar la preferencia. Intenta de nuevo.');
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['cliente-exclusiones'] });
     },
   });
