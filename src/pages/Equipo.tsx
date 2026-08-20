@@ -1,3 +1,4 @@
+import { EquipoTabs } from "@/components/equipo/EquipoTabs";
 import { useState } from 'react';
 import { Users, Trophy, UserPlus, BarChart3 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -11,6 +12,7 @@ export default function Equipo() {
 
   return (
     <div className="space-y-6">
+      <EquipoTabs />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">

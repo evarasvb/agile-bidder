@@ -24,6 +24,7 @@ import {
   Puzzle,
   GraduationCap,
   Sparkles,
+  Shield,
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -86,12 +87,21 @@ const navItems: NavItem[] = [
     icon: FileText,
   },
   {
+    title: "Equipo",
+    url: "/equipo",
+    icon: Users,
+    children: [
+      { title: "Miembros", url: "/equipo", icon: Users },
+      { title: "Desempeño", url: "/dashboard/vendedores", icon: BarChart3 },
+      { title: "Roles y permisos", url: "/configuracion/equipo", icon: Shield },
+    ],
+  },
+  {
     title: "Configuración",
     url: "/configuracion",
     icon: Settings,
     children: [
       { title: "Mi empresa", url: "/configuracion/empresa", icon: Building2 },
-      { title: "Equipo", url: "/equipo", icon: Users },
       { title: "Extensión Chrome", url: "/configuracion/extension", icon: Puzzle },
     ],
   },

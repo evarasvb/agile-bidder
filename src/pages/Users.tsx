@@ -1,3 +1,4 @@
+import { EquipoTabs } from "@/components/equipo/EquipoTabs";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -474,6 +475,7 @@ export default function Users() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <EquipoTabs />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
