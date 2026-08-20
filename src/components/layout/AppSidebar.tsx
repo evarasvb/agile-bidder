@@ -53,12 +53,11 @@ const navItems: NavItem[] = [
     url: "/oportunidades",
     icon: Crosshair,
     children: [
-      { title: "Panel de Match", url: "/oportunidades", icon: Crosshair },
-      { title: "Filtros con IA", url: "/configuracion", icon: Sparkles },
-      { title: "Licitaciones", url: "/licitaciones-nuevas", icon: FileSearch },
+      { title: "Bandeja", url: "/oportunidades", icon: Crosshair },
       { title: "Compras Ágiles", url: "/compras-agiles", icon: Zap },
-      { title: "Mis Oportunidades", url: "/mis-oportunidades", icon: Star },
+      { title: "Guardadas", url: "/mis-oportunidades", icon: Star },
       { title: "Calendario", url: "/calendario", icon: Calendar },
+      { title: "Filtros con IA", url: "/configuracion", icon: Sparkles },
     ],
   },
   {

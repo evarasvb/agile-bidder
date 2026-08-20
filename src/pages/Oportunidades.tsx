@@ -348,19 +348,28 @@ export default function Oportunidades() {
             />
           </div>
 
-          <Select
-            value={filters.tipo || "all"}
-            onValueChange={(v) => updateFilter("tipo", v === "all" ? undefined : v)}
-          >
-            <SelectTrigger className="w-full sm:w-[160px]">
-              <SelectValue placeholder="Tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los tipos</SelectItem>
-              <SelectItem value="compra_agil">Compra Ágil</SelectItem>
-              <SelectItem value="licitacion">Licitación</SelectItem>
-            </SelectContent>
-          </Select>
+          {/* Chips de tipo: una sola bandeja, se filtra con un toque. */}
+          <div className="flex flex-wrap items-center gap-1">
+            {([
+              { v: undefined, label: "Todas" },
+              { v: "licitacion", label: "Licitaciones" },
+              { v: "compra_agil", label: "Compras Ágiles" },
+            ] as const).map((t) => {
+              const active = (filters.tipo || undefined) === t.v;
+              return (
+                <Button
+                  key={t.label}
+                  type="button"
+                  size="sm"
+                  variant={active ? "default" : "outline"}
+                  className="h-9"
+                  onClick={() => updateFilter("tipo", t.v)}
+                >
+                  {t.label}
+                </Button>
+              );
+            })}
+          </div>
 
           <Select
             value={String(filters.scoreMin || 0)}
