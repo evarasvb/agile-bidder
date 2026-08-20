@@ -42,7 +42,10 @@ export async function uploadProductImage(
 export async function uploadCompanyLogo(file: File, userId: string): Promise<string | null> {
   try {
     const fileExt = file.name.split('.').pop()?.toLowerCase() || 'png';
-    const fileName = `logos/${userId}-${Date.now()}.${fileExt}`;
+    // El primer segmento del path DEBE ser el uid: la política del bucket exige
+    // (storage.foldername(name))[1] = auth.uid(). Antes usábamos "logos/..." y
+    // la subida del logo fallaba por RLS.
+    const fileName = `${userId}/logos/logo-${Date.now()}.${fileExt}`;
     const { data, error } = await supabase.storage
       .from('product-images')
       .upload(fileName, file, { cacheControl: '3600', upsert: true });

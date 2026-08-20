@@ -64,6 +64,18 @@ async function unsplash(query: string, n: number): Promise<Candidata[]> {
   }
 }
 
+// Solo permitimos fijar imágenes desde los CDN de banco confiables (evita SSRF:
+// un usuario no puede hacer que el servidor descargue una URL interna arbitraria).
+const HOSTS_PERMITIDOS = ['images.pexels.com', 'images.unsplash.com', 'plus.unsplash.com'];
+function urlPermitida(u: string): boolean {
+  try {
+    const parsed = new URL(u);
+    return parsed.protocol === 'https:' && HOSTS_PERMITIDOS.includes(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
 // Pexels primero; si no alcanza (o no hay key), completamos con Unsplash.
 async function buscarCandidatas(query: string, n: number): Promise<Candidata[]> {
   const p = await pexels(query, n);
@@ -129,6 +141,11 @@ serve(async (req) => {
     if (body.action === 'fijar') {
       if (!body.productId || !body.imageUrl) {
         return new Response(JSON.stringify({ error: 'Faltan productId o imageUrl' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      if (!urlPermitida(body.imageUrl)) {
+        return new Response(JSON.stringify({ error: 'URL de imagen no permitida' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
