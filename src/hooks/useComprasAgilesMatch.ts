@@ -11,6 +11,11 @@ export interface CompraAgilMatch {
   codigo: string;
   nombre: string;
   nombre_organismo: string | null;
+  organismo: string | null;
+  monto: number | null;
+  estado: string | null;
+  region: string | null;
+  link_oficial: string | null;
   monto_estimado: number | null;
   moneda: string | null;
   fecha_cierre: string | null;
@@ -19,6 +24,7 @@ export interface CompraAgilMatch {
   match_score: number;
   items_count: number;
   matched_items: number;
+  matched_product_ids: string[];
 }
 
 // =============================================================================
@@ -70,13 +76,14 @@ export function useComprasAgilesMatch(clienteId: string | null) {
         const items = c.compras_agiles_items || [];
         const totalItems = items.length;
         let matchedItems = 0;
+        const matchedProductIds = new Set<string>();
 
         for (const item of items) {
           const itemNombre = (item.nombre_producto || '').toLowerCase();
           const itemCodigo = item.codigo_producto || null;
 
           const found = inventario.find(inv => {
-            const invNombre = (inv.nombre || '').toLowerCase();
+            const invNombre = (inv.nombre || inv.nombre_producto || '').toLowerCase();
             const invCodigo = inv.codigo_producto || inv.sku || null;
 
             // Match por código exacto
@@ -91,17 +98,29 @@ export function useComprasAgilesMatch(clienteId: string | null) {
             return codigoMatch || nombreMatch;
           });
 
-          if (found) matchedItems++;
+          if (found) {
+            matchedItems++;
+            matchedProductIds.add(found.id);
+          }
         }
 
         const score =
           totalItems > 0 ? Math.round((matchedItems / totalItems) * 100) : 0;
 
+        const organismo = c.organismo || c.nombre_organismo || null;
+        const monto = c.monto ?? c.monto_estimado ?? c.monto_disponible ?? null;
+
         return {
           id: c.id,
           codigo: c.codigo,
           nombre: c.nombre || 'Sin título',
-          nombre_organismo: c.nombre_organismo || c.organismo || null,
+          nombre_organismo: organismo,
+          // Campos que consume el modal de oportunidades (misma forma que CompraAgil):
+          organismo,
+          monto,
+          estado: c.estado || null,
+          region: c.region || null,
+          link_oficial: c.link_oficial || c.url || null,
           monto_estimado: c.monto_estimado ?? c.monto_disponible ?? null,
           moneda: c.moneda ?? null,
           fecha_cierre: c.fecha_cierre || null,
@@ -110,6 +129,7 @@ export function useComprasAgilesMatch(clienteId: string | null) {
           match_score: score,
           items_count: totalItems,
           matched_items: matchedItems,
+          matched_product_ids: Array.from(matchedProductIds),
         };
       });
 

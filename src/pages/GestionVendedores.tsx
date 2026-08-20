@@ -1,3 +1,4 @@
+import { EquipoTabs } from "@/components/equipo/EquipoTabs";
 import { useState } from 'react';
 import { Users, CalendarDays, BarChart3, UserPlus, Loader2, Trophy, Target, TrendingUp, DollarSign, CheckCircle2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -503,6 +504,7 @@ function ListaVendedores() {
 export default function GestionVendedores() {
   return (
     <div className="space-y-6">
+      <EquipoTabs />
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <Users className="h-6 w-6 text-primary" />
