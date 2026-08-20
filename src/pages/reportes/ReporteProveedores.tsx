@@ -11,14 +11,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ReportHero } from "@/components/reportes/ReportHero";
 import { formatCurrency, formatCompact, formatNumber, exportToCSV } from "@/hooks/useReportes";
-import { useBIStats, useTopProveedores, useProveedorDetalle, type BIProveedor } from "@/hooks/useBI";
+import { useBIStats, useTopProveedores, useProveedorDetalle, rangoDePreset, type BIProveedor, type PeriodoPreset } from "@/hooks/useBI";
+import { PeriodoSelector } from "@/components/reportes/PeriodoSelector";
 
 export default function ReporteProveedores() {
   const [search, setSearch] = useState("");
   const [sel, setSel] = useState<BIProveedor | null>(null);
+  const [preset, setPreset] = useState<PeriodoPreset>("total");
+  const periodo = rangoDePreset(preset);
 
-  const { data: stats } = useBIStats();
-  const { data, isLoading } = useTopProveedores(search, 80);
+  const { data: stats } = useBIStats(periodo);
+  const { data, isLoading } = useTopProveedores(search, 80, periodo);
   const items = data?.items ?? [];
   const { data: detalle, isLoading: detalleLoading } = useProveedorDetalle(sel?.proveedor ?? null);
 
@@ -39,6 +42,7 @@ export default function ReporteProveedores() {
           { label: "Órdenes", value: stats ? formatNumber(stats.ordenes) : "…", icon: FileText },
           { label: "Compradores", value: stats ? formatNumber(stats.compradores) : "…", icon: Building2 },
         ]}
+        right={<PeriodoSelector value={preset} onChange={setPreset} />}
       />
 
       <div className="flex items-center justify-between gap-3 flex-wrap">

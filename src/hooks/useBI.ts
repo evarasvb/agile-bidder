@@ -45,28 +45,57 @@ async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
   return data as T;
 }
 
-export function useBIStats() {
+// ---- Período de los reportes ----
+export type PeriodoPreset = "total" | "mes" | "trimestre" | "ano" | "12m";
+export interface RangoPeriodo { desde: string; hasta: string }
+
+const iso = (d: Date) => d.toISOString().slice(0, 10);
+
+/** Convierte un preset en un rango {desde,hasta}. "total" => null (histórico). */
+export function rangoDePreset(p: PeriodoPreset): RangoPeriodo | null {
+  if (p === "total") return null;
+  const hoy = new Date();
+  let desde: Date;
+  if (p === "mes") desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  else if (p === "trimestre") desde = new Date(hoy.getFullYear(), hoy.getMonth() - 3, hoy.getDate());
+  else if (p === "ano") desde = new Date(hoy.getFullYear(), 0, 1);
+  else desde = new Date(hoy.getFullYear() - 1, hoy.getMonth(), hoy.getDate()); // 12m
+  return { desde: iso(desde), hasta: iso(hoy) };
+}
+
+export function useBIStats(periodo?: RangoPeriodo | null) {
   return useQuery({
-    queryKey: ["bi-stats"],
-    queryFn: () => rpc<BIStats>("bi_stats", {}),
+    queryKey: ["bi-stats", periodo?.desde ?? null, periodo?.hasta ?? null],
+    queryFn: () =>
+      periodo
+        ? rpc<BIStats>("bi_stats_rango", { p_desde: periodo.desde, p_hasta: periodo.hasta })
+        : rpc<BIStats>("bi_stats", {}),
     staleTime: 5 * 60_000,
   });
 }
 
-export function useTopProveedores(termino = "", limite = 60) {
+export function useTopProveedores(termino = "", limite = 60, periodo?: RangoPeriodo | null) {
   return useQuery({
-    queryKey: ["bi-top-proveedores", termino, limite],
-    queryFn: () => rpc<{ total: number; total_mercado: number; items: BIProveedor[] }>(
-      "bi_top_proveedores", { termino, limite }),
+    queryKey: ["bi-top-proveedores", termino, limite, periodo?.desde ?? null, periodo?.hasta ?? null],
+    queryFn: () =>
+      periodo
+        ? rpc<{ total: number; total_mercado: number; items: BIProveedor[] }>(
+            "bi_top_proveedores_rango", { termino, limite, p_desde: periodo.desde, p_hasta: periodo.hasta })
+        : rpc<{ total: number; total_mercado: number; items: BIProveedor[] }>(
+            "bi_top_proveedores", { termino, limite }),
     staleTime: 60_000,
   });
 }
 
-export function useTopCompradores(termino = "", limite = 60) {
+export function useTopCompradores(termino = "", limite = 60, periodo?: RangoPeriodo | null) {
   return useQuery({
-    queryKey: ["bi-top-compradores", termino, limite],
-    queryFn: () => rpc<{ total: number; total_mercado: number; items: BIComprador[] }>(
-      "bi_top_compradores", { termino, limite }),
+    queryKey: ["bi-top-compradores", termino, limite, periodo?.desde ?? null, periodo?.hasta ?? null],
+    queryFn: () =>
+      periodo
+        ? rpc<{ total: number; total_mercado: number; items: BIComprador[] }>(
+            "bi_top_compradores_rango", { termino, limite, p_desde: periodo.desde, p_hasta: periodo.hasta })
+        : rpc<{ total: number; total_mercado: number; items: BIComprador[] }>(
+            "bi_top_compradores", { termino, limite }),
     staleTime: 60_000,
   });
 }

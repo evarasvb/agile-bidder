@@ -349,7 +349,7 @@ export default function Oportunidades() {
           </div>
 
           {/* Chips de tipo: una sola bandeja, se filtra con un toque. */}
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             {([
               { v: undefined, label: "Todas" },
               { v: "licitacion", label: "Licitaciones" },
