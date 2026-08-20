@@ -30,14 +30,17 @@ import {
   ExternalLink,
   RefreshCw
 } from "lucide-react";
+import { Package, Sparkles } from "lucide-react";
 import { useOportunidadesFiltradas, OportunidadFiltrada } from "@/hooks/useOportunidadesFiltradas";
 import { useClienteFiltros } from "@/hooks/useClienteFiltros";
+import { useInventoryStats } from "@/hooks/useInventory";
 import { format, differenceInHours } from "date-fns";
 import { es } from "date-fns/locale";
 
 export default function MisOportunidades() {
   const { oportunidades, stats, isLoading, refetch } = useOportunidadesFiltradas();
   const { filtros } = useClienteFiltros();
+  const { data: invStats } = useInventoryStats();
   const [searchTerm, setSearchTerm] = useState("");
   const [tipoFilter, setTipoFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
@@ -275,11 +278,46 @@ export default function MisOportunidades() {
                   <TableBody>
                     {paginatedOportunidades.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                          No se encontraron oportunidades con los filtros actuales
+                        <TableCell colSpan={9} className="py-12">
+                          {(invStats?.total ?? 0) === 0 ? (
+                            // Causa más común en clientes nuevos: sin inventario no hay match.
+                            <div className="flex flex-col items-center text-center max-w-md mx-auto">
+                              <div className="p-3 rounded-2xl bg-firmavb-blue/10 text-firmavb-blue mb-3"><Package className="h-7 w-7" /></div>
+                              <p className="text-base font-semibold text-foreground">Primero carga tu inventario</p>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                firmavb usa tus productos para encontrar las licitaciones y compras ágiles que puedes ganar. En cuanto cargues tu inventario, aquí aparecerán tus oportunidades con match.
+                              </p>
+                              <Button asChild className="mt-4 bg-firmavb-blue hover:bg-firmavb-blue/90">
+                                <Link to="/inventario"><Package className="h-4 w-4 mr-1.5" /> Cargar mi inventario</Link>
+                              </Button>
+                            </div>
+                          ) : (searchTerm || tipoFilter !== "all") ? (
+                            // Hay oportunidades, pero los filtros locales las esconden.
+                            <div className="flex flex-col items-center text-center max-w-md mx-auto">
+                              <div className="p-3 rounded-2xl bg-muted text-muted-foreground mb-3"><Filter className="h-7 w-7" /></div>
+                              <p className="text-base font-semibold text-foreground">Ninguna oportunidad coincide con tu filtro</p>
+                              <p className="text-sm text-muted-foreground mt-1">Prueba con otra búsqueda o quita los filtros para ver todas.</p>
+                              <Button variant="outline" className="mt-4" onClick={() => { setSearchTerm(""); setTipoFilter("all"); setPage(1); }}>
+                                <RefreshCw className="h-4 w-4 mr-1.5" /> Limpiar filtros
+                              </Button>
+                            </div>
+                          ) : (
+                            // Tiene inventario y sin filtros: todavía no hay match vigente.
+                            <div className="flex flex-col items-center text-center max-w-md mx-auto">
+                              <div className="p-3 rounded-2xl bg-firmavb-green/10 text-firmavb-green mb-3"><Sparkles className="h-7 w-7" /></div>
+                              <p className="text-base font-semibold text-foreground">Aún no hay oportunidades con match</p>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Buscamos oportunidades nuevas del Estado varias veces al día y las cruzamos con tu inventario. Vuelve pronto o revisa que tu inventario esté completo para mejorar el match.
+                              </p>
+                              <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
+                                <Button variant="outline" onClick={() => refetch()}><RefreshCw className="h-4 w-4 mr-1.5" /> Actualizar</Button>
+                                <Button asChild variant="ghost"><Link to="/inventario">Revisar mi inventario</Link></Button>
+                              </div>
+                            </div>
+                          )}
                         </TableCell>
                       </TableRow>
-                ) : (     
+                ) : (
                                 paginatedOportunidades.map((op) => (
                         <TableRow key={op.id} className="cursor-pointer hover:bg-muted/50">
                           <TableCell className="font-mono text-xs">
