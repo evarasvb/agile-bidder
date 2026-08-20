@@ -69,6 +69,10 @@ export default function Landing() {
     setTeaserTermino(q);
   };
 
+  // CTA de registro: aterriza en la pestaña "Registrarse" y arrastra el término
+  // buscado para precargarlo en el onboarding.
+  const signupHref = `/auth?tab=signup${searchQuery.trim() ? `&buscar=${encodeURIComponent(searchQuery.trim())}` : ''}`;
+
   return (
     <div className="min-h-screen bg-firmavb-gray">
       {/* Demo Modal */}
@@ -119,7 +123,7 @@ export default function Landing() {
                   <Link to="/auth">Iniciar Sesión</Link>
                 </Button>
                 <Button asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90 transition-all hover:scale-105 active:scale-95 px-3 sm:px-4">
-                  <Link to="/auth">
+                  <Link to={signupHref}>
                     Comenzar Gratis
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
@@ -185,7 +189,7 @@ export default function Landing() {
                 asChild
                 className="bg-firmavb-blue hover:bg-firmavb-blue/90 shadow-lg shadow-firmavb-blue/25 text-base h-12 px-8 transition-all hover:scale-105 active:scale-95"
               >
-                <Link to="/auth">
+                <Link to={signupHref}>
                   Configurar mi empresa
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
@@ -383,7 +387,7 @@ Validar Admisibilidad Gratis
                 asChild
                 className="bg-white text-firmavb-blue hover:bg-white/90 shadow-lg text-base h-12 px-8 transition-all hover:scale-105 active:scale-95 font-semibold"
               >
-                <Link to="/auth">
+                <Link to={signupHref}>
                   Comenzar Configuración
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
@@ -432,7 +436,7 @@ Validar Admisibilidad Gratis
             </div>
           </div>
           <p className="text-center text-sm text-muted-foreground">
-            © 2024 FirmaVB - Inteligencia para Ganar Más. Todos los derechos reservados.
+            © {new Date().getFullYear()} FirmaVB - Inteligencia para Ganar Más. Todos los derechos reservados.
           </p>
         </div>
       </footer>

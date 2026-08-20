@@ -27,7 +27,22 @@ export default function OnboardingStep1({ cliente }: OnboardingStep1Props) {
       ? cliente.industrias
       : (cliente.categoria_negocio ? [cliente.categoria_negocio] : []);
     setIndustrias(inds);
-    setPalabras(cliente.palabras_clave_busqueda ?? []);
+
+    // Palabra que el visitante buscó en el landing antes de registrarse: la
+    // precargamos aquí para no perder el hilo (Auth la dejó en localStorage).
+    const base = cliente.palabras_clave_busqueda ?? [];
+    let inicial = base;
+    try {
+      const kw = localStorage.getItem('fvb_onboarding_kw')?.trim().toLowerCase();
+      if (kw) {
+        localStorage.removeItem('fvb_onboarding_kw');
+        if (!base.includes(kw)) {
+          inicial = [...base, kw];
+          actualizarCliente.mutate({ id: cliente.id, palabras_clave_busqueda: inicial } as any);
+        }
+      }
+    } catch { /* noop */ }
+    setPalabras(inicial);
   }, [cliente]);
 
   const persist = (inds: string[], pals: string[]) => {

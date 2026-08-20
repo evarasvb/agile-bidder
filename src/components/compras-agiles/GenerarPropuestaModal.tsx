@@ -21,6 +21,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { descargarCotizacionPDF, type ItemCotizacion, type DatosCotizacion } from "@/services/pdfGenerator";
 import { useFichaTecnica, type ProductoFicha } from "@/hooks/useFichaTecnica";
 import { blobFichaTecnicaPDF, type DatosFichaTecnica } from "@/services/fichaTecnicaPdf";
+import { useCreatePipelineItem } from "@/hooks/usePipeline";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ItemParaPropuesta {
   itemId: string;
@@ -76,6 +78,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
   const { data: clienteInventario } = useTodoElInventario();
   const { data: cliente } = useCliente();
   const fichaTecnica = useFichaTecnica();
+  const crearPipeline = useCreatePipelineItem();
   const [productoSeleccionando, setProductoSeleccionando] = useState<string | null>(null);
   const [mostrarAgregarManual, setMostrarAgregarManual] = useState(false);
   
@@ -358,10 +361,33 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
           ...(ficha_tecnica ? { ficha_tecnica } : {}),
         },
       });
+      // Conectar con el pipeline: al guardar la propuesta la oportunidad avanza
+      // a "preparación" en Postulaciones (si no estaba ya). Antes la propuesta
+      // quedaba aislada y el pipeline no se enteraba.
+      try {
+        const { data: existe } = await supabase
+          .from('pipeline')
+          .select('id')
+          .eq('oportunidad_id', compra.codigo)
+          .limit(1);
+        if (!existe || existe.length === 0) {
+          await crearPipeline.mutateAsync({
+            oportunidad_id: compra.codigo,
+            oportunidad_tipo: 'compra_agil',
+            titulo: compra.nombre,
+            institucion: compra.organismo || undefined,
+            monto_estimado: montoTotal || undefined,
+            fecha_cierre: compra.fecha_cierre || undefined,
+            match_score: compra.match_score || undefined,
+            etapa: 'preparacion',
+          });
+        }
+      } catch { /* no bloqueamos el guardado si el pipeline falla */ }
+
       toast.success(
         ficha_tecnica
-          ? 'Propuesta y ficha técnica guardadas'
-          : 'Propuesta guardada exitosamente'
+          ? 'Propuesta y ficha técnica guardadas · en tu pipeline'
+          : 'Propuesta guardada · en tu pipeline'
       );
       onOpenChange(false);
     } catch (error) {

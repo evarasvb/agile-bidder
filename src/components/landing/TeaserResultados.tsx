@@ -114,7 +114,7 @@ export function TeaserResultados({ termino }: { termino: string }) {
               recibir alertas cuando aparezca una que te sirva.
             </p>
             <Button asChild className="mt-2 bg-firmavb-blue hover:bg-firmavb-blue/90">
-              <Link to="/auth">Crear cuenta gratis</Link>
+              <Link to={`/auth?tab=signup&buscar=${encodeURIComponent(termino.trim())}`}>Crear cuenta gratis</Link>
             </Button>
           </CardContent>
         </Card>
@@ -197,7 +197,7 @@ export function TeaserResultados({ termino }: { termino: string }) {
             </div>
           </div>
           <Button asChild size="lg" className="bg-firmavb-blue hover:bg-firmavb-blue/90 shrink-0">
-            <Link to="/auth">
+            <Link to={`/auth?tab=signup&buscar=${encodeURIComponent(termino.trim())}`}>
               Crear cuenta gratis
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
