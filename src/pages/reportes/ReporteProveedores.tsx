@@ -66,7 +66,7 @@ export default function ReporteProveedores() {
             {isLoading ? (
               <div className="space-y-2">{[...Array(8)].map((_, i) => <Skeleton key={i} className="h-11 w-full" />)}</div>
             ) : items.length === 0 ? (
-              <p className="py-8 text-center text-muted-foreground text-sm">Sin proveedores para “{search}”.</p>
+              <p className="py-8 text-center text-muted-foreground text-sm">{search ? `Sin proveedores para “${search}”.` : "Aún no hay datos para mostrar."}</p>
             ) : (
               <div className="rounded-lg border overflow-auto max-h-[68vh]">
                 <Table>
@@ -120,6 +120,11 @@ export default function ReporteProveedores() {
                 <p className="text-sm text-muted-foreground">
                   {formatCompact(sel.monto_total)} · {formatNumber(sel.ordenes)} órdenes · {formatNumber(sel.compradores)} compradores · {(sel.share ?? 0).toFixed(1)}% del mercado
                 </p>
+                {periodo && (
+                  <p className="text-xs text-muted-foreground/70 mt-1">
+                    El desglose de productos y compradores es histórico total (no filtrado por período).
+                  </p>
+                )}
               </div>
 
               <Card className="border-border/50 shadow-sm">

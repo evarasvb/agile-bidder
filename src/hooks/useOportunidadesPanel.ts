@@ -24,6 +24,9 @@ export interface OportunidadPanel {
   items_count: number;
   items_matched: number;
   created_at: string;
+  // Texto concatenado de los productos de la compra, para buscar por ítem
+  // (una compra "Insumos de oficina" que en su lista tiene tóner debe calzar).
+  items_text?: string;
 }
 
 export interface OportunidadDetalle extends OportunidadPanel {
@@ -110,9 +113,9 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       let comprasQuery = supabase
         .from('compras_agiles')
         .select(`
-          id, codigo, nombre, descripcion, region, monto_estimado, fecha_cierre,
-          created_at, estado, match_score, match_encontrado,
-          compras_agiles_items(id)
+          id, codigo, nombre, descripcion, nombre_organismo, region, monto_estimado,
+          fecha_cierre, created_at, estado, match_score, match_encontrado, url_ficha,
+          compras_agiles_items(id, nombre_producto)
         `)
         .order('created_at', { ascending: false });
 
@@ -241,19 +244,23 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         codigo: c.codigo,
         nombre: c.nombre || 'Sin título',
         descripcion: c.descripcion,
-        organismo: c.organismo || 'Sin organismo',
+        organismo: c.nombre_organismo || c.organismo || 'Sin organismo',
         region: c.region,
         monto: c.monto_estimado ?? c.monto ?? null,
         fecha_cierre: c.fecha_cierre,
         fecha_publicacion: c.created_at,
         estado: c.estado,
         tipo: 'compra_agil' as const,
-        link_oficial: c.link_oficial,
+        link_oficial: c.url_ficha || c.link_oficial || null,
         match_score: bestMatchByCodigo[c.codigo]?.score ?? c.match_score ?? null,
         match_encontrado: bestMatchByCodigo[c.codigo] ? true : (c.match_encontrado ?? false),
         items_count: c.compras_agiles_items?.length || 0,
         items_matched: bestMatchByCodigo[c.codigo]?.count ?? 0,
         created_at: c.created_at,
+        items_text: (c.compras_agiles_items || [])
+          .map((i: any) => i.nombre_producto)
+          .filter(Boolean)
+          .join(' '),
       }));
 
       // Map licitaciones (columnas de licitaciones_bi)
@@ -306,7 +313,8 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         all = all.filter(o =>
           o.nombre.toLowerCase().includes(search) ||
           o.codigo.toLowerCase().includes(search) ||
-          o.organismo.toLowerCase().includes(search)
+          o.organismo.toLowerCase().includes(search) ||
+          (o.items_text || '').toLowerCase().includes(search)
         );
       }
 
@@ -459,14 +467,14 @@ export function useOportunidadDetalle(id: string | null, tipo: 'compra_agil' | '
           codigo: (compra as any).codigo,
           nombre: (compra as any).nombre || 'Sin título',
           descripcion: (compra as any).descripcion,
-          organismo: (compra as any).organismo || 'Sin organismo',
+          organismo: (compra as any).nombre_organismo || (compra as any).organismo || 'Sin organismo',
           region: (compra as any).region,
-          monto: (compra as any).monto,
+          monto: (compra as any).monto_estimado ?? (compra as any).monto ?? null,
           fecha_cierre: (compra as any).fecha_cierre,
           fecha_publicacion: (compra as any).created_at,
           estado: (compra as any).estado,
           tipo: 'compra_agil',
-          link_oficial: (compra as any).link_oficial,
+          link_oficial: (compra as any).url_ficha || (compra as any).link_oficial || null,
           match_score: (compra as any).match_score,
           match_encontrado: (compra as any).match_encontrado ?? false,
           items_count: items.length,

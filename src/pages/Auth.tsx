@@ -47,7 +47,15 @@ export default function Auth() {
   const [resetEmail, setResetEmail] = useState('');
   const [googleLoading, setGoogleLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
-  
+
+  // Modo recuperación de contraseña: se activa al volver del enlace del correo
+  // (/auth?reset=true) o cuando Supabase emite el evento PASSWORD_RECOVERY. En
+  // ese modo NO redirigimos al dashboard (aunque el enlace deje sesión abierta)
+  // y mostramos el formulario para fijar la nueva contraseña.
+  const [recoveryMode, setRecoveryMode] = useState(searchParams.get('reset') === 'true');
+  const [newPassword, setNewPassword] = useState('');
+  const [newPassword2, setNewPassword2] = useState('');
+
   // Form states
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -55,12 +63,46 @@ export default function Auth() {
   const [signupPassword, setSignupPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated — salvo en modo recuperación, donde el
+  // enlace del correo deja una sesión temporal pero el usuario todavía debe
+  // fijar su nueva contraseña (antes lo mandaba al dashboard sin poder hacerlo).
   useEffect(() => {
-    if (!authLoading && isAuthenticated) {
+    if (!authLoading && isAuthenticated && !recoveryMode) {
       navigate('/dashboard');
     }
-  }, [isAuthenticated, authLoading, navigate]);
+  }, [isAuthenticated, authLoading, navigate, recoveryMode]);
+
+  // Supabase emite PASSWORD_RECOVERY cuando se abre el enlace de restablecer.
+  useEffect(() => {
+    const { data } = supabaseClient.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') setRecoveryMode(true);
+    });
+    return () => data.subscription.unsubscribe();
+  }, []);
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
+    if (newPassword.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+    if (newPassword !== newPassword2) {
+      setError('Las contraseñas no coinciden');
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+    setLoading(false);
+    if (error) {
+      setError(error.message || 'No se pudo actualizar la contraseña. Pide un enlace nuevo.');
+      return;
+    }
+    setSuccess('¡Contraseña actualizada! Entrando a tu cuenta…');
+    setRecoveryMode(false);
+    setTimeout(() => navigate('/dashboard', { replace: true }), 900);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -228,6 +270,44 @@ export default function Auth() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {/* Modo recuperación: fijar nueva contraseña tras el enlace del correo */}
+              {recoveryMode && (
+                <div className="space-y-4">
+                  <div className="text-center">
+                    <h3 className="text-lg font-semibold">Crea tu nueva contraseña</h3>
+                    <p className="text-sm text-muted-foreground">Ingresa una contraseña nueva para tu cuenta.</p>
+                  </div>
+                  {error && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
+                  {success && (
+                    <Alert className="border-[hsl(var(--success))] bg-[hsl(var(--success))]/10">
+                      <Sparkles className="h-4 w-4 text-[hsl(var(--success))]" />
+                      <AlertDescription className="text-[hsl(var(--success))]">{success}</AlertDescription>
+                    </Alert>
+                  )}
+                  <form onSubmit={handleUpdatePassword} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="new-password">Nueva contraseña</Label>
+                      <Input id="new-password" type="password" placeholder="Mínimo 6 caracteres"
+                        value={newPassword} onChange={(e) => setNewPassword(e.target.value)} disabled={loading} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="new-password-2">Repite la contraseña</Label>
+                      <Input id="new-password-2" type="password" placeholder="Repite tu contraseña"
+                        value={newPassword2} onChange={(e) => setNewPassword2(e.target.value)} disabled={loading} />
+                    </div>
+                    <Button type="submit" className="w-full" disabled={loading || !newPassword || !newPassword2}>
+                      {loading ? 'Guardando…' : 'Guardar nueva contraseña'}
+                    </Button>
+                  </form>
+                </div>
+              )}
+
+              {!recoveryMode && (
               <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'login' | 'signup')}>
                 <TabsList className="grid w-full grid-cols-2 mb-6">
                   <TabsTrigger value="login">Iniciar Sesión</TabsTrigger>
@@ -511,16 +591,17 @@ export default function Auth() {
                   </form>
                 </TabsContent>
               </Tabs>
+              )}
 
               <p className="text-center text-sm text-muted-foreground mt-6">
                 Al continuar, aceptas nuestros{' '}
-                <a href="#" className="text-[hsl(var(--firmavb-blue))] hover:underline">
+                <span className="font-medium text-foreground">
                   Términos de Servicio
-                </a>{' '}
+                </span>{' '}
                 y{' '}
-                <a href="#" className="text-[hsl(var(--firmavb-blue))] hover:underline">
+                <span className="font-medium text-foreground">
                   Política de Privacidad
-                </a>
+                </span>
               </p>
             </CardContent>
           </Card>

@@ -1,19 +1,24 @@
 import { NavLink } from "react-router-dom";
 import { Users, BarChart3, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useProfile } from "@/hooks/useProfile";
 
 // Sub-navegación compartida entre las páginas de equipo. Antes eran 3 destinos
 // desconectados y sin enlace entre sí; ahora se moverse entre ellos es un clic.
 const TABS = [
-  { to: "/equipo", label: "Miembros", icon: Users },
-  { to: "/dashboard/vendedores", label: "Desempeño", icon: BarChart3 },
-  { to: "/configuracion/equipo", label: "Roles y permisos", icon: Shield },
+  { to: "/equipo", label: "Miembros", icon: Users, adminOnly: false },
+  { to: "/dashboard/vendedores", label: "Desempeño", icon: BarChart3, adminOnly: false },
+  { to: "/configuracion/equipo", label: "Roles y permisos", icon: Shield, adminOnly: true },
 ];
 
 export function EquipoTabs() {
+  // "Roles y permisos" está reservado a admin (la página bloquea con "Acceso
+  // Restringido"); ocultamos el tab a quien no es admin para no llevarlo a un muro.
+  const { isAdmin } = useProfile();
+  const tabs = TABS.filter((t) => !t.adminOnly || isAdmin);
   return (
     <div className="flex flex-wrap gap-1 border-b border-border">
-      {TABS.map((t) => (
+      {tabs.map((t) => (
         <NavLink
           key={t.to}
           to={t.to}

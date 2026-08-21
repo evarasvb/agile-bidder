@@ -32,7 +32,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { DemoModal } from "@/components/landing/DemoModal";
 import { LandingChat, LandingChatButton } from "@/components/landing/LandingChat";
@@ -47,6 +47,7 @@ export default function Landing() {
   const [demoOpen, setDemoOpen] = useState(false);
   const { isAuthenticated, signOut, user } = useAuth();
   const navigate = useNavigate();
+  const teaserRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = async () => {
     await signOut();
@@ -67,6 +68,10 @@ export default function Landing() {
     // Visitante anónimo: mostramos el teaser público aquí mismo (engancha) y
     // el candado para registrarse. No lo mandamos al login en seco.
     setTeaserTermino(q);
+    // Damos feedback en móvil: bajamos suave hasta los resultados una vez montados.
+    setTimeout(() => {
+      teaserRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
   };
 
   // CTA de registro: aterriza en la pestaña "Registrarse" y arrastra el término
@@ -146,10 +151,14 @@ export default function Landing() {
             <h1 className="text-4xl md:text-6xl font-bold text-foreground mb-4 leading-tight">
               Adjudicar es clave.
             </h1>
-            <h2 className="text-3xl md:text-5xl font-bold text-firmavb-blue mb-6">
+            <h2 className="text-3xl md:text-5xl font-bold text-firmavb-blue mb-4">
               Hacerlo constante es vital.
             </h2>
-            
+
+            <p className="text-lg md:text-xl text-foreground font-medium mb-6 max-w-3xl mx-auto">
+              Encuentra y gana licitaciones y compras ágiles de Mercado Público con IA.
+            </p>
+
             <p className="text-xl text-muted-foreground font-light mb-8 max-w-3xl mx-auto">
               FirmaVB maximiza tu <span className="text-success font-medium">flujo de caja</span> y 
               <span className="text-firmavb-blue font-medium"> rentabilidad</span> con inteligencia 
@@ -176,12 +185,14 @@ export default function Landing() {
                 </Button>
               </div>
               <p className="text-sm text-muted-foreground font-light mt-2">
-                Nuestra IA analizará tu intención comercial y te mostrará oportunidades relevantes
+                Te mostramos licitaciones y compras ágiles abiertas que coinciden con lo que buscas
               </p>
             </div>
 
             {/* Resultados teaser (visitante anónimo): oportunidades reales + candado */}
-            <TeaserResultados termino={teaserTermino} />
+            <div ref={teaserRef}>
+              <TeaserResultados termino={teaserTermino} />
+            </div>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button 
@@ -426,13 +437,13 @@ Validar Admisibilidad Gratis
                 rel="noopener noreferrer"
                 className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2"
               >
-                💬 +56 994259157
+                💬 +56 9 9425 9157
               </a>
             </div>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <Link to="/academia" className="hover:text-foreground transition-colors">Academia</Link>
-              <span className="hover:text-foreground cursor-pointer">Términos</span>
-              <span className="hover:text-foreground cursor-pointer">Privacidad</span>
+              <span>Términos</span>
+              <span>Privacidad</span>
             </div>
           </div>
           <p className="text-center text-sm text-muted-foreground">

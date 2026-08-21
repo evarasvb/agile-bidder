@@ -127,12 +127,15 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
         query = query.or('match_encontrado.is.null,match_encontrado.eq.false');
       }
 
+      // La columna real del monto es `monto_estimado` (NO existe `monto`).
+      // Antes filtraba por `monto`, así que al poner un monto mínimo/máximo la
+      // query fallaba y la lista quedaba en 0. Se corrige a `monto_estimado`.
       if (filters?.montoMin) {
-        query = query.gte('monto', filters.montoMin);
+        query = query.gte('monto_estimado', filters.montoMin);
       }
 
       if (filters?.montoMax) {
-        query = query.lte('monto', filters.montoMax);
+        query = query.lte('monto_estimado', filters.montoMax);
       }
 
       // Filtro de fecha de cierre
@@ -224,12 +227,17 @@ export function useComprasAgilesStats() {
         .select('*', { count: 'exact', head: true })
         .eq('match_encontrado', true);
 
+      // Valor potencial = suma de `monto_estimado` de las compras ACTIVAS
+      // (antes sumaba `monto`, columna inexistente => siempre $0; y traía las
+      // 78k filas para sumarlas en el navegador). Ahora solo las abiertas.
       const { data: montoData } = await supabase
         .from('compras_agiles')
-        .select('monto');
+        .select('monto_estimado')
+        .or('estado.ilike.publicada,estado.ilike.activa')
+        .gt('fecha_cierre', new Date().toISOString());
 
       const montoTotal = (montoData || []).reduce(
-        (sum, c) => sum + (c.monto || 0),
+        (sum, c) => sum + ((c as any).monto_estimado || 0),
         0
       );
 

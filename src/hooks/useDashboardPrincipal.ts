@@ -170,20 +170,24 @@ export function useCierresProximos() {
       const now = new Date();
       const in7Days = addDays(now, 7);
 
-      // Compras Agiles closing soon
-      const { data: caData, error: caError } = await supabase
+      // Compras Ágiles que cierran pronto. La columna del organismo es
+      // `nombre_organismo` (no `organismo`, que no existe y hacía fallar la query).
+      const { data: caData, error: caError } = await (supabase as any)
         .from('compras_agiles')
-        .select('codigo, nombre, organismo, fecha_cierre, match_score, estado')
+        .select('codigo, nombre, nombre_organismo, fecha_cierre, match_score, estado')
         .gte('fecha_cierre', now.toISOString())
         .lte('fecha_cierre', in7Days.toISOString())
         .order('fecha_cierre', { ascending: true })
         .limit(10);
       if (caError) throw caError;
 
-      // Licitaciones closing soon
-      const { data: licData, error: licError } = await supabase
-        .from('licitaciones')
-        .select('id_licitacion, titulo, organismo, fecha_cierre, match_score, estado')
+      // Licitaciones que cierran pronto: desde `licitaciones_bi` (tabla fresca del
+      // sync oficial). La antigua `licitaciones` está congelada (0 activas) y no
+      // tiene `id_licitacion`, por eso la query lanzaba error y el widget de
+      // cierres próximos quedaba vacío. No está en los tipos generados => any.
+      const { data: licData, error: licError } = await (supabase as any)
+        .from('licitaciones_bi')
+        .select('codigo, nombre, institucion_nombre, fecha_cierre, match_score, estado')
         .gte('fecha_cierre', now.toISOString())
         .lte('fecha_cierre', in7Days.toISOString())
         .order('fecha_cierre', { ascending: true })
@@ -194,17 +198,17 @@ export function useCierresProximos() {
         ...(caData || []).map(ca => ({
           codigo: ca.codigo,
           nombre: ca.nombre,
-          institucion: ca.organismo,
+          institucion: (ca as any).nombre_organismo || 'Sin organismo',
           fecha_cierre: ca.fecha_cierre || '',
           diasRestantes: Math.max(0, Math.ceil((new Date(ca.fecha_cierre!).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))),
           match_score: ca.match_score,
           etapa: ca.estado || 'Publicada',
           tipo: 'Compra Ágil',
         })),
-        ...(licData || []).map(l => ({
-          codigo: l.id_licitacion,
-          nombre: l.titulo,
-          institucion: l.organismo,
+        ...((licData || []) as any[]).map(l => ({
+          codigo: l.codigo,
+          nombre: l.nombre,
+          institucion: l.institucion_nombre || 'Sin organismo',
           fecha_cierre: l.fecha_cierre || '',
           diasRestantes: Math.max(0, Math.ceil((new Date(l.fecha_cierre!).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))),
           match_score: l.match_score,
@@ -228,19 +232,20 @@ export function useUltimosMatches() {
   return useQuery({
     queryKey: ['dashboard-principal', 'ultimos-matches'],
     queryFn: async (): Promise<UltimoMatch[]> => {
-      // Compras Agiles with matches
-      const { data: caData, error: caError } = await supabase
+      // Compras Ágiles con match. Organismo = `nombre_organismo`.
+      const { data: caData, error: caError } = await (supabase as any)
         .from('compras_agiles')
-        .select('codigo, nombre, organismo, match_score, created_at')
+        .select('codigo, nombre, nombre_organismo, match_score, created_at')
         .eq('match_encontrado', true)
         .order('created_at', { ascending: false })
         .limit(5);
       if (caError) throw caError;
 
-      // Licitaciones with matches
-      const { data: licData, error: licError } = await supabase
-        .from('licitaciones')
-        .select('id_licitacion, titulo, organismo, match_score, created_at')
+      // Licitaciones con match desde `licitaciones_bi` (fresca). La antigua
+      // `licitaciones` no tiene `id_licitacion` => la query fallaba. any por tipos.
+      const { data: licData, error: licError } = await (supabase as any)
+        .from('licitaciones_bi')
+        .select('codigo, nombre, institucion_nombre, match_score, created_at')
         .eq('match_encontrado', true)
         .order('created_at', { ascending: false })
         .limit(5);
@@ -250,15 +255,15 @@ export function useUltimosMatches() {
         ...(caData || []).map(ca => ({
           codigo: ca.codigo,
           nombre: ca.nombre,
-          institucion: ca.organismo,
+          institucion: (ca as any).nombre_organismo || 'Sin organismo',
           match_score: ca.match_score,
           tipo: 'Compra Ágil',
           fecha: ca.created_at,
         })),
-        ...(licData || []).map(l => ({
-          codigo: l.id_licitacion,
-          nombre: l.titulo,
-          institucion: l.organismo,
+        ...((licData || []) as any[]).map(l => ({
+          codigo: l.codigo,
+          nombre: l.nombre,
+          institucion: l.institucion_nombre || 'Sin organismo',
           match_score: l.match_score,
           tipo: 'Licitación',
           fecha: l.created_at,

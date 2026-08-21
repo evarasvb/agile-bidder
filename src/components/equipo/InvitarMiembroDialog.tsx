@@ -85,9 +85,9 @@ export function InvitarMiembroDialog({ open, onOpenChange }: InvitarMiembroDialo
                 <Select value={form.rol} onValueChange={(v) => setForm({ ...form, rol: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">Admin - Acceso completo</SelectItem>
-                    <SelectItem value="vendedor">Vendedor - Pipeline y asignaciones</SelectItem>
-                    <SelectItem value="viewer">Viewer - Solo lectura</SelectItem>
+                    <SelectItem value="admin">Admin — Acceso completo</SelectItem>
+                    <SelectItem value="vendedor">Vendedor — Pipeline y asignaciones</SelectItem>
+                    <SelectItem value="visor">Visor — Solo lectura</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

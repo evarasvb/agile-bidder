@@ -20,7 +20,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { descargarCotizacionPDF, type ItemCotizacion, type DatosCotizacion } from "@/services/pdfGenerator";
 import { useFichaTecnica, type ProductoFicha } from "@/hooks/useFichaTecnica";
-import { blobFichaTecnicaPDF, type DatosFichaTecnica } from "@/services/fichaTecnicaPdf";
+import { blobFichaTecnicaPDF, descargarFichaTecnicaPDF, type DatosFichaTecnica } from "@/services/fichaTecnicaPdf";
 import { useCreatePipelineItem } from "@/hooks/usePipeline";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -272,7 +272,18 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
   // navegador no bloquee el popup, y luego le cargamos el PDF.
   const handleFichaTecnica = async () => {
     if (!compra) return;
+    // Abrimos la pestaña de inmediato (gesto del usuario) para que el navegador
+    // no bloquee el popup, y le mostramos un aviso mientras la IA genera la ficha
+    // (antes quedaba una pestaña en blanco varios segundos, se veía como colgado).
     const win = window.open('', '_blank');
+    if (win) {
+      win.document.write(
+        '<!doctype html><meta charset="utf-8"><title>Generando ficha técnica…</title>' +
+        '<body style="font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#334155">' +
+        '<div style="text-align:center"><div style="font-size:16px;font-weight:600">Generando ficha técnica…</div>' +
+        '<div style="font-size:13px;color:#94a3b8;margin-top:6px">La IA está preparando el documento. Esto puede tardar unos segundos.</div></div></body>'
+      );
+    }
     try {
       const r = await fichaTecnica.mutateAsync({
         compra: {
@@ -296,9 +307,43 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
       const url = await blobFichaTecnicaPDF(datos);
       if (win) win.location.href = url;
       else window.location.href = url;
+      // Liberamos el blob una vez que el visor alcanzó a cargarlo (evita fuga de
+      // memoria por object URLs que nunca se revocan).
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
       toast.success(r.fuente === 'ia' ? 'Ficha técnica lista (IA)' : 'Ficha técnica lista');
     } catch (e) {
       if (win) win.close();
+      toast.error('No se pudo generar la ficha técnica. Intenta de nuevo.');
+    }
+  };
+
+  // Descarga directa de la ficha técnica (misma generación por IA, pero baja el
+  // PDF en vez de abrirlo). Evita el paso "guardar y navegar al detalle".
+  const handleDescargarFicha = async () => {
+    if (!compra) return;
+    try {
+      const r = await fichaTecnica.mutateAsync({
+        compra: {
+          id: compra.id,
+          codigo: compra.codigo,
+          nombre: compra.nombre,
+          organismo: compra.organismo,
+          datos_json: compra.datos_json,
+        },
+        productos: construirProductosFicha(),
+        empresa: empresaFicha,
+        descargar: false,
+        persistir: true,
+      });
+      await descargarFichaTecnicaPDF({
+        compra: { codigo: compra.codigo, nombre: compra.nombre, organismo: compra.organismo },
+        empresa: empresaFicha,
+        fecha: new Date(),
+        fichas: r.fichas,
+      });
+      toast.success('Ficha técnica descargada');
+    } catch (e) {
+      toast.error('No se pudo descargar la ficha técnica. Intenta de nuevo.');
     }
   };
 
@@ -416,6 +461,20 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                     <span className="font-medium">{formatCurrency(compra.monto)}</span>
                   </div>
                 )}
+                {compra.fecha_cierre && (() => {
+                  const cierre = new Date(compra.fecha_cierre);
+                  const horas = (cierre.getTime() - Date.now()) / 3_600_000;
+                  const urgente = horas > 0 && horas < 48;
+                  return (
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-muted-foreground">Cierra:</span>
+                      <span className={`font-medium ${urgente ? 'text-red-600' : ''}`}>
+                        {cierre.toLocaleString('es-CL', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        {urgente ? ' · urgente' : ''}
+                      </span>
+                    </div>
+                  );
+                })()}
                 {/* Buen pagador feature removed */}
                 {recargoAplicado > 0 && compra.region && (
                   <Badge variant="outline" className="text-xs">
@@ -618,7 +677,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                         </Button>
                       )}
 
-                      <div className="grid grid-cols-3 gap-4 mt-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
                         <div>
                           <Label className="text-xs">Cantidad a ofertar</Label>
                           <Input
@@ -756,6 +815,18 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                 <FileText className="h-4 w-4 mr-2" />
               )}
               Ver ficha técnica
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={handleDescargarFicha}
+              disabled={itemsActivos.length === 0 || fichaTecnica.isPending}
+            >
+              {fichaTecnica.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              Descargar ficha
             </Button>
             <Button
               onClick={handleGuardarPropuesta}

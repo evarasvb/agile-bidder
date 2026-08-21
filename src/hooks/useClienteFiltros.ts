@@ -29,6 +29,25 @@ export interface ClienteFiltros {
 export const normalizar = (s: string): string =>
   (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 
+// Coincidencia por CONCEPTO (no por palabra exacta). Antes el filtro exigía que
+// el texto contuviera la palabra tal cual, así que "computador" no calzaba con
+// "equipos computacionales" ni "impresora" con "impresión". Ahora, además del
+// match exacto, calzamos por la RAÍZ de la palabra (prefijo) contra el inicio de
+// cualquier palabra del texto: computador→comput→computacional/computación,
+// impresora→impres→impresión, notebook→notebook, etc. Para palabras cortas
+// (<6) se mantiene exacto para no sobre-emparejar.
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+export function coincideConcepto(textoNorm: string, palabra: string): boolean {
+  const p = normalizar(palabra);
+  if (!p) return false;
+  if (textoNorm.includes(p)) return true;
+  if (p.length >= 6) {
+    const raiz = p.slice(0, Math.max(5, Math.round(p.length * 0.7)));
+    return new RegExp('\\b' + escapeRe(raiz)).test(textoNorm);
+  }
+  return false;
+}
+
 // Resuelve el cliente_id real (clientes.id) a partir del user autenticado.
 // IMPORTANTE: la tabla cliente_filtros_oportunidades.cliente_id referencia
 // clientes(id), NO auth.users(id). Antes se usaba user.id directo => nunca
@@ -166,10 +185,10 @@ export function pasaFiltrosCliente(
   // Crear texto combinado normalizado para buscar palabras
   const texto = normalizar(`${compra.nombre || ''} ${compra.descripcion || ''}`);
 
-  // Filtrar por palabras a incluir (debe contener al menos una)
+  // Filtrar por palabras a incluir (debe coincidir al menos una, por concepto)
   if (filtros.palabras_incluir && filtros.palabras_incluir.length > 0) {
     const tieneIncluida = filtros.palabras_incluir.some((palabra) =>
-      texto.includes(normalizar(palabra))
+      coincideConcepto(texto, palabra)
     );
     if (!tieneIncluida) return false;
   }
@@ -218,6 +237,7 @@ export function aplicarFiltrosCliente<
     region?: string | null;
     monto?: number | null;
     match_encontrado?: boolean;
+    items_text?: string | null;
   }
 >(oportunidades: T[], filtros?: Partial<ClienteFiltros> | null): T[] {
   if (!filtros) return oportunidades;
@@ -232,14 +252,17 @@ export function aplicarFiltrosCliente<
   }
 
   return oportunidades.filter((o) => {
-    const texto = normalizar(`${o.nombre || ''} ${o.descripcion || ''} ${o.organismo || ''}`);
+    // Incluimos el texto de los ítems: una compra cuyo título no dice "toner"
+    // pero que lo tiene en su lista de productos igual debe calzar por concepto.
+    const texto = normalizar(`${o.nombre || ''} ${o.descripcion || ''} ${o.organismo || ''} ${o.items_text || ''}`);
 
     // Excluir (duro): descarta aunque haya match.
     if (excluir.some((p) => texto.includes(p))) return false;
 
-    // Incluir: debe contener alguna, salvo que sea un match real del inventario.
+    // Incluir: debe coincidir alguna (por concepto/raíz, no palabra exacta),
+    // salvo que sea un match real del inventario.
     if (incluir.length && !o.match_encontrado) {
-      if (!incluir.some((p) => texto.includes(p))) return false;
+      if (!incluir.some((p) => coincideConcepto(texto, p))) return false;
     }
 
     // Regiones activas (conserva las sin región).

@@ -9,7 +9,7 @@ function json(b: unknown, s = 200) { return new Response(JSON.stringify(b), { st
 const FROM = 'FirmaVB <notificaciones@notifications.firmavb.cl>';
 
 function emailHtml(nombre: string, empresa: string, rol: string, url: string) {
-  const rolLabel = rol === 'admin' ? 'Administrador' : rol === 'viewer' ? 'Visor (solo lectura)' : 'Vendedor';
+  const rolLabel = rol === 'admin' ? 'Administrador' : rol === 'visor' ? 'Visor (solo lectura)' : 'Vendedor';
   return `<!doctype html><html><body style="margin:0;background:#f4f7fa;font-family:Segoe UI,Arial,sans-serif;color:#1e293b">
   <div style="max-width:520px;margin:0 auto;padding:32px 20px">
     <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden">
@@ -46,7 +46,10 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const nombre = String(body.nombre || '').trim();
     const email = String(body.email || '').trim().toLowerCase();
-    const rol = ['admin', 'vendedor', 'viewer'].includes(body.rol) ? body.rol : 'vendedor';
+    // Vocabulario único de rol, alineado al enum app_role (admin/vendedor/visor).
+    // Se acepta 'viewer' por compatibilidad y se normaliza a 'visor'.
+    const rolRaw = String(body.rol || '').trim();
+    const rol = rolRaw === 'admin' ? 'admin' : (rolRaw === 'visor' || rolRaw === 'viewer') ? 'visor' : 'vendedor';
     const telefono = body.telefono ? String(body.telefono).trim() : null;
     const appUrl = String(body.app_url || '').replace(/\/$/, '') || 'https://firmavb.cl';
     if (!nombre || !email) return json({ error: 'Falta nombre o email' }, 400);

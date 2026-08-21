@@ -72,8 +72,18 @@ export default function ExtensionConfig() {
   const [newKeyName, setNewKeyName] = useState('');
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+
+  // chrome://extensions no se puede abrir como enlace desde una web (Chrome lo
+  // bloquea), así que ofrecemos copiarlo para pegarlo en la barra de direcciones.
+  const handleCopyExtensionsUrl = () => {
+    navigator.clipboard.writeText('chrome://extensions');
+    setCopiedUrl(true);
+    toast.success('Copiado: pégalo en la barra de direcciones de Chrome');
+    setTimeout(() => setCopiedUrl(false), 2000);
+  };
 
   const handleDownloadExtension = async () => {
     setIsDownloading(true);
@@ -257,7 +267,9 @@ export default function ExtensionConfig() {
                 ¿No tienes la extensión?
               </h3>
               <p className="text-sm text-blue-700">
-                Descarga FirmaVB Postulador para automatizar tus postulaciones en MercadoPúblico.cl
+                Descarga FirmaVB Postulador para automatizar tus postulaciones en MercadoPúblico.cl.
+                Es un archivo <strong>.zip</strong>: descárgalo, <strong>descomprímelo</strong> y cárgalo en Chrome.
+                Sigue el paso a paso de más abajo 👇
               </p>
             </div>
             <Button 
@@ -434,42 +446,126 @@ export default function ExtensionConfig() {
         </Card>
       )}
 
-      {/* Instructions */}
+      {/* Instructions — guía detallada paso a paso (pensada para alguien que
+          nunca ha instalado una extensión "descomprimida" en Chrome). */}
       <Card>
         <CardHeader>
-          <CardTitle>Cómo usar la extensión</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Chrome className="h-5 w-5 text-primary" />
+            Cómo instalar y usar la extensión (paso a paso)
+          </CardTitle>
+          <CardDescription>
+            La primera vez toma ~2 minutos. Solo se instala una vez.
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <ol className="space-y-4 text-sm">
-            <li className="flex gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">1</span>
-              <div>
-                <strong>Instala la extensión</strong>
-                <p className="text-muted-foreground">Descarga y carga la extensión en Chrome</p>
-              </div>
-            </li>
-            <li className="flex gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">2</span>
-              <div>
-                <strong>Genera una API Key</strong>
-                <p className="text-muted-foreground">Crea una key desde esta página y cópiala</p>
-              </div>
-            </li>
-            <li className="flex gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">3</span>
-              <div>
-                <strong>Conecta la extensión</strong>
-                <p className="text-muted-foreground">Abre el popup de la extensión y pega tu API Key</p>
-              </div>
-            </li>
-            <li className="flex gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">4</span>
-              <div>
-                <strong>¡Listo para postular!</strong>
-                <p className="text-muted-foreground">Ve a MercadoPúblico y usa el botón "Postular con FirmaVB"</p>
-              </div>
-            </li>
-          </ol>
+        <CardContent className="space-y-6">
+          {/* Parte A: instalar en Chrome */}
+          <div>
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold">A</span>
+              Instalar en Chrome (una sola vez)
+            </h3>
+            <ol className="space-y-4 text-sm">
+              <li className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">1</span>
+                <div>
+                  <strong>Descarga la extensión</strong>
+                  <p className="text-muted-foreground">Usa el botón <em>“Descargar Extensión (.zip)”</em> de más arriba. Se guardará el archivo <code className="bg-muted px-1 rounded">firmavb-extension.zip</code>.</p>
+                </div>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">2</span>
+                <div>
+                  <strong>Descomprime el .zip</strong>
+                  <p className="text-muted-foreground">
+                    Búscalo en tu carpeta de Descargas. En Windows: clic derecho → <em>“Extraer todo”</em>. En Mac: doble clic.
+                    Quedará una <strong>carpeta</strong> llamada <code className="bg-muted px-1 rounded">firmavb-extension</code>. Recuerda dónde quedó.
+                  </p>
+                </div>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">3</span>
+                <div className="flex-1">
+                  <strong>Abre la página de extensiones de Chrome</strong>
+                  <p className="text-muted-foreground mb-2">
+                    Copia esta dirección y pégala en la barra de direcciones de Chrome (no se puede abrir como enlace):
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <code className="bg-muted px-2 py-1 rounded text-xs">chrome://extensions</code>
+                    <Button size="sm" variant="outline" className="h-7" onClick={handleCopyExtensionsUrl}>
+                      {copiedUrl ? <Check className="h-3.5 w-3.5 mr-1 text-green-600" /> : <Copy className="h-3.5 w-3.5 mr-1" />}
+                      {copiedUrl ? 'Copiado' : 'Copiar'}
+                    </Button>
+                  </div>
+                </div>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">4</span>
+                <div>
+                  <strong>Activa el “Modo de desarrollador”</strong>
+                  <p className="text-muted-foreground">Es un interruptor arriba a la derecha de esa página. Actívalo.</p>
+                </div>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">5</span>
+                <div>
+                  <strong>Haz clic en “Cargar descomprimida”</strong>
+                  <p className="text-muted-foreground">
+                    (en inglés “Load unpacked”). Se abrirá un explorador de archivos: selecciona la <strong>carpeta</strong> <code className="bg-muted px-1 rounded">firmavb-extension</code> que descomprimiste en el paso 2.
+                  </p>
+                </div>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">6</span>
+                <div>
+                  <strong>¡Ya está instalada!</strong>
+                  <p className="text-muted-foreground">
+                    Verás <em>“FirmaVB Postulador”</em> en la lista. Para tenerla a mano, haz clic en el ícono de puzzle 🧩 de Chrome y fíjala con el pin 📌.
+                  </p>
+                </div>
+              </li>
+            </ol>
+            <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <p className="text-sm text-amber-800">
+                ℹ️ Chrome mostrará un aviso de que es una extensión en “modo desarrollador”. <strong>Es normal</strong>: la extensión aún no está publicada en la Chrome Web Store. Puedes usarla con confianza.
+              </p>
+            </div>
+          </div>
+
+          {/* Parte B: conectar y postular */}
+          <div>
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold">B</span>
+              Conectar tu cuenta y postular
+            </h3>
+            <ol className="space-y-4 text-sm">
+              <li className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">7</span>
+                <div>
+                  <strong>Genera tu API Key</strong>
+                  <p className="text-muted-foreground">En esta misma página, haz clic en <em>“Nueva API Key”</em>, y cópiala (solo se muestra una vez).</p>
+                </div>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">8</span>
+                <div>
+                  <strong>Conecta la extensión</strong>
+                  <p className="text-muted-foreground">Haz clic en el ícono de FirmaVB en Chrome, pega tu API Key y guarda.</p>
+                </div>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">9</span>
+                <div>
+                  <strong>¡Listo para postular!</strong>
+                  <p className="text-muted-foreground">Entra a MercadoPúblico.cl a una compra ágil o licitación y usa el botón <em>“Postular con FirmaVB”</em>.</p>
+                </div>
+              </li>
+            </ol>
+          </div>
+
+          <div className="border-t pt-4 text-sm text-muted-foreground">
+            ¿Te quedaste pegado en algún paso? Escríbenos a <a className="text-primary font-medium" href="mailto:contacto@firmavb.cl">contacto@firmavb.cl</a> o por WhatsApp al <a className="text-primary font-medium" href="https://wa.me/56994259157" target="_blank" rel="noopener noreferrer">+56 9 9425 9157</a> y te ayudamos a instalarla.
+          </div>
         </CardContent>
       </Card>
     </div>

@@ -57,7 +57,29 @@ Deno.serve(async (req) => {
         invite_token: null, updated_at: new Date().toISOString(),
       }).eq('id', v.id);
 
-      return json({ ok: true, email: v.email });
+      // Perfil + ROL REAL. Antes la activación solo vinculaba `vendedores.user_id`
+      // pero no creaba el rol en `user_roles`, así que el miembro entraba SIN
+      // permisos y no aparecía en "Roles y permisos". Mapeamos el rol de la
+      // invitación al enum app_role y lo dejamos escrito, con el perfil, para que
+      // el miembro entre operativo y en un solo roster.
+      const roleMap: Record<string, string> = { admin: 'admin', visor: 'visor', viewer: 'visor', vendedor: 'vendedor' };
+      const appRole = roleMap[String(v.rol || '').toLowerCase()] || 'vendedor';
+      let rolError: string | null = null;
+      try {
+        await db.from('profiles').upsert(
+          { user_id: created.user.id, email: v.email, full_name: v.nombre },
+          { onConflict: 'user_id' },
+        );
+        const { error: rErr } = await db.from('user_roles').upsert(
+          { user_id: created.user.id, role: appRole },
+          { onConflict: 'user_id,role', ignoreDuplicates: true },
+        );
+        if (rErr) rolError = rErr.message;
+      } catch (e) {
+        rolError = e instanceof Error ? e.message : String(e);
+      }
+
+      return json({ ok: true, email: v.email, rol: appRole, rol_error: rolError });
     }
 
     return json({ error: 'Acción inválida' }, 400);

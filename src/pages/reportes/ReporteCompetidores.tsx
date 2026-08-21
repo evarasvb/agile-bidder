@@ -7,16 +7,19 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ReportHero } from "@/components/reportes/ReportHero";
 import { formatCurrency, formatCompact, formatNumber, exportToCSV } from "@/hooks/useReportes";
-import { useBIStats, useTopProveedores, useProveedorDetalle, type BIProveedor } from "@/hooks/useBI";
+import { useBIStats, useTopProveedores, useProveedorDetalle, rangoDePreset, type BIProveedor, type PeriodoPreset } from "@/hooks/useBI";
+import { PeriodoSelector } from "@/components/reportes/PeriodoSelector";
 
 export default function ReporteCompetidores() {
   const [search, setSearch] = useState("");
   const [sel, setSel] = useState<BIProveedor | null>(null);
+  const [preset, setPreset] = useState<PeriodoPreset>("total");
+  const periodo = rangoDePreset(preset);
 
-  const { data: stats } = useBIStats();
-  const { data, isLoading } = useTopProveedores(search, 60);
+  const { data: stats } = useBIStats(periodo);
+  const { data, isLoading } = useTopProveedores(search, 60, periodo);
   const items = data?.items ?? [];
-  const { data: detalle } = useProveedorDetalle(sel?.proveedor ?? null);
+  const { data: detalle, isLoading: detalleLoading } = useProveedorDetalle(sel?.proveedor ?? null);
 
   // Concentración: participación acumulada del top 5 (sobre el mercado total).
   const top5 = useMemo(() => (search ? null : items.slice(0, 5).reduce((s, p) => s + (p.share ?? 0), 0)), [items, search]);
@@ -39,6 +42,7 @@ export default function ReporteCompetidores() {
           { label: "Transado", value: stats ? formatCompact(stats.monto_total) : "…", icon: DollarSign },
           { label: "Líder", value: items[0]?.proveedor ? `${(items[0].share ?? 0).toFixed(1)}%` : "…", icon: Crown },
         ]}
+        right={<PeriodoSelector value={preset} onChange={setPreset} />}
       />
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -78,7 +82,7 @@ export default function ReporteCompetidores() {
                         <span className="font-mono text-sm shrink-0">{formatCompact(p.monto_total)}</span>
                       </div>
                       <div className="flex items-center gap-2 mt-2 pl-7">
-                        <Progress value={Math.min(100, (p.share ?? 0) * 3)} className="h-1.5 flex-1" />
+                        <Progress value={Math.min(100, p.share ?? 0)} className="h-1.5 flex-1" />
                         <span className="text-xs text-muted-foreground w-12 text-right">{(p.share ?? 0).toFixed(1)}%</span>
                       </div>
                     </button>
@@ -106,11 +110,17 @@ export default function ReporteCompetidores() {
                 <p className="text-sm text-muted-foreground">
                   {formatCompact(sel.monto_total)} · {(sel.share ?? 0).toFixed(1)}% del mercado · {formatNumber(sel.compradores)} clientes
                 </p>
+                {periodo && (
+                  <p className="text-xs text-muted-foreground/70 mt-1">
+                    El desglose de productos y clientes es histórico total (no filtrado por período).
+                  </p>
+                )}
               </div>
               <Card className="border-border/50 shadow-sm">
                 <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Package className="h-4 w-4" /> Sus productos fuertes</CardTitle></CardHeader>
                 <CardContent>
-                  {detalle?.productos?.length ? (
+                  {detalleLoading ? <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
+                    : detalle?.productos?.length ? (
                     <div className="space-y-1.5">
                       {detalle.productos.slice(0, 8).map((pr, i) => (
                         <div key={i} className="flex items-center justify-between gap-2 text-sm">
@@ -125,7 +135,8 @@ export default function ReporteCompetidores() {
               <Card className="border-border/50 shadow-sm">
                 <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Building2 className="h-4 w-4" /> Sus clientes</CardTitle></CardHeader>
                 <CardContent>
-                  {detalle?.compradores?.length ? (
+                  {detalleLoading ? <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
+                    : detalle?.compradores?.length ? (
                     <div className="space-y-1.5">
                       {detalle.compradores.slice(0, 8).map((c, i) => (
                         <div key={i} className="flex items-center justify-between gap-2 text-sm">

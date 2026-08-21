@@ -298,54 +298,6 @@ export default function Inventory() {
     toast.success('Inventario exportado a CSV');
   };
 
-  const handleImportExcel = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-        let importedCount = 0;
-        for (const row of jsonData as any[]) {
-          const productData: InventoryInput = {
-            sku: row['SKU'] || `SKU-${Date.now()}`,
-            nombre_producto: row['Producto'] || row['Nombre'] || 'Sin nombre',
-            descripcion: row['Descripción'] || row['Descripcion'] || '',
-            categoria: row['Categoría'] || row['Categoria'] || 'General',
-            proveedor: row['Proveedor'] || '',
-            precio_unitario: Number(row['Precio Unitario'] || row['Precio'] || 0),
-            margen_minimo: Number(row['Margen Mínimo (%)'] || row['Margen'] || 10),
-            margen_objetivo: Number(row['Margen Objetivo (%)'] || 15),
-            stock_disponible: Number(row['Stock'] || 0),
-            unidad_medida: row['Unidad'] || 'unidad',
-            tiempo_entrega_dias: Number(row['Tiempo Entrega (días)'] || row['Tiempo Entrega'] || 5),
-            keywords: row['Keywords'] ? String(row['Keywords']).split(',').map(k => k.trim()) : [],
-            activo: row['Activo'] === 'Sí' || row['Activo'] === 'Si' || row['Activo'] === true
-          };
-
-          await crearProducto.mutateAsync(productData);
-          importedCount++;
-        }
-
-        toast.success(`${importedCount} productos importados correctamente`);
-        refetch();
-      } catch (error) {
-        console.error('Error importing Excel:', error);
-        toast.error('Error al importar el archivo Excel');
-      }
-    };
-    reader.readAsArrayBuffer(file);
-    
-    // Reset input
-    event.target.value = '';
-  };
-
   const getStatusBadge = (stock: number, activo: boolean | null) => {
     if (!activo) {
       return <Badge className="bg-muted text-muted-foreground border-0">Inactivo</Badge>;
@@ -515,7 +467,7 @@ export default function Inventory() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="rounded-lg border border-border bg-card p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-primary/10">
@@ -609,7 +561,7 @@ export default function Inventory() {
       </div>
 
       {/* Table */}
-      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+      <div className="rounded-xl border border-border bg-card shadow-sm overflow-x-auto">
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -701,7 +653,22 @@ export default function Inventory() {
                   </TableCell>
                   <TableCell>
                     <div>
-                      <p className="font-medium">{item.nombre_producto}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{item.nombre_producto}</p>
+                        {esIncompleto(item) && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge className="bg-warning/10 text-warning border-0 gap-1">
+                                <Info className="h-3 w-3" />
+                                Incompleto
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="text-xs">Falta descripción o imagen para la ficha del PDF</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
                       {item.descripcion && (
                         <p className="text-xs text-muted-foreground truncate max-w-[200px]">
                           {item.descripcion}
@@ -732,7 +699,14 @@ export default function Inventory() {
                     {isLoadingComprasAgiles ? (
                       <Loader2 className="h-3 w-3 animate-spin inline text-muted-foreground" />
                     ) : (matchesByProductId[item.id]?.length ?? 0) === 0 ? (
-                      <span className="text-xs text-muted-foreground">—</span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-xs text-muted-foreground cursor-default">—</span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-xs">Sin compras ágiles activas que hagan match</p>
+                        </TooltipContent>
+                      </Tooltip>
                     ) : (
                       <button
                         type="button"
