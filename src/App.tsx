@@ -72,6 +72,8 @@ const ReporteCompetidores = lazy(() => import("./pages/reportes/ReporteCompetido
 const ReporteConvenioMarco = lazy(() => import("./pages/reportes/ReporteConvenioMarco"));
 
 const AdminEvaristo = lazy(() => import("./pages/AdminEvaristo"));
+const AdminSoporte = lazy(() => import("./pages/AdminSoporte"));
+const MisTickets = lazy(() => import("./pages/MisTickets"));
 
 // Defaults de React Query para que la app se sienta más rápida: cachea 1 min,
 // no re-consulta al volver a la pestaña y reintenta solo 1 vez. Antes cada
@@ -139,6 +141,7 @@ const App = () => (
           
           {/* Admin oculto */}
           <Route path="/admin/evaristo" element={<AdminOnlyRoute><AdminEvaristo /></AdminOnlyRoute>} />
+          <Route path="/admin/soporte" element={<AdminOnlyRoute><AdminSoporte /></AdminOnlyRoute>} />
 
           {/* ========== RUTAS PROTEGIDAS CON LAYOUT ========== */}
           <Route element={<ProtectedLayoutWrapper />}>
@@ -198,6 +201,9 @@ const App = () => (
             <Route path="/configuracion/equipo" element={<Users />} />
             <Route path="/configuracion/extension" element={<ExtensionConfig />} />
             
+            {/* ----- SOPORTE (mis consultas) ----- */}
+            <Route path="/soporte" element={<MisTickets />} />
+
             {/* ----- CUENTA ----- */}
             <Route path="/cuenta" element={<Cuenta />} />
             <Route path="/cuenta/facturacion" element={<Billing />} />
