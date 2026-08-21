@@ -25,6 +25,7 @@ import {
   GraduationCap,
   Sparkles,
   Shield,
+  LifeBuoy,
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -103,6 +104,11 @@ const navItems: NavItem[] = [
       { title: "Mi empresa", url: "/configuracion/empresa", icon: Building2 },
       { title: "Extensión Chrome", url: "/configuracion/extension", icon: Puzzle },
     ],
+  },
+  {
+    title: "Soporte",
+    url: "/soporte",
+    icon: LifeBuoy,
   },
 ];
 

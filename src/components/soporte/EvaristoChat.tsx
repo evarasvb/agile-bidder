@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Sparkles, Send, X, ImagePlus, Loader2, Bot, MessageCircle } from "lucide-react";
+import { Sparkles, Send, X, ImagePlus, Loader2, Bot, MessageCircle, LifeBuoy, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
@@ -92,6 +92,22 @@ export function EvaristoChat() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Identidad del usuario (para canalizar el caso al equipo).
+  const [identidad, setIdentidad] = useState<{ userId?: string; email?: string }>({});
+  // Estado del formulario "Dejar mi caso al equipo".
+  const [escalando, setEscalando] = useState(false);
+  const [escEmail, setEscEmail] = useState("");
+  const [escNombre, setEscNombre] = useState("");
+  const [escMensaje, setEscMensaje] = useState("");
+  const [enviandoTicket, setEnviandoTicket] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      const u = data?.user;
+      if (u) setIdentidad({ userId: u.id, email: u.email ?? undefined });
+    }).catch(() => { /* sin sesión (landing): pediremos el correo en el form) */ });
+  }, []);
+
   useEffect(() => { try { localStorage.setItem(LS_MSGS, JSON.stringify(msgs.slice(-30))); } catch { /* noop */ } }, [msgs]);
   useEffect(() => { try { localStorage.setItem(LS_OPEN, open ? "1" : "0"); } catch { /* noop */ } }, [open]);
   useEffect(() => {
@@ -143,6 +159,56 @@ export function EvaristoChat() {
   };
 
   const limpiar = () => { setMsgs([SALUDO]); setImg(null); };
+
+  // Abre el formulario para dejar el caso al equipo, prellenando lo que sabemos.
+  const abrirEscalar = () => {
+    setEscEmail((prev) => prev || identidad.email || "");
+    // Prellenamos el mensaje con la última duda escrita por el usuario.
+    const ultimaDuda = [...msgs].reverse().find((m) => m.role === "user" && m.content && !m.img);
+    setEscMensaje((prev) => prev || (ultimaDuda?.content ?? ""));
+    setEscalando(true);
+  };
+
+  const enviarTicket = async () => {
+    const email = escEmail.trim().toLowerCase();
+    const mensaje = escMensaje.trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { alert("Escribe un correo válido para poder responderte."); return; }
+    if (!mensaje) { alert("Cuéntanos brevemente tu caso."); return; }
+    setEnviandoTicket(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("soporte-ticket", {
+        body: {
+          email,
+          nombre: escNombre.trim() || undefined,
+          user_id: identidad.userId,
+          canal: identidad.userId ? "app" : "landing",
+          pantalla: nombrePagina(location.pathname),
+          mensaje,
+          conversacion: msgs
+            .filter((m) => m.content)
+            .map((m) => ({ role: m.role, content: m.content })),
+        },
+      });
+      if (error) throw error;
+      const numero = (data as any)?.numero;
+      setEscalando(false);
+      setEscMensaje("");
+      setMsgs((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            `✅ ¡Listo! Registré tu caso${numero ? ` con el número **#${numero}**` : ""}. ` +
+            `Te envié un correo de confirmación a **${email}** y el equipo te responderá ahí lo antes posible. ` +
+            `Si es urgente, escríbenos por WhatsApp: https://wa.me/56990996055`,
+        },
+      ]);
+    } catch {
+      alert("No pude enviar tu caso ahora. Reintenta en un ratito o escríbenos a contacto@firmavb.cl.");
+    } finally {
+      setEnviandoTicket(false);
+    }
+  };
 
   return (
     <>
@@ -216,7 +282,7 @@ export function EvaristoChat() {
           </div>
 
           {/* Preview imagen */}
-          {img && (
+          {!escalando && img && (
             <div className="px-3 pt-2 flex items-center gap-2">
               <div className="relative">
                 <img src={img} alt="adjunto" className="h-12 w-12 rounded-lg object-cover border" />
@@ -226,24 +292,72 @@ export function EvaristoChat() {
             </div>
           )}
 
-          {/* Input */}
-          <div className="border-t border-border p-2.5 flex items-end gap-2 bg-card">
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickImg} />
-            <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => fileRef.current?.click()} aria-label="Adjuntar captura">
-              <ImagePlus className="h-5 w-5" />
-            </Button>
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); } }}
-              placeholder="Escribe tu duda…"
-              rows={1}
-              className="flex-1 resize-none max-h-24 rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-firmavb-blue/30"
-            />
-            <Button size="icon" className="h-9 w-9 shrink-0 bg-firmavb-blue hover:bg-firmavb-blue/90" onClick={enviar} disabled={loading || (!input.trim() && !img)} aria-label="Enviar">
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
+          {escalando ? (
+            /* Canalizar el caso al equipo: deja REGISTRO (ticket) y manda correo a
+               contacto@firmavb.cl. El equipo responde al correo del cliente. */
+            <div className="border-t border-border p-3 bg-card space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold flex items-center gap-1.5"><LifeBuoy className="h-4 w-4 text-firmavb-blue" /> Dejar mi caso al equipo</p>
+                <button onClick={() => setEscalando(false)} className="text-muted-foreground hover:text-foreground" aria-label="Cancelar"><X className="h-4 w-4" /></button>
+              </div>
+              <p className="text-xs text-muted-foreground">Te responderemos por correo y queda registrado para hacerle seguimiento. Adjuntamos tu conversación con Evaristo.</p>
+              <input
+                type="email"
+                value={escEmail}
+                onChange={(e) => setEscEmail(e.target.value)}
+                placeholder="Tu correo (para responderte)"
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-firmavb-blue/30"
+              />
+              <input
+                type="text"
+                value={escNombre}
+                onChange={(e) => setEscNombre(e.target.value)}
+                placeholder="Tu nombre (opcional)"
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-firmavb-blue/30"
+              />
+              <textarea
+                value={escMensaje}
+                onChange={(e) => setEscMensaje(e.target.value)}
+                placeholder="Cuéntanos tu caso…"
+                rows={3}
+                className="w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-firmavb-blue/30"
+              />
+              <Button onClick={enviarTicket} disabled={enviandoTicket} className="w-full bg-firmavb-blue hover:bg-firmavb-blue/90">
+                {enviandoTicket
+                  ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Enviando…</>
+                  : <><CheckCircle2 className="h-4 w-4 mr-1.5" /> Enviar mi caso al equipo</>}
+              </Button>
+            </div>
+          ) : (
+            <>
+              {/* CTA sutil: canalizar al equipo cuando el chat no basta */}
+              <button
+                onClick={abrirEscalar}
+                className="w-full flex items-center justify-center gap-1.5 border-t border-border py-2 text-xs font-medium text-firmavb-blue hover:bg-firmavb-blue/5 transition-colors"
+              >
+                <LifeBuoy className="h-3.5 w-3.5" /> ¿Prefieres que te contacte el equipo?
+              </button>
+
+              {/* Input */}
+              <div className="border-t border-border p-2.5 flex items-end gap-2 bg-card">
+                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickImg} />
+                <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => fileRef.current?.click()} aria-label="Adjuntar captura">
+                  <ImagePlus className="h-5 w-5" />
+                </Button>
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); } }}
+                  placeholder="Escribe tu duda…"
+                  rows={1}
+                  className="flex-1 resize-none max-h-24 rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-firmavb-blue/30"
+                />
+                <Button size="icon" className="h-9 w-9 shrink-0 bg-firmavb-blue hover:bg-firmavb-blue/90" onClick={enviar} disabled={loading || (!input.trim() && !img)} aria-label="Enviar">
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </>

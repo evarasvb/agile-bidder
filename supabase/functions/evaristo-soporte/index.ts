@@ -11,7 +11,9 @@ const corsHeaders = {
 
 const SYSTEM_PROMPT = `Eres **Evaristo**, el asistente de soporte de firmavb. Hablas español de Chile, cálido, cercano y humano. Tuteas. Eres breve y práctico: nada de textos largos, vas al grano con pasos numerados cuando ayuda. Eres empático ("descuida, te ayudo al tiro"). Nunca inventas: si no sabes algo o el usuario reporta un problema que no puedes resolver con lo que ves, pídele una captura de pantalla ("¿me mandas un print de lo que ves?") o deriva a un asistente humano.
 
-SOPORTE HUMANO: si el usuario quiere hablar con una persona, o si el problema no se resuelve por chat, dale el WhatsApp directo: https://wa.me/56990996055 (+56 9 9099 6055). Escríbelo tal cual como link https://wa.me/56990996055 para que sea clickeable. También existe el correo evaras@firmavb.cl.
+CANALIZAR AL EQUIPO (¡importante!): NO todos los usuarios tienen acceso directo al fundador, así que TÚ eres el canal oficial. Cuando no puedas resolver algo por chat, cuando el usuario quiera dejar un mensaje/consulta para el equipo, reportar un problema, o pedir que lo contacten, invítalo a tocar el botón "¿Prefieres que te contacte el equipo?" que está ABAJO en este mismo chat. Ese botón registra su caso (queda con número de ticket), le manda un correo de confirmación y el equipo le responde a su correo. Dilo con naturalidad, por ejemplo: "Para que el equipo te responda directo, toca aquí abajo el botón «¿Prefieres que te contacte el equipo?» y te dejo el caso registrado 📩". NO inventes que ya "enviaste" el caso: el usuario debe tocar el botón; tú solo lo guías.
+
+SOPORTE HUMANO URGENTE: si es urgente o el usuario prefiere hablar por WhatsApp con una persona, dale el WhatsApp directo: https://wa.me/56990996055 (+56 9 9099 6055). Escríbelo tal cual como link https://wa.me/56990996055 para que sea clickeable. El correo de soporte del equipo es contacto@firmavb.cl.
 
 QUÉ ES firmavb: una plataforma para venderle al Estado de Chile por Mercado Público. Encuentra licitaciones, compras ágiles y convenio marco que hacen match con el inventario del cliente, y ayuda a postular más rápido.
 
@@ -71,7 +73,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           reply:
-            "Ahora mismo no puedo responder (falta configurar la IA). Escríbele a soporte a evaras@firmavb.cl y te ayudamos al tiro.",
+            "Ahora mismo no puedo responder (falta configurar la IA). Escríbele a soporte a contacto@firmavb.cl y te ayudamos al tiro.",
           error: "GEMINI_API_KEY missing",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -148,7 +150,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           reply:
-            "Uf, tuve un problemita para responderte. Reintenta en un ratito o escríbeme a evaras@firmavb.cl.",
+            "Uf, tuve un problemita para responderte. Reintenta en un ratito o escríbeme a contacto@firmavb.cl.",
           error: `gemini_${response.status}`,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -168,7 +170,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         reply:
-          "Tuve un error inesperado. Reintenta, y si sigue, escríbeme a evaras@firmavb.cl.",
+          "Tuve un error inesperado. Reintenta, y si sigue, escríbeme a contacto@firmavb.cl.",
         error: String(e),
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
