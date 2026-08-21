@@ -24,6 +24,9 @@ export interface OportunidadPanel {
   items_count: number;
   items_matched: number;
   created_at: string;
+  // Texto concatenado de los productos de la compra, para buscar por ítem
+  // (una compra "Insumos de oficina" que en su lista tiene tóner debe calzar).
+  items_text?: string;
 }
 
 export interface OportunidadDetalle extends OportunidadPanel {
@@ -112,7 +115,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         .select(`
           id, codigo, nombre, descripcion, nombre_organismo, region, monto_estimado,
           fecha_cierre, created_at, estado, match_score, match_encontrado, url_ficha,
-          compras_agiles_items(id)
+          compras_agiles_items(id, nombre_producto)
         `)
         .order('created_at', { ascending: false });
 
@@ -254,6 +257,10 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         items_count: c.compras_agiles_items?.length || 0,
         items_matched: bestMatchByCodigo[c.codigo]?.count ?? 0,
         created_at: c.created_at,
+        items_text: (c.compras_agiles_items || [])
+          .map((i: any) => i.nombre_producto)
+          .filter(Boolean)
+          .join(' '),
       }));
 
       // Map licitaciones (columnas de licitaciones_bi)
@@ -306,7 +313,8 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         all = all.filter(o =>
           o.nombre.toLowerCase().includes(search) ||
           o.codigo.toLowerCase().includes(search) ||
-          o.organismo.toLowerCase().includes(search)
+          o.organismo.toLowerCase().includes(search) ||
+          (o.items_text || '').toLowerCase().includes(search)
         );
       }
 

@@ -237,6 +237,7 @@ export function aplicarFiltrosCliente<
     region?: string | null;
     monto?: number | null;
     match_encontrado?: boolean;
+    items_text?: string | null;
   }
 >(oportunidades: T[], filtros?: Partial<ClienteFiltros> | null): T[] {
   if (!filtros) return oportunidades;
@@ -251,7 +252,9 @@ export function aplicarFiltrosCliente<
   }
 
   return oportunidades.filter((o) => {
-    const texto = normalizar(`${o.nombre || ''} ${o.descripcion || ''} ${o.organismo || ''}`);
+    // Incluimos el texto de los ítems: una compra cuyo título no dice "toner"
+    // pero que lo tiene en su lista de productos igual debe calzar por concepto.
+    const texto = normalizar(`${o.nombre || ''} ${o.descripcion || ''} ${o.organismo || ''} ${o.items_text || ''}`);
 
     // Excluir (duro): descarta aunque haya match.
     if (excluir.some((p) => texto.includes(p))) return false;
