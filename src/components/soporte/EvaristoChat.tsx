@@ -114,14 +114,26 @@ export function EvaristoChat() {
     if (open && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [msgs, open, loading]);
 
-  const onPickImg = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
+  const cargarArchivo = (f: File | null | undefined) => {
+    if (!f || !f.type.startsWith("image/")) return;
     if (f.size > 4 * 1024 * 1024) { alert("La imagen es muy grande (máx 4MB)."); return; }
     const reader = new FileReader();
     reader.onload = () => setImg(String(reader.result));
     reader.readAsDataURL(f);
+  };
+
+  const onPickImg = (e: React.ChangeEvent<HTMLInputElement>) => {
+    cargarArchivo(e.target.files?.[0]);
     e.target.value = "";
+  };
+
+  // Pegar un print (Ctrl/Cmd+V) directo en el chat.
+  const onPaste = (e: React.ClipboardEvent) => {
+    const item = Array.from(e.clipboardData?.items || []).find((it) => it.type.startsWith("image/"));
+    if (item) {
+      e.preventDefault();
+      cargarArchivo(item.getAsFile());
+    }
   };
 
   const enviar = async () => {
@@ -200,7 +212,7 @@ export function EvaristoChat() {
           content:
             `✅ ¡Listo! Registré tu caso${numero ? ` con el número **#${numero}**` : ""}. ` +
             `Te envié un correo de confirmación a **${email}** y el equipo te responderá ahí lo antes posible. ` +
-            `Si es urgente, escríbenos por WhatsApp: https://wa.me/56990996055`,
+            `Si es urgente, escríbenos por WhatsApp: https://wa.me/56994259157`,
         },
       ]);
     } catch {
@@ -243,7 +255,7 @@ export function EvaristoChat() {
             </div>
             <div className="flex items-center gap-1">
               <a
-                href="https://wa.me/56990996055"
+                href="https://wa.me/56994259157"
                 target="_blank"
                 rel="noreferrer"
                 title="Hablar con un humano por WhatsApp"
@@ -348,7 +360,8 @@ export function EvaristoChat() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); } }}
-                  placeholder="Escribe tu duda…"
+                  onPaste={onPaste}
+                  placeholder="Escribe tu duda… (puedes pegar un print)"
                   rows={1}
                   className="flex-1 resize-none max-h-24 rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-firmavb-blue/30"
                 />

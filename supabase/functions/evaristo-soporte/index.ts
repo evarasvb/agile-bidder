@@ -13,7 +13,7 @@ const SYSTEM_PROMPT = `Eres **Evaristo**, el asistente de soporte de firmavb. Ha
 
 CANALIZAR AL EQUIPO (¡importante!): NO todos los usuarios tienen acceso directo al fundador, así que TÚ eres el canal oficial. Cuando no puedas resolver algo por chat, cuando el usuario quiera dejar un mensaje/consulta para el equipo, reportar un problema, o pedir que lo contacten, invítalo a tocar el botón "¿Prefieres que te contacte el equipo?" que está ABAJO en este mismo chat. Ese botón registra su caso (queda con número de ticket), le manda un correo de confirmación y el equipo le responde a su correo. Dilo con naturalidad, por ejemplo: "Para que el equipo te responda directo, toca aquí abajo el botón «¿Prefieres que te contacte el equipo?» y te dejo el caso registrado 📩". NO inventes que ya "enviaste" el caso: el usuario debe tocar el botón; tú solo lo guías.
 
-SOPORTE HUMANO URGENTE: si es urgente o el usuario prefiere hablar por WhatsApp con una persona, dale el WhatsApp directo: https://wa.me/56990996055 (+56 9 9099 6055). Escríbelo tal cual como link https://wa.me/56990996055 para que sea clickeable. El correo de soporte del equipo es contacto@firmavb.cl.
+SOPORTE HUMANO URGENTE: si es urgente o el usuario prefiere hablar por WhatsApp con una persona, dale el WhatsApp directo: https://wa.me/56994259157 (+56 9 9425 9157). Escríbelo tal cual como link https://wa.me/56994259157 para que sea clickeable. El correo de soporte del equipo es contacto@firmavb.cl.
 
 QUÉ ES firmavb: una plataforma para venderle al Estado de Chile por Mercado Público. Encuentra licitaciones, compras ágiles y convenio marco que hacen match con el inventario del cliente, y ayuda a postular más rápido.
 
@@ -37,7 +37,7 @@ API KEY: se crea en Configuración → Extensión → "Nueva API Key". Se muestr
 
 MATCH: el % indica qué tan bien calza una oportunidad con su inventario. Si un match está mal, se puede corregir por ítem en Compras Ágiles o en el detalle de la licitación (confirmar, cambiar producto, descartar).
 
-PLANES: hay versión gratis (ve oportunidades con límites) y Pro (gestión completa). Para dudas de pago o plan, deriva al WhatsApp humano https://wa.me/56990996055.
+PLANES: hay versión gratis (ve oportunidades con límites) y Pro (gestión completa). Para dudas de pago o plan, deriva al WhatsApp humano https://wa.me/56994259157.
 
 LINKS DE ACCIÓN (¡úsalos siempre que guíes a una pantalla!): en vez de decir "anda al menú Inventario", entrégale un botón clickeable con este formato markdown exacto: [Texto del botón](/ruta). El sistema lo convierte en un botón que lo lleva directo. Rutas disponibles:
 - Inicio / Dashboard: /dashboard
@@ -56,7 +56,7 @@ CÓMO ATIENDES (esto te hace un crack, mejor que cualquier chat genérico):
 - Da el SIGUIENTE paso concreto, no teoría. Siempre termina con una acción clara (un link de acción o una pregunta corta y útil).
 - NO respondas por responder ni repitas lo obvio. Si algo se resuelve con un clic, dáselo con un link de acción.
 - Anticípate: si detectas la causa raíz (ej: sin inventario → sin match), dila y ofrece el atajo.
-- Si no puedes resolverlo o el usuario prefiere una persona, ofrécele el WhatsApp humano https://wa.me/56990996055.
+- Si no puedes resolverlo o el usuario prefiere una persona, ofrécele el WhatsApp humano https://wa.me/56994259157.
 
 REGLAS DE ESTILO: respuestas cortas (2-5 líneas o una lista corta). Un tema a la vez. Cercano y experto, nunca robótico. Si el usuario está perdido, pídele un print o pregúntale en qué pantalla está.`;
 
@@ -82,7 +82,14 @@ serve(async (req) => {
 
     const GEMINI_URL =
       "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
-    const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash";
+    // Probamos varios modelos por si la key no tiene acceso a alguno.
+    const envModel = Deno.env.get("GEMINI_MODEL");
+    const MODELOS = [
+      ...(envModel ? [envModel] : []),
+      "gemini-2.0-flash",
+      "gemini-2.5-flash",
+      "gemini-1.5-flash",
+    ].filter((m, i, a) => a.indexOf(m) === i);
 
     // Contexto de la sesión (página actual, estado del cliente) para guiar mejor.
     let contextoTxt = "";
@@ -130,37 +137,49 @@ serve(async (req) => {
       }
     }
 
-    const response = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${GEMINI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: GEMINI_MODEL,
-        messages: chatMessages,
-        temperature: 0.6,
-        max_tokens: 700,
-      }),
-    });
+    let reply = "";
+    let diag = "";
+    for (const model of MODELOS) {
+      try {
+        const response = await fetch(GEMINI_URL, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${GEMINI_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            messages: chatMessages,
+            temperature: 0.6,
+            max_tokens: 700,
+          }),
+        });
+        if (!response.ok) {
+          const errTxt = await response.text();
+          diag = `${model}: ${response.status} ${errTxt.slice(0, 160)}`;
+          console.error("Gemini error:", diag);
+          continue; // probar el siguiente modelo
+        }
+        const data = await response.json();
+        const c = data?.choices?.[0]?.message?.content;
+        if (c && String(c).trim()) { reply = String(c); break; }
+        diag = `${model}: respuesta vacía`;
+      } catch (err) {
+        diag = `${model}: ${String(err).slice(0, 120)}`;
+        console.error("Gemini fetch error:", diag);
+      }
+    }
 
-    if (!response.ok) {
-      const errTxt = await response.text();
-      console.error("Gemini error:", response.status, errTxt);
+    if (!reply) {
       return new Response(
         JSON.stringify({
           reply:
-            "Uf, tuve un problemita para responderte. Reintenta en un ratito o escríbeme a contacto@firmavb.cl.",
-          error: `gemini_${response.status}`,
+            "Uf, tuve un problemita para responderte 🙈. Reintenta en un ratito, o escríbeme por WhatsApp +56 9 9425 9157 / contacto@firmavb.cl.",
+          error: diag || "sin_respuesta",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-
-    const data = await response.json();
-    const reply =
-      data?.choices?.[0]?.message?.content ??
-      "No te entendí bien 😅 ¿me lo explicas de otra forma o me mandas un print?";
 
     return new Response(JSON.stringify({ reply }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
