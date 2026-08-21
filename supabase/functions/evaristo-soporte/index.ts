@@ -86,12 +86,20 @@ serve(async (req) => {
     let contextoTxt = "";
     if (contexto) {
       const partes: string[] = [];
+      if (contexto.canal) partes.push(`Canal: ${contexto.canal}`);
       if (contexto.page) partes.push(`Pantalla actual: ${contexto.page}`);
       if (typeof contexto.tieneInventario === "boolean")
         partes.push(`Tiene inventario cargado: ${contexto.tieneInventario ? "sí" : "no"}`);
       if (typeof contexto.extensionConectada === "boolean")
         partes.push(`Extensión conectada: ${contexto.extensionConectada ? "sí" : "no"}`);
-      if (partes.length) contextoTxt = `\n\n[Contexto en vivo del usuario: ${partes.join("; ")}]`;
+      if (contexto.whatsapp) partes.push(`WhatsApp de contacto a usar: ${contexto.whatsapp}`);
+      if (contexto.email) partes.push(`Email de contacto a usar: ${contexto.email}`);
+      if (partes.length) contextoTxt = `\n\n[Contexto en vivo: ${partes.join("; ")}]`;
+    }
+    // En el landing público el visitante NO tiene sesión: nada de links de acción internos.
+    if (contexto?.canal === "landing") {
+      contextoTxt +=
+        `\n\n[MODO LANDING PÚBLICO: el visitante todavía NO tiene cuenta ni sesión. NO uses links de acción a rutas internas (/inventario, etc.) porque no puede entrar. En su lugar: explica con gancho comercial qué gana con firmavb (más adjudicaciones, flujo de caja, IA que encuentra licitaciones que calzan con lo que vende), responde su duda concreta, e invítalo a crear su cuenta o a tocar "Configurar mi empresa" / "Ver demostración". Si pide hablar con alguien o cotización, dale el WhatsApp y email del contexto. Sé breve, cercano y vendedor, nunca genérico ni "contáctanos y ya".]`;
     }
 
     // Historial (recortado) + system.

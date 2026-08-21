@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Bot, X, Send, MessageSquare, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   id: string;
@@ -115,21 +116,33 @@ export function LandingChat({ open, onClose }: LandingChatProps) {
       timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    const historial = [...messages, userMessage];
+    setMessages(historial);
     setInputValue("");
     setIsTyping(true);
 
-    // Simular delay de respuesta
-    setTimeout(() => {
-      const botResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        text: findBestResponse(userMessage.text),
-        isBot: true,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, botResponse]);
+    try {
+      const { data, error } = await supabase.functions.invoke("evaristo-soporte", {
+        body: {
+          messages: historial
+            .filter((m) => m.id !== "1" && m.id !== "2") // saltar el saludo inicial
+            .map((m) => ({ role: m.isBot ? "assistant" : "user", content: m.text })),
+          contexto: {
+            canal: "landing",
+            whatsapp: "+56 9 9425 9157",
+            email: "contacto@firmavb.cl",
+          },
+        },
+      });
+      if (error) throw error;
+      const reply = (data as any)?.reply || findBestResponse(userMessage.text);
+      setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), text: reply, isBot: true, timestamp: new Date() }]);
+    } catch {
+      // Fallback a la respuesta local si la IA no está disponible.
+      setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), text: findBestResponse(userMessage.text), isBot: true, timestamp: new Date() }]);
+    } finally {
       setIsTyping(false);
-    }, 800);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
