@@ -37,6 +37,7 @@ import {
   type PanelFilters,
 } from "@/hooks/useOportunidadesPanel";
 import { useRegistrarSenal } from "@/hooks/useSenales";
+import { useClienteFiltros } from "@/hooks/useClienteFiltros";
 import { format, differenceInDays, differenceInHours } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -214,6 +215,19 @@ export default function Oportunidades() {
     filters.incluirCerradas
   );
   const clearFilters = () => setFilters({ sortBy: "match_score", sortAsc: false });
+
+  // Filtros de RUBRO del cliente (palabras/regiones/monto, de Configuración →
+  // Filtros con IA). Se aplican en el servidor dentro del panel, así que NO se
+  // reflejan en `hasActiveFilters`; sin esto el empty-state culpaba al inventario
+  // cuando en realidad eran estas palabras las que ocultaban todo.
+  const { filtros: clienteFiltros } = useClienteFiltros();
+  const tieneFiltrosRubro = Boolean(
+    (clienteFiltros?.palabras_incluir?.length || 0) > 0 ||
+    (clienteFiltros?.regiones_activas?.length || 0) > 0 ||
+    clienteFiltros?.monto_min ||
+    clienteFiltros?.monto_max
+  );
+  const soloComprasAgiles = filters.tipo === "compra_agil";
 
   const handleDescartar = (op: OportunidadPanel) => {
     // Gestionar (descartar) es Pro; en free abre el modal de upgrade.
@@ -439,19 +453,43 @@ export default function Oportunidades() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Package className="h-12 w-12 text-muted-foreground/50 mb-4" />
-            {hasActiveFilters ? (
-              // Hay filtros aplicados que dejaron la lista vacía.
+            {stats.totalActivas > 0 || hasActiveFilters || tieneFiltrosRubro ? (
+              // Hay oportunidades activas en el mercado (o filtros aplicados),
+              // pero la vista actual quedó vacía. NO es que no haya nada: son los
+              // filtros (de vista o de rubro) los que están ocultando todo.
               <>
-                <h3 className="text-lg font-medium">Sin resultados</h3>
+                <h3 className="text-lg font-medium">Ninguna coincide con tus filtros ahora</h3>
                 <p className="text-sm text-muted-foreground max-w-md">
-                  Ninguna oportunidad coincide con los filtros seleccionados.
+                  {stats.totalActivas > 0 && (
+                    <>Hay <strong>{stats.totalActivas}</strong> oportunidades activas en el mercado, pero ninguna pasa tus filtros{soloComprasAgiles ? " de Compras Ágiles" : ""} en este momento.{" "}</>
+                  )}
+                  {soloComprasAgiles && (
+                    <>Las compras ágiles abren y cierran rápido, y suele haber muy pocas de un rubro específico a la vez. </>
+                  )}
+                  {tieneFiltrosRubro && (
+                    <>Tus palabras clave o regiones pueden estar acotando de más. </>
+                  )}
                 </p>
-                <Button variant="outline" className="mt-5" onClick={clearFilters}>
-                  Limpiar filtros
-                </Button>
+                <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                  {filters.tipo && filters.tipo !== "all" && (
+                    <Button onClick={() => setFilters((prev) => ({ ...prev, tipo: "all" }))}>
+                      Ver todas (incluye licitaciones)
+                    </Button>
+                  )}
+                  {tieneFiltrosRubro && (
+                    <Button variant="outline" onClick={() => navigate("/configuracion")}>
+                      Ajustar mis palabras clave
+                    </Button>
+                  )}
+                  {hasActiveFilters && (
+                    <Button variant="ghost" onClick={clearFilters}>
+                      Limpiar filtros de vista
+                    </Button>
+                  )}
+                </div>
               </>
             ) : (
-              // Sin filtros y sin oportunidades: guiar a cargar inventario.
+              // Sin filtros de ningún tipo y sin oportunidades: guiar a inventario.
               <>
                 <h3 className="text-lg font-medium">No hay oportunidades activas</h3>
                 <p className="text-sm text-muted-foreground max-w-md">
