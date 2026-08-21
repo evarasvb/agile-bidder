@@ -90,12 +90,24 @@ export function useActualizarEstadoTicket() {
         .update({ estado, updated_at: new Date().toISOString() })
         .eq('id', id);
       if (error) throw error;
+      // Al resolver, avisamos al cliente por correo (no bloquea el cambio si falla).
+      if (estado === 'resuelto') {
+        try {
+          await supabaseClient.functions.invoke('notificar-ticket-resuelto', {
+            body: { ticket_id: id },
+          });
+        } catch (e) {
+          console.error('No se pudo avisar al cliente del ticket resuelto:', e);
+        }
+      }
       return { id, estado };
     },
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['tickets-admin'] });
       queryClient.invalidateQueries({ queryKey: ['mis-tickets'] });
-      toast.success('Estado actualizado');
+      toast.success(
+        res.estado === 'resuelto' ? 'Resuelto — le avisamos al cliente por correo' : 'Estado actualizado'
+      );
     },
     onError: () => toast.error('No se pudo actualizar el estado'),
   });
