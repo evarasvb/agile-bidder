@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 export interface ExtensionApiKey {
   id: string;
   cliente_id: string;
-  api_key: string;
+  api_key: string | null; // legado: no se guarda la key real (vive hasheada en api_key_hash)
   nombre: string;
   activa: boolean;
   last_used: string | null;
@@ -66,8 +66,10 @@ export function useCreateApiKey() {
       const { data, error } = await supabase
         .from('extension_api_keys')
         .insert({
+          // La key real NO se guarda: se guarda su hash (api_key_hash) y el prefijo
+          // (api_key_prefix) para mostrarla/buscarla. api_key queda null.
           cliente_id: clienteId,
-          api_key: '[HASHED]', // We don't store the actual key
+          api_key: null,
           api_key_hash: apiKeyHash,
           api_key_prefix: apiKeyPrefix,
           nombre: nombre || 'API Key',
