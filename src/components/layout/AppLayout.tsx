@@ -2,6 +2,7 @@ import { ReactNode, useState } from "react";
 import { Menu } from "lucide-react";
 import { AppSidebar } from "./AppSidebar";
 import { StatusBar } from "./StatusBar";
+import { EvaristoChat } from "@/components/soporte/EvaristoChat";
 import logoFirmavbBlanco from "@/assets/logo-firmavb-blanco.png";
 
 interface AppLayoutProps {
@@ -36,6 +37,9 @@ export function AppLayout({ children }: AppLayoutProps) {
         <StatusBar />
         <main className="p-4 sm:p-6">{children}</main>
       </div>
+
+      {/* Asistente de soporte con IA, disponible en toda la app */}
+      <EvaristoChat />
     </div>
   );
 }

@@ -1,0 +1,148 @@
+// Evaristo — asistente de soporte de firmavb (chat con IA).
+// Responde cálido y guía paso a paso; puede leer una captura (print) del usuario.
+// Usa Gemini vía su endpoint compatible con OpenAI (mismo patrón que el resto).
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
+const SYSTEM_PROMPT = `Eres **Evaristo**, el asistente de soporte de firmavb. Hablas español de Chile, cálido, cercano y humano. Tuteas. Eres breve y práctico: nada de textos largos, vas al grano con pasos numerados cuando ayuda. Eres empático ("descuida, te ayudo al tiro"). Nunca inventas: si no sabes algo o el usuario reporta un problema que no puedes resolver con lo que ves, pídele una captura de pantalla ("¿me mandas un print de lo que ves?") o deriva a soporte humano (WhatsApp de firmavb o el correo evaras@firmavb.cl).
+
+QUÉ ES firmavb: una plataforma para venderle al Estado de Chile por Mercado Público. Encuentra licitaciones, compras ágiles y convenio marco que hacen match con el inventario del cliente, y ayuda a postular más rápido.
+
+PRIMEROS PASOS (rutina básica; guíalos en este orden):
+1. Cargar el inventario (Menú → Inventario). Es lo que alimenta el match; sin inventario no aparecen oportunidades.
+2. Revisar oportunidades (Menú → Mis Oportunidades): las licitaciones y compras ágiles con su % de match.
+3. Generar la primera oferta (desde Compras Ágiles o el detalle de una licitación).
+4. (Opcional) Conectar la extensión de Chrome para postular más rápido y activar el Auto-Bid.
+
+EXTENSIÓN DE CHROME (paso a paso, es una extensión que se instala manualmente, NO está en la Chrome Web Store):
+1. Entra a Configuración → Extensión (o "Extensión Chrome").
+2. Presiona "Descargar Extensión (.zip)" y guarda el archivo.
+3. Descomprime el .zip en una carpeta.
+4. Abre Chrome y ve a chrome://extensions
+5. Activa arriba a la derecha el "Modo de desarrollador".
+6. Presiona "Cargar descomprimida" (Load unpacked) y elige la carpeta que descomprimiste.
+7. Vuelve a firmavb, en Configuración → Extensión crea una "API Key", cópiala y pégala en la extensión.
+8. Inicia sesión en Mercado Público en el mismo navegador. Listo: el estado en el "Centro de Control" pasará a "Conectada".
+
+API KEY: se crea en Configuración → Extensión → "Nueva API Key". Se muestra UNA sola vez: hay que copiarla al tiro. Si dio error antes, pídele que recargue la página e intente de nuevo.
+
+MATCH: el % indica qué tan bien calza una oportunidad con su inventario. Si un match está mal, se puede corregir por ítem en Compras Ágiles o en el detalle de la licitación (confirmar, cambiar producto, descartar).
+
+PLANES: hay versión gratis (ve oportunidades con límites) y Pro (gestión completa). Para dudas de pago o plan, deriva a soporte humano.
+
+REGLAS: respuestas cortas (2-6 líneas o una lista corta). Un solo tema a la vez. Si el usuario está perdido, pregúntale en qué pantalla está o pídele un print. Cierra ofreciendo seguir ayudando.`;
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    const { messages = [], contexto, imagen } = await req.json();
+
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) {
+      return new Response(
+        JSON.stringify({
+          reply:
+            "Ahora mismo no puedo responder (falta configurar la IA). Escríbele a soporte a evaras@firmavb.cl y te ayudamos al tiro.",
+          error: "GEMINI_API_KEY missing",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const GEMINI_URL =
+      "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+    const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash";
+
+    // Contexto de la sesión (página actual, estado del cliente) para guiar mejor.
+    let contextoTxt = "";
+    if (contexto) {
+      const partes: string[] = [];
+      if (contexto.page) partes.push(`Pantalla actual: ${contexto.page}`);
+      if (typeof contexto.tieneInventario === "boolean")
+        partes.push(`Tiene inventario cargado: ${contexto.tieneInventario ? "sí" : "no"}`);
+      if (typeof contexto.extensionConectada === "boolean")
+        partes.push(`Extensión conectada: ${contexto.extensionConectada ? "sí" : "no"}`);
+      if (partes.length) contextoTxt = `\n\n[Contexto en vivo del usuario: ${partes.join("; ")}]`;
+    }
+
+    // Historial (recortado) + system.
+    const historial = (messages as Array<{ role: string; content: string }>)
+      .filter((m) => m && (m.role === "user" || m.role === "assistant") && m.content)
+      .slice(-12);
+
+    const chatMessages: any[] = [
+      { role: "system", content: SYSTEM_PROMPT + contextoTxt },
+      ...historial.map((m) => ({ role: m.role, content: m.content })),
+    ];
+
+    // Si viene una imagen (print), la adjuntamos al último mensaje del usuario.
+    if (imagen && typeof imagen === "string" && imagen.startsWith("data:")) {
+      const last = chatMessages[chatMessages.length - 1];
+      const userText =
+        last && last.role === "user" ? String(last.content || "") : "Te mando una captura de lo que veo.";
+      const contentArr = [
+        { type: "text", text: userText || "Te mando una captura de lo que veo." },
+        { type: "image_url", image_url: { url: imagen } },
+      ];
+      if (last && last.role === "user") {
+        last.content = contentArr;
+      } else {
+        chatMessages.push({ role: "user", content: contentArr });
+      }
+    }
+
+    const response = await fetch(GEMINI_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${GEMINI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: GEMINI_MODEL,
+        messages: chatMessages,
+        temperature: 0.6,
+        max_tokens: 700,
+      }),
+    });
+
+    if (!response.ok) {
+      const errTxt = await response.text();
+      console.error("Gemini error:", response.status, errTxt);
+      return new Response(
+        JSON.stringify({
+          reply:
+            "Uf, tuve un problemita para responderte. Reintenta en un ratito o escríbeme a evaras@firmavb.cl.",
+          error: `gemini_${response.status}`,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const data = await response.json();
+    const reply =
+      data?.choices?.[0]?.message?.content ??
+      "No te entendí bien 😅 ¿me lo explicas de otra forma o me mandas un print?";
+
+    return new Response(JSON.stringify({ reply }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    console.error("evaristo-soporte error:", e);
+    return new Response(
+      JSON.stringify({
+        reply:
+          "Tuve un error inesperado. Reintenta, y si sigue, escríbeme a evaras@firmavb.cl.",
+        error: String(e),
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+});
