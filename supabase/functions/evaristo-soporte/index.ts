@@ -84,11 +84,14 @@ serve(async (req) => {
       "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
     // Probamos varios modelos por si la key no tiene acceso a alguno.
     const envModel = Deno.env.get("GEMINI_MODEL");
+    // Mismos modelos vigentes que usan las funciones que sí funcionan
+    // (enriquecer-inventario, ficha-tecnica-ia). gemini-flash-latest es la clave:
+    // 1.5/2.0/2.5 pueden estar retirados según la key.
     const MODELOS = [
       ...(envModel ? [envModel] : []),
+      "gemini-flash-latest",
       "gemini-2.0-flash",
       "gemini-2.5-flash",
-      "gemini-1.5-flash",
     ].filter((m, i, a) => a.indexOf(m) === i);
 
     // Contexto de la sesión (página actual, estado del cliente) para guiar mejor.
