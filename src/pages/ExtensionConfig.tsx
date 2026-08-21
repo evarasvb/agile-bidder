@@ -123,8 +123,8 @@ export default function ExtensionConfig() {
     return formatDistanceToNow(new Date(dateStr), { addSuffix: true, locale: es });
   };
 
-  const maskKey = (key: string) => {
-    return key.substring(0, 12) + '••••••••••••••••••••';
+  const maskKey = (key: string | null | undefined) => {
+    return (key ? key.substring(0, 12) : 'fvb_ext_') + '••••••••••••••••••••';
   };
 
   if (!clienteId) {
@@ -323,7 +323,7 @@ export default function ExtensionConfig() {
                     <TableCell className="font-medium">{key.nombre}</TableCell>
                     <TableCell>
                       <code className="text-xs bg-muted px-2 py-1 rounded">
-                        {maskKey(key.api_key)}
+                        {maskKey((key as any).api_key_prefix ?? key.api_key)}
                       </code>
                     </TableCell>
                     <TableCell>
