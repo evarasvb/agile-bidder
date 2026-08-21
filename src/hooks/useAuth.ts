@@ -71,11 +71,23 @@ export function useAuth(): AuthState & AuthActions {
   }, []);
 
   const resetPassword = useCallback(async (email: string) => {
-    const redirectUrl = `${window.location.origin}/auth?reset=true`;
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: redirectUrl,
-    });
-    return { error };
+    // Enviamos el correo de recuperación vía Resend (edge function) para entrega
+    // confiable, en vez del mailer interno de Supabase (que necesita SMTP). El
+    // enlace aterriza en /auth?reset=true, donde el usuario fija su contraseña.
+    try {
+      const { error } = await supabase.functions.invoke('reset-password', {
+        body: { email, app_url: window.location.origin },
+      });
+      if (error) throw error;
+      return { error: null };
+    } catch (err) {
+      // Respaldo: si la función falla, usamos el flujo nativo de Supabase.
+      const redirectUrl = `${window.location.origin}/auth?reset=true`;
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectUrl,
+      });
+      return { error };
+    }
   }, []);
 
   return {
