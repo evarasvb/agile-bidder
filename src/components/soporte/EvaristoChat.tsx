@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
-import { Sparkles, Send, X, ImagePlus, Loader2, Bot } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Sparkles, Send, X, ImagePlus, Loader2, Bot, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,17 +18,42 @@ const SALUDO: Msg = {
     "¡Hola! 👋 Soy Evaristo, tu asistente de firmavb. Cuéntame en qué estás y te ayudo al tiro. Por ejemplo: “¿cómo bajo la extensión?” o “no me aparecen oportunidades”. Si algo te da error, mándame un print. 📸",
 };
 
-// Renderiza **negritas** sin usar HTML crudo.
-function Rico({ text }: { text: string }) {
+// Divide una línea en: links de acción markdown [txt](/ruta) o [txt](http…),
+// **negritas** y URLs sueltas. Todo sin HTML crudo.
+const TOKEN = /(\[[^\]]+\]\((?:https?:\/\/[^\s)]+|\/[^\s)]+)\)|\*\*[^*]+\*\*|https?:\/\/[^\s)]+)/g;
+const MD_LINK = /^\[([^\]]+)\]\(([^)]+)\)$/;
+
+// Renderiza el texto de Evaristo con negritas y links (internos = botón que
+// navega dentro de la app; externos = nueva pestaña).
+function Rico({ text, onInternal }: { text: string; onInternal: (path: string) => void }) {
   return (
     <>
       {text.split("\n").map((linea, i) => (
         <span key={i} className="block">
-          {linea.split(/(\*\*[^*]+\*\*)/g).map((frag, j) =>
-            frag.startsWith("**") && frag.endsWith("**")
-              ? <strong key={j}>{frag.slice(2, -2)}</strong>
-              : <span key={j}>{frag}</span>
-          )}
+          {linea.split(TOKEN).map((frag, j) => {
+            const md = frag.match(MD_LINK);
+            if (md) {
+              const [, txt, href] = md;
+              if (href.startsWith("/")) {
+                return (
+                  <button
+                    key={j}
+                    type="button"
+                    onClick={() => onInternal(href)}
+                    className="inline-flex items-center gap-1 my-0.5 rounded-full bg-firmavb-blue/10 text-firmavb-blue hover:bg-firmavb-blue/20 font-medium px-2.5 py-1 text-[13px] transition-colors"
+                  >
+                    {txt} →
+                  </button>
+                );
+              }
+              return <a key={j} href={href} target="_blank" rel="noreferrer" className="underline text-firmavb-blue break-all">{txt}</a>;
+            }
+            if (frag.startsWith("**") && frag.endsWith("**")) return <strong key={j}>{frag.slice(2, -2)}</strong>;
+            if (/^https?:\/\//.test(frag)) return (
+              <a key={j} href={frag} target="_blank" rel="noreferrer" className="underline text-firmavb-blue break-all">{frag}</a>
+            );
+            return <span key={j}>{frag}</span>;
+          })}
         </span>
       ))}
     </>
@@ -48,6 +73,7 @@ const nombrePagina = (path: string): string => {
 
 export function EvaristoChat() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { data: invStats } = useInventoryStats();
   const { isConnected } = useExtensionStatus();
 
@@ -150,6 +176,15 @@ export function EvaristoChat() {
               </div>
             </div>
             <div className="flex items-center gap-1">
+              <a
+                href="https://wa.me/56990996055"
+                target="_blank"
+                rel="noreferrer"
+                title="Hablar con un humano por WhatsApp"
+                className="flex items-center gap-1 rounded-full bg-white/15 hover:bg-white/25 text-white text-xs font-medium px-2.5 h-7 transition-colors"
+              >
+                <MessageCircle className="h-3.5 w-3.5" /> Humano
+              </a>
               <Button variant="ghost" size="sm" onClick={limpiar} className="text-white/80 hover:text-white hover:bg-white/10 h-7 px-2 text-xs">Reiniciar</Button>
               <Button variant="ghost" size="icon" onClick={() => setOpen(false)} className="text-white hover:bg-white/10 h-7 w-7"><X className="h-4 w-4" /></Button>
             </div>
@@ -166,7 +201,7 @@ export function EvaristoChat() {
                   m.role === "user" ? "bg-firmavb-blue text-white rounded-br-sm" : "bg-card border border-border/60 rounded-bl-sm"
                 }`}>
                   {m.img && <img src={m.img} alt="captura" className="rounded-lg mb-1.5 max-h-40 w-auto" />}
-                  <Rico text={m.content} />
+                  <Rico text={m.content} onInternal={(path) => { navigate(path); if (window.innerWidth < 640) setOpen(false); }} />
                 </div>
               </div>
             ))}
