@@ -78,5 +78,15 @@ Deno.serve(async (req)=>{
     pagina++;
     await sleep(300);
   }
+
+  // Encadenar el MATCH: apenas terminamos de traer compras, generamos los
+  // matches contra el inventario de los clientes, para que las oportunidades
+  // lleguen "matcheadas" al panel sin esperar al cron horario. Envuelto en
+  // try/catch para que un fallo del match NO rompa la ingesta.
+  try{
+    const { data: m, error: mErr } = await supabase.rpc('generar_matches_ca_todos');
+    res.matches = mErr ? `error: ${mErr.message}` : m;
+  }catch(e){ res.matches = `error: ${e instanceof Error? e.message:String(e)}`; }
+
   return new Response(JSON.stringify(res),{headers:{...cors,'Content-Type':'application/json'},status:200});
 });
