@@ -30,3 +30,9 @@ dist-ssr
 
 # TypeScript incremental build info (generado)
 *.tsbuildinfo
+
+# Playwright E2E
+e2e/.auth/
+playwright-report/
+test-results/
+blob-report/
