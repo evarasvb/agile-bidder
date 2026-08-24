@@ -179,7 +179,11 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
       console.log(`[useComprasAgiles] Loaded ${compras.length} compras ágiles`);
       return compras;
     },
-    refetchInterval: 30000,
+    // Antes refrescaba TODO (hasta 500 filas con sus ítems) cada 30s: la página
+    // se sentía lenta y "pensando". La ingesta corre cada horas; 3 min sobra.
+    staleTime: 120_000,
+    refetchInterval: 180_000,
+    placeholderData: (prev: any) => prev,
   });
 }
 

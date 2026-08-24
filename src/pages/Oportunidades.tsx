@@ -95,9 +95,18 @@ function OpportunityCard({
         {/* Top row: Score + Type + Deadline */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Badge className={getScoreColor(op.match_score)}>
-              {op.match_score ? `${op.match_score}%` : "N/A"}
-            </Badge>
+            {/* La tarjeta dice POR QUÉ está aquí: % si calza con tu inventario,
+                "Tu rubro" si coincide con tus palabras clave del onboarding.
+                (Antes decía "N/A": parecía que el match no funcionaba.) */}
+            {op.match_score ? (
+              <Badge className={getScoreColor(op.match_score)}>
+                {op.match_score}% match
+              </Badge>
+            ) : op.rubro_match ? (
+              <Badge variant="outline" className="border-firmavb-blue/40 text-firmavb-blue bg-firmavb-blue/5">
+                Tu rubro ✓
+              </Badge>
+            ) : null}
             <Badge variant="outline" className="text-xs">
               {op.tipo === "compra_agil" ? "Compra Ágil" : "Licitación"}
             </Badge>

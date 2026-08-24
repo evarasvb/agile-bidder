@@ -27,6 +27,10 @@ export interface OportunidadPanel {
   // Texto concatenado de los productos de la compra, para buscar por ítem
   // (una compra "Insumos de oficina" que en su lista tiene tóner debe calzar).
   items_text?: string;
+  // true cuando la oportunidad coincide con las PALABRAS CLAVE que el cliente
+  // definió en su onboarding (aunque aún no tenga inventario para el % de match).
+  // Permite que la tarjeta diga "Tu rubro" en vez de un "N/A" mudo.
+  rubro_match?: boolean;
 }
 
 export interface OportunidadDetalle extends OportunidadPanel {
@@ -172,13 +176,30 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       // descarta baja). Resuelve el cliente por auth.uid() dentro de la función.
       const afinidadQuery = (supabase as any).rpc('cliente_afinidad');
 
-      // Consultas independientes en PARALELO (antes eran en serie: 3 idas y vueltas
-      // secuenciales). compras, licitaciones y filtros no dependen entre sí.
-      const [comprasRes, licitacionesRes, filtrosRes, afinidadRes] = await Promise.all([
+      // Conteo real de activas (head:true = sin traer filas). Se pide junto al
+      // resto: no depende de nada.
+      const licCountQuery = (supabase as any)
+        .from('licitaciones_bi')
+        .select('codigo', { count: 'exact', head: true })
+        .or('estado.is.null,estado.ilike.publicada,estado.ilike.activa')
+        .gt('fecha_cierre', nowIso);
+      const caCountQuery = supabase
+        .from('compras_agiles')
+        .select('codigo', { count: 'exact', head: true })
+        .or('estado.ilike.publicada,estado.ilike.activa')
+        .gt('fecha_cierre', nowIso);
+
+      // TODO EN PARALELO (antes eran 5 etapas secuenciales de red y el panel se
+      // sentía lento): compras, licitaciones, filtros, afinidad, empresa dueña y
+      // los conteos no dependen entre sí.
+      const [comprasRes, licitacionesRes, filtrosRes, afinidadRes, ownerRes, licCountRes, caCountRes] = await Promise.all([
         comprasQuery,
         licitacionesQuery,
         filtrosQuery,
         afinidadQuery,
+        (supabase as any).rpc('cliente_owner_id').then((r: any) => r).catch(() => ({ data: null })),
+        incluirCerradas ? Promise.resolve(null) : licCountQuery,
+        incluirCerradas ? Promise.resolve(null) : caCountQuery,
       ]);
 
       const { data: comprasRaw, error: caError } = comprasRes as any;
@@ -209,60 +230,51 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       // eso "el match no aparecía".
       //
       // IMPORTANTE: ca_matches tiene un match por CLIENTE (score según SU
-      // inventario) y su RLS deja leer todas las filas. Si no filtramos por el
-      // cliente logueado, un cliente vería el % de match calculado con el
-      // inventario de OTRO. Resolvemos la empresa DUEÑA con cliente_owner_id()
-      // (si el usuario es miembro de equipo, devuelve la empresa que lo invitó,
-      // no la fila vacía que useCliente() le auto-crea) y filtramos por ella.
-      let clienteIdPanel: string | null = null;
-      try {
-        const { data: ownerId } = await (supabase as any).rpc('cliente_owner_id');
-        clienteIdPanel = (ownerId as string) ?? null;
-      } catch { /* sin sesión / sin empresa: dejamos clienteIdPanel en null */ }
+      // inventario) y su RLS deja leer todas las filas. Filtramos por la empresa
+      // DUEÑA (cliente_owner_id: si el usuario es miembro de equipo, la que lo
+      // invitó). El RPC ya vino en el lote paralelo de arriba.
+      const clienteIdPanel: string | null = ((ownerRes as any)?.data as string) ?? null;
 
-      const codigosCompras = (comprasRaw || [])
-        .map((c: any) => c.codigo)
-        .filter(Boolean)
-        .slice(0, 300);
+      // Matches del cliente en UNA etapa paralela, filtrados por cliente + compra
+      // abierta (pocas filas). Antes se pedían en serie con un `.in(...)` de 300
+      // códigos: URLs enormes y dos idas y vueltas extra que hacían lento el panel.
       const bestMatchByCodigo: Record<string, { score: number; producto: string | null; count: number }> = {};
-      if (codigosCompras.length > 0) {
-        // ca_matches no está en los tipos generados de Supabase; usamos any.
-        let matchQuery = (supabase as any)
-          .from('ca_matches')
-          .select('compra_agil_codigo, score, nombre_producto, cliente_id')
-          .in('compra_agil_codigo', codigosCompras);
-        if (clienteIdPanel) matchQuery = matchQuery.eq('cliente_id', clienteIdPanel);
-        const { data: matchesRaw, error: matchErr } = await matchQuery;
-        if (matchErr) {
-          console.error('[OportunidadesPanel] Error fetching ca_matches:', matchErr);
+      const itemMatchCountByCodigo: Record<string, number> = {};
+      if (clienteIdPanel) {
+        const [matchesRes, itemMatchesRes] = await Promise.all([
+          (supabase as any)
+            .from('ca_matches')
+            .select('compra_agil_codigo, score, nombre_producto')
+            .eq('cliente_id', clienteIdPanel)
+            .gte('fecha_cierre', nowIso),
+          (supabase as any)
+            .from('ca_item_matches')
+            .select('compra_agil_codigo')
+            .eq('cliente_id', clienteIdPanel)
+            .gte('fecha_cierre', nowIso),
+        ]);
+        if ((matchesRes as any)?.error) {
+          console.error('[OportunidadesPanel] Error fetching ca_matches:', (matchesRes as any).error);
         }
-        for (const m of (matchesRaw || []) as any[]) {
-          const k = (m as any).compra_agil_codigo as string;
-          const score = Math.round(Number((m as any).score) || 0);
+        if ((itemMatchesRes as any)?.error) {
+          console.error('[OportunidadesPanel] Error fetching ca_item_matches:', (itemMatchesRes as any).error);
+        }
+        for (const m of (((matchesRes as any)?.data) || []) as any[]) {
+          const k = m.compra_agil_codigo as string;
+          const score = Math.round(Number(m.score) || 0);
           const prev = bestMatchByCodigo[k];
           if (!prev) {
-            bestMatchByCodigo[k] = { score, producto: (m as any).nombre_producto ?? null, count: 1 };
+            bestMatchByCodigo[k] = { score, producto: m.nombre_producto ?? null, count: 1 };
           } else {
             prev.count += 1;
             if (score > prev.score) {
               prev.score = score;
-              prev.producto = (m as any).nombre_producto ?? null;
+              prev.producto = m.nombre_producto ?? null;
             }
           }
         }
-      }
-
-      // Cobertura ÍTEM POR ÍTEM (tabla ca_item_matches): cuántos ítems de cada
-      // compra calzan con el inventario del cliente. Es el indicador "producto por
-      // producto" del panel. La RLS ya restringe a la empresa dueña.
-      const itemMatchCountByCodigo: Record<string, number> = {};
-      if (codigosCompras.length > 0) {
-        const { data: itemMatchesRaw, error: imErr } = await (supabase as any)
-          .from('ca_item_matches')
-          .select('compra_agil_codigo')
-          .in('compra_agil_codigo', codigosCompras);
-        if (imErr) console.error('[OportunidadesPanel] Error fetching ca_item_matches:', imErr);
-        for (const im of (itemMatchesRaw || []) as any[]) {
+        // Cobertura ÍTEM POR ÍTEM: cuántos ítems de cada compra calzan.
+        for (const im of (((itemMatchesRes as any)?.data) || []) as any[]) {
           const k = im.compra_agil_codigo as string;
           itemMatchCountByCodigo[k] = (itemMatchCountByCodigo[k] || 0) + 1;
         }
@@ -322,8 +334,15 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
 
       // Filtros del cliente (onboarding + IA): no mostrar lo que no cumple.
       // filtrosRow ya se trajo en paralelo arriba. Si no hay filtros, es un no-op.
+      const tienePalabras = !!(filtrosRow?.palabras_incluir?.length);
       if (filtrosRow) {
         all = aplicarFiltrosCliente(all, filtrosRow as Partial<ClienteFiltros>);
+      }
+      // Lo que sobrevivió al filtro de palabras COINCIDE con la definición del
+      // cliente: márcalo como "tu rubro" para que la tarjeta lo diga (clave para
+      // clientes sin inventario todavía: antes veían puro "N/A").
+      if (tienePalabras) {
+        for (const o of all) o.rubro_match = true;
       }
 
       // Apply filters
@@ -361,8 +380,11 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       all.sort((a, b) => {
         let valA: number, valB: number;
         if (sortBy === 'match_score') {
-          valA = (a.match_score || 0) + (boostByCodigo[a.codigo] || 0);
-          valB = (b.match_score || 0) + (boostByCodigo[b.codigo] || 0);
+          // "Lo más ganable primero": además del % de match, pesa la COBERTURA de
+          // ítems (una compra donde calzan 12 productos vale más que una donde
+          // calza 1 con score alto). +3 por ítem calzado, tope +45.
+          valA = (a.match_score || 0) + (boostByCodigo[a.codigo] || 0) + Math.min(a.items_matched || 0, 15) * 3;
+          valB = (b.match_score || 0) + (boostByCodigo[b.codigo] || 0) + Math.min(b.items_matched || 0, 15) * 3;
         } else if (sortBy === 'fecha_cierre') {
           valA = a.fecha_cierre ? new Date(a.fecha_cierre).getTime() : Infinity;
           valB = b.fecha_cierre ? new Date(b.fecha_cierre).getTime() : Infinity;
@@ -378,25 +400,12 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       const oneWeek = 7 * 24 * 60 * 60 * 1000;
       const activas = all.filter(o => o.fecha_cierre && new Date(o.fecha_cierre).getTime() > now);
 
-      // El total real de activas puede superar el límite renderizado (MAX_ACTIVAS),
-      // así que lo contamos aparte en el servidor (head:true = sin traer filas).
-      // Sin esto, "totalActivas" mostraría 500 aunque hubiera miles.
+      // El total real de activas puede superar el límite renderizado (MAX_ACTIVAS).
+      // Los conteos ya vinieron en el lote paralelo inicial (head:true).
       let totalActivasReal = activas.length;
       if (!incluirCerradas) {
-        const [licCount, caCount] = await Promise.all([
-          (supabase as any)
-            .from('licitaciones_bi')
-            .select('codigo', { count: 'exact', head: true })
-            .or('estado.is.null,estado.ilike.publicada,estado.ilike.activa')
-            .gt('fecha_cierre', nowIso),
-          supabase
-            .from('compras_agiles')
-            .select('codigo', { count: 'exact', head: true })
-            .or('estado.ilike.publicada,estado.ilike.activa')
-            .gt('fecha_cierre', nowIso),
-        ]);
-        const licN = (licCount as any)?.count ?? 0;
-        const caN = (caCount as any)?.count ?? 0;
+        const licN = (licCountRes as any)?.count ?? 0;
+        const caN = (caCountRes as any)?.count ?? 0;
         if (licN || caN) totalActivasReal = licN + caN;
       }
 
@@ -415,8 +424,12 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
 
       return { data: all, stats };
     },
-    staleTime: 30000,
-    refetchInterval: 60000,
+    // Caché: volver al panel es instantáneo (muestra lo cacheado y refresca de
+    // fondo). Las compras ágiles nuevas llegan por ingesta cada horas; refrescar
+    // cada 3 min sobra y evita que la pantalla "piense" a cada rato.
+    staleTime: 120_000,
+    refetchInterval: 180_000,
+    placeholderData: (prev: any) => prev,
   });
 }
 
