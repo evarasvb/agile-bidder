@@ -53,7 +53,7 @@ export interface ClienteInventario {
 export interface ClienteExclusion {
   id: string;
   cliente_id: string;
-  tipo_exclusion: string;
+  producto_excluido: string;
   created_at: string;
 }
 
@@ -368,14 +368,16 @@ export function useClienteExclusiones() {
     queryKey: ['cliente-exclusiones', cliente?.id],
     queryFn: async () => {
       if (!cliente?.id) return [];
-      
-      const { data, error } = await supabase
+
+      // Cast a any: los tipos generados aún traen la columna antigua
+      // `tipo_exclusion`; la real es `producto_excluido`.
+      const { data, error } = await (supabase as any)
         .from('cliente_exclusiones')
         .select('*')
         .eq('cliente_id', cliente.id);
-      
+
       if (error) throw error;
-      return data as ClienteExclusion[];
+      return (data as ClienteExclusion[]) ?? [];
     },
     enabled: !!cliente?.id,
   });
@@ -392,24 +394,25 @@ export function useToggleExclusion() {
     mutationFn: async (tipoExclusion: string) => {
       if (!cliente?.id) throw new Error('No hay cliente');
 
-      // Verificar si existe (maybeSingle: 0 filas no es error)
-      const { data: existing } = await supabase
+      // Verificar si existe (maybeSingle: 0 filas no es error). Cast a any: los
+      // tipos generados aún traen la columna antigua `tipo_exclusion`.
+      const { data: existing } = await (supabase as any)
         .from('cliente_exclusiones')
         .select('id')
         .eq('cliente_id', cliente.id)
-        .eq('tipo_exclusion', tipoExclusion)
+        .eq('producto_excluido', tipoExclusion)
         .maybeSingle();
 
       if (existing) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('cliente_exclusiones')
           .delete()
           .eq('id', existing.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('cliente_exclusiones')
-          .insert({ cliente_id: cliente.id, tipo_exclusion: tipoExclusion });
+          .insert({ cliente_id: cliente.id, producto_excluido: tipoExclusion });
         if (error) throw error;
       }
     },
@@ -419,10 +422,10 @@ export function useToggleExclusion() {
       await queryClient.cancelQueries({ queryKey: key });
       const prev = queryClient.getQueryData<ClienteExclusion[]>(key);
       queryClient.setQueryData<ClienteExclusion[]>(key, (old = []) => {
-        const existe = old.some((e) => e.tipo_exclusion === tipoExclusion);
+        const existe = old.some((e) => e.producto_excluido === tipoExclusion);
         return existe
-          ? old.filter((e) => e.tipo_exclusion !== tipoExclusion)
-          : [...old, { id: `temp-${tipoExclusion}`, cliente_id: cliente.id, tipo_exclusion: tipoExclusion, created_at: new Date().toISOString() }];
+          ? old.filter((e) => e.producto_excluido !== tipoExclusion)
+          : [...old, { id: `temp-${tipoExclusion}`, cliente_id: cliente.id, producto_excluido: tipoExclusion, created_at: new Date().toISOString() }];
       });
       return { prev };
     },

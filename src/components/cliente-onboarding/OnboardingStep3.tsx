@@ -23,7 +23,7 @@ export default function OnboardingStep3() {
   const { data: exclusiones = [], isLoading: exclusionesLoading } = useClienteExclusiones();
   const toggleExclusion = useToggleExclusion();
 
-  const exclusionesActivas = new Set(exclusiones.map(e => e.tipo_exclusion));
+  const exclusionesActivas = new Set(exclusiones.map(e => e.producto_excluido));
 
   const handleToggle = (id: string) => {
     if (!cliente?.id) return;      // aún preparando el cliente; evita el fallo silencioso

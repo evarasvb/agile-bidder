@@ -2,6 +2,20 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabaseClient as supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/hooks/useAuth';
 
+// Resuelve la EMPRESA DUEÑA (clientes.id) del usuario. El inventario vive bajo
+// clientes.id, NO bajo auth.uid(): usar user.id hacía que un usuario real (donde
+// clientes.id != user_id) no pudiera ver NI insertar su inventario (la RLS de
+// escritura exige clientes.id y el match une por clientes.id). Ver función SQL
+// cliente_owner_id(). Devuelve null si aún no hay empresa.
+async function resolverClienteOwnerId(): Promise<string | null> {
+  const { data, error } = await (supabase as any).rpc('cliente_owner_id');
+  if (error) {
+    console.error('[inventory] cliente_owner_id error:', error);
+    return null;
+  }
+  return (data as string) ?? null;
+}
+
 // Interface based on cliente_inventario table schema with additional UI fields
 export interface InventoryItem {
   id: string;
@@ -81,11 +95,11 @@ export function useInventory() {
       });
 
       if (!clienteId) {
-        console.warn('[useInventory] No cliente_id available, returning empty array');
+        console.warn('[useInventory] No auth, returning empty array');
         return [];
       }
-
-      console.log('[useInventory] Fetching products for cliente_id:', clienteId);
+      const ownerId = await resolverClienteOwnerId();
+      if (!ownerId) return [];
 
       // Fetch all products without the 1000 row limit using pagination
       const allProducts: InventoryItem[] = [];
@@ -102,7 +116,7 @@ export function useInventory() {
         const { data, error } = await supabase
           .from('cliente_inventario')
           .select('*')
-          .eq('cliente_id', clienteId)
+          .eq('cliente_id', ownerId)
           .order('created_at', { ascending: false })
           .range(from, to);
 
@@ -156,12 +170,9 @@ export function useInventoryActivo() {
   return useQuery({
     queryKey: ['inventory', 'activo', clienteId],
     queryFn: async () => {
-      if (!clienteId) {
-        console.log('[useInventoryActivo] No cliente_id, returning empty array');
-        return [];
-      }
-
-      console.log('[useInventoryActivo] Fetching active products for:', clienteId);
+      if (!clienteId) return [];
+      const ownerId = await resolverClienteOwnerId();
+      if (!ownerId) return [];
 
       const allProducts: InventoryItem[] = [];
       const pageSize = 1000;
@@ -175,8 +186,8 @@ export function useInventoryActivo() {
         const { data, error } = await supabase
           .from('cliente_inventario')
           .select('*')
-          .eq('cliente_id', clienteId)
-                    .order('nombre')
+          .eq('cliente_id', ownerId)
+          .order('nombre')
           .range(from, to);
 
         if (error) {
@@ -209,14 +220,14 @@ export function useInventoryItem(id: string | null) {
     queryKey: ['inventory', id, clienteId],
     queryFn: async () => {
       if (!id || !clienteId) return null;
-
-      console.log('[useInventoryItem] Fetching item:', id);
+      const ownerId = await resolverClienteOwnerId();
+      if (!ownerId) return null;
 
       const { data, error } = await supabase
         .from('cliente_inventario')
         .select('*')
         .eq('id', id)
-        .eq('cliente_id', clienteId)
+        .eq('cliente_id', ownerId)
         .maybeSingle();
 
       if (error) {
@@ -237,17 +248,22 @@ export function useCreateInventoryItem() {
 
   return useMutation({
     mutationFn: async (item: InventoryInput) => {
-      const clienteId = user?.id;
-      if (!clienteId) {
+      if (!user?.id) {
         throw new Error('Debes iniciar sesión para agregar productos');
       }
-
-      console.log('[useCreateInventoryItem] Creating product:', item.nombre_producto);
+      const clienteId = await resolverClienteOwnerId();
+      if (!clienteId) {
+        throw new Error('No se encontró tu empresa. Completa tu perfil e intenta de nuevo.');
+      }
 
       const insertData = {
         cliente_id: clienteId,
         sku: item.sku,
+        // `nombre` y `nombre_producto` son ambos NOT NULL. Antes solo se seteaba
+        // `nombre` → el insert fallaba (nombre_producto sin default) y el trigger
+        // que calcula `nombre_norm` (base del match) se alimenta de nombre_producto.
         nombre: item.nombre_producto,
+        nombre_producto: item.nombre_producto,
         descripcion: item.descripcion,
         categoria: item.categoria || 'General',
         palabras_clave: item.keywords,
@@ -284,16 +300,17 @@ export function useUpdateInventoryItem() {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<InventoryItem> & { id: string }) => {
-      const clienteId = user?.id;
-      if (!clienteId) {
+      if (!user?.id) {
         throw new Error('Debes iniciar sesión para actualizar productos');
       }
-
-      console.log('[useUpdateInventoryItem] Updating product:', id);
+      const clienteId = await resolverClienteOwnerId();
+      if (!clienteId) throw new Error('No se encontró tu empresa.');
 
       // Map InventoryItem fields to cliente_inventario fields
       const updateData: Record<string, any> = {};
-      if (updates.nombre_producto !== undefined) updateData.nombre = updates.nombre_producto;
+      // Mantener `nombre` y `nombre_producto` en sincronía (ambos NOT NULL; el
+      // trigger de búsqueda/nombre_norm se alimenta de nombre_producto).
+      if (updates.nombre_producto !== undefined) { updateData.nombre = updates.nombre_producto; updateData.nombre_producto = updates.nombre_producto; }
       if (updates.descripcion !== undefined) updateData.descripcion = updates.descripcion;
       if (updates.categoria !== undefined) updateData.categoria = updates.categoria;
       if (updates.keywords !== undefined) updateData.palabras_clave = updates.keywords;
@@ -332,12 +349,11 @@ export function useDeleteInventoryItem() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const clienteId = user?.id;
-      if (!clienteId) {
+      if (!user?.id) {
         throw new Error('Debes iniciar sesión para eliminar productos');
       }
-
-      console.log('[useDeleteInventoryItem] Deleting product:', id);
+      const clienteId = await resolverClienteOwnerId();
+      if (!clienteId) throw new Error('No se encontró tu empresa.');
 
       const { error } = await supabase
         .from('cliente_inventario')
@@ -365,25 +381,16 @@ export function useInventoryStats() {
   return useQuery({
     queryKey: ['inventory', 'stats', clienteId],
     queryFn: async () => {
-      if (!clienteId) {
-        console.log('[useInventoryStats] No cliente_id, returning empty stats');
-        return {
-          total: 0,
-          activos: 0,
-          sinStock: 0,
-          stockBajo: 0,
-          valorInventario: 0,
-          categorias: []
-        };
-      }
-
-      console.log('[useInventoryStats] Fetching stats for:', clienteId);
+      const emptyStats = { total: 0, activos: 0, sinStock: 0, stockBajo: 0, valorInventario: 0, categorias: [] };
+      if (!clienteId) return emptyStats;
+      const ownerId = await resolverClienteOwnerId();
+      if (!ownerId) return emptyStats;
 
       // Get count first
       const { count, error: countError } = await supabase
         .from('cliente_inventario')
         .select('*', { count: 'exact', head: true })
-        .eq('cliente_id', clienteId);
+        .eq('cliente_id', ownerId);
 
       if (countError) {
         console.error('[useInventoryStats] Count error:', countError);
@@ -403,7 +410,7 @@ export function useInventoryStats() {
         const { data, error } = await supabase
           .from('cliente_inventario')
           .select('stock_disponible, precio_unitario, categoria')
-          .eq('cliente_id', clienteId)
+          .eq('cliente_id', ownerId)
           .range(from, to);
 
         if (error) {
