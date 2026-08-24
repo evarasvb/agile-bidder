@@ -252,6 +252,22 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         }
       }
 
+      // Cobertura ÍTEM POR ÍTEM (tabla ca_item_matches): cuántos ítems de cada
+      // compra calzan con el inventario del cliente. Es el indicador "producto por
+      // producto" del panel. La RLS ya restringe a la empresa dueña.
+      const itemMatchCountByCodigo: Record<string, number> = {};
+      if (codigosCompras.length > 0) {
+        const { data: itemMatchesRaw, error: imErr } = await (supabase as any)
+          .from('ca_item_matches')
+          .select('compra_agil_codigo')
+          .in('compra_agil_codigo', codigosCompras);
+        if (imErr) console.error('[OportunidadesPanel] Error fetching ca_item_matches:', imErr);
+        for (const im of (itemMatchesRaw || []) as any[]) {
+          const k = im.compra_agil_codigo as string;
+          itemMatchCountByCodigo[k] = (itemMatchCountByCodigo[k] || 0) + 1;
+        }
+      }
+
       // Map compras_agiles
       const compras: OportunidadPanel[] = (comprasRaw || []).map((c: any) => ({
         id: c.id,
@@ -267,9 +283,11 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         tipo: 'compra_agil' as const,
         link_oficial: c.url_ficha || c.link_oficial || null,
         match_score: bestMatchByCodigo[c.codigo]?.score ?? c.match_score ?? null,
-        match_encontrado: bestMatchByCodigo[c.codigo] ? true : (c.match_encontrado ?? false),
+        match_encontrado: (itemMatchCountByCodigo[c.codigo] > 0) || bestMatchByCodigo[c.codigo] ? true : (c.match_encontrado ?? false),
         items_count: c.compras_agiles_items?.length || 0,
-        items_matched: bestMatchByCodigo[c.codigo]?.count ?? 0,
+        // Ítems que calzan producto-a-producto (ca_item_matches). Antes era el
+        // conteo de filas de ca_matches (match a nivel de compra), poco útil.
+        items_matched: itemMatchCountByCodigo[c.codigo] ?? 0,
         created_at: c.created_at,
         items_text: (c.compras_agiles_items || [])
           .map((i: any) => i.nombre_producto)
