@@ -110,13 +110,15 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
         query = query.eq('estado', estado!);
       } else if (!verTodosLosEstados && !fechaElegida) {
         // Default (o estado 'activas'): mostrar solo ACTIVAS (abiertas y con
-        // cierre futuro). Antes traía las 77 mil filas (casi todas cerradas)
-        // con todos sus items => muy lento. "Todos los estados" ve también
-        // cerradas. Comparación case-insensitive: la extensión guarda
-        // 'publicada' en minúscula y el default histórico es 'activa'.
+        // cierre futuro REAL). Antes se incluía `fecha_cierre.is.null`, pero
+        // ~4.573 compras de una carga histórica (2026-03-20) no tienen fecha y
+        // ensuciaban la lista como si estuvieran abiertas. Se exige fecha futura
+        // (excluye nulos), igual que el Panel de Oportunidades. "Todos los
+        // estados" ve también cerradas. Comparación case-insensitive: la
+        // extensión guarda 'publicada' en minúscula y el histórico es 'activa'.
         query = query
           .or('estado.ilike.publicada,estado.ilike.activa')
-          .or(`fecha_cierre.is.null,fecha_cierre.gt.${new Date().toISOString()}`);
+          .gt('fecha_cierre', new Date().toISOString());
       }
 
       // Filtro de match aplicado EN EL SERVIDOR (antes del limit) para no
