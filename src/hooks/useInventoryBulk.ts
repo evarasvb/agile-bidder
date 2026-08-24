@@ -50,12 +50,18 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
       onProgress?.({ current: 0, total: products.length, phase: 'validating', message: 'Obteniendo usuario autenticado...' });
 
       const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
+
       if (authError || !user) {
         throw new Error('Debes iniciar sesión para importar productos');
       }
 
-      const clienteId = user.id;
+      // El inventario vive bajo clientes.id (no auth.uid()). Antes se usaba
+      // user.id → los inserts se rechazaban por RLS y nada quedaba cargado.
+      const { data: ownerId } = await (supabase as any).rpc('cliente_owner_id');
+      if (!ownerId) {
+        throw new Error('No se encontró tu empresa. Completa tu perfil e intenta de nuevo.');
+      }
+      const clienteId = ownerId as string;
 
       onProgress?.({ current: 0, total: products.length, phase: 'validating', message: 'Validando productos...' });
 
@@ -120,20 +126,23 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
           ? row.keywords.split(',').map(k => k.trim()).filter(k => k.length > 0)
           : null;
 
-        // Map to cliente_inventario schema
+        // Map to cliente_inventario schema. OJO: los nombres de columna reales
+        // son stock_disponible / tiempo_entrega (no stock / tiempo_entrega_dias),
+        // y NO existe columna `activo`. Antes se usaban esos nombres inexistentes
+        // y faltaba nombre_producto (NOT NULL) → cada insert fallaba.
         const productData = {
           cliente_id: clienteId,
           sku: row.sku.trim(),
           nombre: row.nombre.trim(),
+          nombre_producto: row.nombre.trim(),
           descripcion: row.descripcion?.trim() || null,
           categoria: row.categoria?.trim() || 'General',
           precio_unitario: Number(row.precio_unitario),
           palabras_clave: keywords,
           imagen_url: row.imagen_url?.trim() || null,
-          stock: row.stock !== undefined ? Number(row.stock) : 0,
+          stock_disponible: row.stock !== undefined ? Number(row.stock) : 0,
           margen_minimo: row.margen_minimo !== undefined ? Number(row.margen_minimo) : (row.margen_objetivo !== undefined ? Number(row.margen_objetivo) : 10),
-          tiempo_entrega_dias: row.tiempo_entrega_dias !== undefined ? Number(row.tiempo_entrega_dias) : 5,
-          activo: true,
+          tiempo_entrega: row.tiempo_entrega_dias !== undefined ? Number(row.tiempo_entrega_dias) : 5,
         };
 
         const existingId = existingSkuMap.get(row.sku.trim().toLowerCase());

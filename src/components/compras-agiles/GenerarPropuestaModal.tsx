@@ -411,6 +411,52 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
           ...(ficha_tecnica ? { ficha_tecnica } : {}),
         },
       });
+
+      // Publicar la oferta para la EXTENSIÓN de Chrome. La extensión SOLO lee la
+      // tabla `cliente_ofertas`; antes la propuesta se guardaba únicamente en
+      // datos_json y la extensión nunca la encontraba (el botón "Postular con
+      // FirmaVB" daba 404). Con esto, lo que armas a mano queda listo para
+      // autocompletar precios en Mercado Público. Mismo shape que genera
+      // `generar-ofertas-auto`. No bloquea el guardado si falla.
+      try {
+        if (cliente?.id) {
+          const productos_ofertados = itemsActivos.map((item) => ({
+            codigo_producto: (item as any).codigoProducto ?? null,
+            nombre_solicitado: item.nombre,
+            nombre_producto: item.match?.nombre ?? null,
+            sku: item.match?.sku ?? null,
+            cantidad: item.cantidad,
+            precio_unitario: item.precioUnitario || 0,
+            precio_total: (item.precioUnitario || 0) * item.cantidad,
+            match_score: item.match?.matchScore ?? 0,
+          }));
+          const conMatch = productos_ofertados.filter((p) => p.sku).length;
+          const ofertaData = {
+            cliente_id: cliente.id,
+            licitacion_id: compra.codigo,
+            estado: 'pendiente',
+            match_score: itemsActivos.length ? Math.round((conMatch / itemsActivos.length) * 100) : 0,
+            productos_ofertados,
+            valor_total: subtotalItems,
+            notas: 'Propuesta preparada manualmente en firmavb.',
+            updated_at: new Date().toISOString(),
+          };
+          const { data: existente } = await supabase
+            .from('cliente_ofertas')
+            .select('id')
+            .eq('cliente_id', cliente.id)
+            .eq('licitacion_id', compra.codigo)
+            .maybeSingle();
+          if ((existente as any)?.id) {
+            await supabase.from('cliente_ofertas').update(ofertaData).eq('id', (existente as any).id);
+          } else {
+            await supabase.from('cliente_ofertas').insert(ofertaData);
+          }
+        }
+      } catch (e) {
+        console.error('No se pudo publicar la oferta para la extensión:', e);
+      }
+
       // Conectar con el pipeline: al guardar la propuesta la oportunidad avanza
       // a "preparación" en Postulaciones (si no estaba ya). Antes la propuesta
       // quedaba aislada y el pipeline no se enteraba.

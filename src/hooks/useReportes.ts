@@ -240,116 +240,32 @@ export function useCompradoresReport() {
 
 // ─── Mercado ───
 
+export interface MercadoReport {
+  kpis: {
+    totalOportunidades: number;
+    valorTotal: number;
+    totalLicitaciones: number;
+    totalCompras: number;
+    valorLicitaciones: number;
+    valorCompras: number;
+    valorOrdenes: number;
+  };
+  porRegion: { region: string; count: number; monto: number }[];
+  porTipo: { tipo: string; count: number; monto: number }[];
+  tendenciaMensual: { mes: string; count: number; monto: number }[];
+}
+
 export function useMercadoReport() {
   return useQuery({
     queryKey: ["reportes", "mercado"],
-    queryFn: async () => {
-      const [licitacionesRes, comprasRes, ordenesRes] = await Promise.all([
-        supabase
-          .from("licitaciones_bi")
-          .select("id, nombre, presupuesto_estimado, estado, tipo, fecha_publicacion, unidad_compra_region, institucion_nombre"),
-        supabase
-          .from("compras_agiles")
-          .select("id, nombre, monto, estado, region, fecha_cierre, created_at"),
-        supabase
-          .from("ordenes_compra")
-          .select("id, total, fecha_creacion, tipo")
-          .limit(1000),
-      ]);
-
-      if (licitacionesRes.error) throw licitacionesRes.error;
-
-      const licitaciones = licitacionesRes.data || [];
-      const compras = comprasRes.data || [];
-      const ordenes = ordenesRes.data || [];
-
-      const totalLicitaciones = licitaciones.length;
-      const totalCompras = compras.length;
-      const valorLicitaciones = licitaciones.reduce(
-        (sum, l) => sum + (l.presupuesto_estimado || 0),
-        0
-      );
-      const valorCompras = compras.reduce(
-        (sum, c) => sum + (c.monto || 0),
-        0
-      );
-      const valorOrdenes = ordenes.reduce(
-        (sum, o) => sum + (o.total || 0),
-        0
-      );
-
-      // By region
-      const regionMap = new Map<string, { count: number; monto: number }>();
-      for (const l of licitaciones) {
-        const r = l.unidad_compra_region || "Sin región";
-        const prev = regionMap.get(r) || { count: 0, monto: 0 };
-        regionMap.set(r, {
-          count: prev.count + 1,
-          monto: prev.monto + (l.presupuesto_estimado || 0),
-        });
-      }
-      for (const c of compras) {
-        const r = c.region || "Sin región";
-        const prev = regionMap.get(r) || { count: 0, monto: 0 };
-        regionMap.set(r, {
-          count: prev.count + 1,
-          monto: prev.monto + (c.monto || 0),
-        });
-      }
-
-      // By type
-      const tipoMap = new Map<string, { count: number; monto: number }>();
-      for (const l of licitaciones) {
-        const t = l.tipo || "Otro";
-        const prev = tipoMap.get(t) || { count: 0, monto: 0 };
-        tipoMap.set(t, {
-          count: prev.count + 1,
-          monto: prev.monto + (l.presupuesto_estimado || 0),
-        });
-      }
-
-      // Monthly trend (last 12 months)
-      const monthlyMap = new Map<string, { count: number; monto: number }>();
-      const allDates = [
-        ...licitaciones.map((l) => ({
-          date: l.fecha_publicacion,
-          monto: l.presupuesto_estimado || 0,
-        })),
-        ...compras.map((c) => ({
-          date: c.created_at,
-          monto: c.monto || 0,
-        })),
-      ];
-      for (const { date, monto } of allDates) {
-        if (!date) continue;
-        const month = date.slice(0, 7); // YYYY-MM
-        const prev = monthlyMap.get(month) || { count: 0, monto: 0 };
-        monthlyMap.set(month, { count: prev.count + 1, monto: prev.monto + monto });
-      }
-
-      const monthly = Array.from(monthlyMap.entries())
-        .map(([mes, data]) => ({ mes, ...data }))
-        .sort((a, b) => a.mes.localeCompare(b.mes))
-        .slice(-12);
-
-      return {
-        kpis: {
-          totalOportunidades: totalLicitaciones + totalCompras,
-          valorTotal: valorLicitaciones + valorCompras,
-          totalLicitaciones,
-          totalCompras,
-          valorLicitaciones,
-          valorCompras,
-          valorOrdenes,
-        },
-        porRegion: Array.from(regionMap.entries())
-          .map(([region, data]) => ({ region, ...data }))
-          .sort((a, b) => b.monto - a.monto),
-        porTipo: Array.from(tipoMap.entries())
-          .map(([tipo, data]) => ({ tipo, ...data }))
-          .sort((a, b) => b.count - a.count),
-        tendenciaMensual: monthly,
-      };
+    queryFn: async (): Promise<MercadoReport> => {
+      // Agregación EN EL SERVIDOR (RPC bi_mercado_stats). Antes el hook bajaba
+      // 130k+ licitaciones y 79k compras al navegador: el tope de 1.000 filas de
+      // la API subcontaba las licitaciones (~1.000 en vez de 130.665) y se leía
+      // compras_agiles.monto (columna inexistente → error tragado → compras=0).
+      const { data, error } = await (supabase as any).rpc("bi_mercado_stats");
+      if (error) throw error;
+      return data as MercadoReport;
     },
   });
 }
