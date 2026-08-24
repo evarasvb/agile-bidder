@@ -89,6 +89,9 @@ serve(async (req) => {
     // 1.5/2.0/2.5 pueden estar retirados según la key.
     const MODELOS = [
       ...(envModel ? [envModel] : []),
+      // El más rápido primero (pedido: dejar fijo el modelo más rápido). Si la
+      // key no tiene acceso a alguno, se cae al siguiente.
+      "gemini-2.0-flash-lite",
       "gemini-flash-latest",
       "gemini-2.0-flash",
       "gemini-2.5-flash",
