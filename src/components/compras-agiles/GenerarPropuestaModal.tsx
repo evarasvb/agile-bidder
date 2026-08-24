@@ -15,7 +15,7 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import { aplicarRecargoPorRegion, obtenerRecargoRegion } from "@/utils/regiones";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useInventoryActivo } from "@/hooks/useInventory";
-import { useTodoElInventario, useCliente } from "@/hooks/useCliente";
+import { useTodoElInventario, useCliente, useClienteOwner } from "@/hooks/useCliente";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { descargarCotizacionPDF, type ItemCotizacion, type DatosCotizacion } from "@/services/pdfGenerator";
@@ -76,7 +76,12 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
   const { data: userSettings } = useUserSettings();
   const { data: inventario } = useInventoryActivo();
   const { data: clienteInventario } = useTodoElInventario();
-  const { data: cliente } = useCliente();
+  const { data: clientePropio } = useCliente();
+  // La identidad de la EMPRESA (para los PDF que se suben a postular) debe ser la
+  // empresa DUEÑA: si el usuario es miembro de equipo, la que lo invitó, no su
+  // fila auto-creada. Con respaldo a la propia por si aún no resuelve.
+  const { data: clienteOwner } = useClienteOwner();
+  const cliente = clienteOwner || clientePropio;
   const fichaTecnica = useFichaTecnica();
   const crearPipeline = useCreatePipelineItem();
   const [productoSeleccionando, setProductoSeleccionando] = useState<string | null>(null);
@@ -770,7 +775,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
             </Button>
             <Button
               variant="secondary"
-              onClick={() => {
+              onClick={async () => {
                 if (!compra) return;
                 const itemsPDF: ItemCotizacion[] = itemsActivos.map(item => ({
                   itemRequerido: item.nombre,
@@ -800,7 +805,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                     logo: empresaFicha.logoUrl,
                   },
                 };
-                descargarCotizacionPDF(datosPDF);
+                await descargarCotizacionPDF(datosPDF);
                 toast.success('PDF generado correctamente');
               }}
               disabled={itemsActivos.length === 0}

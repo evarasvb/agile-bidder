@@ -62,18 +62,30 @@ export function generarCotizacionPDF(datos: DatosCotizacion): jsPDF {
   // Logo y datos empresa
   doc.setFillColor(COLORS.primary);
   doc.rect(0, 0, pageWidth, 40, 'F');
-  
+
+  // Logo del cliente (si viene ya convertido a data URL). Si falla, seguimos sin él.
+  let headerTextX = margin;
+  if (datos.empresa.logo && datos.empresa.logo.startsWith('data:')) {
+    try {
+      doc.addImage(datos.empresa.logo, 'PNG', margin, 8, 18, 18);
+      headerTextX = margin + 22;
+    } catch { /* logo inválido: encabezado sin logo */ }
+  }
+
   // Nombre empresa
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
-  doc.text(datos.empresa.nombre, margin, 20);
-  
-  // Datos de contacto
+  doc.text(datos.empresa.nombre, headerTextX, 20);
+
+  // Datos de contacto (solo los que existen, para no imprimir "RUT: " vacío).
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.text(`RUT: ${datos.empresa.rut}`, margin, 28);
-  doc.text(`${datos.empresa.direccion} | Tel: ${datos.empresa.telefono}`, margin, 34);
+  if (datos.empresa.rut) doc.text(`RUT: ${datos.empresa.rut}`, headerTextX, 28);
+  const contacto = [datos.empresa.direccion, datos.empresa.telefono ? `Tel: ${datos.empresa.telefono}` : '']
+    .filter(Boolean)
+    .join(' | ');
+  if (contacto) doc.text(contacto, headerTextX, 34);
   
   // Número de cotización (lado derecho)
   doc.setFontSize(11);
@@ -275,8 +287,36 @@ export function generarCotizacionPDF(datos: DatosCotizacion): jsPDF {
 /**
  * Descarga el PDF de cotización
  */
-export function descargarCotizacionPDF(datos: DatosCotizacion): void {
-  const doc = generarCotizacionPDF(datos);
+// Descarga la imagen del logo (URL http) y la convierte a data URL para jsPDF.
+// Si falla (CORS, 404, etc.) devolvemos null y el PDF sale sin logo.
+async function urlADataUrl(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return await new Promise<string | null>((resolve) => {
+      const fr = new FileReader();
+      fr.onloadend = () => resolve(typeof fr.result === 'string' ? fr.result : null);
+      fr.onerror = () => resolve(null);
+      fr.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+// Si empresa.logo es una URL http, la convierte a data URL (para poder dibujarla).
+async function conLogoResuelto(datos: DatosCotizacion): Promise<DatosCotizacion> {
+  const logo = datos.empresa.logo;
+  if (logo && /^https?:\/\//.test(logo)) {
+    const dataUrl = await urlADataUrl(logo);
+    return { ...datos, empresa: { ...datos.empresa, logo: dataUrl ?? undefined } };
+  }
+  return datos;
+}
+
+export async function descargarCotizacionPDF(datos: DatosCotizacion): Promise<void> {
+  const doc = generarCotizacionPDF(await conLogoResuelto(datos));
   const filename = `cotizacion_${datos.numero}_${datos.compra.codigo.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
   doc.save(filename);
 }
@@ -284,8 +324,8 @@ export function descargarCotizacionPDF(datos: DatosCotizacion): void {
 /**
  * Abre el PDF en una nueva pestaña
  */
-export function previsualizarCotizacionPDF(datos: DatosCotizacion): void {
-  const doc = generarCotizacionPDF(datos);
+export async function previsualizarCotizacionPDF(datos: DatosCotizacion): Promise<void> {
+  const doc = generarCotizacionPDF(await conLogoResuelto(datos));
   const pdfBlob = doc.output('blob');
   const url = URL.createObjectURL(pdfBlob);
   window.open(url, '_blank');
