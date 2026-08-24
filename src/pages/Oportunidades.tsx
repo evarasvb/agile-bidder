@@ -132,12 +132,19 @@ function OpportunityCard({
             ) : (
               <span className="text-muted-foreground">Sin monto</span>
             )}
-            {op.items_count > 0 && (
+            {op.tipo === "compra_agil" && op.items_count > 0 ? (
+              // Cobertura producto-a-producto: cuántos ítems pedidos calzan con tu
+              // inventario. Es el atajo del panel para decidir dónde postular.
+              <span className={`flex items-center gap-1 ${op.items_matched > 0 ? "text-firmavb-blue font-medium" : "text-muted-foreground"}`}>
+                <Package className="h-3 w-3" />
+                {op.items_matched > 0 ? `${op.items_matched}/${op.items_count} ítems calzan` : `${op.items_count} ítems`}
+              </span>
+            ) : op.items_count > 0 ? (
               <span className="text-muted-foreground flex items-center gap-1">
                 <Package className="h-3 w-3" />
                 {op.items_count} items
               </span>
-            )}
+            ) : null}
           </div>
           <div className="flex items-center gap-1 sm:opacity-60 sm:group-hover:opacity-100 transition-opacity">
             <Button
