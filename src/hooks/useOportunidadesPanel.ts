@@ -206,8 +206,27 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       // Traer los matches REALES (tabla ca_matches) de las compras ágiles
       // mostradas y quedarnos con el mejor score por código. Antes el Panel
       // leía compras_agiles.match_score, que está vacío en toda la tabla, por
-      // eso "el match no aparecía". Los datos de ca_matches están duplicados
-      // entre clientes con el mismo score, así que tomamos el mejor por código.
+      // eso "el match no aparecía".
+      //
+      // IMPORTANTE: ca_matches tiene un match por CLIENTE (score según SU
+      // inventario) y su RLS deja leer todas las filas. Si no filtramos por el
+      // cliente logueado, un cliente vería el % de match calculado con el
+      // inventario de OTRO. Resolvemos el cliente por auth.uid() y filtramos. Si
+      // el usuario no tiene fila en `clientes` (p. ej. un miembro del equipo),
+      // caemos al comportamiento anterior (mejor score por código).
+      let clienteIdPanel: string | null = null;
+      try {
+        const { data: u } = await supabase.auth.getUser();
+        if (u?.user?.id) {
+          const { data: cli } = await supabase
+            .from('clientes')
+            .select('id')
+            .eq('user_id', u.user.id)
+            .maybeSingle();
+          clienteIdPanel = (cli as any)?.id ?? null;
+        }
+      } catch { /* sin sesión: dejamos clienteIdPanel en null */ }
+
       const codigosCompras = (comprasRaw || [])
         .map((c: any) => c.codigo)
         .filter(Boolean)
@@ -215,10 +234,12 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       const bestMatchByCodigo: Record<string, { score: number; producto: string | null; count: number }> = {};
       if (codigosCompras.length > 0) {
         // ca_matches no está en los tipos generados de Supabase; usamos any.
-        const { data: matchesRaw, error: matchErr } = await (supabase as any)
+        let matchQuery = (supabase as any)
           .from('ca_matches')
-          .select('compra_agil_codigo, score, nombre_producto')
+          .select('compra_agil_codigo, score, nombre_producto, cliente_id')
           .in('compra_agil_codigo', codigosCompras);
+        if (clienteIdPanel) matchQuery = matchQuery.eq('cliente_id', clienteIdPanel);
+        const { data: matchesRaw, error: matchErr } = await matchQuery;
         if (matchErr) {
           console.error('[OportunidadesPanel] Error fetching ca_matches:', matchErr);
         }

@@ -788,13 +788,17 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                   validezDias: 15,
                   compra: compra,
                   items: itemsPDF,
+                  // Datos REALES de la empresa del cliente (antes iban de relleno
+                  // "76.XXX.XXX-X", así el PDF que se subía a postular salía con
+                  // RUT/dirección falsos). empresaFicha ya trae los datos del cliente.
                   empresa: {
-                    nombre: 'FirmaVB',
-                    rut: '76.XXX.XXX-X',
-                    direccion: 'Santiago, Chile',
-                    telefono: '+56 9 XXXX XXXX',
-                    email: 'contacto@firmavb.cl'
-                  }
+                    nombre: empresaFicha.nombre,
+                    rut: empresaFicha.rut || '',
+                    direccion: empresaFicha.direccion || '',
+                    telefono: empresaFicha.telefono || '',
+                    email: empresaFicha.email,
+                    logo: empresaFicha.logoUrl,
+                  },
                 };
                 descargarCotizacionPDF(datosPDF);
                 toast.success('PDF generado correctamente');
