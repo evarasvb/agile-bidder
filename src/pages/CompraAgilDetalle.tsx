@@ -19,13 +19,22 @@ import { ArrowLeft, Building2, Calendar, DollarSign, Package, Clock, FileText, D
 import { format, parseISO, differenceInHours } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useCliente } from '@/hooks/useCliente';
+import { useCaItemMatches } from '@/hooks/useCaItemMatches';
 import { descargarFichaTecnicaPDF, verFichaTecnicaPDF } from '@/services/fichaTecnicaPdf';
+
+// Color del badge de match según el %.
+const matchBadge = (score: number) =>
+  score >= 80 ? 'bg-firmavb-green/15 text-firmavb-green border-firmavb-green/30'
+  : score >= 50 ? 'bg-firmavb-blue/15 text-firmavb-blue border-firmavb-blue/30'
+  : 'bg-amber-100 text-amber-800 border-amber-200';
+const clp = (n: number) => `$${Math.round(n || 0).toLocaleString('es-CL')}`;
 
 export default function CompraAgilDetalle() {
   const { codigo } = useParams<{ codigo: string }>();
   const navigate = useNavigate();
   const { data: compra, isLoading, error } = useCompraAgil(codigo || null);
   const { data: cliente } = useCliente();
+  const { data: itemMatches } = useCaItemMatches(codigo || null);
   const [propuestaOpen, setPropuestaOpen] = useState(false);
 
   if (isLoading) {
@@ -81,16 +90,58 @@ export default function CompraAgilDetalle() {
     void descargarFichaTecnicaPDF(datosFicha());
   };
 
-  // Ítems de la compra ágil en el formato que espera el modal de propuesta.
-  // El modal permite asignar productos del inventario a cada ítem (match null).
-  const productosPropuesta = (compra.items || []).map((it: any, idx: number) => ({
-    itemId: it.id,
-    itemIndex: idx,
-    nombre: it.nombre_producto,
-    descripcion: it.descripcion_producto || '',
-    cantidadSolicitada: it.cantidad || 1,
-    unidadMedida: it.unidad || 'UN',
-    match: null,
+  // Match ítem por ítem (precalculado, tabla ca_item_matches) indexado por item_id.
+  const matchByItem = new Map<string, any>((itemMatches || []).map((m: any) => [m.item_id, m]));
+
+  // Filas de la compra con su match (para la tabla producto-a-producto).
+  const filasItems = (compra.items || []).map((it: any, idx: number) => {
+    const m = matchByItem.get(it.id);
+    const cantidad = it.cantidad || 1;
+    const precio = m?.precio_unitario ?? null;
+    return {
+      idx,
+      id: it.id,
+      solicitado: it.nombre_producto,
+      descripcion: it.descripcion_producto || '',
+      cantidad,
+      unidad: it.unidad || 'UN',
+      match: m
+        ? {
+            inventarioId: m.inventario_id,
+            nombre: m.nombre_producto,
+            sku: m.sku,
+            precio,
+            score: Math.round(Number(m.score) || 0),
+            subtotal: (precio || 0) * cantidad,
+          }
+        : null,
+    };
+  });
+
+  const itemsConMatch = filasItems.filter((f) => f.match).length;
+  const totalOferta = filasItems.reduce((s, f) => s + (f.match?.subtotal || 0), 0);
+  const dentroPresupuesto = compra.monto ? totalOferta <= compra.monto : null;
+
+  // Ítems en el formato del modal de propuesta, PRECARGADOS con el match para que
+  // "Generar propuesta" abra con los productos y precios ya asignados.
+  const productosPropuesta = filasItems.map((f: any) => ({
+    itemId: f.id,
+    itemIndex: f.idx,
+    nombre: f.solicitado,
+    descripcion: f.descripcion,
+    cantidadSolicitada: f.cantidad,
+    unidadMedida: f.unidad,
+    match: f.match
+      ? {
+          id: f.match.inventarioId,
+          sku: f.match.sku,
+          nombre: f.match.nombre,
+          precio_unitario: f.match.precio || 0,
+          stock: null,
+          matchScore: f.match.score,
+          margen_estimado: 0,
+        }
+      : null,
   }));
 
   return (
@@ -182,61 +233,104 @@ export default function CompraAgilDetalle() {
         </Card>
       )}
 
-      {/* Items */}
+      {/* Match ítem por ítem: para cada producto pedido, con qué producto de tu
+          inventario calza, a qué precio y con qué %. Lista para postular. */}
       <Card>
         <CardHeader>
-          <h2 className="text-lg font-semibold">Productos Solicitados</h2>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-firmavb-blue" />
+              <h2 className="text-lg font-semibold">Tu match, producto por producto</h2>
+            </div>
+            {(compra.items?.length || 0) > 0 && (
+              <Badge variant="outline" className="font-normal">
+                {itemsConMatch} de {compra.items.length} con match
+              </Badge>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {compra.items && compra.items.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Producto</TableHead>
-                  <TableHead>Descripción</TableHead>
-                  <TableHead className="text-right">Cantidad</TableHead>
-                  <TableHead>Unidad</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {compra.items.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium">{item.nombre_producto}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
-                      {item.descripcion_producto}
-                    </TableCell>
-                    <TableCell className="text-right">{item.cantidad}</TableCell>
-                    <TableCell>{item.unidad}</TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Ítem pedido</TableHead>
+                    <TableHead>Tu producto</TableHead>
+                    <TableHead className="text-center">Match</TableHead>
+                    <TableHead className="text-right">Cant.</TableHead>
+                    <TableHead className="text-right">Precio unit.</TableHead>
+                    <TableHead className="text-right">Subtotal</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filasItems.map((f) => (
+                    <TableRow key={f.id}>
+                      <TableCell className="align-top">
+                        <p className="font-medium">{f.solicitado}</p>
+                        {f.descripcion && (
+                          <p className="text-xs text-muted-foreground max-w-xs truncate">{f.descripcion}</p>
+                        )}
+                      </TableCell>
+                      <TableCell className="align-top">
+                        {f.match ? (
+                          <div>
+                            <p className="font-medium">{f.match.nombre}</p>
+                            {f.match.sku && <p className="text-xs font-mono text-muted-foreground">{f.match.sku}</p>}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">Sin match en tu inventario</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center align-top">
+                        {f.match ? (
+                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${matchBadge(f.match.score)}`}>
+                            {f.match.score}%
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right align-top">{f.cantidad} {f.unidad}</TableCell>
+                      <TableCell className="text-right align-top">{f.match?.precio ? clp(f.match.precio) : '—'}</TableCell>
+                      <TableCell className="text-right align-top font-medium">{f.match?.precio ? clp(f.match.subtotal) : '—'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Resumen: total de tu oferta vs presupuesto */}
+              <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border bg-muted/30 p-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Tu oferta (ítems con match)</p>
+                  <p className="text-2xl font-bold text-firmavb-blue">{clp(totalOferta)}</p>
+                </div>
+                {compra.monto ? (
+                  <div className="text-sm">
+                    <p className="text-muted-foreground">Presupuesto: <span className="font-medium text-foreground">{clp(compra.monto)}</span></p>
+                    <p className={dentroPresupuesto ? 'text-firmavb-green font-medium' : 'text-firmavb-red font-medium'}>
+                      {dentroPresupuesto ? '✓ Dentro del presupuesto' : '⚠ Excede el presupuesto'}
+                      {' · '}{((totalOferta / compra.monto) * 100).toFixed(0)}%
+                    </p>
+                  </div>
+                ) : null}
+                <Button onClick={() => setPropuestaOpen(true)} className="gap-2 shrink-0">
+                  <Sparkles className="h-4 w-4" /> Generar propuesta
+                </Button>
+              </div>
+              {itemsConMatch === 0 && (
+                <p className="mt-3 text-sm text-muted-foreground text-center">
+                  Aún no hay match para estos ítems. Si acabas de cargar inventario, el match se actualiza en unos minutos; o ajusta tus productos/palabras clave.
+                </p>
+              )}
+            </div>
           ) : (
             <p className="text-sm text-muted-foreground py-8 text-center">
-              No se encontraron items para esta compra ágil.
+              No se encontraron ítems para esta compra ágil.
             </p>
           )}
         </CardContent>
       </Card>
-
-      {/* Match Score */}
-      {compra.match_encontrado && (
-        <Card>
-          <CardHeader>
-            <h2 className="text-lg font-semibold">Match con tu Catálogo</h2>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-4">
-              <Badge variant="default" className="text-lg px-4 py-2">
-                {compra.match_score}% Match
-              </Badge>
-              <p className="text-muted-foreground">
-                Esta compra coincide con productos de tu inventario.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Ficha técnica (generada por IA y guardada en la compra ágil) */}
       {fichaTecnica?.fichas?.length > 0 && (
