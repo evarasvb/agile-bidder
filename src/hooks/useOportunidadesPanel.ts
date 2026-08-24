@@ -211,21 +211,14 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       // IMPORTANTE: ca_matches tiene un match por CLIENTE (score según SU
       // inventario) y su RLS deja leer todas las filas. Si no filtramos por el
       // cliente logueado, un cliente vería el % de match calculado con el
-      // inventario de OTRO. Resolvemos el cliente por auth.uid() y filtramos. Si
-      // el usuario no tiene fila en `clientes` (p. ej. un miembro del equipo),
-      // caemos al comportamiento anterior (mejor score por código).
+      // inventario de OTRO. Resolvemos la empresa DUEÑA con cliente_owner_id()
+      // (si el usuario es miembro de equipo, devuelve la empresa que lo invitó,
+      // no la fila vacía que useCliente() le auto-crea) y filtramos por ella.
       let clienteIdPanel: string | null = null;
       try {
-        const { data: u } = await supabase.auth.getUser();
-        if (u?.user?.id) {
-          const { data: cli } = await supabase
-            .from('clientes')
-            .select('id')
-            .eq('user_id', u.user.id)
-            .maybeSingle();
-          clienteIdPanel = (cli as any)?.id ?? null;
-        }
-      } catch { /* sin sesión: dejamos clienteIdPanel en null */ }
+        const { data: ownerId } = await (supabase as any).rpc('cliente_owner_id');
+        clienteIdPanel = (ownerId as string) ?? null;
+      } catch { /* sin sesión / sin empresa: dejamos clienteIdPanel en null */ }
 
       const codigosCompras = (comprasRaw || [])
         .map((c: any) => c.codigo)

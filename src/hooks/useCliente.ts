@@ -147,6 +147,30 @@ export function useCliente() {
   });
 }
 
+// Resuelve la empresa DUEÑA del usuario (la propia si es dueño; la que lo invitó
+// si es miembro de equipo). Úsalo donde la identidad de la EMPRESA importa (p. ej.
+// el PDF de cotización que se sube a postular), no el `clientes` auto-creado que
+// useCliente() genera para cada usuario. Ver función SQL cliente_owner_id().
+export function useClienteOwner() {
+  const { user, loading: authLoading } = useAuthUser();
+
+  return useQuery({
+    queryKey: ['cliente-owner', user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data: ownerId, error } = await (supabase as any).rpc('cliente_owner_id');
+      if (error || !ownerId) return null;
+      const { data } = await supabase
+        .from('clientes')
+        .select('*')
+        .eq('id', ownerId as string)
+        .maybeSingle();
+      return (data as Cliente) ?? null;
+    },
+    enabled: !authLoading && !!user,
+  });
+}
+
 // Hook para registrar cliente
 export function useRegistrarCliente() {
   const queryClient = useQueryClient();
