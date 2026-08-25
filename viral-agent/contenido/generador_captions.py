@@ -65,15 +65,19 @@ def armar_calendario(dias, seed=42):
     filas = []
     usados_por_pilar = {p["clave"]: 0 for p in PILARES}
 
+    cta_pilar = next(p for p in PILARES if p["clave"] == "cta_directo")
+    rotacion = [p for p in PILARES if p["clave"] != "cta_directo"]
+    idx_rotacion = 0
+
     for dia in range(1, dias + 1):
-        # cta_directo se repite más seguido (es el pilar de venta directa),
-        # el resto rota en orden para no sonar repetitivo dentro de pocos días.
-        if dia % 5 == 0:
-            pilar = next(p for p in PILARES if p["clave"] == "cta_directo")
+        # cta_directo cae cada 6 días (pilar de venta directa); el resto
+        # rota en orden por su propio contador, para que ningún pilar quede
+        # fuera solo por coincidir con el día del CTA.
+        if dia % 6 == 0:
+            pilar = cta_pilar
         else:
-            pilar = PILARES[(dia - 1) % (len(PILARES) - 1)]
-            if pilar["clave"] == "cta_directo":
-                pilar = PILARES[0]
+            pilar = rotacion[idx_rotacion % len(rotacion)]
+            idx_rotacion += 1
 
         idx_caption = usados_por_pilar[pilar["clave"]] % len(pilar["captions"])
         usados_por_pilar[pilar["clave"]] += 1
