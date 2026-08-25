@@ -202,11 +202,11 @@ export function ComprasAgilesFilters({ filters, onFiltersChange }: ComprasAgiles
             </div>
           </div>
 
-          {/* Umbral de Match */}
+          {/* Umbral de Match (renombrado a lenguaje humano) */}
           <div className="space-y-1.5">
             <div className="flex items-center gap-1.5">
               <Percent className="h-3 w-3 text-muted-foreground" />
-              <Label className="text-xs text-muted-foreground">Umbral Match</Label>
+              <Label className="text-xs text-muted-foreground">Match mínimo</Label>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />

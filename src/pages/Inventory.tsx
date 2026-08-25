@@ -33,7 +33,6 @@ import { AddProductDialog } from "@/components/inventory/AddProductDialog";
 import { BulkDeleteDialog } from "@/components/inventory/BulkDeleteDialog";
 import { BulkUploadDialog } from "@/components/inventory/BulkUploadDialog";
 import { useRequirePro } from "@/components/pro/UpgradeProProvider";
-import { DownloadTemplateButton } from "@/components/inventory/DownloadTemplateButton";
 import { ProductGallery } from "@/components/inventory/ProductGallery";
 import { ImportHistoryPanel } from "@/components/inventory/ImportHistoryPanel";
 import { OportunidadesModal } from "@/components/inventory/OportunidadesModal";
@@ -318,151 +317,70 @@ export default function Inventory() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Header simplificado: 2 acciones primarias + menú "Más". Antes había
+          7 botones compitiendo al mismo nivel (incluido "Cargar desde Script",
+          jerga de desarrollador expuesta al dueño de PYME). */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Inventario</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Gestiona tus productos y reglas de matching
+            Tus productos y precios: con esto encontramos las compras que puedes ganar
           </p>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRefresh}
-                className="gap-2"
-                disabled={isLoading}
-              >
-                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                Actualizar
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="text-xs">Actualiza la lista de productos del inventario</p>
-            </TooltipContent>
-          </Tooltip>
-          
-          {/* Download Template */}
-          <DownloadTemplateButton />
-          
-          {/* Bulk Upload */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="default" 
-                className="gap-2 bg-primary hover:bg-primary/90"
-                onClick={() => setBulkUploadOpen(true)}
-              >
-                <FileSpreadsheet className="h-4 w-4" />
-                Cargar desde Excel
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="text-xs">Importa múltiples productos desde un archivo Excel (.xlsx)</p>
-            </TooltipContent>
-          </Tooltip>
-          
-          {/* Export Dropdown */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <Download className="h-4 w-4" />
-                    Exportar
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-popover">
-                  <DropdownMenuItem onClick={handleExportExcel} className="gap-2 cursor-pointer">
-                    <FileSpreadsheet className="h-4 w-4" />
-                    Exportar a Excel (.xlsx)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleExportCSV} className="gap-2 cursor-pointer">
-                    <FileText className="h-4 w-4" />
-                    Exportar a CSV (.csv)
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="text-xs">Exporta tu inventario completo en Excel o CSV</p>
-            </TooltipContent>
-          </Tooltip>
-          
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="default"
+            className="gap-2 bg-primary hover:bg-primary/90"
+            onClick={() => setBulkUploadOpen(true)}
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Cargar desde Excel
+          </Button>
+          <Button
+            className="gap-2 bg-primary hover:bg-primary/90"
+            onClick={handleAgregarClick}
+          >
+            <Plus className="h-4 w-4" />
+            Agregar Producto
+          </Button>
           <DropdownMenu>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="gap-2 border-firmavb-blue text-firmavb-blue hover:bg-firmavb-blue/10"
-                    disabled={enriquecer.isPending}
-                  >
-                    {enriquecer.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Sparkles className="h-4 w-4" />
-                    )}
-                    Enriquecer con IA
-                  </Button>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="text-xs">
-                  Completa con IA la descripción, palabras clave y fotos (banco). Sin selección, procesa los
-                  incompletos.
-                </p>
-              </TooltipContent>
-            </Tooltip>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleEnriquecer()} className="gap-2 cursor-pointer">
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                Más
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-popover">
+              <DropdownMenuItem onClick={() => handleEnriquecer()} className="gap-2 cursor-pointer" disabled={enriquecer.isPending}>
                 <Sparkles className="h-4 w-4" />
-                {selectedIds.size > 0 ? `Completar seleccionados (${selectedIds.size})` : 'Completar incompletos'}
+                {selectedIds.size > 0 ? `Completar con IA (${selectedIds.size} selecc.)` : 'Completar incompletos con IA'}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => handleEnriquecer({ overwrite: true })}
                 className="gap-2 cursor-pointer"
-                disabled={selectedIds.size === 0}
+                disabled={selectedIds.size === 0 || enriquecer.isPending}
               >
                 <RefreshCw className="h-4 w-4" />
-                Rehacer seleccionados (sobrescribir)
+                Rehacer con IA (sobrescribir selecc.)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportExcel} className="gap-2 cursor-pointer">
+                <FileSpreadsheet className="h-4 w-4" />
+                Exportar a Excel (.xlsx)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportCSV} className="gap-2 cursor-pointer">
+                <FileText className="h-4 w-4" />
+                Exportar a CSV (.csv)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleRefresh} className="gap-2 cursor-pointer" disabled={isLoading}>
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                Actualizar lista
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setImportDialogOpen(true)} className="gap-2 cursor-pointer">
+                <FileJson className="h-4 w-4" />
+                Importar JSON (avanzado)
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                className="gap-2 border-firmavb-blue text-firmavb-blue hover:bg-firmavb-blue/10"
-                onClick={() => setImportDialogOpen(true)}
-              >
-                <FileJson className="h-4 w-4" />
-                Cargar desde Script
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="text-xs">Importa productos desde un script JSON personalizado</p>
-            </TooltipContent>
-          </Tooltip>
-          
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                className="gap-2 bg-primary hover:bg-primary/90"
-                onClick={handleAgregarClick}
-              >
-                <Plus className="h-4 w-4" />
-                Agregar Producto
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="text-xs">Agrega un nuevo producto al inventario manualmente</p>
-            </TooltipContent>
-          </Tooltip>
         </div>
       </div>
 
@@ -518,7 +436,7 @@ export default function Inventory() {
       <ImportHistoryPanel />
 
       {/* Search and Filters */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input

@@ -104,7 +104,8 @@ export function useCreateVendedor() {
       toast.success('Vendedor creado exitosamente');
     },
     onError: (error) => {
-      toast.error('Error al crear vendedor: ' + error.message);
+      console.error('crear vendedor:', error.message);
+      toast.error(error.message?.includes('duplicate') ? 'Ese correo ya está en tu equipo.' : 'No se pudo agregar al miembro. Intenta de nuevo.');
     },
   });
 }
@@ -224,7 +225,8 @@ export function useAsignarLicitacion() {
       toast.success('Licitación asignada exitosamente');
     },
     onError: (error) => {
-      toast.error('Error al asignar licitación: ' + error.message);
+      console.error('asignar licitación:', error.message);
+      toast.error('No se pudo asignar. Intenta de nuevo.');
     },
   });
 }
@@ -260,7 +262,8 @@ export function useActualizarAsignacion() {
       toast.success('Asignación actualizada');
     },
     onError: (error) => {
-      toast.error('Error al actualizar: ' + error.message);
+      console.error('actualizar vendedor:', error.message);
+      toast.error('No se pudo guardar el cambio. Intenta de nuevo.');
     },
   });
 }
