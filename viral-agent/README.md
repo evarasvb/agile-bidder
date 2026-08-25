@@ -58,49 +58,61 @@ Esto crea `contenido/calendario_lanzamiento.csv` con 30 días de posts (red, for
 
 ### 5. Publicar
 
-Dos formas, según qué tan "hands-off" lo quieras:
+**El bot que está corriendo de verdad vive en Supabase**, no en GitHub Actions
+(ver sección "Estado actual" más abajo). Formas de interactuar con él:
 
-**A) A mano / probando (dry-run primero):**
+**A) A mano / probando en tu computador (dry-run primero):**
 
 ```bash
 python publicador/meta_poster.py --dry-run
 ```
 
-Muestra qué publicaría hoy según el calendario, sin llamar a la API. Cuando estés conforme:
+Esto usa `viral-agent/.env` + el CSV local, no la base de Supabase — sirve para
+probar cambios de copy antes de subirlos a la tabla `viral_agent_calendario`.
 
-```bash
-python publicador/meta_poster.py
+**B) El bot automático real (Supabase Edge Function + pg_cron):**
+
+La Edge Function `publicar-libro-redes` (en `supabase/functions/publicar-libro-redes/`)
+corre todos los días a las 15:00 UTC vía `pg_cron`, lee la config y el calendario desde
+las tablas `viral_agent_config` / `viral_agent_calendario` (RLS bloqueado — solo la
+función, con el service role, puede leerlas) y publica el siguiente post pendiente.
+
+Para probarla o dispararla a mano (fuera del horario del cron), desde el SQL Editor de
+Supabase o con `execute_sql`:
+
+```sql
+select net.http_post(
+  url := 'https://juiskeeutbaipwbeeezw.supabase.co/functions/v1/publicar-libro-redes',
+  headers := jsonb_build_object(
+    'Content-Type', 'application/json',
+    'x-viral-agent-secret', (select value from public.viral_agent_config where key = 'cron_shared_secret')
+  ),
+  body := jsonb_build_object('dry_run', true)  -- saca dry_run para publicar de verdad
+);
+-- el resultado (async) aparece poco después en:
+select * from net._http_response order by id desc limit 1;
 ```
 
-Publica el post del día en Facebook e Instagram (si el formato es compatible), y marca la fila como `publicado` en el CSV para no duplicar.
+Para pausar el bot: `select cron.unschedule('publicar-libro-redes-diario');` — para
+reactivarlo, vuelve a correr la migración `cron_publicar_libro_redes`.
 
-**B) El bot automático (GitHub Actions):**
+**C) GitHub Actions (`.github/workflows/publicar-libro-redes.yml`)** quedó como
+respaldo manual únicamente (sin `schedule`) — usa el CSV del repo, con estado
+independiente del de Supabase. No actives su cron mientras el de Supabase esté
+activo: publicarían el mismo día dos veces por caminos separados.
 
-Ya está el workflow `.github/workflows/publicar-libro-redes.yml` — corre todos los días
-y publica el siguiente post pendiente del calendario, sin que tengas que hacer nada ni
-tener tu computador prendido. Para activarlo:
+### Estado actual
 
-1. En GitHub: `Settings → Secrets and variables → Actions → New repository secret`, agrega:
-   - `META_PAGE_ID`
-   - `META_IG_BUSINESS_ID`
-   - `META_PAGE_ACCESS_TOKEN`
-   - `BOOK_URL`
-   - `IG_HANDLE`
-2. Importante sobre el token: si lo sacaste rápido desde el Graph API Explorer, probablemente
-   dura solo 1-2 horas. Para que el bot funcione día a día necesitas extenderlo a un token
-   de **larga duración** (60 días) desde el [Access Token Debugger](https://developers.facebook.com/tools/debug/accesstoken),
-   botón "Extend Access Token" — y guardar ESE token en el secret, no el original.
-3. El disparador programado (`schedule`) solo se activa cuando este workflow vive en la
-   rama principal (`main`). Mientras el trabajo esté en una rama aparte, pruébalo manual:
-   pestaña **Actions → "Publicar libro en redes" → Run workflow** (con "Modo prueba" activado
-   la primera vez).
-4. Instagram no acepta posts de solo texto: el calendario ya trae `imagen_url` completo,
-   apuntando a `viral-agent/imagenes/` (las 6 plantillas ya renderizadas con tu portada y
-   foto reales, servidas como raw.githubusercontent.com porque el repo es público). No
-   necesitas subir nada a mano. **Eso sí:** una vez que esta rama se fusione a `main`, regenera
-   el CSV para que las URLs apunten a `main` en vez de a esta rama (que eventualmente se borra):
-   `python contenido/generador_captions.py` (ya usa `main` por defecto — solo hazlo de nuevo
-   sin la variable `IMAGENES_BASE_URL` que se usó para probar en esta rama).
+- ✅ Credenciales cargadas en `viral_agent_config` (Page ID, IG Business ID, Page
+  Access Token, book URL, handle).
+- ✅ 30 días de calendario cargados en `viral_agent_calendario`.
+- ✅ Edge Function desplegada y probada (dry-run real vía `pg_net`, HTTP 200).
+- ✅ `pg_cron` programado — corre solo, todos los días.
+- ⚠️ El `META_PAGE_ACCESS_TOKEN` cargado puede ser de corta duración (1-2h) si
+  salió directo del Graph API Explorer sin extenderlo. Si el cron empieza a fallar
+  con error de token expirado, genera uno de **larga duración** (60 días) desde el
+  [Access Token Debugger](https://developers.facebook.com/tools/debug/accesstoken)
+  y actualízalo: `update public.viral_agent_config set value = 'NUEVO_TOKEN' where key = 'meta_page_access_token';`
 
 ### 6. Comunidades
 

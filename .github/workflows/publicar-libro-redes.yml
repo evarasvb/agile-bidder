@@ -1,17 +1,17 @@
 # Bot de publicación - Marketing viral del libro
-# Publica un post del calendario de viral-agent/ en Facebook/Instagram
-# cada día, usando la API oficial de Meta Graph API.
+# Publica un post del calendario de viral-agent/ en Facebook/Instagram,
+# usando la API oficial de Meta Graph API.
 #
-# IMPORTANTE: el trigger `schedule` solo se activa cuando este archivo
-# vive en la rama por defecto (main). Mientras tanto, úsalo con
-# "Run workflow" (workflow_dispatch) desde la pestaña Actions.
-
-name: Publicar libro en redes
+# DESACTIVADO como cron: la publicación diaria real la maneja ahora la Edge
+# Function `publicar-libro-redes` de Supabase + pg_cron (ver
+# supabase/functions/publicar-libro-redes/ y viral-agent/README.md).
+# Ambos sistemas comparten el mismo calendario en concepto pero con estado
+# separado (este workflow usa el CSV del repo, Supabase usa su propia tabla)
+# — si se corren los dos a la vez pueden publicar el mismo día dos veces.
+# Este workflow queda solo para pruebas manuales puntuales (dry-run).
+name: Publicar libro en redes (manual / respaldo)
 
 on:
-  schedule:
-    # Todos los días a las 12:00 hora Chile (aprox., ajusta si cambia el horario de verano)
-    - cron: '0 15 * * *'
   workflow_dispatch:
     inputs:
       dry_run:
