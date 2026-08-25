@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
@@ -114,6 +115,26 @@ export function PipelineDetailModal({
       ? `/licitaciones/${item.oportunidad_id}`
       : null;
 
+  // Ficha oficial en Mercado Público (URL determinística por código). Es el
+  // paso que faltaba: la propuesta quedaba lista pero no había cómo POSTULAR.
+  const mpUrl =
+    item.oportunidad_tipo === 'compra_agil'
+      ? `https://www.mercadopublico.cl/CompraAgil/Cotizacion/${item.oportunidad_id}`
+      : item.oportunidad_tipo === 'licitacion'
+      ? `https://www.mercadopublico.cl/Procurement/Modules/RFB/DetailsAcquisition.aspx?idlicitacion=${item.oportunidad_id}`
+      : null;
+  const prePostulacion = item.etapa === 'descubierta' || item.etapa === 'seguimiento' || item.etapa === 'preparacion';
+
+  const handleYaPostule = () => {
+    moveItem.mutate(
+      { id: item.id, nuevaEtapa: 'postulada', currentHistorial: item.etapa_historial },
+      {
+        onSuccess: () => toast.success('¡Bien! Marcada como Postulada 🎉'),
+        onError: () => toast.error('No se pudo mover'),
+      }
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
@@ -173,15 +194,43 @@ export function PipelineDetailModal({
             )}
           </div>
 
-          {/* Link to detail page */}
-          {detailUrl && (
+          {/* Cierre del negocio: postular en el portal y marcarla postulada.
+              (Antes esto era un callejón sin salida: propuesta lista y ningún
+              camino hacia Mercado Público.) */}
+          {mpUrl && prePostulacion && (
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm" className="gap-1.5">
+                <a href={mpUrl} target="_blank" rel="noreferrer">
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Postular en Mercado Público
+                </a>
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleYaPostule} disabled={moveItem.isPending}>
+                Ya postulé ✓
+              </Button>
+            </div>
+          )}
+          {mpUrl && !prePostulacion && (
             <a
-              href={detailUrl}
+              href={mpUrl}
+              target="_blank"
+              rel="noreferrer"
               className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
             >
               <ExternalLink className="h-3.5 w-3.5" />
-              Ver detalle de oportunidad
+              Ver en Mercado Público
             </a>
+          )}
+
+          {/* Link interno (SPA: sin recargar toda la app como hacía el <a href>) */}
+          {detailUrl && (
+            <Link
+              to={detailUrl}
+              className="inline-flex items-center gap-1 text-sm text-primary hover:underline ml-0 sm:ml-3"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+              Ver detalle en firmavb
+            </Link>
           )}
 
           <Separator />

@@ -117,7 +117,7 @@ export function useCreatePipelineItem() {
           etapa,
           notas: item.notas || null,
           etapa_historial: [{ etapa, fecha: now, usuario_id: user.id }],
-        })
+        } as any)
         .select()
         .single();
 
@@ -143,7 +143,7 @@ export function useUpdatePipelineItem() {
         .update({
           ...updates,
           updated_at: new Date().toISOString(),
-        })
+        } as any)
         .eq('id', id)
         .select()
         .single();
@@ -182,10 +182,11 @@ export function useMovePipelineItem() {
       const { data, error } = await supabase
         .from('pipeline')
         .update({
+          // cast: los tipos generados aún no incluyen la etapa 'perdida'
           etapa: nuevaEtapa,
           etapa_historial: nuevoHistorial,
           updated_at: now,
-        })
+        } as any)
         .eq('id', id)
         .select()
         .single();
