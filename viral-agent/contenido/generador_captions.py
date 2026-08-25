@@ -28,6 +28,21 @@ except ImportError:
 BOOK_URL = os.environ.get("BOOK_URL", "https://www.amazon.com/-/es/dp/B0G4NLY5TL")
 IG_HANDLE = os.environ.get("IG_HANDLE", "surfeandolicitaciones")
 
+# Imágenes reales de las plantillas (ver plantillas-diseno/), una por pilar.
+# Regeneradas con: cd plantillas-diseno && npm run render
+IMAGENES_BASE_URL = os.environ.get(
+    "IMAGENES_BASE_URL",
+    "https://raw.githubusercontent.com/evarasvb/agile-bidder/main/viral-agent/imagenes",
+)
+IMG_POR_PILAR = {
+    "mitos": "pilar-mitos.png",
+    "tips": "pilar-tips.png",
+    "historias": "pilar-historias.png",
+    "backstage": "pilar-backstage.png",
+    "prueba_social": "pilar-prueba-social.png",
+    "cta_directo": "pilar-cta.png",
+}
+
 CITAS_LECTOR_EJEMPLO = [
     "Ojalá lo hubiera leído antes de mi primera postulación",
     "Por fin alguien explica esto en simple",
@@ -83,7 +98,7 @@ def armar_calendario(dias, seed=42):
                 "caption": caption,
                 "hashtags": armar_hashtags(rng),
                 "cta": f"Link del libro: {BOOK_URL} · Síguenos en @{IG_HANDLE}",
-                "imagen_url": "",
+                "imagen_url": f"{IMAGENES_BASE_URL}/{IMG_POR_PILAR[pilar['clave']]}",
                 "estado": "pendiente",
             }
         )
