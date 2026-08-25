@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
 
     // Config Gemini (si está disponible)
     const geminiKey = Deno.env.get('GEMINI_API_KEY');
-    const gemini = usarIA && geminiKey ? { key: geminiKey, url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', model: Deno.env.get('GEMINI_MODEL') || 'gemini-2.5-flash' } : null;
+    const gemini = usarIA && geminiKey ? { key: geminiKey, url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', model: Deno.env.get('GEMINI_MODEL') || 'gemini-3.6-flash' } : null;
     let aiCalls = 0;
     const MAX_AI = 120;
 

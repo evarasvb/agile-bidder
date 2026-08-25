@@ -89,7 +89,7 @@ serve(async (req) => {
       throw new Error("GEMINI_API_KEY is not configured");
     }
     const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
-    const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash";
+    const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-3.6-flash";
 
     // Truncate text if too long (max ~30k chars to stay within token limits)
     const textoTruncado = texto.length > 30000 ? texto.substring(0, 30000) + '...' : texto;

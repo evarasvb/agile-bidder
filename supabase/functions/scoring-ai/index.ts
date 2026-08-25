@@ -74,7 +74,7 @@ serve(async (req) => {
     }
     // Endpoint compatible con OpenAI de Google Gemini (soporta tool-calling).
     const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
-    const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash";
+    const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-3.6-flash";
 
     const prompt = `Analiza la compatibilidad entre este cliente y esta licitación.
 

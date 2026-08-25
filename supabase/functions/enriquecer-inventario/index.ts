@@ -49,7 +49,7 @@ async function enriquecerConIA(productos: ProductoRow[]): Promise<EnriquecidoIA[
     'gemini-3.6-flash',
     'gemini-2.0-flash',
     'gemini-flash-latest',
-    'gemini-2.5-flash',
+    'gemini-3.6-flash',
   ].filter(Boolean);
 
   const entrada = productos.map((p) => ({
