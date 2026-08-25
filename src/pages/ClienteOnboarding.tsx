@@ -56,8 +56,21 @@ export default function ClienteOnboarding() {
       } catch {
         // el cron horario lo generará igual
       }
-      navigate('/oportunidades');
+      // Aterrizar en el Dashboard, donde vive la guía "Empieza aquí" que retoma
+      // los pasos (antes caía en /oportunidades y el usuario nuevo nunca la veía).
+      navigate('/dashboard');
     }
+  };
+
+  // Salida sin fricción: marcar completado y seguir después con la guía
+  // "Empieza aquí" del Dashboard (antes el onboarding era un túnel sin escape).
+  const handleSaltarOnboarding = async () => {
+    if (!cliente?.id) return;
+    await actualizarCliente.mutateAsync({
+      id: cliente.id,
+      onboarding_completado: true,
+    });
+    navigate('/dashboard');
   };
 
   const handleBack = async () => {
@@ -86,11 +99,22 @@ export default function ClienteOnboarding() {
       {/* Header */}
       <div className="border-b">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <h1 className="text-xl font-bold">Configuración inicial</h1>
-            <span className="text-sm text-muted-foreground">
-              {cliente.empresa_nombre}
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="hidden sm:inline text-sm text-muted-foreground">
+                {cliente.empresa_nombre}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
+                onClick={handleSaltarOnboarding}
+                disabled={actualizarCliente.isPending}
+              >
+                Lo hago después
+              </Button>
+            </div>
           </div>
           <Progress value={progress} className="mt-4" />
         </div>

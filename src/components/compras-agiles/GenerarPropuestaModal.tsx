@@ -18,6 +18,7 @@ import { useInventoryActivo } from "@/hooks/useInventory";
 import { useTodoElInventario, useCliente, useClienteOwner } from "@/hooks/useCliente";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { descargarCotizacionPDF, type ItemCotizacion, type DatosCotizacion } from "@/services/pdfGenerator";
 import { useFichaTecnica, type ProductoFicha } from "@/hooks/useFichaTecnica";
 import { blobFichaTecnicaPDF, descargarFichaTecnicaPDF, type DatosFichaTecnica } from "@/services/fichaTecnicaPdf";
@@ -352,6 +353,40 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
     }
   };
 
+  // Descarga la cotización en PDF con los datos reales de la empresa.
+  const handleDescargarCotizacion = async () => {
+    if (!compra) return;
+    const itemsPDF: ItemCotizacion[] = itemsActivos.map(item => ({
+      itemRequerido: item.nombre,
+      productoOfertado: item.match?.nombre || item.nombre,
+      sku: item.match?.sku || 'N/A',
+      cantidad: item.cantidad,
+      unidad: item.unidadMedida,
+      precioUnitario: item.precioUnitario,
+      total: item.precioUnitario * item.cantidad,
+      matchScore: item.match?.matchScore
+    }));
+    const datosPDF: DatosCotizacion = {
+      numero: `COT-${Date.now().toString().slice(-8)}`,
+      fecha: new Date(),
+      validezDias: 15,
+      compra: compra,
+      items: itemsPDF,
+      // Datos REALES de la empresa del cliente (antes iban de relleno
+      // "76.XXX.XXX-X" y el PDF que se subía a postular salía con datos falsos).
+      empresa: {
+        nombre: empresaFicha.nombre,
+        rut: empresaFicha.rut || '',
+        direccion: empresaFicha.direccion || '',
+        telefono: empresaFicha.telefono || '',
+        email: empresaFicha.email,
+        logo: empresaFicha.logoUrl,
+      },
+    };
+    await descargarCotizacionPDF(datosPDF);
+    toast.success('Cotización descargada');
+  };
+
   const handleGuardarPropuesta = async () => {
     if (!compra) return;
 
@@ -371,7 +406,9 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
         subtotal: (item.precioUnitario || 0) * item.cantidad,
         match_score: item.match?.matchScore
       })),
-      monto_total: montoTotal,
+      // NETO (coherente con valor_total, el pipeline y el presupuesto de MP).
+      monto_total: subtotalItems,
+      monto_total_con_iva: montoTotal,
       estado: 'borrador',
     };
 
@@ -472,7 +509,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
             oportunidad_tipo: 'compra_agil',
             titulo: compra.nombre,
             institucion: compra.organismo || undefined,
-            monto_estimado: montoTotal || undefined,
+            monto_estimado: subtotalItems || undefined,
             fecha_cierre: compra.fecha_cierre || undefined,
             match_score: compra.match_score || undefined,
             etapa: 'preparacion',
@@ -534,27 +571,31 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                 )}
               </div>
               {compra.monto && (
-                <div className="flex items-center gap-4 text-xs pt-1 border-t">
+                // La decisión "dentro/excede" se toma con el NETO, igual que el
+                // detalle de la compra y que Mercado Público (compara netos).
+                // Antes aquí se comparaba CON IVA y la misma oferta cambiaba de
+                // "dentro" a "excede" entre una pantalla y la otra.
+                <div className="flex items-center gap-4 text-xs pt-1 border-t flex-wrap">
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">Nuestra oferta:</span>
+                    <span className="text-muted-foreground">Nuestra oferta (neto):</span>
                     <span className={`font-bold ${
-                      montoTotal <= compra.monto ? 'text-green-600' : 'text-red-600'
+                      subtotalItems <= compra.monto ? 'text-green-600' : 'text-red-600'
                     }`}>
-                      {formatCurrency(montoTotal)}
+                      {formatCurrency(subtotalItems)}
                     </span>
                   </div>
                   {compra.monto > 0 && (
                     <div className="flex items-center gap-2">
-                      {montoTotal <= compra.monto ? (
+                      {subtotalItems <= compra.monto ? (
                         <TrendingDown className="h-3.5 w-3.5 text-green-600" />
                       ) : (
                         <TrendingUp className="h-3.5 w-3.5 text-red-600" />
                       )}
-                      <span className={montoTotal <= compra.monto ? 'text-green-600' : 'text-red-600'}>
-                        {montoTotal <= compra.monto ? 'Dentro del presupuesto' : 'Excede presupuesto'}
+                      <span className={subtotalItems <= compra.monto ? 'text-green-600' : 'text-red-600'}>
+                        {subtotalItems <= compra.monto ? 'Dentro del presupuesto' : 'Excede presupuesto'}
                       </span>
                       <span className="text-muted-foreground">
-                        ({((montoTotal / compra.monto) * 100).toFixed(1)}%)
+                        ({((subtotalItems / compra.monto) * 100).toFixed(1)}%)
                       </span>
                     </div>
                   )}
@@ -582,7 +623,9 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
             </Button>
           </div>
 
-          <ScrollArea className="h-[400px] pr-4 -mr-4">
+          {/* Altura flexible: en pantallas chicas la lista se adapta en vez de
+              empujar el pie fuera del diálogo (antes era h-[400px] fija). */}
+          <ScrollArea className="h-[45vh] sm:h-[400px] pr-4 -mr-4">
             <div className="space-y-4">
               {itemsSeleccionados.map((item) => (
                 <div
@@ -811,78 +854,47 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
             </div>
             <div className="flex items-center gap-2">
               <Calculator className="h-4 w-4 text-muted-foreground" />
-              <span className="text-lg font-bold text-primary">{formatCurrency(montoTotal)}</span>
+              <div className="text-right leading-tight">
+                <span className="text-lg font-bold text-primary">{formatCurrency(subtotalItems)}</span>
+                <span className="text-sm text-muted-foreground font-normal"> neto</span>
+                <p className="text-xs text-muted-foreground">+ IVA = {formatCurrency(montoTotal)}</p>
+              </div>
             </div>
           </div>
 
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+          {/* Pie simplificado: antes había 5 botones al mismo nivel (se cortaban
+              en celular). Ahora: 1 CTA primario + un menú "Descargar" con las
+              salidas de PDF + Cancelar. */}
+          <DialogFooter className="gap-2 flex-row flex-wrap justify-end">
+            <Button variant="ghost" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button
-              variant="secondary"
-              onClick={async () => {
-                if (!compra) return;
-                const itemsPDF: ItemCotizacion[] = itemsActivos.map(item => ({
-                  itemRequerido: item.nombre,
-                  productoOfertado: item.match?.nombre || item.nombre,
-                  sku: item.match?.sku || 'N/A',
-                  cantidad: item.cantidad,
-                  unidad: item.unidadMedida,
-                  precioUnitario: item.precioUnitario,
-                  total: item.precioUnitario * item.cantidad,
-                  matchScore: item.match?.matchScore
-                }));
-                const datosPDF: DatosCotizacion = {
-                  numero: `COT-${Date.now().toString().slice(-8)}`,
-                  fecha: new Date(),
-                  validezDias: 15,
-                  compra: compra,
-                  items: itemsPDF,
-                  // Datos REALES de la empresa del cliente (antes iban de relleno
-                  // "76.XXX.XXX-X", así el PDF que se subía a postular salía con
-                  // RUT/dirección falsos). empresaFicha ya trae los datos del cliente.
-                  empresa: {
-                    nombre: empresaFicha.nombre,
-                    rut: empresaFicha.rut || '',
-                    direccion: empresaFicha.direccion || '',
-                    telefono: empresaFicha.telefono || '',
-                    email: empresaFicha.email,
-                    logo: empresaFicha.logoUrl,
-                  },
-                };
-                await descargarCotizacionPDF(datosPDF);
-                toast.success('PDF generado correctamente');
-              }}
-              disabled={itemsActivos.length === 0}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Cotización PDF
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={handleFichaTecnica}
-              disabled={itemsActivos.length === 0 || fichaTecnica.isPending}
-            >
-              {fichaTecnica.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <FileText className="h-4 w-4 mr-2" />
-              )}
-              Ver ficha técnica
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={handleDescargarFicha}
-              disabled={itemsActivos.length === 0 || fichaTecnica.isPending}
-            >
-              {fichaTecnica.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4 mr-2" />
-              )}
-              Descargar ficha
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="secondary"
+                  disabled={itemsActivos.length === 0 || fichaTecnica.isPending}
+                >
+                  {fichaTecnica.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
+                  Descargar
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleDescargarCotizacion}>
+                  <Download className="h-4 w-4 mr-2" /> Cotización (PDF)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleDescargarFicha}>
+                  <Download className="h-4 w-4 mr-2" /> Ficha técnica (PDF)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleFichaTecnica}>
+                  <FileText className="h-4 w-4 mr-2" /> Ver ficha técnica
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
               onClick={handleGuardarPropuesta}
               disabled={itemsActivos.length === 0 || updateCompra.isPending || fichaTecnica.isPending}

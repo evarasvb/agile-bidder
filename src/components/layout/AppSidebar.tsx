@@ -317,13 +317,23 @@ export function AppSidebar({ open = false, onClose }: AppSidebarProps) {
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-sidebar-border p-3">
-        <button 
+      <div className="border-t border-sidebar-border p-3 space-y-1">
+        {/* Mi cuenta era huérfana: no existía ninguna entrada del menú hacia
+            /cuenta (plan, facturación). */}
+        <NavLink
+          to="/cuenta"
+          onClick={() => onClose?.()}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
+        >
+          <User className="h-5 w-5" />
+          Mi cuenta
+        </NavLink>
+        <button
           onClick={handleLogout}
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
         >
           <LogOut className="h-5 w-5" />
-          Cerrar Sesion
+          Cerrar Sesión
         </button>
       </div>
       </aside>

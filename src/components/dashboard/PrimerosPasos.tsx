@@ -75,7 +75,9 @@ export function PrimerosPasos() {
       id: "oportunidades", done: revisoOportunidades, icon: Sparkles,
       titulo: "Revisa tus oportunidades",
       desc: "Mira las licitaciones y compras ágiles que calzan con tus productos, con su % de match.",
-      to: "/mis-oportunidades", onClick: marcarVistoOps,
+      // A la BANDEJA (/oportunidades), donde están sus matches. Antes iba a
+      // "Guardadas" (/mis-oportunidades), vacía para un cliente nuevo.
+      to: "/oportunidades", onClick: marcarVistoOps,
       aviso: "Estas son las oportunidades que calzan contigo ✨",
     },
     {
@@ -146,7 +148,7 @@ export function PrimerosPasos() {
           <Button
             size="sm"
             className="bg-firmavb-blue hover:bg-firmavb-blue/90 shrink-0"
-            onClick={() => navigate("/mis-oportunidades")}
+            onClick={() => navigate("/oportunidades")}
           >
             Ver mis oportunidades<ChevronRight className="h-3.5 w-3.5 ml-1" />
           </Button>
