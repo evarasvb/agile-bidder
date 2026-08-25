@@ -28,16 +28,12 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 
 const MisOportunidades = lazy(() => import("./pages/MisOportunidades"));
 const LicitacionDetalle = lazy(() => import("./pages/LicitacionDetalle"));
-const Licitaciones = lazy(() => import("./pages/Licitaciones"));
-const LicitacionesMP = lazy(() => import("./pages/LicitacionesMP"));
 
 const ChatIA = lazy(() => import("./pages/ChatIA"));
 
 const OportunidadesPanel = lazy(() => import("./pages/Oportunidades"));
 const OportunidadDetalle = lazy(() => import("./pages/OportunidadDetalle"));
 
-const Mercado = lazy(() => import("./pages/Mercado"));
-const Instituciones = lazy(() => import("./pages/Instituciones"));
 const ComprasAgiles = lazy(() => import("./pages/ComprasAgiles"));
 const CompraAgilDetalle = lazy(() => import("./pages/CompraAgilDetalle"));
 const OrdenesCompra = lazy(() => import("./pages/OrdenesCompra"));
@@ -47,7 +43,6 @@ const Inventory = lazy(() => import("./pages/Inventory"));
 const Pipeline = lazy(() => import("./pages/Pipeline"));
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Calendar = lazy(() => import("./pages/Calendar"));
 const CalendarioIntegrado = lazy(() => import("./pages/CalendarioIntegrado"));
 const GestionVendedores = lazy(() => import("./pages/GestionVendedores"));
 
@@ -151,8 +146,9 @@ const App = () => (
             <Route path="/mis-oportunidades" element={<MisOportunidades />} />
             <Route path="/licitaciones/:id" element={<LicitacionDetalle />} />
             <Route path="/licitaciones/:id/chat" element={<ChatIA />} />
-            <Route path="/licitaciones" element={<Licitaciones />} />
-            <Route path="/licitaciones-nuevas" element={<LicitacionesMP />} />
+            {/* Legacy: la lista vieja duplicaba Compras Ágiles (y hasta se titulaba así) */}
+            <Route path="/licitaciones" element={<Navigate to="/compras-agiles" replace />} />
+            <Route path="/licitaciones-nuevas" element={<Navigate to="/oportunidades" replace />} />
 
             {/* ----- OPORTUNIDADES PANEL ----- */}
             <Route path="/oportunidades" element={<OportunidadesPanel />} />
@@ -160,12 +156,12 @@ const App = () => (
             <Route path="/oportunidades/:tipo/:id/chat" element={<ChatIA />} />
 
             {/* ----- MERCADO ----- */}
-            <Route path="/mercado" element={<Mercado />} />
+            <Route path="/mercado" element={<Navigate to="/oportunidades" replace />} />
             
               {/* ----- COMPRAS AGILES ----- */}
               <Route path="/compras-agiles" element={<ComprasAgiles />} />
               <Route path="/compras-agiles/:codigo" element={<CompraAgilDetalle />} />
-            <Route path="/mercado/instituciones" element={<Instituciones />} />
+            <Route path="/mercado/instituciones" element={<Navigate to="/reportes/compradores" replace />} />
             <Route path="/mercado/ordenes" element={<OrdenesCompra />} />
 
             {/* ----- PIPELINE ----- */}
@@ -183,7 +179,7 @@ const App = () => (
             
             {/* ----- DASHBOARD ----- */}
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/dashboard/calendario" element={<Calendar />} />
+            <Route path="/dashboard/calendario" element={<Navigate to="/calendario" replace />} />
             <Route path="/calendario" element={<CalendarioIntegrado />} />
             <Route path="/dashboard/vendedores" element={<GestionVendedores />} />
             
@@ -210,6 +206,7 @@ const App = () => (
             <Route path="/cuenta/facturacion" element={<Billing />} />
             
             {/* Redirects de rutas antiguas */}
+            <Route path="/planes" element={<Navigate to="/cuenta" replace />} />
             <Route path="/dashboard-old" element={<Navigate to="/dashboard" replace />} />
             <Route path="/clientes/*" element={<Navigate to="/dashboard" replace />} />
             

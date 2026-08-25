@@ -7,6 +7,9 @@ export const PIPELINE_ETAPAS = [
   'adjudicada',
   'oc_emitida',
   'pagada',
+  // Cierre negativo: sin esta etapa las no adjudicadas quedaban vagando
+  // eternamente en "evaluación" y las métricas de éxito no cuadraban.
+  'perdida',
 ] as const;
 
 export type PipelineEtapa = (typeof PIPELINE_ETAPAS)[number];
@@ -75,6 +78,13 @@ export const ETAPA_CONFIG: Record<PipelineEtapa, EtapaConfig> = {
     color: 'bg-emerald-600',
     textColor: 'text-emerald-700',
     badgeColor: 'bg-emerald-100 text-emerald-700',
+  },
+  perdida: {
+    key: 'perdida',
+    label: 'Perdida',
+    color: 'bg-rose-500',
+    textColor: 'text-rose-700',
+    badgeColor: 'bg-rose-100 text-rose-700',
   },
 };
 

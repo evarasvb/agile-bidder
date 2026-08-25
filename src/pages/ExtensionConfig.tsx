@@ -54,6 +54,7 @@ import {
   useExtensionActivity 
 } from '@/hooks/useExtensionApiKeys';
 import { useCliente } from '@/hooks/useCliente';
+import { useExtensionStatus } from '@/hooks/useExtensionStatus';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { downloadExtension } from '@/utils/extensionDownload';
@@ -61,6 +62,9 @@ import { toast } from 'sonner';
 
 export default function ExtensionConfig() {
   const { data: cliente } = useCliente();
+  // Estado REAL de conexión: antes esta pantalla no decía si la extensión
+  // estaba conectada (el indicador vivía en una barra oculta en móvil).
+  const { isConnected: extConectada, isLoading: extVerificando, lastActivity: extUltimaActividad } = useExtensionStatus();
   const clienteId = cliente?.id || null;
   
   const { data: apiKeys, isLoading } = useExtensionApiKeys(clienteId);
@@ -163,7 +167,7 @@ export default function ExtensionConfig() {
             Extensión Chrome
           </h1>
           <p className="text-muted-foreground mt-1">
-            Gestiona las API Keys para FirmaVB Postulador
+            Postula más rápido: la extensión autocompleta tus ofertas en Mercado Público
           </p>
         </div>
         
@@ -257,6 +261,33 @@ export default function ExtensionConfig() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Estado de conexión, grande y claro (lo primero que el usuario quiere
+          saber, especialmente en celular). */}
+      {!extVerificando && (
+        extConectada ? (
+          <div className="rounded-xl border border-firmavb-green/30 bg-firmavb-green/10 px-4 py-3 flex flex-wrap items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-firmavb-green animate-pulse" />
+            <p className="text-sm font-semibold text-firmavb-green">✅ Extensión conectada</p>
+            {extUltimaActividad && (
+              <p className="text-xs text-muted-foreground">
+                Última actividad {formatDistanceToNow(extUltimaActividad, { addSuffix: true, locale: es })}
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+              <p className="text-sm font-semibold text-amber-800">Aún no está conectada</p>
+              <p className="text-xs text-amber-700">Sigue la guía y quedará lista en ~3 minutos.</p>
+            </div>
+            <a href="#guia-instalacion" className="text-sm font-semibold text-amber-800 underline underline-offset-2">
+              Ir a la guía paso a paso ↓
+            </a>
+          </div>
+        )
+      )}
 
       {/* Info Card */}
       <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
@@ -448,7 +479,7 @@ export default function ExtensionConfig() {
 
       {/* Instructions — guía detallada paso a paso (pensada para alguien que
           nunca ha instalado una extensión "descomprimida" en Chrome). */}
-      <Card>
+      <Card id="guia-instalacion">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Chrome className="h-5 w-5 text-primary" />
