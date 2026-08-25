@@ -1,0 +1,11 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1080, "h": 1350, "title": "Mitos y errores" },
+    { "file": "Tips.dc.html", "x": 1230, "y": 0, "w": 1080, "h": 1350, "title": "Tips prácticos" },
+    { "file": "Historias.dc.html", "x": 2460, "y": 0, "w": 1080, "h": 1350, "title": "Historias reales" },
+    { "file": "Backstage.dc.html", "x": 0, "y": 1550, "w": 1080, "h": 1350, "title": "Detrás de cámara" },
+    { "file": "PruebaSocial.dc.html", "x": 1230, "y": 1550, "w": 1080, "h": 1350, "title": "Prueba social" },
+    { "file": "CTA.dc.html", "x": 2460, "y": 1550, "w": 1080, "h": 1350, "title": "CTA directo" }
+  ],
+  "launch": { "view": "canvas" }
+}
