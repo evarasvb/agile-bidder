@@ -89,12 +89,12 @@ serve(async (req) => {
     // 1.5/2.0/2.5 pueden estar retirados según la key.
     const MODELOS = [
       ...(envModel ? [envModel] : []),
-      // El más rápido primero (pedido: dejar fijo el modelo más rápido). Si la
-      // key no tiene acceso a alguno, se cae al siguiente.
-      "gemini-2.0-flash-lite",
+      // 2026-08-25: Google retiró gemini-2.0-* y gemini-2.5-flash (404 "no
+      // longer available"); su propio error indica migrar a gemini-3.6-flash.
+      // flash-latest/lite-latest quedan de respaldo (a veces dan 503).
+      "gemini-3.6-flash",
       "gemini-flash-latest",
-      "gemini-2.0-flash",
-      "gemini-2.5-flash",
+      "gemini-flash-lite-latest",
     ].filter((m, i, a) => a.indexOf(m) === i);
 
     // Contexto de la sesión (página actual, estado del cliente) para guiar mejor.

@@ -243,19 +243,23 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       // códigos: URLs enormes y dos idas y vueltas extra que hacían lento el panel.
       const bestMatchByCodigo: Record<string, { score: number; producto: string | null; count: number }> = {};
       const itemMatchCountByCodigo: Record<string, number> = {};
-      if (clienteIdPanel) {
-        const [matchesRes, itemMatchesRes] = await Promise.all([
-          (supabase as any)
-            .from('ca_matches')
-            .select('compra_agil_codigo, score, nombre_producto')
-            .eq('cliente_id', clienteIdPanel)
-            .gte('fecha_cierre', nowIso),
-          (supabase as any)
-            .from('ca_item_matches')
-            .select('compra_agil_codigo')
-            .eq('cliente_id', clienteIdPanel)
-            .gte('fecha_cierre', nowIso),
-        ]);
+      {
+        // Si el RPC de empresa dueña no resolvió (p. ej. caché de esquema o un
+        // usuario sin fila en clientes), NO dejamos el panel sin matches: caemos
+        // al comportamiento anterior (matches por código, mejor score).
+        let matchQuery = (supabase as any)
+          .from('ca_matches')
+          .select('compra_agil_codigo, score, nombre_producto')
+          .gte('fecha_cierre', nowIso);
+        let itemQuery = (supabase as any)
+          .from('ca_item_matches')
+          .select('compra_agil_codigo')
+          .gte('fecha_cierre', nowIso);
+        if (clienteIdPanel) {
+          matchQuery = matchQuery.eq('cliente_id', clienteIdPanel);
+          itemQuery = itemQuery.eq('cliente_id', clienteIdPanel);
+        }
+        const [matchesRes, itemMatchesRes] = await Promise.all([matchQuery, itemQuery]);
         if ((matchesRes as any)?.error) {
           console.error('[OportunidadesPanel] Error fetching ca_matches:', (matchesRes as any).error);
         }
