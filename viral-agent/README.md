@@ -11,6 +11,7 @@ Instagram existente: [@surfeandolicitaciones](https://www.instagram.com/surfeand
 - Genera decenas de variantes de captions/posts a partir de unos pocos pilares de contenido (el "multiplicador").
 - Arma un calendario de lanzamiento de 30 días listo para copiar/pegar o publicar automáticamente.
 - Mantiene bancos de hashtags segmentados por nicho (compras públicas, PYMES, libros de negocio).
+- Genera las 6 imágenes de post (con tu portada y foto reales) y las deja con URL pública lista para el bot — no hay que exportar ni subir nada a mano.
 - Publica automáticamente en tu Página de Facebook y tu cuenta de Instagram (Business) usando la API oficial de Meta, una vez que las tengas configuradas.
 - Te da una lista de tipos de comunidades reales donde tu audiencia (PYMES/emprendedores/proveedores del Estado en Chile) ya está activa, con la etiqueta correcta para no quemar la cuenta.
 
@@ -53,7 +54,7 @@ pip install -r requirements.txt
 python contenido/generador_captions.py
 ```
 
-Esto crea `contenido/calendario_lanzamiento.csv` con 30 días de posts (red, formato, pilar, caption, hashtags, CTA), combinando los pilares de `estrategia` con los bancos de hashtags. Revísalo y edita a mano lo que quieras antes de publicar — el agente multiplica variantes, pero tú eres quien conoce mejor tu voz.
+Esto crea `contenido/calendario_lanzamiento.csv` con 30 días de posts (red, formato, pilar, caption, hashtags, CTA, imagen_url), combinando los 6 pilares de contenido con los bancos de hashtags y las imágenes ya renderizadas en `imagenes/`. Revísalo y edita a mano lo que quieras antes de publicar — el agente multiplica variantes, pero tú eres quien conoce mejor tu voz.
 
 ### 5. Publicar
 
@@ -93,9 +94,13 @@ tener tu computador prendido. Para activarlo:
    rama principal (`main`). Mientras el trabajo esté en una rama aparte, pruébalo manual:
    pestaña **Actions → "Publicar libro en redes" → Run workflow** (con "Modo prueba" activado
    la primera vez).
-4. Instagram no acepta posts de solo texto: para que el bot publique ahí, cada fila del CSV
-   necesita algo en la columna `imagen_url` (una URL pública a la imagen/carrusel de ese día).
-   Sin eso, el bot salta ese post y avisa en el log — Facebook sí funciona solo con texto.
+4. Instagram no acepta posts de solo texto: el calendario ya trae `imagen_url` completo,
+   apuntando a `viral-agent/imagenes/` (las 6 plantillas ya renderizadas con tu portada y
+   foto reales, servidas como raw.githubusercontent.com porque el repo es público). No
+   necesitas subir nada a mano. **Eso sí:** una vez que esta rama se fusione a `main`, regenera
+   el CSV para que las URLs apunten a `main` en vez de a esta rama (que eventualmente se borra):
+   `python contenido/generador_captions.py` (ya usa `main` por defecto — solo hazlo de nuevo
+   sin la variable `IMAGENES_BASE_URL` que se usó para probar en esta rama).
 
 ### 6. Comunidades
 
@@ -112,7 +117,13 @@ viral-agent/
 │   ├── pilares.py              # pilares de contenido + plantillas de caption
 │   ├── banco_hashtags.py       # hashtags por segmento
 │   ├── generador_captions.py   # arma el calendario de 30 días
-│   └── calendario_lanzamiento.csv  # (generado)
+│   └── calendario_lanzamiento.csv  # (generado, con imagen_url ya completo)
+├── plantillas-diseno/
+│   ├── *.dc.html                # las 6 plantillas visuales (editables en Claude Design)
+│   ├── render.mjs + package.json  # las renderiza a PNG (npm run render)
+│   └── canvas.json
+├── imagenes/
+│   └── pilar-*.png              # PNGs ya renderizados, con portada y foto reales
 ├── comunidades/
 │   └── COMUNIDADES_OBJETIVO.md
 └── publicador/
