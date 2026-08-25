@@ -1,0 +1,79 @@
+# Bot de publicación - Marketing viral del libro
+# Publica un post del calendario de viral-agent/ en Facebook/Instagram
+# cada día, usando la API oficial de Meta Graph API.
+#
+# IMPORTANTE: el trigger `schedule` solo se activa cuando este archivo
+# vive en la rama por defecto (main). Mientras tanto, úsalo con
+# "Run workflow" (workflow_dispatch) desde la pestaña Actions.
+
+name: Publicar libro en redes
+
+on:
+  schedule:
+    # Todos los días a las 12:00 hora Chile (aprox., ajusta si cambia el horario de verano)
+    - cron: '0 15 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Modo prueba (no publica de verdad, solo muestra qué haría)'
+        type: boolean
+        default: true
+      red:
+        description: 'Forzar una red específica (dejar vacío = automático)'
+        type: choice
+        options:
+          - ''
+          - Instagram
+          - Facebook
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: viral-agent
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Generar calendario si aún no existe
+        run: |
+          test -f contenido/calendario_lanzamiento.csv || python contenido/generador_captions.py
+
+      - name: Publicar post del día
+        env:
+          META_PAGE_ID: ${{ secrets.META_PAGE_ID }}
+          META_IG_BUSINESS_ID: ${{ secrets.META_IG_BUSINESS_ID }}
+          META_PAGE_ACCESS_TOKEN: ${{ secrets.META_PAGE_ACCESS_TOKEN }}
+          BOOK_URL: ${{ secrets.BOOK_URL }}
+          IG_HANDLE: ${{ secrets.IG_HANDLE }}
+        run: |
+          ARGS=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          if [ -n "${{ github.event.inputs.red }}" ]; then
+            ARGS="$ARGS --red ${{ github.event.inputs.red }}"
+          fi
+          python publicador/meta_poster.py $ARGS
+
+      - name: Guardar estado actualizado del calendario
+        run: |
+          git config user.name "viral-agent-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add contenido/calendario_lanzamiento.csv
+          git diff --cached --quiet || git commit -m "bot: marca publicación del día"
+          git diff --cached --quiet || git push

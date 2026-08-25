@@ -83,6 +83,7 @@ def armar_calendario(dias, seed=42):
                 "caption": caption,
                 "hashtags": armar_hashtags(rng),
                 "cta": f"Link del libro: {BOOK_URL} · Síguenos en @{IG_HANDLE}",
+                "imagen_url": "",
                 "estado": "pendiente",
             }
         )
@@ -103,7 +104,7 @@ def main():
     with open(args.salida, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
             f,
-            fieldnames=["dia", "red", "formato", "pilar", "caption", "hashtags", "cta", "estado"],
+            fieldnames=["dia", "red", "formato", "pilar", "caption", "hashtags", "cta", "imagen_url", "estado"],
         )
         writer.writeheader()
         writer.writerows(filas)

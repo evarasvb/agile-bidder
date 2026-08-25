@@ -55,7 +55,11 @@ python contenido/generador_captions.py
 
 Esto crea `contenido/calendario_lanzamiento.csv` con 30 días de posts (red, formato, pilar, caption, hashtags, CTA), combinando los pilares de `estrategia` con los bancos de hashtags. Revísalo y edita a mano lo que quieras antes de publicar — el agente multiplica variantes, pero tú eres quien conoce mejor tu voz.
 
-### 5. Publicar (dry-run primero)
+### 5. Publicar
+
+Dos formas, según qué tan "hands-off" lo quieras:
+
+**A) A mano / probando (dry-run primero):**
 
 ```bash
 python publicador/meta_poster.py --dry-run
@@ -68,6 +72,30 @@ python publicador/meta_poster.py
 ```
 
 Publica el post del día en Facebook e Instagram (si el formato es compatible), y marca la fila como `publicado` en el CSV para no duplicar.
+
+**B) El bot automático (GitHub Actions):**
+
+Ya está el workflow `.github/workflows/publicar-libro-redes.yml` — corre todos los días
+y publica el siguiente post pendiente del calendario, sin que tengas que hacer nada ni
+tener tu computador prendido. Para activarlo:
+
+1. En GitHub: `Settings → Secrets and variables → Actions → New repository secret`, agrega:
+   - `META_PAGE_ID`
+   - `META_IG_BUSINESS_ID`
+   - `META_PAGE_ACCESS_TOKEN`
+   - `BOOK_URL`
+   - `IG_HANDLE`
+2. Importante sobre el token: si lo sacaste rápido desde el Graph API Explorer, probablemente
+   dura solo 1-2 horas. Para que el bot funcione día a día necesitas extenderlo a un token
+   de **larga duración** (60 días) desde el [Access Token Debugger](https://developers.facebook.com/tools/debug/accesstoken),
+   botón "Extend Access Token" — y guardar ESE token en el secret, no el original.
+3. El disparador programado (`schedule`) solo se activa cuando este workflow vive en la
+   rama principal (`main`). Mientras el trabajo esté en una rama aparte, pruébalo manual:
+   pestaña **Actions → "Publicar libro en redes" → Run workflow** (con "Modo prueba" activado
+   la primera vez).
+4. Instagram no acepta posts de solo texto: para que el bot publique ahí, cada fila del CSV
+   necesita algo en la columna `imagen_url` (una URL pública a la imagen/carrusel de ese día).
+   Sin eso, el bot salta ese post y avisa en el log — Facebook sí funciona solo con texto.
 
 ### 6. Comunidades
 
