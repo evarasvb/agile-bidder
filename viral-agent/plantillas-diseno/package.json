@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "render": "node render.mjs"
+    "render": "node render.mjs",
+    "render:variantes": "node generar_variantes.mjs"
   },
   "devDependencies": {
     "playwright-core": "^1.48.0"

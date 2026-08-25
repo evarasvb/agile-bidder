@@ -26,21 +26,23 @@ except ImportError:
     pass
 
 BOOK_URL = os.environ.get("BOOK_URL", "https://www.amazon.com/-/es/dp/B0G4NLY5TL")
+SITE_URL = os.environ.get("SITE_URL", "https://www.firmavb.cl")
 IG_HANDLE = os.environ.get("IG_HANDLE", "surfeandolicitaciones")
 
-# Imágenes reales de las plantillas (ver plantillas-diseno/), una por pilar.
-# Regeneradas con: cd plantillas-diseno && npm run render
+# Imágenes reales (ver plantillas-diseno/generar_variantes.mjs): un pool por
+# pilar en vez de una sola imagen fija, para no repetir la misma foto cada
+# vez que el pilar rota. Regenerar con: cd plantillas-diseno && npm run render:variantes
 IMAGENES_BASE_URL = os.environ.get(
     "IMAGENES_BASE_URL",
     "https://raw.githubusercontent.com/evarasvb/agile-bidder/main/viral-agent/imagenes",
 )
-IMG_POR_PILAR = {
-    "mitos": "pilar-mitos.png",
-    "tips": "pilar-tips.png",
-    "historias": "pilar-historias.png",
-    "backstage": "pilar-backstage.png",
-    "prueba_social": "pilar-prueba-social.png",
-    "cta_directo": "pilar-cta.png",
+POOL_POR_PILAR = {
+    "mitos": [f"variantes/mitos-{i:02d}.jpg" for i in range(1, 18)],
+    "tips": [f"variantes/tips-{i:02d}.jpg" for i in range(1, 18)],
+    "historias": [f"variantes/historias-{i:02d}.jpg" for i in range(1, 18)],
+    "backstage": [f"variantes/backstage-{i:02d}.jpg" for i in range(1, 18)],
+    "prueba_social": [f"variantes/prueba-social-{i:02d}.jpg" for i in range(1, 17)],
+    "cta_directo": [f"variantes/cta-{i:02d}.jpg" for i in range(1, 17)],
 }
 
 CITAS_LECTOR_EJEMPLO = [
@@ -79,9 +81,14 @@ def armar_calendario(dias, seed=42):
             pilar = rotacion[idx_rotacion % len(rotacion)]
             idx_rotacion += 1
 
-        idx_caption = usados_por_pilar[pilar["clave"]] % len(pilar["captions"])
-        usados_por_pilar[pilar["clave"]] += 1
+        usos_previos = usados_por_pilar[pilar["clave"]]
+        idx_caption = usos_previos % len(pilar["captions"])
         caption_tpl = pilar["captions"][idx_caption]
+
+        pool_imagenes = POOL_POR_PILAR[pilar["clave"]]
+        imagen = pool_imagenes[usos_previos % len(pool_imagenes)]
+
+        usados_por_pilar[pilar["clave"]] += 1
 
         caption = caption_tpl.format(
             titulo=BOOK_TITLE,
@@ -101,8 +108,8 @@ def armar_calendario(dias, seed=42):
                 "pilar": pilar["nombre"],
                 "caption": caption,
                 "hashtags": armar_hashtags(rng),
-                "cta": f"Link del libro: {BOOK_URL} · Síguenos en @{IG_HANDLE}",
-                "imagen_url": f"{IMAGENES_BASE_URL}/{IMG_POR_PILAR[pilar['clave']]}",
+                "cta": f"Link del libro: {BOOK_URL} · Más info: {SITE_URL} · Síguenos en @{IG_HANDLE}",
+                "imagen_url": f"{IMAGENES_BASE_URL}/{imagen}",
                 "estado": "pendiente",
             }
         )
