@@ -251,7 +251,35 @@ export default function CompraAgilDetalle() {
         </CardHeader>
         <CardContent>
           {compra.items && compra.items.length > 0 ? (
-            <div className="overflow-x-auto">
+            <div>
+              {/* Móvil: una tarjeta por ítem ("Piden X → Ofreces Y") en vez de
+                  obligar a scroll horizontal sobre una tabla de 6 columnas. */}
+              <div className="sm:hidden space-y-2.5">
+                {filasItems.map((f) => (
+                  <div key={f.id} className={`rounded-xl border p-3 ${f.match ? 'border-firmavb-blue/30' : 'border-border/60'}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-medium flex-1">{f.solicitado}</p>
+                      {f.match && (
+                        <span className={`shrink-0 inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${matchBadge(f.match.score)}`}>
+                          {f.match.score}%
+                        </span>
+                      )}
+                    </div>
+                    {f.match ? (
+                      <div className="mt-1.5 text-sm">
+                        <p className="text-firmavb-blue font-medium">→ {f.match.nombre}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {f.cantidad} {f.unidad} × {clp(f.match.precio || 0)} = <span className="font-semibold text-foreground">{clp(f.match.subtotal)}</span>
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-xs text-muted-foreground">Sin match en tu inventario · {f.cantidad} {f.unidad}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="hidden sm:block overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -298,6 +326,7 @@ export default function CompraAgilDetalle() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
 
               {/* Resumen: total de tu oferta vs presupuesto */}
               <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border bg-muted/30 p-4">

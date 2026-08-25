@@ -500,7 +500,7 @@ export default function Dashboard() {
                   <TableHeader>
                     <TableRow className="bg-muted/50">
                       <TableHead className="font-semibold">Título</TableHead>
-                      <TableHead className="font-semibold">Score</TableHead>
+                      <TableHead className="font-semibold">Match</TableHead>
                       <TableHead className="font-semibold">
                         Institución
                       </TableHead>

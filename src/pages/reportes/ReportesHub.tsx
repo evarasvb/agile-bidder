@@ -34,12 +34,15 @@ const reports: {
   href: string;
   accent: Accent;
 }[] = [
-  { title: "Proveedores", description: "Quién le vende al Estado: ranking por monto adjudicado y participación de mercado", icon: Users, href: "/reportes/proveedores", accent: "blue" },
-  { title: "Productos", description: "Qué demanda el Estado: monto transado, precio de referencia y quién los vende", icon: Package, href: "/reportes/productos", accent: "green" },
-  { title: "Compradores", description: "Instituciones que compran: volúmenes, a quién le compran y qué compran", icon: Building2, href: "/reportes/compradores", accent: "orange" },
-  { title: "Mercado", description: "Vista general: tendencias, regiones, volúmenes y tipos de compra pública", icon: TrendingUp, href: "/reportes/mercado", accent: "violet" },
-  { title: "Competidores", description: "Inteligencia competitiva: quién domina y qué tan concentrado está el mercado", icon: Swords, href: "/reportes/competidores", accent: "red" },
-  { title: "Convenio Marco", description: "Precios, competidores y compradores por producto de convenio marco", icon: FileCheck, href: "/reportes/convenio-marco", accent: "celeste" },
+  // Cada reporte se presenta como la PREGUNTA que responde (un dueño de PYME
+  // busca decisiones, no "rankings"). El más accionable va primero: Convenio
+  // Marco trae "Mi competitividad" (Ganas / Competitivo / Caro por producto).
+  { title: "¿Estoy caro o barato?", description: "Compara tus precios contra el mercado, producto por producto: Ganas · Competitivo · Caro", icon: FileCheck, href: "/reportes/convenio-marco", accent: "celeste" },
+  { title: "¿Quién me está ganando?", description: "Tus competidores: quiénes se adjudican las compras de tu rubro y qué tan concentrado está", icon: Swords, href: "/reportes/competidores", accent: "red" },
+  { title: "¿Quién compra lo que vendo?", description: "Las instituciones que más compran tu tipo de producto, para enfocar tus postulaciones", icon: Building2, href: "/reportes/compradores", accent: "orange" },
+  { title: "¿Qué pide el Estado?", description: "Los productos más demandados, su precio de referencia y quién los vende", icon: Package, href: "/reportes/productos", accent: "green" },
+  { title: "¿Quién le vende al Estado?", description: "Ranking de proveedores por monto adjudicado y participación de mercado", icon: Users, href: "/reportes/proveedores", accent: "blue" },
+  { title: "¿Cómo se mueve el mercado?", description: "Tendencias, regiones, volúmenes y tipos de compra pública", icon: TrendingUp, href: "/reportes/mercado", accent: "violet" },
 ];
 
 export default function ReportesHub() {

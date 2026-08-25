@@ -82,7 +82,10 @@ export default function CalendarioIntegrado() {
   const [activeFilters, setActiveFilters] = useState<Set<FilterKey>>(
     new Set(typeFilters.map((f) => f.key))
   );
-  const [showSidebar, setShowSidebar] = useState(true);
+  // En celular parte cerrado: si no, el panel lateral aplastaba el calendario.
+  const [showSidebar, setShowSidebar] = useState(() =>
+    typeof window === 'undefined' ? true : window.innerWidth >= 1024
+  );
 
   // Modals
   const [selectedEvent, setSelectedEvent] = useState<CalendarioEvent | null>(null);
@@ -223,7 +226,7 @@ export default function CalendarioIntegrado() {
       </div>
 
       {/* Main layout: Calendar + Sidebar */}
-      <div className="flex gap-4">
+      <div className="flex flex-col lg:flex-row gap-4">
         {/* Calendar */}
         <Card className={cn("flex-1 min-w-0", showSidebar ? "" : "")}>
           <CardContent className="p-4">
@@ -280,7 +283,7 @@ export default function CalendarioIntegrado() {
 
         {/* Sidebar */}
         {showSidebar && (
-          <div className="w-80 shrink-0 space-y-4">
+          <div className="w-full lg:w-80 shrink-0 space-y-4">
             {/* Filters */}
             <Card>
               <CardHeader className="pb-3">

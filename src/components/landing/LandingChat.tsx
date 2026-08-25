@@ -155,7 +155,7 @@ export function LandingChat({ open, onClose }: LandingChatProps) {
   if (!open) return null;
 
   return (
-    <Card className="w-80 h-[500px] flex flex-col shadow-2xl border-border/50 fixed bottom-24 right-6 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
+    <Card className="w-[calc(100vw-1.5rem)] max-w-sm sm:w-80 h-[500px] flex flex-col shadow-2xl border-border/50 fixed bottom-24 right-6 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
       <div className="flex items-center justify-between p-4 border-b border-border bg-gradient-to-r from-firmavb-blue to-header-dark rounded-t-lg">
         <div className="flex items-center gap-2">
           <div className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center">
@@ -163,7 +163,7 @@ export function LandingChat({ open, onClose }: LandingChatProps) {
           </div>
           <div>
             <p className="font-medium text-white text-sm">Asistente FirmaVB</p>
-            <p className="text-xs text-white/70">Respuestas automáticas</p>
+            <p className="text-xs text-white/70">Te respondo al toque</p>
           </div>
         </div>
         <Button
