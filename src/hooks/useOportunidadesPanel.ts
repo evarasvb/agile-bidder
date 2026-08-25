@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { aplicarFiltrosCliente, normalizar, type ClienteFiltros } from '@/hooks/useClienteFiltros';
+import { aplicarFiltrosCliente, coincideConcepto, normalizar, type ClienteFiltros } from '@/hooks/useClienteFiltros';
 
 // =============================================================================
 // INTERFACES
@@ -31,6 +31,9 @@ export interface OportunidadPanel {
   // definió en su onboarding (aunque aún no tenga inventario para el % de match).
   // Permite que la tarjeta diga "Tu rubro" en vez de un "N/A" mudo.
   rubro_match?: boolean;
+  // La palabra concreta que calzó (ej: "toner"), para que la tarjeta explique
+  // POR QUÉ está aquí en vez de un ✓ genérico igual en todas.
+  rubro_palabra?: string;
 }
 
 export interface OportunidadDetalle extends OportunidadPanel {
@@ -338,11 +341,19 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       if (filtrosRow) {
         all = aplicarFiltrosCliente(all, filtrosRow as Partial<ClienteFiltros>);
       }
-      // Lo que sobrevivió al filtro de palabras COINCIDE con la definición del
-      // cliente: márcalo como "tu rubro" para que la tarjeta lo diga (clave para
-      // clientes sin inventario todavía: antes veían puro "N/A").
+      // Lo que coincide con la definición del cliente lleva la PALABRA que calzó
+      // (ej: "toner"), para que la tarjeta explique por qué está aquí. Clave para
+      // clientes sin inventario todavía: antes veían puro "N/A".
       if (tienePalabras) {
-        for (const o of all) o.rubro_match = true;
+        const palabras = (filtrosRow!.palabras_incluir as string[]).filter(Boolean);
+        for (const o of all) {
+          const texto = normalizar(`${o.nombre || ''} ${o.descripcion || ''} ${o.organismo || ''} ${o.items_text || ''}`);
+          const p = palabras.find((w) => coincideConcepto(texto, w));
+          if (p) {
+            o.rubro_match = true;
+            o.rubro_palabra = p;
+          }
+        }
       }
 
       // Apply filters

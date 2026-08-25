@@ -8,7 +8,6 @@ import { BrowserRouter, Routes, Route, Outlet, Navigate } from "react-router-dom
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AdminOnlyRoute } from "@/components/auth/AdminOnlyRoute";
-import { ChatWidget } from "@/components/support/ChatWidget";
 import { ScrollToTop } from "@/components/ScrollToTop";
 
 import { useCliente } from "@/hooks/useCliente";
@@ -119,7 +118,9 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <ScrollToTop />
-        <ChatWidget />
+        {/* ChatWidget eliminado: se superponía con Evaristo (dos burbujas de
+            ayuda en la misma esquina). Evaristo cubre soporte con IA + WhatsApp
+            dentro de la app, y el landing tiene su propio LandingChat. */}
         <Suspense
           fallback={
             <div className="min-h-screen flex items-center justify-center bg-background">

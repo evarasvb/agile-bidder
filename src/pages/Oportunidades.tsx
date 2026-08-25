@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -104,7 +104,7 @@ function OpportunityCard({
               </Badge>
             ) : op.rubro_match ? (
               <Badge variant="outline" className="border-firmavb-blue/40 text-firmavb-blue bg-firmavb-blue/5">
-                Tu rubro ✓
+                {op.rubro_palabra ? `Tu rubro: ${op.rubro_palabra}` : "Tu rubro ✓"}
               </Badge>
             ) : null}
             <Badge variant="outline" className="text-xs">
@@ -202,10 +202,14 @@ function OpportunityCard({
 export default function Oportunidades() {
   const navigate = useNavigate();
   const { requirePro } = useRequirePro();
-  const [filters, setFilters] = useState<PanelFilters>({
+  // Acepta ?q= (viene del buscador del landing y de otros enlaces): el término
+  // llega precargado en la búsqueda en vez de perderse.
+  const [searchParams] = useSearchParams();
+  const [filters, setFilters] = useState<PanelFilters>(() => ({
     sortBy: "match_score",
     sortAsc: false,
-  });
+    search: searchParams.get("q") || undefined,
+  }));
   const [page, setPage] = useState(1);
   const pageSize = 24;
 
@@ -274,6 +278,13 @@ export default function Oportunidades() {
   };
 
   const handleViewDetail = (op: OportunidadPanel) => {
+    // Compra ágil → directo al detalle con el match producto-por-producto.
+    // Antes pasaba por OportunidadDetalle (mismos ítems SIN match) y desde ahí
+    // otro clic al detalle bueno: dos pantallas para lo mismo.
+    if (op.tipo === 'compra_agil') {
+      navigate(`/compras-agiles/${op.codigo}`);
+      return;
+    }
     navigate(`/oportunidades/${op.tipo}/${op.codigo}`);
   };
 

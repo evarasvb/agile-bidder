@@ -62,7 +62,9 @@ export default function Landing() {
     }
     if (isAuthenticated) {
       // Ya tiene sesión: lo llevamos directo a la lista completa.
-      navigate(`/licitaciones?search=${encodeURIComponent(q)}`);
+      // A la Bandeja, que SÍ lee ?q= (antes iba a /licitaciones, que ignoraba
+      // el parámetro: lo buscado se perdía en silencio).
+      navigate(`/oportunidades?q=${encodeURIComponent(q)}`);
       return;
     }
     // Visitante anónimo: mostramos el teaser público aquí mismo (engancha) y

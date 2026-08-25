@@ -49,14 +49,13 @@ import {
   Cell,
   Legend,
 } from "recharts";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import {
   MetricCardSkeleton,
   ChartSkeleton,
 } from "@/components/dashboard/DashboardSkeleton";
-import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
 import { PrimerosPasos } from "@/components/dashboard/PrimerosPasos";
 import { ResumenEjecutivo } from "@/components/dashboard/ResumenEjecutivo";
 import { FirmaVBHeader } from "@/components/layout/FirmaVBHeader";
@@ -95,6 +94,7 @@ const formatCompact = (value: number) => {
 };
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const {
     data: kpis,
     isLoading: kpisLoading,
@@ -109,54 +109,27 @@ export default function Dashboard() {
     useCierresProximos();
   const { data: matchesData, isLoading: matchesLoading } =
     useUltimosMatches();
-  const { mutate: runMatching, isPending: isMatching } = useMatchingAI();
-  const [matchingDialogOpen, setMatchingDialogOpen] = useState(false);
-  const [matchingPreview, setMatchingPreview] = useState<{
-    total: number;
-    comprasAgiles: number;
-    licitaciones: number;
-  } | null>(null);
-
-  const handleMatchingClick = async () => {
+  // "Buscar oportunidades para mí": corre el match del PROPIO cliente y lleva a
+  // la bandeja. Antes era "Ejecutar Matching IA" con un diálogo que contaba
+  // oportunidades de TODO el sistema (jerga + números ajenos al cliente).
+  const [isMatching, setIsMatching] = useState(false);
+  const handleBuscarParaMi = async () => {
+    setIsMatching(true);
     try {
-      const { data: comprasAgiles } = await supabase
-        .from("compras_agiles")
-        .select("codigo", { count: "exact" })
-        .or("match_encontrado.eq.false,match_encontrado.is.null")
-        .limit(1000);
-
-      const { data: licitaciones } = await supabase
-        .from("licitaciones")
-        .select("id_licitacion", { count: "exact" })
-        .eq("procesada", false)
-        .limit(1000);
-
-      const total =
-        (comprasAgiles?.length || 0) + (licitaciones?.length || 0);
-
-      if (total === 0) {
-        toast({
-          title: "Sin oportunidades nuevas",
-          description: "Todas las oportunidades ya han sido procesadas",
-        });
-        return;
-      }
-
-      setMatchingPreview({
-        total,
-        comprasAgiles: comprasAgiles?.length || 0,
-        licitaciones: licitaciones?.length || 0,
+      await (supabase as any).rpc("generar_matches_ca_para_mi");
+      toast({
+        title: "¡Listo!",
+        description: "Buscamos coincidencias nuevas con tu inventario.",
       });
-      setMatchingDialogOpen(true);
-    } catch (error) {
-      console.error("Error loading preview:", error);
-      runMatching();
+      navigate("/oportunidades");
+    } catch {
+      toast({
+        title: "No se pudo buscar ahora",
+        description: "El robot lo hará automáticamente en unos minutos.",
+      });
+    } finally {
+      setIsMatching(false);
     }
-  };
-
-  const handleConfirmMatching = () => {
-    setMatchingDialogOpen(false);
-    runMatching();
   };
 
   const handleForceRefresh = async () => {
@@ -200,131 +173,29 @@ export default function Dashboard() {
             </TooltipContent>
           </Tooltip>
 
-          <Dialog
-            open={matchingDialogOpen}
-            onOpenChange={setMatchingDialogOpen}
-          >
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DialogTrigger asChild>
-                  <Button
-                    onClick={handleMatchingClick}
-                    disabled={isMatching}
-                    className="bg-firmavb-blue hover:bg-firmavb-blue/90 text-white shadow-lg"
-                  >
-                    {isMatching ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Procesando...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        Ejecutar Matching IA
-                      </>
-                    )}
-                  </Button>
-                </DialogTrigger>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="text-xs">
-                  Analiza oportunidades y encuentra matches con tu inventario
-                  usando IA
-                </p>
-              </TooltipContent>
-            </Tooltip>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-firmavb-blue" />
-                  Ejecutar Matching con IA
-                </DialogTitle>
-                <DialogDescription>
-                  El sistema analizará las compras ágiles y licitaciones
-                  pendientes para encontrar matches con tu inventario.
-                </DialogDescription>
-              </DialogHeader>
-              {matchingPreview && (
-                <div className="space-y-4 py-4">
-                  <div className="p-4 rounded-lg bg-muted/50 border border-border">
-                    <p className="text-sm font-medium mb-3">
-                      Resumen de procesamiento:
-                    </p>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">
-                          Total a procesar:
-                        </span>
-                        <span className="font-semibold">
-                          {matchingPreview.total}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">
-                          Compras Ágiles:
-                        </span>
-                        <span className="font-medium">
-                          {matchingPreview.comprasAgiles}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">
-                          Licitaciones:
-                        </span>
-                        <span className="font-medium">
-                          {matchingPreview.licitaciones}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
-                    <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
-                    <p className="text-xs text-blue-900 dark:text-blue-100">
-                      <strong>Nota:</strong> El proceso puede tomar varios
-                      minutos. Los resultados se mostrarán automáticamente al
-                      finalizar.
-                    </p>
-                  </div>
-                </div>
-              )}
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setMatchingDialogOpen(false)}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={handleConfirmMatching}
-                  disabled={isMatching}
-                  className="bg-firmavb-blue hover:bg-firmavb-blue/90"
-                >
-                  {isMatching ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Procesando...
-                    </>
-                  ) : (
-                    "Ejecutar Matching"
-                  )}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
           <Tooltip>
             <TooltipTrigger asChild>
-              <Badge
-                variant="outline"
-                className="gap-1.5 px-3 py-1.5 border-firmavb-green cursor-help"
+              <Button
+                onClick={handleBuscarParaMi}
+                disabled={isMatching}
+                className="bg-firmavb-blue hover:bg-firmavb-blue/90 text-white shadow-lg"
               >
-                <span className="h-2 w-2 rounded-full bg-firmavb-green animate-pulse" />
-                En vivo
-              </Badge>
+                {isMatching ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Buscando...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Buscar oportunidades para mí
+                  </>
+                )}
+              </Button>
             </TooltipTrigger>
             <TooltipContent>
               <p className="text-xs">
-                Sistema activo y actualizando datos en tiempo real
+                Cruza las compras del Estado con tu inventario y te lleva a tu bandeja
               </p>
             </TooltipContent>
           </Tooltip>
@@ -354,52 +225,10 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Row 1: KPI Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {kpisLoading ? (
-          <>
-            <MetricCardSkeleton />
-            <MetricCardSkeleton />
-            <MetricCardSkeleton />
-            <MetricCardSkeleton />
-          </>
-        ) : (
-          <>
-            <KPICard
-              title="Oportunidades activas"
-              value={kpis?.oportunidadesActivas || 0}
-              icon={Target}
-              color="blue"
-              trend={kpis?.oportunidadesActivasTrend}
-              subtitle="Abiertas hoy en el mercado (MP)"
-            />
-            <KPICard
-              title="Match promedio"
-              value={`${kpis?.matchScorePromedio || 0}%`}
-              icon={Zap}
-              color="green"
-              trend={kpis?.matchScorePromedioTrend}
-              subtitle="Afinidad con tu catálogo"
-            />
-            <KPICard
-              title="Valor de mercado activo"
-              value={formatCompact(kpis?.montoEnPipeline || 0)}
-              icon={DollarSign}
-              color="amber"
-              trend={kpis?.montoEnPipelineTrend}
-              subtitle="Suma de oportunidades abiertas"
-            />
-            <KPICard
-              title="Tasa de Éxito"
-              value={`${kpis?.tasaExito || 0}%`}
-              icon={TrendingUp}
-              color="emerald"
-              trend={kpis?.tasaExitoTrend}
-              subtitle="Ofertas ganadas / enviadas"
-            />
-          </>
-        )}
-      </div>
+      {/* (Se eliminó la fila de 4 KPI de mercado: duplicaba y hasta contradecía
+          al Resumen Ejecutivo de arriba — dos "Tasa de éxito" con fuentes
+          distintas a centímetros de distancia. El Resumen habla del negocio
+          DEL cliente, que es lo que importa.) */}
 
       {/* Row 2: Two Charts Side by Side */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
@@ -755,7 +584,9 @@ export default function Dashboard() {
       </div>
 
       {/* Row 4: Activity Feed */}
-      <ActivityFeed />
+      {/* (ActivityFeed eliminado: era un log técnico global tipo consola —
+          "[12:03] Scraper…" — con un botón "Forzar Escaneo" que no escaneaba.
+          Pantalla de desarrollador, no de cliente.) */}
     </div>
   );
 }

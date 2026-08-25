@@ -20,6 +20,7 @@ import {
   Loader2
 } from "lucide-react";
 import { useClienteFiltros, useSugerirFiltros } from "@/hooks/useClienteFiltros";
+import { useCliente } from "@/hooks/useCliente";
 import { RecargosRegion } from '@/components/settings/RecargosRegion';
 import { InfoHint } from "@/components/ui/info-hint";
 import AprendizajeIA from "@/components/oportunidades/AprendizajeIA";
@@ -48,6 +49,7 @@ export default function ConfiguracionOportunidades() {
   const navigate = useNavigate();
   const { filtros, isLoading, updateFiltros, isUpdating } = useClienteFiltros();
   const sugerir = useSugerirFiltros();
+  const { data: cliente } = useCliente();
 
   const [palabrasIncluir, setPalabrasIncluir] = useState<string[]>([]);
   const [palabrasExcluir, setPalabrasExcluir] = useState<string[]>([]);
@@ -59,16 +61,21 @@ export default function ConfiguracionOportunidades() {
   const [newPalabraIncluir, setNewPalabraIncluir] = useState("");
   const [newPalabraExcluir, setNewPalabraExcluir] = useState("");
 
-  // Load existing values
+  // Load existing values. Si el cliente aún no guardó filtros aquí pero SÍ
+  // definió palabras en su ONBOARDING (clientes.palabras_clave_busqueda), las
+  // precargamos: antes esta pantalla aparecía vacía aunque ya respondió
+  // "¿qué vendes?" al registrarse — configuraba dos veces.
   useEffect(() => {
+    const incluirGuardado = filtros?.palabras_incluir || [];
+    const delOnboarding = (cliente?.palabras_clave_busqueda as string[] | undefined) || [];
+    setPalabrasIncluir(incluirGuardado.length ? incluirGuardado : delOnboarding);
     if (filtros) {
-      setPalabrasIncluir(filtros.palabras_incluir || []);
       setPalabrasExcluir(filtros.palabras_excluir || []);
       setRegionesActivas(filtros.regiones_activas || []);
       setMontoMin(filtros.monto_min?.toString() || "");
       setMontoMax(filtros.monto_max?.toString() || "");
     }
-  }, [filtros]);
+  }, [filtros, cliente]);
 
   const handleAddPalabraIncluir = () => {
     if (newPalabraIncluir.trim() && !palabrasIncluir.includes(newPalabraIncluir.trim())) {
@@ -161,7 +168,7 @@ export default function ConfiguracionOportunidades() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/mis-oportunidades")}>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/oportunidades")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>

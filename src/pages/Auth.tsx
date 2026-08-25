@@ -72,6 +72,20 @@ export default function Auth() {
     }
   }, [isAuthenticated, authLoading, navigate, recoveryMode]);
 
+  // Traduce los errores técnicos de Supabase (en inglés) a mensajes humanos.
+  // Antes el usuario leía cosas como "For security purposes, you can only
+  // request this after 60 seconds".
+  const traducirError = (msg?: string | null): string => {
+    const m = (msg || '').toLowerCase();
+    if (m.includes('invalid login credentials')) return 'Correo o contraseña incorrectos. Revisa e intenta de nuevo.';
+    if (m.includes('email not confirmed')) return 'Tu correo aún no está confirmado. Revisa tu bandeja de entrada (y el spam).';
+    if (m.includes('already registered') || m.includes('already been registered')) return 'Ese correo ya tiene una cuenta. Prueba iniciar sesión.';
+    if (m.includes('for security purposes') || m.includes('rate limit') || m.includes('too many')) return 'Hiciste varios intentos seguidos. Espera un minuto y vuelve a intentar.';
+    if (m.includes('password should be')) return 'La contraseña debe tener al menos 6 caracteres.';
+    if (m.includes('network') || m.includes('fetch')) return 'Problema de conexión. Revisa tu internet e intenta de nuevo.';
+    return 'No pudimos completar la acción. Intenta de nuevo o escríbenos a contacto@firmavb.cl.';
+  };
+
   // Supabase emite PASSWORD_RECOVERY cuando se abre el enlace de restablecer.
   useEffect(() => {
     const { data } = supabaseClient.auth.onAuthStateChange((event) => {
@@ -96,7 +110,7 @@ export default function Auth() {
     const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
     setLoading(false);
     if (error) {
-      setError(error.message || 'No se pudo actualizar la contraseña. Pide un enlace nuevo.');
+      setError(traducirError(error.message) || 'No se pudo actualizar la contraseña. Pide un enlace nuevo.');
       return;
     }
     setSuccess('¡Contraseña actualizada! Entrando a tu cuenta…');
@@ -127,7 +141,7 @@ export default function Auth() {
       } else if (error.message.includes('Email not confirmed')) {
         setError('Tu email no ha sido confirmado. Revisa tu bandeja de entrada.');
       } else {
-        setError(error.message);
+        setError(traducirError(error.message));
       }
     }
   };
@@ -156,7 +170,7 @@ export default function Auth() {
       if (error.message.includes('User already registered')) {
         setError('Este email ya está registrado. Intenta iniciar sesión.');
       } else {
-        setError(error.message);
+        setError(traducirError(error.message));
       }
       return;
     }
@@ -201,7 +215,7 @@ export default function Auth() {
     setResetLoading(false);
 
     if (error) {
-      setError(error.message);
+      setError(traducirError(error.message));
     } else {
       setSuccess('¡Revisa tu correo! Te hemos enviado un enlace para restablecer tu contraseña.');
       setResetEmail('');
@@ -221,7 +235,7 @@ export default function Auth() {
     });
 
     if (error) {
-      setError(error.message);
+      setError(traducirError(error.message));
       setGoogleLoading(false);
     }
   };
