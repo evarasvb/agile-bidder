@@ -473,6 +473,13 @@ export default function OportunidadDetalle() {
           {/* Actions */}
           <div className="flex flex-wrap gap-3">
             <Button
+              className="gap-2"
+              onClick={() => navigate(`/experto?licitacion=${encodeURIComponent(oportunidad.codigo)}`)}
+            >
+              <Sparkles className="h-4 w-4" />
+              Consultar al experto
+            </Button>
+            <Button
               variant="outline"
               className="gap-2"
               onClick={() => navigate(`/oportunidades/${tipo}/${id}/chat`)}
