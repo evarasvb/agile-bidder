@@ -37,8 +37,10 @@ function rolYSub(auth: string): { role: string; sub: string | null } {
   } catch { return { role: "", sub: null }; }
 }
 function ipCliente(req: Request): string | null {
-  const raw = req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? req.headers.get("cf-connecting-ip") ?? "";
-  const ip = raw.split(",")[0].trim();
+  // X-Forwarded-For puede traer valores forjados por el cliente al inicio; el gateway
+  // agrega la IP real AL FINAL. Se toma la ultima para que el tope por IP no se pueda esquivar.
+  const xff = (req.headers.get("x-forwarded-for") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const ip = xff.length ? xff[xff.length - 1] : (req.headers.get("x-real-ip") ?? req.headers.get("cf-connecting-ip") ?? "").trim();
   return ip ? ip.slice(0, 64) : null;
 }
 const fmt = (n: any) => n == null ? "s/i" : "$" + Math.round(Number(n)).toLocaleString("es-CL");
