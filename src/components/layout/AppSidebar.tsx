@@ -62,6 +62,11 @@ const navItems: NavItem[] = [
     ],
   },
   {
+    title: "Experto",
+    url: "/experto",
+    icon: GraduationCap,
+  },
+  {
     title: "Postulaciones",
     url: "/pipeline",
     icon: Kanban,

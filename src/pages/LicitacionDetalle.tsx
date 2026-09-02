@@ -323,6 +323,13 @@ export default function LicitacionDetalle() {
             </Button>
           )}
           <Button
+            size="sm"
+            onClick={() => navigate(`/experto?licitacion=${encodeURIComponent(licitacion.codigo)}`)}
+          >
+            <Sparkles className="h-4 w-4 mr-2" />
+            Consultar al experto
+          </Button>
+          <Button
             variant="outline"
             size="sm"
             onClick={() => navigate(`/licitaciones/${id}/chat`)}
