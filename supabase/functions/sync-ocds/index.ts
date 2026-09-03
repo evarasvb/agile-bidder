@@ -9,19 +9,30 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const API = "https://api.mercadopublico.cl/APISOCDS/OCDS";
 const UA = "FirmaVB/1.0 (+https://www.firmavb.cl)";
-const PARALELO = 4;
+const PARALELO = 3;
 
 function rolJwt(auth: string | null): string | null {
   try { return JSON.parse(atob((auth ?? "").replace(/^Bearer\s+/i, "").split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).role ?? null; } catch { return null; }
 }
-async function getJson(url: string): Promise<any | null> {
+// Contadores de la pasada para distinguir "no publicado" (404) de errores/limitación (429, 5xx, timeout).
+const http = { ok: 0, no_publicado: 0, errores: 0 };
+class ErrorHttp extends Error {}
+async function getJson(url: string, intento = 1): Promise<any | null> {
   const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 20000);
   try {
     const r = await fetch(url, { headers: { "User-Agent": UA, "Accept": "application/json" }, signal: ctl.signal });
-    if (!r.ok) return null;
+    if (r.status === 404) { http.no_publicado++; return null; }
+    if (!r.ok) throw new ErrorHttp(`HTTP ${r.status}`);
     const j = await r.json();
-    return j?.status === 404 ? null : j;
-  } catch { return null; } finally { clearTimeout(t); }
+    if (j?.status === 404) { http.no_publicado++; return null; }
+    http.ok++;
+    return j;
+  } catch (e) {
+    clearTimeout(t);
+    if (intento < 3) { await new Promise((res) => setTimeout(res, 1500 * intento)); return getJson(url, intento + 1); }
+    http.errores++;
+    throw e instanceof ErrorHttp ? e : new ErrorHttp(String(e));
+  } finally { clearTimeout(t); }
 }
 const nombreCorto = (s: any) => String(s ?? "").split(" | ")[0].trim().slice(0, 200);
 function partes(rel: any) {
@@ -70,10 +81,13 @@ function destilar(codigo: string, award: any, tender: any) {
     tender_leido: !!rt, award_leido: !!ra,
   };
 }
+// Devuelve undefined cuando hubo error de red/limitación (para no dar el proceso por leído).
 async function leerProceso(codigo: string, conTender: boolean) {
-  const [award, tender] = await Promise.all([getJson(`${API}/award/${codigo}`), conTender ? getJson(`${API}/tender/${codigo}`) : Promise.resolve(null)]);
-  if (!award && !tender) return null;
-  return destilar(codigo, award, tender);
+  try {
+    const [award, tender] = await Promise.all([getJson(`${API}/award/${codigo}`), conTender ? getJson(`${API}/tender/${codigo}`) : Promise.resolve(null)]);
+    if (!award && !tender) return null;
+    return destilar(codigo, award, tender);
+  } catch { return undefined; }
 }
 async function enLotes<T>(xs: T[], fn: (x: T) => Promise<any>, n: number, limiteMs: number, t0: number) {
   const out: any[] = [];
@@ -91,6 +105,7 @@ Deno.serve(async (req: Request) => {
   let body: any = {}; try { body = await req.json(); } catch { /* vacío */ }
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const t0 = Date.now();
+  http.ok = 0; http.no_publicado = 0; http.errores = 0;
   const res: any = { recientes: 0, mes: null, guardadas: 0, sin_dato: 0, errores: [] };
   const guardar = async (filas: any[]) => {
     const ok = filas.filter(Boolean);
@@ -115,7 +130,7 @@ Deno.serve(async (req: Request) => {
     const filas = await enLotes(codigos, (c: string) => leerProceso(c, false), PARALELO, 60_000, t0);
     res.recientes = filas.length;
     // Los que OCDS aún no publica se anotan como leídos (award_leido) para reintentarlos recién en 7 días.
-    await guardar(filas.map((f, i) => f ?? { codigo: codigos[i], award_leido: true }));
+    await guardar(filas.map((f, i) => f === undefined ? undefined : (f ?? { codigo: codigos[i], award_leido: true })));
   }
 
   // 2. Relleno mes a mes hacia atrás (solo procesos con adjudicación publicada)
@@ -136,12 +151,13 @@ Deno.serve(async (req: Request) => {
       const conAward = datos.filter((d) => d.urlAward).map((d) => String(d.urlAward).split("/").pop()!);
       const filas = await enLotes(conAward, (c: string) => leerProceso(c, true), PARALELO, 115_000, t0);
       await guardar(filas);
-      const leidosTodos = filas.length >= conAward.length;
+      // Si hubo errores de red/limitación en el tramo, no se avanza: se repite en la próxima pasada (el upsert es idempotente).
+      const leidosTodos = filas.length >= conAward.length && !filas.some((f) => f === undefined);
       const nuevoOffset = leidosTodos ? mp.offset_leido + datos.length : mp.offset_leido; // si no alcanzó el tiempo, repite el tramo
       const completo = leidosTodos && (datos.length < limite || nuevoOffset >= total);
       await sb.rpc("ocds_marcar_mes", { p_anio: mp.anio, p_mes: mp.mes, p_offset: nuevoOffset, p_total: total, p_completo: completo });
       res.mes = { anio: mp.anio, mes: mp.mes, offset: nuevoOffset, total, en_tramo: datos.length, con_award: conAward.length, leidos: filas.length, completo };
     }
   }
-  return new Response(JSON.stringify({ ...res, ms: Date.now() - t0 }), { headers: { "Content-Type": "application/json" } });
+  return new Response(JSON.stringify({ ...res, http, ms: Date.now() - t0 }), { headers: { "Content-Type": "application/json" } });
 });
