@@ -192,7 +192,7 @@ export function TeaserResultados({ termino }: { termino: string }) {
                   : "Regístrate gratis para ver el detalle y postular"}
               </p>
               <p className="text-sm text-muted-foreground">
-                Con tu cuenta miras todas las oportunidades. Para gestionarlas y postular, el plan Pro.
+                Con tu cuenta miras todas las oportunidades. Para gestionarlas y postular, el plan FirmaVB ERP.
               </p>
             </div>
           </div>

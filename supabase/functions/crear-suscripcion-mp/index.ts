@@ -15,7 +15,7 @@ const cors = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 const WEBHOOK_URL = 'https://juiskeeutbaipwbeeezw.supabase.co/functions/v1/mp-suscripcion-webhook';
-const MONTO_CLP = 45000;
+const MONTO_CLP = Number(Deno.env.get("FIRMAVB_ERP_CLP") ?? 159000);
 
 function json(obj: unknown, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { ...cors, 'Content-Type': 'application/json' } });

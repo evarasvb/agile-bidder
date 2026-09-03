@@ -57,6 +57,9 @@
   .aviso a{color:var(--navy);font-weight:600}
   .badge{display:inline-block;font:11px system-ui,sans-serif;background:var(--mist);color:var(--muted);border-radius:8px;padding:2px 8px;margin-left:6px}
   .oculto{display:none}
+  .opinar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;font:12px system-ui,sans-serif;color:var(--muted)}
+  .opinar button{font-size:14px;background:var(--mist);border:0;border-radius:8px;padding:3px 8px;cursor:pointer}
+  .opinar input{font:12px system-ui,sans-serif;border:1px solid var(--line);border-radius:8px;padding:4px 8px;min-width:220px}
   nav button small{display:block;font:11px system-ui,sans-serif;color:var(--muted);font-weight:400;margin-top:2px}
   .ayuda{font:12px system-ui,sans-serif;color:var(--muted);margin:0;padding:0 16px 8px;background:var(--foam)}
   .bases{margin-top:10px;padding:10px 12px;border:1px dashed var(--sea);border-radius:12px;background:#F3FAFB;font:13px system-ui,sans-serif;color:var(--navy)}
@@ -205,6 +208,16 @@ function ofrecerBases(p,codigo,body,boton){
     catch(e){est.textContent=e.message;btn.disabled=false;}};
   p.appendChild(d);chat.scrollTop=chat.scrollHeight;
 }
+// Opinión sobre la respuesta: se guarda y el Experto la recuerda en las próximas respuestas de este usuario.
+function opinar(p,pregunta){
+  const d=document.createElement('div');d.className='opinar';
+  d.innerHTML='<span>¿Te sirvió?</span><button type="button" title="Sí, me sirvió">👍</button><button type="button" title="No, faltó algo">👎</button><span class="est"></span>';
+  const [si,no]=d.querySelectorAll('button'),est=d.querySelector('.est');
+  const enviar=async(util,comentario)=>{try{await fetch(SUPA+'/rest/v1/rpc/experto_feedback',{method:'POST',headers:{'Content-Type':'application/json','apikey':ANON,'Authorization':'Bearer '+(tokenUsuario||ANON)},body:JSON.stringify({p_huella:huella,p_pregunta:pregunta,p_util:util,p_comentario:comentario||null})});}catch{}};
+  si.onclick=()=>{enviar(true,null);d.innerHTML='<span class="est">Gracias. Sigo aprendiendo de lo que preguntas.</span>';};
+  no.onclick=()=>{d.innerHTML='<span>¿Qué faltó?</span><input type="text" placeholder="Ej: no buscó la licitación que te pedí" maxlength="300"><button type="button">Enviar</button>';const inp=d.querySelector('input'),b=d.querySelector('button');b.onclick=()=>{enviar(false,inp.value.trim());d.innerHTML='<span class="est">Anotado. Lo tendré presente en tus próximas preguntas.</span>';};inp.focus();};
+  p.appendChild(d);
+}
 async function consultar(body,boton){
   boton.disabled=true;
   const p=add('exp','<div class="cuerpo"></div>');
@@ -237,6 +250,7 @@ async function consultar(body,boton){
     clearInterval(timer);pintar();
     if(!texto)cuerpo.innerHTML='<span class="estado">No obtuve respuesta. Intenta de nuevo.</span>';
     if(fuentes.length){const fu=document.createElement('div');fu.className='fuentes';fu.innerHTML=`<details><summary style="cursor:pointer"><b>Fuentes consultadas (${fuentes.length})</b></summary>`+fuentes.map(f=>`[${f.n}] ${f.url?`<a href="${f.url}" target="_blank" rel="noopener noreferrer">${f.fuente}</a>`:f.fuente}${f.seccion?' · '+String(f.seccion).slice(0,80):''}`).join('<br>')+'</details>'+`<span class="badge">${((Date.now()-t0)/1000).toFixed(1)} s</span>`;p.appendChild(fu);}
+    if(texto)opinar(p,body.pregunta||('informe '+body.codigo));
     if(pedirBases&&texto)ofrecerBases(p,pedirBases,body,boton);
     if((body.modo==='informe'||body.modo==='estudio')&&basesMeta.length&&texto){const ax=document.createElement('div');ax.className='ejemplos';ax.innerHTML='<button>Completar anexos con mis datos (Plus)</button>';ax.children[0].onclick=()=>completarAnexos(body.codigo,ax.children[0]);p.appendChild(ax);}
     if(body.modo==='chat'){historial.push({role:'user',content:body.pregunta},{role:'assistant',content:texto});if(historial.length>6)historial.splice(0,2);}

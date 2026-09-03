@@ -47,13 +47,13 @@ export function SuscripcionProCard() {
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-green-600" />
-            <CardTitle className="text-lg">Plan Pro activo</CardTitle>
+            <CardTitle className="text-lg">Plan FirmaVB ERP activo</CardTitle>
           </div>
-          <Badge className="bg-green-600">Pro</Badge>
+          <Badge className="bg-green-600">ERP</Badge>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
           Tienes acceso completo para gestionar todas tus oportunidades. Tu suscripción se renueva
-          automáticamente cada mes por $45.000.
+          automáticamente cada mes por $159.000. Incluye el Experto Pro y Plus.
         </CardContent>
       </Card>
     );
@@ -64,15 +64,15 @@ export function SuscripcionProCard() {
       <CardHeader>
         <div className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-primary" />
-          <CardTitle className="text-lg">Hazte FirmaVB Pro</CardTitle>
+          <CardTitle className="text-lg">Hazte FirmaVB ERP</CardTitle>
         </div>
         <CardDescription>
-          Con el plan gratuito puedes mirar las oportunidades. Para gestionarlas, activa Pro.
+          Con el plan gratuito miras las oportunidades. Para postular, gestionar y tener el Experto completo, activa el ERP.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-baseline gap-1">
-          <span className="text-3xl font-bold">$45.000</span>
+          <span className="text-3xl font-bold">$159.000</span>
           <span className="text-muted-foreground">/mes</span>
         </div>
         <ul className="space-y-2">

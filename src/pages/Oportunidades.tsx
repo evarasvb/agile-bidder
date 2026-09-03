@@ -261,7 +261,7 @@ export default function Oportunidades() {
           onError: () => toast.error("Error al descartar"),
         }
       );
-    }, "Descartar y gestionar oportunidades es parte del plan Pro.");
+    }, "Descartar y gestionar oportunidades es parte del plan FirmaVB ERP.");
   };
 
   const handleCotizar = (op: OportunidadPanel) => {
@@ -274,7 +274,7 @@ export default function Oportunidades() {
       } else {
         navigate(`/licitaciones/${op.codigo}`);
       }
-    }, "Cotizar y postular a oportunidades es parte del plan Pro.");
+    }, "Cotizar y postular a oportunidades es parte del plan FirmaVB ERP.");
   };
 
   const handleViewDetail = (op: OportunidadPanel) => {
