@@ -106,7 +106,7 @@ Deno.serve(async (req: Request) => {
       const iso = d.toISOString().slice(0, 10); tareas.push({ fecha: iso, tipo: 1 }, { fecha: iso, tipo: 2 });
     }
   } else {
-    const { data, error } = await sb.rpc("reclamos_mp_dias_pendientes", { p_max: Math.min(Number(body.dias ?? 3), 20) * 2 });
+    const { data, error } = await sb.rpc("reclamos_mp_dias_pendientes", { p_max: Math.min(Number(body.dias ?? 3), 30) * 2 });
     if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { "Content-Type": "application/json" } });
     tareas = (data ?? []).map((r: any) => ({ fecha: r.fecha, tipo: r.tipo }));
   }
