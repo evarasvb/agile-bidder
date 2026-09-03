@@ -77,21 +77,7 @@ export function StatusBar() {
         </Tooltip>
       </div>
 
-      {/* Alert Banner */}
-      {!isLoading && !isConnected && (
-        <div className="bg-warning/10 border-b border-warning/20 px-4 sm:px-6 py-2 flex flex-wrap items-center gap-x-2 gap-y-1">
-          <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
-          <span className="text-xs sm:text-sm text-warning font-medium">
-            La extensión de Chrome no está conectada: postular te tomará más pasos.
-          </span>
-          <Link
-            to="/configuracion/extension"
-            className="text-xs sm:text-sm font-semibold text-warning underline underline-offset-2 hover:opacity-80"
-          >
-            Ver cómo conectarla →
-          </Link>
-        </div>
-      )}
+      {/* La franja naranja se retiró: el indicador "Extensión: Desconectada" de arriba ya avisa y enlaza a la guía. */}
     </header>
   );
 }
