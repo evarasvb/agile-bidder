@@ -12,12 +12,19 @@ import { useAuth } from '@/hooks/useAuth';
 import { expertoMd } from '@/lib/expertoMd';
 import { Infografia, type InfografiaDatos } from '@/components/experto/Infografia';
 import { MapaConceptual, type Nodo } from '@/components/experto/MapaConceptual';
+import { compartirPdfExperto } from '@/services/expertoPdf';
 
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string;
 const ANON = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
 const fmt = (n: unknown) => n == null ? 's/i' : '$' + Math.round(Number(n)).toLocaleString('es-CL');
 const RE_ID = /\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2}/;
 const idEn = (t: string) => t.toUpperCase().match(RE_ID)?.[0];
+// Citas [n] como en NotebookLM: clic abre la fuente (o despliega la lista si no tiene link); al pasar el mouse muestra cuál es.
+const conCitas = (html: string, fuentes?: any[]) => html.replace(/\[(\d{1,2})\]/g, (_m, n) => {
+  const f = fuentes?.find((x) => String(x.n) === n);
+  const titulo = String(f?.fuente ?? `Fuente ${n}`).replace(/"/g, '&quot;');
+  return `<sup><a class="cita text-primary font-semibold no-underline hover:underline" data-n="${n}" href="${f?.url ?? '#'}" title="${titulo}"${f?.url ? ' target="_blank" rel="noreferrer"' : ''}>[${n}]</a></sup>`;
+});
 const fecha = (d?: string | null) => d ? new Date(d).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }) : 's/i';
 
 interface Msg { rol: 'yo' | 'exp'; texto: string; fuentes?: any[]; pedirBases?: string | null }
@@ -49,7 +56,7 @@ export default function LibroLicitacion() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [codigoAbrir, setCodigoAbrir] = useState('');
   const [limite, setLimite] = useState<string | null>(null);
-  const [compartido, setCompartido] = useState<{ url: string; titulo: string } | null>(null);
+  const [compartido, setCompartido] = useState<{ url: string; titulo: string; token: string; tipo: string } | null>(null);
   const autoRef = useRef(false);
   const [pregunta, setPregunta] = useState('');
   const [ocupado, setOcupado] = useState<string | null>(null);
@@ -161,10 +168,22 @@ export default function LibroLicitacion() {
     if (error || !data) { toast.error('No pude crear el link'); return; }
     const url = `${window.location.origin}/experto/c/${data}`;
     try { await navigator.clipboard.writeText(url); } catch { /* sin permiso */ }
-    setCompartido({ url, titulo });
+    setCompartido({ url, titulo, token: data, tipo });
     toast.success('Link listo y copiado: la página lleva tu nombre y la marca FirmaVB');
   };
   const waUrl = (c: { url: string; titulo: string }) => `https://wa.me/?text=${encodeURIComponent(`${c.titulo}\n${c.url}`)}`;
+  // PDF con marca para adjuntar en WhatsApp (celular: se comparte directo; escritorio: se descarga).
+  const pdfCompartido = async () => {
+    if (!compartido) return;
+    setOcupado('pdf');
+    try {
+      const fila = (await (supabase as any).rpc('experto_compartido', { p_token: compartido.token })).data?.[0];
+      if (!fila) throw new Error('No encontré el análisis');
+      const r = await compartirPdfExperto({ titulo: fila.titulo ?? compartido.titulo, empresa: fila.empresa, contenido: fila.contenido, url: compartido.url, fecha: fila.creado_en }, `${cod || 'experto'}-${compartido.tipo}.pdf`);
+      if (r === 'descargado') toast.success('PDF descargado: adjúntalo en WhatsApp o correo');
+    } catch (e: any) { toast.error(e.message); }
+    setOcupado(null);
+  };
   const datosInfografia = (): InfografiaDatos => ({
     codigo: cod, nombre: f?.nombre, institucion: f?.institucion, tipo: f?.tipo, presupuesto: f?.presupuesto, cierre: f?.fecha_cierre, publicada: f?.fecha_publicacion, region: f?.region,
     pago: o.institucion ? { conducta: o.conducta_pago, dias: o.pago_promedio_dias, reclamos_100: o.reclamos_pago_por_100_procesos, reclamos: o.reclamos_pago_12m ?? o.reclamos } : null,
@@ -205,9 +224,10 @@ export default function LibroLicitacion() {
       {compartido && (
         <div className="flex items-center gap-2 flex-wrap text-sm rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
           <span className="font-medium truncate max-w-[40vw]">Link listo: {compartido.titulo}</span>
-          <Button size="sm" className="h-8 bg-[#25D366] hover:bg-[#1ebe5d] text-white" asChild><a href={waUrl(compartido)} target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4 mr-1" />WhatsApp</a></Button>
+          <Button size="sm" className="h-8 bg-[#25D366] hover:bg-[#1ebe5d] text-white" asChild><a href={waUrl(compartido)} target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4 mr-1" />WhatsApp (link)</a></Button>
+          {compartido.tipo !== 'mapa' && compartido.tipo !== 'infografia' && <Button size="sm" variant="outline" className="h-8" onClick={pdfCompartido} disabled={ocupado === 'pdf'}>{ocupado === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <FileText className="h-4 w-4 mr-1" />}PDF para WhatsApp</Button>}
           <Button size="sm" variant="outline" className="h-8" onClick={() => { navigator.clipboard.writeText(compartido.url); toast.success('Copiado'); }}><Copy className="h-4 w-4 mr-1" />Copiar link</Button>
-          <Button size="sm" variant="outline" className="h-8" asChild><a href={compartido.url} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4 mr-1" />Ver / PDF</a></Button>
+          <Button size="sm" variant="outline" className="h-8" asChild><a href={compartido.url} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4 mr-1" />Ver página</a></Button>
           {typeof navigator !== 'undefined' && 'share' in navigator && <Button size="sm" variant="ghost" className="h-8" onClick={() => navigator.share({ title: compartido.titulo, url: compartido.url }).catch(() => {})}><Share2 className="h-4 w-4 mr-1" />Más…</Button>}
           <button className="ml-auto text-muted-foreground" onClick={() => setCompartido(null)}>✕</button>
         </div>
@@ -286,12 +306,16 @@ export default function LibroLicitacion() {
                 <div key={i} className="ml-auto max-w-[85%] rounded-2xl bg-firmavb-blue text-white px-4 py-2 text-sm">{m.texto}</div>
               ) : (
                 <div key={i} className="max-w-[95%] rounded-2xl bg-muted/50 px-4 py-3 text-sm">
-                  {m.texto ? <div dangerouslySetInnerHTML={{ __html: expertoMd(m.texto) }} /> : <span className="text-muted-foreground">Buscando en las fuentes…</span>}
+                  {m.texto ? <div dangerouslySetInnerHTML={{ __html: conCitas(expertoMd(m.texto), m.fuentes) }} onClick={(e) => {
+                    const a = (e.target as HTMLElement).closest('a.cita') as HTMLAnchorElement | null; if (!a || a.getAttribute('href') !== '#') return;
+                    e.preventDefault(); const d = document.getElementById(`fuentes-${i}`) as HTMLDetailsElement | null; if (d) d.open = true;
+                    const fila = document.getElementById(`fuente-${i}-${a.dataset.n}`); if (fila) { fila.scrollIntoView({ block: 'nearest' }); fila.classList.add('bg-yellow-100'); setTimeout(() => fila.classList.remove('bg-yellow-100'), 1500); }
+                  }} /> : <span className="text-muted-foreground">Buscando en las fuentes…</span>}
                   {m.pedirBases && <p className="mt-2 text-xs text-muted-foreground">Sube las bases en el panel de Fuentes y vuelve a preguntar.</p>}
                   {!cod && m.texto && idEn(msgs[i - 1]?.texto ?? '') && <Button size="sm" variant="outline" className="mt-2" onClick={() => navigate(`/experto/libro/${idEn(msgs[i - 1].texto)}`)}><BookOpen className="h-3.5 w-3.5 mr-1" />Abrir el libro de {idEn(msgs[i - 1].texto)}</Button>}
                   {m.texto && m.fuentes && m.fuentes.length > 0 && (
-                    <details className="mt-2 text-xs text-muted-foreground"><summary className="cursor-pointer">Fuentes ({m.fuentes.length})</summary>
-                      {m.fuentes.map((s: any) => <div key={s.n}>[{s.n}] {s.url ? <a className="underline" href={s.url} target="_blank" rel="noreferrer">{s.fuente}</a> : s.fuente}</div>)}
+                    <details id={`fuentes-${i}`} className="mt-2 text-xs text-muted-foreground"><summary className="cursor-pointer">Fuentes ({m.fuentes.length}) · haz clic en un [n] del texto para ver de dónde salió</summary>
+                      {m.fuentes.map((s: any) => <div key={s.n} id={`fuente-${i}-${s.n}`} className="rounded px-1 transition-colors">[{s.n}] {s.url ? <a className="underline" href={s.url} target="_blank" rel="noreferrer">{s.fuente}</a> : s.fuente}</div>)}
                     </details>
                   )}
                   {m.texto && !ocupado && (
@@ -345,7 +369,7 @@ export default function LibroLicitacion() {
                 ) : tab === 'infografia' ? (
                   <div className="max-h-[62vh] overflow-y-auto pr-1"><Infografia d={datosInfografia()} /></div>
                 ) : (
-                  <div className="max-h-[62vh] overflow-y-auto pr-1" dangerouslySetInnerHTML={{ __html: expertoMd(entregables[tab]) }} />
+                  <div className="max-h-[62vh] overflow-y-auto pr-1" dangerouslySetInnerHTML={{ __html: conCitas(expertoMd(entregables[tab])) }} />
                 )}
               </div>
             ) : (

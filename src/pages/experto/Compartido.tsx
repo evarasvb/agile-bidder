@@ -9,6 +9,7 @@ import { expertoMd } from '@/lib/expertoMd';
 import { Infografia } from '@/components/experto/Infografia';
 import { MapaConceptual } from '@/components/experto/MapaConceptual';
 import logo from '@/assets/logo-firmavb-blanco.png';
+import { compartirPdfExperto } from '@/services/expertoPdf';
 
 const TIPO: Record<string, string> = { informe: 'Informe de trabajo', estudio: 'Estudio profundo', anexos: 'Anexos', chat: 'Respuesta del Experto', mapa: 'Mapa conceptual', infografia: 'Infografía' };
 const parse = (t: string) => { try { return JSON.parse(t); } catch { return null; } };
@@ -52,7 +53,9 @@ export default function Compartido() {
               Hecho por <b>{data.empresa ?? 'un proveedor'}</b> con el Experto FirmaVB · {new Date(data.creado_en).toLocaleDateString('es-CL')}
             </p>
             <div className="no-print flex flex-wrap gap-2 mt-4">
-              <Button size="sm" variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4 mr-1" />Guardar PDF</Button>
+              {data.tipo === 'mapa' || data.tipo === 'infografia'
+                ? <Button size="sm" variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4 mr-1" />Guardar PDF</Button>
+                : <Button size="sm" variant="outline" onClick={async () => { const r = await compartirPdfExperto({ titulo: data.titulo ?? `Análisis ${data.codigo ?? ''}`, empresa: data.empresa, contenido: data.contenido, url: window.location.href, fecha: data.creado_en }, `${data.codigo ?? 'experto'}-${data.tipo}.pdf`); if (r === 'descargado') toast.success('PDF descargado'); }}><Printer className="h-4 w-4 mr-1" />Descargar PDF</Button>}
               <Button size="sm" className="bg-[#25D366] hover:bg-[#1ebe5d] text-white" asChild><a href={`https://wa.me/?text=${encodeURIComponent(`${data.titulo ?? 'Análisis del Experto FirmaVB'}\n${window.location.href}`)}`} target="_blank" rel="noreferrer">WhatsApp</a></Button>
               <Button size="sm" variant="outline" onClick={compartir}><Share2 className="h-4 w-4 mr-1" />Compartir</Button>
             </div>
