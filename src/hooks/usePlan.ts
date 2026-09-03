@@ -23,12 +23,14 @@ export function usePlan() {
     enabled: !isPro,
     staleTime: 5 * 60 * 1000,
   });
-  const isExpertoPro = planExperto === 'pro';
+  const isExpertoPro = planExperto === 'pro' || planExperto === 'plus';
+  const isExpertoPlus = planExperto === 'plus';
   return {
     plan,
     isPro,
     isFree: !isPro,
     isExpertoPro,
+    isExpertoPlus,
     verInteligencia: isPro || isExpertoPro,
     loading: isLoading,
   };

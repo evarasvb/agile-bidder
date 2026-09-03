@@ -1,10 +1,11 @@
-// Pago único del Experto Pro (30 días) con Mercado Pago Checkout Pro.
+// Pago único del Experto Pro o Plus (30 días) con Mercado Pago Checkout Pro.
 // Devuelve la URL de pago; el webhook mp-pago-experto-webhook activa el plan al aprobarse.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 const PRODUCTOS: Record<string, { titulo: string; monto: number; dias: number }> = {
   pro_30: { titulo: "Experto FirmaVB Pro — 30 días", monto: Number(Deno.env.get("EXPERTO_PRO_CLP") ?? 50000), dias: 30 },
+  plus_30: { titulo: "Experto FirmaVB Plus — 30 días (anexos completados)", monto: Number(Deno.env.get("EXPERTO_PLUS_CLP") ?? 100000), dias: 30 },
 };
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...cors, "Content-Type": "application/json" } });
 function jwt(auth: string): { role: string; sub: string | null; email: string | null } {
