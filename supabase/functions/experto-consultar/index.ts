@@ -158,7 +158,8 @@ Deno.serve(async (req) => {
     let codigo: string | null = body.codigo ? String(body.codigo).trim().toUpperCase() : null;
 
     const { role, sub } = rolYSub(req.headers.get("Authorization") ?? "");
-    const userId = role === "authenticated" ? sub : null;
+    // Con service_role se puede actuar en nombre de un usuario (body.user_id): automatizaciones y soporte.
+    const userId = role === "authenticated" ? sub : (role === "service_role" && body.user_id ? String(body.user_id) : null);
     const ip = ipCliente(req);
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
