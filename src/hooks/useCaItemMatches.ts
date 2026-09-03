@@ -31,3 +31,30 @@ export function useCaItemMatches(codigo: string | null | undefined) {
     },
   });
 }
+
+// Cuántos ítems calzan por compra ágil, para varios códigos a la vez (tabla/
+// lista). Mismo dato que usa el detalle (ca_item_matches), así el número no
+// cambia entre pantallas — antes la tabla de Compras Ágiles calculaba su
+// propio "Match Catálogo" con un motor de fuzzy matching aparte (por marca/
+// tipo de producto, en el navegador), que daba resultados distintos e
+// inconsistentes con el resto de la app.
+export function useCaItemMatchCounts(codigos: string[]) {
+  const codigosKey = [...codigos].sort().join(',');
+  return useQuery({
+    queryKey: ['ca-item-match-counts', codigosKey],
+    enabled: codigos.length > 0,
+    queryFn: async (): Promise<Record<string, number>> => {
+      const { data, error } = await (supabaseClient as any)
+        .from('ca_item_matches')
+        .select('compra_agil_codigo')
+        .in('compra_agil_codigo', codigos);
+      if (error) throw error;
+      const counts: Record<string, number> = {};
+      for (const row of (data || []) as { compra_agil_codigo: string }[]) {
+        counts[row.compra_agil_codigo] = (counts[row.compra_agil_codigo] || 0) + 1;
+      }
+      return counts;
+    },
+    staleTime: 60_000,
+  });
+}
