@@ -1,4 +1,6 @@
+import { useQuery } from '@tanstack/react-query';
 import { useCliente } from '@/hooks/useCliente';
+import { supabase } from '@/integrations/supabase/client';
 
 export type PlanId = 'free' | 'pro' | 'business' | 'enterprise';
 
@@ -13,10 +15,21 @@ export function usePlan() {
   const { data: cliente, isLoading } = useCliente();
   const plan = ((cliente?.plan as PlanId) || 'free');
   const isPro = PLANES_PRO.includes(plan);
+  // Experto Pro (pago único de 30 días) no da acceso a gestionar, pero sí a la inteligencia:
+  // riesgo de pago del organismo, competencia y match completo.
+  const { data: planExperto } = useQuery({
+    queryKey: ['experto_mi_plan'],
+    queryFn: async () => (await (supabase as any).rpc('experto_mi_plan')).data as string | null,
+    enabled: !isPro,
+    staleTime: 5 * 60 * 1000,
+  });
+  const isExpertoPro = planExperto === 'pro';
   return {
     plan,
     isPro,
     isFree: !isPro,
+    isExpertoPro,
+    verInteligencia: isPro || isExpertoPro,
     loading: isLoading,
   };
 }
