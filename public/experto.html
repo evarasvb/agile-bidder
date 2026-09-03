@@ -73,6 +73,7 @@
 <nav>
   <button id="tabChat" class="on">Preguntar</button>
   <button id="tabInforme">Analizar una licitación</button>
+  <button id="tabEstudio">Estudio profundo · Pro</button>
 </nav>
 <main id="chat">
   <div class="msg exp" id="bienvenida">
@@ -96,6 +97,11 @@
   <input type="text" id="ctx" placeholder="Opcional: qué vende tu empresa" autocomplete="off">
   <label class="adjunto" id="lblAdj" title="Si tienes las bases en PDF, adjúntalas: el informe usará los criterios y ponderaciones reales">📎 Bases (PDF)<input type="file" id="pdfInforme" accept="application/pdf" class="oculto"></label>
   <button class="enviar" id="bInforme" type="submit">Analizar</button>
+</form>
+<form id="fEstudio" class="oculto">
+  <input type="text" id="codigoE" placeholder="ID de licitación para el estudio profundo" autocomplete="off">
+  <input type="text" id="ctxE" placeholder="Opcional: qué vendes y a qué precio sueles ofertar" autocomplete="off">
+  <button class="enviar" id="bEstudio" type="submit">Estudiar</button>
 </form>
 <footer>Fuentes: BCN (Ley Chile), ChileCompra, Contraloría General de la República, Tribunal de Contratación Pública, API Mercado Público. FirmaVB SpA.</footer>
 
@@ -134,8 +140,20 @@ function md(t){
 }
 function add(cls,html){const d=document.createElement('div');d.className='msg '+cls;d.innerHTML=html;chat.appendChild(d);chat.scrollTop=chat.scrollHeight;return d;}
 function setUso(u){if(!u)return;const pro=u.plan&&u.plan!=='free';usoEl.innerHTML=pro?`Plan ${u.plan}<br>ilimitado`:`Gratis: ${u.consultas}/5 preguntas<br>${u.informes}/1 informe este mes`;}
-function modo(m){const c=m==='chat';tabChat.classList.toggle('on',c);tabInforme.classList.toggle('on',!c);fChat.classList.toggle('oculto',!c);fInforme.classList.toggle('oculto',c);if(!c)document.getElementById('codigo').focus();else q.focus();}
-tabChat.onclick=()=>modo('chat');tabInforme.onclick=()=>modo('informe');
+const fEstudio=document.getElementById('fEstudio'),tabEstudio=document.getElementById('tabEstudio');
+function modo(m){for(const [k,tab,f] of [['chat',tabChat,fChat],['informe',tabInforme,fInforme],['estudio',tabEstudio,fEstudio]]){tab.classList.toggle('on',k===m);f.classList.toggle('oculto',k!==m);}(m==='chat'?q:document.getElementById(m==='informe'?'codigo':'codigoE')).focus();}
+tabChat.onclick=()=>modo('chat');tabInforme.onclick=()=>modo('informe');tabEstudio.onclick=()=>modo('estudio');
+// Plan Pro: pago único por Mercado Pago (30 días). Vuelve a esta misma página con ?pago=ok.
+async function activarPro(el){
+  if(!tokenUsuario){window.open(PLANES.replace('/planes','/auth'),'_blank');return;}
+  el.textContent='Preparando el pago…';
+  try{const volver=location.origin+(window.top!==window?'/experto':'/experto.html');
+    const r=await fetch(SUPA+'/functions/v1/crear-pago-experto',{method:'POST',headers:{'Content-Type':'application/json','apikey':ANON,'Authorization':'Bearer '+tokenUsuario},body:JSON.stringify({producto:'pro_30',back_url:volver})});
+    const j=await r.json();if(!r.ok||!j.url)throw new Error(j.mensaje||j.error||r.status);
+    window.top.location.href=j.url;}
+  catch(e){el.textContent='No pude iniciar el pago: '+e.message;}
+}
+function ofrecerPro(p,mensaje){p.classList.add('aviso');p.innerHTML=`${mensaje} <div style="margin-top:8px"><button type="button" class="enviar" style="padding:8px 14px">Activar Pro · $50.000 por 30 días</button> <span class="est"></span></div>`;const b=p.querySelector('button');b.onclick=()=>{b.disabled=true;activarPro(p.querySelector('.est'));};}
 document.querySelectorAll('.ejemplos button').forEach(x=>x.onclick=()=>{modo('chat');q.value=x.textContent;fChat.requestSubmit();});
 q.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();fChat.requestSubmit();}});
 
@@ -167,10 +185,11 @@ async function consultar(body,boton){
   const cuerpo=p.querySelector('.cuerpo');cuerpo.innerHTML='<span class="estado">Buscando en la ley, la jurisprudencia y Mercado Público…</span>';
   let texto='',fuentes=[],t0=Date.now(),timer=null,pedirBases=null;
   try{
-    const r=await fetch(SUPA+'/functions/v1/experto-consultar',{method:'POST',headers:{'Content-Type':'application/json','apikey':ANON,'Authorization':'Bearer '+(tokenUsuario||ANON)},body:JSON.stringify({...body,huella})});
+    const r=await fetch(SUPA+'/functions/v1/'+(body.modo==='estudio'?'experto-estudio':'experto-consultar'),{method:'POST',headers:{'Content-Type':'application/json','apikey':ANON,'Authorization':'Bearer '+(tokenUsuario||ANON)},body:JSON.stringify({...body,huella})});
     if(!r.ok){
       const j=await r.json().catch(()=>({}));
-      if(r.status===402){cuerpo.innerHTML='';p.classList.add('aviso');p.innerHTML=`${j.mensaje||'Llegaste al límite gratuito.'} <a href="${PLANES}" target="_blank">Ver planes de FirmaVB</a>`;setUso(j.uso);}
+      if(r.status===402){cuerpo.innerHTML='';ofrecerPro(p,j.mensaje||'Llegaste al límite gratuito.');setUso(j.uso);}
+      else if(r.status===401){cuerpo.innerHTML='';p.classList.add('aviso');p.innerHTML=`${j.mensaje||'Inicia sesión.'} <a href="${PLANES.replace('/planes','/auth')}" target="_blank">Entrar a FirmaVB</a>`;}
       else cuerpo.textContent='No pude responder: '+(j.mensaje||j.error||r.status);
       boton.disabled=false;return;
     }
@@ -209,6 +228,9 @@ fInforme.onsubmit=async e=>{e.preventDefault();const codigo=document.getElementB
     catch(err){est.textContent='No pude leer las bases: '+err.message+'. Sigo con la ficha.';}
     boton.disabled=false;}
   consultar({modo:'informe',codigo,pregunta:ctx},boton);};
+fEstudio.onsubmit=e=>{e.preventDefault();const codigo=document.getElementById('codigoE').value.trim().toUpperCase();if(!codigo)return;const ctx=document.getElementById('ctxE').value.trim();add('yo','Estudio profundo '+codigo+(ctx?' · '+ctx.replace(/</g,'&lt;'):''));consultar({modo:'estudio',codigo,pregunta:ctx},document.getElementById('bEstudio'));};
+if(params.get('pago')==='ok')add('exp aviso','Pago recibido. Tu plan Pro queda activo en segundos: ya puedes pedir estudios profundos y preguntar sin límite.');
+else if(params.get('pago')==='pendiente')add('exp aviso','Tu pago quedó pendiente en Mercado Pago. Cuando se apruebe, el plan Pro se activa solo.');
 // Deep link: ?licitacion=CODIGO abre el informe directo (para el botón dentro de FirmaVB)
 if(params.get('licitacion')){modo('informe');document.getElementById('codigo').value=params.get('licitacion');fInforme.requestSubmit();}
 else if(params.get('q')||params.get('pregunta')){q.value=params.get('q')||params.get('pregunta');fChat.requestSubmit();}
