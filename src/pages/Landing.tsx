@@ -37,6 +37,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { DemoModal } from "@/components/landing/DemoModal";
 import { LandingChat, LandingChatButton } from "@/components/landing/LandingChat";
 import { TeaserResultados } from "@/components/landing/TeaserResultados";
+import { ExpertoComodin } from "@/components/landing/ExpertoComodin";
 import logoFirmavbOriginal from "@/assets/logo-firmavb-original.png";
 import { toast } from "sonner";
 
@@ -220,6 +221,9 @@ export default function Landing() {
           </div>
         </div>
       </section>
+
+      {/* Comodín telefónico: primera pregunta al Experto */}
+      <ExpertoComodin />
 
       {/* Banner Validador CM2239 */}
 <section className="py-10 px-6">

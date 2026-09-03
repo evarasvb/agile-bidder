@@ -57,6 +57,10 @@
   .aviso a{color:var(--navy);font-weight:600}
   .badge{display:inline-block;font:11px system-ui,sans-serif;background:var(--mist);color:var(--muted);border-radius:8px;padding:2px 8px;margin-left:6px}
   .oculto{display:none}
+  .bases{margin-top:10px;padding:10px 12px;border:1px dashed var(--sea);border-radius:12px;background:#F3FAFB;font:13px system-ui,sans-serif;color:var(--navy)}
+  .bases button{font:13px system-ui,sans-serif;background:var(--navy);color:#fff;border:0;border-radius:10px;padding:7px 12px;cursor:pointer;margin-right:8px}
+  .bases button:disabled{opacity:.5}.bases .est{color:var(--muted)}
+  .adjunto{font:13px system-ui,sans-serif;color:var(--navy);background:var(--mist);border-radius:10px;padding:8px 10px;cursor:pointer;white-space:nowrap;align-self:center}
   footer{font:11px system-ui,sans-serif;color:var(--muted);text-align:center;padding:6px 12px 10px;background:var(--foam)}
 </style>
 </head>
@@ -90,6 +94,7 @@
 <form id="fInforme" class="oculto">
   <input type="text" id="codigo" placeholder="ID de licitación, ej. 2699-35-LE26" autocomplete="off">
   <input type="text" id="ctx" placeholder="Opcional: qué vende tu empresa" autocomplete="off">
+  <label class="adjunto" id="lblAdj" title="Si tienes las bases en PDF, adjúntalas: el informe usará los criterios y ponderaciones reales">📎 Bases (PDF)<input type="file" id="pdfInforme" accept="application/pdf" class="oculto"></label>
   <button class="enviar" id="bInforme" type="submit">Analizar</button>
 </form>
 <footer>Fuentes: BCN (Ley Chile), ChileCompra, Contraloría General de la República, Tribunal de Contratación Pública, API Mercado Público. FirmaVB SpA.</footer>
@@ -134,11 +139,33 @@ tabChat.onclick=()=>modo('chat');tabInforme.onclick=()=>modo('informe');
 document.querySelectorAll('.ejemplos button').forEach(x=>x.onclick=()=>{modo('chat');q.value=x.textContent;fChat.requestSubmit();});
 q.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();fChat.requestSubmit();}});
 
+// Subir bases (PDF) para que el Experto las lea; quedan guardadas por código para todos.
+function leerBase64(file){return new Promise((ok,ko)=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(',')[1]||'');r.onerror=()=>ko(new Error('No pude leer el archivo'));r.readAsDataURL(file);});}
+async function subirBases(codigo,file,estado){
+  if(!tokenUsuario)throw new Error('Inicia sesión en FirmaVB (es gratis) para subir las bases.');
+  if(file.size>20*1024*1024)throw new Error('El PDF supera los 20 MB.');
+  estado('Leyendo las bases ('+(file.size/1024/1024).toFixed(1)+' MB)… puede tardar hasta un minuto.');
+  const pdf_base64=await leerBase64(file);
+  const r=await fetch(SUPA+'/functions/v1/experto-bases',{method:'POST',headers:{'Content-Type':'application/json','apikey':ANON,'Authorization':'Bearer '+tokenUsuario},body:JSON.stringify({codigo,nombre:file.name,pdf_base64})});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(j.mensaje||j.error||('Error '+r.status));
+  return j;
+}
+function ofrecerBases(p,codigo,body,boton){
+  const d=document.createElement('div');d.className='bases';
+  d.innerHTML=`<div>¿Tienes las bases de <b>${codigo}</b> en PDF? Súbelas y respondo con los criterios, ponderaciones, garantías y cláusulas reales.</div><div style="margin-top:8px"><button type="button">Subir bases (PDF)</button><span class="est">${tokenUsuario?'Quedan guardadas para todos los que consulten esta licitación.':'Necesitas iniciar sesión en FirmaVB (gratis).'}</span></div><input type="file" accept="application/pdf" class="oculto">`;
+  const btn=d.querySelector('button'),inp=d.querySelector('input'),est=d.querySelector('.est');
+  btn.onclick=()=>{if(!tokenUsuario){window.open(PLANES.replace('/planes','/auth'),'_blank');return;}inp.click();};
+  inp.onchange=async()=>{const f=inp.files[0];if(!f)return;btn.disabled=true;
+    try{const j=await subirBases(codigo,f,t=>est.textContent=t);est.textContent=`Bases leídas: ${j.paginas} páginas, ${j.secciones} secciones. Vuelvo a responder con ellas…`;consultar(body,boton);}
+    catch(e){est.textContent=e.message;btn.disabled=false;}};
+  p.appendChild(d);chat.scrollTop=chat.scrollHeight;
+}
 async function consultar(body,boton){
   boton.disabled=true;
   const p=add('exp','<div class="cuerpo"></div>');
   const cuerpo=p.querySelector('.cuerpo');cuerpo.innerHTML='<span class="estado">Buscando en la ley, la jurisprudencia y Mercado Público…</span>';
-  let texto='',fuentes=[],t0=Date.now(),timer=null;
+  let texto='',fuentes=[],t0=Date.now(),timer=null,pedirBases=null;
   try{
     const r=await fetch(SUPA+'/functions/v1/experto-consultar',{method:'POST',headers:{'Content-Type':'application/json','apikey':ANON,'Authorization':'Bearer '+(tokenUsuario||ANON)},body:JSON.stringify({...body,huella})});
     if(!r.ok){
@@ -157,7 +184,7 @@ async function consultar(body,boton){
       for(const part of parts){
         const ln=part.trim();if(!ln.startsWith('data:'))continue;
         let j;try{j=JSON.parse(ln.slice(5));}catch{continue;}
-        if(j.meta){fuentes=j.meta.fuentes||[];setUso(j.meta.uso);if(!texto)cuerpo.innerHTML='<span class="estado">Redactando…</span>';}
+        if(j.meta){fuentes=j.meta.fuentes||[];pedirBases=j.meta.pedir_bases||null;setUso(j.meta.uso);if(!texto)cuerpo.innerHTML='<span class="estado">Redactando…</span>';}
         if(j.delta){texto+=j.delta;}
         if(j.error){texto+='\n\n_(error: '+j.error+')_';}
       }
@@ -165,16 +192,26 @@ async function consultar(body,boton){
     clearInterval(timer);pintar();
     if(!texto)cuerpo.innerHTML='<span class="estado">No obtuve respuesta. Intenta de nuevo.</span>';
     if(fuentes.length){const fu=document.createElement('div');fu.className='fuentes';fu.innerHTML='<b>Fuentes consultadas</b><br>'+fuentes.map(f=>`[${f.n}] ${f.url?`<a href="${f.url}" target="_blank" rel="noopener noreferrer">${f.fuente}</a>`:f.fuente}${f.seccion?' · '+String(f.seccion).slice(0,80):''}`).join('<br>')+`<span class="badge">${((Date.now()-t0)/1000).toFixed(1)} s</span>`;p.appendChild(fu);}
+    if(pedirBases&&texto)ofrecerBases(p,pedirBases,body,boton);
     if(body.modo==='chat'){historial.push({role:'user',content:body.pregunta},{role:'assistant',content:texto});if(historial.length>6)historial.splice(0,2);}
     if(body.modo==='informe'&&texto){const acc=document.createElement('div');acc.className='ejemplos';acc.innerHTML='<button>Copiar informe</button><button>Preguntar sobre esta licitación</button>';acc.children[0].onclick=()=>{navigator.clipboard.writeText(texto);acc.children[0].textContent='Copiado';};acc.children[1].onclick=()=>{modo('chat');q.value=`Sobre la licitación ${body.codigo}: `;q.focus();};p.appendChild(acc);}
   }catch(err){clearInterval(timer);cuerpo.textContent='No pude responder: '+err.message;}
   boton.disabled=false;chat.scrollTop=chat.scrollHeight;
 }
 fChat.onsubmit=e=>{e.preventDefault();const pregunta=q.value.trim();if(!pregunta)return;q.value='';add('yo',pregunta.replace(/</g,'&lt;'));consultar({modo:'chat',pregunta,historial:historial.slice(-6)},document.getElementById('bChat'));};
-fInforme.onsubmit=e=>{e.preventDefault();const codigo=document.getElementById('codigo').value.trim().toUpperCase();if(!codigo)return;const ctx=document.getElementById('ctx').value.trim();add('yo','Analizar licitación '+codigo+(ctx?' · '+ctx.replace(/</g,'&lt;'):''));consultar({modo:'informe',codigo,pregunta:ctx},document.getElementById('bInforme'));};
+const pdfInforme=document.getElementById('pdfInforme'),lblAdj=document.getElementById('lblAdj');
+pdfInforme.onchange=()=>{lblAdj.textContent=pdfInforme.files[0]?'📎 '+pdfInforme.files[0].name.slice(0,28):'📎 Bases (PDF)';lblAdj.appendChild(pdfInforme);};
+fInforme.onsubmit=async e=>{e.preventDefault();const codigo=document.getElementById('codigo').value.trim().toUpperCase();if(!codigo)return;const ctx=document.getElementById('ctx').value.trim();const boton=document.getElementById('bInforme');
+  add('yo','Analizar licitación '+codigo+(ctx?' · '+ctx.replace(/</g,'&lt;'):''));
+  const f=pdfInforme.files[0];
+  if(f){boton.disabled=true;const p=add('exp','<div class="cuerpo"><span class="estado"></span></div>');const est=p.querySelector('.estado');
+    try{const j=await subirBases(codigo,f,t=>est.textContent=t);est.textContent=`Bases leídas: ${j.paginas} páginas. Ahora el informe usa sus criterios reales.`;pdfInforme.value='';lblAdj.textContent='📎 Bases (PDF)';lblAdj.appendChild(pdfInforme);}
+    catch(err){est.textContent='No pude leer las bases: '+err.message+'. Sigo con la ficha.';}
+    boton.disabled=false;}
+  consultar({modo:'informe',codigo,pregunta:ctx},boton);};
 // Deep link: ?licitacion=CODIGO abre el informe directo (para el botón dentro de FirmaVB)
 if(params.get('licitacion')){modo('informe');document.getElementById('codigo').value=params.get('licitacion');fInforme.requestSubmit();}
-else if(params.get('q')){q.value=params.get('q');fChat.requestSubmit();}
+else if(params.get('q')||params.get('pregunta')){q.value=params.get('q')||params.get('pregunta');fChat.requestSubmit();}
 </script>
 </body>
 </html>

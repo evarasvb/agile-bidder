@@ -81,12 +81,36 @@ COMPETENCIA (quién vende estos productos al Estado, 12 meses):\n${comp || "s/i"
 LICITACIONES SIMILARES DEL MISMO ORGANISMO:\n${sim || "ninguna"}`;
 }
 
+// Bases subidas por usuarios: resumen estructurado + secciones más afines a la pregunta.
+function textoBases(bases: any[], pregunta: string, maxChars: number, nDesde: number, codigo: string): string {
+  const claves = [...palabrasClave(pregunta), "evaluacion", "criterio", "puntaje", "ponderacion", "garantia", "multa", "pago", "admisibilidad", "anexo", "plazo"]
+    .map((w) => w.normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
+  const norm = (t: string) => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const out: string[] = [];
+  bases.forEach((b, i) => {
+    const n = nDesde + i + 1;
+    let presupuesto = Math.max(2500, Math.floor(maxChars / bases.length));
+    const secs: any[] = Array.isArray(b.secciones) ? b.secciones : [];
+    const puntuadas = secs.map((s, idx) => { const t = norm(String(s.texto ?? "")); return { idx, s, p: claves.reduce((a, k) => a + (t.split(k).length - 1), 0) }; })
+      .sort((x, y) => y.p - x.p || x.idx - y.idx);
+    const elegidas: any[] = [];
+    for (const c of puntuadas) { const len = String(c.s.texto ?? "").length + 40; if (len > presupuesto) continue; elegidas.push(c); presupuesto -= len; }
+    elegidas.sort((x, y) => x.idx - y.idx);
+    out.push(`[${n}] BASES DE LA LICITACIÓN ${codigo} — archivo "${b.archivo}" (${b.paginas ?? "?"} páginas, subido por un usuario de FirmaVB)
+RESUMEN ESTRUCTURADO DE LAS BASES: ${b.resumen ? JSON.stringify(b.resumen) : "(sin resumen)"}
+SECCIONES DE LAS BASES MÁS RELACIONADAS CON LA PREGUNTA:
+${elegidas.map((c) => `## ${c.s.titulo}\n${c.s.texto}`).join("\n\n") || "(sin secciones)"}`);
+  });
+  return out.join("\n\n");
+}
+
 const SYS_CHAT = `Eres el Experto FirmaVB, asesor con 17 años vendiéndole al Estado chileno por Mercado Público / ChileCompra. Español chileno, directo, práctico, como mentor de un empresario pyme.
 Reglas:
 - Responde SOLO con lo que respaldan las FUENTES y DATOS entregados. Cita entre corchetes [n] la fuente usada después de cada afirmación que provenga de ella. Con ley o reglamento nombra el artículo en la frase; con directivas su número; con dictámenes de Contraloría número y año (advierte si es anterior a dic-2024: puede citar el reglamento antiguo D.250/2004, reemplazado por el D.661/2024); con sentencias del TCP rol y fecha; con el libro, dilo como criterio práctico del autor.
 - Con datos de Mercado Público entrega código, organismo, monto, cierre y link.
 - Si hay FICHA ORGANISMO, úsala para evaluar el riesgo de venderle. Distingue reclamos por pago no oportuno (riesgo de caja) de los por irregularidad en el proceso (riesgo de evaluación). Pondera por volumen: usa "reclamos de pago por cada 100 procesos" (menos de 1 bajo, 1 a 5 medio, más de 5 alto) antes que el número bruto; si un solo reclamante concentra más del 50%, adviértelo (puede ser un proveedor reclamando en masa). Compara con la cifra de hace 90 días si existe. Cítalo como "Datos Mercado Público vía FirmaVB". Si el dato dice "sin dato", dilo así.
 - Con LICITACIONES PARECIDAS YA ADJUDICADAS y QUIÉN LE GANA A ESTE ORGANISMO, di quién gana, a qué precio respecto del presupuesto y cuántos oferentes compiten; cítalo como "Datos Mercado Público vía FirmaVB (OCDS)".
+- Si hay BASES DE LA LICITACIÓN (PDF subido por un usuario), son la fuente principal para criterios de evaluación, ponderaciones, garantías, plazos, multas, anexos y cláusulas: responde con esos datos exactos, cita [n] y nombra la sección o numeral. Si el contexto dice NO HAY BASES CARGADAS y la pregunta las necesita, responde lo que sí sabes y pide que las suban con el botón "Subir bases (PDF)"; no mandes al usuario a descargarlas de Mercado Público.
 - Si las fuentes no cubren la pregunta, dilo ("No tengo fuente en mi base para eso") y señala qué documento consultar. No inventes artículos, plazos, cifras ni licitaciones.
 - Montos en pesos con separador de miles ($1.234.567). Máximo 250 palabras salvo que pidan detalle. Párrafos cortos; lista corta solo para varias licitaciones. Formato Markdown simple.`;
 
@@ -109,7 +133,7 @@ Acciones concretas para hoy.
 ## Fuentes
 Lista numerada de las fuentes citadas (norma y artículo, directiva, dictamen, sentencia, capítulo del libro, "Datos Mercado Público vía FirmaVB").
 
-Reglas: cita [n] tras cada afirmación con fuente; no inventes criterios ni plazos que no estén en la ficha o fuentes (si no están, di "revisar en bases"); montos con separador de miles; máximo 900 palabras.`;
+Reglas: cita [n] tras cada afirmación con fuente; si hay BASES DE LA LICITACIÓN en el contexto, la sección 4 usa sus criterios y ponderaciones reales y las secciones 2 y 3 sus plazos, garantías y anexos, citando la sección; no inventes criterios ni plazos que no estén en la ficha, las bases o las fuentes (si no están, di "revisar en bases" y sugiere subirlas con el botón "Subir bases (PDF)"); montos con separador de miles; máximo 900 palabras.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -167,6 +191,7 @@ Deno.serve(async (req) => {
     const qDatos = kd.length > 1 ? kd.slice(0, 2).join(" ") + (kd[2] ? " or " + kd[2] : "") : (kd[0] ?? "");
     const tareas: Record<string, Promise<any>> = {};
     if (codigo) tareas.ficha = sb.rpc("experto_ficha_licitacion", { p_codigo: codigo }).then((r) => r.data);
+    if (codigo) tareas.bases = sb.rpc("experto_bases_texto", { p_codigo: codigo }).then((r) => r.data ?? []);
     if (modo === "chat") {
       if (kws.length) {
         tareas.normOr = sb.rpc("experto_buscar_or", { consulta: qOr, cantidad: 8 }).then((r) => r.data ?? []);
@@ -221,6 +246,13 @@ Deno.serve(async (req) => {
     if (fragmentos.length) partes.push("FUENTES:\n" + textoFragmentos(fragmentos));
     if (res.ficha) partes.push("FICHA DE LICITACIÓN (Datos Mercado Público vía FirmaVB):\n" + textoFicha(res.ficha));
     else if (codigo) partes.push(`No encontré la licitación ${codigo} en la base (puede ser antigua o el código estar mal).`);
+    const bases: any[] = Array.isArray(res.bases) ? res.bases : [];
+    let pedirBases: string | null = null;
+    if (codigo && bases.length) partes.push(textoBases(bases, modo === "chat" ? pregunta : "criterios evaluacion ponderacion garantia plazo multa admisibilidad anexos pago", modo === "chat" ? 14000 : 24000, fragmentos.length, codigo));
+    else if (codigo && (modo === "informe" || /ponder|criterio|evalua|puntaj|garant|cl[aá]usul|multa|anexo|requisit|admisib|plazo de entrega|forma de pago|bases|pliego|t[eé]cnic/i.test(pregunta))) {
+      pedirBases = codigo;
+      partes.push(`NO HAY BASES CARGADAS para ${codigo}. Si la respuesta requiere las bases (criterios, ponderación, garantías, multas, cláusulas, anexos), dile al usuario que las suba con el botón "Subir bases (PDF)" que aparece bajo esta respuesta: las leerás al instante y quedarán disponibles para todos.`);
+    }
     if (res.lic?.length) partes.push("LICITACIONES ABIERTAS (Datos Mercado Público vía FirmaVB):\n" + res.lic.map((l: any) => `${l.codigo} | ${l.nombre} | ${l.institucion} | ${l.region ?? ""} | ${fmt(l.presupuesto)} | cierra ${fecha(l.cierra)} | ${l.url}`).join("\n"));
     if (res.ca?.length) partes.push("COMPRAS ÁGILES ABIERTAS:\n" + res.ca.map((l: any) => `${l.codigo} | ${l.nombre} | ${l.organismo} | ${fmt(l.monto)} | cierra ${fecha(l.cierra)} | pago: ${l.conducta_pago ?? "s/i"} ${l.pago_dias ? l.pago_dias + " días" : ""} | ${l.url ?? ""}`).join("\n"));
     if (res.comp?.length) partes.push(`COMPETENCIA para "${qDatos}" (proveedores que le vendieron exactamente ese producto al Estado en los últimos 12 meses, según los ítems de sus órdenes de compra; son datos confirmados, úsalos con confianza):\n` + res.comp.map((c: any) => `${c.proveedor} (${c.rut ?? ""}): ${c.ordenes} OC, ${fmt(c.monto)}, precio unitario mediano ${fmt(c.precio_unit_mediano)}, ${c.compradores} compradores`).join("\n"));
@@ -253,12 +285,15 @@ Deno.serve(async (req) => {
     }
     if (!upstream) return new Response(JSON.stringify({ error: "ia_no_disponible" }), { status: 502, headers: cors });
 
-    const fuentesMeta = fragmentos.map((f, i) => ({ n: i + 1, fuente: f.fuente, seccion: f.seccion, url: f.url }));
+    const fuentesMeta = [
+      ...fragmentos.map((f, i) => ({ n: i + 1, fuente: f.fuente, seccion: f.seccion, url: f.url })),
+      ...bases.map((b, i) => ({ n: fragmentos.length + i + 1, fuente: `Bases de la licitación ${codigo}: ${b.archivo}`, seccion: `${b.paginas ?? "?"} páginas, PDF subido por un usuario de FirmaVB el ${fecha(b.creado_en)}`, url: null })),
+    ];
     const enc = new TextEncoder(); const dec = new TextDecoder();
     let respuesta = "";
     const stream = new ReadableStream({
       async start(ctrl) {
-        ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ meta: { modelo, fuentes: fuentesMeta, codigo, uso: u, ms_busqueda: tBusq, ms_ia_inicio: Date.now() - t0, tiempos, kws, kd } })}\n\n`));
+        ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ meta: { modelo, fuentes: fuentesMeta, codigo, pedir_bases: pedirBases, bases: bases.map((b) => ({ archivo: b.archivo, paginas: b.paginas })), uso: u, ms_busqueda: tBusq, ms_ia_inicio: Date.now() - t0, tiempos, kws, kd } })}\n\n`));
         const reader = upstream!.body!.getReader(); let buf = "";
         try {
           while (true) {
