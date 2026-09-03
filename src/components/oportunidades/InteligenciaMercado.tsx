@@ -26,7 +26,8 @@ export default function InteligenciaMercado({
   tipo: "compra_agil" | "licitacion" | null;
 }) {
   const navigate = useNavigate();
-  const { isFree } = usePlan();
+  const { verInteligencia } = usePlan();
+  const isFree = !verInteligencia;
   const { data, isLoading } = useInteligenciaOC(codigo, tipo);
 
   const Header = (

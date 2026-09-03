@@ -4,6 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useOrganismoRiesgo } from '@/hooks/useOrganismoRiesgo';
+import { usePlan } from '@/hooks/usePlan';
+import { useRequirePro } from '@/components/pro/UpgradeProProvider';
+import { Lock } from 'lucide-react';
 
 interface Props {
   /** Código del proceso (licitación o compra ágil): permite ubicar el RUT exacto del organismo. */
@@ -28,7 +31,33 @@ const fecha = (d: string | null) => (d ? new Date(d + 'T00:00:00').toLocaleDateS
  */
 export function RiesgoOrganismoCard({ codigo, organismo }: Props) {
   const navigate = useNavigate();
-  const { data, isLoading } = useOrganismoRiesgo(codigo, organismo);
+  const { verInteligencia } = usePlan();
+  const { requirePro } = useRequirePro();
+  const { data, isLoading } = useOrganismoRiesgo(verInteligencia ? codigo : null, verInteligencia ? organismo : null);
+
+  // Modo vitrina (free): se muestra que el dato existe, no el dato.
+  if (!verInteligencia) {
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <CardTitle className="text-lg">¿Cómo paga este organismo?</CardTitle>
+            <Badge variant="outline" className="bg-muted text-muted-foreground"><Lock className="h-3.5 w-3.5 mr-1" />Pro</Badge>
+          </div>
+          {organismo && <p className="text-xs text-muted-foreground">{organismo}</p>}
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Reclamos por no pago en Mercado Público, plazo real de pago, quién le gana a este organismo y a qué precio.
+          </p>
+          <Button size="sm" onClick={() => requirePro(undefined, 'Ver el riesgo de pago del organismo y quién le gana')}>
+            <Sparkles className="h-4 w-4 mr-1" />
+            Ver riesgo y competencia (Pro)
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (isLoading || !data) return null;
   const n = NIVEL[data.nivel] ?? NIVEL.sin_dato;
