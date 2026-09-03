@@ -81,7 +81,7 @@ grant execute on function public.ocds_marcar_mes(integer, integer, integer, inte
 create or replace function public.ocds_codigos_pendientes(p_max integer default 100) returns table (codigo text)
 language sql stable security definer set search_path to 'public' as $$
   select b.codigo from public.licitaciones_bi b left join public.ocds_procesos o on o.codigo = b.codigo
-  where b.fecha_cierre < now() - interval '2 days' and b.fecha_publicacion >= now() - interval '120 days'
+  where b.fecha_cierre < now() - interval '30 days' and b.fecha_publicacion >= now() - interval '150 days'
     and (o.codigo is null or (o.adjudicatarios is null and coalesce(o.award_leido_en, 'epoch') < now() - interval '7 days'))
   order by b.fecha_cierre desc limit least(p_max, 300); $$;
 revoke execute on function public.ocds_codigos_pendientes(integer) from public, anon, authenticated;

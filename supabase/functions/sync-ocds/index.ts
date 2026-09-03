@@ -94,10 +94,10 @@ Deno.serve(async (req: Request) => {
   const res: any = { recientes: 0, mes: null, guardadas: 0, sin_dato: 0, errores: [] };
   const guardar = async (filas: any[]) => {
     const ok = filas.filter(Boolean);
+    res.sin_dato += filas.length - ok.length;
     if (!ok.length) return;
     const { data, error } = await sb.rpc("ocds_upsert", { p_filas: ok });
     if (error) res.errores.push(error.message); else res.guardadas += data ?? 0;
-    res.sin_dato += filas.length - ok.length;
   };
 
   // 0. Códigos explícitos
@@ -111,9 +111,11 @@ Deno.serve(async (req: Request) => {
   // 1. Licitaciones recientes de nuestra base, cerradas y sin adjudicación leída
   const { data: pend } = await sb.rpc("ocds_codigos_pendientes", { p_max: Number(body.recientes ?? 80) });
   if (pend?.length) {
-    const filas = await enLotes(pend.map((r: any) => r.codigo), (c: string) => leerProceso(c, false), PARALELO, 60_000, t0);
+    const codigos: string[] = pend.map((r: any) => r.codigo);
+    const filas = await enLotes(codigos, (c: string) => leerProceso(c, false), PARALELO, 60_000, t0);
     res.recientes = filas.length;
-    await guardar(filas);
+    // Los que OCDS aún no publica se anotan como leídos (award_leido) para reintentarlos recién en 7 días.
+    await guardar(filas.map((f, i) => f ?? { codigo: codigos[i], award_leido: true }));
   }
 
   // 2. Relleno mes a mes hacia atrás (solo procesos con adjudicación publicada)
