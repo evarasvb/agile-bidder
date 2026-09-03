@@ -37,8 +37,8 @@ Quién gana más veces a este organismo, quién siempre postula, quién vende es
 Si hay BASES: criterios y ponderación reales con su sección. Si no, lo que la ficha permite saber y qué revisar (y sugiere subir las bases con el botón "Subir bases (PDF)").
 ## 5. Riesgo de pago del organismo
 Reclamos por pago no oportuno por cada 100 procesos, plazo declarado, conducta histórica.
-## 6. Estrategia recomendada
-Precio objetivo (rango con cifras, justificado con el historial), a quién hay que ganarle, dónde poner el esfuerzo técnico, garantías y plazos.
+## 6. Estrategia para postular
+Precio objetivo (rango con cifras, justificado con el historial), a quién hay que ganarle y con qué, dónde poner el esfuerzo técnico según los criterios, si conviene ir solo o en UTP, garantías y plazos, y los errores que en casos parecidos dejaron fuera a otros (dictámenes o sentencias de las FUENTES).
 ## 7. Plan de trabajo hasta el cierre
 Hitos con fechas hacia atrás desde el cierre.
 ## Fuentes
@@ -80,12 +80,15 @@ Deno.serve(async (req) => {
       docs: sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: codigo, p_max: 8000 }).then((r) => r.data ?? []),
       n1: sb.rpc("experto_buscar_texto", { consulta: "criterios evaluacion puntaje precio experiencia", cantidad: 3 }).then((r) => r.data ?? []),
       n2: sb.rpc("experto_buscar_texto", { consulta: "garantia seriedad oferta", cantidad: 2 }).then((r) => r.data ?? []),
+      // Normativa, dictámenes y sentencias sobre el tema de esta licitación (base propia del Experto)
+      n3: sb.rpc("experto_buscar_texto", { consulta: nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9ñ ]/g, " ").split(/\s+/).filter((w: string) => w.length > 4).slice(0, 3).join(" "), cantidad: 3 }).then((r) => r.data ?? []),
     };
     const res: Record<string, any> = {};
     await Promise.all(Object.entries(t).map(async ([k, p]) => { try { res[k] = await p; } catch { res[k] = null; } }));
 
     // Fuentes normativas [1..n], luego bases
-    const frag: any[] = [...(res.n1 ?? []), ...(res.n2 ?? [])];
+    const vistos = new Set<number>();
+    const frag: any[] = [...(res.n1 ?? []), ...(res.n2 ?? []), ...(res.n3 ?? [])].filter((f) => !vistos.has(f.id) && vistos.add(f.id));
     const bases: any[] = res.bases ?? [];
     const partes: string[] = [];
     if (frag.length) partes.push("FUENTES:\n" + frag.map((f, i) => `[${i + 1}] ${f.fuente}${f.seccion ? " — " + f.seccion : ""}\n${String(f.texto).slice(0, 1200)}`).join("\n\n"));
