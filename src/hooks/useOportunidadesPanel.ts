@@ -172,7 +172,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       // la fila al propio cliente, así que un maybeSingle basta.
       const filtrosQuery = (supabase as any)
         .from('cliente_filtros_oportunidades')
-        .select('palabras_incluir, palabras_excluir, regiones_activas, monto_min, monto_max')
+        .select('palabras_incluir, palabras_incluir_ia, palabras_excluir, regiones_activas, monto_min, monto_max')
         .maybeSingle();
 
       // Afinidad aprendida del comportamiento (lo que cotiza sube, lo que
@@ -341,7 +341,14 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
 
       // Filtros del cliente (onboarding + IA): no mostrar lo que no cumple.
       // filtrosRow ya se trajo en paralelo arriba. Si no hay filtros, es un no-op.
-      const tienePalabras = !!(filtrosRow?.palabras_incluir?.length);
+      // Búsqueda por CONCEPTO: se suman las palabras que el cliente escribió con
+      // los sinónimos/variantes que la IA amplió (palabras_incluir_ia), para que
+      // "consumible de impresión" calce con la palabra "toner" que él definió.
+      const palabrasConIA = [
+        ...((filtrosRow?.palabras_incluir as string[]) || []),
+        ...((filtrosRow?.palabras_incluir_ia as string[]) || []),
+      ].filter(Boolean);
+      const tienePalabras = palabrasConIA.length > 0;
       if (filtrosRow) {
         all = aplicarFiltrosCliente(all, filtrosRow as Partial<ClienteFiltros>);
       }
@@ -349,7 +356,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       // (ej: "toner"), para que la tarjeta explique por qué está aquí. Clave para
       // clientes sin inventario todavía: antes veían puro "N/A".
       if (tienePalabras) {
-        const palabras = (filtrosRow!.palabras_incluir as string[]).filter(Boolean);
+        const palabras = palabrasConIA;
         for (const o of all) {
           const texto = normalizar(`${o.nombre || ''} ${o.descripcion || ''} ${o.organismo || ''} ${o.items_text || ''}`);
           const p = palabras.find((w) => coincideConcepto(texto, w));

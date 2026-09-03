@@ -27,19 +27,24 @@ export interface UpsertOverrideInput {
   procesoTipo?: string;
 }
 
-/** Correcciones manuales del match del cliente para una compra (por código). */
-export function useMatchOverrides(codigo: string | null | undefined) {
+/** Correcciones manuales del match del cliente para una compra (por código).
+ *  Filtrado también por proceso_tipo: el mismo código podría, en teoría,
+ *  tener correcciones guardadas bajo otro tipo de proceso (match_overrides
+ *  permite filas separadas por cliente+codigo+item_ref+proceso_tipo), y no
+ *  queremos aplicar la corrección de un proceso a otro. */
+export function useMatchOverrides(codigo: string | null | undefined, procesoTipo: string = 'compra_agil') {
   const { user } = useAuth();
   const clienteId = user?.id ?? null;
 
   return useQuery({
-    queryKey: ['match_overrides', clienteId, codigo],
+    queryKey: ['match_overrides', clienteId, codigo, procesoTipo],
     enabled: !!clienteId && !!codigo,
     queryFn: async (): Promise<Record<string, MatchOverride>> => {
       if (!clienteId || !codigo) return {};
       const { data, error } = await (supabase.from as any)('match_overrides')
         .select('*')
-        .eq('codigo', codigo);
+        .eq('codigo', codigo)
+        .eq('proceso_tipo', procesoTipo);
       if (error) {
         console.error('[useMatchOverrides] error:', error);
         throw error;

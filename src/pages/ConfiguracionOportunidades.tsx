@@ -19,7 +19,7 @@ import {
   Sparkles,
   Loader2
 } from "lucide-react";
-import { useClienteFiltros, useSugerirFiltros } from "@/hooks/useClienteFiltros";
+import { useClienteFiltros, useSugerirFiltros, useExpandirConceptos } from "@/hooks/useClienteFiltros";
 import { useCliente } from "@/hooks/useCliente";
 import { RecargosRegion } from '@/components/settings/RecargosRegion';
 import { InfoHint } from "@/components/ui/info-hint";
@@ -49,6 +49,7 @@ export default function ConfiguracionOportunidades() {
   const navigate = useNavigate();
   const { filtros, isLoading, updateFiltros, isUpdating } = useClienteFiltros();
   const sugerir = useSugerirFiltros();
+  const expandirConceptos = useExpandirConceptos();
   const { data: cliente } = useCliente();
 
   const [palabrasIncluir, setPalabrasIncluir] = useState<string[]>([]);
@@ -142,7 +143,34 @@ export default function ConfiguracionOportunidades() {
       monto_min: montoMin ? parseFloat(montoMin) : null,
       monto_max: montoMax ? parseFloat(montoMax) : null,
     });
+    // Amplía las palabras a un concepto más amplio (sinónimos, cómo lo nombra
+    // el Estado) en segundo plano: no bloquea el guardado, y en cuanto termina
+    // el Panel de Oportunidades ya busca por concepto, no por palabra exacta.
+    if (palabrasIncluir.length > 0) {
+      expandirConceptos.mutate(palabrasIncluir, {
+        onSuccess: (res) => {
+          if (res.palabras_incluir_ia.length > 0) {
+            toast.success(`IA amplió tus palabras a ${res.palabras_incluir_ia.length} términos relacionados — ya buscando por concepto.`);
+          }
+        },
+      });
+    }
   };
+
+  // Si ya tiene palabras guardadas pero nunca se ampliaron con IA (cuentas
+  // creadas antes de esta función), lo hace una vez sola al entrar a la
+  // pantalla — así clientes existentes no se quedan atrás sin pedirles nada.
+  useEffect(() => {
+    if (
+      filtros?.palabras_incluir?.length &&
+      !filtros?.palabras_incluir_ia?.length &&
+      !expandirConceptos.isPending
+    ) {
+      expandirConceptos.mutate(filtros.palabras_incluir);
+    }
+    // Solo cuando cambian los filtros cargados desde el servidor.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtros?.id]);
 
   const handleKeyPress = (e: React.KeyboardEvent, action: () => void) => {
     if (e.key === "Enter") {
@@ -222,7 +250,7 @@ export default function ConfiguracionOportunidades() {
               Palabras a Incluir
             </CardTitle>
             <CardDescription>
-              Las oportunidades deben contener al menos una de estas palabras
+              Las oportunidades deben contener al menos una de estas palabras, o un concepto relacionado
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -244,8 +272,8 @@ export default function ConfiguracionOportunidades() {
                 </p>
               ) : (
                 palabrasIncluir.map((palabra) => (
-                  <Badge 
-                    key={palabra} 
+                  <Badge
+                    key={palabra}
                     variant="secondary"
                     className="flex items-center gap-1 bg-green-100 text-green-800 hover:bg-green-200"
                   >
@@ -257,6 +285,25 @@ export default function ConfiguracionOportunidades() {
                 ))
               )}
             </div>
+            {(expandirConceptos.isPending || !!filtros?.palabras_incluir_ia?.length) && (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Sparkles className="h-3 w-3" />
+                  {expandirConceptos.isPending
+                    ? "Ampliando con IA a conceptos relacionados..."
+                    : "También busca por estos conceptos relacionados (ampliados por IA):"}
+                </div>
+                {!!filtros?.palabras_incluir_ia?.length && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {filtros.palabras_incluir_ia.map((palabra) => (
+                      <Badge key={palabra} variant="outline" className="text-xs font-normal text-muted-foreground border-dashed">
+                        {palabra}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
