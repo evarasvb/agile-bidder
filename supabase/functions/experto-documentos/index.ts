@@ -67,22 +67,18 @@ Deno.serve(async (req) => {
     const userId = role === "authenticated" ? sub : role === "service_role" ? (req.headers.get("x-user-id") || null) : null;
     if (!userId) return json({ error: "login", mensaje: "Inicia sesión en FirmaVB para subir tus documentos de trabajo." }, 401);
     const url = new URL(req.url);
-    const tabla = () => sb.schema("experto").from("documentos");
 
     if (req.method === "GET") {
       const codigo = (url.searchParams.get("codigo") ?? "").trim().toUpperCase();
-      let q = tabla().select("id, codigo, nombre, tipo, caracteres, creado_en").eq("user_id", userId).order("creado_en", { ascending: false }).limit(50);
-      q = codigo ? q.eq("codigo", codigo) : q.is("codigo", null);
-      const { data, error } = await q;
+      const { data, error } = await sb.rpc("experto_documentos_listar", { p_user_id: userId, p_codigo: codigo || null });
       if (error) return json({ error: error.message }, 500);
       return json({ documentos: data ?? [] });
     }
     if (req.method === "DELETE") {
       const id = url.searchParams.get("id") ?? "";
-      const { data: fila } = await tabla().select("id, storage_path").eq("id", id).eq("user_id", userId).maybeSingle();
-      if (!fila) return json({ error: "no_existe" }, 404);
-      if (fila.storage_path) await sb.storage.from(BUCKET).remove([fila.storage_path]);
-      await tabla().delete().eq("id", id);
+      const { data: path, error } = await sb.rpc("experto_documento_borrar", { p_user_id: userId, p_id: id });
+      if (error) return json({ error: error.message }, 500);
+      if (path) await sb.storage.from(BUCKET).remove([String(path)]);
       return json({ ok: true });
     }
 
@@ -106,9 +102,9 @@ Deno.serve(async (req) => {
 
     const storage_path = `${userId}/${codigo || "general"}/${Date.now()}_${nombre.replace(/\s+/g, "_")}`;
     const up = await sb.storage.from(BUCKET).upload(storage_path, bytes, { contentType: req.headers.get("content-type") || "application/octet-stream", upsert: false });
-    const { data: fila, error } = await tabla().insert({ user_id: userId, codigo: codigo || null, nombre, tipo, storage_path: up.error ? null : storage_path, texto, caracteres: texto.length }).select("id").single();
+    const { data: id, error } = await sb.rpc("experto_documento_insertar", { p_user_id: userId, p_codigo: codigo || null, p_nombre: nombre, p_tipo: tipo, p_storage_path: up.error ? null : storage_path, p_texto: texto });
     if (error) return json({ error: error.message }, 500);
-    return json({ ok: true, id: fila.id, nombre, tipo, caracteres: texto.length });
+    return json({ ok: true, id, nombre, tipo, caracteres: texto.length });
   } catch (e) {
     return json({ error: String((e as Error)?.message ?? e) }, 500);
   }

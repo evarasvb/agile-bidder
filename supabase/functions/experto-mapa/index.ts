@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
     const [ficha, bases, informe] = await Promise.all([
       sb.rpc("experto_ficha_licitacion", { p_codigo: codigo }).then((r) => r.data),
       sb.rpc("experto_bases_texto", { p_codigo: codigo }).then((r) => r.data ?? []),
-      sb.schema("experto").from("consultas").select("respuesta").eq("user_id", userId).eq("licitacion", codigo).in("modo", ["informe", "estudio"]).order("creado_en", { ascending: false }).limit(2).then((r) => r.data ?? []),
+      sb.rpc("experto_entregables_texto", { p_user_id: userId, p_codigo: codigo }).then((r) => r.data ?? []),
     ]);
     if (!ficha && !bases.length) return json({ error: "sin_datos", mensaje: `No tengo ficha ni bases de ${codigo}.` }, 404);
     const f = ficha ?? {}; const o = f.organismo ?? {};
