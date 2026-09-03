@@ -188,13 +188,11 @@ document.querySelectorAll('.ejemplos button').forEach(x=>x.onclick=()=>{modo('ch
 q.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();fChat.requestSubmit();}});
 
 // Subir bases (PDF) para que el Experto las lea; quedan guardadas por código para todos.
-function leerBase64(file){return new Promise((ok,ko)=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(',')[1]||'');r.onerror=()=>ko(new Error('No pude leer el archivo'));r.readAsDataURL(file);});}
 async function subirBases(codigo,file,estado){
   if(!tokenUsuario)throw new Error('Inicia sesión en FirmaVB (es gratis) para subir las bases.');
   if(file.size>20*1024*1024)throw new Error('El PDF supera los 20 MB.');
   estado('Leyendo las bases ('+(file.size/1024/1024).toFixed(1)+' MB)… puede tardar hasta un minuto.');
-  const pdf_base64=await leerBase64(file);
-  const r=await fetch(SUPA+'/functions/v1/experto-bases',{method:'POST',headers:{'Content-Type':'application/json','apikey':ANON,'Authorization':'Bearer '+tokenUsuario},body:JSON.stringify({codigo,nombre:file.name,pdf_base64})});
+  const r=await fetch(SUPA+'/functions/v1/experto-bases',{method:'POST',headers:{'Content-Type':'application/pdf','X-Codigo':codigo,'X-Nombre':encodeURIComponent(file.name),'apikey':ANON,'Authorization':'Bearer '+tokenUsuario},body:file});
   const j=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(j.mensaje||j.error||('Error '+r.status));
   return j;

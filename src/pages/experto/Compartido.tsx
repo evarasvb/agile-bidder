@@ -51,8 +51,9 @@ export default function Compartido() {
             <p className="text-sm text-muted-foreground mt-1">
               Hecho por <b>{data.empresa ?? 'un proveedor'}</b> con el Experto FirmaVB · {new Date(data.creado_en).toLocaleDateString('es-CL')}
             </p>
-            <div className="no-print flex gap-2 mt-4">
+            <div className="no-print flex flex-wrap gap-2 mt-4">
               <Button size="sm" variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4 mr-1" />Guardar PDF</Button>
+              <Button size="sm" className="bg-[#25D366] hover:bg-[#1ebe5d] text-white" asChild><a href={`https://wa.me/?text=${encodeURIComponent(`${data.titulo ?? 'Análisis del Experto FirmaVB'}\n${window.location.href}`)}`} target="_blank" rel="noreferrer">WhatsApp</a></Button>
               <Button size="sm" variant="outline" onClick={compartir}><Share2 className="h-4 w-4 mr-1" />Compartir</Button>
             </div>
             {data.tipo === 'infografia' && parse(data.contenido) ? <div className="mt-6"><Infografia d={{ ...parse(data.contenido), empresa: data.empresa }} /></div>
@@ -64,7 +65,7 @@ export default function Compartido() {
           <p className="font-semibold flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" />¿Tienes una licitación entre manos?</p>
           <p className="text-sm text-muted-foreground mt-1">Pregúntale al Experto FirmaVB: 17 años vendiéndole al Estado, la ley, 3.148 dictámenes y los datos reales de quién gana y cómo paga cada organismo. Tu primera pregunta es gratis, sin registrarte.</p>
           <div className="no-print mt-3 flex gap-2 flex-wrap">
-            <Button asChild><a href="/experto.html">Usar mi comodín gratis</a></Button>
+            <Button asChild><a href="/">Usar mi comodín gratis</a></Button>
             <Button variant="outline" asChild><Link to="/auth?tab=signup">Crear cuenta</Link></Button>
           </div>
           <p className="text-xs text-muted-foreground mt-3">firmavb.cl · Este análisis se generó con fuentes públicas y datos de Mercado Público; no reemplaza la lectura de las bases.</p>

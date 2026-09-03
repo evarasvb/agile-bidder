@@ -30,7 +30,6 @@ const MisOportunidades = lazy(() => import("./pages/MisOportunidades"));
 const LicitacionDetalle = lazy(() => import("./pages/LicitacionDetalle"));
 
 const ChatIA = lazy(() => import("./pages/ChatIA"));
-const Experto = lazy(() => import("./pages/Experto"));
 const LibroLicitacion = lazy(() => import("./pages/experto/LibroLicitacion"));
 const Compartido = lazy(() => import("./pages/experto/Compartido"));
 const Compartidos = lazy(() => import("./pages/experto/Compartidos"));
@@ -151,7 +150,7 @@ const App = () => (
             <Route path="/mis-oportunidades" element={<MisOportunidades />} />
             <Route path="/licitaciones/:id" element={<LicitacionDetalle />} />
             <Route path="/licitaciones/:id/chat" element={<ChatIA />} />
-            <Route path="/experto" element={<Experto />} />
+            <Route path="/experto" element={<LibroLicitacion />} />
             <Route path="/experto/libro/:codigo" element={<LibroLicitacion />} />
             <Route path="/experto/compartidos" element={<Compartidos />} />
             {/* Legacy: la lista vieja duplicaba Compras Ágiles (y hasta se titulaba así) */}

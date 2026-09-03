@@ -6,11 +6,11 @@
 //   GET  ?codigo=XXXX          -> estado (cuántos archivos hay)
 //   POST {codigo, nombre, pdf_base64} -> extrae, resume y guarda (requiere sesión)
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { extractText, getDocumentProxy } from "npm:unpdf";
+import { getDocumentProxy } from "npm:unpdf";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-codigo, x-nombre",
 };
 const MAX_PDF_BYTES = 20 * 1024 * 1024;
 const MAX_TEXTO = 400_000;
@@ -60,7 +60,9 @@ async function resumir(texto: string): Promise<Record<string, unknown> | null> {
  "multas_y_clausulas_riesgosas":["multa o cláusula con su monto/porcentaje y por qué es riesgosa"],
  "advertencias":["cualquier cosa rara: criterios subjetivos, experiencia imposible de acreditar, plazos de entrega irreales, exclusividad, etc."]}
 Si algo no está en el texto, usa null o lista vacía. No inventes.`;
-  for (const model of MODELOS) {
+  // Google devuelve 503 por alta demanda a ratos: segunda pasada por todos los modelos tras una pausa.
+  for (const model of [...MODELOS, "espera", ...MODELOS]) {
+    if (model === "espera") { await new Promise((ok) => setTimeout(ok, 2500)); continue; }
     try {
       const r = await fetch(GEMINI_URL, {
         method: "POST",
@@ -99,22 +101,43 @@ Deno.serve(async (req) => {
     if (role !== "authenticated" && role !== "service_role") {
       return json({ error: "login", mensaje: "Inicia sesión en FirmaVB (es gratis) para subir las bases." }, 401);
     }
-    const body = await req.json();
-    const codigo = String(body.codigo ?? "").trim().toUpperCase();
+    // El PDF llega crudo (Content-Type application/pdf + cabeceras X-Codigo / X-Nombre): sin base64
+    // se usa la mitad de memoria y no se cae el worker con bases grandes.
+    let codigo = "", nombre = "", bytes: Uint8Array;
+    if ((req.headers.get("content-type") ?? "").includes("application/pdf")) {
+      codigo = decodeURIComponent(req.headers.get("x-codigo") ?? "").trim().toUpperCase();
+      nombre = decodeURIComponent(req.headers.get("x-nombre") ?? "bases.pdf");
+      const len = Number(req.headers.get("content-length") ?? 0);
+      if (len > MAX_PDF_BYTES) return json({ error: "tamano", mensaje: "El PDF supera los 20 MB." }, 413);
+      bytes = new Uint8Array(await req.arrayBuffer());
+    } else {
+      const body = await req.json();
+      codigo = String(body.codigo ?? "").trim().toUpperCase();
+      nombre = String(body.nombre ?? "bases.pdf");
+      const b64 = String(body.pdf_base64 ?? "").replace(/^data:[^,]*,/, "");
+      if (!b64) return json({ error: "sin_archivo", mensaje: "Adjunta el PDF de las bases." }, 400);
+      if (b64.length > MAX_PDF_BYTES * 1.4) return json({ error: "tamano", mensaje: "El PDF supera los 20 MB." }, 413);
+      bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    }
     if (!/^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2}$/.test(codigo)) return json({ error: "codigo", mensaje: "Indica el ID de la licitación (ej. 2699-35-LE26)." }, 400);
-    const nombre = String(body.nombre ?? "bases.pdf").replace(/[^\w.\-áéíóúñÁÉÍÓÚÑ ]/g, "_").slice(0, 120);
-    const b64 = String(body.pdf_base64 ?? "").replace(/^data:[^,]*,/, "");
-    if (!b64) return json({ error: "sin_archivo", mensaje: "Adjunta el PDF de las bases." }, 400);
-    if (b64.length > MAX_PDF_BYTES * 1.4) return json({ error: "tamano", mensaje: "El PDF supera los 20 MB." }, 413);
-    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    nombre = nombre.replace(/[^\w.\-áéíóúñÁÉÍÓÚÑ ]/g, "_").slice(0, 120);
+    if (bytes.length > MAX_PDF_BYTES) return json({ error: "tamano", mensaje: "El PDF supera los 20 MB." }, 413);
     if (bytes.length < 100 || String.fromCharCode(...bytes.slice(0, 5)) !== "%PDF-") return json({ error: "no_pdf", mensaje: "El archivo no es un PDF." }, 400);
 
-    // 1. Texto
+    // 1. Texto, página por página (tope de páginas y caracteres para no agotar memoria)
     let texto = "", paginas = 0;
     try {
       const pdf = await getDocumentProxy(bytes);
-      const r = await extractText(pdf, { mergePages: true });
-      paginas = r.totalPages; texto = limpiar(String(r.text ?? ""));
+      paginas = pdf.numPages;
+      const partes: string[] = []; let total = 0;
+      for (let i = 1; i <= Math.min(pdf.numPages, 400) && total < MAX_TEXTO; i++) {
+        const page = await pdf.getPage(i);
+        const tc = await page.getTextContent();
+        const t = (tc.items as any[]).map((it) => it.str ?? "").join(" ");
+        partes.push(t); total += t.length;
+        page.cleanup?.();
+      }
+      texto = limpiar(partes.join("\n"));
     } catch (e) {
       console.error("extract", String(e));
       return json({ error: "lectura", mensaje: "No pude leer ese PDF. Prueba con otro archivo o con la versión con texto." }, 422);

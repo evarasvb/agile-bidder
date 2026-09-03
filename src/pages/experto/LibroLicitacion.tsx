@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2 } from 'lucide-react';
+import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -16,6 +16,8 @@ import { MapaConceptual, type Nodo } from '@/components/experto/MapaConceptual';
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string;
 const ANON = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
 const fmt = (n: unknown) => n == null ? 's/i' : '$' + Math.round(Number(n)).toLocaleString('es-CL');
+const RE_ID = /\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2}/;
+const idEn = (t: string) => t.toUpperCase().match(RE_ID)?.[0];
 const fecha = (d?: string | null) => d ? new Date(d).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }) : 's/i';
 
 interface Msg { rol: 'yo' | 'exp'; texto: string; fuentes?: any[]; pedirBases?: string | null }
@@ -24,11 +26,13 @@ type Entregable = 'informe' | 'estudio' | 'anexos' | 'mapa' | 'infografia';
 /**
  * Libro de trabajo de una licitación: Fuentes (ficha, bases, organismo, quién gana) · Chat con el
  * Experto · Entregables (informe, estudio profundo, anexos). Todo queda guardado por licitación.
+ * Sin código (/experto) es el chat general del Experto más la lista de libros del usuario.
  */
 export default function LibroLicitacion() {
   const { codigo = '' } = useParams();
   const cod = codigo.toUpperCase();
   const navigate = useNavigate();
+  const [sp] = useSearchParams();
   const qc = useQueryClient();
   const { session } = useAuth();
   const token = session?.access_token ?? '';
@@ -40,7 +44,13 @@ export default function LibroLicitacion() {
     queryFn: async () => (await (supabase as any).rpc('experto_libro', { p_codigo: cod })).data,
   });
 
+  const { data: libros = [] } = useQuery({ queryKey: ['experto_mis_libros'], enabled: !!token, queryFn: async () => ((await (supabase as any).rpc('experto_mis_libros')).data ?? []) as any[] });
+
   const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [codigoAbrir, setCodigoAbrir] = useState('');
+  const [limite, setLimite] = useState<string | null>(null);
+  const [compartido, setCompartido] = useState<{ url: string; titulo: string } | null>(null);
+  const autoRef = useRef(false);
   const [pregunta, setPregunta] = useState('');
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [tab, setTab] = useState<Entregable>('informe');
@@ -49,6 +59,7 @@ export default function LibroLicitacion() {
   const chatRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => { setMsgs([]); setLimite(null); setCompartido(null); }, [cod]);
   useEffect(() => {
     if (!libro) return;
     setMsgs((libro.chat ?? []).flatMap((c: any) => [{ rol: 'yo', texto: c.pregunta }, { rol: 'exp', texto: c.respuesta }]));
@@ -61,7 +72,7 @@ export default function LibroLicitacion() {
   // Streaming SSE del Experto (chat, informe y estudio comparten el formato).
   async function pedir(body: Record<string, unknown>, fn: 'experto-consultar' | 'experto-estudio', onTexto: (t: string, meta?: any) => void) {
     const r = await fetch(`${SUPA}/functions/v1/${fn}`, { method: 'POST', headers: auth, body: JSON.stringify(body) });
-    if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.mensaje || j.error || `Error ${r.status}`); }
+    if (!r.ok) { const j = await r.json().catch(() => ({})); throw Object.assign(new Error(j.mensaje || j.error || `Error ${r.status}`), { status: r.status }); }
     const reader = r.body!.getReader(); const dec = new TextDecoder(); let buf = ''; let texto = ''; let meta: any = null;
     while (true) {
       const { done, value } = await reader.read(); if (done) break;
@@ -78,18 +89,29 @@ export default function LibroLicitacion() {
     return { texto, meta };
   }
 
-  const preguntar = async () => {
-    const p = pregunta.trim(); if (!p || ocupado) return;
+  const preguntar = async (texto?: string) => {
+    const p = (texto ?? pregunta).trim(); if (!p || ocupado) return;
     setPregunta('');
+    // Sin libro abierto, un ID de licitación solo abre su libro.
+    if (!cod && RE_ID.test(p.toUpperCase()) && p.length < 20) { navigate(`/experto/libro/${idEn(p)}`); return; }
     const historial = msgs.slice(-6).map((m) => ({ role: m.rol === 'yo' ? 'user' : 'assistant', content: m.texto }));
     setMsgs((m) => [...m, { rol: 'yo', texto: p }, { rol: 'exp', texto: '' }]);
     setOcupado('chat');
     try {
-      await pedir({ modo: 'chat', pregunta: p, codigo: cod, historial, huella: 'libro' }, 'experto-consultar', (t, meta) =>
+      await pedir({ modo: 'chat', pregunta: p, codigo: cod || undefined, historial, huella: 'libro' }, 'experto-consultar', (t, meta) =>
         setMsgs((m) => { const c = [...m]; c[c.length - 1] = { rol: 'exp', texto: t, fuentes: meta?.fuentes, pedirBases: meta?.pedir_bases }; return c; }));
-    } catch (e: any) { setMsgs((m) => { const c = [...m]; c[c.length - 1] = { rol: 'exp', texto: 'No pude responder: ' + e.message }; return c; }); }
+    } catch (e: any) {
+      if (e.status === 402 || e.status === 401) setLimite(e.message);
+      setMsgs((m) => { const c = [...m]; c[c.length - 1] = { rol: 'exp', texto: (e.status === 402 ? '' : 'No pude responder: ') + e.message }; return c; });
+    }
     setOcupado(null);
   };
+  // Pregunta que llega por la URL (landing, tarjeta de riesgo del organismo): se envía sola una vez.
+  useEffect(() => {
+    const q = sp.get('q') ?? sp.get('pregunta');
+    if (q && token && !autoRef.current) { autoRef.current = true; preguntar(q); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   const generar = async (tipo: Entregable) => {
     if (ocupado) return;
@@ -110,7 +132,7 @@ export default function LibroLicitacion() {
       } else {
         await pedir({ modo: tipo, codigo: cod, pregunta: '', huella: 'libro' }, tipo === 'estudio' ? 'experto-estudio' : 'experto-consultar', (t) => setEntregables((e) => ({ ...e, [tipo]: t })));
       }
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) { toast.error(e.message, e.status === 402 ? { action: { label: 'Ver planes', onClick: () => navigate('/cuenta') } } : undefined); }
     setOcupado(null);
   };
 
@@ -118,8 +140,8 @@ export default function LibroLicitacion() {
     if (file.size > 20 * 1024 * 1024) { toast.error('El PDF supera los 20 MB'); return; }
     setOcupado('bases');
     try {
-      const b64 = await new Promise<string>((ok, ko) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(',')[1] || ''); fr.onerror = () => ko(new Error('No pude leer el archivo')); fr.readAsDataURL(file); });
-      const r = await fetch(`${SUPA}/functions/v1/experto-bases`, { method: 'POST', headers: auth, body: JSON.stringify({ codigo: cod, nombre: file.name, pdf_base64: b64 }) });
+      // PDF crudo (sin base64): la función lo lee página por página y no se cae con bases grandes.
+      const r = await fetch(`${SUPA}/functions/v1/experto-bases`, { method: 'POST', headers: { ...auth, 'Content-Type': 'application/pdf', 'X-Codigo': cod, 'X-Nombre': encodeURIComponent(file.name) }, body: file });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.mensaje || j.error || `Error ${r.status}`);
       toast.success(`Bases leídas: ${j.paginas} páginas`);
@@ -135,13 +157,14 @@ export default function LibroLicitacion() {
   };
 
   const compartirTexto = async (tipo: string, titulo: string, contenido: string) => {
-    const { data, error } = await (supabase as any).rpc('experto_compartir', { p_codigo: cod, p_tipo: tipo, p_titulo: titulo, p_contenido: contenido });
+    const { data, error } = await (supabase as any).rpc('experto_compartir', { p_codigo: cod || null, p_tipo: tipo, p_titulo: titulo, p_contenido: contenido });
     if (error || !data) { toast.error('No pude crear el link'); return; }
     const url = `${window.location.origin}/experto/c/${data}`;
-    if (navigator.share) { try { await navigator.share({ title: titulo, url }); return; } catch { /* cancelado */ } }
-    await navigator.clipboard.writeText(url); toast.success('Link copiado: la página lleva tu nombre y la marca FirmaVB');
-    window.open(url, '_blank');
+    try { await navigator.clipboard.writeText(url); } catch { /* sin permiso */ }
+    setCompartido({ url, titulo });
+    toast.success('Link listo y copiado: la página lleva tu nombre y la marca FirmaVB');
   };
+  const waUrl = (c: { url: string; titulo: string }) => `https://wa.me/?text=${encodeURIComponent(`${c.titulo}\n${c.url}`)}`;
   const datosInfografia = (): InfografiaDatos => ({
     codigo: cod, nombre: f?.nombre, institucion: f?.institucion, tipo: f?.tipo, presupuesto: f?.presupuesto, cierre: f?.fecha_cierre, publicada: f?.fecha_publicacion, region: f?.region,
     pago: o.institucion ? { conducta: o.conducta_pago, dias: o.pago_promedio_dias, reclamos_100: o.reclamos_pago_por_100_procesos, reclamos: o.reclamos_pago_12m ?? o.reclamos } : null,
@@ -159,11 +182,19 @@ export default function LibroLicitacion() {
   const top: any[] = libro?.top_adjudicatarios ?? [];
   const esPro = libro?.plan && libro.plan !== 'free';
 
-  if (!cod) return null;
+  const abrirLibro = (c: string) => { const id = idEn(c); if (id) navigate(`/experto/libro/${id}`); else toast.error('Escribe un ID de licitación, ej. 2699-35-LE26'); };
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3 flex-wrap">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/experto')}><ArrowLeft className="h-4 w-4 mr-1" />Libros</Button>
+        {cod ? <Button variant="ghost" size="sm" onClick={() => navigate('/experto')}><ArrowLeft className="h-4 w-4 mr-1" />Experto</Button> : <><BookOpen className="h-5 w-5 text-primary" /><h1 className="text-xl font-bold">Experto FirmaVB</h1></>}
+        {!cod && (
+          <form className="flex gap-1" onSubmit={(e) => { e.preventDefault(); abrirLibro(codigoAbrir); }}>
+            <Input value={codigoAbrir} onChange={(e) => setCodigoAbrir(e.target.value)} placeholder="Abrir libro por ID, ej. 2699-35-LE26" className="h-8 w-64" />
+            <Button size="sm" type="submit" className="h-8">Abrir</Button>
+          </form>
+        )}
+        <Button size="sm" variant="ghost" className="h-8" onClick={() => navigate('/experto/compartidos')}>Mis compartidos</Button>
         {f && <Button variant="outline" size="sm" onClick={() => navigate(String(f.tipo ?? '').toLowerCase().includes('gil') ? `/compras-agiles/${cod}` : `/oportunidades/licitacion/${cod}`)}>Ver la oportunidad</Button>}
         <BookOpen className="h-5 w-5 text-primary" />
         <h1 className="text-xl font-bold">{cod}</h1>
@@ -171,14 +202,37 @@ export default function LibroLicitacion() {
         {f && <Badge variant="outline">cierra {fecha(f.fecha_cierre)}</Badge>}
         {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
       </div>
-      {!isLoading && libro && !f && (
+      {compartido && (
+        <div className="flex items-center gap-2 flex-wrap text-sm rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
+          <span className="font-medium truncate max-w-[40vw]">Link listo: {compartido.titulo}</span>
+          <Button size="sm" className="h-8 bg-[#25D366] hover:bg-[#1ebe5d] text-white" asChild><a href={waUrl(compartido)} target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4 mr-1" />WhatsApp</a></Button>
+          <Button size="sm" variant="outline" className="h-8" onClick={() => { navigator.clipboard.writeText(compartido.url); toast.success('Copiado'); }}><Copy className="h-4 w-4 mr-1" />Copiar link</Button>
+          <Button size="sm" variant="outline" className="h-8" asChild><a href={compartido.url} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4 mr-1" />Ver / PDF</a></Button>
+          {typeof navigator !== 'undefined' && 'share' in navigator && <Button size="sm" variant="ghost" className="h-8" onClick={() => navigator.share({ title: compartido.titulo, url: compartido.url }).catch(() => {})}><Share2 className="h-4 w-4 mr-1" />Más…</Button>}
+          <button className="ml-auto text-muted-foreground" onClick={() => setCompartido(null)}>✕</button>
+        </div>
+      )}
+      {!isLoading && cod && libro && !f && (
         <p className="text-sm text-yellow-800 bg-yellow-50 border border-yellow-200 rounded-md px-3 py-2">No encontré {cod} en la base de Mercado Público. Revisa el ID o sube las bases para trabajar igual.</p>
       )}
 
-      <div className="grid gap-3 lg:grid-cols-[300px_1fr_360px]">
-        {/* Fuentes */}
+      <div className={cod ? 'grid gap-3 lg:grid-cols-[300px_1fr_360px]' : 'grid gap-3 lg:grid-cols-[300px_1fr]'}>
+        {/* Fuentes (sin código: mis libros) */}
         <div className="space-y-3">
-          <Card>
+          {!cod && (
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Mis libros</CardTitle></CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                {libros.length === 0 && <p className="text-muted-foreground">Cada licitación que estudies queda aquí con sus fuentes, bases, chat y entregables. Escribe un ID arriba o desde una oportunidad usa "Libro del Experto".</p>}
+                {libros.slice(0, 15).map((l: any) => (
+                  <button key={l.codigo} onClick={() => navigate(`/experto/libro/${l.codigo}`)} className="block w-full text-left rounded-md border px-2 py-1 hover:border-primary">
+                    <span className="font-medium">{l.codigo}</span>{l.nombre && <span className="text-muted-foreground"> · {l.nombre}</span>}
+                  </button>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+          {cod && <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Fuentes</CardTitle></CardHeader>
             <CardContent className="space-y-3 text-sm">
               <div>
@@ -211,7 +265,7 @@ export default function LibroLicitacion() {
                 </div>
               )}
             </CardContent>
-          </Card>
+          </Card>}
         </div>
 
         {/* Chat */}
@@ -221,8 +275,9 @@ export default function LibroLicitacion() {
             <div ref={chatRef} className="flex-1 overflow-y-auto space-y-3 pr-1 max-h-[60vh]">
               {msgs.length === 0 && (
                 <div className="text-sm text-muted-foreground space-y-2">
-                  <p>Pregúntame sobre esta licitación con las fuentes de la izquierda. Ejemplos:</p>
-                  {['¿Vale la pena postular? ¿Qué me juega en contra?', '¿Cuáles son los criterios de evaluación y cómo gano puntos?', '¿Qué garantías y multas tiene y qué riesgo veo?', '¿A qué precio debería ofertar según lo que se ha pagado?'].map((e) => (
+                  <p>{cod ? 'Pregúntame sobre esta licitación con las fuentes de la izquierda. Ejemplos:' : 'Pregúntame lo que quieras sobre vender al Estado: ley, garantías, un organismo, qué se está licitando, noticias. Si me das un ID de licitación, abro su libro con fuentes y entregables. Ejemplos:'}</p>
+                  {(cod ? ['¿Vale la pena postular? ¿Qué me juega en contra?', '¿Cuáles son los criterios de evaluación y cómo gano puntos?', '¿Qué garantías y multas tiene y qué riesgo veo?', '¿A qué precio debería ofertar según lo que se ha pagado?']
+                    : ['¿Cómo funciona una compra ágil y cómo la gano?', '¿Es riesgoso venderle a la Municipalidad de Puerto Montt? ¿Cómo paga?', '¿Hay licitaciones abiertas de servicios de aseo?', '¿Qué garantía de seriedad me pueden pedir y cuándo?']).map((e) => (
                     <button key={e} className="block text-left rounded-full border px-3 py-1 hover:border-primary" onClick={() => setPregunta(e)}>{e}</button>
                   ))}
                 </div>
@@ -233,6 +288,7 @@ export default function LibroLicitacion() {
                 <div key={i} className="max-w-[95%] rounded-2xl bg-muted/50 px-4 py-3 text-sm">
                   {m.texto ? <div dangerouslySetInnerHTML={{ __html: expertoMd(m.texto) }} /> : <span className="text-muted-foreground">Buscando en las fuentes…</span>}
                   {m.pedirBases && <p className="mt-2 text-xs text-muted-foreground">Sube las bases en el panel de Fuentes y vuelve a preguntar.</p>}
+                  {!cod && m.texto && idEn(msgs[i - 1]?.texto ?? '') && <Button size="sm" variant="outline" className="mt-2" onClick={() => navigate(`/experto/libro/${idEn(msgs[i - 1].texto)}`)}><BookOpen className="h-3.5 w-3.5 mr-1" />Abrir el libro de {idEn(msgs[i - 1].texto)}</Button>}
                   {m.texto && m.fuentes && m.fuentes.length > 0 && (
                     <details className="mt-2 text-xs text-muted-foreground"><summary className="cursor-pointer">Fuentes ({m.fuentes.length})</summary>
                       {m.fuentes.map((s: any) => <div key={s.n}>[{s.n}] {s.url ? <a className="underline" href={s.url} target="_blank" rel="noreferrer">{s.fuente}</a> : s.fuente}</div>)}
@@ -249,15 +305,21 @@ export default function LibroLicitacion() {
                 </div>
               ))}
             </div>
+            {limite && (
+              <div className="flex items-center gap-2 flex-wrap text-xs rounded-md border border-yellow-200 bg-yellow-50 text-yellow-900 px-3 py-2">
+                <span>{limite}</span>
+                <Button size="sm" className="h-7 ml-auto" onClick={() => navigate('/cuenta')}>Ver planes</Button>
+              </div>
+            )}
             <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); preguntar(); }}>
-              <Input value={pregunta} onChange={(e) => setPregunta(e.target.value)} placeholder={`Pregunta sobre ${cod}…`} disabled={!!ocupado} />
+              <Input value={pregunta} onChange={(e) => setPregunta(e.target.value)} placeholder={cod ? `Pregunta sobre ${cod}…` : 'Pregúntale al Experto o escribe un ID de licitación…'} disabled={!!ocupado} />
               <Button type="submit" disabled={!!ocupado || !pregunta.trim()}>{ocupado === 'chat' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}</Button>
             </form>
           </CardContent>
         </Card>
 
         {/* Entregables */}
-        <Card className="flex flex-col">
+        {cod && <Card className="flex flex-col">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Entregables</CardTitle>
             <div className="flex flex-wrap gap-1 pt-1">
@@ -272,10 +334,10 @@ export default function LibroLicitacion() {
           <CardContent className="text-sm flex-1">
             {entregables[tab] ? (
               <div>
-                <div className="flex gap-2 mb-2">
+                <div className="flex flex-wrap gap-1 mb-2">
+                  <Button size="sm" variant="outline" onClick={compartirEntregable}><Share2 className="h-3.5 w-3.5 mr-1" />Compartir · PDF · WhatsApp</Button>
                   {tab !== 'mapa' && tab !== 'infografia' && <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(entregables[tab]); toast.success('Copiado'); }}><Copy className="h-3.5 w-3.5 mr-1" />Copiar</Button>}
                   <Button size="sm" variant="ghost" onClick={() => generar(tab)} disabled={!!ocupado}>Volver a generar</Button>
-                  <Button size="sm" variant="ghost" onClick={compartirEntregable}><Share2 className="h-3.5 w-3.5 mr-1" />Compartir / PDF</Button>
                 </div>
                 {tab === 'anexos' && faltantes.length > 0 && <p className="text-xs text-yellow-800 bg-yellow-50 border border-yellow-200 rounded px-2 py-1 mb-2">Completa a mano: {faltantes.join(', ')}</p>}
                 {tab === 'mapa' ? (
@@ -298,7 +360,7 @@ export default function LibroLicitacion() {
               </div>
             )}
           </CardContent>
-        </Card>
+        </Card>}
       </div>
     </div>
   );
