@@ -1,5 +1,19 @@
 // Markdown mínimo (títulos, listas, negrita, links, separadores) a HTML seguro. Mismo criterio que experto.html.
+// Fórmulas LaTeX que a veces escribe el modelo ($$...$$ o $...$) a texto plano legible.
+export function sinLatex(t: string): string {
+  const plano = (f: string) => {
+    let x = f;
+    for (let i = 0; i < 3; i++) x = x.replace(/\\(?:text|mathrm|textbf|mathbf|operatorname)\{([^{}]*)\}/g, '$1');
+    for (let i = 0; i < 3; i++) x = x.replace(/_\{([^{}]*)\}/g, '_$1').replace(/\^\{([^{}]*)\}/g, '^$1');
+    for (let i = 0; i < 3; i++) x = x.replace(/\\(?:d?frac)\{([^{}]*)\}\{([^{}]*)\}/g, '($1) / ($2)');
+    return x.replace(/\\times/g, '×').replace(/\\cdot/g, '·').replace(/\\(?:le|leq)\b/g, '≤').replace(/\\(?:ge|geq)\b/g, '≥').replace(/\\(?:sum|Sigma)\b/g, 'Σ').replace(/\\%/g, '%')
+      .replace(/\\(?:left|right)\b/g, '').replace(/[{}]/g, '').replace(/\\[a-zA-Z]+/g, '').replace(/\s+/g, ' ').trim();
+  };
+  return t.replace(/\$\$([\s\S]+?)\$\$/g, (_m, f) => ' ' + plano(f) + ' ').replace(/(^|[^\d$])\$(?![\d.])([^$\n]{2,120}?)\$(?!\d)/g, (_m, pre, f) => pre + plano(f));
+}
+
 export function expertoMd(t: string): string {
+  t = sinLatex(t);
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const inline = (s: string) => esc(s)
     .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
