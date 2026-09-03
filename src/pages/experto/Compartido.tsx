@@ -6,9 +6,12 @@ import { Printer, Share2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { expertoMd } from '@/lib/expertoMd';
+import { Infografia } from '@/components/experto/Infografia';
+import { MapaConceptual } from '@/components/experto/MapaConceptual';
 import logo from '@/assets/logo-firmavb-blanco.png';
 
-const TIPO: Record<string, string> = { informe: 'Informe de trabajo', estudio: 'Estudio profundo', anexos: 'Anexos', chat: 'Respuesta del Experto' };
+const TIPO: Record<string, string> = { informe: 'Informe de trabajo', estudio: 'Estudio profundo', anexos: 'Anexos', chat: 'Respuesta del Experto', mapa: 'Mapa conceptual', infografia: 'Infografía' };
+const parse = (t: string) => { try { return JSON.parse(t); } catch { return null; } };
 
 /** Página pública de un análisis compartido: marca FirmaVB, autor, contenido y llamada a probar el Experto. */
 export default function Compartido() {
@@ -52,7 +55,9 @@ export default function Compartido() {
               <Button size="sm" variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4 mr-1" />Guardar PDF</Button>
               <Button size="sm" variant="outline" onClick={compartir}><Share2 className="h-4 w-4 mr-1" />Compartir</Button>
             </div>
-            <article className="mt-6 text-[15px] leading-relaxed" dangerouslySetInnerHTML={{ __html: expertoMd(data.contenido) }} />
+            {data.tipo === 'infografia' && parse(data.contenido) ? <div className="mt-6"><Infografia d={{ ...parse(data.contenido), empresa: data.empresa }} /></div>
+              : data.tipo === 'mapa' && parse(data.contenido) ? <div className="mt-6"><MapaConceptual raiz={parse(data.contenido)} /></div>
+              : <article className="mt-6 text-[15px] leading-relaxed" dangerouslySetInnerHTML={{ __html: expertoMd(data.contenido) }} />}
           </>
         )}
         <section className="mt-10 rounded-xl border bg-muted/30 p-6">

@@ -10,6 +10,8 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { expertoMd } from '@/lib/expertoMd';
+import { Infografia, type InfografiaDatos } from '@/components/experto/Infografia';
+import { MapaConceptual, type Nodo } from '@/components/experto/MapaConceptual';
 
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string;
 const ANON = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
@@ -17,7 +19,7 @@ const fmt = (n: unknown) => n == null ? 's/i' : '$' + Math.round(Number(n)).toLo
 const fecha = (d?: string | null) => d ? new Date(d).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }) : 's/i';
 
 interface Msg { rol: 'yo' | 'exp'; texto: string; fuentes?: any[]; pedirBases?: string | null }
-type Entregable = 'informe' | 'estudio' | 'anexos';
+type Entregable = 'informe' | 'estudio' | 'anexos' | 'mapa' | 'infografia';
 
 /**
  * Libro de trabajo de una licitación: Fuentes (ficha, bases, organismo, quién gana) · Chat con el
@@ -42,7 +44,7 @@ export default function LibroLicitacion() {
   const [pregunta, setPregunta] = useState('');
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [tab, setTab] = useState<Entregable>('informe');
-  const [entregables, setEntregables] = useState<Record<Entregable, string>>({ informe: '', estudio: '', anexos: '' });
+  const [entregables, setEntregables] = useState<Record<Entregable, string>>({ informe: '', estudio: '', anexos: '', mapa: '', infografia: '' });
   const [faltantes, setFaltantes] = useState<string[]>([]);
   const chatRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -50,7 +52,7 @@ export default function LibroLicitacion() {
   useEffect(() => {
     if (!libro) return;
     setMsgs((libro.chat ?? []).flatMap((c: any) => [{ rol: 'yo', texto: c.pregunta }, { rol: 'exp', texto: c.respuesta }]));
-    setEntregables({ informe: libro.informe?.texto ?? '', estudio: libro.estudio?.texto ?? '', anexos: libro.anexos?.texto ?? '' });
+    setEntregables({ informe: libro.informe?.texto ?? '', estudio: libro.estudio?.texto ?? '', anexos: libro.anexos?.texto ?? '', mapa: libro.mapa?.texto ?? '', infografia: libro.ficha ? 'ok' : '' });
     setFaltantes(libro.anexos?.faltantes ?? []);
     if (libro.estudio?.texto && !libro.informe?.texto) setTab('estudio');
   }, [libro]);
@@ -93,7 +95,14 @@ export default function LibroLicitacion() {
     if (ocupado) return;
     setTab(tipo); setOcupado(tipo);
     try {
-      if (tipo === 'anexos') {
+      if (tipo === 'mapa') {
+        const r = await fetch(`${SUPA}/functions/v1/experto-mapa`, { method: 'POST', headers: auth, body: JSON.stringify({ codigo: cod }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.mensaje || j.error || `Error ${r.status}`);
+        setEntregables((e) => ({ ...e, mapa: JSON.stringify(j.mapa) }));
+      } else if (tipo === 'infografia') {
+        setEntregables((e) => ({ ...e, infografia: 'ok' }));
+      } else if (tipo === 'anexos') {
         const r = await fetch(`${SUPA}/functions/v1/experto-anexos`, { method: 'POST', headers: auth, body: JSON.stringify({ codigo: cod }) });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(j.mensaje || j.error || `Error ${r.status}`);
@@ -133,9 +142,17 @@ export default function LibroLicitacion() {
     await navigator.clipboard.writeText(url); toast.success('Link copiado: la página lleva tu nombre y la marca FirmaVB');
     window.open(url, '_blank');
   };
+  const datosInfografia = (): InfografiaDatos => ({
+    codigo: cod, nombre: f?.nombre, institucion: f?.institucion, tipo: f?.tipo, presupuesto: f?.presupuesto, cierre: f?.fecha_cierre, publicada: f?.fecha_publicacion, region: f?.region,
+    pago: o.institucion ? { conducta: o.conducta_pago, dias: o.pago_promedio_dias, reclamos_100: o.reclamos_pago_por_100_procesos, reclamos: o.reclamos_pago_12m ?? o.reclamos } : null,
+    ganadores: top.slice(0, 4).map((t: any) => ({ nombre: t.adjudicatario, n: t.licitaciones, monto: t.monto })),
+    competencia: (f?.competencia ?? []).slice(0, 4).map((c: any) => ({ proveedor: c.proveedor, ordenes: c.ordenes, precio: c.precio_unit_mediano })),
+    items: (f?.items ?? []).slice(0, 6).map((i: any) => i.producto),
+  });
   const compartirEntregable = async () => {
-    const titulo = `${tab === 'informe' ? 'Informe de trabajo' : tab === 'estudio' ? 'Estudio profundo' : 'Anexos'} · ${cod}${f?.nombre ? ' · ' + f.nombre : ''}`;
-    await compartirTexto(tab, titulo, entregables[tab]);
+    const nombres: Record<Entregable, string> = { informe: 'Informe de trabajo', estudio: 'Estudio profundo', anexos: 'Anexos', mapa: 'Mapa conceptual', infografia: 'Infografía' };
+    const titulo = `${nombres[tab]} · ${cod}${f?.nombre ? ' · ' + f.nombre : ''}`;
+    await compartirTexto(tab, titulo, tab === 'infografia' ? JSON.stringify(datosInfografia()) : entregables[tab]);
   };
   const f = libro?.ficha; const o = f?.organismo ?? {};
   const bases: any[] = libro?.bases ?? [];
@@ -244,7 +261,7 @@ export default function LibroLicitacion() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Entregables</CardTitle>
             <div className="flex flex-wrap gap-1 pt-1">
-              {([['informe', 'Informe de trabajo', ''], ['estudio', 'Estudio profundo', 'Experto Pro'], ['anexos', 'Anexos completados', 'Experto Plus']] as [Entregable, string, string][]).map(([k, n, tag]) => (
+              {([['informe', 'Informe de trabajo', ''], ['mapa', 'Mapa conceptual', ''], ['infografia', 'Infografía', ''], ['estudio', 'Estudio profundo', 'Experto Pro'], ['anexos', 'Anexos completados', 'Experto Plus']] as [Entregable, string, string][]).map(([k, n, tag]) => (
                 <Button key={k} size="sm" variant={tab === k ? 'default' : 'outline'} onClick={() => entregables[k] ? setTab(k) : generar(k)} disabled={!!ocupado && ocupado !== k}>
                   {ocupado === k ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : entregables[k] ? <ClipboardList className="h-3.5 w-3.5 mr-1" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />}
                   {n}{tag && <span className="ml-1 text-[10px] opacity-70">{tag}</span>}
@@ -256,16 +273,24 @@ export default function LibroLicitacion() {
             {entregables[tab] ? (
               <div>
                 <div className="flex gap-2 mb-2">
-                  <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(entregables[tab]); toast.success('Copiado'); }}><Copy className="h-3.5 w-3.5 mr-1" />Copiar</Button>
+                  {tab !== 'mapa' && tab !== 'infografia' && <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(entregables[tab]); toast.success('Copiado'); }}><Copy className="h-3.5 w-3.5 mr-1" />Copiar</Button>}
                   <Button size="sm" variant="ghost" onClick={() => generar(tab)} disabled={!!ocupado}>Volver a generar</Button>
                   <Button size="sm" variant="ghost" onClick={compartirEntregable}><Share2 className="h-3.5 w-3.5 mr-1" />Compartir / PDF</Button>
                 </div>
                 {tab === 'anexos' && faltantes.length > 0 && <p className="text-xs text-yellow-800 bg-yellow-50 border border-yellow-200 rounded px-2 py-1 mb-2">Completa a mano: {faltantes.join(', ')}</p>}
-                <div className="max-h-[62vh] overflow-y-auto pr-1" dangerouslySetInnerHTML={{ __html: expertoMd(entregables[tab]) }} />
+                {tab === 'mapa' ? (
+                  <div className="max-h-[62vh] overflow-y-auto pr-1"><MapaConceptual raiz={JSON.parse(entregables.mapa) as Nodo} onPreguntar={(t) => setPregunta(`Sobre ${cod}: explícame "${t}" y qué debo hacer con eso`)} /></div>
+                ) : tab === 'infografia' ? (
+                  <div className="max-h-[62vh] overflow-y-auto pr-1"><Infografia d={datosInfografia()} /></div>
+                ) : (
+                  <div className="max-h-[62vh] overflow-y-auto pr-1" dangerouslySetInnerHTML={{ __html: expertoMd(entregables[tab]) }} />
+                )}
               </div>
             ) : (
               <div className="text-muted-foreground space-y-2">
-                <p>{tab === 'informe' && 'Informe de trabajo: veredicto, fechas, checklist de admisibilidad, cómo se ganan los puntos, riesgos, competencia y próximos pasos.'}
+                <p>{tab === 'mapa' && 'Mapa conceptual navegable: qué compran, fechas, cómo se gana, requisitos, garantías, organismo, competencia, riesgos y tu jugada. Cada nodo se abre y se le puede preguntar al Experto.'}
+                   {tab === 'infografia' && 'Lámina con marca FirmaVB: presupuesto, cierre, riesgo de pago, quién gana y quién vende. Para WhatsApp, LinkedIn o PDF.'}
+                   {tab === 'informe' && 'Informe de trabajo: veredicto, fechas, checklist de admisibilidad, cómo se ganan los puntos, riesgos, competencia y próximos pasos.'}
                    {tab === 'estudio' && 'Estudio profundo (Pro): historial de compras parecidas del organismo, quién ganó y con cuánto, precio objetivo.'}
                    {tab === 'anexos' && 'Anexos completados (Plus): los formularios de las bases con los datos de tu empresa, listos para revisar y firmar.'}</p>
                 {!esPro && tab !== 'informe' && <p className="text-xs">Requiere Experto {tab === 'anexos' ? 'Plus' : 'Pro'} o FirmaVB ERP.</p>}
