@@ -21,6 +21,7 @@ import { es } from 'date-fns/locale';
 import { useCliente } from '@/hooks/useCliente';
 import { useCaItemMatches } from '@/hooks/useCaItemMatches';
 import { descargarFichaTecnicaPDF, verFichaTecnicaPDF } from '@/services/fichaTecnicaPdf';
+import { RiesgoOrganismoCard } from '@/components/organismo/RiesgoOrganismoCard';
 
 // Color del badge de match según el %.
 const matchBadge = (score: number) =>
@@ -163,6 +164,8 @@ export default function CompraAgilDetalle() {
           Generar propuesta
         </Button>
       </div>
+
+      <RiesgoOrganismoCard codigo={compra.codigo} organismo={compra.organismo} />
 
       {/* Info General */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

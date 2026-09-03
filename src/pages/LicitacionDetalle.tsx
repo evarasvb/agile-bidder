@@ -27,6 +27,7 @@ import { useLicitacionItemsReal } from '@/hooks/useLicitacionItemsReal';
 import LicitacionesSimilares from '@/components/licitaciones/LicitacionesSimilares';
 import { LicitacionItemsMatch } from '@/components/licitaciones/LicitacionItemsMatch';
 import { useDocumentosLicitacion } from '@/hooks/useChatIA';
+import { RiesgoOrganismoCard } from '@/components/organismo/RiesgoOrganismoCard';
 
 interface LicitacionBIItem {
   id: string;
@@ -398,6 +399,8 @@ export default function LicitacionDetalle() {
               </p>
             </CardContent>
           </Card>
+
+          <RiesgoOrganismoCard codigo={licitacion.codigo} organismo={licitacion.organismo} />
 
           {/* Buyer Info */}
           <Card>
