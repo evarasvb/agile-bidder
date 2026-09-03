@@ -3,7 +3,7 @@
 // aprobado, se activa Pro por los días del producto. Siempre responde 200 para que MP no reintente.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 const json = (b: unknown) => new Response(JSON.stringify(b), { status: 200, headers: { "Content-Type": "application/json" } });
-const DIAS: Record<string, number> = { pro_30: 30 };
+const DIAS: Record<string, number> = { pro_30: 30, plus_30: 30 };
 
 Deno.serve(async (req) => {
   try {
@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
       raw: { status: p.status, detalle: p.status_detail, monto: p.transaction_amount, aprobado: p.date_approved, metodo: p.payment_method_id },
     }).eq("id", pago.id);
     if (p.status === "approved" && pago.estado !== "approved") {
-      const { data: hasta, error } = await sb.rpc("experto_activar_pro", { p_user_id: pago.user_id, p_dias: DIAS[pago.producto] ?? 30, p_origen: `mp:${p.id}` });
+      const { data: hasta, error } = await sb.rpc("experto_activar_pro", { p_user_id: pago.user_id, p_dias: DIAS[pago.producto] ?? 30, p_origen: `mp:${p.id}`, p_nivel: String(pago.producto).startsWith("plus") ? "plus" : "pro" });
       return json({ ok: !error, pro_hasta: hasta, error: error?.message });
     }
     return json({ ok: true, estado: p.status });

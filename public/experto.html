@@ -144,16 +144,38 @@ const fEstudio=document.getElementById('fEstudio'),tabEstudio=document.getElemen
 function modo(m){for(const [k,tab,f] of [['chat',tabChat,fChat],['informe',tabInforme,fInforme],['estudio',tabEstudio,fEstudio]]){tab.classList.toggle('on',k===m);f.classList.toggle('oculto',k!==m);}(m==='chat'?q:document.getElementById(m==='informe'?'codigo':'codigoE')).focus();}
 tabChat.onclick=()=>modo('chat');tabInforme.onclick=()=>modo('informe');tabEstudio.onclick=()=>modo('estudio');
 // Plan Pro: pago único por Mercado Pago (30 días). Vuelve a esta misma página con ?pago=ok.
-async function activarPro(el){
+async function activarPro(el,producto){producto=producto||'pro_30';
   if(!tokenUsuario){window.open(PLANES.replace('/planes','/auth'),'_blank');return;}
   el.textContent='Preparando el pago…';
   try{const volver=location.origin+(window.top!==window?'/experto':'/experto.html');
-    const r=await fetch(SUPA+'/functions/v1/crear-pago-experto',{method:'POST',headers:{'Content-Type':'application/json','apikey':ANON,'Authorization':'Bearer '+tokenUsuario},body:JSON.stringify({producto:'pro_30',back_url:volver})});
+    const r=await fetch(SUPA+'/functions/v1/crear-pago-experto',{method:'POST',headers:{'Content-Type':'application/json','apikey':ANON,'Authorization':'Bearer '+tokenUsuario},body:JSON.stringify({producto,back_url:volver})});
     const j=await r.json();if(!r.ok||!j.url)throw new Error(j.mensaje||j.error||r.status);
     window.top.location.href=j.url;}
   catch(e){el.textContent='No pude iniciar el pago: '+e.message;}
 }
-function ofrecerPro(p,mensaje){p.classList.add('aviso');p.innerHTML=`${mensaje} <div style="margin-top:8px"><button type="button" class="enviar" style="padding:8px 14px">Activar Pro · $50.000 por 30 días</button> <span class="est"></span></div>`;const b=p.querySelector('button');b.onclick=()=>{b.disabled=true;activarPro(p.querySelector('.est'));};}
+function ofrecerPro(p,mensaje,producto){producto=producto||'pro_30';const etiqueta=producto==='plus_30'?'Activar Plus · $100.000 por 30 días':'Activar Pro · $50.000 por 30 días';p.classList.add('aviso');p.innerHTML=`${mensaje} <div style="margin-top:8px"><button type="button" class="enviar" style="padding:8px 14px">${etiqueta}</button> <span class="est"></span></div>`;const b=p.querySelector('button');b.onclick=()=>{b.disabled=true;activarPro(p.querySelector('.est'),producto);};}
+// Experto Plus: completa los anexos de las bases con los datos de la empresa (Mi empresa).
+async function completarAnexos(codigo,boton){
+  boton.disabled=true;
+  const p=add('exp','<div class="cuerpo"><span class="estado">Leyendo los anexos de las bases y completándolos con los datos de tu empresa… (hasta un minuto)</span></div>');
+  const cuerpo=p.querySelector('.cuerpo');
+  try{
+    const r=await fetch(SUPA+'/functions/v1/experto-anexos',{method:'POST',headers:{'Content-Type':'application/json','apikey':ANON,'Authorization':'Bearer '+(tokenUsuario||ANON)},body:JSON.stringify({codigo})});
+    const j=await r.json().catch(()=>({}));
+    if(r.status===402){cuerpo.innerHTML='';ofrecerPro(p,j.mensaje||'Completar anexos es parte del Experto Plus.','plus_30');}
+    else if(r.status===428){cuerpo.innerHTML=`${j.mensaje} <a href="/mi-empresa" target="_top">Ir a Mi empresa</a>`;}
+    else if(!r.ok){cuerpo.textContent='No pude completar los anexos: '+(j.mensaje||j.error||r.status);}
+    else{
+      cuerpo.innerHTML=md(j.contenido);
+      const acc=document.createElement('div');acc.className='ejemplos';
+      acc.innerHTML='<button>Copiar anexos</button>'+(j.faltantes&&j.faltantes.length?`<span class="est">Te falta completar a mano: ${j.faltantes.join(', ')}</span>`:'');
+      acc.children[0].onclick=()=>{navigator.clipboard.writeText(j.contenido);acc.children[0].textContent='Copiado';};
+      p.appendChild(acc);
+      const nota=document.createElement('div');nota.className='fuentes';nota.textContent='Borrador para revisar. Las declaraciones juradas las firma el representante legal y la oferta la subes tú en Mercado Público.';p.appendChild(nota);
+    }
+  }catch(e){cuerpo.textContent='No pude completar los anexos: '+e.message;}
+  boton.disabled=false;chat.scrollTop=chat.scrollHeight;
+}
 document.querySelectorAll('.ejemplos button').forEach(x=>x.onclick=()=>{modo('chat');q.value=x.textContent;fChat.requestSubmit();});
 q.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();fChat.requestSubmit();}});
 
@@ -183,7 +205,7 @@ async function consultar(body,boton){
   boton.disabled=true;
   const p=add('exp','<div class="cuerpo"></div>');
   const cuerpo=p.querySelector('.cuerpo');cuerpo.innerHTML='<span class="estado">Buscando en la ley, la jurisprudencia y Mercado Público…</span>';
-  let texto='',fuentes=[],t0=Date.now(),timer=null,pedirBases=null;
+  let texto='',fuentes=[],t0=Date.now(),timer=null,pedirBases=null,basesMeta=[];
   try{
     const r=await fetch(SUPA+'/functions/v1/'+(body.modo==='estudio'?'experto-estudio':'experto-consultar'),{method:'POST',headers:{'Content-Type':'application/json','apikey':ANON,'Authorization':'Bearer '+(tokenUsuario||ANON)},body:JSON.stringify({...body,huella})});
     if(!r.ok){
@@ -203,7 +225,7 @@ async function consultar(body,boton){
       for(const part of parts){
         const ln=part.trim();if(!ln.startsWith('data:'))continue;
         let j;try{j=JSON.parse(ln.slice(5));}catch{continue;}
-        if(j.meta){fuentes=j.meta.fuentes||[];pedirBases=j.meta.pedir_bases||null;setUso(j.meta.uso);if(!texto)cuerpo.innerHTML='<span class="estado">Redactando…</span>';}
+        if(j.meta){fuentes=j.meta.fuentes||[];pedirBases=j.meta.pedir_bases||null;basesMeta=j.meta.bases||[];setUso(j.meta.uso);if(!texto)cuerpo.innerHTML='<span class="estado">Redactando…</span>';}
         if(j.delta){texto+=j.delta;}
         if(j.error){texto+='\n\n_(error: '+j.error+')_';}
       }
@@ -212,6 +234,7 @@ async function consultar(body,boton){
     if(!texto)cuerpo.innerHTML='<span class="estado">No obtuve respuesta. Intenta de nuevo.</span>';
     if(fuentes.length){const fu=document.createElement('div');fu.className='fuentes';fu.innerHTML=`<details><summary style="cursor:pointer"><b>Fuentes consultadas (${fuentes.length})</b></summary>`+fuentes.map(f=>`[${f.n}] ${f.url?`<a href="${f.url}" target="_blank" rel="noopener noreferrer">${f.fuente}</a>`:f.fuente}${f.seccion?' · '+String(f.seccion).slice(0,80):''}`).join('<br>')+'</details>'+`<span class="badge">${((Date.now()-t0)/1000).toFixed(1)} s</span>`;p.appendChild(fu);}
     if(pedirBases&&texto)ofrecerBases(p,pedirBases,body,boton);
+    if((body.modo==='informe'||body.modo==='estudio')&&basesMeta.length&&texto){const ax=document.createElement('div');ax.className='ejemplos';ax.innerHTML='<button>Completar anexos con mis datos (Plus)</button>';ax.children[0].onclick=()=>completarAnexos(body.codigo,ax.children[0]);p.appendChild(ax);}
     if(body.modo==='chat'){historial.push({role:'user',content:body.pregunta},{role:'assistant',content:texto});if(historial.length>6)historial.splice(0,2);}
     if(body.modo==='informe'&&texto){const acc=document.createElement('div');acc.className='ejemplos';acc.innerHTML='<button>Copiar informe</button><button>Preguntar sobre esta licitación</button>';acc.children[0].onclick=()=>{navigator.clipboard.writeText(texto);acc.children[0].textContent='Copiado';};acc.children[1].onclick=()=>{modo('chat');q.value=`Sobre la licitación ${body.codigo}: `;q.focus();};p.appendChild(acc);}
   }catch(err){clearInterval(timer);cuerpo.textContent='No pude responder: '+err.message;}
