@@ -44,6 +44,7 @@ export interface ComprasAgilesFilters {
   fechaCierre?: 'hoy' | 'proximos3' | 'proximos7' | 'todas';
   matchStatus?: 'con_match' | 'sin_match' | 'todos';
   clienteFiltros?: ClienteFiltros | null;
+  sortBy?: 'vigencia' | 'monto_desc' | 'monto_asc' | 'match';
 }
 
 // =============================================================================
@@ -97,8 +98,27 @@ export function useComprasAgiles(filters?: ComprasAgilesFilters) {
         .select(`
           *,
           compras_agiles_items(*)
-        `)
-        .order('fecha_cierre', { ascending: true });
+        `);
+
+      // Orden: por defecto la más urgente primero (vigencia). "Monto" y
+      // "Match" se pueden elegir desde el selector "Ordenar por" del filtro.
+      switch (filters?.sortBy) {
+        case 'monto_desc':
+          query = query.order('monto_estimado', { ascending: false, nullsFirst: false });
+          break;
+        case 'monto_asc':
+          query = query.order('monto_estimado', { ascending: true, nullsFirst: false });
+          break;
+        case 'match':
+          query = query
+            .order('match_score', { ascending: false, nullsFirst: false })
+            .order('fecha_cierre', { ascending: true });
+          break;
+        case 'vigencia':
+        default:
+          query = query.order('fecha_cierre', { ascending: true });
+          break;
+      }
 
       // Filtros opcionales
       const estado = filters?.estado;
