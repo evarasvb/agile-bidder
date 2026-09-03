@@ -37,6 +37,7 @@ const BENEFICIOS = [
   'Reportes e inteligencia de mercado completos',
   'Inventario ilimitado y matching automático',
   'Experto Pro y Plus incluidos: estudios profundos y anexos completados',
+  'Más 3% solo sobre las órdenes de compra aceptadas que postulaste desde FirmaVB (tope $300.000 por orden)',
 ];
 
 export function UpgradeProProvider({ children }: { children: ReactNode }) {
@@ -79,7 +80,7 @@ export function UpgradeProProvider({ children }: { children: ReactNode }) {
 
           <div className="rounded-lg border bg-muted/30 p-4">
             <div className="mb-3 flex items-baseline justify-center gap-1">
-              <span className="text-3xl font-bold">$159.000</span>
+              <span className="text-3xl font-bold">$149.990</span>
               <span className="text-muted-foreground">/mes</span>
             </div>
             <ul className="space-y-2">
