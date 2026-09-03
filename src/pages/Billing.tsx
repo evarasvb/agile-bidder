@@ -17,6 +17,7 @@ import {
   Receipt
 } from "lucide-react";
 import { format } from "date-fns";
+import { toast } from "sonner";
 import { es } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
@@ -28,6 +29,8 @@ import {
   useBillingSettings
 } from "@/hooks/useBilling";
 import { SuscripcionProCard } from "@/components/pro/SuscripcionProCard";
+import { FacturasAdminCard } from "@/components/pro/FacturasAdminCard";
+import { useAuth } from "@/hooks/useAuth";
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("es-CL", {
@@ -72,6 +75,22 @@ export default function Billing() {
   const { data: monthlyData, isLoading: chartLoading } = useMonthlyBillingData();
   const { data: sales, isLoading: salesLoading } = useCurrentMonthSales(searchTerm);
   const { data: invoices, isLoading: invoicesLoading } = useInvoiceHistory();
+  const { session } = useAuth();
+  const [pagando, setPagando] = useState<string | null>(null);
+  const pagarFactura = async (facturaId: string) => {
+    if (!session?.access_token) return;
+    setPagando(facturaId);
+    try {
+      const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crear-pago-experto`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string, Authorization: "Bearer " + session.access_token },
+        body: JSON.stringify({ producto: "factura", factura_id: facturaId, back_url: window.location.origin + "/cuenta/facturacion" }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.url) throw new Error(j.mensaje || j.error || `Error ${r.status}`);
+      window.location.href = j.url;
+    } catch (e: any) { toast.error("No pude iniciar el pago: " + e.message); setPagando(null); }
+  };
   const { data: billingSettings, isLoading: settingsLoading } = useBillingSettings();
 
   const chartConfig = {
@@ -87,6 +106,12 @@ export default function Billing() {
 
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
+      case "preforma":
+        return <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-200">Preforma en validación</Badge>;
+      case "por_facturar":
+        return <Badge variant="outline" className="bg-accent text-accent-foreground">Por facturar</Badge>;
+      case "facturada":
+        return <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200">Emitida · por pagar</Badge>;
       case "pagada":
         return <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">Pagada</Badge>;
       case "pendiente":
@@ -110,6 +135,7 @@ export default function Billing() {
 
       {/* Suscripción / Plan Pro */}
       <SuscripcionProCard />
+      <FacturasAdminCard />
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -267,27 +293,38 @@ export default function Billing() {
             ) : invoices && invoices.length > 0 ? (
               <div className="space-y-3">
                 {invoices.map((factura) => (
-                  <div
-                    key={factura.id}
-                    className="flex items-center justify-between p-4 rounded-lg border bg-card"
-                  >
-                    <div className="space-y-1">
-                      <div className="font-medium">{factura.numero_factura}</div>
-                      <div className="text-sm text-muted-foreground">
-                        Período: {factura.periodo} · {formatCurrency(factura.total_comision)}
+                  <div key={factura.id} className="p-4 rounded-lg border bg-card space-y-2">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div className="space-y-1">
+                        <div className="font-medium">{factura.numero_factura || `Período ${factura.periodo}`}</div>
+                        <div className="text-sm text-muted-foreground">
+                          Fijo {formatCurrency(factura.fijo_monto ?? 0)} + comisiones {formatCurrency(factura.total_comision)} = <b>{formatCurrency(factura.total ?? (factura.fijo_monto ?? 0) + factura.total_comision)}</b>
+                          {factura.estado === "preforma" && factura.validacion_hasta && ` · puedes objetar hasta el ${new Date(factura.validacion_hasta).toLocaleDateString("es-CL")}`}
+                          {factura.fecha_pago && ` · pagada el ${new Date(factura.fecha_pago + "T00:00:00").toLocaleDateString("es-CL")}`}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {getEstadoBadge(factura.estado)}
+                        {factura.documento_url && (
+                          <Button variant="outline" size="sm" asChild><a href={factura.documento_url} target="_blank" rel="noreferrer"><Download className="h-4 w-4 mr-1" />PDF</a></Button>
+                        )}
+                        {(factura.estado === "facturada" || factura.estado === "por_facturar") && (factura.total ?? 0) > 0 && (
+                          <Button size="sm" disabled={pagando === factura.id} onClick={() => pagarFactura(factura.id)}>
+                            {pagando === factura.id ? "Abriendo Mercado Pago…" : "Pagar con Mercado Pago"}
+                          </Button>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      {getEstadoBadge(factura.estado)}
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        disabled={!factura.documento_url}
-                      >
-                        <Download className="h-4 w-4 mr-1" />
-                        PDF
-                      </Button>
-                    </div>
+                    {factura.detalle?.ocs && factura.detalle.ocs.length > 0 && (
+                      <details className="text-xs text-muted-foreground">
+                        <summary className="cursor-pointer">Órdenes de compra aceptadas del período ({factura.detalle.ocs.length})</summary>
+                        <div className="mt-1 space-y-0.5">
+                          {factura.detalle.ocs.map((o) => (
+                            <div key={o.oc}>OC {o.oc} · {o.licitacion} · {o.comprador} · {new Date(o.fecha).toLocaleDateString("es-CL")} · neto {formatCurrency(o.neto)} · comisión {formatCurrency(o.comision)}</div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
                   </div>
                 ))}
               </div>

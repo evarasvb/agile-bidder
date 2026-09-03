@@ -21,9 +21,13 @@ export interface FacturaComision {
   fecha_vencimiento: string | null;
   total_ventas: number;
   total_comision: number;
+  fijo_monto?: number;
+  total?: number;
   estado: string;
   fecha_pago: string | null;
   documento_url: string | null;
+  validacion_hasta?: string | null;
+  detalle?: { ocs?: { oc: string; licitacion: string; comprador: string; fecha: string; neto: number; comision: number }[]; n?: number } | null;
 }
 
 export interface EmpresaBilling {
