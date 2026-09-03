@@ -249,7 +249,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
     rut: cliente?.rut || undefined,
     direccion: cliente?.direccion || undefined,
     telefono: cliente?.telefono || undefined,
-    email: cliente?.email || 'contacto@firmavb.cl',
+    email: cliente?.email_contacto || cliente?.email || 'contacto@firmavb.cl',
     logoUrl: cliente?.logo_url || undefined,
   };
 

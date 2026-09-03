@@ -95,7 +95,7 @@ export default function CompraAgilDetalle() {
       rut: cliente?.rut || undefined,
       direccion: cliente?.direccion || undefined,
       telefono: cliente?.telefono || undefined,
-      email: cliente?.email || 'contacto@firmavb.cl',
+      email: cliente?.email_contacto || cliente?.email || 'contacto@firmavb.cl',
       logoUrl: cliente?.logo_url || undefined,
     },
     fecha: fichaTecnica?.generada_en ? new Date(fichaTecnica.generada_en) : new Date(),

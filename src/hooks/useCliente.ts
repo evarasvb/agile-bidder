@@ -16,6 +16,10 @@ export interface Cliente {
   region: string;
   telefono?: string;
   direccion?: string;
+  // Correo que se imprime en los PDF (ficha técnica / cotización). Distinto
+  // de `email` (la cuenta de acceso, con constraint UNIQUE): dos clientes
+  // pueden querer mostrar el mismo correo de contacto sin chocar.
+  email_contacto?: string;
   logo_url?: string;
   categoria_negocio?: string;
   industrias?: string[];
@@ -238,14 +242,31 @@ export function useActualizarCliente() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cliente'] });
     },
-    onError: (error: Error) => {
+    onError: (error: any) => {
       toast({
         title: 'Error al actualizar',
-        description: error.message,
+        description: traducirErrorCliente(error),
         variant: 'destructive',
       });
     },
   });
+}
+
+// Traduce errores de Postgres (constraints, etc.) a un mensaje que un usuario
+// no técnico pueda entender, en vez del mensaje crudo de la base de datos
+// (p.ej. "duplicate key value violates unique constraint clientes_email_key").
+function traducirErrorCliente(error: any): string {
+  const msg = String(error?.message || '');
+  if (error?.code === '23505' || /duplicate key|already exists/i.test(msg)) {
+    if (msg.includes('clientes_rut_key')) {
+      return 'Ese RUT ya está registrado en otra cuenta de FirmaVB. Revisa que esté bien escrito.';
+    }
+    if (msg.includes('clientes_email_key')) {
+      return 'Ese correo ya está en uso por otra cuenta. Si querías guardar un correo de contacto para tus PDF, prueba de nuevo (ya se separó del correo de la cuenta).';
+    }
+    return 'Ese valor ya está en uso por otra cuenta.';
+  }
+  return msg || 'No se pudo guardar. Intenta de nuevo.';
 }
 
 // Hook para inventario del cliente

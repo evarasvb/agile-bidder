@@ -1,12 +1,25 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Building2, Upload, Loader2, Save, Image as ImageIcon } from 'lucide-react';
+import { Building2, Upload, Loader2, Save, Image as ImageIcon, CheckCircle2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { useCliente, useActualizarCliente } from '@/hooks/useCliente';
+import { useCliente, useActualizarCliente, validarRUT, formatearRUT } from '@/hooks/useCliente';
 import { uploadCompanyLogo, isValidImageFile } from '@/hooks/useProductImageUpload';
+import { cn } from '@/lib/utils';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Ícono de estado (ok/error) al lado derecho de un campo, solo cuando hay algo escrito. */
+function CampoEstado({ tocado, valido }: { tocado: boolean; valido: boolean }) {
+  if (!tocado) return null;
+  return valido ? (
+    <CheckCircle2 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-firmavb-green" />
+  ) : (
+    <AlertCircle className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-destructive" />
+  );
+}
 
 /**
  * Datos de la empresa que se imprimen en los PDF (ficha técnica y cotización):
@@ -31,16 +44,22 @@ export function DatosEmpresaCard() {
   useEffect(() => {
     if (cliente) {
       setEmpresaNombre(cliente.empresa_nombre || '');
-      setRut(cliente.rut || '');
+      setRut(cliente.rut ? formatearRUT(cliente.rut) : '');
       setDireccion(cliente.direccion || '');
       setTelefono(cliente.telefono || '');
-      setEmail(cliente.email || '');
+      // Correo de contacto para los PDF: el propio (si ya lo definió) o, para
+      // no partir en blanco, el de su cuenta como sugerencia inicial.
+      setEmail(cliente.email_contacto || cliente.email || '');
       setLogoUrl(cliente.logo_url || null);
       setRepNombre((cliente as any).representante_nombre || '');
-      setRepRut((cliente as any).representante_rut || '');
+      setRepRut((cliente as any).representante_rut ? formatearRUT((cliente as any).representante_rut) : '');
       setGiros((cliente as any).giros || '');
     }
   }, [cliente]);
+
+  const rutValido = useMemo(() => rut.trim().length === 0 || validarRUT(rut), [rut]);
+  const repRutValido = useMemo(() => repRut.trim().length === 0 || validarRUT(repRut), [repRut]);
+  const emailValido = useMemo(() => email.trim().length === 0 || EMAIL_RE.test(email.trim()), [email]);
 
   const handleLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -66,6 +85,18 @@ export function DatosEmpresaCard() {
 
   const handleGuardar = () => {
     if (!cliente?.id) return;
+    if (!rutValido) {
+      toast.error('El RUT de la empresa no es válido. Revisa el dígito verificador.');
+      return;
+    }
+    if (!repRutValido) {
+      toast.error('El RUT del representante no es válido. Revisa el dígito verificador.');
+      return;
+    }
+    if (!emailValido) {
+      toast.error('El correo de contacto no tiene un formato válido.');
+      return;
+    }
     actualizar.mutate(
       {
         id: cliente.id,
@@ -73,7 +104,10 @@ export function DatosEmpresaCard() {
         rut: rut.trim(),
         direccion: direccion.trim(),
         telefono: telefono.trim(),
-        email: email.trim(),
+        // Correo de contacto (para los PDF): va en su propia columna, NUNCA
+        // en `email` (esa es la cuenta de acceso y tiene un UNIQUE constraint
+        // — guardar ahí un correo ya usado por otra cuenta rompía el guardado).
+        email_contacto: email.trim(),
         logo_url: logoUrl,
         representante_nombre: repNombre.trim(),
         representante_rut: repRut.trim(),
@@ -81,6 +115,10 @@ export function DatosEmpresaCard() {
       } as any,
       { onSuccess: () => toast.success('Datos de la empresa guardados') }
     );
+  };
+
+  const handleRutChange = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setter(formatearRUT(e.target.value));
   };
 
   return (
@@ -126,7 +164,18 @@ export function DatosEmpresaCard() {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="empresa-rut">RUT</Label>
-            <Input id="empresa-rut" value={rut} onChange={(e) => setRut(e.target.value)} placeholder="76.xxx.xxx-x" />
+            <div className="relative">
+              <Input
+                id="empresa-rut"
+                value={rut}
+                onChange={handleRutChange(setRut)}
+                placeholder="76.xxx.xxx-x"
+                maxLength={12}
+                className={cn('pr-9', !rutValido && 'border-destructive focus-visible:ring-destructive')}
+              />
+              <CampoEstado tocado={rut.trim().length > 0} valido={rutValido} />
+            </div>
+            {!rutValido && <p className="text-xs text-destructive">RUT inválido — revisa el dígito verificador.</p>}
           </div>
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="empresa-direccion">Dirección</Label>
@@ -138,7 +187,18 @@ export function DatosEmpresaCard() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="empresa-rep-rut">RUT del representante</Label>
-            <Input id="empresa-rep-rut" value={repRut} onChange={(e) => setRepRut(e.target.value)} placeholder="12.345.678-9" />
+            <div className="relative">
+              <Input
+                id="empresa-rep-rut"
+                value={repRut}
+                onChange={handleRutChange(setRepRut)}
+                placeholder="12.345.678-9"
+                maxLength={12}
+                className={cn('pr-9', !repRutValido && 'border-destructive focus-visible:ring-destructive')}
+              />
+              <CampoEstado tocado={repRut.trim().length > 0} valido={repRutValido} />
+            </div>
+            {!repRutValido && <p className="text-xs text-destructive">RUT inválido — revisa el dígito verificador.</p>}
           </div>
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="empresa-giros">Giros (como aparecen en el SII)</Label>
@@ -150,7 +210,18 @@ export function DatosEmpresaCard() {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="empresa-email">Correo de contacto</Label>
-            <Input id="empresa-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="contacto@empresa.cl" />
+            <div className="relative">
+              <Input
+                id="empresa-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="contacto@empresa.cl"
+                className={cn('pr-9', !emailValido && 'border-destructive focus-visible:ring-destructive')}
+              />
+              <CampoEstado tocado={email.trim().length > 0} valido={emailValido} />
+            </div>
+            {!emailValido && <p className="text-xs text-destructive">Correo con formato inválido.</p>}
           </div>
         </div>
 
