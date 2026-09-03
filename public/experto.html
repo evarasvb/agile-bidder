@@ -57,6 +57,8 @@
   .aviso a{color:var(--navy);font-weight:600}
   .badge{display:inline-block;font:11px system-ui,sans-serif;background:var(--mist);color:var(--muted);border-radius:8px;padding:2px 8px;margin-left:6px}
   .oculto{display:none}
+  nav button small{display:block;font:11px system-ui,sans-serif;color:var(--muted);font-weight:400;margin-top:2px}
+  .ayuda{font:12px system-ui,sans-serif;color:var(--muted);margin:0;padding:0 16px 8px;background:var(--foam)}
   .bases{margin-top:10px;padding:10px 12px;border:1px dashed var(--sea);border-radius:12px;background:#F3FAFB;font:13px system-ui,sans-serif;color:var(--navy)}
   .bases button{font:13px system-ui,sans-serif;background:var(--navy);color:#fff;border:0;border-radius:10px;padding:7px 12px;cursor:pointer;margin-right:8px}
   .bases button:disabled{opacity:.5}.bases .est{color:var(--muted)}
@@ -71,9 +73,9 @@
   <div class="uso" id="uso"></div>
 </header>
 <nav>
-  <button id="tabChat" class="on">Preguntar</button>
-  <button id="tabInforme">Analizar una licitación</button>
-  <button id="tabEstudio">Estudio profundo · Pro</button>
+  <button id="tabChat" class="on">Preguntar<small>Respuesta corta con su fuente</small></button>
+  <button id="tabInforme">Analizar una licitación<small>Informe de trabajo con el ID</small></button>
+  <button id="tabEstudio">Estudio profundo · Pro<small>Historial del organismo y quién gana</small></button>
 </nav>
 <main id="chat">
   <div class="msg exp" id="bienvenida">
@@ -90,12 +92,14 @@
 </main>
 <form id="fChat">
   <textarea id="q" placeholder="Escribe tu pregunta…" rows="1"></textarea>
+  <label class="adjunto" id="lblAdjChat" title="Sube las bases de una licitación en PDF con texto (máx. 20 MB) para responder con criterios, ponderaciones y cláusulas reales">📎 Bases PDF<input type="file" id="pdfChat" accept="application/pdf" class="oculto"></label>
   <button class="enviar" id="bChat" type="submit">Preguntar</button>
 </form>
+<p class="ayuda" id="ayudaChat">Escribe en tus palabras (organismo, ID de licitación o tema). Con 📎 adjuntas las bases en PDF con texto, máximo 20 MB; el Experto las lee y las guarda para esa licitación.</p>
 <form id="fInforme" class="oculto">
   <input type="text" id="codigo" placeholder="ID de licitación, ej. 2699-35-LE26" autocomplete="off">
   <input type="text" id="ctx" placeholder="Opcional: qué vende tu empresa" autocomplete="off">
-  <label class="adjunto" id="lblAdj" title="Si tienes las bases en PDF, adjúntalas: el informe usará los criterios y ponderaciones reales">📎 Bases (PDF)<input type="file" id="pdfInforme" accept="application/pdf" class="oculto"></label>
+  <label class="adjunto" id="lblAdj" title="PDF con texto, máximo 20 MB: el informe usará los criterios y ponderaciones reales">📎 Bases PDF<input type="file" id="pdfInforme" accept="application/pdf" class="oculto"></label>
   <button class="enviar" id="bInforme" type="submit">Analizar</button>
 </form>
 <form id="fEstudio" class="oculto">
@@ -240,6 +244,14 @@ async function consultar(body,boton){
   }catch(err){clearInterval(timer);cuerpo.textContent='No pude responder: '+err.message;}
   boton.disabled=false;chat.scrollTop=chat.scrollHeight;
 }
+const pdfChat=document.getElementById('pdfChat'),lblAdjChat=document.getElementById('lblAdjChat');
+pdfChat.onchange=async()=>{const f=pdfChat.files[0];if(!f)return;
+  let codigo=(q.value.match(/\b\d{1,7}-\d{1,6}-[A-Za-z]{1,3}\d{2}\b/)||[])[0]||prompt('¿De qué licitación son estas bases? Escribe el ID (ej. 2699-35-LE26)');
+  pdfChat.value='';if(!codigo)return;codigo=codigo.trim().toUpperCase();
+  add('yo','Subir bases de '+codigo+' · '+f.name.replace(/</g,'&lt;'));
+  const p=add('exp','<div class="cuerpo"><span class="estado"></span></div>');const est=p.querySelector('.estado');
+  try{const j=await subirBases(codigo,f,t=>est.textContent=t);est.textContent=`Bases leídas: ${j.paginas} páginas, ${j.secciones} secciones. Ya puedes preguntar sobre ${codigo} (criterios, ponderación, garantías, multas).`;if(!q.value.trim())q.value=`Sobre la licitación ${codigo}: `;q.focus();}
+  catch(e){est.textContent=e.message;}};
 fChat.onsubmit=e=>{e.preventDefault();const pregunta=q.value.trim();if(!pregunta)return;q.value='';add('yo',pregunta.replace(/</g,'&lt;'));consultar({modo:'chat',pregunta,historial:historial.slice(-6)},document.getElementById('bChat'));};
 const pdfInforme=document.getElementById('pdfInforme'),lblAdj=document.getElementById('lblAdj');
 pdfInforme.onchange=()=>{lblAdj.textContent=pdfInforme.files[0]?'📎 '+pdfInforme.files[0].name.slice(0,28):'📎 Bases (PDF)';lblAdj.appendChild(pdfInforme);};
