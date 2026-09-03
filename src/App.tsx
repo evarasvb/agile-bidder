@@ -32,6 +32,7 @@ const LicitacionDetalle = lazy(() => import("./pages/LicitacionDetalle"));
 const ChatIA = lazy(() => import("./pages/ChatIA"));
 const Experto = lazy(() => import("./pages/Experto"));
 const LibroLicitacion = lazy(() => import("./pages/experto/LibroLicitacion"));
+const Compartido = lazy(() => import("./pages/experto/Compartido"));
 
 const OportunidadesPanel = lazy(() => import("./pages/Oportunidades"));
 const OportunidadDetalle = lazy(() => import("./pages/OportunidadDetalle"));
@@ -131,6 +132,7 @@ const App = () => (
           <Route path="/academia" element={<Academia />} />
           <Route path="/academia/curso/:slug" element={<AcademiaCurso />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/experto/c/:token" element={<Compartido />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/activar" element={<Activar />} />
           

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy } from 'lucide-react';
+import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -125,6 +125,15 @@ export default function LibroLicitacion() {
     toast.success(util ? 'Gracias' : 'Anotado');
   };
 
+  const compartirEntregable = async () => {
+    const titulo = `${tab === 'informe' ? 'Informe de trabajo' : tab === 'estudio' ? 'Estudio profundo' : 'Anexos'} · ${cod}${f?.nombre ? ' · ' + f.nombre : ''}`;
+    const { data, error } = await (supabase as any).rpc('experto_compartir', { p_codigo: cod, p_tipo: tab, p_titulo: titulo, p_contenido: entregables[tab] });
+    if (error || !data) { toast.error('No pude crear el link'); return; }
+    const url = `${window.location.origin}/experto/c/${data}`;
+    if (navigator.share) { try { await navigator.share({ title: titulo, url }); return; } catch { /* cancelado */ } }
+    await navigator.clipboard.writeText(url); toast.success('Link copiado: la página lleva tu nombre y la marca FirmaVB');
+    window.open(url, '_blank');
+  };
   const f = libro?.ficha; const o = f?.organismo ?? {};
   const bases: any[] = libro?.bases ?? [];
   const top: any[] = libro?.top_adjudicatarios ?? [];
@@ -244,6 +253,7 @@ export default function LibroLicitacion() {
                 <div className="flex gap-2 mb-2">
                   <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(entregables[tab]); toast.success('Copiado'); }}><Copy className="h-3.5 w-3.5 mr-1" />Copiar</Button>
                   <Button size="sm" variant="ghost" onClick={() => generar(tab)} disabled={!!ocupado}>Volver a generar</Button>
+                  <Button size="sm" variant="ghost" onClick={compartirEntregable}><Share2 className="h-3.5 w-3.5 mr-1" />Compartir / PDF</Button>
                 </div>
                 {tab === 'anexos' && faltantes.length > 0 && <p className="text-xs text-yellow-800 bg-yellow-50 border border-yellow-200 rounded px-2 py-1 mb-2">Completa a mano: {faltantes.join(', ')}</p>}
                 <div className="max-h-[62vh] overflow-y-auto pr-1" dangerouslySetInnerHTML={{ __html: expertoMd(entregables[tab]) }} />
