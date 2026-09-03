@@ -21,16 +21,25 @@ Deno.serve(async (req) => {
     const userId = role === "authenticated" ? sub : role === "service_role" ? (body.user_id ?? null) : null;
     if (!userId) return json({ error: "login", mensaje: "Inicia sesión en FirmaVB para activar el plan Pro." }, 401);
     const clave = String(body.producto ?? "pro_30");
-    const prod = PRODUCTOS[clave];
+    const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    // Pago de una factura mensual (fijo + comisiones) del propio usuario.
+    let prod = PRODUCTOS[clave]; let facturaId: string | null = null;
+    if (clave === "factura") {
+      const { data: f } = await sb.from("facturas_comision").select("id, user_id, periodo, numero_factura, total, estado").eq("id", String(body.factura_id ?? "")).maybeSingle();
+      if (!f || f.user_id !== userId) return json({ error: "factura", mensaje: "Factura no encontrada." }, 404);
+      if (f.estado === "pagada") return json({ error: "pagada", mensaje: "Esa factura ya está pagada." }, 400);
+      if (Number(f.total) <= 0) return json({ error: "monto", mensaje: "La factura no tiene monto." }, 400);
+      prod = { titulo: `FirmaVB ERP — ${f.numero_factura ? "Factura " + f.numero_factura : "Período " + f.periodo}`, monto: Math.round(Number(f.total)), dias: 0 };
+      facturaId = f.id;
+    }
     if (!prod) return json({ error: "producto" }, 400);
 
-    const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     let token = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN") ?? "";
     if (!token) token = (await sb.from("app_secrets").select("value").eq("key", "MERCADOPAGO_ACCESS_TOKEN").maybeSingle()).data?.value ?? "";
     if (!token) return json({ error: "sin_pasarela", mensaje: "Mercado Pago no está configurado." }, 500);
 
     const correo = body.email ?? email ?? null;
-    const { data: pago, error } = await sb.from("experto_pagos").insert({ user_id: userId, email: correo, producto: clave, monto: prod.monto }).select("id").single();
+    const { data: pago, error } = await sb.from("experto_pagos").insert({ user_id: userId, email: correo, producto: clave, monto: prod.monto, factura_id: facturaId }).select("id").single();
     if (error) return json({ error: error.message }, 500);
 
     const volver = String(body.back_url ?? "https://firmavb.cl/experto.html").split("?")[0];
@@ -41,7 +50,7 @@ Deno.serve(async (req) => {
       notification_url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/mp-pago-experto-webhook`,
       back_urls: { success: `${volver}?pago=ok`, pending: `${volver}?pago=pendiente`, failure: `${volver}?pago=error` },
       auto_return: "approved",
-      statement_descriptor: "FIRMAVB EXPERTO",
+      statement_descriptor: "FIRMAVB",
     };
     if (correo) pref.payer = { email: correo };
     const r = await fetch("https://api.mercadopago.com/checkout/preferences", {

@@ -21,13 +21,17 @@ Deno.serve(async (req) => {
     const p = await r.json();
     const ref = p.external_reference ?? p.metadata?.pago_id;
     if (!ref) return json({ ok: true, sin_referencia: true });
-    const { data: pago } = await sb.from("experto_pagos").select("id, user_id, producto, estado").eq("id", ref).maybeSingle();
+    const { data: pago } = await sb.from("experto_pagos").select("id, user_id, producto, estado, factura_id").eq("id", ref).maybeSingle();
     if (!pago) return json({ ok: true, desconocido: true });
 
     await sb.from("experto_pagos").update({
       estado: p.status, mp_payment_id: String(p.id), updated_at: new Date().toISOString(),
       raw: { status: p.status, detalle: p.status_detail, monto: p.transaction_amount, aprobado: p.date_approved, metodo: p.payment_method_id },
     }).eq("id", pago.id);
+    if (p.status === "approved" && pago.estado !== "approved" && pago.factura_id) {
+      const { error } = await sb.from("facturas_comision").update({ estado: "pagada", fecha_pago: new Date().toISOString().slice(0, 10) }).eq("id", pago.factura_id);
+      return json({ ok: !error, factura_pagada: pago.factura_id, error: error?.message });
+    }
     if (p.status === "approved" && pago.estado !== "approved") {
       const { data: hasta, error } = await sb.rpc("experto_activar_pro", { p_user_id: pago.user_id, p_dias: DIAS[pago.producto] ?? 30, p_origen: `mp:${p.id}`, p_nivel: String(pago.producto).startsWith("plus") ? "plus" : "pro" });
       return json({ ok: !error, pro_hasta: hasta, error: error?.message });
