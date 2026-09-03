@@ -1,5 +1,5 @@
--- Job: cada 10 minutos carga hasta 3 días pendientes de reclamos (ayer hacia atrás, 365 días),
--- ambos tipos. Terminado el histórico, solo queda "ayer" cada día.
+-- Job: cada 10 minutos carga hasta 3 días pendientes (ambos tipos) del buscador de reclamos.
+-- Primero rellena los últimos 365 días (~2 h) y después solo carga el día anterior.
 select cron.unschedule(jobid) from cron.job where jobname = 'sync-reclamos-mp-cron';
 select cron.schedule(
   'sync-reclamos-mp-cron',

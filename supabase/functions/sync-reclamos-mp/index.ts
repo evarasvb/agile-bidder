@@ -1,68 +1,75 @@
 // sync-reclamos-mp
 // Lee el buscador público de reclamos de Mercado Público (BusquedaReclamos.aspx, ASP.NET WebForms)
-// por día y tipo (1 = pago no oportuno, 2 = irregularidad en el proceso) y guarda cada reclamo:
-// id, proceso, fecha, reclamante, organismo, estado. Corre por pg_cron; body opcional:
+// por día y tipo (1 = pago no oportuno, 2 = irregularidad en el proceso), usa "Descargar resultados"
+// para traer todas las filas de una vez y guarda cada reclamo: id, proceso, fecha, reclamante, organismo, estado. Corre por pg_cron; body opcional:
 // { dias: 3 } (días pendientes por pasada) o { desde:"2026-09-01", hasta:"2026-09-01" }.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const URL_B = "https://www.mercadopublico.cl/Portal/Modules/Site/Reclamos/BusquedaReclamos.aspx";
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
-const PAGER = "rgBusqueda$ctl00$ctl03$ctl01$";
 
 function rolJwt(auth: string | null): string | null {
   try { return JSON.parse(atob((auth ?? "").replace(/^Bearer\s+/i, "").split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).role ?? null; } catch { return null; }
 }
-// Todos los campos del formulario tal como los enviaría el navegador: hidden + text + selects.
-function formulario(html: string): Record<string, string> {
+// Frasco de cookies: Mercado Público corre tras un balanceador (cookie GCLB); sin afinidad, la
+// sesión cae en otro nodo y la grilla vuelve vacía.
+class Jar {
+  c: Record<string, string> = {};
+  absorber(r: Response) {
+    const h: string[] = (r.headers as any).getSetCookie ? (r.headers as any).getSetCookie() : [(r.headers.get("set-cookie") ?? "")];
+    for (const raw of h) for (const parte of raw.split(/,(?=[^ ;]+=)/)) {
+      const kv = parte.split(";")[0].trim(); const i = kv.indexOf("=");
+      if (i > 0) this.c[kv.slice(0, i)] = kv.slice(i + 1);
+    }
+  }
+  get header() { return Object.entries(this.c).map(([k, v]) => `${k}=${v}`).join("; "); }
+}
+// El sitio declara charsets que no siempre cumple: se intenta UTF-8 estricto y se cae a Latin-1.
+async function texto(r: Response): Promise<string> {
+  const buf = await r.arrayBuffer();
+  try { return new TextDecoder("utf-8", { fatal: true }).decode(buf); } catch { return new TextDecoder("iso-8859-1").decode(buf); }
+}
+function ocultos(html: string): Record<string, string> {
   const out: Record<string, string> = {};
-  const re = /<input[^>]*>/gi; let m: RegExpExecArray | null;
+  const re = /<input[^>]*type="hidden"[^>]*>/gi; let m: RegExpExecArray | null;
   while ((m = re.exec(html))) {
-    const tipo = (m[0].match(/type="([^"]+)"/i)?.[1] ?? "text").toLowerCase();
-    if (!["hidden", "text"].includes(tipo)) continue;
     const n = m[0].match(/name="([^"]+)"/i)?.[1]; const v = m[0].match(/value="([^"]*)"/i)?.[1] ?? "";
     if (n) out[n] = v;
-  }
-  const rs = /<select[^>]*name="([^"]+)"[^>]*>([\s\S]*?)<\/select>/gi;
-  while ((m = rs.exec(html))) {
-    const sel = m[2].match(/<option[^>]*selected[^>]*value="([^"]*)"/i)?.[1] ?? m[2].match(/<option[^>]*value="([^"]*)"[^>]*selected/i)?.[1] ?? m[2].match(/<option[^>]*value="([^"]*)"/i)?.[1] ?? "";
-    out[m[1]] = sel;
   }
   return out;
 }
 const limpiar = (s: string) => s.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&#(\d+);/g, (_, c) => String.fromCharCode(Number(c))).replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
-function filas(html: string) {
+// Filas del "Descargar resultados" (tabla HTML servida como .xls): id, proceso, fecha+hora, reclamante, organismo, estado.
+function filasExcel(html: string) {
   const out: any[] = [];
-  const re = /<tr class="rg(?:Alt)?Row"[^>]*>([\s\S]*?)<\/tr>/g; let m: RegExpExecArray | null;
+  const re = /<tr[^>]*>([\s\S]*?)<\/tr>/g; let m: RegExpExecArray | null;
   while ((m = re.exec(html))) {
-    const tds = [...m[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((t) => t[1]);
+    const tds = [...m[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((t) => limpiar(t[1]));
     if (tds.length < 6) continue;
-    const fecha = limpiar(tds[2]).match(/(\d{2})-(\d{2})-(\d{4})/);
-    out.push({
-      id_reclamo: limpiar(tds[0]), proceso_codigo: limpiar(tds[1]),
-      fecha: fecha ? `${fecha[3]}-${fecha[2]}-${fecha[1]}` : null,
-      reclamante: limpiar(tds[3]).slice(0, 200), organismo_nombre: limpiar(tds[4]).slice(0, 200),
-      estado: tds[5].match(/EstadoPAF-([A-Za-z]+)\.png/)?.[1] ?? null,
-    });
+    const f = tds[2].match(/(\d{2})-(\d{2})-(\d{4})/);
+    if (!f || !/-REC\d{2}$/i.test(tds[0])) continue;
+    out.push({ id_reclamo: tds[0], proceso_codigo: tds[1], fecha: `${f[3]}-${f[2]}-${f[1]}`, reclamante: tds[3].slice(0, 200), organismo_nombre: tds[4].slice(0, 200), estado: tds[5].slice(0, 80) });
   }
-  return out.filter((r) => r.id_reclamo && r.fecha);
+  return out;
 }
-function info(html: string) {
-  const m = html.match(/P[^ ]{0,3}gina <strong>(\d+)<\/strong> de <strong>(\d+)<\/strong>, registros del <strong>\d+<\/strong> al <strong>\d+<\/strong> de <strong>(\d+)<\/strong>/);
-  return m ? { pagina: +m[1], paginas: +m[2], total: +m[3] } : { pagina: 1, paginas: html.includes("rgBusqueda_ctl00") ? 1 : 0, total: 0 };
+function total(html: string): number | null {
+  const m = html.match(/Se encontraron (\d+) elementos/) ?? html.match(/de <strong>(\d+)<\/strong>\. <\/div>/);
+  return m ? +m[1] : (/<div id="rgBusqueda"/.test(html) ? 0 : null);
 }
 const fechaMP = (iso: string) => { const [y, mo, d] = iso.split("-"); return `${d}-${mo}-${y}`; };
 
-async function post(form: Record<string, string>, cookie: string): Promise<string> {
-  const r = await fetch(URL_B, { method: "POST", headers: { "User-Agent": UA, "Content-Type": "application/x-www-form-urlencoded", "Cookie": cookie, "Referer": URL_B }, body: new URLSearchParams(form).toString() });
-  return await r.text();
+async function post(form: Record<string, string>, jar: Jar): Promise<{ html: string; tipo: string }> {
+  const r = await fetch(URL_B, { method: "POST", headers: { "User-Agent": UA, "Content-Type": "application/x-www-form-urlencoded", "Cookie": jar.header, "Referer": URL_B }, body: new URLSearchParams(form).toString() });
+  jar.absorber(r);
+  return { html: await texto(r), tipo: r.headers.get("content-type") ?? "" };
 }
 
-async function leerDia(iso: string, tipo: 1 | 2, limiteMs: number) {
-  const t0 = Date.now();
+async function leerDia(iso: string, tipo: 1 | 2) {
+  const jar = new Jar();
   const g = await fetch(URL_B, { headers: { "User-Agent": UA } });
-  const cookie = (g.headers.get("set-cookie") ?? "").split(/,(?=[^ ]+=)/).map((c) => c.split(";")[0]).join("; ");
-  let html = await g.text();
+  jar.absorber(g);
+  const inicio = await texto(g);
   const filtro: Record<string, string> = {
     ddlTipoReclamo: String(tipo), ddlEstadoReclamo: "Seleccione...",
     txtIDReclamo: "", txtRut: "", txtValidador: "", txtRutProv: "", txtValProv: "", txtIDLicOc: "",
@@ -71,34 +78,18 @@ async function leerDia(iso: string, tipo: 1 | 2, limiteMs: number) {
   };
   if (tipo === 1) filtro.ddlMotivoReclamo = "1";
   const pasos: string[] = [];
-  html = await post({ ...formulario(html), ...filtro, btnBuscar: "Buscar" }, cookie);
-  let filasTodas = filas(html);
-  let inf = info(html);
-  pasos.push(`busqueda:${filasTodas.length}/${inf.total}`);
-  if (inf.total === 0) return { filas: [], total: 0, paginas: 0, completo: true, pasos };
-  const tam50: Record<string, string> = {
-    [PAGER + "PageSizeComboBox"]: "50",
-    "rgBusqueda_ctl00_ctl03_ctl01_PageSizeComboBox_ClientState": JSON.stringify({ logEntries: [], value: "50", text: "50", enabled: true, checkedIndices: [], checkedItemsTextOverflows: false }),
-  };
-  if (inf.paginas > 1) {
-    const h50 = await post({ ...formulario(html), ...filtro, ...tam50, __EVENTTARGET: PAGER + "PageSizeComboBox", __EVENTARGUMENT: "" }, cookie);
-    const f50 = filas(h50);
-    pasos.push(`tam50:${f50.length}`);
-    if (f50.length > filasTodas.length) { html = h50; filasTodas = f50; inf = info(h50); }
-  }
-  let completo = true;
-  while (inf.pagina < inf.paginas) {
-    if (Date.now() - t0 > limiteMs) { completo = false; pasos.push("tiempo"); break; }
-    html = await post({ ...formulario(html), ...filtro, ...tam50, [PAGER + "ctl18"]: " " }, cookie);
-    const f = filas(html); const i2 = info(html);
-    pasos.push(`p${i2.pagina}:${f.length}`);
-    if (!f.length || i2.pagina <= inf.pagina) { completo = false; break; }
-    filasTodas.push(...f); inf = i2;
-    await new Promise((r) => setTimeout(r, 250));
-  }
+  const b = await post({ ...ocultos(inicio), ...filtro, btnBuscar: "Buscar" }, jar);
+  const n = total(b.html);
+  pasos.push(`busqueda:${n ?? "?"}`);
+  if (n === 0) return { filas: [], total: 0, completo: true, pasos };
+  if (n == null) return { filas: [], total: null, completo: false, pasos };
+  // Exportación completa en una sola respuesta (tabla HTML servida como .xls)
+  const x = await post({ ...ocultos(b.html), ...filtro, __EVENTTARGET: "lnkExcel", __EVENTARGUMENT: "" }, jar);
+  const filas = filasExcel(x.html);
+  pasos.push(`excel:${filas.length} (${x.tipo.split(";")[0]})`);
   const vistos = new Set<string>();
-  filasTodas = filasTodas.filter((r) => !vistos.has(r.id_reclamo) && vistos.add(r.id_reclamo));
-  return { filas: filasTodas, total: inf.total, paginas: inf.paginas, completo: completo && filasTodas.length >= inf.total, pasos };
+  const unicas = filas.filter((r) => !vistos.has(r.id_reclamo) && vistos.add(r.id_reclamo));
+  return { filas: unicas, total: n, completo: unicas.length >= n, pasos };
 }
 
 Deno.serve(async (req: Request) => {
@@ -123,7 +114,7 @@ Deno.serve(async (req: Request) => {
   for (const t of tareas) {
     if (Date.now() - t0 > 120_000) break;
     try {
-      const d = await leerDia(t.fecha, t.tipo, 40_000);
+      const d = await leerDia(t.fecha, t.tipo);
       let guardadas = 0;
       if (d.filas.length) {
         const { data: n, error } = await sb.rpc("reclamos_mp_upsert", { p_filas: d.filas.map((f) => ({ ...f, tipo: t.tipo })) });
@@ -131,7 +122,7 @@ Deno.serve(async (req: Request) => {
         guardadas = n ?? 0;
       }
       await sb.rpc("reclamos_mp_marcar_dia", { p_fecha: t.fecha, p_tipo: t.tipo, p_cargados: d.filas.length, p_total: d.total, p_completo: d.completo });
-      res.hechas.push({ ...t, total: d.total, paginas: d.paginas, leidas: d.filas.length, guardadas, completo: d.completo, pasos: d.pasos });
+      res.hechas.push({ ...t, total: d.total, leidas: d.filas.length, guardadas, completo: d.completo, pasos: d.pasos });
     } catch (e) { res.errores.push({ ...t, error: String(e).slice(0, 200) }); }
   }
   res.ms = Date.now() - t0;
