@@ -150,13 +150,14 @@ Deno.serve(async (req: Request) => {
       const datos: any[] = lista?.data ?? [];
       const total = lista?.pagination?.total ?? mp.total ?? 0;
       const conAward = datos.filter((d) => d.urlAward).map((d) => String(d.urlAward).split("/").pop()!);
-      const filas = await enLotes(conAward, (c: string) => leerProceso(c, true), PARALELO, 115_000, t0);
-      // Los que fallaron por red/limitación quedan como fila vacía (sin leído) y se reintentan en el frente 1.
-      await guardar(filas.map((f, i) => f === undefined ? { codigo: conAward[i] } : f));
-      res.reintentar = filas.filter((f) => f === undefined).length;
-      const leidosTodos = filas.length >= conAward.length;
-      const nuevoOffset = leidosTodos ? mp.offset_leido + datos.length : mp.offset_leido; // si no alcanzó el tiempo, repite el tramo
-      const completo = leidosTodos && (datos.length < limite || nuevoOffset >= total);
+      const filas = await enLotes(conAward, (c: string) => leerProceso(c, true), PARALELO, 85_000, t0);
+      // Los que fallaron por red/limitación o no alcanzaron en el tiempo quedan como fila vacía (sin leído)
+      // y se reintentan en el frente 1. El puntero del mes avanza siempre: así un tramo con errores no se repite eternamente.
+      const sinTiempo = conAward.slice(filas.length);
+      await guardar([...filas.map((f, i) => f === undefined ? { codigo: conAward[i] } : f), ...sinTiempo.map((c) => ({ codigo: c }))]);
+      res.reintentar = filas.filter((f) => f === undefined).length + sinTiempo.length;
+      const nuevoOffset = mp.offset_leido + datos.length;
+      const completo = datos.length < limite || nuevoOffset >= total;
       await sb.rpc("ocds_marcar_mes", { p_anio: mp.anio, p_mes: mp.mes, p_offset: nuevoOffset, p_total: total, p_completo: completo });
       res.mes = { anio: mp.anio, mes: mp.mes, offset: nuevoOffset, total, en_tramo: datos.length, con_award: conAward.length, leidos: filas.length, completo };
     }
