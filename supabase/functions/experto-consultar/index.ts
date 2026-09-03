@@ -219,8 +219,15 @@ Deno.serve(async (req) => {
       if (/adjudic|qui[eé]n (se )?gan|ganador|ganan|competidor|compet[ií]|precio/.test(p) && qDatos) {
         tareas.adj = sb.rpc("experto_adjudicaciones", { texto: qDatos, p_rut: null, meses: 12, cantidad: 8 }).then((r) => r.data ?? []);
       }
+      // Organismo: "municipalidad de X" o, si viene desordenado ("puerto montt la municipalidad"),
+      // se busca por las palabras de contenido (sin las de pago/riesgo) vía experto_buscar_organismo.
       const org = pregunta.match(/((?:i\.?\s*)?municipalidad|hospital|ministerio|servicio de salud|servicio local|universidad|gobierno regional|subsecretar[ií]a|direcci[oó]n|instituto|carabineros|ej[eé]rcito|armada|junaeb|junji|sename|cenabast|serviu|corfo|sence|fonasa)\s+(?:de\s+)?([a-záéíóúñ\s]{3,40})/i);
-      if (org) tareas.org = sb.rpc("experto_organismo", { nombre_o_rut: org[0].replace(/[?¿.,]/g, "").trim().slice(0, 60) }).then((r) => r.data?.[0]);
+      const hablaDeOrg = /municipalidad|hospital|ministerio|servicio|universidad|gobierno|subsecretar|direcci|instituto|carabineros|ej[eé]rcito|armada|junaeb|junji|sename|cenabast|serviu|corfo|sence|fonasa|organismo|paga[nr]?\b|pago|reclamo|riesgo|conducta/i.test(pregunta);
+      if (org || (hablaDeOrg && kd.length)) {
+        const texto = org ? org[0].replace(/[?¿.,]/g, "").trim().slice(0, 60)
+          : palabrasClave(pregunta).filter((w) => !GENERICAS.has(w) && !/^(pag\w*|reclam\w*|riesg\w*|conduct\w*|demor\w*|atras\w*|cumpl\w*|deud\w*|vender\w*|organismo)$/.test(w)).slice(0, 5).join(" ");
+        if (texto) tareas.org = sb.rpc("experto_buscar_organismo", { p_texto: texto }).then(async (r) => r.data ? (await sb.rpc("experto_organismo", { nombre_o_rut: r.data })).data?.[0] : null);
+      }
     } else {
       // Informe: fuentes por temas fijos + el organismo
       const temas = ["inadmisibilidad oferta requisitos bases", "garantia seriedad oferta", "criterios evaluacion puntaje precio experiencia", "foro inverso subsanacion errores formales", "pago oportuno proveedores 30 dias", "inhabilidades articulo 4 ley 19886"];

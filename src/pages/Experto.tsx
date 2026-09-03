@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -20,8 +20,20 @@ export default function Experto() {
 
   useEffect(() => { document.title = "Experto FirmaVB"; }, []);
 
+  // El alto se calcula con el header real (cambia si aparece la franja de la extensión).
+  const [alto, setAlto] = useState("calc(100dvh - 4rem)");
+  useEffect(() => {
+    const header = document.querySelector("header");
+    if (!header) return;
+    const medir = () => setAlto(`calc(100dvh - ${header.getBoundingClientRect().height}px)`);
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(header);
+    return () => ro.disconnect();
+  }, []);
+
   return (
-    <div className="h-[calc(100vh-4rem)] -m-4 md:-m-6">
+    <div className="-m-4 sm:-m-6" style={{ height: alto }}>
       <iframe title="Experto FirmaVB" src={src} className="w-full h-full border-0" allow="clipboard-write" />
     </div>
   );

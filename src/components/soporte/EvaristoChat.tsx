@@ -73,6 +73,8 @@ const nombrePagina = (path: string): string => {
 
 export function EvaristoChat() {
   const location = useLocation();
+  // Dentro del Experto el asistente flotante tapa el cuadro de pregunta.
+  if (location.pathname.startsWith("/experto")) return null;
   const navigate = useNavigate();
   const { data: invStats } = useInventoryStats();
   const { isConnected } = useExtensionStatus();
