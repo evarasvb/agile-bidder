@@ -222,10 +222,12 @@ Deno.serve(async (req) => {
       // Organismo: "municipalidad de X" o, si viene desordenado ("puerto montt la municipalidad"),
       // se busca por las palabras de contenido (sin las de pago/riesgo) vía experto_buscar_organismo.
       const org = pregunta.match(/((?:i\.?\s*)?municipalidad|hospital|ministerio|servicio de salud|servicio local|universidad|gobierno regional|subsecretar[ií]a|direcci[oó]n|instituto|carabineros|ej[eé]rcito|armada|junaeb|junji|sename|cenabast|serviu|corfo|sence|fonasa)\s+(?:de\s+)?([a-záéíóúñ\s]{3,40})/i);
-      const hablaDeOrg = /municipalidad|hospital|ministerio|servicio|universidad|gobierno|subsecretar|direcci|instituto|carabineros|ej[eé]rcito|armada|junaeb|junji|sename|cenabast|serviu|corfo|sence|fonasa|organismo|paga[nr]?\b|pago|reclamo|riesgo|conducta/i.test(pregunta);
-      if (org || (hablaDeOrg && kd.length)) {
-        const texto = org ? org[0].replace(/[?¿.,]/g, "").trim().slice(0, 60)
-          : palabrasClave(pregunta).filter((w) => !GENERICAS.has(w) && !/^(pag\w*|reclam\w*|riesg\w*|conduct\w*|demor\w*|atras\w*|cumpl\w*|deud\w*|vender\w*|organismo)$/.test(w)).slice(0, 5).join(" ");
+      const tipoOrg = /municipalidad|hospital|ministerio|servicio de|universidad|gobierno regional|subsecretar|direcci[oó]n de|instituto|carabineros|ej[eé]rcito|armada|junaeb|junji|sename|cenabast|serviu|corfo|sence|fonasa/i.test(pregunta);
+      const hablaDePago = /paga[nr]?\b|pago|reclamo|riesgo|conducta/i.test(pregunta);
+      if (org || tipoOrg || hablaDePago) {
+        const palabras = palabrasClave(pregunta).filter((w) => !GENERICAS.has(w) && !/^(pag\w*|reclam\w*|riesg\w*|conduct\w*|demor\w*|atras\w*|cumpl\w*|deud\w*|vender\w*|organismo)$/.test(w)).slice(0, 5);
+        // Sin "municipalidad de X" explícito se exige un tipo de organismo o al menos dos palabras (evita buscar "garantía" como organismo).
+        const texto = org ? org[0].replace(/[?¿.,]/g, "").trim().slice(0, 60) : (tipoOrg || palabras.length >= 2) ? palabras.join(" ") : "";
         if (texto) tareas.org = sb.rpc("experto_buscar_organismo", { p_texto: texto }).then(async (r) => r.data ? (await sb.rpc("experto_organismo", { nombre_o_rut: r.data })).data?.[0] : null);
       }
     } else {
