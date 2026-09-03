@@ -16,6 +16,11 @@ export interface ClienteFiltros {
   id: string;
   cliente_id: string;
   palabras_incluir: string[] | null;
+  // Términos relacionados/sinónimos generados por IA a partir de
+  // palabras_incluir (ver useExpandirConceptos). Se usan ADEMÁS de, nunca en
+  // vez de, palabras_incluir: una compra que dice "consumible de impresión"
+  // debe calzar con la palabra "toner" aunque el texto no la contenga.
+  palabras_incluir_ia: string[] | null;
   palabras_excluir: string[] | null;
   regiones_activas: string[] | null;
   monto_min: number | null;
@@ -165,6 +170,41 @@ export function useSugerirFiltros() {
   });
 }
 
+// Hook: pide a la IA que amplíe las palabras clave del cliente a un concepto
+// más amplio (sinónimos, variantes, cómo lo nombra el Estado) y GUARDA el
+// resultado en palabras_incluir_ia. A diferencia de useSugerirFiltros (que
+// sugiere palabras nuevas sin guardar), esto amplía las palabras que el
+// cliente YA definió y confirmó, y persiste de inmediato — el Panel las usa
+// apenas termina.
+export function useExpandirConceptos() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (palabras: string[]) => {
+      if (!user?.id) throw new Error('Usuario no autenticado');
+      const clienteId = await resolverClienteId(user.id);
+      if (!clienteId) throw new Error('No se encontró el cliente');
+      if (!palabras.length) return { palabras_incluir_ia: [] as string[] };
+
+      const { data, error } = await supabaseClient.functions.invoke('expandir-conceptos', {
+        body: { cliente_id: clienteId, palabras },
+      });
+      if (error) throw error;
+      return { palabras_incluir_ia: (data?.palabras_incluir_ia as string[]) || [] };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cliente-filtros'] });
+      queryClient.invalidateQueries({ queryKey: ['oportunidades-panel'] });
+    },
+    // Silencioso: corre en segundo plano después de guardar; si falla, las
+    // palabras que el cliente escribió a mano siguen funcionando igual.
+    onError: (error) => {
+      console.error('Error ampliando conceptos con IA:', error);
+    },
+  });
+}
+
 // Interfaz para compra ágil simplificada (para filtrado)
 export interface CompraAgilParaFiltrar {
   nombre?: string;
@@ -185,11 +225,12 @@ export function pasaFiltrosCliente(
   // Crear texto combinado normalizado para buscar palabras
   const texto = normalizar(`${compra.nombre || ''} ${compra.descripcion || ''}`);
 
-  // Filtrar por palabras a incluir (debe coincidir al menos una, por concepto)
-  if (filtros.palabras_incluir && filtros.palabras_incluir.length > 0) {
-    const tieneIncluida = filtros.palabras_incluir.some((palabra) =>
-      coincideConcepto(texto, palabra)
-    );
+  // Filtrar por palabras a incluir (debe coincidir al menos una, por concepto).
+  // Se suman los sinónimos/términos ampliados por IA (palabras_incluir_ia):
+  // buscar "por concepto", no por la palabra exacta que escribió el cliente.
+  const incluirConIA = [...(filtros.palabras_incluir || []), ...(filtros.palabras_incluir_ia || [])];
+  if (incluirConIA.length > 0) {
+    const tieneIncluida = incluirConIA.some((palabra) => coincideConcepto(texto, palabra));
     if (!tieneIncluida) return false;
   }
 
@@ -241,7 +282,11 @@ export function aplicarFiltrosCliente<
   }
 >(oportunidades: T[], filtros?: Partial<ClienteFiltros> | null): T[] {
   if (!filtros) return oportunidades;
-  const incluir = (filtros.palabras_incluir || []).map(normalizar).filter(Boolean);
+  // Búsqueda por CONCEPTO, no por palabra exacta: se suman los términos que
+  // el cliente escribió con los sinónimos/variantes que amplió la IA
+  // (palabras_incluir_ia) — así "consumible de impresión" calza con "toner".
+  const incluir = [...(filtros.palabras_incluir || []), ...(filtros.palabras_incluir_ia || [])]
+    .map(normalizar).filter(Boolean);
   const excluir = (filtros.palabras_excluir || []).map(normalizar).filter(Boolean);
   const regiones = (filtros.regiones_activas || []).map(normalizar).filter(Boolean);
   const montoMin = filtros.monto_min ?? null;
