@@ -43,6 +43,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, differenceInHours, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
+import { RiesgoOrganismoCard } from '@/components/organismo/RiesgoOrganismoCard';
 
 function formatCurrency(value: number | null) {
   if (!value) return "-";
@@ -312,6 +313,7 @@ export default function OportunidadDetalle() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
+          <RiesgoOrganismoCard codigo={oportunidad.codigo} organismo={oportunidad.organismo} />
           {/* Info cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Card>
