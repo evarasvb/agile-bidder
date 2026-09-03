@@ -200,9 +200,20 @@ export function DatosEmpresaCard() {
             </div>
             {!repRutValido && <p className="text-xs text-destructive">RUT inválido — revisa el dígito verificador.</p>}
           </div>
-          <div className="space-y-2 sm:col-span-2">
+          <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="empresa-giros">Giros (como aparecen en el SII)</Label>
-            <Input id="empresa-giros" value={giros} onChange={(e) => setGiros(e.target.value)} placeholder="Venta al por mayor de artículos de oficina; servicios informáticos" />
+            <Input
+              id="empresa-giros"
+              value={giros}
+              onChange={(e) => setGiros(e.target.value)}
+              placeholder="Venta al por mayor de artículos de oficina; servicios informáticos"
+            />
+            <p className="text-xs text-muted-foreground">
+              Cópialos tal como figuran en sii.cl → Servicios online → Situación tributaria. Si tienes más de uno, sepáralos con punto y coma ( ; ).
+            </p>
+            {giros.trim().length > 0 && giros.trim().length < 8 && (
+              <p className="text-xs text-amber-600">Parece muy corto para ser un giro completo del SII — revisa que esté bien copiado.</p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="empresa-telefono">Teléfono</Label>
