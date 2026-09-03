@@ -7,6 +7,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { CompraAgil } from '@/hooks/useComprasAgiles';
+import { IVA_RATE } from '@/lib/constants';
 
 export interface ItemCotizacion {
   itemRequerido: string;
@@ -202,7 +203,7 @@ export function generarCotizacionPDF(datos: DatosCotizacion): jsPDF {
   
   // === TOTALES ===
   const subtotal = datos.items.reduce((sum, item) => sum + item.total, 0);
-  const iva = subtotal * 0.19;
+  const iva = subtotal * IVA_RATE;
   const total = subtotal + iva;
   
   const totalesX = pageWidth - margin - 70;

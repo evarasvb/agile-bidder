@@ -28,6 +28,7 @@ import { ClienteOferta, useActualizarEstadoOfertaCliente } from '@/hooks/useClie
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
+import { IVA_RATE } from '@/lib/constants';
 
 interface OfertaDetalleProps {
   oferta: ClienteOferta;
@@ -48,7 +49,7 @@ export function OfertaDetalle({ oferta, onClose }: OfertaDetalleProps) {
 
   const presupuesto = oferta.licitacion?.presupuesto || 0;
   const valorNeto = oferta.valor_total || 0;
-  const iva = valorNeto * 0.19;
+  const iva = valorNeto * IVA_RATE;
   const valorTotal = valorNeto + iva;
   const excedePresupuesto = presupuesto > 0 && valorNeto > presupuesto;
   const diferenciaPresupuesto = valorNeto - presupuesto;

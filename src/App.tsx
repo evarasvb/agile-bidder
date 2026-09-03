@@ -25,6 +25,8 @@ const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const ClienteOnboarding = lazy(() => import("./pages/ClienteOnboarding"));
 const Activar = lazy(() => import("./pages/Activar"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const Terminos = lazy(() => import("./pages/Terminos"));
+const Privacidad = lazy(() => import("./pages/Privacidad"));
 
 const MisOportunidades = lazy(() => import("./pages/MisOportunidades"));
 const LicitacionDetalle = lazy(() => import("./pages/LicitacionDetalle"));
@@ -135,6 +137,8 @@ const App = () => (
           <Route path="/experto/c/:token" element={<Compartido />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/activar" element={<Activar />} />
+          <Route path="/terminos" element={<Terminos />} />
+          <Route path="/privacidad" element={<Privacidad />} />
           
           {/* Onboarding - sin sidebar */}
           <Route path="/onboarding" element={<ProtectedRoute><ClienteOnboarding /></ProtectedRoute>} />

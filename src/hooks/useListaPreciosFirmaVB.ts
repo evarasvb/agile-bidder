@@ -34,7 +34,7 @@ export function useListaPreciosFirmaVB(filters?: ListaPreciosFilters) {
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
 
-      let query = (supabase as any)
+      const query = (supabase as any)
         .from('lista_precios_firmavb')
         .select('*', { count: 'exact' })
         .range(from, to)
@@ -213,7 +213,7 @@ export function useMatchProductosFirmaVB(nombreBuscado: string | null) {
           .replace(/[\u0300-\u036f]/g, '');
         
         let score = 0;
-        let matchedTerms: string[] = [];
+        const matchedTerms: string[] = [];
 
         palabras.forEach(palabra => {
           if (descripcionNorm.includes(palabra)) {

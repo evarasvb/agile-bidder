@@ -101,7 +101,7 @@ async function downloadConvenioMarcoCsv(): Promise<string[][]> {
   log(`Downloaded ${(arrayBuffer.byteLength / 1024).toFixed(1)} KB`);
 
   // Try Latin-1 first, then UTF-8
-  let text = decodeLatin1(arrayBuffer);
+  const text = decodeLatin1(arrayBuffer);
 
   // Detect delimiter (semicolon or comma)
   const firstLine = text.split(/\r?\n/)[0] || '';

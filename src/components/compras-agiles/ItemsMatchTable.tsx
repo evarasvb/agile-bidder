@@ -17,6 +17,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useLicitacionItems, type LicitacionItem } from '@/hooks/useLicitacionItems';
 import { useProductMatching, type ItemConMatch } from '@/hooks/useProductMatching';
 import { cn } from '@/lib/utils';
+import { IVA_RATE } from '@/lib/constants';
 
 interface ItemRow {
   id: number;
@@ -44,7 +45,6 @@ interface ItemsMatchTableProps {
   onValidationChange?: (isValid: boolean) => void;
 }
 
-const IVA_RATE = 0.19;
 const MATCH_THRESHOLD = 70;
 
 function formatCurrency(value: number): string {

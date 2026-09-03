@@ -2,6 +2,7 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { IVA_RATE } from '@/lib/constants';
 
 interface LineItem {
   id: string;
@@ -22,7 +23,7 @@ export function EconomicBreakdown({
   items,
   className,
   showCard = true,
-  ivaRate = 0.19,
+  ivaRate = IVA_RATE,
 }: EconomicBreakdownProps) {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-CL', {
@@ -96,7 +97,7 @@ export function EconomicBreakdown({
 // Simple inline version for tables
 export function EconomicSummary({
   subtotal,
-  ivaRate = 0.19,
+  ivaRate = IVA_RATE,
   className,
 }: {
   subtotal: number;

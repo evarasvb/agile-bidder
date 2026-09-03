@@ -78,7 +78,7 @@ export async function prepararOfertaParaMP(
     }
     
     // Intentar obtener de compras_agiles primero, luego licitaciones
-    let licitacion = null;
+    const licitacion = null;
     let codigoLicitacion = null;
     
     // Buscar en compras_agiles
