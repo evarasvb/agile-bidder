@@ -84,9 +84,17 @@ async function leerDia(iso: string, tipo: 1 | 2) {
   if (n === 0) return { filas: [], total: 0, completo: true, pasos };
   if (n == null) return { filas: [], total: null, completo: false, pasos };
   // Exportación completa en una sola respuesta (tabla HTML servida como .xls)
-  const x = await post({ ...ocultos(b.html), ...filtro, __EVENTTARGET: "lnkExcel", __EVENTARGUMENT: "" }, jar);
-  const filas = filasExcel(x.html);
-  pasos.push(`excel:${filas.length} (${x.tipo.split(";")[0]})`);
+  // Mercado Público a veces devuelve la exportación vacía o truncada tras muchas llamadas seguidas:
+  // se reintenta hasta 3 veces con pausa creciente antes de darse por vencido.
+  let filas: any[] = [];
+  let tipoResp = "";
+  for (let intento = 1; intento <= 3; intento++) {
+    const x = await post({ ...ocultos(b.html), ...filtro, __EVENTTARGET: "lnkExcel", __EVENTARGUMENT: "" }, jar);
+    filas = filasExcel(x.html); tipoResp = x.tipo.split(";")[0];
+    pasos.push(`excel${intento}:${filas.length} (${tipoResp})`);
+    if (filas.length >= n) break;
+    await new Promise((r) => setTimeout(r, 2000 * intento));
+  }
   const vistos = new Set<string>();
   const unicas = filas.filter((r) => !vistos.has(r.id_reclamo) && vistos.add(r.id_reclamo));
   return { filas: unicas, total: n, completo: unicas.length >= n, pasos };
@@ -111,10 +119,13 @@ Deno.serve(async (req: Request) => {
     tareas = (data ?? []).map((r: any) => ({ fecha: r.fecha, tipo: r.tipo }));
   }
   const res: any = { tareas: tareas.length, hechas: [], errores: [] };
+  let vacias = 0;
   for (const t of tareas) {
     if (Date.now() - t0 > 120_000) break;
+    if (vacias >= 2) { res.detenido = "exportaciones vacías seguidas: se reintenta en la próxima pasada"; break; }
     try {
       const d = await leerDia(t.fecha, t.tipo);
+      vacias = (d.total ?? 0) > 0 && d.filas.length === 0 ? vacias + 1 : 0;
       let guardadas = 0;
       if (d.filas.length) {
         const { data: n, error } = await sb.rpc("reclamos_mp_upsert", { p_filas: d.filas.map((f) => ({ ...f, tipo: t.tipo })) });
@@ -124,6 +135,7 @@ Deno.serve(async (req: Request) => {
       await sb.rpc("reclamos_mp_marcar_dia", { p_fecha: t.fecha, p_tipo: t.tipo, p_cargados: d.filas.length, p_total: d.total, p_completo: d.completo });
       res.hechas.push({ ...t, total: d.total, leidas: d.filas.length, guardadas, completo: d.completo, pasos: d.pasos });
     } catch (e) { res.errores.push({ ...t, error: String(e).slice(0, 200) }); }
+    await new Promise((r) => setTimeout(r, 1500));
   }
   res.ms = Date.now() - t0;
   return new Response(JSON.stringify(res), { headers: { "Content-Type": "application/json" } });
