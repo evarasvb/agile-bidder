@@ -1,4 +1,4 @@
-// Crea una SUSCRIPCIÓN mensual (preapproval) en MercadoPago para el cliente Pro.
+// Crea una SUSCRIPCIÓN mensual (preapproval) en MercadoPago para el cliente FirmaVB ERP.
 // La llama el frontend con el JWT del usuario logueado. Devuelve el init_point
 // (URL de checkout de MercadoPago) al que se redirige al usuario.
 //
@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        reason: 'FirmaVB Pro — Suscripción mensual',
+        reason: 'FirmaVB ERP — Suscripción mensual',
         external_reference: (cliente as { id: string }).id,
         payer_email: payerEmail,
         notification_url: WEBHOOK_URL,
