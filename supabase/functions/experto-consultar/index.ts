@@ -276,7 +276,7 @@ Deno.serve(async (req) => {
     if (res.perfil) partes.push(`PERFIL DEL USUARIO (personaliza con esto, sin repetirlo): empresa ${res.perfil.empresa_nombre ?? "s/i"}; rubro ${res.perfil.categoria_negocio ?? "s/i"}; industrias ${(res.perfil.industrias ?? []).join(", ") || "s/i"}; vende/busca: ${(res.perfil.palabras_clave_busqueda ?? []).slice(0, 12).join(", ") || "s/i"}; región ${res.perfil.region ?? "s/i"}.`);
     if (res.memoria?.length) partes.push("LO QUE ESTE USUARIO PIDIÓ MEJORAR EN RESPUESTAS ANTERIORES (tenlo en cuenta):\n" + res.memoria.map((m: any) => `- ${m.util === false ? "No le sirvió" : "Comentó"} en "${String(m.pregunta ?? "").slice(0, 80)}": ${m.comentario}`).join("\n"));
     if (tareas.lic && !res.lic?.length) partes.push(`BÚSQUEDA DE LICITACIONES ABIERTAS para "${qDatos}": sin resultados en títulos, descripciones ni ítems de los últimos 60 días (Datos Mercado Público vía FirmaVB). Dilo así (no digas que no tienes fuente) y sugiere otras palabras o el rubro.`);
-    if (res.lic?.length) partes.push("LICITACIONES ABIERTAS (Datos Mercado Público vía FirmaVB):\n" + res.lic.map((l: any) => `${l.codigo} | ${l.nombre} | ${l.institucion} | ${l.region ?? ""} | ${fmt(l.presupuesto)} | cierra ${fecha(l.cierra)} | ${l.url}`).join("\n"));
+    if (res.lic?.length) partes.push("LICITACIONES ABIERTAS (Datos Mercado Público vía FirmaVB):\n" + res.lic.map((l: any) => `${l.codigo} | ${l.nombre} | ${l.institucion} | ${l.region ?? ""} | ${fmt(l.presupuesto)} | cierra ${fecha(l.cierra)} | ${l.url}${l.coincidencia ? " | coincide en el ítem: " + l.coincidencia : ""}`).join("\n"));
     if (res.ca?.length) partes.push("COMPRAS ÁGILES ABIERTAS:\n" + res.ca.map((l: any) => `${l.codigo} | ${l.nombre} | ${l.organismo} | ${fmt(l.monto)} | cierra ${fecha(l.cierra)} | pago: ${l.conducta_pago ?? "s/i"} ${l.pago_dias ? l.pago_dias + " días" : ""} | ${l.url ?? ""}`).join("\n"));
     if (res.comp?.length) partes.push(`COMPETENCIA para "${qDatos}" (proveedores que le vendieron exactamente ese producto al Estado en los últimos 12 meses, según los ítems de sus órdenes de compra; son datos confirmados, úsalos con confianza):\n` + res.comp.map((c: any) => `${c.proveedor} (${c.rut ?? ""}): ${c.ordenes} OC, ${fmt(c.monto)}, precio unitario mediano ${fmt(c.precio_unit_mediano)}, ${c.compradores} compradores`).join("\n"));
     if (res.pan) partes.push("PANORAMA (90 días): " + JSON.stringify(res.pan));
@@ -301,7 +301,7 @@ Deno.serve(async (req) => {
       const r = await fetch(GEMINI_URL, {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: mdl, messages, temperature: 0.3, max_tokens: modo === "chat" ? 1200 : 3000, stream: true, reasoning_effort: "low" }),
+        body: JSON.stringify({ model: mdl, messages, temperature: 0.3, max_tokens: modo === "chat" ? 2500 : 4000, stream: true, reasoning_effort: "low" }),
       });
       if (r.ok && r.body) { upstream = r; modelo = mdl; break; }
       console.error("gemini", mdl, r.status, (await r.text()).slice(0, 200));
