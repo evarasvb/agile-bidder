@@ -23,6 +23,9 @@ export function DatosEmpresaCard() {
   const [telefono, setTelefono] = useState('');
   const [email, setEmail] = useState('');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [repNombre, setRepNombre] = useState('');
+  const [repRut, setRepRut] = useState('');
+  const [giros, setGiros] = useState('');
   const [subiendo, setSubiendo] = useState(false);
 
   useEffect(() => {
@@ -33,6 +36,9 @@ export function DatosEmpresaCard() {
       setTelefono(cliente.telefono || '');
       setEmail(cliente.email || '');
       setLogoUrl(cliente.logo_url || null);
+      setRepNombre((cliente as any).representante_nombre || '');
+      setRepRut((cliente as any).representante_rut || '');
+      setGiros((cliente as any).giros || '');
     }
   }, [cliente]);
 
@@ -69,6 +75,9 @@ export function DatosEmpresaCard() {
         telefono: telefono.trim(),
         email: email.trim(),
         logo_url: logoUrl,
+        representante_nombre: repNombre.trim(),
+        representante_rut: repRut.trim(),
+        giros: giros.trim(),
       } as any,
       { onSuccess: () => toast.success('Datos de la empresa guardados') }
     );
@@ -122,6 +131,18 @@ export function DatosEmpresaCard() {
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="empresa-direccion">Dirección</Label>
             <Input id="empresa-direccion" value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder="Calle 123, Comuna, Ciudad" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="empresa-rep">Representante legal</Label>
+            <Input id="empresa-rep" value={repNombre} onChange={(e) => setRepNombre(e.target.value)} placeholder="Nombre completo" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="empresa-rep-rut">RUT del representante</Label>
+            <Input id="empresa-rep-rut" value={repRut} onChange={(e) => setRepRut(e.target.value)} placeholder="12.345.678-9" />
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="empresa-giros">Giros (como aparecen en el SII)</Label>
+            <Input id="empresa-giros" value={giros} onChange={(e) => setGiros(e.target.value)} placeholder="Venta al por mayor de artículos de oficina; servicios informáticos" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="empresa-telefono">Teléfono</Label>
