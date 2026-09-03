@@ -15,6 +15,10 @@ function rolYSub(auth: string): { role: string; sub: string | null } {
   try { const p = JSON.parse(atob(auth.replace(/^Bearer\s+/i, "").split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))); return { role: p.role ?? "", sub: p.sub ?? null }; }
   catch { return { role: "", sub: null }; }
 }
+function resumenPlano(r: any): string {
+  const v = (x: any): string => x == null || x === "" ? "no indicado" : Array.isArray(x) ? (x.length ? x.map(v).join("; ") : "ninguno indicado") : typeof x === "object" ? Object.entries(x).map(([k, y]) => `${k.replace(/_/g, " ")}: ${v(y)}`).join(", ") : String(x);
+  return Object.entries(r).map(([k, y]) => `- ${k.replace(/_/g, " ")}: ${v(y)}`).join("\n");
+}
 function ipCliente(req: Request): string | null {
   const xff = (req.headers.get("x-forwarded-for") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   const ip = xff.length ? xff[xff.length - 1] : (req.headers.get("x-real-ip") ?? "").trim();
@@ -40,7 +44,7 @@ Hitos con fechas hacia atrás desde el cierre.
 ## Fuentes
 Lista numerada de lo citado.
 
-Reglas: cita [n] tras cada afirmación con fuente; "Datos Mercado Público vía FirmaVB (OCDS)" para historial y adjudicaciones; no inventes procesos, montos ni criterios; si el historial es corto, dilo (la base OCDS parte en julio de 2026 y crece a diario); montos con separador de miles; máximo 1.400 palabras.`;
+Reglas: cita [n] tras cada afirmación con fuente; "Datos Mercado Público vía FirmaVB (OCDS)" para historial y adjudicaciones; no inventes procesos, montos ni criterios; si el historial es corto, dilo (la base OCDS parte en julio de 2026 y crece a diario); montos con separador de miles; máximo 1.800 palabras. Nunca escribas fórmulas en LaTeX ni digas "null" o "JSON": escribe las fórmulas en texto (precio mínimo / precio ofertado × 100) y si un dato no está, di que las bases no lo indican.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -73,6 +77,7 @@ Deno.serve(async (req) => {
       comp: sb.rpc("experto_competencia", { texto: productos.slice(0, 80), meses: 12, cantidad: 8 }).then((r) => r.data ?? []),
       org: rut ? sb.rpc("experto_organismo", { nombre_o_rut: rut }).then((r) => r.data?.[0]) : Promise.resolve(null),
       bases: sb.rpc("experto_bases_texto", { p_codigo: codigo }).then((r) => r.data ?? []),
+      docs: sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: codigo, p_max: 8000 }).then((r) => r.data ?? []),
       n1: sb.rpc("experto_buscar_texto", { consulta: "criterios evaluacion puntaje precio experiencia", cantidad: 3 }).then((r) => r.data ?? []),
       n2: sb.rpc("experto_buscar_texto", { consulta: "garantia seriedad oferta", cantidad: 2 }).then((r) => r.data ?? []),
     };
@@ -99,10 +104,11 @@ Deno.serve(async (req) => {
     if (res.org) { const g = res.org; partes.push(`PAGO DEL ORGANISMO (Datos Mercado Público vía FirmaVB): reclamos por pago no oportuno 12 meses: ${g.reclamos_pago_12m ?? g.reclamos ?? "s/i"}; por irregularidad del proceso: ${g.reclamos_proceso_12m ?? "s/i"}; procesos 12 meses: ${g.procesos_12m ?? "s/i"} → ${g.reclamos_pago_por_100_procesos ?? "s/i"} reclamos de pago por cada 100 procesos; mayor reclamante: ${g.top_reclamante ?? "s/i"} (${g.top_reclamante_pct ?? "s/i"}%); plazo declarado: ${g.plazo_pago ?? "s/i"}; conducta histórica: ${g.conducta_pago ?? "s/i"} (${g.pago_promedio_dias ?? "s/i"} días)`); }
     else partes.push(`PAGO DEL ORGANISMO: conducta ${o.conducta_pago ?? "s/i"}, ${o.pago_promedio_dias ?? "s/i"} días promedio; reclamos por no pagar a tiempo: ${o.reclamos ?? "s/i"}`);
     bases.forEach((b, i) => {
-      const secs = (Array.isArray(b.secciones) ? b.secciones : []).filter((s: any) => /evalua|criterio|puntaj|ponder|garant|multa|plazo|pago/i.test(String(s.texto))).slice(0, 8);
-      partes.push(`[${frag.length + i + 1}] BASES DE LA LICITACIÓN ${codigo} — "${b.archivo}" (${b.paginas ?? "?"} páginas, PDF subido por un usuario)\nRESUMEN: ${JSON.stringify(b.resumen ?? {})}\n${secs.map((s: any) => `## ${s.titulo}\n${String(s.texto).slice(0, 2500)}`).join("\n\n")}`);
+      const secs = (Array.isArray(b.secciones) ? b.secciones : []).filter((s: any) => /evalua|criterio|puntaj|ponder|garant|multa|plazo|pago|admisib|anexo/i.test(String(s.texto))).slice(0, 12);
+      partes.push(`[${frag.length + i + 1}] BASES DE LA LICITACIÓN ${codigo} — "${b.archivo}" (${b.paginas ?? "?"} páginas, PDF subido por un usuario)\nRESUMEN (extraído del PDF; "no indicado" = las bases no lo exigen o no lo mencionan):\n${b.resumen ? resumenPlano(b.resumen) : "(sin resumen)"}\n${secs.map((s: any) => `## ${s.titulo}\n${String(s.texto).slice(0, 2500)}`).join("\n\n")}`);
     });
     if (!bases.length) partes.push("NO HAY BASES CARGADAS para esta licitación.");
+    if (res.docs?.length) partes.push("DOCUMENTOS DE TRABAJO DEL PROVEEDOR (subidos por el usuario; úsalos en la estrategia y el plan, y anota qué le falta completar):\n" + res.docs.map((d: any) => `### ${d.nombre} (${d.tipo})\n${d.texto}`).join("\n\n"));
     const userMsg = `${partes.join("\n\n")}\n\nGenera el estudio profundo de la licitación ${codigo}.${contextoProv ? " Contexto del proveedor: " + contextoProv : ""}`;
 
     const key = Deno.env.get("GEMINI_API_KEY");
@@ -110,7 +116,7 @@ Deno.serve(async (req) => {
     let upstream: Response | null = null; let modelo = "";
     for (const mdl of MODELOS) {
       const r = await fetch(GEMINI_URL, { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: mdl, messages: [{ role: "system", content: SYS }, { role: "user", content: userMsg }], temperature: 0.3, max_tokens: 4000, stream: true, reasoning_effort: "low" }) });
+        body: JSON.stringify({ model: mdl, messages: [{ role: "system", content: SYS }, { role: "user", content: userMsg }], temperature: 0.3, max_tokens: 7000, stream: true, reasoning_effort: "low" }) });
       if (r.ok && r.body) { upstream = r; modelo = mdl; break; }
       console.error("gemini", mdl, r.status, (await r.text()).slice(0, 200));
     }
@@ -139,7 +145,7 @@ Deno.serve(async (req) => {
         } catch (e) { ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ error: String(e) })}\n\n`)); }
         ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ done: true, ms: Date.now() - t0 })}\n\n`));
         ctrl.close();
-        try { await sb.rpc("experto_registrar_uso", { p_user_id: userId, p_huella: huella || "anon", p_modo: "informe", p_pregunta: `estudio profundo ${codigo}`, p_respuesta: respuesta, p_fuentes: fuentesMeta, p_licitacion: codigo, p_ms: Date.now() - t0, p_ip: ipCliente(req) }); } catch { /* no bloquear */ }
+        try { await sb.rpc("experto_registrar_uso", { p_user_id: userId, p_huella: huella || "anon", p_modo: "estudio", p_pregunta: `estudio profundo ${codigo}`, p_respuesta: respuesta, p_fuentes: fuentesMeta, p_licitacion: codigo, p_ms: Date.now() - t0, p_ip: ipCliente(req) }); } catch { /* no bloquear */ }
       },
     });
     return new Response(stream, { headers: { ...cors, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });

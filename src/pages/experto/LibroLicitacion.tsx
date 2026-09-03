@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink } from 'lucide-react';
+import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink, Trash2, Paperclip } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -13,6 +13,7 @@ import { expertoMd } from '@/lib/expertoMd';
 import { Infografia, type InfografiaDatos } from '@/components/experto/Infografia';
 import { MapaConceptual, type Nodo } from '@/components/experto/MapaConceptual';
 import { compartirPdfExperto } from '@/services/expertoPdf';
+import { MatrizPostulacion, type Matriz } from '@/components/experto/MatrizPostulacion';
 
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string;
 const ANON = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
@@ -28,7 +29,7 @@ const conCitas = (html: string, fuentes?: any[]) => html.replace(/\[(\d{1,2})\]/
 const fecha = (d?: string | null) => d ? new Date(d).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }) : 's/i';
 
 interface Msg { rol: 'yo' | 'exp'; texto: string; fuentes?: any[]; pedirBases?: string | null }
-type Entregable = 'informe' | 'estudio' | 'anexos' | 'mapa' | 'infografia';
+type Entregable = 'informe' | 'matriz' | 'estudio' | 'anexos' | 'mapa' | 'infografia';
 
 /**
  * Libro de trabajo de una licitación: Fuentes (ficha, bases, organismo, quién gana) · Chat con el
@@ -61,16 +62,18 @@ export default function LibroLicitacion() {
   const [pregunta, setPregunta] = useState('');
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [tab, setTab] = useState<Entregable>('informe');
-  const [entregables, setEntregables] = useState<Record<Entregable, string>>({ informe: '', estudio: '', anexos: '', mapa: '', infografia: '' });
+  const [entregables, setEntregables] = useState<Record<Entregable, string>>({ informe: '', matriz: '', estudio: '', anexos: '', mapa: '', infografia: '' });
   const [faltantes, setFaltantes] = useState<string[]>([]);
   const chatRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const docRef = useRef<HTMLInputElement>(null);
+  const guardarRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { setMsgs([]); setLimite(null); setCompartido(null); }, [cod]);
   useEffect(() => {
     if (!libro) return;
     setMsgs((libro.chat ?? []).flatMap((c: any) => [{ rol: 'yo', texto: c.pregunta }, { rol: 'exp', texto: c.respuesta }]));
-    setEntregables({ informe: libro.informe?.texto ?? '', estudio: libro.estudio?.texto ?? '', anexos: libro.anexos?.texto ?? '', mapa: libro.mapa?.texto ?? '', infografia: libro.ficha ? 'ok' : '' });
+    setEntregables({ informe: libro.informe?.texto ?? '', matriz: libro.matriz?.texto ?? '', estudio: libro.estudio?.texto ?? '', anexos: libro.anexos?.texto ?? '', mapa: libro.mapa?.texto ?? '', infografia: libro.ficha ? 'ok' : '' });
     setFaltantes(libro.anexos?.faltantes ?? []);
     if (libro.estudio?.texto && !libro.informe?.texto) setTab('estudio');
   }, [libro]);
@@ -129,6 +132,12 @@ export default function LibroLicitacion() {
         const j = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(j.mensaje || j.error || `Error ${r.status}`);
         setEntregables((e) => ({ ...e, mapa: JSON.stringify(j.mapa) }));
+      } else if (tipo === 'matriz') {
+        const r = await fetch(`${SUPA}/functions/v1/experto-matriz`, { method: 'POST', headers: auth, body: JSON.stringify({ codigo: cod }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw Object.assign(new Error(j.mensaje || j.error || `Error ${r.status}`), { status: r.status });
+        setEntregables((e) => ({ ...e, matriz: JSON.stringify(j.matriz) }));
+        if (j.documentos) toast.success(`Matriz hecha con tus ${j.documentos} documento(s) de trabajo`);
       } else if (tipo === 'infografia') {
         setEntregables((e) => ({ ...e, infografia: 'ok' }));
       } else if (tipo === 'anexos') {
@@ -141,6 +150,29 @@ export default function LibroLicitacion() {
       }
     } catch (e: any) { toast.error(e.message, e.status === 402 ? { action: { label: 'Ver planes', onClick: () => navigate('/cuenta') } } : undefined); }
     setOcupado(null);
+  };
+
+  // Documentos de trabajo del usuario (Excel, Word, PDF): el Experto los lee y ayuda a completarlos.
+  const subirDocumento = async (file: File) => {
+    if (file.size > 15 * 1024 * 1024) { toast.error('El archivo supera los 15 MB'); return; }
+    setOcupado('doc');
+    try {
+      const r = await fetch(`${SUPA}/functions/v1/experto-documentos`, { method: 'POST', headers: { ...auth, 'Content-Type': file.type || 'application/octet-stream', 'X-Codigo': cod, 'X-Nombre': encodeURIComponent(file.name) }, body: file });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.mensaje || j.error || `Error ${r.status}`);
+      toast.success(`Leído: ${j.nombre}. Pregúntame qué te falta o genera la matriz.`);
+      qc.invalidateQueries({ queryKey: ['experto_libro', cod] });
+    } catch (e: any) { toast.error(e.message); }
+    setOcupado(null);
+  };
+  const borrarDocumento = async (id: string) => {
+    await fetch(`${SUPA}/functions/v1/experto-documentos?id=${id}`, { method: 'DELETE', headers: auth });
+    qc.invalidateQueries({ queryKey: ['experto_libro', cod] });
+  };
+  const matrizCambio = (m: Matriz) => {
+    setEntregables((e) => ({ ...e, matriz: JSON.stringify(m) }));
+    if (guardarRef.current) clearTimeout(guardarRef.current);
+    guardarRef.current = setTimeout(async () => { const { error } = await (supabase as any).rpc('experto_matriz_guardar', { p_codigo: cod, p_matriz: m }); if (error) toast.error('No pude guardar la matriz'); }, 1200);
   };
 
   const subirBases = async (file: File) => {
@@ -192,12 +224,13 @@ export default function LibroLicitacion() {
     items: (f?.items ?? []).slice(0, 6).map((i: any) => i.producto),
   });
   const compartirEntregable = async () => {
-    const nombres: Record<Entregable, string> = { informe: 'Informe de trabajo', estudio: 'Estudio profundo', anexos: 'Anexos', mapa: 'Mapa conceptual', infografia: 'Infografía' };
+    const nombres: Record<Entregable, string> = { informe: 'Informe de trabajo', matriz: 'Matriz de postulación', estudio: 'Estudio profundo', anexos: 'Anexos', mapa: 'Mapa conceptual', infografia: 'Infografía' };
     const titulo = `${nombres[tab]} · ${cod}${f?.nombre ? ' · ' + f.nombre : ''}`;
     await compartirTexto(tab, titulo, tab === 'infografia' ? JSON.stringify(datosInfografia()) : entregables[tab]);
   };
   const f = libro?.ficha; const o = f?.organismo ?? {};
   const bases: any[] = libro?.bases ?? [];
+  const documentos: any[] = libro?.documentos ?? [];
   const top: any[] = libro?.top_adjudicatarios ?? [];
   const esPro = libro?.plan && libro.plan !== 'free';
 
@@ -266,6 +299,20 @@ export default function LibroLicitacion() {
                 <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => { const x = e.target.files?.[0]; if (x) subirBases(x); e.target.value = ''; }} />
                 <Button size="sm" variant="outline" className="mt-1" disabled={ocupado === 'bases'} onClick={() => fileRef.current?.click()}>
                   {ocupado === 'bases' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}Subir PDF (máx. 20 MB)
+                </Button>
+              </div>
+              <div>
+                <p className="font-medium flex items-center gap-1"><Paperclip className="h-4 w-4" />Mis documentos de trabajo</p>
+                <p className="text-xs text-muted-foreground">Excel, Word o PDF (tu matriz, checklist, anexos a medio llenar). El Experto los lee para anotar qué te falta y ayudarte a completarlos.</p>
+                {documentos.map((d: any) => (
+                  <div key={d.id} className="flex items-center gap-1 text-muted-foreground">
+                    <span className="truncate flex-1" title={d.nombre}>{d.nombre} <span className="text-[10px] uppercase">{d.tipo}</span></span>
+                    <button onClick={() => borrarDocumento(d.id)} title="Quitar"><Trash2 className="h-3.5 w-3.5" /></button>
+                  </div>
+                ))}
+                <input ref={docRef} type="file" accept=".pdf,.xlsx,.xls,.xlsm,.csv,.docx,.txt,.md" className="hidden" onChange={(e) => { const x = e.target.files?.[0]; if (x) subirDocumento(x); e.target.value = ''; }} />
+                <Button size="sm" variant="outline" className="mt-1" onClick={() => docRef.current?.click()} disabled={ocupado === 'doc'}>
+                  {ocupado === 'doc' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Paperclip className="h-4 w-4 mr-1" />}Subir Excel / Word / PDF
                 </Button>
               </div>
               <div>
@@ -347,7 +394,7 @@ export default function LibroLicitacion() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Entregables</CardTitle>
             <div className="flex flex-wrap gap-1 pt-1">
-              {([['informe', 'Informe de trabajo', ''], ['mapa', 'Mapa conceptual', ''], ['infografia', 'Infografía', ''], ['estudio', 'Estudio profundo', 'Experto Pro'], ['anexos', 'Anexos completados', 'Experto Plus']] as [Entregable, string, string][]).map(([k, n, tag]) => (
+              {([['informe', 'Informe de trabajo', ''], ['matriz', 'Matriz de postulación', 'Experto Pro'], ['estudio', 'Estudio profundo', 'Experto Pro'], ['mapa', 'Mapa conceptual', ''], ['infografia', 'Infografía', ''], ['anexos', 'Anexos completados', 'Experto Plus']] as [Entregable, string, string][]).map(([k, n, tag]) => (
                 <Button key={k} size="sm" variant={tab === k ? 'default' : 'outline'} onClick={() => entregables[k] ? setTab(k) : generar(k)} disabled={!!ocupado && ocupado !== k}>
                   {ocupado === k ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : entregables[k] ? <ClipboardList className="h-3.5 w-3.5 mr-1" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />}
                   {n}{tag && <span className="ml-1 text-[10px] opacity-70">{tag}</span>}
@@ -360,12 +407,14 @@ export default function LibroLicitacion() {
               <div>
                 <div className="flex flex-wrap gap-1 mb-2">
                   <Button size="sm" variant="outline" onClick={compartirEntregable}><Share2 className="h-3.5 w-3.5 mr-1" />Compartir · PDF · WhatsApp</Button>
-                  {tab !== 'mapa' && tab !== 'infografia' && <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(entregables[tab]); toast.success('Copiado'); }}><Copy className="h-3.5 w-3.5 mr-1" />Copiar</Button>}
+                  {tab !== 'mapa' && tab !== 'infografia' && tab !== 'matriz' && <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(entregables[tab]); toast.success('Copiado'); }}><Copy className="h-3.5 w-3.5 mr-1" />Copiar</Button>}
                   <Button size="sm" variant="ghost" onClick={() => generar(tab)} disabled={!!ocupado}>Volver a generar</Button>
                 </div>
                 {tab === 'anexos' && faltantes.length > 0 && <p className="text-xs text-yellow-800 bg-yellow-50 border border-yellow-200 rounded px-2 py-1 mb-2">Completa a mano: {faltantes.join(', ')}</p>}
                 {tab === 'mapa' ? (
                   <div className="max-h-[62vh] overflow-y-auto pr-1"><MapaConceptual raiz={JSON.parse(entregables.mapa) as Nodo} onPreguntar={(t) => setPregunta(`Sobre ${cod}: explícame "${t}" y qué debo hacer con eso`)} /></div>
+                ) : tab === 'matriz' ? (
+                  <div className="max-h-[62vh] overflow-y-auto pr-1"><MatrizPostulacion m={JSON.parse(entregables.matriz) as Matriz} onChange={matrizCambio} url={`${window.location.origin}/experto/libro/${cod}`} /></div>
                 ) : tab === 'infografia' ? (
                   <div className="max-h-[62vh] overflow-y-auto pr-1"><Infografia d={datosInfografia()} /></div>
                 ) : (
@@ -376,6 +425,7 @@ export default function LibroLicitacion() {
               <div className="text-muted-foreground space-y-2">
                 <p>{tab === 'mapa' && 'Mapa conceptual navegable: qué compran, fechas, cómo se gana, requisitos, garantías, organismo, competencia, riesgos y tu jugada. Cada nodo se abre y se le puede preguntar al Experto.'}
                    {tab === 'infografia' && 'Lámina con marca FirmaVB: presupuesto, cierre, riesgo de pago, quién gana y quién vende. Para WhatsApp, LinkedIn o PDF.'}
+                   {tab === 'matriz' && 'Matriz de postulación (Pro): checklist de admisibilidad, cómo se puntúa, anexos, reglas especiales y plan de tareas con responsable y plazo. Se edita aquí, se exporta a Excel, Word o PDF, y usa tus documentos de trabajo para marcar lo que ya tienes listo.'}
                    {tab === 'informe' && 'Informe de trabajo: veredicto, fechas, checklist de admisibilidad, cómo se ganan los puntos, riesgos, competencia y próximos pasos.'}
                    {tab === 'estudio' && 'Estudio profundo (Pro): historial de compras parecidas del organismo, quién ganó y con cuánto, precio objetivo.'}
                    {tab === 'anexos' && 'Anexos completados (Plus): los formularios de las bases con los datos de tu empresa, listos para revisar y firmar.'}</p>

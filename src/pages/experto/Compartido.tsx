@@ -8,10 +8,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { expertoMd } from '@/lib/expertoMd';
 import { Infografia } from '@/components/experto/Infografia';
 import { MapaConceptual } from '@/components/experto/MapaConceptual';
+import { MatrizPostulacion } from '@/components/experto/MatrizPostulacion';
 import logo from '@/assets/logo-firmavb-blanco.png';
 import { compartirPdfExperto } from '@/services/expertoPdf';
 
-const TIPO: Record<string, string> = { informe: 'Informe de trabajo', estudio: 'Estudio profundo', anexos: 'Anexos', chat: 'Respuesta del Experto', mapa: 'Mapa conceptual', infografia: 'Infografía' };
+const TIPO: Record<string, string> = { informe: 'Informe de trabajo', matriz: 'Matriz de postulación', estudio: 'Estudio profundo', anexos: 'Anexos', chat: 'Respuesta del Experto', mapa: 'Mapa conceptual', infografia: 'Infografía' };
 const parse = (t: string) => { try { return JSON.parse(t); } catch { return null; } };
 
 /** Página pública de un análisis compartido: marca FirmaVB, autor, contenido y llamada a probar el Experto. */
@@ -61,6 +62,7 @@ export default function Compartido() {
             </div>
             {data.tipo === 'infografia' && parse(data.contenido) ? <div className="mt-6"><Infografia d={{ ...parse(data.contenido), empresa: data.empresa }} /></div>
               : data.tipo === 'mapa' && parse(data.contenido) ? <div className="mt-6"><MapaConceptual raiz={parse(data.contenido)} /></div>
+              : data.tipo === 'matriz' && parse(data.contenido) ? <div className="mt-6"><MatrizPostulacion m={parse(data.contenido)} empresa={data.empresa} url={window.location.href} /></div>
               : <article className="mt-6 text-[15px] leading-relaxed" dangerouslySetInnerHTML={{ __html: expertoMd(data.contenido) }} />}
           </>
         )}

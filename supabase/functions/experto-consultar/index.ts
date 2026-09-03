@@ -121,6 +121,7 @@ Reglas:
 - Si hay FICHA ORGANISMO, úsala para evaluar el riesgo de venderle. Distingue reclamos por pago no oportuno (riesgo de caja) de los por irregularidad en el proceso (riesgo de evaluación). Pondera por volumen: usa "reclamos de pago por cada 100 procesos" (menos de 1 bajo, 1 a 5 medio, más de 5 alto) antes que el número bruto; si un solo reclamante concentra más del 50%, adviértelo (puede ser un proveedor reclamando en masa). Compara con la cifra de hace 90 días si existe. Cítalo como "Datos Mercado Público vía FirmaVB". Si el dato dice "sin dato", dilo así.
 - Con LICITACIONES PARECIDAS YA ADJUDICADAS y QUIÉN LE GANA A ESTE ORGANISMO, di quién gana, a qué precio respecto del presupuesto y cuántos oferentes compiten; cítalo como "Datos Mercado Público vía FirmaVB (OCDS)".
 - Si hay BASES DE LA LICITACIÓN (PDF subido por un usuario), son la fuente principal para criterios de evaluación, ponderaciones, garantías, plazos, multas, anexos y cláusulas: responde con esos datos exactos, cita [n] y nombra la sección o numeral. Nunca digas "null", "JSON", "resumen estructurado" ni "texto resumen": si un dato figura como no indicado, di que las bases no lo exigen o no lo mencionan. Si el contexto dice NO HAY BASES CARGADAS y la pregunta las necesita, responde lo que sí sabes y pide que las suban con el botón "Subir bases (PDF)"; no mandes al usuario a descargarlas de Mercado Público.
+- Si hay DOCUMENTOS DE TRABAJO DEL USUARIO, son sus propios formatos (matriz, checklist, anexos): revísalos contra las bases, dile qué está bien, qué falta y cómo completarlo, campo por campo si te lo pide.
 - Si hay NOTICIAS RECIENTES, úsalas como fuente externa: di "según la prensa" o "según ChileCompra" con el medio y la fecha, cita [n], y sepáralo de lo que dicen nuestros datos ("según nuestros datos de Mercado Público"). Con ambos puedes dar tu opinión, marcándola como opinión.
 - Si las fuentes no cubren la pregunta, dilo ("No tengo fuente en mi base para eso") y señala qué documento consultar. No inventes artículos, plazos, cifras ni licitaciones.
 - Montos en pesos con separador de miles ($1.234.567). Máximo 250 palabras salvo que pidan detalle. Párrafos cortos; lista corta solo para varias licitaciones. Formato Markdown simple.`;
@@ -208,6 +209,7 @@ Deno.serve(async (req) => {
     const tareas: Record<string, Promise<any>> = {};
     if (codigo) tareas.ficha = sb.rpc("experto_ficha_licitacion", { p_codigo: codigo }).then((r) => r.data);
     if (codigo) tareas.bases = sb.rpc("experto_bases_texto", { p_codigo: codigo }).then((r) => r.data ?? []);
+    if (codigo && userId) tareas.docs = sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: codigo, p_max: 8000 }).then((r) => r.data ?? []);
     if (modo === "chat") {
       if (kws.length) {
         tareas.normOr = sb.rpc("experto_buscar_or", { consulta: qOr, cantidad: 8 }).then((r) => r.data ?? []);
@@ -283,6 +285,7 @@ Deno.serve(async (req) => {
       pedirBases = codigo;
       partes.push(`NO HAY BASES CARGADAS para ${codigo}. Si la respuesta requiere las bases (criterios, ponderación, garantías, multas, cláusulas, anexos), dile al usuario que las suba con el botón "Subir bases (PDF)" que aparece bajo esta respuesta: las leerás al instante y quedarán disponibles para todos.`);
     }
+    if (res.docs?.length) partes.push("DOCUMENTOS DE TRABAJO DEL USUARIO (Excel, Word o PDF que él subió: su matriz, checklist o anexos a medio llenar; úsalos para anotar qué le falta, corregir y ayudarle a completarlos):\n" + res.docs.map((d: any) => `### ${d.nombre} (${d.tipo})\n${d.texto}`).join("\n\n"));
     const noticias: any[] = Array.isArray(res.noticias) ? res.noticias : [];
     if (noticias.length) partes.push("NOTICIAS RECIENTES (fuente externa, prensa y ChileCompra; distingue lo que dice la prensa de nuestros datos):\n" + noticias.map((n, i) => `[${fragmentos.length + bases.length + i + 1}] ${n.fuente} — ${n.seccion}\n${String(n.texto).slice(0, 700)}`).join("\n\n"));
     if (res.perfil) partes.push(`PERFIL DEL USUARIO (personaliza con esto, sin repetirlo): empresa ${res.perfil.empresa_nombre ?? "s/i"}; rubro ${res.perfil.categoria_negocio ?? "s/i"}; industrias ${(res.perfil.industrias ?? []).join(", ") || "s/i"}; vende/busca: ${(res.perfil.palabras_clave_busqueda ?? []).slice(0, 12).join(", ") || "s/i"}; región ${res.perfil.region ?? "s/i"}.`);
