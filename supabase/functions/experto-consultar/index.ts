@@ -22,7 +22,7 @@ const MODELOS_CHAT = [Deno.env.get("GEMINI_MODEL_CHAT"), "gemini-3.5-flash-lite"
 const MODELOS_INFORME = [Deno.env.get("GEMINI_MODEL_INFORME"), "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.5-flash-lite", "gemini-flash-lite-latest"].filter(Boolean) as string[];
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
 
-const STOP = new Set("de la el los las un una unos unas y o u que en para por con sin sobre al del se su sus es son fue ser hay como cuando donde qué que cual cuál cuáles quien quién cómo cuánto cuánta cuántos cuántas mi mis me tu tus le les lo nos si no más muy este esta estos estas ese esa eso aquel puedo puede pueden podemos debo debe deben hacer tiene tienen tengo hay está están estoy ese esa".split(" "));
+const STOP = new Set("de la el los las un una unos unas y o u que en para por con sin sobre al del se su sus es son fue ser hay como cuando donde qué que cual cuál cuáles quien quién cómo cuánto cuánta cuántos cuántas mi mis me tu tus le les lo nos si no más muy este esta estos estas ese esa eso aquel puedo puede pueden podemos debo debe deben hacer tiene tienen tengo hay está están estoy ese esa alguna algun algún alguno algunos algunas alguien algo otra otro otras otros".split(" "));
 
 const GENERICAS = new Set("licitacion licitaciones licitacio compra compras agil agiles abierta abiertas abierto abiertos semana semanas hoy ahora vigente vigentes oportunidad oportunidades estado mercado publico publicas publica dame dime muestrame busca buscar quiero necesito hay existen existe cuales cuantas cuantos tipo tipos vende venden vender precio precios quien quienes competencia proveedor proveedores organismo organismos entiende cual sobre respecto tema".split(" "));
 function palabrasClave(t: string): string[] {
@@ -235,6 +235,9 @@ Deno.serve(async (req) => {
       const temas = ["inadmisibilidad oferta requisitos bases", "garantia seriedad oferta", "criterios evaluacion puntaje precio experiencia", "foro inverso subsanacion errores formales", "pago oportuno proveedores 30 dias", "inhabilidades articulo 4 ley 19886"];
       temas.forEach((t, i) => tareas["tema" + i] = sb.rpc("experto_buscar_texto", { consulta: t, cantidad: 3 }).then((r) => r.data ?? []));
     }
+    // Perfil del usuario (qué vende, rubro, región) y memoria (lo que pidió mejorar antes): personalizan la respuesta.
+    if (userId) tareas.perfil = sb.from("clientes").select("empresa_nombre, categoria_negocio, industrias, palabras_clave_busqueda, region").eq("user_id", userId).maybeSingle().then((r) => r.data);
+    tareas.memoria = sb.rpc("experto_memoria", { p_user_id: userId, p_huella: huella || "anon" }).then((r) => r.data ?? []);
     const res: Record<string, any> = {};
     const tiempos: Record<string, number> = {};
     await Promise.all(Object.entries(tareas).map(async ([k, p]) => { const ti = Date.now(); try { res[k] = await p; } catch { res[k] = null; } tiempos[k] = Date.now() - ti; }));
@@ -270,6 +273,9 @@ Deno.serve(async (req) => {
       pedirBases = codigo;
       partes.push(`NO HAY BASES CARGADAS para ${codigo}. Si la respuesta requiere las bases (criterios, ponderación, garantías, multas, cláusulas, anexos), dile al usuario que las suba con el botón "Subir bases (PDF)" que aparece bajo esta respuesta: las leerás al instante y quedarán disponibles para todos.`);
     }
+    if (res.perfil) partes.push(`PERFIL DEL USUARIO (personaliza con esto, sin repetirlo): empresa ${res.perfil.empresa_nombre ?? "s/i"}; rubro ${res.perfil.categoria_negocio ?? "s/i"}; industrias ${(res.perfil.industrias ?? []).join(", ") || "s/i"}; vende/busca: ${(res.perfil.palabras_clave_busqueda ?? []).slice(0, 12).join(", ") || "s/i"}; región ${res.perfil.region ?? "s/i"}.`);
+    if (res.memoria?.length) partes.push("LO QUE ESTE USUARIO PIDIÓ MEJORAR EN RESPUESTAS ANTERIORES (tenlo en cuenta):\n" + res.memoria.map((m: any) => `- ${m.util === false ? "No le sirvió" : "Comentó"} en "${String(m.pregunta ?? "").slice(0, 80)}": ${m.comentario}`).join("\n"));
+    if (tareas.lic && !res.lic?.length) partes.push(`BÚSQUEDA DE LICITACIONES ABIERTAS para "${qDatos}": sin resultados en títulos, descripciones ni ítems de los últimos 60 días (Datos Mercado Público vía FirmaVB). Dilo así (no digas que no tienes fuente) y sugiere otras palabras o el rubro.`);
     if (res.lic?.length) partes.push("LICITACIONES ABIERTAS (Datos Mercado Público vía FirmaVB):\n" + res.lic.map((l: any) => `${l.codigo} | ${l.nombre} | ${l.institucion} | ${l.region ?? ""} | ${fmt(l.presupuesto)} | cierra ${fecha(l.cierra)} | ${l.url}`).join("\n"));
     if (res.ca?.length) partes.push("COMPRAS ÁGILES ABIERTAS:\n" + res.ca.map((l: any) => `${l.codigo} | ${l.nombre} | ${l.organismo} | ${fmt(l.monto)} | cierra ${fecha(l.cierra)} | pago: ${l.conducta_pago ?? "s/i"} ${l.pago_dias ? l.pago_dias + " días" : ""} | ${l.url ?? ""}`).join("\n"));
     if (res.comp?.length) partes.push(`COMPETENCIA para "${qDatos}" (proveedores que le vendieron exactamente ese producto al Estado en los últimos 12 meses, según los ítems de sus órdenes de compra; son datos confirmados, úsalos con confianza):\n` + res.comp.map((c: any) => `${c.proveedor} (${c.rut ?? ""}): ${c.ordenes} OC, ${fmt(c.monto)}, precio unitario mediano ${fmt(c.precio_unit_mediano)}, ${c.compradores} compradores`).join("\n"));

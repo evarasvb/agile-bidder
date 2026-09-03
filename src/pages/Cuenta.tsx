@@ -77,7 +77,7 @@ export default function Cuenta() {
             <p className="text-sm text-muted-foreground">
               {isPro
                 ? "Tienes acceso completo: postular, exportar y gestionar tus oportunidades."
-                : "El plan Gratis te deja ver oportunidades. Para postular y gestionar, pásate a Pro."}
+                : "El plan Gratis te deja ver oportunidades. Para postular y gestionar, pásate a FirmaVB ERP."}
             </p>
             {!isPro && (
               <ul className="text-sm space-y-1.5 mt-1">

@@ -36,6 +36,7 @@ const BENEFICIOS = [
   'Gestionar tu pipeline, equipo y órdenes',
   'Reportes e inteligencia de mercado completos',
   'Inventario ilimitado y matching automático',
+  'Experto Pro y Plus incluidos: estudios profundos y anexos completados',
 ];
 
 export function UpgradeProProvider({ children }: { children: ReactNode }) {
@@ -67,18 +68,18 @@ export function UpgradeProProvider({ children }: { children: ReactNode }) {
               <Sparkles className="h-6 w-6 text-primary" />
             </div>
             <DialogTitle className="text-center text-xl">
-              Desbloquéalo con FirmaVB Pro
+              Desbloquéalo con FirmaVB ERP
             </DialogTitle>
             <DialogDescription className="text-center">
               {motivo
                 ? motivo
-                : 'Con el plan gratuito puedes mirar las oportunidades, pero gestionarlas es parte de Pro.'}
+                : 'Con el plan gratuito puedes mirar las oportunidades, pero gestionarlas es parte del plan FirmaVB ERP.'}
             </DialogDescription>
           </DialogHeader>
 
           <div className="rounded-lg border bg-muted/30 p-4">
             <div className="mb-3 flex items-baseline justify-center gap-1">
-              <span className="text-3xl font-bold">$45.000</span>
+              <span className="text-3xl font-bold">$159.000</span>
               <span className="text-muted-foreground">/mes</span>
             </div>
             <ul className="space-y-2">
