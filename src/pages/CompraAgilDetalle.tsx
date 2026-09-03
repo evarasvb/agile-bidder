@@ -218,7 +218,11 @@ export default function CompraAgilDetalle() {
         itemIndex: 9999,
         nombre: f.match.nombre,
         descripcion: '',
-        cantidadSolicitada: f.cantidad,
+        // Un producto agregado a mano no tiene una cantidad "pedida" por el
+        // organismo que limite cuánto se puede ofrecer (a diferencia de los
+        // ítems del listado, el modal capea la cantidad a 2x lo solicitado).
+        // Se deja un tope generoso en vez de 1 para no bloquear ofertas reales.
+        cantidadSolicitada: 999,
         unidadMedida: f.unidad,
         match: { id: f.match.inventarioId, sku: f.match.sku, nombre: f.match.nombre, precio_unitario: f.match.precio || 0, stock: null, matchScore: f.match.score, margen_estimado: 0 },
       })),

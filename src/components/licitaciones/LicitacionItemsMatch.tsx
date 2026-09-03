@@ -26,7 +26,7 @@ function badgeColor(score: number) {
  *  (confirmar / reasignar / descartar / editar), persistido en match_overrides. */
 export function LicitacionItemsMatch({ codigo, items }: Props) {
   const { procesarCompra, isLoading: invLoading } = useProductMatching();
-  const { data: overrides = {} } = useMatchOverrides(codigo);
+  const { data: overrides = {} } = useMatchOverrides(codigo, 'licitacion');
   const { data: inventarioActivo = [] } = useInventoryActivo();
 
   const inventarioById = useMemo(() => {
