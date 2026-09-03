@@ -85,6 +85,11 @@ LICITACIONES SIMILARES DEL MISMO ORGANISMO:\n${sim || "ninguna"}`;
 }
 
 // Bases subidas por usuarios: resumen estructurado + secciones más afines a la pregunta.
+// El resumen JSON de las bases se pasa como texto plano para que el modelo no hable de "null" ni de "JSON".
+function resumenPlano(r: any): string {
+  const v = (x: any): string => x == null || x === "" ? "no indicado" : Array.isArray(x) ? (x.length ? x.map(v).join("; ") : "ninguno indicado") : typeof x === "object" ? Object.entries(x).map(([k, y]) => `${k.replace(/_/g, " ")}: ${v(y)}`).join(", ") : String(x);
+  return Object.entries(r).map(([k, y]) => `- ${k.replace(/_/g, " ")}: ${v(y)}`).join("\n");
+}
 function textoBases(bases: any[], pregunta: string, maxChars: number, nDesde: number, codigo: string): string {
   const claves = [...palabrasClave(pregunta), "evaluacion", "criterio", "puntaje", "ponderacion", "garantia", "multa", "pago", "admisibilidad", "anexo", "plazo"]
     .map((w) => w.normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
@@ -100,7 +105,8 @@ function textoBases(bases: any[], pregunta: string, maxChars: number, nDesde: nu
     for (const c of puntuadas) { const len = String(c.s.texto ?? "").length + 40; if (len > presupuesto) continue; elegidas.push(c); presupuesto -= len; }
     elegidas.sort((x, y) => x.idx - y.idx);
     out.push(`[${n}] BASES DE LA LICITACIÓN ${codigo} — archivo "${b.archivo}" (${b.paginas ?? "?"} páginas, subido por un usuario de FirmaVB)
-RESUMEN ESTRUCTURADO DE LAS BASES: ${b.resumen ? JSON.stringify(b.resumen) : "(sin resumen)"}
+RESUMEN DE LAS BASES (extraído del PDF; "no indicado" significa que las bases no lo exigen o no lo mencionan):
+${b.resumen ? resumenPlano(b.resumen) : "(sin resumen)"}
 SECCIONES DE LAS BASES MÁS RELACIONADAS CON LA PREGUNTA:
 ${elegidas.map((c) => `## ${c.s.titulo}\n${c.s.texto}`).join("\n\n") || "(sin secciones)"}`);
   });
@@ -114,7 +120,7 @@ Reglas:
 - Con datos de Mercado Público entrega código, organismo, monto, cierre y link.
 - Si hay FICHA ORGANISMO, úsala para evaluar el riesgo de venderle. Distingue reclamos por pago no oportuno (riesgo de caja) de los por irregularidad en el proceso (riesgo de evaluación). Pondera por volumen: usa "reclamos de pago por cada 100 procesos" (menos de 1 bajo, 1 a 5 medio, más de 5 alto) antes que el número bruto; si un solo reclamante concentra más del 50%, adviértelo (puede ser un proveedor reclamando en masa). Compara con la cifra de hace 90 días si existe. Cítalo como "Datos Mercado Público vía FirmaVB". Si el dato dice "sin dato", dilo así.
 - Con LICITACIONES PARECIDAS YA ADJUDICADAS y QUIÉN LE GANA A ESTE ORGANISMO, di quién gana, a qué precio respecto del presupuesto y cuántos oferentes compiten; cítalo como "Datos Mercado Público vía FirmaVB (OCDS)".
-- Si hay BASES DE LA LICITACIÓN (PDF subido por un usuario), son la fuente principal para criterios de evaluación, ponderaciones, garantías, plazos, multas, anexos y cláusulas: responde con esos datos exactos, cita [n] y nombra la sección o numeral. Si el contexto dice NO HAY BASES CARGADAS y la pregunta las necesita, responde lo que sí sabes y pide que las suban con el botón "Subir bases (PDF)"; no mandes al usuario a descargarlas de Mercado Público.
+- Si hay BASES DE LA LICITACIÓN (PDF subido por un usuario), son la fuente principal para criterios de evaluación, ponderaciones, garantías, plazos, multas, anexos y cláusulas: responde con esos datos exactos, cita [n] y nombra la sección o numeral. Nunca digas "null", "JSON", "resumen estructurado" ni "texto resumen": si un dato figura como no indicado, di que las bases no lo exigen o no lo mencionan. Si el contexto dice NO HAY BASES CARGADAS y la pregunta las necesita, responde lo que sí sabes y pide que las suban con el botón "Subir bases (PDF)"; no mandes al usuario a descargarlas de Mercado Público.
 - Si hay NOTICIAS RECIENTES, úsalas como fuente externa: di "según la prensa" o "según ChileCompra" con el medio y la fecha, cita [n], y sepáralo de lo que dicen nuestros datos ("según nuestros datos de Mercado Público"). Con ambos puedes dar tu opinión, marcándola como opinión.
 - Si las fuentes no cubren la pregunta, dilo ("No tengo fuente en mi base para eso") y señala qué documento consultar. No inventes artículos, plazos, cifras ni licitaciones.
 - Montos en pesos con separador de miles ($1.234.567). Máximo 250 palabras salvo que pidan detalle. Párrafos cortos; lista corta solo para varias licitaciones. Formato Markdown simple.`;
@@ -271,7 +277,7 @@ Deno.serve(async (req) => {
     else if (codigo) partes.push(`No encontré la licitación ${codigo} en la base (puede ser antigua o el código estar mal).`);
     const bases: any[] = Array.isArray(res.bases) ? res.bases : [];
     let pedirBases: string | null = null;
-    if (codigo && bases.length) partes.push(textoBases(bases, modo === "chat" ? pregunta : "criterios evaluacion ponderacion garantia plazo multa admisibilidad anexos pago", modo === "chat" ? 14000 : 24000, fragmentos.length, codigo));
+    if (codigo && bases.length) partes.push(textoBases(bases, modo === "chat" ? pregunta : "criterios evaluacion ponderacion garantia plazo multa admisibilidad anexos pago", modo === "chat" ? 20000 : 24000, fragmentos.length, codigo));
     else if (codigo && (modo === "informe" || /ponder|criterio|evalua|puntaj|garant|cl[aá]usul|multa|anexo|requisit|admisib|plazo de entrega|forma de pago|bases|pliego|t[eé]cnic/i.test(pregunta))) {
       pedirBases = codigo;
       partes.push(`NO HAY BASES CARGADAS para ${codigo}. Si la respuesta requiere las bases (criterios, ponderación, garantías, multas, cláusulas, anexos), dile al usuario que las suba con el botón "Subir bases (PDF)" que aparece bajo esta respuesta: las leerás al instante y quedarán disponibles para todos.`);
@@ -280,7 +286,7 @@ Deno.serve(async (req) => {
     if (noticias.length) partes.push("NOTICIAS RECIENTES (fuente externa, prensa y ChileCompra; distingue lo que dice la prensa de nuestros datos):\n" + noticias.map((n, i) => `[${fragmentos.length + bases.length + i + 1}] ${n.fuente} — ${n.seccion}\n${String(n.texto).slice(0, 700)}`).join("\n\n"));
     if (res.perfil) partes.push(`PERFIL DEL USUARIO (personaliza con esto, sin repetirlo): empresa ${res.perfil.empresa_nombre ?? "s/i"}; rubro ${res.perfil.categoria_negocio ?? "s/i"}; industrias ${(res.perfil.industrias ?? []).join(", ") || "s/i"}; vende/busca: ${(res.perfil.palabras_clave_busqueda ?? []).slice(0, 12).join(", ") || "s/i"}; región ${res.perfil.region ?? "s/i"}.`);
     if (res.memoria?.length) partes.push("LO QUE ESTE USUARIO PIDIÓ MEJORAR EN RESPUESTAS ANTERIORES (tenlo en cuenta):\n" + res.memoria.map((m: any) => `- ${m.util === false ? "No le sirvió" : "Comentó"} en "${String(m.pregunta ?? "").slice(0, 80)}": ${m.comentario}`).join("\n"));
-    if (tareas.lic && !res.lic?.length) partes.push(`BÚSQUEDA DE LICITACIONES ABIERTAS para "${qDatos}": sin resultados en títulos, descripciones ni ítems de los últimos 60 días (Datos Mercado Público vía FirmaVB). Dilo así (no digas que no tienes fuente) y sugiere otras palabras o el rubro.`);
+    if (tareas.lic && !res.lic?.length) partes.push(`BÚSQUEDA DE LICITACIONES ABIERTAS para "${qDatos}": sin resultados en títulos, descripciones ni ítems de los últimos 180 días (Datos Mercado Público vía FirmaVB). Dilo así (no digas que no tienes fuente) y sugiere otras palabras o el rubro.`);
     if (res.lic?.length) partes.push("LICITACIONES ABIERTAS (Datos Mercado Público vía FirmaVB):\n" + res.lic.map((l: any) => `${l.codigo} | ${l.nombre} | ${l.institucion} | ${l.region ?? ""} | ${fmt(l.presupuesto)} | cierra ${fecha(l.cierra)} | ${l.url}${l.coincidencia ? " | coincide en el ítem: " + l.coincidencia : ""}`).join("\n"));
     if (res.ca?.length) partes.push("COMPRAS ÁGILES ABIERTAS:\n" + res.ca.map((l: any) => `${l.codigo} | ${l.nombre} | ${l.organismo} | ${fmt(l.monto)} | cierra ${fecha(l.cierra)} | pago: ${l.conducta_pago ?? "s/i"} ${l.pago_dias ? l.pago_dias + " días" : ""} | ${l.url ?? ""}`).join("\n"));
     if (res.comp?.length) partes.push(`COMPETENCIA para "${qDatos}" (proveedores que le vendieron exactamente ese producto al Estado en los últimos 12 meses, según los ítems de sus órdenes de compra; son datos confirmados, úsalos con confianza):\n` + res.comp.map((c: any) => `${c.proveedor} (${c.rut ?? ""}): ${c.ordenes} OC, ${fmt(c.monto)}, precio unitario mediano ${fmt(c.precio_unit_mediano)}, ${c.compradores} compradores`).join("\n"));
