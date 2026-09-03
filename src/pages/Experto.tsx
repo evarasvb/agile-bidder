@@ -52,6 +52,7 @@ export default function Experto() {
           <Input value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="ID de licitación, ej. 2699-35-LE26" className="h-8 w-64" />
           <Button size="sm" type="submit" className="h-8">Abrir</Button>
         </form>
+        <Button size="sm" variant="ghost" className="h-8" onClick={() => navigate("/experto/compartidos")}>Mis compartidos</Button>
         {libros.slice(0, 5).map((l: any) => (
           <button key={l.codigo} onClick={() => navigate(`/experto/libro/${l.codigo}`)} className="text-xs rounded-full border px-2 py-1 hover:border-primary truncate max-w-[220px]" title={l.nombre ?? ""}>{l.codigo}{l.nombre ? " · " + l.nombre : ""}</button>
         ))}

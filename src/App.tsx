@@ -33,6 +33,7 @@ const ChatIA = lazy(() => import("./pages/ChatIA"));
 const Experto = lazy(() => import("./pages/Experto"));
 const LibroLicitacion = lazy(() => import("./pages/experto/LibroLicitacion"));
 const Compartido = lazy(() => import("./pages/experto/Compartido"));
+const Compartidos = lazy(() => import("./pages/experto/Compartidos"));
 
 const OportunidadesPanel = lazy(() => import("./pages/Oportunidades"));
 const OportunidadDetalle = lazy(() => import("./pages/OportunidadDetalle"));
@@ -152,6 +153,7 @@ const App = () => (
             <Route path="/licitaciones/:id/chat" element={<ChatIA />} />
             <Route path="/experto" element={<Experto />} />
             <Route path="/experto/libro/:codigo" element={<LibroLicitacion />} />
+            <Route path="/experto/compartidos" element={<Compartidos />} />
             {/* Legacy: la lista vieja duplicaba Compras Ágiles (y hasta se titulaba así) */}
             <Route path="/licitaciones" element={<Navigate to="/compras-agiles" replace />} />
             <Route path="/licitaciones-nuevas" element={<Navigate to="/oportunidades" replace />} />

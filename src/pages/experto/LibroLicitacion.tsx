@@ -125,14 +125,17 @@ export default function LibroLicitacion() {
     toast.success(util ? 'Gracias' : 'Anotado');
   };
 
-  const compartirEntregable = async () => {
-    const titulo = `${tab === 'informe' ? 'Informe de trabajo' : tab === 'estudio' ? 'Estudio profundo' : 'Anexos'} · ${cod}${f?.nombre ? ' · ' + f.nombre : ''}`;
-    const { data, error } = await (supabase as any).rpc('experto_compartir', { p_codigo: cod, p_tipo: tab, p_titulo: titulo, p_contenido: entregables[tab] });
+  const compartirTexto = async (tipo: string, titulo: string, contenido: string) => {
+    const { data, error } = await (supabase as any).rpc('experto_compartir', { p_codigo: cod, p_tipo: tipo, p_titulo: titulo, p_contenido: contenido });
     if (error || !data) { toast.error('No pude crear el link'); return; }
     const url = `${window.location.origin}/experto/c/${data}`;
     if (navigator.share) { try { await navigator.share({ title: titulo, url }); return; } catch { /* cancelado */ } }
     await navigator.clipboard.writeText(url); toast.success('Link copiado: la página lleva tu nombre y la marca FirmaVB');
     window.open(url, '_blank');
+  };
+  const compartirEntregable = async () => {
+    const titulo = `${tab === 'informe' ? 'Informe de trabajo' : tab === 'estudio' ? 'Estudio profundo' : 'Anexos'} · ${cod}${f?.nombre ? ' · ' + f.nombre : ''}`;
+    await compartirTexto(tab, titulo, entregables[tab]);
   };
   const f = libro?.ficha; const o = f?.organismo ?? {};
   const bases: any[] = libro?.bases ?? [];
@@ -218,10 +221,12 @@ export default function LibroLicitacion() {
                       {m.fuentes.map((s: any) => <div key={s.n}>[{s.n}] {s.url ? <a className="underline" href={s.url} target="_blank" rel="noreferrer">{s.fuente}</a> : s.fuente}</div>)}
                     </details>
                   )}
-                  {m.texto && i === msgs.length - 1 && !ocupado && (
-                    <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">¿Te sirvió?
-                      <button onClick={() => opinar(msgs[i - 1]?.texto ?? '', true)}><ThumbsUp className="h-3.5 w-3.5" /></button>
-                      <button onClick={() => opinar(msgs[i - 1]?.texto ?? '', false)}><ThumbsDown className="h-3.5 w-3.5" /></button>
+                  {m.texto && !ocupado && (
+                    <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                      {i === msgs.length - 1 && <>¿Te sirvió?
+                        <button onClick={() => opinar(msgs[i - 1]?.texto ?? '', true)}><ThumbsUp className="h-3.5 w-3.5" /></button>
+                        <button onClick={() => opinar(msgs[i - 1]?.texto ?? '', false)}><ThumbsDown className="h-3.5 w-3.5" /></button></>}
+                      <button className="ml-auto flex items-center gap-1 underline" onClick={() => compartirTexto('chat', (msgs[i - 1]?.texto ?? `Respuesta del Experto · ${cod}`).slice(0, 120), `**Pregunta:** ${msgs[i - 1]?.texto ?? ''}\n\n${m.texto}`)}><Share2 className="h-3.5 w-3.5" />Compartir</button>
                     </div>
                   )}
                 </div>
