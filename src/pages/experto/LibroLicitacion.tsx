@@ -135,6 +135,7 @@ export default function LibroLicitacion() {
     <div className="space-y-3">
       <div className="flex items-center gap-3 flex-wrap">
         <Button variant="ghost" size="sm" onClick={() => navigate('/experto')}><ArrowLeft className="h-4 w-4 mr-1" />Libros</Button>
+        {f && <Button variant="outline" size="sm" onClick={() => navigate(String(f.tipo ?? '').toLowerCase().includes('gil') ? `/compras-agiles/${cod}` : `/oportunidades/licitacion/${cod}`)}>Ver la oportunidad</Button>}
         <BookOpen className="h-5 w-5 text-primary" />
         <h1 className="text-xl font-bold">{cod}</h1>
         {f && <span className="text-muted-foreground truncate max-w-[50vw]">{f.nombre} · {f.institucion}</span>}
@@ -229,7 +230,7 @@ export default function LibroLicitacion() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Entregables</CardTitle>
             <div className="flex flex-wrap gap-1 pt-1">
-              {([['informe', 'Informe de trabajo', ''], ['estudio', 'Estudio profundo', 'Pro'], ['anexos', 'Anexos completados', 'Plus']] as [Entregable, string, string][]).map(([k, n, tag]) => (
+              {([['informe', 'Informe de trabajo', ''], ['estudio', 'Estudio profundo', 'Experto Pro'], ['anexos', 'Anexos completados', 'Experto Plus']] as [Entregable, string, string][]).map(([k, n, tag]) => (
                 <Button key={k} size="sm" variant={tab === k ? 'default' : 'outline'} onClick={() => entregables[k] ? setTab(k) : generar(k)} disabled={!!ocupado && ocupado !== k}>
                   {ocupado === k ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : entregables[k] ? <ClipboardList className="h-3.5 w-3.5 mr-1" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />}
                   {n}{tag && <span className="ml-1 text-[10px] opacity-70">{tag}</span>}
@@ -252,7 +253,7 @@ export default function LibroLicitacion() {
                 <p>{tab === 'informe' && 'Informe de trabajo: veredicto, fechas, checklist de admisibilidad, cómo se ganan los puntos, riesgos, competencia y próximos pasos.'}
                    {tab === 'estudio' && 'Estudio profundo (Pro): historial de compras parecidas del organismo, quién ganó y con cuánto, precio objetivo.'}
                    {tab === 'anexos' && 'Anexos completados (Plus): los formularios de las bases con los datos de tu empresa, listos para revisar y firmar.'}</p>
-                {!esPro && tab !== 'informe' && <p className="text-xs">Requiere plan {tab === 'anexos' ? 'Plus' : 'Pro'} o FirmaVB ERP.</p>}
+                {!esPro && tab !== 'informe' && <p className="text-xs">Requiere Experto {tab === 'anexos' ? 'Plus' : 'Pro'} o FirmaVB ERP.</p>}
                 <Button size="sm" onClick={() => generar(tab)} disabled={!!ocupado}><Sparkles className="h-4 w-4 mr-1" />Generar</Button>
               </div>
             )}

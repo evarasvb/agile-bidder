@@ -102,7 +102,7 @@ export function UpgradeProProvider({ children }: { children: ReactNode }) {
               }}
             >
               <Sparkles className="mr-2 h-4 w-4" />
-              Suscribirme a Pro
+              Suscribirme a FirmaVB ERP
             </Button>
             <Button variant="ghost" className="w-full" onClick={() => setOpen(false)}>
               Ahora no

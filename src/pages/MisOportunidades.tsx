@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +39,7 @@ import { format, differenceInHours } from "date-fns";
 import { es } from "date-fns/locale";
 
 export default function MisOportunidades() {
+  const navigate = useNavigate();
   const { oportunidades, stats, isLoading, refetch } = useOportunidadesFiltradas();
   const { filtros } = useClienteFiltros();
   const { data: invStats } = useInventoryStats();
@@ -132,7 +134,7 @@ export default function MisOportunidades() {
             Actualizar
           </Button>
           <Button asChild>
-            <Link to="/configuracion-oportunidades">
+            <Link to="/configuracion">
               <Settings2 className="h-4 w-4 mr-2" />
               Configurar Filtros
             </Link>
@@ -155,7 +157,7 @@ export default function MisOportunidades() {
                 </p>
               </div>
               <Button variant="outline" asChild className="ml-auto">
-                <Link to="/configuracion-oportunidades">Configurar ahora</Link>
+                <Link to="/configuracion">Configurar ahora</Link>
               </Button>
             </div>
           </CardContent>
@@ -319,7 +321,7 @@ export default function MisOportunidades() {
                       </TableRow>
                 ) : (
                                 paginatedOportunidades.map((op) => (
-                        <TableRow key={op.id} className="cursor-pointer hover:bg-muted/50">
+                        <TableRow key={op.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(op.tipo_proceso === "Compra Ágil" ? `/compras-agiles/${op.codigo}` : `/oportunidades/licitacion/${op.codigo}`)}>
                           <TableCell className="font-mono text-xs">
                             <div className="flex items-center gap-2">
                               <Badge variant="outline" className="text-xs">

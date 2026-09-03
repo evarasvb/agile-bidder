@@ -58,7 +58,7 @@ function useLicitacionDetalle(id: string | undefined) {
       const { data: compraAgil, error: caError } = await (supabaseClient as any)
         .from('compras_agiles')
         .select('*')
-        .or(`codigo.eq.${id},id.eq.${id}`)
+        .or(/^[0-9a-f-]{36}$/i.test(id) ? `codigo.eq.${id},id.eq.${id}` : `codigo.eq.${id}`)
         .maybeSingle();
 
       if (compraAgil) {
@@ -112,7 +112,7 @@ function useLicitacionDetalle(id: string | undefined) {
       const { data: licitacionBI, error: biError } = await (supabaseClient as any)
         .from('licitaciones_bi')
         .select('*')
-        .or(`codigo.eq.${id},id.eq.${id}`)
+        .or(/^[0-9a-f-]{36}$/i.test(id) ? `codigo.eq.${id},id.eq.${id}` : `codigo.eq.${id}`)
         .maybeSingle();
 
       if (licitacionBI) {
@@ -221,8 +221,8 @@ export default function LicitacionDetalle() {
         <FileText className="mx-auto h-12 w-12 text-muted-foreground/50" />
         <h2 className="mt-4 text-lg font-medium">Licitación no encontrada</h2>
         <p className="text-muted-foreground mt-2">El código "{id}" no existe en el sistema</p>
-        <Button variant="link" onClick={() => navigate('/licitaciones')}>
-          Volver a licitaciones
+        <Button variant="link" onClick={() => navigate('/oportunidades')}>
+          Volver a oportunidades
         </Button>
       </div>
     );
@@ -247,7 +247,7 @@ export default function LicitacionDetalle() {
     if (licitacion.tipo === 'compra_agil') {
       navigate(`/compras-agiles/${licitacion.codigo}`);
     } else {
-      navigate(`/ofertas/nueva?licitacion=${licitacion.id}`);
+      navigate(`/experto/libro/${licitacion.codigo}`);
     }
   };
 
@@ -325,7 +325,7 @@ export default function LicitacionDetalle() {
           )}
           <Button
             size="sm"
-            onClick={() => navigate(`/experto?licitacion=${encodeURIComponent(licitacion.codigo)}`)}
+            onClick={() => navigate(`/experto/libro/${licitacion.codigo}`)}
           >
             <Sparkles className="h-4 w-4 mr-2" />
             Consultar al experto

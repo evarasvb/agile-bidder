@@ -15,7 +15,7 @@ import {
   TableRow,
   TableCell,
 } from '@/components/ui/table';
-import { ArrowLeft, Building2, Calendar, DollarSign, Package, Clock, FileText, Download, Sparkles } from 'lucide-react';
+import { ArrowLeft, Building2, Calendar, DollarSign, Package, Clock, FileText, Download, Sparkles, BookOpen } from "lucide-react";
 import { format, parseISO, differenceInHours } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useCliente } from '@/hooks/useCliente';
@@ -159,6 +159,10 @@ export default function CompraAgilDetalle() {
         {/* CTA principal: generar la propuesta + ficha técnica desde el detalle
             (antes esta pantalla no tenía cómo generar oferta: la bandeja de
             oportunidades quedaba sin salida hacia el constructor de propuesta). */}
+        <Button variant="outline" className="gap-2 shrink-0" onClick={() => navigate(`/experto/libro/${compra.codigo}`)}>
+          <BookOpen className="h-4 w-4" />
+          Libro del Experto
+        </Button>
         <Button onClick={() => setPropuestaOpen(true)} className="gap-2 shrink-0">
           <Sparkles className="h-4 w-4" />
           Generar propuesta

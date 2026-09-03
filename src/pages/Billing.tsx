@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -133,7 +134,7 @@ export default function Billing() {
         </p>
       </div>
 
-      {/* Suscripción / Plan Pro */}
+      {/* Suscripción FirmaVB ERP */}
       <SuscripcionProCard />
       <FacturasAdminCard />
 
@@ -365,9 +366,7 @@ export default function Billing() {
                     </div>
                   </div>
                 </div>
-                <Button variant="outline" className="w-full">
-                  Cambiar Tarjeta
-                </Button>
+                <Button variant="outline" className="w-full" asChild><Link to="/cuenta">Cambiar tarjeta (Mercado Pago)</Link></Button>
               </div>
             ) : (
               <div className="text-center py-6 space-y-4">

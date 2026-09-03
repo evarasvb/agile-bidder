@@ -68,7 +68,7 @@ export default function AdminEvaristo() {
               className="p-0 h-auto mt-2 text-xs"
               asChild
             >
-              <Link to="/admin/settings">Ver configuración</Link>
+              <Link to="/configuracion">Ver configuración</Link>
             </Button>
           </CardContent>
         </Card>
