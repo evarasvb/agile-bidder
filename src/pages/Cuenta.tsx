@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import { useCliente } from "@/hooks/useCliente";
 import { usePlan, type PlanId } from "@/hooks/usePlan";
+import { PlanesEscalera } from "@/components/pro/PlanesEscalera";
 
 const PLAN_LABEL: Record<PlanId, string> = {
   free: "Gratis",
@@ -69,29 +70,8 @@ export default function Cuenta() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-muted-foreground">Plan actual:</span>
-              <Badge variant={isPro ? "default" : "secondary"}>{PLAN_LABEL[plan]}</Badge>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {isPro
-                ? "Tienes acceso completo: postular, exportar y gestionar tus oportunidades."
-                : "El plan Gratis te deja ver oportunidades. Para postular y gestionar, pásate a FirmaVB ERP."}
-            </p>
-            {!isPro && (
-              <ul className="text-sm space-y-1.5 mt-1">
-                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-[hsl(var(--success))]" /> Postular y exportar propuestas</li>
-                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-[hsl(var(--success))]" /> Inventario y equipo sin límite</li>
-                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-[hsl(var(--success))]" /> Reportes e inteligencia de mercado</li>
-              </ul>
-            )}
-            <Button className="w-full mt-2 gap-2" asChild>
-              <Link to="/cuenta/facturacion">
-                {isPro ? "Ver mi facturación" : "Mejorar mi plan"}
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </Button>
+          <CardContent>
+            <PlanesEscalera />
           </CardContent>
         </Card>
 
