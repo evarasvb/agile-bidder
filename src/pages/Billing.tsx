@@ -298,7 +298,9 @@ export default function Billing() {
                       <div className="space-y-1">
                         <div className="font-medium">{factura.numero_factura || `Período ${factura.periodo}`}</div>
                         <div className="text-sm text-muted-foreground">
-                          Fijo {formatCurrency(factura.fijo_monto ?? 0)} + comisiones {formatCurrency(factura.total_comision)} = <b>{formatCurrency(factura.total ?? (factura.fijo_monto ?? 0) + factura.total_comision)}</b>
+                          {factura.por_suscripcion
+                            ? <>Fijo {formatCurrency(factura.fijo_monto ?? 0)} lo cobra tu suscripción · comisiones <b>{formatCurrency(factura.total_comision)}</b>{factura.cobro_programado_en && !factura.cobro_revertido_en && factura.estado !== "pagada" ? " · se suman a tu próximo cobro automático" : ""}</>
+                            : <>Fijo {formatCurrency(factura.fijo_monto ?? 0)} + comisiones {formatCurrency(factura.total_comision)} = <b>{formatCurrency(factura.total ?? (factura.fijo_monto ?? 0) + factura.total_comision)}</b></>}
                           {factura.estado === "preforma" && factura.validacion_hasta && ` · puedes objetar hasta el ${new Date(factura.validacion_hasta).toLocaleDateString("es-CL")}`}
                           {factura.fecha_pago && ` · pagada el ${new Date(factura.fecha_pago + "T00:00:00").toLocaleDateString("es-CL")}`}
                         </div>
@@ -308,7 +310,7 @@ export default function Billing() {
                         {factura.documento_url && (
                           <Button variant="outline" size="sm" asChild><a href={factura.documento_url} target="_blank" rel="noreferrer"><Download className="h-4 w-4 mr-1" />PDF</a></Button>
                         )}
-                        {(factura.estado === "facturada" || factura.estado === "por_facturar") && (factura.total ?? 0) > 0 && (
+                        {(factura.estado === "facturada" || factura.estado === "por_facturar") && (factura.total ?? 0) > 0 && !(factura.por_suscripcion && factura.cobro_programado_en && !factura.cobro_revertido_en) && (
                           <Button size="sm" disabled={pagando === factura.id} onClick={() => pagarFactura(factura.id)}>
                             {pagando === factura.id ? "Abriendo Mercado Pago…" : "Pagar con Mercado Pago"}
                           </Button>

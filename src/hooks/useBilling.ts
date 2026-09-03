@@ -27,6 +27,9 @@ export interface FacturaComision {
   fecha_pago: string | null;
   documento_url: string | null;
   validacion_hasta?: string | null;
+  por_suscripcion?: boolean;
+  cobro_programado_en?: string | null;
+  cobro_revertido_en?: string | null;
   detalle?: { ocs?: { oc: string; licitacion: string; comprador: string; fecha: string; neto: number; comision: number }[]; n?: number } | null;
 }
 
