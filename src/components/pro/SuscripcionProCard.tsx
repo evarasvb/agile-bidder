@@ -53,7 +53,7 @@ export function SuscripcionProCard() {
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
           Tienes acceso completo para gestionar todas tus oportunidades. Tu suscripción se renueva
-          automáticamente cada mes por $159.000. Incluye el Experto Pro y Plus.
+          automáticamente cada mes por $149.990 más 3% de las órdenes de compra aceptadas que postulaste desde FirmaVB. Incluye el Experto Pro y Plus.
         </CardContent>
       </Card>
     );
@@ -72,7 +72,7 @@ export function SuscripcionProCard() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-baseline gap-1">
-          <span className="text-3xl font-bold">$159.000</span>
+          <span className="text-3xl font-bold">$149.990</span>
           <span className="text-muted-foreground">/mes</span>
         </div>
         <ul className="space-y-2">

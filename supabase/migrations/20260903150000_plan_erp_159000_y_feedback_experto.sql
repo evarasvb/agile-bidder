@@ -1,5 +1,5 @@
--- Plan de suscripcion FirmaVB ERP: $159.000 / mes (incluye Experto Pro y Plus).
-update public.planes set precio_mensual = 159000, nombre = 'FirmaVB ERP' where id = 'pro';
+-- Plan de suscripcion FirmaVB ERP: $149.990 / mes (incluye Experto Pro y Plus).
+update public.planes set precio_mensual = 149990, nombre = 'FirmaVB ERP' where id = 'pro';
 
 -- Feedback del usuario sobre cada respuesta del Experto: sirve para mejorar dia a dia y
 -- se reinyecta como memoria en las proximas respuestas de ese usuario.
