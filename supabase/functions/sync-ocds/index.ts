@@ -9,7 +9,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const API = "https://api.mercadopublico.cl/APISOCDS/OCDS";
 const UA = "FirmaVB/1.0 (+https://www.firmavb.cl)";
-const PARALELO = 3;
+const PARALELO = 2;
 
 function rolJwt(auth: string | null): string | null {
   try { return JSON.parse(atob((auth ?? "").replace(/^Bearer\s+/i, "").split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).role ?? null; } catch { return null; }
@@ -94,6 +94,7 @@ async function enLotes<T>(xs: T[], fn: (x: T) => Promise<any>, n: number, limite
   for (let i = 0; i < xs.length; i += n) {
     if (Date.now() - t0 > limiteMs) break;
     out.push(...(await Promise.all(xs.slice(i, i + n).map(fn))));
+    await new Promise((r) => setTimeout(r, 250));
   }
   return out;
 }
@@ -150,9 +151,10 @@ Deno.serve(async (req: Request) => {
       const total = lista?.pagination?.total ?? mp.total ?? 0;
       const conAward = datos.filter((d) => d.urlAward).map((d) => String(d.urlAward).split("/").pop()!);
       const filas = await enLotes(conAward, (c: string) => leerProceso(c, true), PARALELO, 115_000, t0);
-      await guardar(filas);
-      // Si hubo errores de red/limitación en el tramo, no se avanza: se repite en la próxima pasada (el upsert es idempotente).
-      const leidosTodos = filas.length >= conAward.length && !filas.some((f) => f === undefined);
+      // Los que fallaron por red/limitación quedan como fila vacía (sin leído) y se reintentan en el frente 1.
+      await guardar(filas.map((f, i) => f === undefined ? { codigo: conAward[i] } : f));
+      res.reintentar = filas.filter((f) => f === undefined).length;
+      const leidosTodos = filas.length >= conAward.length;
       const nuevoOffset = leidosTodos ? mp.offset_leido + datos.length : mp.offset_leido; // si no alcanzó el tiempo, repite el tramo
       const completo = leidosTodos && (datos.length < limite || nuevoOffset >= total);
       await sb.rpc("ocds_marcar_mes", { p_anio: mp.anio, p_mes: mp.mes, p_offset: nuevoOffset, p_total: total, p_completo: completo });

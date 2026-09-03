@@ -48,7 +48,7 @@ function filasExcel(html: string) {
     const tds = [...m[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((t) => limpiar(t[1]));
     if (tds.length < 6) continue;
     const f = tds[2].match(/(\d{2})-(\d{2})-(\d{4})/);
-    if (!f || !/-REC\d{2}$/i.test(tds[0])) continue;
+    if (!f || !/(-REC\d{2}$|^INC-)/i.test(tds[0])) continue; // formatos: 1224896-9-REC26 (hasta jul-2026) e INC-1360319-V1Y3C3 (nuevo)
     out.push({ id_reclamo: tds[0], proceso_codigo: tds[1], fecha: `${f[3]}-${f[2]}-${f[1]}`, reclamante: tds[3].slice(0, 200), organismo_nombre: tds[4].slice(0, 200), estado: tds[5].slice(0, 80) });
   }
   return out;
