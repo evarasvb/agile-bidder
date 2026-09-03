@@ -64,7 +64,7 @@ Fechas API: ${JSON.stringify(f.fechas_api ?? {})}
 Descripción: ${(f.descripcion ?? "").slice(0, 1500)}
 Link: ${f.url}
 ÍTEMS:\n${items || "(sin ítems)"}
-ORGANISMO: conducta de pago ${o.conducta_pago ?? "s/i"}, ${o.pago_promedio_dias ?? "s/i"} días promedio; reclamos ${o.reclamos ?? "s/i"}; OC últimos 12 meses ${o.oc_12m ?? 0} por ${fmt(o.monto_12m)}; licitaciones abiertas ${o.licitaciones_abiertas ?? 0}. Top proveedores: ${top || "s/i"}
+ORGANISMO: conducta de pago ${o.conducta_pago ?? "s/i"}, ${o.pago_promedio_dias ?? "s/i"} días promedio; reclamos por no pagar a tiempo (12 meses, ficha Mercado Público al ${o.dato_pago_al ?? "s/i"}): ${o.reclamos ?? "s/i"}${o.reclamos_hace_90d != null ? ` (hace 90 días: ${o.reclamos_hace_90d})` : ""}; plazo de pago declarado: ${o.plazo_pago ?? "s/i"}; OC últimos 12 meses ${o.oc_12m ?? 0} por ${fmt(o.monto_12m)}; licitaciones abiertas ${o.licitaciones_abiertas ?? 0}. Top proveedores: ${top || "s/i"}
 COMPETENCIA (quién vende estos productos al Estado, 12 meses):\n${comp || "s/i"}
 LICITACIONES SIMILARES DEL MISMO ORGANISMO:\n${sim || "ninguna"}`;
 }
