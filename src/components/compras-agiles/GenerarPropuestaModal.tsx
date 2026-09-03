@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 import { useUpdateCompraAgil } from "@/hooks/useComprasAgiles";
 import { formatCurrency } from "@/utils/clasificacion";
+import { PrecioMercadoHint } from "./PrecioMercadoHint";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { aplicarRecargoPorRegion, obtenerRecargoRegion } from "@/utils/regiones";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -810,6 +811,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                               )}
                             </div>
                           )}
+                          {item.selected && <PrecioMercadoHint nombre={item.match?.nombre || item.nombre} disabled={!item.selected} onUsar={(p) => handlePrecioChange(item.itemId, p)} />}
                           {/* Mostrar margen en tiempo real */}
                           {item.match && item.precioUnitario > 0 && (
                             <div className="mt-1">
