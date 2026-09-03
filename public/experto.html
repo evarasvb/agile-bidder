@@ -139,7 +139,7 @@ function md(t){
   cierra();return out;
 }
 function add(cls,html){const d=document.createElement('div');d.className='msg '+cls;d.innerHTML=html;chat.appendChild(d);chat.scrollTop=chat.scrollHeight;return d;}
-function setUso(u){if(!u)return;const pro=u.plan&&u.plan!=='free';usoEl.innerHTML=pro?`Plan ${u.plan}<br>ilimitado`:`Gratis: ${u.consultas}/5 preguntas<br>${u.informes}/1 informe este mes`;}
+function setUso(u){if(!u)return;const pro=u.plan&&u.plan!=='free';usoEl.innerHTML=pro?`Plan ${u.plan}<br>ilimitado`:tokenUsuario?`Gratis: ${u.consultas}/3 preguntas<br>${u.informes}/1 informe este mes`:`Comodín: ${Math.min(u.consultas,1)}/1 pregunta gratis`;}
 const fEstudio=document.getElementById('fEstudio'),tabEstudio=document.getElementById('tabEstudio');
 function modo(m){for(const [k,tab,f] of [['chat',tabChat,fChat],['informe',tabInforme,fInforme],['estudio',tabEstudio,fEstudio]]){tab.classList.toggle('on',k===m);f.classList.toggle('oculto',k!==m);}(m==='chat'?q:document.getElementById(m==='informe'?'codigo':'codigoE')).focus();}
 tabChat.onclick=()=>modo('chat');tabInforme.onclick=()=>modo('informe');tabEstudio.onclick=()=>modo('estudio');
@@ -188,7 +188,7 @@ async function consultar(body,boton){
     const r=await fetch(SUPA+'/functions/v1/'+(body.modo==='estudio'?'experto-estudio':'experto-consultar'),{method:'POST',headers:{'Content-Type':'application/json','apikey':ANON,'Authorization':'Bearer '+(tokenUsuario||ANON)},body:JSON.stringify({...body,huella})});
     if(!r.ok){
       const j=await r.json().catch(()=>({}));
-      if(r.status===402){cuerpo.innerHTML='';ofrecerPro(p,j.mensaje||'Llegaste al límite gratuito.');setUso(j.uso);}
+      if(r.status===402){cuerpo.innerHTML='';if(j.registro){p.classList.add('aviso');p.innerHTML=`${j.mensaje} <div style="margin-top:8px"><a class="enviar" style="display:inline-block;padding:8px 14px;text-decoration:none" href="/auth?tab=signup" target="_top">Crear cuenta gratis</a> <a href="/auth" target="_top" style="margin-left:8px">Ya tengo cuenta</a></div>`;}else ofrecerPro(p,j.mensaje||'Llegaste al límite gratuito.');setUso(j.uso);}
       else if(r.status===401){cuerpo.innerHTML='';p.classList.add('aviso');p.innerHTML=`${j.mensaje||'Inicia sesión.'} <a href="${PLANES.replace('/planes','/auth')}" target="_blank">Entrar a FirmaVB</a>`;}
       else cuerpo.textContent='No pude responder: '+(j.mensaje||j.error||r.status);
       boton.disabled=false;return;
@@ -210,7 +210,7 @@ async function consultar(body,boton){
     }
     clearInterval(timer);pintar();
     if(!texto)cuerpo.innerHTML='<span class="estado">No obtuve respuesta. Intenta de nuevo.</span>';
-    if(fuentes.length){const fu=document.createElement('div');fu.className='fuentes';fu.innerHTML='<b>Fuentes consultadas</b><br>'+fuentes.map(f=>`[${f.n}] ${f.url?`<a href="${f.url}" target="_blank" rel="noopener noreferrer">${f.fuente}</a>`:f.fuente}${f.seccion?' · '+String(f.seccion).slice(0,80):''}`).join('<br>')+`<span class="badge">${((Date.now()-t0)/1000).toFixed(1)} s</span>`;p.appendChild(fu);}
+    if(fuentes.length){const fu=document.createElement('div');fu.className='fuentes';fu.innerHTML=`<details><summary style="cursor:pointer"><b>Fuentes consultadas (${fuentes.length})</b></summary>`+fuentes.map(f=>`[${f.n}] ${f.url?`<a href="${f.url}" target="_blank" rel="noopener noreferrer">${f.fuente}</a>`:f.fuente}${f.seccion?' · '+String(f.seccion).slice(0,80):''}`).join('<br>')+'</details>'+`<span class="badge">${((Date.now()-t0)/1000).toFixed(1)} s</span>`;p.appendChild(fu);}
     if(pedirBases&&texto)ofrecerBases(p,pedirBases,body,boton);
     if(body.modo==='chat'){historial.push({role:'user',content:body.pregunta},{role:'assistant',content:texto});if(historial.length>6)historial.splice(0,2);}
     if(body.modo==='informe'&&texto){const acc=document.createElement('div');acc.className='ejemplos';acc.innerHTML='<button>Copiar informe</button><button>Preguntar sobre esta licitación</button>';acc.children[0].onclick=()=>{navigator.clipboard.writeText(texto);acc.children[0].textContent='Copiado';};acc.children[1].onclick=()=>{modo('chat');q.value=`Sobre la licitación ${body.codigo}: `;q.focus();};p.appendChild(acc);}

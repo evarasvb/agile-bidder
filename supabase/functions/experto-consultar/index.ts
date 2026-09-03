@@ -7,7 +7,10 @@ const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-const LIMITES_FREE = { chat: 5, informe: 1 };
+// Gratis con cuenta: 3 preguntas y 1 informe al mes. Comodín sin cuenta: 1 pregunta por navegador y 3 por IP al día.
+const LIMITES_FREE = { chat: 3, informe: 1 };
+const LIMITES_ANON = { chat: 1, informe: 0 };
+const MAX_IP_ANON_24H = 3;
 // Topes que el cliente no controla (el limite mensual por huella se reinicia en incognito):
 //  - por IP y hora: frena loops
 //  - anonimas en 24h rodantes: techo de costo en Gemini cuando se viraliza
@@ -104,7 +107,8 @@ ${elegidas.map((c) => `## ${c.s.titulo}\n${c.s.texto}`).join("\n\n") || "(sin se
   return out.join("\n\n");
 }
 
-const SYS_CHAT = `Eres el Experto FirmaVB, asesor con 17 años vendiéndole al Estado chileno por Mercado Público / ChileCompra. Español chileno, directo, práctico, como mentor de un empresario pyme.
+const SYS_CHAT = `Eres el Experto FirmaVB, asesor con 17 años vendiéndole al Estado chileno por Mercado Público / ChileCompra.
+Hablas como Evaristo Varas en su libro "Véndele al Estado y No Mueras en el Intento": de tú, cercano, directo, como un amigo que ya pasó por esto y te lo cuenta sin adornos. Frases cortas. Nada de "estimado", "revisor en mano" ni saludos largos; entra al grano en la primera línea. Ejemplos concretos de la calle antes que teoría. Cuando toca, un empujón honesto ("no hay atajos", "no basta con querer ganar, hay que poder cumplir"). Si algo es riesgoso, dilo sin rodeos. Cierra siempre con el paso concreto que daría hoy.
 Reglas:
 - Responde SOLO con lo que respaldan las FUENTES y DATOS entregados. Cita entre corchetes [n] la fuente usada después de cada afirmación que provenga de ella. Con ley o reglamento nombra el artículo en la frase; con directivas su número; con dictámenes de Contraloría número y año (advierte si es anterior a dic-2024: puede citar el reglamento antiguo D.250/2004, reemplazado por el D.661/2024); con sentencias del TCP rol y fecha; con el libro, dilo como criterio práctico del autor.
 - Con datos de Mercado Público entrega código, organismo, monto, cierre y link.
@@ -114,7 +118,7 @@ Reglas:
 - Si las fuentes no cubren la pregunta, dilo ("No tengo fuente en mi base para eso") y señala qué documento consultar. No inventes artículos, plazos, cifras ni licitaciones.
 - Montos en pesos con separador de miles ($1.234.567). Máximo 250 palabras salvo que pidan detalle. Párrafos cortos; lista corta solo para varias licitaciones. Formato Markdown simple.`;
 
-const SYS_INFORME = `Eres el Experto FirmaVB, asesor con 17 años vendiéndole al Estado chileno. Vas a entregar a un proveedor pyme un INFORME DE TRABAJO para una licitación concreta, usando SOLO la ficha, fuentes y datos entregados. Español chileno, directo, sin relleno. Formato Markdown con estas secciones exactas:
+const SYS_INFORME = `Eres el Experto FirmaVB, asesor con 17 años vendiéndole al Estado chileno. Vas a entregar a un proveedor pyme un INFORME DE TRABAJO para una licitación concreta, usando SOLO la ficha, fuentes y datos entregados. Hablas como Evaristo Varas en su libro "Véndele al Estado y No Mueras en el Intento": de tú, cercano, directo, como un amigo que ya pasó por esto y te lo cuenta sin adornos. Frases cortas. Nada de "estimado", "revisor en mano" ni saludos largos; entra al grano en la primera línea. Ejemplos concretos de la calle antes que teoría. Cuando toca, un empujón honesto ("no hay atajos", "no basta con querer ganar, hay que poder cumplir"). Si algo es riesgoso, dilo sin rodeos. Cierra siempre con el paso concreto que daría hoy. Formato Markdown con estas secciones exactas:
 
 ## 1. Resumen ejecutivo
 Qué se compra, quién, cuánto, cuándo cierra, y tu veredicto en una línea: ¿vale la pena postular? (sí / con reservas / no) y por qué.
@@ -164,6 +168,9 @@ Deno.serve(async (req) => {
           if (ip && c.ip_hora >= MAX_IP_HORA) {
             return new Response(JSON.stringify({ error: "ritmo", mensaje: "Demasiadas preguntas seguidas desde tu conexión. Espera un rato e intenta de nuevo.", uso: u }), { status: 429, headers: { ...cors, "Content-Type": "application/json", "Retry-After": "900" } });
           }
+          if (!userId && ip && (c.ip_anon_24h ?? 0) >= MAX_IP_ANON_24H) {
+            return new Response(JSON.stringify({ error: "comodin_usado", registro: true, mensaje: "El comodín gratis ya se usó desde esta conexión. Crea tu cuenta gratis en FirmaVB y tienes 3 preguntas y 1 informe al mes.", uso: u }), { status: 402, headers: { ...cors, "Content-Type": "application/json" } });
+          }
           if (c.anon_24h >= MAX_ANON_24H) {
             return new Response(JSON.stringify({ error: "cupo_diario", mensaje: "El cupo gratuito de hoy ya se agotó. Vuelve mañana, o con el plan Pro de FirmaVB no hay límite.", plan: u.plan, uso: u }), { status: 402, headers: { ...cors, "Content-Type": "application/json" } });
           }
@@ -171,8 +178,9 @@ Deno.serve(async (req) => {
       } catch (e) { console.error("experto_cuota", String(e)); }
 
       const usado = modo === "chat" ? u.consultas : u.informes;
-      const lim = LIMITES_FREE[modo];
+      const lim = (userId ? LIMITES_FREE : LIMITES_ANON)[modo];
       if (usado >= lim) {
+        if (!userId) return new Response(JSON.stringify({ error: "comodin_usado", registro: true, mensaje: modo === "chat" ? "Usaste tu comodín telefónico. Crea tu cuenta gratis en FirmaVB: 3 preguntas y 1 informe al mes." : "El informe de una licitación es para usuarios con cuenta. Créala gratis: incluye 1 informe al mes.", plan: u.plan, uso: u }), { status: 402, headers: { ...cors, "Content-Type": "application/json" } });
         return new Response(JSON.stringify({ error: "limite", mensaje: `Llegaste al límite gratuito de ${lim} ${modo === "chat" ? "preguntas" : "informe"} al mes. Con el plan Pro de FirmaVB es ilimitado.`, plan: u.plan, uso: u }), { status: 402, headers: { ...cors, "Content-Type": "application/json" } });
       }
     }
