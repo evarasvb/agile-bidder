@@ -52,8 +52,11 @@ function textoFragmentos(frs: any[]) {
 function textoOrganismo(o: any) {
   const top = (o.top_proveedores ?? []).slice(0, 5).map((p: any) => `${p.proveedor} (${p.ordenes} OC, ${fmt(p.monto)})`).join("; ");
   const recl = o.reclamos == null ? "sin dato" : `${o.reclamos} reclamos por incumplir plazo de pago en los últimos 12 meses (ficha Mercado Público leída el ${o.dato_pago_al ?? "s/i"}${o.reclamos_hace_90d != null ? `; hace 90 días eran ${o.reclamos_hace_90d}` : ""})`;
+  const desglose = o.reclamos_pago_12m == null ? "sin dato" :
+    `${o.reclamos_pago_12m} por pago no oportuno y ${o.reclamos_proceso_12m ?? 0} por irregularidad en el proceso (buscador de reclamos MP desde ${o.reclamos_desde ?? "s/i"}); ${o.reclamos_pago_90d ?? 0} de pago en los últimos 90 días; ${o.reclamantes_pago_12m ?? 0} reclamantes distintos${o.top_reclamante ? `, el mayor (${o.top_reclamante}) concentra el ${o.top_reclamante_pct}%` : ""}; procesos publicados 12 meses: ${o.procesos_12m ?? 0} → ${o.reclamos_pago_por_100_procesos ?? "s/i"} reclamos de pago por cada 100 procesos`;
   return `${o.institucion} (RUT ${o.rut ?? "s/i"}, ${o.region ?? "s/i"})
-Reclamos por no pago: ${recl}
+Reclamos por no pago (ficha MP): ${recl}
+Reclamos desglosados: ${desglose}
 Plazo de pago declarado en sus licitaciones: ${o.plazo_pago ?? "s/i"} | Conducta de pago histórica: ${o.conducta_pago ?? "s/i"} (${o.pago_promedio_dias ?? "s/i"} días promedio)
 Órdenes de compra últimos 12 meses: ${o.oc_12m ?? 0} por ${fmt(o.monto_12m)} | Licitaciones abiertas hoy: ${o.licitaciones_abiertas ?? 0}
 Top proveedores 12 meses: ${top || "s/i"}`;
@@ -82,7 +85,7 @@ const SYS_CHAT = `Eres el Experto FirmaVB, asesor con 17 años vendiéndole al E
 Reglas:
 - Responde SOLO con lo que respaldan las FUENTES y DATOS entregados. Cita entre corchetes [n] la fuente usada después de cada afirmación que provenga de ella. Con ley o reglamento nombra el artículo en la frase; con directivas su número; con dictámenes de Contraloría número y año (advierte si es anterior a dic-2024: puede citar el reglamento antiguo D.250/2004, reemplazado por el D.661/2024); con sentencias del TCP rol y fecha; con el libro, dilo como criterio práctico del autor.
 - Con datos de Mercado Público entrega código, organismo, monto, cierre y link.
-- Si hay FICHA ORGANISMO, úsala para evaluar el riesgo de venderle: los reclamos por no pago son un dato real de la ficha de Mercado Público (últimos 12 meses). Interprétalo según su volumen de compras: 0-5 bajo, 6-50 medio, más de 50 alto; compáralo con la cifra de hace 90 días si existe. Cítalo como "Datos Mercado Público vía FirmaVB". Si el dato dice "sin dato", dilo así.
+- Si hay FICHA ORGANISMO, úsala para evaluar el riesgo de venderle. Distingue reclamos por pago no oportuno (riesgo de caja) de los por irregularidad en el proceso (riesgo de evaluación). Pondera por volumen: usa "reclamos de pago por cada 100 procesos" (menos de 1 bajo, 1 a 5 medio, más de 5 alto) antes que el número bruto; si un solo reclamante concentra más del 50%, adviértelo (puede ser un proveedor reclamando en masa). Compara con la cifra de hace 90 días si existe. Cítalo como "Datos Mercado Público vía FirmaVB". Si el dato dice "sin dato", dilo así.
 - Si las fuentes no cubren la pregunta, dilo ("No tengo fuente en mi base para eso") y señala qué documento consultar. No inventes artículos, plazos, cifras ni licitaciones.
 - Montos en pesos con separador de miles ($1.234.567). Máximo 250 palabras salvo que pidan detalle. Párrafos cortos; lista corta solo para varias licitaciones. Formato Markdown simple.`;
 
