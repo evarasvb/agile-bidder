@@ -42,7 +42,7 @@ export function RiesgoOrganismoCard({ codigo, organismo }: Props) {
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <CardTitle className="text-lg">¿Cómo paga este organismo?</CardTitle>
-            <Badge variant="outline" className="bg-muted text-muted-foreground"><Lock className="h-3.5 w-3.5 mr-1" />Pro</Badge>
+            <Badge variant="outline" className="bg-muted text-muted-foreground"><Lock className="h-3.5 w-3.5 mr-1" />Experto Pro</Badge>
           </div>
           {organismo && <p className="text-xs text-muted-foreground">{organismo}</p>}
         </CardHeader>
@@ -50,9 +50,9 @@ export function RiesgoOrganismoCard({ codigo, organismo }: Props) {
           <p className="text-sm text-muted-foreground">
             Reclamos por no pago en Mercado Público, plazo real de pago, quién le gana a este organismo y a qué precio.
           </p>
-          <Button size="sm" onClick={() => requirePro(undefined, 'Ver el riesgo de pago del organismo y quién le gana')}>
+          <Button size="sm" onClick={() => navigate('/cuenta')}>
             <Sparkles className="h-4 w-4 mr-1" />
-            Ver riesgo y competencia (Pro)
+            Ver riesgo y competencia (Experto Pro)
           </Button>
         </CardContent>
       </Card>

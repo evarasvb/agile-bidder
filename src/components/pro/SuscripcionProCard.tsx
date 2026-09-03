@@ -92,7 +92,7 @@ export function SuscripcionProCard() {
           ) : (
             <>
               <Sparkles className="mr-2 h-4 w-4" />
-              Suscribirme a Pro
+              Suscribirme a FirmaVB ERP
             </>
           )}
         </Button>

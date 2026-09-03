@@ -7,12 +7,6 @@ import { useCliente } from "@/hooks/useCliente";
 import { usePlan, type PlanId } from "@/hooks/usePlan";
 import { PlanesEscalera } from "@/components/pro/PlanesEscalera";
 
-const PLAN_LABEL: Record<PlanId, string> = {
-  free: "Gratis",
-  pro: "Pro",
-  business: "Business",
-  enterprise: "Enterprise",
-};
 
 export default function Cuenta() {
   const { data: cliente } = useCliente();

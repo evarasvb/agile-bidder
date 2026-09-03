@@ -476,7 +476,7 @@ export default function OportunidadDetalle() {
           <div className="flex flex-wrap gap-3">
             <Button
               className="gap-2"
-              onClick={() => navigate(`/experto?licitacion=${encodeURIComponent(oportunidad.codigo)}`)}
+              onClick={() => navigate(`/experto/libro/${oportunidad.codigo}`)}
             >
               <Sparkles className="h-4 w-4" />
               Consultar al experto
@@ -487,11 +487,11 @@ export default function OportunidadDetalle() {
               onClick={() => navigate(`/oportunidades/${tipo}/${id}/chat`)}
             >
               <Sparkles className="h-4 w-4" />
-              Chat IA
+              Libro del Experto
             </Button>
             <Button className="gap-2" onClick={handleCotizar}>
               <FileText className="h-4 w-4" />
-              Cotizar en 2 Clicks
+              Ir a cotizar
             </Button>
             <Button
               variant="outline"
