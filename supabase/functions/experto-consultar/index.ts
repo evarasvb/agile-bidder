@@ -86,6 +86,7 @@ Reglas:
 - Responde SOLO con lo que respaldan las FUENTES y DATOS entregados. Cita entre corchetes [n] la fuente usada después de cada afirmación que provenga de ella. Con ley o reglamento nombra el artículo en la frase; con directivas su número; con dictámenes de Contraloría número y año (advierte si es anterior a dic-2024: puede citar el reglamento antiguo D.250/2004, reemplazado por el D.661/2024); con sentencias del TCP rol y fecha; con el libro, dilo como criterio práctico del autor.
 - Con datos de Mercado Público entrega código, organismo, monto, cierre y link.
 - Si hay FICHA ORGANISMO, úsala para evaluar el riesgo de venderle. Distingue reclamos por pago no oportuno (riesgo de caja) de los por irregularidad en el proceso (riesgo de evaluación). Pondera por volumen: usa "reclamos de pago por cada 100 procesos" (menos de 1 bajo, 1 a 5 medio, más de 5 alto) antes que el número bruto; si un solo reclamante concentra más del 50%, adviértelo (puede ser un proveedor reclamando en masa). Compara con la cifra de hace 90 días si existe. Cítalo como "Datos Mercado Público vía FirmaVB". Si el dato dice "sin dato", dilo así.
+- Con LICITACIONES PARECIDAS YA ADJUDICADAS y QUIÉN LE GANA A ESTE ORGANISMO, di quién gana, a qué precio respecto del presupuesto y cuántos oferentes compiten; cítalo como "Datos Mercado Público vía FirmaVB (OCDS)".
 - Si las fuentes no cubren la pregunta, dilo ("No tengo fuente en mi base para eso") y señala qué documento consultar. No inventes artículos, plazos, cifras ni licitaciones.
 - Montos en pesos con separador de miles ($1.234.567). Máximo 250 palabras salvo que pidan detalle. Párrafos cortos; lista corta solo para varias licitaciones. Formato Markdown simple.`;
 
@@ -102,7 +103,7 @@ Qué criterios de evaluación suelen aplicarse a este tipo de compra y dónde po
 ## 5. Riesgos y jurisprudencia aplicable
 Errores que en casos parecidos Contraloría o el TCP ya sancionaron o validaron (cita [n]). Riesgos del organismo (pago, reclamos).
 ## 6. Competencia y precio de referencia
-Quién le vende esto al Estado y a qué precio mediano; presupuesto vs. mercado; recomendación de estrategia de precio.
+Quién le vende esto al Estado y a qué precio mediano; quién ganó licitaciones parecidas y con qué monto respecto del presupuesto; quién le gana habitualmente a este organismo; presupuesto vs. mercado; recomendación de estrategia de precio.
 ## 7. Próximos 3 pasos
 Acciones concretas para hoy.
 ## Fuentes
@@ -182,6 +183,9 @@ Deno.serve(async (req) => {
       if (/cu[aá]nt[ao]s|panorama|mercado|demanda/.test(p) && qDatos) {
         tareas.pan = sb.rpc("experto_panorama", { texto: qDatos, dias: 90 }).then((r) => r.data?.[0]);
       }
+      if (/adjudic|qui[eé]n (se )?gan|ganador|ganan|competidor|compet[ií]|precio/.test(p) && qDatos) {
+        tareas.adj = sb.rpc("experto_adjudicaciones", { texto: qDatos, p_rut: null, meses: 12, cantidad: 8 }).then((r) => r.data ?? []);
+      }
       const org = pregunta.match(/((?:i\.?\s*)?municipalidad|hospital|ministerio|servicio de salud|servicio local|universidad|gobierno regional|subsecretar[ií]a|direcci[oó]n|instituto|carabineros|ej[eé]rcito|armada|junaeb|junji|sename|cenabast|serviu|corfo|sence|fonasa)\s+(?:de\s+)?([a-záéíóúñ\s]{3,40})/i);
       if (org) tareas.org = sb.rpc("experto_organismo", { nombre_o_rut: org[0].replace(/[?¿.,]/g, "").trim().slice(0, 60) }).then((r) => r.data?.[0]);
     } else {
@@ -192,6 +196,11 @@ Deno.serve(async (req) => {
     const res: Record<string, any> = {};
     const tiempos: Record<string, number> = {};
     await Promise.all(Object.entries(tareas).map(async ([k, p]) => { const ti = Date.now(); try { res[k] = await p; } catch { res[k] = null; } tiempos[k] = Date.now() - ti; }));
+
+    // Adjudicaciones: quién le gana al organismo (chat e informe) y licitaciones parecidas ya adjudicadas (informe)
+    const rutOrg = res.org?.rut ?? res.ficha?.organismo?.rut ?? null;
+    if (rutOrg) { try { res.topadj = (await sb.rpc("experto_top_adjudicatarios", { p_rut: rutOrg, meses: 12, cantidad: 6 })).data ?? []; } catch { res.topadj = []; } }
+    if (modo === "informe" && res.ficha?.nombre) { try { res.adj = (await sb.rpc("experto_adjudicaciones", { texto: String(res.ficha.nombre).slice(0, 120), p_rut: null, meses: 12, cantidad: 6 })).data ?? []; } catch { res.adj = []; } }
 
     // Ensamblar contexto
     let fragmentos: any[] = [];
@@ -216,6 +225,8 @@ Deno.serve(async (req) => {
     if (res.ca?.length) partes.push("COMPRAS ÁGILES ABIERTAS:\n" + res.ca.map((l: any) => `${l.codigo} | ${l.nombre} | ${l.organismo} | ${fmt(l.monto)} | cierra ${fecha(l.cierra)} | pago: ${l.conducta_pago ?? "s/i"} ${l.pago_dias ? l.pago_dias + " días" : ""} | ${l.url ?? ""}`).join("\n"));
     if (res.comp?.length) partes.push(`COMPETENCIA para "${qDatos}" (proveedores que le vendieron exactamente ese producto al Estado en los últimos 12 meses, según los ítems de sus órdenes de compra; son datos confirmados, úsalos con confianza):\n` + res.comp.map((c: any) => `${c.proveedor} (${c.rut ?? ""}): ${c.ordenes} OC, ${fmt(c.monto)}, precio unitario mediano ${fmt(c.precio_unit_mediano)}, ${c.compradores} compradores`).join("\n"));
     if (res.pan) partes.push("PANORAMA (90 días): " + JSON.stringify(res.pan));
+    if (res.adj?.length) partes.push("LICITACIONES PARECIDAS YA ADJUDICADAS (API OCDS de Mercado Público, 12 meses; quién ganó y con cuánto):\n" + res.adj.map((a: any) => `${a.codigo} | ${a.titulo} | ${a.comprador} | adjudicada ${fecha(a.fecha_adjudicacion)} a ${a.adjudicatario ?? "s/i"} por ${fmt(a.monto_adjudicado)} (presupuesto ${fmt(a.monto_estimado)}) | ${a.num_oferentes ?? "s/i"} oferentes: ${a.oferentes ?? "s/i"}`).join("\n"));
+    if (res.topadj?.length) partes.push("QUIÉN LE GANA A ESTE ORGANISMO (API OCDS, 12 meses):\n" + res.topadj.map((t: any) => `${t.adjudicatario} (${t.rut ?? "s/i"}): ${t.licitaciones} licitaciones ganadas por ${fmt(t.monto)}, participó en ${t.participaciones}`).join("\n"));
     if (res.org) partes.push("FICHA ORGANISMO (Datos Mercado Público vía FirmaVB):\n" + textoOrganismo(res.org));
     const contexto = partes.join("\n\n") || "(sin fuentes ni datos para esta pregunta)";
 
