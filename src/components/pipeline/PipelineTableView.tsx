@@ -28,6 +28,7 @@ function formatCLP(amount: number): string {
 export function PipelineTableView({ items, onRowClick }: PipelineTableViewProps) {
   return (
     <div className="border rounded-lg overflow-hidden bg-white">
+      <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
@@ -115,6 +116,7 @@ export function PipelineTableView({ items, onRowClick }: PipelineTableViewProps)
           )}
         </TableBody>
       </Table>
+      </div>
     </div>
   );
 }

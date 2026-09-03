@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Slider } from "@/components/ui/slider";
-import { Filter, DollarSign, HelpCircle, Calendar, CheckCircle2, Percent } from "lucide-react";
+import { Filter, DollarSign, HelpCircle, Calendar, CheckCircle2, Percent, ArrowUpDown } from "lucide-react";
 import type { ComprasAgilesFilters as Filters } from "@/hooks/useComprasAgiles";
 import { UMBRAL_COMPRA_AGIL_CLP, formatCurrency } from "@/utils/clasificacion";
 
@@ -15,12 +15,19 @@ interface ComprasAgilesFiltersProps {
 }
 
 const ESTADOS = [
-  { value: 'activas', label: 'Activas (abiertas)' },
+  { value: 'activas', label: 'Vigentes (abiertas)' },
   { value: 'todas', label: 'Todos los estados' },
   { value: 'Cerrada', label: 'Cerrada' },
   { value: 'Desierta', label: 'Desierta' },
   { value: 'Cancelada', label: 'Cancelada' },
   { value: 'Proveedor seleccionado', label: 'Adjudicada' },
+];
+
+const ORDEN = [
+  { value: 'vigencia', label: 'Vigencia (cierra antes primero)' },
+  { value: 'monto_desc', label: 'Monto: mayor a menor' },
+  { value: 'monto_asc', label: 'Monto: menor a mayor' },
+  { value: 'match', label: 'Match: mayor a menor' },
 ];
 
 const REGIONES = [
@@ -54,12 +61,37 @@ export function ComprasAgilesFilters({ filters, onFiltersChange }: ComprasAgiles
   return (
     <Card className="bg-card border-border shadow-sm">
       <CardContent className="pt-4">
-        <div className="flex items-center gap-2 mb-4">
-          <Filter className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium text-foreground">Filtros</span>
+        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium text-foreground">Filtros</span>
+          </div>
+
+          {/* Ordenar por: aparte de los filtros, para que no se pierda entre
+              los 7 campos de abajo (era el pedido más repetido: "ordenar por
+              monto y vigencia"). */}
+          <div className="flex items-center gap-2">
+            <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <Label className="text-xs text-muted-foreground whitespace-nowrap">Ordenar por</Label>
+            <Select
+              value={filters.sortBy || 'vigencia'}
+              onValueChange={(value) => onFiltersChange({ ...filters, sortBy: value as Filters['sortBy'] })}
+            >
+              <SelectTrigger className="bg-background w-[220px]">
+                <SelectValue placeholder="Ordenar por" />
+              </SelectTrigger>
+              <SelectContent>
+                {ORDEN.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-x-4 gap-y-5">
           {/* Fecha de Cierre */}
           <div className="space-y-1.5">
             <div className="flex items-center gap-1.5">
@@ -106,11 +138,14 @@ export function ComprasAgilesFilters({ filters, onFiltersChange }: ComprasAgiles
             </Select>
           </div>
 
-          {/* Estado */}
+          {/* Estado / Vigencia */}
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Estado</Label>
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="h-3 w-3 text-muted-foreground" />
+              <Label className="text-xs text-muted-foreground">Vigencia</Label>
+            </div>
             <Select
-              value={filters.estado || 'todas'}
+              value={filters.estado || 'activas'}
               onValueChange={(value) => onFiltersChange({ ...filters, estado: value })}
             >
               <SelectTrigger className="bg-background">

@@ -7,51 +7,39 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ComprasAgilesStats } from "@/components/compras-agiles/ComprasAgilesStats";
 import { ComprasAgilesFilters } from "@/components/compras-agiles/ComprasAgilesFilters";
 import { ComprasAgilesTable } from "@/components/compras-agiles/ComprasAgilesTable";
-import { MatchPanel } from "@/components/compras-agiles/MatchPanel";
-import { GenerarPropuestaModal } from "@/components/compras-agiles/GenerarPropuestaModal";
-import { useComprasAgiles, type CompraAgil, type ComprasAgilesFilters as Filters } from "@/hooks/useComprasAgiles";
+import { useComprasAgiles, type ComprasAgilesFilters as Filters } from "@/hooks/useComprasAgiles";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useClienteFiltros } from "@/hooks/useClienteFiltros";
 import { supabaseClient as supabase } from "@/lib/supabaseClient";
 
-interface ItemParaPropuesta {
-  itemId: string;
-  itemIndex: number;
-  nombre: string;
-  descripcion: string;
-  cantidadSolicitada: number;
-  unidadMedida: string;
-  match: {
-    id: string;
-    sku: string;
-    nombre: string;
-    precio_unitario: number;
-    stock: number | null;
-    matchScore: number;
-    margen_estimado: number;
-  } | null;
-}
-
 export default function ComprasAgiles() {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<Filters>({ matchThreshold: 70, estado: 'activas' });
-  const [selectedCompra, setSelectedCompra] = useState<CompraAgil | null>(null);
-  const [propuestaModalOpen, setPropuestaModalOpen] = useState(false);
-  const [productosParaPropuesta, setProductosParaPropuesta] = useState<ItemParaPropuesta[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Obtener filtros personalizados del cliente
   const { filtros: clienteFiltros } = useClienteFiltros();
-  
+
   // Combinar filtros de UI con filtros del cliente
   const filtersWithClient = useMemo(() => ({
     ...filters,
     clienteFiltros: clienteFiltros || undefined,
   }), [filters, clienteFiltros]);
 
-  const { data: compras, isLoading, error, refetch } = useComprasAgiles(filtersWithClient);
+  const { data: comprasSinFiltroMatch, isLoading, error, refetch } = useComprasAgiles(filtersWithClient);
+
+  // "Match mínimo" filtra por el % de match REAL (ca_matches, el mismo que
+  // ves en el detalle y en la Bandeja) — antes este control solo alimentaba
+  // un motor de matching aparte que nunca se mostraba en ningún filtro real.
+  const compras = useMemo(() => {
+    const umbral = filters.matchThreshold ?? 0;
+    if (!umbral) return comprasSinFiltroMatch;
+    return (comprasSinFiltroMatch || []).filter(
+      (c) => !c.match_encontrado || (c.match_score ?? 0) >= umbral
+    );
+  }, [comprasSinFiltroMatch, filters.matchThreshold]);
   // Memoizar handlers para evitar re-renders innecesarios
   const handleRefresh = useCallback(async () => {
     try {
@@ -140,28 +128,6 @@ export default function ComprasAgiles() {
       setIsGenerating(false);
     }
   }, [compras, queryClient]);
-
-  const handleSelectCompra = useCallback((compra: CompraAgil) => {
-    setSelectedCompra(compra);
-  }, []);
-
-  const handleGenerarPropuesta = useCallback((productos: ItemParaPropuesta[]) => {
-    if (productos.length === 0) {
-      toast.warning('No hay productos seleccionados para generar propuesta');
-      return;
-    }
-    setProductosParaPropuesta(productos);
-    setPropuestaModalOpen(true);
-  }, []);
-
-  const handleClosePropuestaModal = useCallback(() => {
-    setPropuestaModalOpen(false);
-    // Limpiar productos cuando se cierra el modal
-    setProductosParaPropuesta([]);
-  }, []);
-
-  // Memoizar selectedId para evitar re-renders
-  const selectedId = useMemo(() => selectedCompra?.id || null, [selectedCompra?.id]);
 
   return (
     <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 bg-gradient-to-br from-background via-firmavb-cream/5 to-background min-h-screen">
@@ -261,35 +227,9 @@ export default function ComprasAgiles() {
       {/* Filters */}
       <ComprasAgilesFilters filters={filters} onFiltersChange={setFilters} />
 
-      {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-        {/* Table */}
-        <div className="lg:col-span-2">
-          <ComprasAgilesTable
-            compras={compras}
-            isLoading={isLoading}
-            selectedId={selectedId}
-            onSelect={handleSelectCompra}
-            matchThreshold={filters.matchThreshold ?? 70}
-          />
-        </div>
-
-        {/* Match Panel */}
-        <div className="lg:col-span-1 lg:sticky lg:top-4 lg:self-start">
-          <MatchPanel
-            compra={selectedCompra}
-            onGenerarPropuesta={handleGenerarPropuesta}
-          />
-        </div>
-      </div>
-
-      {/* Propuesta Modal */}
-      <GenerarPropuestaModal
-        open={propuestaModalOpen}
-        onOpenChange={handleClosePropuestaModal}
-        compra={selectedCompra}
-        productos={productosParaPropuesta}
-      />
+      {/* Lista: haz clic en una fila para ver el match producto a producto,
+          editarlo y generar la propuesta desde el detalle de la compra. */}
+      <ComprasAgilesTable compras={compras} isLoading={isLoading} />
     </div>
   );
 }
