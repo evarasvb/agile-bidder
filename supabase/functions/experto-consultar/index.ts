@@ -49,6 +49,15 @@ const fecha = (d: any) => d ? new Date(d).toLocaleDateString("es-CL", { day: "2-
 function textoFragmentos(frs: any[]) {
   return frs.map((f, i) => `[${i + 1}] ${f.fuente}${f.seccion ? " — " + f.seccion : ""}\n${String(f.texto).slice(0, 1800)}`).join("\n\n");
 }
+function textoOrganismo(o: any) {
+  const top = (o.top_proveedores ?? []).slice(0, 5).map((p: any) => `${p.proveedor} (${p.ordenes} OC, ${fmt(p.monto)})`).join("; ");
+  const recl = o.reclamos == null ? "sin dato" : `${o.reclamos} reclamos por incumplir plazo de pago en los últimos 12 meses (ficha Mercado Público leída el ${o.dato_pago_al ?? "s/i"}${o.reclamos_hace_90d != null ? `; hace 90 días eran ${o.reclamos_hace_90d}` : ""})`;
+  return `${o.institucion} (RUT ${o.rut ?? "s/i"}, ${o.region ?? "s/i"})
+Reclamos por no pago: ${recl}
+Plazo de pago declarado en sus licitaciones: ${o.plazo_pago ?? "s/i"} | Conducta de pago histórica: ${o.conducta_pago ?? "s/i"} (${o.pago_promedio_dias ?? "s/i"} días promedio)
+Órdenes de compra últimos 12 meses: ${o.oc_12m ?? 0} por ${fmt(o.monto_12m)} | Licitaciones abiertas hoy: ${o.licitaciones_abiertas ?? 0}
+Top proveedores 12 meses: ${top || "s/i"}`;
+}
 function textoFicha(f: any) {
   if (!f) return "";
   const items = (f.items ?? []).slice(0, 25).map((i: any) => `- ${i.producto}${i.cantidad ? ` (${i.cantidad} ${i.unidad ?? ""})` : ""}${i.descripcion ? ": " + i.descripcion : ""}`).join("\n");
@@ -73,6 +82,7 @@ const SYS_CHAT = `Eres el Experto FirmaVB, asesor con 17 años vendiéndole al E
 Reglas:
 - Responde SOLO con lo que respaldan las FUENTES y DATOS entregados. Cita entre corchetes [n] la fuente usada después de cada afirmación que provenga de ella. Con ley o reglamento nombra el artículo en la frase; con directivas su número; con dictámenes de Contraloría número y año (advierte si es anterior a dic-2024: puede citar el reglamento antiguo D.250/2004, reemplazado por el D.661/2024); con sentencias del TCP rol y fecha; con el libro, dilo como criterio práctico del autor.
 - Con datos de Mercado Público entrega código, organismo, monto, cierre y link.
+- Si hay FICHA ORGANISMO, úsala para evaluar el riesgo de venderle: los reclamos por no pago son un dato real de la ficha de Mercado Público (últimos 12 meses). Interprétalo según su volumen de compras: 0-5 bajo, 6-50 medio, más de 50 alto; compáralo con la cifra de hace 90 días si existe. Cítalo como "Datos Mercado Público vía FirmaVB". Si el dato dice "sin dato", dilo así.
 - Si las fuentes no cubren la pregunta, dilo ("No tengo fuente en mi base para eso") y señala qué documento consultar. No inventes artículos, plazos, cifras ni licitaciones.
 - Montos en pesos con separador de miles ($1.234.567). Máximo 250 palabras salvo que pidan detalle. Párrafos cortos; lista corta solo para varias licitaciones. Formato Markdown simple.`;
 
@@ -203,7 +213,7 @@ Deno.serve(async (req) => {
     if (res.ca?.length) partes.push("COMPRAS ÁGILES ABIERTAS:\n" + res.ca.map((l: any) => `${l.codigo} | ${l.nombre} | ${l.organismo} | ${fmt(l.monto)} | cierra ${fecha(l.cierra)} | pago: ${l.conducta_pago ?? "s/i"} ${l.pago_dias ? l.pago_dias + " días" : ""} | ${l.url ?? ""}`).join("\n"));
     if (res.comp?.length) partes.push(`COMPETENCIA para "${qDatos}" (proveedores que le vendieron exactamente ese producto al Estado en los últimos 12 meses, según los ítems de sus órdenes de compra; son datos confirmados, úsalos con confianza):\n` + res.comp.map((c: any) => `${c.proveedor} (${c.rut ?? ""}): ${c.ordenes} OC, ${fmt(c.monto)}, precio unitario mediano ${fmt(c.precio_unit_mediano)}, ${c.compradores} compradores`).join("\n"));
     if (res.pan) partes.push("PANORAMA (90 días): " + JSON.stringify(res.pan));
-    if (res.org) partes.push("FICHA ORGANISMO: " + JSON.stringify(res.org));
+    if (res.org) partes.push("FICHA ORGANISMO (Datos Mercado Público vía FirmaVB):\n" + textoOrganismo(res.org));
     const contexto = partes.join("\n\n") || "(sin fuentes ni datos para esta pregunta)";
 
     const userMsg = modo === "chat" ? `${contexto}\n\nPREGUNTA: ${pregunta}` : `${contexto}\n\nGenera el informe de trabajo para la licitación ${codigo}.${pregunta ? " Contexto del proveedor: " + pregunta : ""}`;
