@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { compartirPdfExperto } from '@/services/expertoPdf';
 import { matrizAExcelPro } from '@/services/matrizExcel';
 
-export interface Matriz { titulo?: string; resumen?: string; codigo?: string; generada_en?: string; umbral_adjudicacion?: any; admisibilidad?: any[]; evaluacion?: any[]; anexos?: any[]; reglas_especiales?: any[]; tareas?: any[]; fechas?: any[] }
+export interface Matriz { titulo?: string; resumen?: string; codigo?: string; generada_en?: string; umbral_adjudicacion?: any; admisibilidad?: any[]; evaluacion?: any[]; anexos?: any[]; reglas_especiales?: any[]; tareas?: any[]; fechas?: any[]; garantias?: any[]; secuencia_carga?: any[]; pendientes_humanos?: any[] }
 // Misma lógica que las fórmulas del Excel: la entrada del usuario define el estado.
 const aNum = (v: any): number | null => { if (v == null || v === '') return null; const n = Number(String(v).replace(/[^0-9.,-]/g, '').replace(/\.(?=\d{3})/g, '').replace(',', '.')); return Number.isFinite(n) ? n : null; };
 export function evaluarEntrada(r: any): string {
@@ -27,10 +27,14 @@ const SECCIONES: Seccion[] = [
   { clave: 'reglas_especiales', titulo: '4. Reglas especiales', cols: [['aspecto', 'Aspecto'], ['regla', 'Regla']] },
   { clave: 'tareas', titulo: '5. Plan de tareas', cols: [['estado', 'Estado'], ['fase', 'Fase'], ['documento', 'Documento'], ['responsable', 'Responsable'], ['accion', 'Acción'], ['plazo', 'Plazo']] },
   { clave: 'fechas', titulo: '6. Fechas', cols: [['hito', 'Hito'], ['fecha', 'Fecha']] },
+  { clave: 'garantias', titulo: '7. Garantías', cols: [['tipo', 'Garantía'], ['exigida', 'Exigida'], ['monto_o_porcentaje', 'Monto o %'], ['beneficiario', 'Beneficiario'], ['glosa', 'Glosa'], ['vigencia', 'Vigencia'], ['fuente', 'Fuente']] },
+  { clave: 'secuencia_carga', titulo: '8. Secuencia de carga en el portal', cols: [['orden', 'N°'], ['documento', 'Documento'], ['donde', 'Dónde se sube']] },
+  { clave: 'pendientes_humanos', titulo: '9. Pendientes que debe validar la empresa', cols: [['texto', 'Pendiente']] },
 ];
-const ESTADOS: Record<string, string> = { pendiente: 'Pendiente', cumple: 'Cumple', ok: 'OK', no_cumple: 'No cumple', revisar: 'Revisar' };
-const colorEstado = (e: string) => e === 'cumple' || e === 'ok' ? 'bg-green-100 text-green-800' : e === 'no_cumple' ? 'bg-red-100 text-red-800' : e === 'revisar' ? 'bg-yellow-100 text-yellow-800' : 'bg-muted text-muted-foreground';
-const filas = (m: Matriz, k: keyof Matriz) => (Array.isArray(m[k]) ? (m[k] as any[]) : []);
+export const ESTADOS: Record<string, string> = { pendiente: 'Pendiente', cumple: 'Cumple', ok: 'OK', no_cumple: 'No cumple', revisar: 'Revisar', verificar: 'Verificar', no_aplica: 'No aplica', solo_si_adjudica: 'Solo si adjudica' };
+const colorEstado = (e: string) => e === 'cumple' || e === 'ok' ? 'bg-green-100 text-green-800' : e === 'no_cumple' ? 'bg-red-100 text-red-800' : e === 'revisar' || e === 'verificar' ? 'bg-yellow-100 text-yellow-800' : e === 'solo_si_adjudica' ? 'bg-blue-100 text-blue-800' : 'bg-muted text-muted-foreground';
+// Las listas de texto (pendientes) se muestran como filas de una columna.
+const filas = (m: Matriz, k: keyof Matriz) => (Array.isArray(m[k]) ? (m[k] as any[]).map((r) => (typeof r === 'string' ? { texto: r } : r)) : []);
 const txt = (v: any) => v == null ? '' : typeof v === 'boolean' ? (v ? 'Sí' : 'No') : String(v);
 
 export function matrizAExcel(m: Matriz) {

@@ -78,9 +78,10 @@ export async function matrizAExcelPro(m: Matriz) {
 
   // 3. Tareas con estado desplegable
   const ta = wb.addWorksheet('Plan de tareas');
-  titulo(ta, 'Plan de tareas', 'Cambia ESTADO a OK cuando esté listo.');
+  titulo(ta, 'Plan de tareas', 'Cambia ESTADO: OK (listo y probado), VERIFICAR, NO APLICA o SOLO SI ADJUDICA (se entrega después de adjudicar).');
+  const ESTADO_XLS: Record<string, string> = { ok: 'OK', verificar: 'VERIFICAR', no_aplica: 'NO APLICA', solo_si_adjudica: 'SOLO SI ADJUDICA' };
   cab(ta, 4, ['Estado', 'Fase', 'Documento', 'Responsable', 'Acción', 'Plazo'], [12, 24, 28, 20, 50, 18]);
-  (m.tareas ?? []).forEach((r: any, i: number) => { const f = 5 + i; const row = ta.getRow(f); row.values = [r.estado === 'ok' ? 'OK' : 'PENDIENTE', r.fase ?? '', r.documento ?? '', r.responsable ?? '', r.accion ?? '', r.plazo ?? '']; row.alignment = { vertical: 'top', wrapText: true }; entrada(row.getCell(1)); row.getCell(1).dataValidation = { type: 'list', allowBlank: false, formulae: ['"PENDIENTE,OK"'] }; });
+  (m.tareas ?? []).forEach((r: any, i: number) => { const f = 5 + i; const row = ta.getRow(f); row.values = [ESTADO_XLS[r.estado] ?? 'PENDIENTE', r.fase ?? '', r.documento ?? '', r.responsable ?? '', r.accion ?? '', r.plazo ?? '']; row.alignment = { vertical: 'top', wrapText: true }; entrada(row.getCell(1)); row.getCell(1).dataValidation = { type: 'list', allowBlank: false, formulae: ['"PENDIENTE,OK,VERIFICAR,NO APLICA,SOLO SI ADJUDICA"'] }; });
   semaforo(ta, `A5:A${4 + (m.tareas ?? []).length}`);
 
   // 4. Anexos, reglas y fechas (referencia)
@@ -88,6 +89,9 @@ export async function matrizAExcelPro(m: Matriz) {
   simple('Anexos', ['Anexo', 'Obligatorio', 'Cuándo', 'Quién firma', 'Nota'], [34, 12, 22, 24, 44], (m.anexos ?? []).map((a: any) => [a.anexo, a.obligatorio ? 'Sí' : 'No', a.cuando, a.quien_firma, a.nota]));
   simple('Reglas especiales', ['Aspecto', 'Regla'], [30, 90], (m.reglas_especiales ?? []).map((a: any) => [a.aspecto, a.regla]));
   simple('Fechas', ['Hito', 'Fecha'], [40, 30], (m.fechas ?? []).map((a: any) => [a.hito, a.fecha]));
+  if (m.garantias?.length) simple('Garantías', ['Garantía', 'Exigida', 'Monto o %', 'Beneficiario', 'Glosa', 'Vigencia', 'Fuente'], [24, 10, 18, 28, 40, 18, 18], m.garantias.map((g: any) => [g.tipo, g.exigida === false ? 'No' : 'Sí', g.monto_o_porcentaje, g.beneficiario, g.glosa, g.vigencia, g.fuente]));
+  if (m.secuencia_carga?.length) simple('Secuencia de carga', ['N°', 'Documento', 'Dónde se sube'], [6, 60, 30], m.secuencia_carga.map((c: any) => [c.orden, c.documento, c.donde]));
+  if (m.pendientes_humanos?.length) simple('Pendientes empresa', ['N°', 'Debe validar la empresa'], [6, 100], m.pendientes_humanos.map((t: any, i: number) => [i + 1, typeof t === 'string' ? t : t.texto]));
 
   const buf = await wb.xlsx.writeBuffer();
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })); a.download = `${m.codigo ?? 'licitacion'}-matriz-postulacion.xlsx`; a.click();

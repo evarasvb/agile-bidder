@@ -9,7 +9,7 @@ import { pagoOrganismo, presupuestoTexto } from '@/lib/organismoPago';
 type Paso = { k: string; t: string; listo: boolean; accion?: () => void; ayuda?: string };
 const pond = (r: any): number => { const n = r.ponderacion_num != null ? Number(r.ponderacion_num) : Number(String(r.ponderacion ?? '').replace(/[^0-9.,]/g, '').replace(',', '.')); if (!Number.isFinite(n) || n === 0) return 0; return n > 1 ? n / 100 : n; };
 const num = (v: any): number | null => { const n = Number(String(v ?? '').replace(/[^0-9.,-]/g, '').replace(/\.(?=\d{3})/g, '').replace(',', '.')); return v == null || v === '' || !Number.isFinite(n) ? null : n; };
-const ESTADO: Record<string, [string, string]> = { cumple: ['Cumple', 'bg-green-100 text-green-800'], ok: ['OK', 'bg-green-100 text-green-800'], no_cumple: ['No cumple', 'bg-red-100 text-red-800'], revisar: ['Revisar', 'bg-yellow-100 text-yellow-800'], pendiente: ['Pendiente', 'bg-muted text-muted-foreground'] };
+const ESTADO: Record<string, [string, string]> = { cumple: ['Cumple', 'bg-green-100 text-green-800'], ok: ['OK', 'bg-green-100 text-green-800'], verificar: ['Verificar', 'bg-yellow-100 text-yellow-800'], no_aplica: ['No aplica', 'bg-muted text-muted-foreground'], solo_si_adjudica: ['Solo si adjudica', 'bg-blue-100 text-blue-800'], no_cumple: ['No cumple', 'bg-red-100 text-red-800'], revisar: ['Revisar', 'bg-yellow-100 text-yellow-800'], pendiente: ['Pendiente', 'bg-muted text-muted-foreground'] };
 const Chip = ({ e }: { e?: string }) => { const [t, c] = ESTADO[e ?? 'pendiente'] ?? ESTADO.pendiente; return <span className={`rounded px-1.5 py-0.5 text-[11px] ${c}`}>{t}</span>; };
 
 export interface SalaProps {
@@ -28,7 +28,8 @@ export function SalaPostulacion(p: SalaProps) {
   const dias = f.fecha_cierre ? Math.ceil((new Date(f.fecha_cierre).getTime() - Date.now()) / 86400000) : null;
   const campos = (p.anexos.match(/\[\[[^\]]+\]\]/g) ?? []).length;
   const aprob = (m as any)?.aprobacion as { por?: string; en?: string } | undefined;
-  const proxima = tareas.find((t) => t.estado !== 'ok');
+  const proxima = tareas.find((t) => !['ok', 'no_aplica', 'solo_si_adjudica'].includes(t.estado));
+  const garantias = (m as any)?.garantias ?? []; const carga = (m as any)?.secuencia_carga ?? []; const pendHum = ((m as any)?.pendientes_humanos ?? []) as any[];
   const pasos: Paso[] = [
     { k: 'bases', t: 'Bases leídas', listo: p.bases.length > 0, ayuda: 'Sube el PDF de las bases en Fuentes' },
     { k: 'informe', t: 'Veredicto', listo: !!p.informe, accion: () => p.onGenerar('informe') },
@@ -97,6 +98,16 @@ export function SalaPostulacion(p: SalaProps) {
         <p className="text-xs"><b>Mis documentos:</b> {p.documentos.length ? p.documentos.map((d) => d.nombre).join(', ') : 'ninguno todavía'}</p>
         <p className="text-xs"><b>Anexos:</b> {p.anexos ? (campos ? <span className="text-amber-700">{campos} campos por completar a mano ({p.faltantes.slice(0, 4).join(', ')}{p.faltantes.length > 4 ? '…' : ''})</span> : <span className="text-green-700">completos, listos para firmar</span>) : <button className="underline" onClick={() => p.onGenerar('anexos')}>generar con los datos de tu empresa (Plus)</button>}</p>
       </div>
+
+      {/* 4b. Garantías, secuencia de carga y pendientes de la empresa (vienen de la matriz) */}
+      {(garantias.length > 0 || carga.length > 0 || pendHum.length > 0) && (
+        <div className="rounded-lg border p-3 space-y-1">
+          <p className="font-semibold">Garantías, carga y pendientes</p>
+          {garantias.map((g: any, i: number) => <p key={'g' + i} className="text-xs"><b>{g.tipo}:</b> {g.exigida === false ? 'no se exige' : [g.monto_o_porcentaje, g.beneficiario && `a favor de ${g.beneficiario}`, g.vigencia && `vigencia ${g.vigencia}`].filter(Boolean).join(' · ')} {g.fuente && <span className="text-muted-foreground">({g.fuente})</span>}</p>)}
+          {carga.length > 0 && <p className="text-xs"><b>Orden de carga en el portal:</b> {carga.map((c: any) => `${c.orden ?? ''}. ${c.documento}${c.donde ? ` (${c.donde})` : ''}`).join(' → ')}</p>}
+          {pendHum.length > 0 && <div className="text-xs"><b>Debe validar la empresa:</b><ol className="list-decimal ml-4">{pendHum.map((t: any, i: number) => <li key={i}>{typeof t === 'string' ? t : t.texto ?? JSON.stringify(t)}</li>)}</ol></div>}
+        </div>
+      )}
 
       {/* 5. Revisión y postulación */}
       <div className="rounded-lg border p-3 space-y-2">

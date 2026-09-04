@@ -23,8 +23,12 @@ Responde SOLO con JSON válido (sin markdown) con esta forma exacta:
  "evaluacion":[{"criterio":"...","como_se_puntua":"fórmula o escala","ponderacion":"% o puntos","ponderacion_num":número entre 0 y 1 o null,"puntaje_max":"...","puntaje_max_num":número o null,"puntaje_estimado":número que el proveedor probablemente obtiene según sus documentos o null,"que_hacer":"qué hacer para el máximo puntaje","fuente":"..."}],
  "anexos":[{"anexo":"Anexo N° y nombre","obligatorio":true,"cuando":"siempre | solo UTP | solo Cloud | ...","quien_firma":"...","nota":"..."}],
  "reglas_especiales":[{"aspecto":"...","regla":"..."}],
- "tareas":[{"fase":"1. Administrativo y legal | 2. Comercial y precio | 3. Técnico | 4. Anexos y firmas | 5. Garantías | 6. Envío","documento":"...","responsable":"Proveedor | Representante legal | Cliente final | Partner | FirmaVB","accion":"acción concreta","plazo":"fecha o 'X días antes del cierre'","estado":"pendiente|ok"}],
+ "tareas":[{"fase":"1. Administrativo y legal | 2. Comercial y precio | 3. Técnico | 4. Anexos y firmas | 5. Garantías | 6. Envío","documento":"...","responsable":"Proveedor | Representante legal | Cliente final | Partner | FirmaVB","accion":"acción concreta","plazo":"fecha o 'X días antes del cierre'","estado":"pendiente|ok|verificar|no_aplica|solo_si_adjudica"}],
+ "garantias":[{"tipo":"seriedad de la oferta | fiel cumplimiento","exigida":true,"monto_o_porcentaje":"...","beneficiario":"...","glosa":"...","vigencia":"...","fuente":"..."}],
+ "secuencia_carga":[{"orden":1,"documento":"...","donde":"Anexos administrativos | Anexos técnicos | Anexos económicos | Garantía"}],
+ "pendientes_humanos":["lo que la empresa debe decidir o validar (precio final, líneas a ofertar, certificaciones, firmas, declaraciones juradas)"],
  "fechas":[{"hito":"...","fecha":"..."}]}
+Reglas duras: nunca inventes certificaciones, experiencia ni datos de la empresa (si faltan van a pendientes_humanos); las declaraciones juradas se dejan como plantilla con identificación, sin marcar opciones ni firmar; si hay resoluciones modificatorias o aclaraciones en las bases, manda lo modificado; "estado" de una tarea: ok solo si un documento del proveedor lo prueba, verificar si hay dudas, no_aplica si las bases no lo exigen para este caso, solo_si_adjudica para lo que se entrega después de adjudicar (garantía de fiel cumplimiento, contrato).
 Usa SOLO los datos entregados (bases, ficha, documentos del proveedor, perfil de la empresa). El "chequeo" sirve para fórmulas de Excel: usa si_no para requisitos de sí o no (inscripción, declaración, aceptación), minimo/maximo/rango para cifras (garantía mínima en meses, SLA máximo en horas, descuento entre 2 y 10) con el umbral exacto de las bases, y texto para el resto. Si hay DOCUMENTOS DEL PROVEEDOR, úsalos para marcar estado cumple/ok y anotar en "nota" lo que ya está listo y lo que falta. Si algo no está en las fuentes, estado "revisar" y nota "revisar en bases". Máximo 25 filas por lista. Español chileno, directo, cifras exactas, sin inventar.`;
 
 Deno.serve(async (req) => {
@@ -64,7 +68,7 @@ Deno.serve(async (req) => {
     for (const model of [...MODELOS, "espera", ...MODELOS]) {
       if (model === "espera") { await new Promise((ok) => setTimeout(ok, 2500)); continue; }
       const r = await fetch(GEMINI_URL, { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model, temperature: 0.2, max_tokens: 7000, messages: [{ role: "system", content: SYS }, { role: "user", content: partes.join("\n\n") + `\n\nGenera la matriz de postulación de ${codigo}.` }] }) });
+        body: JSON.stringify({ model, temperature: 0.2, max_tokens: 8500, messages: [{ role: "system", content: SYS }, { role: "user", content: partes.join("\n\n") + `\n\nGenera la matriz de postulación de ${codigo}.` }] }) });
       if (!r.ok) { console.error("gemini", model, r.status); continue; }
       let c = String((await r.json()).choices?.[0]?.message?.content ?? "").trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
       const a = c.indexOf("{"), z = c.lastIndexOf("}"); if (a >= 0 && z > a) c = c.slice(a, z + 1);

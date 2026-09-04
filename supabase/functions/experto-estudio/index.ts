@@ -37,14 +37,22 @@ Quién gana más veces a este organismo, quién siempre postula, quién vende es
 Si hay BASES: criterios y ponderación reales con su sección. Si no, lo que la ficha permite saber y qué revisar (y sugiere subir las bases con el botón "Subir bases (PDF)").
 ## 5. Riesgo de pago del organismo
 Reclamos por pago no oportuno por cada 100 procesos, plazo declarado, conducta histórica.
-## 6. Estrategia para postular
-Precio objetivo (rango con cifras, justificado con el historial), a quién hay que ganarle y con qué, dónde poner el esfuerzo técnico según los criterios, si conviene ir solo o en UTP, garantías y plazos, y los errores que en casos parecidos dejaron fuera a otros (dictámenes o sentencias de las FUENTES).
-## 7. Plan de trabajo hasta el cierre
-Hitos con fechas hacia atrás desde el cierre.
+## 6. Cómo se gana
+Descompón la pauta en puntos ponderados y nombra la PALANCA MAYOR (el criterio que más mueve la aguja, con sus puntos: p. ej. soporte 24/7 vale 30 puntos contra 15). Fórmula de precio en texto (precio mínimo / precio ofertado × 100) y cómo se resuelven los empates y el umbral de conveniencia si las bases lo fijan.
+## 7. Precio: tres escenarios
+Tabla Markdown: Escenario | % del tope | Neto | Con IVA (×1,19) | Riesgo. Filas: conservador (98% del tope), recomendado (96%), agresivo (93%), más el piso de referencia del historial (promedio adjudicado/presupuesto). El tope es el presupuesto; si no está informado, usa el tramo del código (L1 hasta 100 UTM, LE 100 a 1.000, LP 1.000 a 2.000, LQ 2.000 a 5.000, LR más de 5.000) con la UTM de hoy y dilo. Si el producto se cotiza en dólares, muestra el cálculo (USD × unidades × años × dólar de hoy). Riesgos a nombrar cuando apliquen: moneda CLP sin reajuste, pago único tras recepción conforme, multas, oferta temeraria.
+## 8. Garantías y compromisos
+Seriedad de la oferta y fiel cumplimiento: tipo, monto o %, beneficiario, glosa, vigencia, cuándo se devuelve (según bases; si no lo dicen, dilo). Recuerda que la garantía de seriedad solo se exige sobre 1.000 UTM. Qué compromisos de servicio conviene NO prometer si no se pueden cumplir.
+## 9. Estrategia para postular
+A quién hay que ganarle y con qué, dónde poner el esfuerzo técnico según los criterios, si conviene ir solo o en UTP, y los errores que en casos parecidos dejaron fuera a otros (dictámenes o sentencias de las FUENTES).
+## 10. Plan de trabajo hasta el cierre
+Hitos con fechas hacia atrás desde el cierre, incluida la secuencia de carga en el portal (administrativos, técnicos, económicos, garantía).
+## 11. Pendientes que debe validar la empresa
+Lista numerada de lo que el Experto NO decide ni inventa: precio final, líneas a ofertar, certificaciones y experiencia acreditable, datos de la empresa, firmas y declaraciones juradas, documento de originalidad si aplica. Marca cada uno con [VALIDAR].
 ## Fuentes
 Lista numerada de lo citado.
 
-Reglas: cita [n] tras cada afirmación con fuente; "Datos Mercado Público vía FirmaVB (OCDS)" para historial y adjudicaciones; no inventes procesos, montos ni criterios; si el historial es corto, dilo (la base OCDS parte en julio de 2026 y crece a diario); montos con separador de miles; máximo 1.800 palabras. Nunca escribas fórmulas en LaTeX ni digas "null" o "JSON": escribe las fórmulas en texto (precio mínimo / precio ofertado × 100) y si un dato no está, di que las bases no lo indican.`;
+Reglas: cita [n] tras cada afirmación con fuente; "Datos Mercado Público vía FirmaVB (OCDS)" para historial y adjudicaciones; no inventes procesos, montos, criterios, certificaciones ni datos de la empresa; si las bases traen resoluciones modificatorias o aclaraciones, manda lo modificado y dilo; si el historial es corto, dilo (la base OCDS parte en julio de 2026 y crece a diario); montos con separador de miles; máximo 2.300 palabras. Nunca escribas fórmulas en LaTeX ni digas "null" o "JSON": escribe las fórmulas en texto (precio mínimo / precio ofertado × 100) y si un dato no está, di que las bases no lo indican.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -81,6 +89,8 @@ Deno.serve(async (req) => {
       n1: sb.rpc("experto_buscar_texto", { consulta: "criterios evaluacion puntaje precio experiencia", cantidad: 3 }).then((r) => r.data ?? []),
       n2: sb.rpc("experto_buscar_texto", { consulta: "garantia seriedad oferta", cantidad: 2 }).then((r) => r.data ?? []),
       // Normativa, dictámenes y sentencias sobre el tema de esta licitación (base propia del Experto)
+      // UTM y dólar del día (mindicador.cl) para tramos en UTM y precios en USD.
+      ind: fetch("https://mindicador.cl/api", { signal: AbortSignal.timeout(4000) }).then((r) => r.json()).then((j: any) => ({ utm: j?.utm?.valor ?? null, dolar: j?.dolar?.valor ?? null })),
       n3: sb.rpc("experto_buscar_texto", { consulta: nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9ñ ]/g, " ").split(/\s+/).filter((w: string) => w.length > 4).slice(0, 3).join(" "), cantidad: 3 }).then((r) => r.data ?? []),
     };
     const res: Record<string, any> = {};
@@ -94,6 +104,7 @@ Deno.serve(async (req) => {
     if (frag.length) partes.push("FUENTES:\n" + frag.map((f, i) => `[${i + 1}] ${f.fuente}${f.seccion ? " — " + f.seccion : ""}\n${String(f.texto).slice(0, 1200)}`).join("\n\n"));
     const o = ficha.organismo ?? {};
     partes.push(`FICHA DE LA LICITACIÓN ${codigo} (Datos Mercado Público vía FirmaVB):\n${nombre}\nOrganismo: ${ficha.institucion} (RUT ${rut ?? "s/i"}) — ${ficha.comuna ?? ""}, ${ficha.region ?? ""}\nEstado: ${ficha.estado} | Tipo: ${ficha.tipo ?? "s/i"} | Presupuesto: ${fmt(ficha.presupuesto)} | Modalidad: ${ficha.modalidad ?? "s/i"} | Pago: ${ficha.tipo_pago ?? "s/i"} | Contrato: ${ficha.duracion_contrato ?? "s/i"}\nPublicada ${fecha(ficha.fecha_publicacion)} | Cierre ${fecha(ficha.fecha_cierre)} | Adjudicación estimada ${fecha(ficha.fecha_adjudicacion)}\nDescripción: ${String(ficha.descripcion ?? "").slice(0, 1200)}\nÍtems: ${(ficha.items ?? []).slice(0, 20).map((i: any) => `${i.producto}${i.cantidad ? ` (${i.cantidad} ${i.unidad ?? ""})` : ""}`).join("; ") || "s/i"}\nLink: ${ficha.url}`);
+    if (res.ind?.utm || res.ind?.dolar) partes.push(`INDICADORES DE HOY (mindicador.cl, ${fecha(new Date())}): UTM ${fmt(res.ind.utm)} · dólar observado ${fmt(res.ind.dolar)}. Úsalos para el tramo en UTM y para precios en dólares.`);
     const hist: any[] = res.hist ?? [];
     if (hist.length) {
       const conAdj = hist.filter((h) => h.monto_adjudicado && h.monto_estimado);
@@ -119,7 +130,7 @@ Deno.serve(async (req) => {
     let upstream: Response | null = null; let modelo = "";
     for (const mdl of MODELOS) {
       const r = await fetch(GEMINI_URL, { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: mdl, messages: [{ role: "system", content: SYS }, { role: "user", content: userMsg }], temperature: 0.3, max_tokens: 7000, stream: true, reasoning_effort: "low" }) });
+        body: JSON.stringify({ model: mdl, messages: [{ role: "system", content: SYS }, { role: "user", content: userMsg }], temperature: 0.3, max_tokens: 8500, stream: true, reasoning_effort: "low" }) });
       if (r.ok && r.body) { upstream = r; modelo = mdl; break; }
       console.error("gemini", mdl, r.status, (await r.text()).slice(0, 200));
     }
