@@ -13,7 +13,7 @@ const aNum = (v: any): number | null => { if (v == null || v === '') return null
 export function evaluarEntrada(r: any): string {
   const e = String(r.entrada ?? '').trim(); if (!e) return 'pendiente';
   const ch = r.chequeo ?? {}; const tipo = ch.tipo ?? 'texto'; const u = aNum(ch.umbral), u2 = aNum(ch.umbral2), n = aNum(e);
-  if (tipo === 'si_no') return /^s[ií]$/i.test(e) ? 'cumple' : /^no$/i.test(e) ? 'no_cumple' : 'revisar';
+  if (tipo === 'si_no') { const esp = /^no$/i.test(String(ch.esperado ?? '')) ? 'NO' : 'SÍ'; const v = /^s[ií]$/i.test(e) ? 'SÍ' : /^no$/i.test(e) ? 'NO' : ''; return !v ? 'revisar' : v === esp ? 'cumple' : 'no_cumple'; }
   if (tipo === 'minimo') return n == null || u == null ? 'revisar' : n >= u ? 'cumple' : 'no_cumple';
   if (tipo === 'maximo') return n == null || u == null ? 'revisar' : n <= u ? 'cumple' : 'no_cumple';
   if (tipo === 'rango') return n == null || u == null || u2 == null ? 'revisar' : n >= u && n <= u2 ? 'cumple' : 'no_cumple';

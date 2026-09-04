@@ -41,7 +41,7 @@ export async function matrizAExcelPro(m: Matriz) {
     const row = ws.getRow(f); row.values = [r.requisito ?? '', r.regla ?? '', r.entrada ?? '', '', r.fuente ?? '', r.nota ?? '']; row.alignment = { vertical: 'top', wrapText: true };
     const c = row.getCell(3); entrada(c);
     let formula: string;
-    if (tipo === 'si_no') { c.dataValidation = { type: 'list', allowBlank: true, formulae: ['"SÍ,NO"'] }; formula = `IF(C${f}="","PENDIENTE",IF(UPPER(C${f})="SÍ","CUMPLE","NO CUMPLE"))`; }
+    if (tipo === 'si_no') { const esp = /^no$/i.test(String(ch.esperado ?? '')) ? 'NO' : 'SÍ'; c.dataValidation = { type: 'list', allowBlank: true, formulae: ['"SÍ,NO"'] }; formula = `IF(C${f}="","PENDIENTE",IF(UPPER(C${f})="${esp}","CUMPLE","NO CUMPLE"))`; }
     else if (tipo === 'minimo' && u != null) formula = `IF(C${f}="","PENDIENTE",IF(C${f}>=${u},"CUMPLE","NO CUMPLE"))`;
     else if (tipo === 'maximo' && u != null) formula = `IF(C${f}="","PENDIENTE",IF(C${f}<=${u},"CUMPLE","NO CUMPLE"))`;
     else if (tipo === 'rango' && u != null && u2 != null) formula = `IF(C${f}="","PENDIENTE",IF(AND(C${f}>=${u},C${f}<=${u2}),"CUMPLE","NO CUMPLE"))`;
