@@ -91,7 +91,7 @@ export function PlanesEscalera() {
           );
         })}
       </div>
-      <p className="text-xs text-muted-foreground">Pagos con Mercado Pago. Experto Pro y Plus son pagos únicos por 30 días; el ERP es suscripción mensual que puedes cancelar cuando quieras e incluye el Experto completo. La comisión del 3% se cobra solo por órdenes de compra de ofertas enviadas desde FirmaVB y nunca supera $149.990 en un mes.</p>
+      <p className="text-xs text-muted-foreground">Pagos con Mercado Pago. Experto Pro y Plus son pagos únicos por 30 días; el ERP es suscripción mensual que puedes cancelar cuando quieras e incluye el Experto completo. La comisión del 3% se calcula sobre el neto de cada orden de compra aceptada de ofertas enviadas desde FirmaVB, se factura mes vencido con IVA y sin tope.</p>
     </div>
   );
 }

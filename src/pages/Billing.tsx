@@ -300,8 +300,8 @@ export default function Billing() {
                         <div className="font-medium">{factura.numero_factura || `Período ${factura.periodo}`}</div>
                         <div className="text-sm text-muted-foreground">
                           {factura.por_suscripcion
-                            ? <>Fijo {formatCurrency(factura.fijo_monto ?? 0)} lo cobra tu suscripción · comisiones <b>{formatCurrency(factura.total_comision)}</b>{factura.cobro_programado_en && !factura.cobro_revertido_en && factura.estado !== "pagada" ? " · se suman a tu próximo cobro automático" : ""}</>
-                            : <>Fijo {formatCurrency(factura.fijo_monto ?? 0)} + comisiones {formatCurrency(factura.total_comision)} = <b>{formatCurrency(factura.total ?? (factura.fijo_monto ?? 0) + factura.total_comision)}</b></>}
+                            ? <>Fijo {formatCurrency(factura.fijo_monto ?? 0)} lo cobra tu suscripción · comisión 3% del neto {formatCurrency(factura.total_comision)} + IVA {formatCurrency((factura as any).iva_comision ?? Math.round(factura.total_comision * 0.19))} = <b>{formatCurrency(factura.total ?? factura.total_comision + Math.round(factura.total_comision * 0.19))}</b>{factura.cobro_programado_en && !factura.cobro_revertido_en && factura.estado !== "pagada" ? " · se suma a tu próximo cobro automático" : ""}</>
+                            : <>Fijo {formatCurrency(factura.fijo_monto ?? 0)} + comisión 3% del neto {formatCurrency(factura.total_comision)} + IVA {formatCurrency((factura as any).iva_comision ?? Math.round(factura.total_comision * 0.19))} = <b>{formatCurrency(factura.total ?? (factura.fijo_monto ?? 0) + factura.total_comision + Math.round(factura.total_comision * 0.19))}</b></>}
                           {factura.estado === "preforma" && factura.validacion_hasta && ` · puedes objetar hasta el ${new Date(factura.validacion_hasta).toLocaleDateString("es-CL")}`}
                           {factura.fecha_pago && ` · pagada el ${new Date(factura.fecha_pago + "T00:00:00").toLocaleDateString("es-CL")}`}
                         </div>

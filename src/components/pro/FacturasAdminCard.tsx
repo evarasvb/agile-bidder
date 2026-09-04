@@ -35,7 +35,7 @@ export function FacturasAdminCard() {
         {filas.map((f) => (
           <div key={f.id} className="rounded border p-2 flex flex-wrap items-center gap-2">
             <div className="flex-1 min-w-[220px]">
-              <b>{f.empresa ?? f.email}</b> · {f.periodo} · fijo {clp(f.fijo)} + comisiones {clp(f.comision)} ({f.ocs ?? 0} OC) = <b>{clp(f.total)}</b>
+              <b>{f.empresa ?? f.email}</b> · {f.periodo} · fijo {clp(f.fijo)} + comisión neta {clp(f.comision)} + IVA ({f.ocs ?? 0} OC) = <b>{clp(f.total)}</b>
               <div className="text-xs text-muted-foreground">{f.email}{f.numero_factura ? ` · N° ${f.numero_factura}` : ''}</div>
             </div>
             <Badge variant="outline">{f.estado}</Badge>
