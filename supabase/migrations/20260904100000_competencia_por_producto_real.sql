@@ -6,3 +6,5 @@
 -- la licitación. La ficha del libro y el estudio profundo usan experto_competencia_licitacion.
 -- (Aplicado en producción como competencia_por_producto_real, competencia_por_marca y
 -- competencia_licitacion_por_niveles; ver esas migraciones en supabase_migrations.)
+-- Umbral (competencia_licitacion_umbral): nivel marca exige 2 proveedores; el nombre de la
+-- licitación solo se usa cuando no trae ítems. Si no hay datos, el libro no muestra el bloque.
