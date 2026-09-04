@@ -203,6 +203,28 @@ export default function LibroLicitacion() {
     if (bases || docs) qc.invalidateQueries({ queryKey: ['experto_libro', cod] });
     setOcupado(null);
   };
+  // Anexos Word oficiales completados por el Experto (conservan el formato; amarillo = validar).
+  const { data: anexosWord = [] } = useQuery({
+    queryKey: ['experto_anexos_word', cod],
+    enabled: !!cod && !!token,
+    queryFn: async () => { const r = await fetch(`${SUPA}/functions/v1/experto-anexo-word?codigo=${cod}`, { headers: auth }); const j = await r.json().catch(() => ({})); return (j.anexos ?? []) as any[]; },
+  });
+  const completarWord = async (d: any) => {
+    setOcupado('word:' + d.id);
+    try {
+      const r = await fetch(`${SUPA}/functions/v1/experto-anexo-word`, { method: 'POST', headers: auth, body: JSON.stringify({ codigo: cod, documento_id: d.id }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.status === 402) { toast.error(j.mensaje || 'Requiere Experto Plus', { action: { label: 'Ver planes', onClick: () => navigate('/cuenta') }, duration: 9000 }); return; }
+      if (r.status === 428) { toast.error(j.mensaje, { action: { label: 'Mi empresa', onClick: () => navigate('/configuracion/empresa') }, duration: 9000 }); return; }
+      if (!r.ok) { toast.error(j.mensaje || j.error || 'No pude completar el anexo'); return; }
+      toast.success(`${j.nombre}: ${j.cambios} campos completados, ${j.campos_validar} en amarillo para que los valides.`, { duration: 8000 });
+      qc.invalidateQueries({ queryKey: ['experto_anexos_word', cod] });
+    } catch (e: any) { toast.error(e.message); } finally { setOcupado(null); }
+  };
+  const borrarAnexoWord = async (id: string) => {
+    await fetch(`${SUPA}/functions/v1/experto-anexo-word?id=${id}`, { method: 'DELETE', headers: auth });
+    qc.invalidateQueries({ queryKey: ['experto_anexos_word', cod] });
+  };
   const borrarDocumento = async (id: string) => {
     await fetch(`${SUPA}/functions/v1/experto-documentos?id=${id}`, { method: 'DELETE', headers: auth });
     qc.invalidateQueries({ queryKey: ['experto_libro', cod] });
@@ -363,9 +385,29 @@ export default function LibroLicitacion() {
                 {documentos.map((d: any) => (
                   <div key={d.id} className="flex items-center gap-1 text-muted-foreground">
                     <span className="truncate flex-1" title={d.nombre}>{d.nombre} <span className="text-[10px] uppercase">{d.tipo}</span></span>
+                    {d.tipo === 'docx' && (
+                      // Anexo oficial en Word: el Experto lo completa en el mismo archivo (formato intacto).
+                      <button onClick={() => completarWord(d)} disabled={!!ocupado} title="Completar este Word con los datos de tu empresa, conservando el formato" className="flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[11px] text-firmavb-blue hover:bg-muted disabled:opacity-50">
+                        {ocupado === 'word:' + d.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}<span className="hidden sm:inline">Completar</span>
+                      </button>
+                    )}
                     <button onClick={() => borrarDocumento(d.id)} title="Quitar"><Trash2 className="h-3.5 w-3.5" /></button>
                   </div>
                 ))}
+                {anexosWord.length > 0 && (
+                  <div className="mt-2 rounded-md border border-yellow-200 bg-yellow-50/40 p-2 space-y-1">
+                    <p className="font-medium text-xs flex items-center gap-1"><Sparkles className="h-3.5 w-3.5 text-firmavb-blue" />Anexos completados por el Experto</p>
+                    <p className="text-[11px] text-muted-foreground">Mismo Word oficial, con tus datos. Lo amarillo es lo que debes validar o decidir antes de firmar.</p>
+                    {anexosWord.map((a: any) => (
+                      <div key={a.id} className="flex flex-wrap items-center gap-1 text-xs">
+                        <span className="truncate flex-1 min-w-[140px]" title={a.nombre}>{a.nombre}</span>
+                        <span className={`rounded px-1.5 py-0.5 text-[10px] ${a.campos_validar ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>{a.campos_validar ? `${a.campos_validar} por validar` : 'sin pendientes'}</span>
+                        {a.url && <a href={a.url} target="_blank" rel="noreferrer" className="flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-firmavb-blue hover:bg-muted"><FileText className="h-3.5 w-3.5" />Descargar</a>}
+                        <button onClick={() => borrarAnexoWord(a.id)} title="Quitar"><Trash2 className="h-3.5 w-3.5 text-muted-foreground" /></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
               </div>
               <div>
