@@ -158,8 +158,9 @@ RANURAS DEL ANEXO "${doc.nombre}" (título: ${titulo}) (i|tipo|texto de la fila|
 ${lista}`;
     const key = Deno.env.get("GEMINI_API_KEY"); if (!key) return json({ error: "sin_ia" }, 500);
     let cambios: any[] | null = null; let meta: any = {};
-    for (const model of [...MODELOS, "espera", ...MODELOS]) {
-      if (model === "espera") { await new Promise((ok) => setTimeout(ok, 2500)); continue; }
+    // Gemini responde 503 (sobrecarga) por rachas: tres pasadas con pausas de 3 y 8 segundos.
+    for (const model of [...MODELOS, "espera:3000", ...MODELOS, "espera:8000", ...MODELOS]) {
+      if (model.startsWith("espera:")) { await new Promise((ok) => setTimeout(ok, Number(model.slice(7)))); continue; }
       const r = await fetch(GEMINI_URL, { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify({ model, temperature: 0.1, max_tokens: 8000, messages: [{ role: "system", content: SYS }, { role: "user", content: datos + "\n\nCompleta el anexo." }] }) });
       if (!r.ok) { console.error("gemini", model, r.status); continue; }
