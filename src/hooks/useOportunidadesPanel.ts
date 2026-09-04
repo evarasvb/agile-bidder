@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { aplicarFiltrosCliente, coincideConcepto, normalizar, type ClienteFiltros } from '@/hooks/useClienteFiltros';
+import { aplicarFiltrosCliente, coincideConcepto, normalizar, palabrasParaFiltrar, type ClienteFiltros } from '@/hooks/useClienteFiltros';
 
 // =============================================================================
 // INTERFACES
@@ -205,10 +205,58 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
 
       // Filtros del cliente (onboarding + IA): se piden en paralelo. RLS restringe
       // la fila al propio cliente, así que un maybeSingle basta.
-      const filtrosQuery = (supabase as any)
+      const filtrosRes = await (supabase as any)
         .from('cliente_filtros_oportunidades')
-        .select('palabras_incluir, palabras_incluir_ia, palabras_excluir, regiones_activas, monto_min, monto_max')
+        .select('palabras_incluir, palabras_incluir_ia, palabras_ia_descartadas, palabras_excluir, regiones_activas, monto_min, monto_max')
         .maybeSingle();
+      const filtrosRow = (filtrosRes as any)?.data ?? null;
+
+      // PALABRAS DEL RUBRO en el servidor: por cada palabra del cliente (y los
+      // conceptos de la IA encendidos) se buscan en título, descripción e
+      // ÍTEMS de TODAS las abiertas, no solo de las 500 más nuevas que baja el
+      // panel. Antes "licencia" solo calzaba si la licitación estaba entre las
+      // 500 recientes y lo decía en el título.
+      const palabraPorCodigo: Record<string, string> = {};
+      const codigosRubroCA: string[] = [];
+      const codigosRubroLic: string[] = [];
+      if (!busquedaEnServidor) {
+        const palabras = palabrasParaFiltrar(filtrosRow as Partial<ClienteFiltros> | null).slice(0, 12);
+        if (palabras.length) {
+          const res = await Promise.all(
+            palabras.map((pal) =>
+              (supabase as any)
+                .rpc('buscar_oportunidades', { p_texto: pal, p_incluir_cerradas: incluirCerradas, p_limite: 100 })
+                .then((r: any) => ({ pal, hits: (r?.data || []) as any[] }))
+                .catch(() => ({ pal, hits: [] as any[] })),
+            ),
+          );
+          for (const { pal, hits } of res) {
+            for (const h of hits) {
+              if (palabraPorCodigo[h.codigo]) continue;
+              palabraPorCodigo[h.codigo] = pal;
+              if (h.coincidencia && !coincidenciaPorCodigo[h.codigo]) coincidenciaPorCodigo[h.codigo] = h.coincidencia;
+              (h.tipo === 'compra_agil' ? codigosRubroCA : codigosRubroLic).push(h.codigo);
+            }
+          }
+        }
+      }
+      // PostgREST manda los códigos en la URL: se piden de a 100 para no
+      // pasarse del largo permitido.
+      const porLotes = (codigos: string[], arma: (lote: string[]) => any) => {
+        const lotes: any[] = [];
+        for (let i = 0; i < codigos.length && i < 400; i += 100) lotes.push(arma(codigos.slice(i, i + 100)));
+        return Promise.all(lotes).then((rs) => rs.flatMap((r: any) => (r?.data || []) as any[]));
+      };
+      const rubroCAQuery = porLotes(codigosRubroCA, (lote) =>
+        supabase
+          .from('compras_agiles')
+          .select(`
+          id, codigo, nombre, descripcion, nombre_organismo, region, monto_estimado,
+          fecha_cierre, created_at, estado, match_score, match_encontrado, url_ficha,
+          compras_agiles_items(id, nombre_producto)
+        `)
+          .in('codigo', lote),
+      );
 
       // Afinidad aprendida del comportamiento (lo que cotiza sube, lo que
       // descarta baja). Resuelve el cliente por auth.uid() dentro de la función.
@@ -230,26 +278,37 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       // TODO EN PARALELO (antes eran 5 etapas secuenciales de red y el panel se
       // sentía lento): compras, licitaciones, filtros, afinidad, empresa dueña y
       // los conteos no dependen entre sí.
-      const [comprasRes, licitacionesRes, filtrosRes, afinidadRes, ownerRes, licCountRes, caCountRes] = await Promise.all([
+      const rubroLicQuery = porLotes(codigosRubroLic, (lote) =>
+        (supabase as any).from('licitaciones_bi').select(LIC_COLS).in('codigo', lote),
+      );
+
+      const [comprasRes, licitacionesRes, rubroCA, rubroLic, afinidadRes, ownerRes, licCountRes, caCountRes] = await Promise.all([
         comprasQuery,
         licitacionesQuery,
-        filtrosQuery,
+        rubroCAQuery,
+        rubroLicQuery,
         afinidadQuery,
         (supabase as any).rpc('cliente_owner_id').then((r: any) => r).catch(() => ({ data: null })),
         incluirCerradas ? Promise.resolve(null) : licCountQuery,
         incluirCerradas ? Promise.resolve(null) : caCountQuery,
       ]);
 
-      const { data: comprasRaw, error: caError } = comprasRes as any;
+      const { data: comprasBase, error: caError } = comprasRes as any;
       if (caError) {
         console.error('[OportunidadesPanel] Error fetching compras:', caError);
         throw caError;
       }
-      const { data: licitacionesRaw, error: licError } = licitacionesRes as any;
+      const { data: licitacionesBase, error: licError } = licitacionesRes as any;
       if (licError) {
         console.error('[OportunidadesPanel] Error fetching licitaciones:', licError);
       }
-      const filtrosRow = (filtrosRes as any)?.data ?? null;
+      // Se suman las que calzaron por palabra del rubro (sin repetir código).
+      const unirPorCodigo = (base: any[] | null, extra: any[]) => {
+        const vistos = new Set((base || []).map((r: any) => r.codigo));
+        return [...(base || []), ...extra.filter((r: any) => r?.codigo && !vistos.has(r.codigo) && (vistos.add(r.codigo), true))];
+      };
+      const comprasRaw = unirPorCodigo(comprasBase, rubroCA as any[]);
+      const licitacionesRaw = unirPorCodigo(licitacionesBase, rubroLic as any[]);
       const afinidadData = (afinidadRes as any)?.data ?? { afinidad: [], aversion: [] };
       const afinWords: string[] = (afinidadData.afinidad ?? []).map(normalizar).filter(Boolean);
       const averWords: string[] = (afinidadData.aversion ?? []).map(normalizar).filter(Boolean);
@@ -381,11 +440,17 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       // Búsqueda por CONCEPTO: se suman las palabras que el cliente escribió con
       // los sinónimos/variantes que la IA amplió (palabras_incluir_ia), para que
       // "consumible de impresión" calce con la palabra "toner" que él definió.
-      const palabrasConIA = [
-        ...((filtrosRow?.palabras_incluir as string[]) || []),
-        ...((filtrosRow?.palabras_incluir_ia as string[]) || []),
-      ].filter(Boolean);
+      const palabrasConIA = palabrasParaFiltrar(filtrosRow as Partial<ClienteFiltros> | null);
       const tienePalabras = palabrasConIA.length > 0;
+      // Lo que calzó en el servidor por palabra del rubro (p. ej. dentro de un
+      // ítem de licitación, que el navegador no tiene) se marca ANTES de
+      // filtrar, para que el filtro local no lo bote.
+      for (const o of all) {
+        if (palabraPorCodigo[o.codigo]) {
+          o.rubro_match = true;
+          o.rubro_palabra = palabraPorCodigo[o.codigo];
+        }
+      }
       if (filtrosRow) {
         all = aplicarFiltrosCliente(all, filtrosRow as Partial<ClienteFiltros>);
       }
@@ -395,6 +460,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       if (tienePalabras) {
         const palabras = palabrasConIA;
         for (const o of all) {
+          if (o.rubro_match) continue;
           const texto = normalizar(`${o.nombre || ''} ${o.descripcion || ''} ${o.organismo || ''} ${o.items_text || ''}`);
           const p = palabras.find((w) => coincideConcepto(texto, w));
           if (p) {
@@ -444,8 +510,11 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
           // "Lo más ganable primero": además del % de match, pesa la COBERTURA de
           // ítems (una compra donde calzan 12 productos vale más que una donde
           // calza 1 con score alto). +3 por ítem calzado, tope +45.
-          valA = (a.match_score || 0) + (boostByCodigo[a.codigo] || 0) + Math.min(a.items_matched || 0, 15) * 3;
-          valB = (b.match_score || 0) + (boostByCodigo[b.codigo] || 0) + Math.min(b.items_matched || 0, 15) * 3;
+          // Lo que calza con las PALABRAS del cliente (su rubro) sube junto a
+          // los matches de inventario: si definió "licencia", eso va arriba y
+          // no queda enterrado bajo productos sueltos del inventario.
+          valA = (a.match_score || 0) + (boostByCodigo[a.codigo] || 0) + Math.min(a.items_matched || 0, 15) * 3 + (a.rubro_match ? 40 : 0);
+          valB = (b.match_score || 0) + (boostByCodigo[b.codigo] || 0) + Math.min(b.items_matched || 0, 15) * 3 + (b.rubro_match ? 40 : 0);
         } else if (sortBy === 'fecha_cierre') {
           valA = a.fecha_cierre ? new Date(a.fecha_cierre).getTime() : Infinity;
           valB = b.fecha_cierre ? new Date(b.fecha_cierre).getTime() : Infinity;

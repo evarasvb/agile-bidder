@@ -31,7 +31,6 @@ const Terminos = lazy(() => import("./pages/Terminos"));
 const Privacidad = lazy(() => import("./pages/Privacidad"));
 const Planes = lazy(() => import("./pages/Planes"));
 
-const MisOportunidades = lazy(() => import("./pages/MisOportunidades"));
 const LicitacionDetalle = lazy(() => import("./pages/LicitacionDetalle"));
 
 const ChatIA = lazy(() => import("./pages/ChatIA"));
@@ -42,7 +41,6 @@ const Compartidos = lazy(() => import("./pages/experto/Compartidos"));
 const OportunidadesPanel = lazy(() => import("./pages/Oportunidades"));
 const OportunidadDetalle = lazy(() => import("./pages/OportunidadDetalle"));
 
-const ComprasAgiles = lazy(() => import("./pages/ComprasAgiles"));
 const CompraAgilDetalle = lazy(() => import("./pages/CompraAgilDetalle"));
 const OrdenesCompra = lazy(() => import("./pages/OrdenesCompra"));
 
@@ -169,14 +167,14 @@ const App = () => (
           <Route element={<ProtectedLayoutWrapper />}>
             
             {/* ----- MIS OPORTUNIDADES ----- */}
-            <Route path="/mis-oportunidades" element={<MisOportunidades />} />
+            <Route path="/mis-oportunidades" element={<Navigate to="/oportunidades" replace />} />
             <Route path="/licitaciones/:id" element={<LicitacionDetalle />} />
             <Route path="/licitaciones/:id/chat" element={<ChatIA />} />
             <Route path="/experto" element={<LibroLicitacion />} />
             <Route path="/experto/libro/:codigo" element={<LibroLicitacion />} />
             <Route path="/experto/compartidos" element={<Compartidos />} />
             {/* Legacy: la lista vieja duplicaba Compras Ágiles (y hasta se titulaba así) */}
-            <Route path="/licitaciones" element={<Navigate to="/compras-agiles" replace />} />
+            <Route path="/licitaciones" element={<Navigate to="/oportunidades?tipo=licitacion" replace />} />
             <Route path="/licitaciones-nuevas" element={<Navigate to="/oportunidades" replace />} />
 
             {/* ----- OPORTUNIDADES PANEL ----- */}
@@ -188,7 +186,7 @@ const App = () => (
             <Route path="/mercado" element={<Navigate to="/oportunidades" replace />} />
             
               {/* ----- COMPRAS AGILES ----- */}
-              <Route path="/compras-agiles" element={<ComprasAgiles />} />
+              <Route path="/compras-agiles" element={<Navigate to="/oportunidades?tipo=compra_agil" replace />} />
               <Route path="/compras-agiles/:codigo" element={<CompraAgilDetalle />} />
             <Route path="/mercado/instituciones" element={<Navigate to="/reportes/compradores" replace />} />
             <Route path="/mercado/ordenes" element={<OrdenesCompra />} />

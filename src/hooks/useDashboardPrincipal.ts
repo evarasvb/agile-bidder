@@ -142,9 +142,15 @@ export function useOportunidadesPorTipo() {
   return useQuery({
     queryKey: ['dashboard-principal', 'por-tipo'],
     queryFn: async (): Promise<OportunidadPorTipo[]> => {
+      // Solo ABIERTAS (mismo criterio que la Bandeja): antes contaba las
+      // 80.000 compras y 130.000 licitaciones históricas, un número distinto
+      // al que el cliente ve en Oportunidades.
+      const nowIso = new Date().toISOString();
       const { count: caCount, error: caError } = await supabase
         .from('compras_agiles')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true })
+        .or('estado.ilike.publicada,estado.ilike.activa')
+        .gt('fecha_cierre', nowIso);
       if (caError) throw caError;
 
       // licitaciones_bi (fresca, sync oficial), no la antigua `licitaciones`
@@ -153,7 +159,9 @@ export function useOportunidadesPorTipo() {
       // mientras el resto del dashboard ya usaba la tabla correcta.
       const { count: licCount, error: licError } = await (supabase as any)
         .from('licitaciones_bi')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true })
+        .or('estado.is.null,estado.ilike.publicada,estado.ilike.activa')
+        .gt('fecha_cierre', nowIso);
       if (licError) throw licError;
 
       return [

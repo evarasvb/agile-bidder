@@ -92,7 +92,7 @@ export function PrimerosPasos() {
       id: "oferta", done: tieneOfertas || tieneLibros, icon: FileText,
       titulo: "Genera tu primera oferta o analiza una licitación",
       desc: "Elige una oportunidad y crea la oferta con tus precios, o abre su libro con el Experto.",
-      to: "/compras-agiles",
+      to: "/oportunidades?tipo=compra_agil",
       aviso: "Elige una compra ágil y arma tu oferta 📝",
     },
     {

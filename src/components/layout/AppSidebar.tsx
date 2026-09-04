@@ -1,9 +1,7 @@
 import {
   LayoutDashboard,
-  Star,
   Kanban,
   Package,
-  Zap,
   BarChart3,
   Settings,
   Store,
@@ -55,9 +53,9 @@ const navItems: NavItem[] = [
     url: "/oportunidades",
     icon: Crosshair,
     children: [
+      // Una sola bandeja: licitaciones y compras ágiles juntas, se filtran con
+      // un toque. Las vistas "Compras Ágiles" y "Guardadas" redirigen aquí.
       { title: "Bandeja", url: "/oportunidades", icon: Crosshair },
-      { title: "Compras Ágiles", url: "/compras-agiles", icon: Zap },
-      { title: "Guardadas", url: "/mis-oportunidades", icon: Star },
       { title: "Calendario", url: "/calendario", icon: Calendar },
       { title: "Filtros con IA", url: "/configuracion", icon: Sparkles },
     ],
@@ -182,17 +180,10 @@ export function AppSidebar({ open = false, onClose }: AppSidebarProps) {
   const userInitials = user?.email?.slice(0, 2).toUpperCase() || 'U';
 
   const isActive = (url: string) => {
-    if (url === "/mis-oportunidades") {
-      return location.pathname === url ||
-             location.pathname.startsWith("/licitaciones/") ||
-             location.pathname.startsWith("/compras-agiles/");
-    }
     if (url === "/oportunidades") {
       return location.pathname === "/oportunidades" ||
-             location.pathname.startsWith("/oportunidades/");
-    }
-    if (url === "/compras-agiles") {
-      return location.pathname === url ||
+             location.pathname.startsWith("/oportunidades/") ||
+             location.pathname.startsWith("/licitaciones/") ||
              location.pathname.startsWith("/compras-agiles/");
     }
     return location.pathname === url ||

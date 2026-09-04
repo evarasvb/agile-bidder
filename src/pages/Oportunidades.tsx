@@ -226,6 +226,10 @@ export default function Oportunidades() {
     sortBy: "match_score",
     sortAsc: false,
     search: searchParams.get("q") || undefined,
+    // ?tipo= viene de los accesos antiguos (/compras-agiles, /licitaciones).
+    tipo: (["compra_agil", "licitacion"].includes(searchParams.get("tipo") || "")
+      ? (searchParams.get("tipo") as PanelFilters["tipo"])
+      : undefined),
   }));
   const [page, setPage] = useState(1);
   const pageSize = 24;

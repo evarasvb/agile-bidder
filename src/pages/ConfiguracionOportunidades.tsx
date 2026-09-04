@@ -45,6 +45,10 @@ const REGIONES_CHILE = [
   "Magallanes",
 ];
 
+// "google, licencia" son DOS palabras: se separa por coma, punto y coma o salto.
+const separarPalabras = (texto: string): string[] =>
+  Array.from(new Set(texto.split(/[,;\n]+/).map((w) => w.trim()).filter(Boolean)));
+
 export default function ConfiguracionOportunidades() {
   const navigate = useNavigate();
   const { filtros, isLoading, updateFiltros, isUpdating } = useClienteFiltros();
@@ -67,7 +71,8 @@ export default function ConfiguracionOportunidades() {
   // precargamos: antes esta pantalla aparecía vacía aunque ya respondió
   // "¿qué vendes?" al registrarse — configuraba dos veces.
   useEffect(() => {
-    const incluirGuardado = filtros?.palabras_incluir || [];
+    // Si alguien escribió "google , licencia" en un solo chip, se separa.
+    const incluirGuardado = separarPalabras((filtros?.palabras_incluir || []).join(','));
     const delOnboarding = (cliente?.palabras_clave_busqueda as string[] | undefined) || [];
     setPalabrasIncluir(incluirGuardado.length ? incluirGuardado : delOnboarding);
     if (filtros) {
@@ -79,10 +84,21 @@ export default function ConfiguracionOportunidades() {
   }, [filtros, cliente]);
 
   const handleAddPalabraIncluir = () => {
-    if (newPalabraIncluir.trim() && !palabrasIncluir.includes(newPalabraIncluir.trim())) {
-      setPalabrasIncluir([...palabrasIncluir, newPalabraIncluir.trim()]);
-      setNewPalabraIncluir("");
-    }
+    const nuevas = separarPalabras(newPalabraIncluir).filter((w) => !palabrasIncluir.includes(w));
+    if (nuevas.length) setPalabrasIncluir([...palabrasIncluir, ...nuevas]);
+    setNewPalabraIncluir("");
+  };
+
+  // Conceptos de la IA: clic enciende/apaga. Se guarda al tiro.
+  const descartadas = filtros?.palabras_ia_descartadas || [];
+  const toggleConceptoIA = (palabra: string) => {
+    const nuevas = descartadas.includes(palabra)
+      ? descartadas.filter((p) => p !== palabra)
+      : [...descartadas, palabra];
+    updateFiltros({ palabras_ia_descartadas: nuevas });
+  };
+  const usarConceptoIA = (palabra: string) => {
+    if (!palabrasIncluir.includes(palabra)) setPalabrasIncluir((prev) => [...prev, palabra]);
   };
 
   const handleRemovePalabraIncluir = (palabra: string) => {
@@ -90,10 +106,9 @@ export default function ConfiguracionOportunidades() {
   };
 
   const handleAddPalabraExcluir = () => {
-    if (newPalabraExcluir.trim() && !palabrasExcluir.includes(newPalabraExcluir.trim())) {
-      setPalabrasExcluir([...palabrasExcluir, newPalabraExcluir.trim()]);
-      setNewPalabraExcluir("");
-    }
+    const nuevas = separarPalabras(newPalabraExcluir).filter((w) => !palabrasExcluir.includes(w));
+    if (nuevas.length) setPalabrasExcluir([...palabrasExcluir, ...nuevas]);
+    setNewPalabraExcluir("");
   };
 
   const handleRemovePalabraExcluir = (palabra: string) => {
@@ -291,15 +306,38 @@ export default function ConfiguracionOportunidades() {
                   <Sparkles className="h-3 w-3" />
                   {expandirConceptos.isPending
                     ? "Ampliando con IA a conceptos relacionados..."
-                    : "También busca por estos conceptos relacionados (ampliados por IA):"}
+                    : "También busca por estos conceptos (toca uno para apagarlo o encenderlo; + lo agrega a tus palabras):"}
                 </div>
                 {!!filtros?.palabras_incluir_ia?.length && (
                   <div className="flex flex-wrap gap-1.5">
-                    {filtros.palabras_incluir_ia.map((palabra) => (
-                      <Badge key={palabra} variant="outline" className="text-xs font-normal text-muted-foreground border-dashed">
-                        {palabra}
-                      </Badge>
-                    ))}
+                    {filtros.palabras_incluir_ia.map((palabra) => {
+                      const apagada = descartadas.includes(palabra);
+                      return (
+                        <Badge
+                          key={palabra}
+                          variant="outline"
+                          title={apagada ? "Apagado: toca para volver a usarlo" : "En uso: toca para apagarlo"}
+                          className={`text-xs font-normal cursor-pointer select-none gap-1 ${
+                            apagada
+                              ? "text-muted-foreground/60 border-dashed line-through"
+                              : "text-green-800 bg-green-50 border-green-300 hover:bg-green-100"
+                          }`}
+                          onClick={() => toggleConceptoIA(palabra)}
+                        >
+                          {palabra}
+                          {!apagada && !palabrasIncluir.includes(palabra) && (
+                            <button
+                              type="button"
+                              className="ml-0.5 rounded hover:bg-green-200"
+                              title="Agregar a mis palabras"
+                              onClick={(e) => { e.stopPropagation(); usarConceptoIA(palabra); }}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          )}
+                        </Badge>
+                      );
+                    })}
                   </div>
                 )}
               </div>

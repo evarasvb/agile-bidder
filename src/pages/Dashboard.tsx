@@ -317,7 +317,7 @@ export default function Dashboard() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-heading font-semibold flex items-center gap-2">
                 <Target className="h-4 w-4 text-firmavb-green" />
-                Oportunidades por Tipo
+                Oportunidades abiertas por tipo
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -566,7 +566,7 @@ export default function Dashboard() {
                                 <Eye className="h-4 w-4" />
                               </Button>
                             </Link>
-                            <Link to="/mis-oportunidades">
+                            <Link to="/oportunidades">
                               <Button variant="ghost" size="sm">
                                 <Plus className="h-4 w-4" />
                               </Button>

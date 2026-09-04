@@ -21,6 +21,9 @@ export interface ClienteFiltros {
   // vez de, palabras_incluir: una compra que dice "consumible de impresión"
   // debe calzar con la palabra "toner" aunque el texto no la contenga.
   palabras_incluir_ia: string[] | null;
+  // Conceptos de la IA que el cliente apagó con un clic (no se usan al filtrar
+  // y una nueva ampliación no los vuelve a encender).
+  palabras_ia_descartadas?: string[] | null;
   palabras_excluir: string[] | null;
   regiones_activas: string[] | null;
   monto_min: number | null;
@@ -42,15 +45,36 @@ export const normalizar = (s: string): string =>
 // impresora→impres→impresión, notebook→notebook, etc. Para palabras cortas
 // (<6) se mantiene exacto para no sobre-emparejar.
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-export function coincideConcepto(textoNorm: string, palabra: string): boolean {
-  const p = normalizar(palabra);
-  if (!p) return false;
-  if (textoNorm.includes(p)) return true;
+// Palabras vacías que no aportan al concepto ("licencia DE software").
+const VACIAS = new Set(['de', 'del', 'la', 'el', 'los', 'las', 'y', 'o', 'u', 'para', 'por', 'con', 'en', 'un', 'una', 'al', 'a']);
+function coincidePalabra(textoNorm: string, p: string): boolean {
   if (p.length >= 6) {
     const raiz = p.slice(0, Math.max(5, Math.round(p.length * 0.7)));
     return new RegExp('\\b' + escapeRe(raiz)).test(textoNorm);
   }
-  return false;
+  // Cortas: palabra completa (no "uso" dentro de "usuario").
+  return new RegExp('\\b' + escapeRe(p) + '\\b').test(textoNorm);
+}
+export function coincideConcepto(textoNorm: string, palabra: string): boolean {
+  const p = normalizar(palabra);
+  if (!p) return false;
+  if (textoNorm.includes(p)) return true;
+  // Frases ("licencia de software", "derecho de uso"): deben calzar TODAS sus
+  // palabras con contenido, cada una por raíz. Antes se tomaba el 70% de la
+  // frase completa como raíz ("derecho de") y calzaba con cualquier cosa.
+  const partes = p.split(/[^a-z0-9ñ]+/).filter((w) => w && !VACIAS.has(w));
+  if (!partes.length) return false;
+  return partes.every((w) => coincidePalabra(textoNorm, w));
+}
+
+// Palabras del cliente + conceptos de la IA que siguen encendidos.
+export function palabrasParaFiltrar(filtros?: Partial<ClienteFiltros> | null): string[] {
+  if (!filtros) return [];
+  const apagadas = new Set((filtros.palabras_ia_descartadas || []).map(normalizar));
+  return [
+    ...(filtros.palabras_incluir || []),
+    ...(filtros.palabras_incluir_ia || []).filter((w) => !apagadas.has(normalizar(w))),
+  ].filter(Boolean);
 }
 
 // Resuelve el cliente_id real (clientes.id) a partir del user autenticado.
@@ -228,7 +252,7 @@ export function pasaFiltrosCliente(
   // Filtrar por palabras a incluir (debe coincidir al menos una, por concepto).
   // Se suman los sinónimos/términos ampliados por IA (palabras_incluir_ia):
   // buscar "por concepto", no por la palabra exacta que escribió el cliente.
-  const incluirConIA = [...(filtros.palabras_incluir || []), ...(filtros.palabras_incluir_ia || [])];
+  const incluirConIA = palabrasParaFiltrar(filtros);
   if (incluirConIA.length > 0) {
     const tieneIncluida = incluirConIA.some((palabra) => coincideConcepto(texto, palabra));
     if (!tieneIncluida) return false;
@@ -279,14 +303,15 @@ export function aplicarFiltrosCliente<
     monto?: number | null;
     match_encontrado?: boolean;
     items_text?: string | null;
+    // Ya calzó con una palabra del rubro en el servidor (ítems incluidos).
+    rubro_match?: boolean;
   }
 >(oportunidades: T[], filtros?: Partial<ClienteFiltros> | null): T[] {
   if (!filtros) return oportunidades;
   // Búsqueda por CONCEPTO, no por palabra exacta: se suman los términos que
   // el cliente escribió con los sinónimos/variantes que amplió la IA
   // (palabras_incluir_ia) — así "consumible de impresión" calza con "toner".
-  const incluir = [...(filtros.palabras_incluir || []), ...(filtros.palabras_incluir_ia || [])]
-    .map(normalizar).filter(Boolean);
+  const incluir = palabrasParaFiltrar(filtros).map(normalizar).filter(Boolean);
   const excluir = (filtros.palabras_excluir || []).map(normalizar).filter(Boolean);
   const regiones = (filtros.regiones_activas || []).map(normalizar).filter(Boolean);
   const montoMin = filtros.monto_min ?? null;
@@ -306,7 +331,7 @@ export function aplicarFiltrosCliente<
 
     // Incluir: debe coincidir alguna (por concepto/raíz, no palabra exacta),
     // salvo que sea un match real del inventario.
-    if (incluir.length && !o.match_encontrado) {
+    if (incluir.length && !o.match_encontrado && !o.rubro_match) {
       if (!incluir.some((p) => coincideConcepto(texto, p))) return false;
     }
 
