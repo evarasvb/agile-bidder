@@ -29,6 +29,14 @@ export interface CompraAgil {
   fecha_publicacion: string | null;
   estado: string | null;
   descripcion: string | null;
+  // Detalle completo bajado por código desde ChileCompra (puede faltar si el robot aún no pasó).
+  plazo_entrega: string | null;
+  direccion_entrega: string | null;
+  unidad_compra: string | null;
+  tipo_presupuesto: string | null;
+  ofertas_recibidas: number | null;
+  documentos: { id?: number | string | null; nombre?: string | null }[] | null;
+  detalle_actualizado_at: string | null;
   match_encontrado: boolean;
   match_score: number;
   items: CompraAgilItem[];
@@ -63,6 +71,13 @@ function mapRowToCompraAgil(row: any): CompraAgil {
     fecha_publicacion: row.fecha_publicacion || row.datos_json?.fecha_publicacion || null,
     estado: row.estado || null,
     descripcion: row.descripcion || null,
+    plazo_entrega: row.plazo_entrega ?? null,
+    direccion_entrega: row.direccion_entrega ?? null,
+    unidad_compra: row.unidad_compra ?? null,
+    tipo_presupuesto: row.tipo_presupuesto ?? null,
+    ofertas_recibidas: row.ofertas_recibidas ?? null,
+    documentos: Array.isArray(row.documentos) ? row.documentos : null,
+    detalle_actualizado_at: row.detalle_actualizado_at ?? null,
     match_encontrado: row.match_encontrado ?? false,
     match_score: row.match_score ?? 0,
     items: (row.compras_agiles_items || []).map((i: any) => ({

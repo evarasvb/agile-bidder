@@ -28,6 +28,7 @@ import LicitacionesSimilares from '@/components/licitaciones/LicitacionesSimilar
 import { LicitacionItemsMatch } from '@/components/licitaciones/LicitacionItemsMatch';
 import { useDocumentosLicitacion } from '@/hooks/useChatIA';
 import { RiesgoOrganismoCard } from '@/components/organismo/RiesgoOrganismoCard';
+import { AccionesCompartir } from '@/components/oportunidades/AccionesCompartir';
 
 interface LicitacionBIItem {
   id: string;
@@ -312,7 +313,8 @@ export default function LicitacionDetalle() {
         </div>
 
         {/* Action buttons */}
-        <div className="flex gap-2 justify-end">
+        <div className="flex gap-2 justify-end flex-wrap">
+          <AccionesCompartir oportunidad={{ codigo: licitacion.codigo, nombre: licitacion.nombre, tipo: licitacion.tipo, organismo: licitacion.organismo, monto: licitacion.monto, fecha_cierre: licitacion.fecha_cierre, fecha_publicacion: licitacion.fecha_publicacion, link: licitacion.link_oficial, descripcion: licitacion.descripcion }} />
           {licitacion.link_oficial && (
             <Button
               variant="outline"

@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { DetalleCompraAgilDatos } from '@/components/compras-agiles/DetalleCompraAgil';
 import { supabase } from '@/integrations/supabase/client';
 import { aplicarFiltrosCliente, coincideConcepto, normalizar, palabrasParaFiltrar, type ClienteFiltros } from '@/hooks/useClienteFiltros';
 
@@ -42,6 +43,8 @@ export interface OportunidadPanel {
 export interface OportunidadDetalle extends OportunidadPanel {
   items: OportunidadItem[];
   buyer: BuyerProfile | null;
+  /** Solo compras ágiles: detalle completo bajado por código (entrega, ofertas, adjuntos). */
+  detalle?: DetalleCompraAgilDatos | null;
 }
 
 export interface OportunidadItem {
@@ -670,6 +673,17 @@ export function useOportunidadDetalle(id: string | null, tipo: 'compra_agil' | '
           created_at: (compra as any).created_at,
           items,
           buyer,
+          detalle: {
+            codigo: (compra as any).codigo,
+            descripcion: (compra as any).descripcion ?? null,
+            plazo_entrega: (compra as any).plazo_entrega ?? null,
+            direccion_entrega: (compra as any).direccion_entrega ?? null,
+            unidad_compra: (compra as any).unidad_compra ?? null,
+            tipo_presupuesto: (compra as any).tipo_presupuesto ?? null,
+            ofertas_recibidas: (compra as any).ofertas_recibidas ?? null,
+            documentos: Array.isArray((compra as any).documentos) ? (compra as any).documentos : null,
+            detalle_actualizado_at: (compra as any).detalle_actualizado_at ?? null,
+          },
         };
       }
 

@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
-import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink, Trash2, Paperclip, Printer } from 'lucide-react';
+import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink, Trash2, Paperclip, Printer, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -25,6 +25,8 @@ import { MatrizPostulacion, type Matriz } from '@/components/experto/MatrizPostu
 import { descargarWord } from '@/services/exportar';
 import { SalaPostulacion } from '@/components/experto/SalaPostulacion';
 import { pagoOrganismo, presupuestoTexto, nombrePropio } from '@/lib/organismoPago';
+import { AccionesCompartir } from '@/components/oportunidades/AccionesCompartir';
+import { mailtoOportunidad } from '@/lib/compartir';
 
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string;
 const ANON = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
@@ -266,6 +268,15 @@ export default function LibroLicitacion() {
   const top: any[] = libro?.top_adjudicatarios ?? [];
   const esPro = libro?.plan && libro.plan !== 'free';
 
+  // Oportunidad en el formato que usan los botones de calendario y email; el email
+  // lleva además el veredicto del informe y, si existe, el link público del análisis.
+  const oportunidadLibro = f ? { codigo: cod, nombre: f.nombre, tipo: f.tipo, organismo: f.institucion, monto: typeof f.presupuesto === 'number' ? f.presupuesto : null, fecha_cierre: f.fecha_cierre, fecha_publicacion: f.fecha_publicacion, link: f.url } : null;
+  const extraEmailLibro = (() => {
+    const v = veredictoDe(entregables.informe);
+    const partes = [v ? `Veredicto del Experto FirmaVB: ${v.t}` : null, compartido ? `${compartido.titulo}\n${compartido.url}` : null];
+    return partes.filter(Boolean).join('\n\n') || undefined;
+  })();
+
   const abrirLibro = (c: string) => { const id = idEn(c); if (id) navigate(`/experto/libro/${id}`); else toast.error('Escribe un ID de licitación, ej. 2699-35-LE26'); };
 
   return (
@@ -285,6 +296,7 @@ export default function LibroLicitacion() {
         <h1 className="text-xl font-bold">{cod}</h1>
         {f && <span className="text-muted-foreground truncate max-w-[50vw]">{f.nombre} · {nombrePropio(f.institucion)}</span>}
         {f && <Badge variant="outline">cierra {fecha(f.fecha_cierre)}</Badge>}
+        {oportunidadLibro && <AccionesCompartir oportunidad={oportunidadLibro} extraEmail={extraEmailLibro} />}
         {(() => { const v = veredictoDe(entregables.informe); return v ? <Badge variant="outline" className={v.c} title="Veredicto del informe de trabajo">{v.t}</Badge> : null; })()}
         {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
       </div>
@@ -294,6 +306,7 @@ export default function LibroLicitacion() {
           <Button size="sm" className="h-7 bg-[#25D366] hover:bg-[#1ebe5d] text-white" asChild><a href={waUrl(compartido)} target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4 mr-1" />WhatsApp (link)</a></Button>
           {compartido.tipo !== 'mapa' && compartido.tipo !== 'infografia' && <Button size="sm" variant="outline" className="h-8" onClick={pdfCompartido} disabled={ocupado === 'pdf'}>{ocupado === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <FileText className="h-4 w-4 mr-1" />}PDF para WhatsApp</Button>}
           <Button size="sm" variant="outline" className="h-8" onClick={() => { navigator.clipboard.writeText(compartido.url); toast.success('Copiado'); }}><Copy className="h-4 w-4 mr-1" />Copiar link</Button>
+          <Button size="sm" variant="outline" className="h-8" asChild><a href={oportunidadLibro ? mailtoOportunidad(oportunidadLibro, `${compartido.titulo}\n${compartido.url}`) : `mailto:?subject=${encodeURIComponent(compartido.titulo)}&body=${encodeURIComponent(compartido.titulo + '\n' + compartido.url)}`}><Mail className="h-4 w-4 mr-1" />Email (link)</a></Button>
           <Button size="sm" variant="outline" className="h-8" asChild><a href={compartido.url} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4 mr-1" />Ver página</a></Button>
           {typeof navigator !== 'undefined' && 'share' in navigator && <Button size="sm" variant="ghost" className="h-8" onClick={() => navigator.share({ title: compartido.titulo, url: compartido.url }).catch(() => {})}><Share2 className="h-4 w-4 mr-1" />Más…</Button>}
           <button className="ml-auto text-muted-foreground" onClick={() => setCompartido(null)}>✕</button>
