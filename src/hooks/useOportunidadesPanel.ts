@@ -382,13 +382,16 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         all = all.filter(o => o.organismo.toLowerCase().includes(search));
       }
       if (filters.search) {
-        const search = filters.search.toLowerCase();
-        all = all.filter(o =>
-          o.nombre.toLowerCase().includes(search) ||
-          o.codigo.toLowerCase().includes(search) ||
-          o.organismo.toLowerCase().includes(search) ||
-          (o.items_text || '').toLowerCase().includes(search)
-        );
+        // Antes exigía la frase completa tal cual (sin tildes, orden distinto
+        // fallaba): "arriendo vehiculos" no encontraba nada aunque "arriendo" y
+        // "vehículos" por separado sí tuvieran resultados. Ahora cada palabra
+        // se busca por separado (todas deben aparecer, en cualquier orden), con
+        // `normalizar` (mismo helper que usan los filtros por concepto más abajo).
+        const palabras = normalizar(filters.search).split(/\s+/).filter(Boolean);
+        all = all.filter(o => {
+          const texto = normalizar(`${o.nombre} ${o.codigo} ${o.organismo} ${o.items_text || ''}`);
+          return palabras.every(p => texto.includes(p));
+        });
       }
 
       // Sort
