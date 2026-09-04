@@ -31,6 +31,7 @@ import {
   type Bloque,
   type Modulo,
 } from "@/data/academiaCursos";
+import { Seo } from "@/components/Seo";
 
 function BloqueView({ bloque }: { bloque: Bloque }) {
   switch (bloque.tipo) {
@@ -215,6 +216,11 @@ export default function AcademiaCurso() {
 
   return (
     <div className="min-h-screen bg-firmavb-gray">
+      <Seo
+        title={`${curso.titulo} — Academia FirmaVB`}
+        description={curso.descripcion}
+        path={`/academia/curso/${curso.slug}`}
+      />
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 px-6 py-4 backdrop-blur-md bg-white/90 border-b border-border/50">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">

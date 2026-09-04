@@ -387,7 +387,10 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
                   Seleccionar Archivo
                 </Button>
                 <p className="text-xs text-muted-foreground mt-4">
-                  Formatos soportados: .xlsx, .xls, .csv (máximo 10,000 productos)
+                  {/* El "máximo 10.000" nunca se aplicó en el código y ya vimos
+                      catálogos reales de más de 16.000 productos (se suben en
+                      lotes de 500, sin tope real). No prometer un número falso. */}
+                  Formatos soportados: .xlsx, .xls, .csv — cualquier tamaño de catálogo
                 </p>
               </div>
               

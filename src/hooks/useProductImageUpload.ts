@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export async function uploadProductImage(
   file: File, 
@@ -20,17 +21,19 @@ export async function uploadProductImage(
     
     if (error) {
       console.error('Error uploading image:', error);
+      toast.error('No se pudo subir la imagen del producto.');
       return null;
     }
-    
+
     // Get public URL
     const { data: urlData } = supabase.storage
       .from('product-images')
       .getPublicUrl(data.path);
-    
+
     return urlData.publicUrl;
   } catch (error) {
     console.error('Upload error:', error);
+    toast.error('No se pudo subir la imagen del producto.');
     return null;
   }
 }
@@ -51,12 +54,14 @@ export async function uploadCompanyLogo(file: File, userId: string): Promise<str
       .upload(fileName, file, { cacheControl: '3600', upsert: true });
     if (error) {
       console.error('Error uploading logo:', error);
+      toast.error('No se pudo subir el logo de la empresa.');
       return null;
     }
     const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(data.path);
     return urlData.publicUrl;
   } catch (error) {
     console.error('Logo upload error:', error);
+    toast.error('No se pudo subir el logo de la empresa.');
     return null;
   }
 }

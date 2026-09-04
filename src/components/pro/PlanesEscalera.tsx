@@ -8,16 +8,10 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlan } from '@/hooks/usePlan';
+import { PLANES } from '@/data/planes';
 
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string;
 const ANON = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
-
-const PLANES = [
-  { id: 'free', nombre: 'Gratis', precio: '$0', periodo: '', puntos: ['3 preguntas y 1 informe al mes en el Experto', 'Ver las oportunidades de tu rubro'] },
-  { id: 'pro_30', nombre: 'Experto Pro', precio: '$50.000', periodo: '30 días', puntos: ['Preguntas e informes sin límite', 'Sala de postulación y matriz con Excel de fórmulas', 'Estudio profundo: historial del organismo y quién gana', 'Riesgo de pago y competencia en cada oportunidad'] },
-  { id: 'plus_30', nombre: 'Experto Plus', precio: '$100.000', periodo: '30 días', puntos: ['Todo lo de Pro', 'Anexos completados con los datos y documentos de tu empresa'] },
-  { id: 'erp', nombre: 'FirmaVB ERP', precio: '$149.990', periodo: 'mes + 3% de las OC aceptadas que postulaste desde FirmaVB (tope: $149.990 al mes)', puntos: ['Todo lo de Plus', 'Postular con la extensión, cotizar y auto-bid', 'Inventario, equipo, órdenes de compra y reportes'] },
-] as const;
 
 /** Escalera de planes con activación por Mercado Pago (Experto Pro/Plus: pago único; ERP: suscripción). */
 export function PlanesEscalera() {
@@ -73,26 +67,29 @@ export function PlanesEscalera() {
         {expertoActivo && !isPro && <Badge variant="outline">Experto {expertoActivo.nivel === 'plus' ? 'Plus' : 'Pro'} hasta {new Date(expertoActivo.hasta).toLocaleDateString('es-CL')}</Badge>}
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        {PLANES.map((p) => (
-          <div key={p.id} className={`rounded-lg border p-3 ${actual(p.id) ? 'border-primary bg-primary/5' : ''}`}>
+        {PLANES.map((p) => {
+          const id = p.id;
+          return (
+          <div key={id} className={`rounded-lg border p-3 ${actual(id) ? 'border-primary bg-primary/5' : ''}`}>
             <div className="flex items-baseline justify-between gap-2">
-              <p className="font-semibold flex items-center gap-1">{p.id === 'erp' ? <Crown className="h-4 w-4 text-primary" /> : p.id !== 'free' ? <Sparkles className="h-4 w-4 text-primary" /> : null}{p.nombre}</p>
+              <p className="font-semibold flex items-center gap-1">{id === 'erp' ? <Crown className="h-4 w-4 text-primary" /> : id !== 'free' ? <Sparkles className="h-4 w-4 text-primary" /> : null}{p.nombre}</p>
               <p className="text-sm"><span className="text-lg font-bold">{p.precio}</span> <span className="text-muted-foreground text-xs">{p.periodo}</span></p>
             </div>
             <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
               {p.puntos.map((x) => <li key={x} className="flex items-start gap-1"><Check className="h-3.5 w-3.5 mt-0.5 text-green-600 shrink-0" />{x}</li>)}
             </ul>
             <div className="mt-3">
-              {actual(p.id) ? <Badge variant="outline">Tu plan</Badge>
-                : p.id === 'free' ? null
-                : p.id === 'erp' ? <Button size="sm" className="w-full" asChild><Link to="/cuenta/facturacion">Suscribirme al ERP</Link></Button>
+              {actual(id) ? <Badge variant="outline">Tu plan</Badge>
+                : id === 'free' ? null
+                : id === 'erp' ? <Button size="sm" className="w-full" asChild><Link to="/cuenta/facturacion">Suscribirme al ERP</Link></Button>
                 : <>
-                  {p.id === 'pro_30' && prueba?.disponible && <Button size="sm" className="w-full mb-1" disabled={!!cargando} onClick={iniciarPrueba}>{cargando === 'prueba' ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Probar 14 días gratis, sin tarjeta'}</Button>}
-                  <Button size="sm" variant="outline" className="w-full" disabled={!!cargando || isPro} onClick={() => pagar(p.id)}>{cargando === p.id ? <Loader2 className="h-4 w-4 animate-spin" /> : `Activar ${p.nombre}`}</Button>
+                  {id === 'pro_30' && prueba?.disponible && <Button size="sm" className="w-full mb-1" disabled={!!cargando} onClick={iniciarPrueba}>{cargando === 'prueba' ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Probar 14 días gratis, sin tarjeta'}</Button>}
+                  <Button size="sm" variant="outline" className="w-full" disabled={!!cargando || isPro} onClick={() => pagar(id)}>{cargando === id ? <Loader2 className="h-4 w-4 animate-spin" /> : `Activar ${p.nombre}`}</Button>
                 </>}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
       <p className="text-xs text-muted-foreground">Pagos con Mercado Pago. Experto Pro y Plus son pagos únicos por 30 días; el ERP es suscripción mensual que puedes cancelar cuando quieras e incluye el Experto completo. La comisión del 3% se cobra solo por órdenes de compra de ofertas enviadas desde FirmaVB y nunca supera $149.990 en un mes.</p>
     </div>

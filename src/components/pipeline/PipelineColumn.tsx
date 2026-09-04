@@ -63,7 +63,7 @@ export function PipelineColumn({ config, items, onCardClick, assignmentMap }: Pi
               key={item.id}
               item={item}
               onClick={onCardClick}
-              assignedVendor={assignmentMap?.[item.id] || null}
+              assignedVendor={assignmentMap?.[item.oportunidad_id] || null}
             />
           ))}
         </SortableContext>

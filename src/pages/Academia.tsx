@@ -19,6 +19,7 @@ import { Link } from "react-router-dom";
 import logoFirmavbOriginal from "@/assets/logo-firmavb-original.png";
 import { AcademiaLeadForm } from "@/components/academia/AcademiaLeadForm";
 import { CURSOS, ACENTO, SAGA_BUNDLE } from "@/data/academiaCursos";
+import { Seo } from "@/components/Seo";
 
 // =============================================================================
 //  CONTENIDO DE LA ACADEMIA  ← EDITA AQUÍ TUS LINKS Y TEXTOS
@@ -260,6 +261,11 @@ export default function Academia() {
 
   return (
     <div className="min-h-screen bg-firmavb-gray">
+      <Seo
+        title="Academia FirmaVB — Cursos para vender al Estado"
+        description="Cursos gratis y en video para vender a Mercado Público: desde encontrar tu primera licitación hasta ganar convenios marco y automatizar tus postulaciones."
+        path="/academia"
+      />
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 px-6 py-4 backdrop-blur-md bg-white/90 border-b border-border/50">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">

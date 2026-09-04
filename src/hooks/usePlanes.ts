@@ -111,7 +111,7 @@ export function useCompararPlanes() {
         { key: 'limite_licitaciones', label: 'Licitaciones/mes', format: (v: number | null) => v === null ? 'Ilimitadas' : v.toString() },
         { key: 'limite_ofertas', label: 'Ofertas/mes', format: (v: number | null) => v === null ? 'Ilimitadas' : v.toString() },
         { key: 'limite_usuarios', label: 'Usuarios', format: (v: number) => v.toString() },
-        { key: 'tiene_auto_bid', label: 'Auto-Bid', format: (v: boolean) => v ? '✓' : '✗' },
+        { key: 'tiene_auto_bid', label: 'Autocompletar cotización', format: (v: boolean) => v ? '✓' : '✗' },
         { key: 'tiene_bi_avanzado', label: 'BI Avanzado', format: (v: boolean) => v ? '✓' : '✗' },
         { key: 'tiene_api', label: 'Acceso API', format: (v: boolean) => v ? '✓' : '✗' },
       ];

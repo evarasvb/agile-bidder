@@ -34,13 +34,15 @@ export function PipelineBoard({ items, onCardClick }: PipelineBoardProps) {
   const moveItem = useMovePipelineItem();
   const { data: asignaciones } = usePipelineAsignaciones();
 
-  // Build a map of pipeline_id -> vendor info for quick card lookups
+  // Mapa de oportunidad_id -> vendedor asignado (vendedor_asignaciones.licitacion_id
+  // guarda el mismo oportunidad_id que usa el pipeline; no hay pipeline_id
+  // porque ya no existe una tabla `asignaciones` separada).
   const assignmentMap = useMemo(() => {
     const map: Record<string, { nombre: string; email: string }> = {};
     for (const a of asignaciones || []) {
       const vendor = a.vendedores as any;
       if (vendor) {
-        map[a.pipeline_id] = { nombre: vendor.nombre, email: vendor.email };
+        map[a.licitacion_id] = { nombre: vendor.nombre, email: vendor.email };
       }
     }
     return map;
