@@ -26,6 +26,7 @@ import { useMatchOverrides } from '@/hooks/useMatchOverrides';
 import { useInventoryActivo } from '@/hooks/useInventory';
 import { MatchItemActions } from '@/components/compras-agiles/MatchItemActions';
 import { AgregarProductoManual } from '@/components/compras-agiles/AgregarProductoManual';
+import { AccionesCompartir } from '@/components/oportunidades/AccionesCompartir';
 
 // Color del badge de match según el %.
 const matchBadge = (score: number) =>
@@ -262,6 +263,9 @@ export default function CompraAgilDetalle() {
           <Sparkles className="h-4 w-4" />
           Generar propuesta
         </Button>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <AccionesCompartir size="default" oportunidad={{ codigo: compra.codigo, nombre: compra.nombre, tipo: 'compra_agil', organismo: compra.organismo, monto: compra.monto, moneda: compra.moneda, fecha_cierre: compra.fecha_cierre, fecha_publicacion: compra.fecha_publicacion, descripcion: compra.descripcion }} />
       </div>
 
       <RiesgoOrganismoCard codigo={compra.codigo} organismo={compra.organismo} />

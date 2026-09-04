@@ -54,6 +54,7 @@ import { PISO_MATCH } from "@/hooks/useOportunidadesPanel";
 import { format, differenceInDays, differenceInHours } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
+import { AccionesCompartir } from '@/components/oportunidades/AccionesCompartir';
 
 function formatCurrency(value: number | null) {
   if (!value) return "-";
@@ -190,6 +191,7 @@ function OpportunityCard({
             >
               <Eye className="h-3.5 w-3.5" />
             </Button>
+            <AccionesCompartir compact oportunidad={{ codigo: op.codigo, nombre: op.nombre, tipo: op.tipo, organismo: op.organismo, monto: op.monto, fecha_cierre: op.fecha_cierre, fecha_publicacion: op.fecha_publicacion, link: op.link_oficial, descripcion: op.descripcion }} />
             <Button
               variant="ghost"
               size="icon"

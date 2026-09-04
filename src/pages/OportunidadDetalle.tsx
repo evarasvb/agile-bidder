@@ -44,6 +44,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, differenceInHours, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
+import { AccionesCompartir } from '@/components/oportunidades/AccionesCompartir';
 import { RiesgoOrganismoCard } from '@/components/organismo/RiesgoOrganismoCard';
 
 function formatCurrency(value: number | null) {
@@ -511,6 +512,7 @@ export default function OportunidadDetalle() {
                 </a>
               </Button>
             )}
+            <AccionesCompartir size="default" oportunidad={{ codigo: oportunidad.codigo, nombre: oportunidad.nombre, tipo: oportunidad.tipo, organismo: oportunidad.organismo, monto: oportunidad.monto, fecha_cierre: oportunidad.fecha_cierre, fecha_publicacion: oportunidad.fecha_publicacion, link: oportunidad.link_oficial, descripcion: oportunidad.descripcion }} />
             <Button
               variant="ghost"
               className="gap-2 text-destructive hover:text-destructive"
