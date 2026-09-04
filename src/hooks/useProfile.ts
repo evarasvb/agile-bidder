@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface Profile {
   id: string;
@@ -76,6 +77,7 @@ export function useProfile() {
         }
       } catch (error) {
         console.error('Error in fetchProfile:', error);
+        toast.error('No se pudo cargar tu perfil. Intenta recargar la página.');
       } finally {
         setLoading(false);
       }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export type AppRole = 'super_admin' | 'admin' | 'user' | 'vendedor' | 'visor';
 
@@ -50,6 +51,7 @@ export function useRolePermissions() {
 
         if (roleError) {
           console.error('Error fetching user role:', roleError);
+          toast.error('No se pudieron cargar tus permisos. Algunas secciones pueden no aparecer.');
           setLoading(false);
           return;
         }
@@ -72,6 +74,7 @@ export function useRolePermissions() {
         }
       } catch (error) {
         console.error('Error in fetchPermissions:', error);
+        toast.error('No se pudieron cargar tus permisos. Algunas secciones pueden no aparecer.');
       } finally {
         setLoading(false);
       }

@@ -298,7 +298,7 @@ export default function ExtensionConfig() {
                 ¿No tienes la extensión?
               </h3>
               <p className="text-sm text-blue-700">
-                Descarga FirmaVB Postulador para automatizar tus postulaciones en MercadoPúblico.cl.
+                Descarga FirmaVB Postulador para autocompletar tus cotizaciones mientras postulas en MercadoPúblico.cl.
                 Es un archivo <strong>.zip</strong>: descárgalo, <strong>descomprímelo</strong> y cárgalo en Chrome.
                 Sigue el paso a paso de más abajo 👇
               </p>

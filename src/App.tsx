@@ -3,7 +3,9 @@ import { Loader2 } from "lucide-react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { HelmetProvider } from "react-helmet-async";
 import { BrowserRouter, Routes, Route, Outlet, Navigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
@@ -25,6 +27,9 @@ const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const ClienteOnboarding = lazy(() => import("./pages/ClienteOnboarding"));
 const Activar = lazy(() => import("./pages/Activar"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const Terminos = lazy(() => import("./pages/Terminos"));
+const Privacidad = lazy(() => import("./pages/Privacidad"));
+const Planes = lazy(() => import("./pages/Planes"));
 
 const MisOportunidades = lazy(() => import("./pages/MisOportunidades"));
 const LicitacionDetalle = lazy(() => import("./pages/LicitacionDetalle"));
@@ -76,6 +81,19 @@ const MisTickets = lazy(() => import("./pages/MisTickets"));
 // no re-consulta al volver a la pestaña y reintenta solo 1 vez. Antes cada
 // navegación volvía a pedir todo (staleTime 0), lo que se sentía lento.
 const queryClient = new QueryClient({
+  // Varios hooks de lectura (useLicitaciones, useProfile, useRolePermissions,
+  // useNotificaciones...) solo hacían console.error en su catch: el usuario
+  // veía la pantalla quedarse cargando o vacía sin ninguna señal de que algo
+  // falló. En vez de parchar catch por catch, un solo onError acá cubre TODAS
+  // las queries de la app. Una pantalla con su propio manejo de error visible
+  // puede optar por no duplicar el aviso con meta: { silentError: true }.
+  queryCache: new QueryCache({
+    onError: (error, query) => {
+      if (query.meta?.silentError) return;
+      const msg = error instanceof Error ? error.message : 'Error desconocido';
+      toast.error(`No se pudo cargar: ${msg}`);
+    },
+  }),
   defaultOptions: {
     queries: {
       staleTime: 60_000,
@@ -110,6 +128,7 @@ const ProtectedLayoutWrapper = () => (
 );
 
 const App = () => (
+  <HelmetProvider>
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
@@ -135,6 +154,9 @@ const App = () => (
           <Route path="/experto/c/:token" element={<Compartido />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/activar" element={<Activar />} />
+          <Route path="/terminos" element={<Terminos />} />
+          <Route path="/privacidad" element={<Privacidad />} />
+          <Route path="/planes" element={<Planes />} />
           
           {/* Onboarding - sin sidebar */}
           <Route path="/onboarding" element={<ProtectedRoute><ClienteOnboarding /></ProtectedRoute>} />
@@ -213,7 +235,6 @@ const App = () => (
             <Route path="/cuenta/facturacion" element={<Billing />} />
             
             {/* Redirects de rutas antiguas */}
-            <Route path="/planes" element={<Navigate to="/cuenta" replace />} />
             <Route path="/dashboard-old" element={<Navigate to="/dashboard" replace />} />
             <Route path="/clientes/*" element={<Navigate to="/dashboard" replace />} />
             
@@ -225,6 +246,7 @@ const App = () => (
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
+  </HelmetProvider>
 );
 
 export default App;

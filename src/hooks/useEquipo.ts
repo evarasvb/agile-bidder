@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 export interface Vendedor {
   id: string;
   user_id: string | null;
-  empresa_id: string | null;
   nombre: string;
   email: string;
   rol: string;
@@ -17,16 +16,6 @@ export interface Vendedor {
   activo: boolean;
   created_at: string;
   updated_at: string;
-}
-
-export interface Asignacion {
-  id: string;
-  vendedor_id: string;
-  pipeline_id: string;
-  asignado_por: string | null;
-  fecha_asignacion: string;
-  notas: string | null;
-  created_at: string;
 }
 
 export interface VendedorDashboard {
@@ -98,36 +87,42 @@ export function useVendedorDetail(vendedorId: string | undefined) {
   });
 }
 
+// Antes /equipo y /dashboard/vendedores (GestionVendedores) eran dos
+// sistemas de asignación paralelos: este leía de una tabla `asignaciones`
+// que nunca existió, y el otro escribe en `vendedor_asignaciones` (real,
+// con RLS correcta, pero sin uso). Ahora ambos escriben en
+// vendedor_asignaciones — una sola fuente de verdad — usando el
+// `oportunidad_id` (texto, el mismo id que usa compras_agiles/pipeline/
+// ca_matches) como `licitacion_id`. Como no hay FK entre vendedor_asignaciones
+// y pipeline, el cruce con los datos del pipeline (título, etapa, monto...)
+// se hace acá en dos consultas en vez de un embed de PostgREST.
 export function useVendedorPipelineItems(vendedorId: string | undefined) {
   return useQuery({
     queryKey: [EQUIPO_KEY, 'pipeline-items', vendedorId],
     queryFn: async () => {
       if (!vendedorId) return [];
-      const { data, error } = await (supabase
-        .from as any)('asignaciones')
-        .select(`
-          id,
-          pipeline_id,
-          fecha_asignacion,
-          notas,
-          pipeline:pipeline_id (
-            id,
-            titulo,
-            institucion,
-            monto_estimado,
-            fecha_cierre,
-            etapa,
-            match_score,
-            oportunidad_tipo,
-            created_at,
-            updated_at
-          )
-        `)
+      const { data: asignaciones, error } = await (supabase as any)
+        .from('vendedor_asignaciones')
+        .select('id, licitacion_id, fecha_asignacion, notas')
         .eq('vendedor_id', vendedorId)
         .order('fecha_asignacion', { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      if (!asignaciones?.length) return [];
+
+      const oportunidadIds = asignaciones.map((a: any) => a.licitacion_id);
+      const { data: pipelineRows, error: pipelineError } = await (supabase as any)
+        .from('pipeline')
+        .select('id, oportunidad_id, titulo, institucion, monto_estimado, fecha_cierre, etapa, match_score, oportunidad_tipo, created_at, updated_at')
+        .in('oportunidad_id', oportunidadIds);
+
+      if (pipelineError) throw pipelineError;
+      const pipelineByOportunidad = new Map((pipelineRows || []).map((p: any) => [p.oportunidad_id, p]));
+
+      return asignaciones.map((a: any) => ({
+        ...a,
+        pipeline: pipelineByOportunidad.get(a.licitacion_id) || null,
+      }));
     },
     enabled: !!vendedorId,
   });
@@ -137,12 +132,12 @@ export function usePipelineAsignaciones() {
   return useQuery({
     queryKey: [ASIGNACIONES_KEY],
     queryFn: async () => {
-      const { data, error } = await (supabase
-        .from as any)('asignaciones')
+      const { data, error } = await (supabase as any)
+        .from('vendedor_asignaciones')
         .select(`
           id,
           vendedor_id,
-          pipeline_id,
+          licitacion_id,
           fecha_asignacion,
           vendedores:vendedor_id (
             id,
@@ -165,25 +160,32 @@ export function useAsignarPipeline() {
   return useMutation({
     mutationFn: async ({
       pipelineId,
+      oportunidadId,
       vendedorId,
+      montoEstimado,
+      fechaCierre,
       notas,
     }: {
       pipelineId: string;
+      oportunidadId: string;
       vendedorId: string;
+      montoEstimado?: number;
+      fechaCierre?: string;
       notas?: string;
     }) => {
       if (!user?.id) throw new Error('No autenticado');
 
-      // Upsert: if assignment exists for this pipeline, update it
-      const { data: existing } = await (supabase
-        .from as any)('asignaciones')
+      // Upsert: si ya existe una asignación para esta oportunidad, se actualiza.
+      const { data: existing } = await (supabase as any)
+        .from('vendedor_asignaciones')
         .select('id')
-        .eq('pipeline_id', pipelineId)
+        .eq('licitacion_id', oportunidadId)
         .maybeSingle();
 
+      let data;
       if (existing) {
-        const { data, error } = await (supabase
-          .from as any)('asignaciones')
+        const res = await (supabase as any)
+          .from('vendedor_asignaciones')
           .update({
             vendedor_id: vendedorId,
             asignado_por: user.id,
@@ -192,25 +194,28 @@ export function useAsignarPipeline() {
           .eq('id', existing.id)
           .select()
           .single();
-
-        if (error) throw error;
-        return data;
+        if (res.error) throw res.error;
+        data = res.data;
+      } else {
+        const res = await (supabase as any)
+          .from('vendedor_asignaciones')
+          .insert({
+            licitacion_id: oportunidadId,
+            licitacion_codigo: oportunidadId,
+            vendedor_id: vendedorId,
+            asignado_por: user.id,
+            monto_estimado: montoEstimado,
+            fecha_cierre: fechaCierre,
+            estado: 'asignada',
+            notas,
+          })
+          .select()
+          .single();
+        if (res.error) throw res.error;
+        data = res.data;
       }
 
-      const { data, error } = await (supabase
-        .from as any)('asignaciones')
-        .insert({
-          pipeline_id: pipelineId,
-          vendedor_id: vendedorId,
-          asignado_por: user.id,
-          notas,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Also update the pipeline item's asignado_a field
+      // Refleja la asignación en la tarjeta del pipeline también.
       await supabase
         .from('pipeline')
         .update({ asignado_a: vendedorId })

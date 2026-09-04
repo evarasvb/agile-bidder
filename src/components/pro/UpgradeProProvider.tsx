@@ -32,7 +32,7 @@ export function useRequirePro() {
 
 const BENEFICIOS = [
   'Cotizar y postular a licitaciones y compras ágiles',
-  'Auto-bid y generación de ofertas con IA',
+  'Autocompletar tu cotización en Mercado Público con la extensión + generación de ofertas con IA',
   'Gestionar tu pipeline, equipo y órdenes',
   'Reportes e inteligencia de mercado completos',
   'Inventario ilimitado y matching automático',

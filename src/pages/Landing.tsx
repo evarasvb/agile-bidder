@@ -27,6 +27,8 @@ import {
   Bot,
   GraduationCap
 } from "lucide-react";
+import { Seo } from "@/components/Seo";
+import { EstadisticasReales } from "@/components/landing/EstadisticasReales";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -83,6 +85,11 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-firmavb-gray">
+      <Seo
+        title="FirmaVB — Vende a Mercado Público con IA | PYMEs de Chile"
+        description="La plataforma para PYMEs chilenas que quieren vender al Estado: IA que encuentra licitaciones y compras ágiles que calzan con tu inventario, arma tu oferta y te avisa antes que cierren."
+        path="/"
+      />
       {/* Demo Modal */}
       <DemoModal open={demoOpen} onOpenChange={setDemoOpen} />
 
@@ -221,6 +228,8 @@ export default function Landing() {
           </div>
         </div>
       </section>
+
+      <EstadisticasReales />
 
       {/* Comodín telefónico: primera pregunta al Experto */}
       <ExpertoComodin />
@@ -448,8 +457,8 @@ Validar Admisibilidad Gratis
             </div>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <Link to="/academia" className="hover:text-foreground transition-colors">Academia</Link>
-              <span>Términos</span>
-              <span>Privacidad</span>
+              <Link to="/terminos" className="hover:text-foreground transition-colors">Términos</Link>
+              <Link to="/privacidad" className="hover:text-foreground transition-colors">Privacidad</Link>
             </div>
           </div>
           <p className="text-center text-sm text-muted-foreground">

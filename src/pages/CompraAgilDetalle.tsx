@@ -15,7 +15,7 @@ import {
   TableRow,
   TableCell,
 } from '@/components/ui/table';
-import { ArrowLeft, Building2, Calendar, DollarSign, Package, Clock, FileText, Download, Sparkles, BookOpen } from "lucide-react";
+import { ArrowLeft, Building2, Calendar, DollarSign, Package, Clock, FileText, Download, Sparkles, BookOpen, ExternalLink } from "lucide-react";
 import { format, parseISO, differenceInHours } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useCliente } from '@/hooks/useCliente';
@@ -245,6 +245,18 @@ export default function CompraAgilDetalle() {
         <Button variant="outline" className="gap-2 shrink-0" onClick={() => navigate(`/experto/libro/${compra.codigo}`)}>
           <BookOpen className="h-4 w-4" />
           Libro del Experto
+        </Button>
+        {/* Siempre visible, no solo tras guardar la propuesta: antes el único
+            camino hacia Mercado Público quedaba escondido en Postulaciones. */}
+        <Button asChild variant="outline" className="gap-2 shrink-0">
+          <a
+            href={`https://www.mercadopublico.cl/CompraAgil/Cotizacion/${compra.codigo}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Postular en Mercado Público
+          </a>
         </Button>
         <Button onClick={() => setPropuestaOpen(true)} className="gap-2 shrink-0">
           <Sparkles className="h-4 w-4" />

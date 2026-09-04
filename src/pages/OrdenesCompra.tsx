@@ -9,13 +9,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, FileText, Building2, User, Calendar, Package, X, Filter, ArrowDownWideNarrow, Download, FileSearch } from "lucide-react";
+import { Search, FileText, Building2, User, Calendar, Package, X, Filter, ArrowDownWideNarrow, Download, FileSearch, Briefcase } from "lucide-react";
 import { formatCurrency } from "@/utils/clasificacion";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
 import { esTratoDirecto, getTipoOCLabel } from "@/utils/tipoOrdenCompra";
 import { descargarOrdenCompraPDF, descargarTopOrdenesCompraPDF } from "@/services/ordenesCompraPdf";
+import { exportToCSV } from "@/hooks/useReportes";
+import { useCliente, formatearRUT } from "@/hooks/useCliente";
+import { toast } from "sonner";
 
 const TIPOS = [
   { value: "todos", label: "Todos los tipos" },
@@ -34,7 +37,9 @@ export default function OrdenesCompra() {
   const [hasSearched, setHasSearched] = useState(false);
   const [ordenSeleccionada, setOrdenSeleccionada] = useState<string | null>(null);
   const [ordenarPorMonto, setOrdenarPorMonto] = useState(false);
+  const [misVentas, setMisVentas] = useState(false);
 
+  const { data: cliente } = useCliente();
   const { data: ordenes = [], isLoading } = useOrdenesCompra(applied ?? {}, false, { enabled: hasSearched });
   const { data: ordenDetalle, isLoading: isLoadingDetalle } = useOrdenCompra(ordenSeleccionada, true);
 
@@ -50,9 +55,41 @@ export default function OrdenesCompra() {
     setHasSearched(true);
   };
 
-  const limpiar = () => { setForm({ ...emptyForm }); setApplied(null); setHasSearched(false); };
+  const limpiar = () => { setForm({ ...emptyForm }); setApplied(null); setHasSearched(false); setMisVentas(false); };
+
+  // "Mis ventas": en vez de escribir el nombre de la propia empresa a mano,
+  // filtra directo por el RUT de tu cliente (búsqueda exacta, no por nombre
+  // que puede variar). Antes esta pantalla era un buscador genérico de todo
+  // el mercado sin ningún atajo para "lo que vendí yo".
+  const verMisVentas = () => {
+    if (!cliente?.rut) {
+      toast.error("No tenemos el RUT de tu empresa guardado. Complétalo en Mi Empresa primero.");
+      return;
+    }
+    setMisVentas(true);
+    setForm({ ...emptyForm });
+    setApplied({ proveedor_rut: formatearRUT(cliente.rut) });
+    setHasSearched(true);
+  };
 
   const ordenesMostradas = ordenarPorMonto ? [...ordenes].sort((a, b) => (b.total ?? 0) - (a.total ?? 0)) : ordenes;
+
+  const exportarCSV = () => {
+    exportToCSV(
+      ordenesMostradas.map((o) => ({
+        codigo: o.codigo,
+        nombre: o.nombre ?? "",
+        tipo: getTipoOCLabel(o.tipo ?? ""),
+        proveedor: o.proveedor_nombre ?? "",
+        rut_proveedor: o.proveedor_rut ?? "",
+        comprador: o.institucion_nombre ?? "",
+        total: o.total ?? 0,
+        estado: o.estado ?? "",
+        fecha_creacion: o.fecha_creacion ?? "",
+      })),
+      misVentas ? "mis_ventas_firmavb" : "ordenes_compra_firmavb"
+    );
+  };
 
   return (
     <div className="space-y-6 p-4 sm:p-6">
@@ -114,6 +151,13 @@ export default function OrdenesCompra() {
             <Button variant="outline" onClick={limpiar} className="gap-2">
               <X className="h-4 w-4" /> Limpiar
             </Button>
+            <Button
+              variant={misVentas ? "default" : "outline"}
+              onClick={verMisVentas}
+              className={misVentas ? "gap-2 bg-firmavb-blue hover:bg-firmavb-blue/90" : "gap-2 border-firmavb-blue/30 text-firmavb-blue hover:bg-firmavb-blue/10"}
+            >
+              <Briefcase className="h-4 w-4" /> Mis ventas
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -135,8 +179,9 @@ export default function OrdenesCompra() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <FileText className="h-5 w-5 text-firmavb-blue" />
-                Resultados
+                {misVentas ? "Mis ventas" : "Resultados"}
                 <Badge variant="secondary">{ordenes.length}</Badge>
+                {misVentas && <Badge className="bg-firmavb-blue">Filtrado por tu RUT</Badge>}
               </CardTitle>
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" onClick={() => setOrdenarPorMonto((v) => !v)} variant={ordenarPorMonto ? "default" : "outline"} className="gap-2">
@@ -146,6 +191,11 @@ export default function OrdenesCompra() {
                   onClick={() => descargarTopOrdenesCompraPDF([...ordenes].sort((a, b) => (b.total ?? 0) - (a.total ?? 0)).slice(0, 20), "Top Órdenes de Compra")}
                   disabled={ordenesMostradas.length === 0}>
                   <Download className="h-4 w-4" /> Exportar PDF
+                </Button>
+                <Button size="sm" variant="outline" className="gap-2"
+                  onClick={exportarCSV}
+                  disabled={ordenesMostradas.length === 0}>
+                  <FileText className="h-4 w-4" /> Exportar CSV
                 </Button>
               </div>
             </div>

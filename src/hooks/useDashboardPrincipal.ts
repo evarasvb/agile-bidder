@@ -147,8 +147,12 @@ export function useOportunidadesPorTipo() {
         .select('*', { count: 'exact', head: true });
       if (caError) throw caError;
 
-      const { count: licCount, error: licError } = await supabase
-        .from('licitaciones')
+      // licitaciones_bi (fresca, sync oficial), no la antigua `licitaciones`
+      // (congelada) — mismo criterio que useCierresProximos/useUltimosMatches
+      // más abajo. Antes esta tarjeta mostraba un conteo desactualizado
+      // mientras el resto del dashboard ya usaba la tabla correcta.
+      const { count: licCount, error: licError } = await (supabase as any)
+        .from('licitaciones_bi')
         .select('*', { count: 'exact', head: true });
       if (licError) throw licError;
 

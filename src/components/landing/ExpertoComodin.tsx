@@ -6,8 +6,10 @@ import { Input } from "@/components/ui/input";
 import { PhoneCall, ArrowRight, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
-const SUPA = "https://juiskeeutbaipwbeeezw.supabase.co";
-const ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1aXNrZWV1dGJhaXB3YmVlZXp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc4OTg2ODQsImV4cCI6MjA4MzQ3NDY4NH0.RLiTsgTl5Xbh1NetQIOB3tBH1EQa9ehcHfWIa4MJWf4";
+// Misma URL/llave pública que usa el cliente canónico (src/integrations/supabase/client.ts),
+// pero por fetch crudo (no supabase.functions.invoke) porque esta respuesta es streaming (SSE).
+const SUPA = import.meta.env.VITE_SUPABASE_URL;
+const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const EJEMPLOS = [
   "¿Cómo paga la Municipalidad de Valparaíso?",
   "¿Pueden exigir ISO 9001 como requisito de admisibilidad?",

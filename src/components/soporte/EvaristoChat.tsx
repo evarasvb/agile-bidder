@@ -73,8 +73,6 @@ const nombrePagina = (path: string): string => {
 
 export function EvaristoChat() {
   const location = useLocation();
-  // Dentro del Experto el asistente flotante tapa el cuadro de pregunta.
-  if (location.pathname.startsWith("/experto")) return null;
   const navigate = useNavigate();
   const { data: invStats } = useInventoryStats();
   const { isConnected } = useExtensionStatus();
@@ -223,6 +221,13 @@ export function EvaristoChat() {
       setEnviandoTicket(false);
     }
   };
+
+  // Dentro del Experto el asistente flotante tapa el cuadro de pregunta.
+  // Este chequeo va DESPUÉS de todos los hooks (no antes): si el usuario navega
+  // entre /experto y el resto de la app sin que el componente se desmonte, un
+  // return temprano antes de los hooks cambia cuántos hooks se llaman entre
+  // renders, lo que rompe React ("Rendered fewer hooks than expected").
+  if (location.pathname.startsWith("/experto")) return null;
 
   return (
     <>

@@ -6,6 +6,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabaseClient as supabase } from '@/lib/supabaseClient';
 import type { InventoryItem } from './useInventory';
+import { IVA_RATE } from '@/lib/constants';
 
 // Tipos
 export interface LicitacionItem {
@@ -331,7 +332,7 @@ export function useEvaristoMatch(licitacionId: string | null, threshold: number 
       }
       
       // 6. Calcular totales
-      const totalIVA = totalNeto * 0.19;
+      const totalIVA = totalNeto * IVA_RATE;
       const totalFinal = totalNeto + totalIVA;
       const porcentajeMatch = licitacionItems.length > 0
         ? Math.round((itemsMatcheados / licitacionItems.length) * 100)

@@ -5,7 +5,10 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist"] },
+  // supabase/functions/** son Deno Edge Functions: runtime y convenciones distintas
+  // a las del frontend (Vite/React). Lintearlas con esta config solo generaba ruido
+  // (cientos de "any" fuera de alcance de este proyecto); su propio linter es `deno lint`.
+  { ignores: ["dist", "supabase/functions"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
@@ -21,6 +24,13 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+      // Deuda preexistente (ver auditoría técnica, hallazgo #8): 479 usos de "any" y
+      // 21 archivos con @ts-nocheck. Reescribirlos todos de golpe es alto riesgo sin
+      // tests que respalden cada cambio de tipo. Quedan como "warn" (visibles, no
+      // bloquean el build) para adoptar tipado estricto gradualmente en vez de una
+      // reescritura masiva; código nuevo debería evitarlos.
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/ban-ts-comment": "warn",
     },
   },
 );

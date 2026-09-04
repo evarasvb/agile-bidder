@@ -609,13 +609,13 @@ export default function Auth() {
 
               <p className="text-center text-sm text-muted-foreground mt-6">
                 Al continuar, aceptas nuestros{' '}
-                <span className="font-medium text-foreground">
+                <Link to="/terminos" className="font-medium text-foreground underline hover:text-primary">
                   Términos de Servicio
-                </span>{' '}
+                </Link>{' '}
                 y{' '}
-                <span className="font-medium text-foreground">
+                <Link to="/privacidad" className="font-medium text-foreground underline hover:text-primary">
                   Política de Privacidad
-                </span>
+                </Link>
               </p>
             </CardContent>
           </Card>
