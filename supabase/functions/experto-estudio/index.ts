@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
       topadj: rut ? sb.rpc("experto_top_adjudicatarios", { p_rut: rut, meses: 24, cantidad: 8 }).then((r) => r.data ?? []) : Promise.resolve([]),
       adj: sb.rpc("experto_adjudicaciones", { texto: nombre.slice(0, 120), p_rut: null, meses: 24, cantidad: 10 }).then((r) => r.data ?? []),
       // Competencia por los productos REALES de la descripción de los ítems (marcas), no por la categoría genérica.
-      comp: sb.rpc("experto_texto_competencia", { p_codigo: codigo }).then((r) => sb.rpc("experto_competencia", { texto: (r.data as string) || productos.slice(0, 80), meses: 12, cantidad: 8 })).then((r) => r.data ?? []),
+      comp: sb.rpc("experto_competencia_licitacion", { p_codigo: codigo, meses: 12, cantidad: 8 }).then((r) => r.data ?? []),
       org: rut ? sb.rpc("experto_organismo", { nombre_o_rut: rut }).then((r) => r.data?.[0]) : Promise.resolve(null),
       bases: sb.rpc("experto_bases_texto", { p_codigo: codigo }).then((r) => r.data ?? []),
       docs: sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: codigo, p_max: 8000 }).then((r) => r.data ?? []),
