@@ -27,6 +27,9 @@ export interface OportunidadPanel {
   // Texto concatenado de los productos de la compra, para buscar por ítem
   // (una compra "Insumos de oficina" que en su lista tiene tóner debe calzar).
   items_text?: string;
+  // Ítem (o descripción) que calzó con lo que el usuario buscó, cuando la
+  // búsqueda corrió en el servidor. Sirve para explicar por qué aparece.
+  coincidencia?: string | null;
   // true cuando la oportunidad coincide con las PALABRAS CLAVE que el cliente
   // definió en su onboarding (aunque aún no tenga inventario para el % de match).
   // Permite que la tarjeta diga "Tu rubro" en vez de un "N/A" mudo.
@@ -112,6 +115,35 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       const nowIso = new Date().toISOString();
       const incluirCerradas = filters.incluirCerradas ?? false;
 
+      // Búsqueda en el SERVIDOR (título, descripción, organismo, código y cada
+      // ÍTEM de licitaciones y compras ágiles) cuando el usuario escribe 2+
+      // letras. Antes se buscaba en el navegador sobre las 500 filas bajadas
+      // (hay ~4.600 licitaciones abiertas) y sin los ítems de licitaciones, así
+      // que una licitación con "resma" en su lista de productos nunca salía.
+      const textoBusqueda = (filters.search || '').trim();
+      const coincidenciaPorCodigo: Record<string, string | null> = {};
+      let codigosCA: string[] | null = null;
+      let codigosLic: string[] | null = null;
+      if (textoBusqueda.length >= 2) {
+        const { data: hits, error: errBusqueda } = await (supabase as any).rpc('buscar_oportunidades', {
+          p_texto: textoBusqueda,
+          p_incluir_cerradas: incluirCerradas,
+          p_limite: 200,
+        });
+        if (errBusqueda) {
+          // Si el RPC falla se cae a la búsqueda local de antes (no se rompe el panel).
+          console.error('[OportunidadesPanel] buscar_oportunidades:', errBusqueda);
+        } else {
+          codigosCA = [];
+          codigosLic = [];
+          for (const h of (hits || []) as any[]) {
+            coincidenciaPorCodigo[h.codigo] = h.coincidencia ?? null;
+            (h.tipo === 'compra_agil' ? codigosCA : codigosLic).push(h.codigo);
+          }
+        }
+      }
+      const busquedaEnServidor = codigosCA !== null;
+
       // Fetch compras_agiles with items count.
       // Por defecto solo activas (Publicada + cierre futuro). Con "incluir
       // cerradas" se traen las más recientes con límite para no saturar.
@@ -126,6 +158,8 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         `)
         .order('created_at', { ascending: false });
 
+      // Con búsqueda en servidor solo se traen los códigos que calzaron.
+      if (codigosCA) comprasQuery = comprasQuery.in('codigo', codigosCA.length ? codigosCA : ['-']);
       if (incluirCerradas) {
         comprasQuery = comprasQuery.limit(MAX_CERRADAS);
       } else {
@@ -155,6 +189,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         .select(LIC_COLS)
         .order('fecha_publicacion', { ascending: false, nullsFirst: false });
 
+      if (codigosLic) licitacionesQuery = licitacionesQuery.in('codigo', codigosLic.length ? codigosLic : ['-']);
       if (incluirCerradas) {
         licitacionesQuery = licitacionesQuery.limit(MAX_CERRADAS);
       } else {
@@ -312,6 +347,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
           .map((i: any) => i.nombre_producto)
           .filter(Boolean)
           .join(' '),
+        coincidencia: coincidenciaPorCodigo[c.codigo] ?? null,
       }));
 
       // Map licitaciones (columnas de licitaciones_bi)
@@ -335,6 +371,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         items_count: 0,
         items_matched: 0,
         created_at: l.created_at || l.fecha_publicacion,
+        coincidencia: coincidenciaPorCodigo[l.codigo] ?? null,
       }));
 
       let all = [...compras, ...licitaciones];
@@ -381,7 +418,9 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         const search = filters.institucion.toLowerCase();
         all = all.filter(o => o.organismo.toLowerCase().includes(search));
       }
-      if (filters.search) {
+      // Filtro local solo si la búsqueda no corrió en el servidor (ese ya
+      // devolvió únicamente lo que calza, incluso por ítem o por raíz de palabra).
+      if (filters.search && !busquedaEnServidor) {
         const search = filters.search.toLowerCase();
         all = all.filter(o =>
           o.nombre.toLowerCase().includes(search) ||
@@ -425,7 +464,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       // El total real de activas puede superar el límite renderizado (MAX_ACTIVAS).
       // Los conteos ya vinieron en el lote paralelo inicial (head:true).
       let totalActivasReal = activas.length;
-      if (!incluirCerradas) {
+      if (!incluirCerradas && !busquedaEnServidor) {
         const licN = (licCountRes as any)?.count ?? 0;
         const caN = (caCountRes as any)?.count ?? 0;
         if (licN || caN) totalActivasReal = licN + caN;

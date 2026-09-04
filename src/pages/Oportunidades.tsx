@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useInventoryStats } from "@/hooks/useInventory";
 
 // De dónde sale el % de match, para que nunca parezca magia: inventario (por producto) o palabras clave.
@@ -143,6 +143,12 @@ function OpportunityCard({
           <Building2 className="h-3 w-3 shrink-0" />
           <span className="truncate">{op.organismo}</span>
         </div>
+        {op.coincidencia ? (
+          // Por qué aparece: el ítem de la lista de productos que calzó con la búsqueda.
+          <p className="text-xs text-firmavb-blue truncate" title={op.coincidencia}>
+            Ítem: {op.coincidencia}
+          </p>
+        ) : null}
 
         {/* Bottom row: Amount + Items + Actions */}
         <div className="flex items-center justify-between pt-1 border-t">
@@ -223,6 +229,17 @@ export default function Oportunidades() {
   }));
   const [page, setPage] = useState(1);
   const pageSize = 24;
+  // Lo que se escribe en el buscador se manda al servidor con una pausa corta
+  // (busca dentro de los ítems; sin la pausa sería una consulta por tecla).
+  const [busqueda, setBusqueda] = useState(filters.search || "");
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const v = busqueda.trim() || undefined;
+      setFilters((prev) => (prev.search === v ? prev : { ...prev, search: v }));
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [busqueda]);
 
   const { data, isLoading, refetch } = useOportunidadesPanel(filters);
   const descartar = useDescartarOportunidad();
@@ -245,7 +262,10 @@ export default function Oportunidades() {
     filters.institucion ||
     filters.incluirCerradas
   );
-  const clearFilters = () => setFilters({ sortBy: "match_score", sortAsc: false });
+  const clearFilters = () => {
+    setBusqueda("");
+    setFilters({ sortBy: "match_score", sortAsc: false });
+  };
 
   // Filtros de RUBRO del cliente (palabras/regiones/monto, de Configuración →
   // Filtros con IA). Se aplican en el servidor dentro del panel, así que NO se
@@ -394,9 +414,9 @@ export default function Oportunidades() {
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Buscar por código, título u organismo..."
-              value={filters.search || ""}
-              onChange={(e) => updateFilter("search", e.target.value || undefined)}
+              placeholder="Buscar producto, título, código u organismo (también dentro de los ítems)..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
               className="pl-9"
             />
           </div>
