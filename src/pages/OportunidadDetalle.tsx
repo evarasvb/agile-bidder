@@ -45,6 +45,7 @@ import { format, differenceInHours, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { AccionesCompartir } from '@/components/oportunidades/AccionesCompartir';
+import { DetalleCompraAgil } from '@/components/compras-agiles/DetalleCompraAgil';
 import { RiesgoOrganismoCard } from '@/components/organismo/RiesgoOrganismoCard';
 
 function formatCurrency(value: number | null) {
@@ -371,8 +372,12 @@ export default function OportunidadDetalle() {
             </Card>
           </div>
 
-          {/* Description */}
-          {oportunidad.descripcion && (
+          {/* Compra ágil: detalle completo (descripción, entrega, ofertas, adjuntos) */}
+          {oportunidad.tipo === 'compra_agil' && oportunidad.detalle && (
+            <DetalleCompraAgil datos={oportunidad.detalle} />
+          )}
+          {/* Description (licitaciones) */}
+          {oportunidad.tipo !== 'compra_agil' && oportunidad.descripcion && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Descripción</CardTitle>

@@ -27,6 +27,7 @@ import { useInventoryActivo } from '@/hooks/useInventory';
 import { MatchItemActions } from '@/components/compras-agiles/MatchItemActions';
 import { AgregarProductoManual } from '@/components/compras-agiles/AgregarProductoManual';
 import { AccionesCompartir } from '@/components/oportunidades/AccionesCompartir';
+import { DetalleCompraAgil } from '@/components/compras-agiles/DetalleCompraAgil';
 
 // Color del badge de match según el %.
 const matchBadge = (score: number) =>
@@ -327,17 +328,8 @@ export default function CompraAgilDetalle() {
         </Card>
       </div>
 
-      {/* Descripción */}
-      {compra.descripcion && (
-        <Card>
-          <CardHeader>
-            <h2 className="text-lg font-semibold">Descripción</h2>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">{compra.descripcion}</p>
-          </CardContent>
-        </Card>
-      )}
+      {/* Detalle completo: descripción, entrega, ofertas recibidas, adjuntos */}
+      <DetalleCompraAgil datos={compra} />
 
       {/* Match ítem por ítem: para cada producto pedido, con qué producto de tu
           inventario calza, a qué precio y con qué %. Editable: confirmar,
