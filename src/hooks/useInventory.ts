@@ -374,6 +374,44 @@ export function useDeleteInventoryItem() {
   });
 }
 
+// Borrado masivo en lotes: antes Inventory.tsx borraba de a uno, con un
+// round-trip por producto (lento con catálogos grandes, ver auditoría de
+// experiencia). Un solo `.in('id', ...)` por lote de 500 hace lo mismo con
+// muchas menos idas y vueltas al servidor.
+export function useDeleteInventoryItems() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      if (!user?.id) {
+        throw new Error('Debes iniciar sesión para eliminar productos');
+      }
+      if (ids.length === 0) return;
+      const clienteId = await resolverClienteOwnerId();
+      if (!clienteId) throw new Error('No se encontró tu empresa.');
+
+      const BATCH_SIZE = 500;
+      for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+        const batch = ids.slice(i, i + BATCH_SIZE);
+        const { error } = await supabase
+          .from('cliente_inventario')
+          .delete()
+          .in('id', batch)
+          .eq('cliente_id', clienteId);
+
+        if (error) {
+          console.error('[useDeleteInventoryItems] Error:', error);
+          throw error;
+        }
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+    },
+  });
+}
+
 export function useInventoryStats() {
   const { user, loading: authLoading } = useAuth();
   const clienteId = user?.id || null;

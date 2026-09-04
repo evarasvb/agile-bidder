@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { useInventory, useUpdateInventoryItem, useDeleteInventoryItem, useCreateInventoryItem, InventoryItem, InventoryInput } from "@/hooks/useInventory";
+import { useInventory, useUpdateInventoryItem, useDeleteInventoryItem, useDeleteInventoryItems, useCreateInventoryItem, InventoryItem, InventoryInput } from "@/hooks/useInventory";
 import { useEnriquecerInventario } from "@/hooks/useEnriquecerInventario";
 import { BuscarFotosDialog } from "@/components/inventory/BuscarFotosDialog";
 import { EditProductDialog } from "@/components/inventory/EditProductDialog";
@@ -125,6 +125,7 @@ export default function Inventory() {
   };
   const actualizarProducto = useUpdateInventoryItem();
   const eliminarProducto = useDeleteInventoryItem();
+  const eliminarProductosEnLote = useDeleteInventoryItems();
   const crearProducto = useCreateInventoryItem();
 
   const handleRefresh = () => {
@@ -155,9 +156,10 @@ export default function Inventory() {
 
   const handleBulkDelete = async () => {
     const idsToDelete = Array.from(selectedIds);
-    for (const id of idsToDelete) {
-      await eliminarProducto.mutateAsync(id);
-    }
+    // Un solo borrado por lotes (in batches de 500) en vez de un round-trip
+    // por producto: con catálogos grandes, seleccionar cientos de productos
+    // para depurar el catálogo se sentía muy lento.
+    await eliminarProductosEnLote.mutateAsync(idsToDelete);
     setSelectedIds(new Set());
     setBulkDeleteOpen(false);
     toast.success(`${idsToDelete.length} productos eliminados`);
@@ -169,16 +171,21 @@ export default function Inventory() {
   const esIncompleto = (item: InventoryItem) => !item.descripcion?.trim() || !item.imagen_url;
   const incompleteCount = inventario.filter(esIncompleto).length;
 
-  const filteredInventory = inventario.filter((item) => {
+  // Memoizado: con catálogos grandes (16k+ productos), recalcular este filtro
+  // en CADA render (no solo cuando cambia la búsqueda) se sentía lento al
+  // escribir en el buscador.
+  const filteredInventory = useMemo(() => {
     const q = searchQuery.toLowerCase();
-    const matchQ =
-      item.nombre_producto.toLowerCase().includes(q) ||
-      item.sku.toLowerCase().includes(q) ||
-      (item.proveedor && item.proveedor.toLowerCase().includes(q));
-    if (!matchQ) return false;
-    if (soloIncompletos && !esIncompleto(item)) return false;
-    return true;
-  });
+    return inventario.filter((item) => {
+      const matchQ =
+        item.nombre_producto.toLowerCase().includes(q) ||
+        item.sku.toLowerCase().includes(q) ||
+        (item.proveedor && item.proveedor.toLowerCase().includes(q));
+      if (!matchQ) return false;
+      if (soloIncompletos && !esIncompleto(item)) return false;
+      return true;
+    });
+  }, [inventario, searchQuery, soloIncompletos]);
 
   // Reset to page 1 when search changes
   const handleSearchChange = (value: string) => {

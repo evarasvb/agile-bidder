@@ -90,7 +90,7 @@ export function PrimerosPasos() {
     {
       id: "extension", done: isConnected, opcional: true, icon: Plug,
       titulo: "Conecta la extensión (opcional)",
-      desc: "Para postular más rápido en Mercado Público y activar el Auto-Bid.",
+      desc: "Para que autocomplete tus cotizaciones mientras postulas en Mercado Público.",
       to: "/configuracion/extension",
       aviso: "Te muestro cómo conectar la extensión 🔌",
     },

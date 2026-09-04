@@ -3,7 +3,8 @@ import { Loader2 } from "lucide-react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { BrowserRouter, Routes, Route, Outlet, Navigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
@@ -78,6 +79,19 @@ const MisTickets = lazy(() => import("./pages/MisTickets"));
 // no re-consulta al volver a la pestaña y reintenta solo 1 vez. Antes cada
 // navegación volvía a pedir todo (staleTime 0), lo que se sentía lento.
 const queryClient = new QueryClient({
+  // Varios hooks de lectura (useLicitaciones, useProfile, useRolePermissions,
+  // useNotificaciones...) solo hacían console.error en su catch: el usuario
+  // veía la pantalla quedarse cargando o vacía sin ninguna señal de que algo
+  // falló. En vez de parchar catch por catch, un solo onError acá cubre TODAS
+  // las queries de la app. Una pantalla con su propio manejo de error visible
+  // puede optar por no duplicar el aviso con meta: { silentError: true }.
+  queryCache: new QueryCache({
+    onError: (error, query) => {
+      if (query.meta?.silentError) return;
+      const msg = error instanceof Error ? error.message : 'Error desconocido';
+      toast.error(`No se pudo cargar: ${msg}`);
+    },
+  }),
   defaultOptions: {
     queries: {
       staleTime: 60_000,

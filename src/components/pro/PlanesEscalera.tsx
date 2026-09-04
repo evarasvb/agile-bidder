@@ -16,7 +16,7 @@ const PLANES = [
   { id: 'free', nombre: 'Gratis', precio: '$0', periodo: '', puntos: ['3 preguntas y 1 informe al mes en el Experto', 'Ver las oportunidades de tu rubro'] },
   { id: 'pro_30', nombre: 'Experto Pro', precio: '$50.000', periodo: '30 días', puntos: ['Preguntas e informes sin límite', 'Estudio profundo: historial del organismo y quién gana', 'Riesgo de pago y competencia en cada oportunidad'] },
   { id: 'plus_30', nombre: 'Experto Plus', precio: '$100.000', periodo: '30 días', puntos: ['Todo lo de Pro', 'Anexos completados con los datos y documentos de tu empresa'] },
-  { id: 'erp', nombre: 'FirmaVB ERP', precio: '$149.990', periodo: 'mes + 3% de las OC aceptadas que postulaste desde FirmaVB', puntos: ['Todo lo de Plus', 'Postular con la extensión, cotizar y auto-bid', 'Inventario, equipo, órdenes de compra y reportes'] },
+  { id: 'erp', nombre: 'FirmaVB ERP', precio: '$149.990', periodo: 'mes + 3% de las OC aceptadas que postulaste desde FirmaVB', puntos: ['Todo lo de Plus', 'Postular y autocompletar cotizaciones con la extensión', 'Inventario, equipo, órdenes de compra y reportes'] },
 ] as const;
 
 /** Escalera de planes con activación por Mercado Pago (Experto Pro/Plus: pago único; ERP: suscripción). */
