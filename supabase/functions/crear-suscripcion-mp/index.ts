@@ -15,7 +15,9 @@ const cors = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 const WEBHOOK_URL = 'https://juiskeeutbaipwbeeezw.supabase.co/functions/v1/mp-suscripcion-webhook';
-const MONTO_CLP = Number(Deno.env.get("FIRMAVB_ERP_CLP") ?? 149990);
+// Precio: $149.990 NETO + IVA 19% = $178.488 (lo que cobra Mercado Pago cada mes).
+const NETO_CLP = Number(Deno.env.get("FIRMAVB_ERP_CLP") ?? 149990);
+const MONTO_CLP = Math.round(NETO_CLP * 1.19);
 
 function json(obj: unknown, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
@@ -63,7 +65,7 @@ Deno.serve(async (req) => {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        reason: 'FirmaVB ERP — Suscripción mensual',
+        reason: 'FirmaVB ERP — Suscripción mensual ($149.990 + IVA)',
         external_reference: (cliente as { id: string }).id,
         payer_email: payerEmail,
         notification_url: WEBHOOK_URL,

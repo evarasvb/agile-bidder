@@ -40,8 +40,8 @@ export const PLANES: readonly PlanEscalera[] = [
   {
     id: 'erp',
     nombre: 'FirmaVB ERP',
-    precio: '$149.990',
-    periodo: 'mes + 3% del neto de cada OC aceptada que postulaste desde FirmaVB (comisión + IVA)',
+    precio: '$149.990 + IVA',
+    periodo: 'al mes ($178.488 con IVA), más 3% del neto de cada OC aceptada que postulaste desde FirmaVB (+ IVA)',
     puntos: [
       'Todo lo de Plus',
       'Postular y autocompletar cotizaciones con la extensión',

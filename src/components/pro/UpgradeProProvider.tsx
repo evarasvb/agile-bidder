@@ -81,7 +81,7 @@ export function UpgradeProProvider({ children }: { children: ReactNode }) {
           <div className="rounded-lg border bg-muted/30 p-4">
             <div className="mb-3 flex items-baseline justify-center gap-1">
               <span className="text-3xl font-bold">$149.990</span>
-              <span className="text-muted-foreground">/mes</span>
+              <span className="text-muted-foreground">+ IVA /mes</span>
             </div>
             <ul className="space-y-2">
               {BENEFICIOS.map((b) => (

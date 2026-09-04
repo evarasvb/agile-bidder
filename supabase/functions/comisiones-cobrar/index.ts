@@ -4,7 +4,11 @@
 // 2) Facturas programadas: si MP ya cobró (last_charged_date posterior) o el cliente pagó con el
 //    botón, se marca pagada y el monto vuelve al fijo (cobro_revertido_en).
 // Facturas sin comisiones con suscripción: quedan pagadas con el cargo fijo del mes.
+// Montos: el fijo es NETO ($149.990) y Mercado Pago cobra con IVA; la comisión (3% del neto) también lleva IVA.
 import { createClient } from "jsr:@supabase/supabase-js@2";
+
+const IVA = 0.19;
+const bruto = (neto: number) => Math.round(Number(neto) * (1 + IVA));
 
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { "Content-Type": "application/json" } });
 function rolJwt(auth: string | null): string | null {
@@ -28,19 +32,20 @@ Deno.serve(async (req) => {
 
   for (const f of (filas ?? []) as any[]) {
     try {
+      const fijoBruto = bruto(f.fijo);
       // 2) Programadas: ¿ya se cobró o ya se pagó por otro lado? → pagada + volver al fijo
       if (f.cobro_programado_en && !f.cobro_revertido_en) {
         const pre = await mp("GET", `/preapproval/${f.cobro_preapproval_id}`);
         const ultimoCobro = pre.data?.summarized?.last_charged_date ?? null;
         const cobrado = ultimoCobro && new Date(ultimoCobro) > new Date(f.cobro_programado_en);
         if (cobrado || f.estado === "pagada" || f.susc_estado !== "authorized") {
-          const back = await mp("PUT", `/preapproval/${f.cobro_preapproval_id}`, { auto_recurring: { transaction_amount: Math.round(Number(f.fijo)), currency_id: "CLP" } });
+          const back = await mp("PUT", `/preapproval/${f.cobro_preapproval_id}`, { auto_recurring: { transaction_amount: fijoBruto, currency_id: "CLP" } });
           if (!back.ok && f.susc_estado === "authorized") { res.errores.push(`revertir ${f.factura_id}: ${back.status}`); continue; }
           await sb.from("facturas_comision").update({
             cobro_revertido_en: new Date().toISOString(),
             ...(cobrado && f.estado !== "pagada" ? { estado: "pagada", fecha_pago: String(ultimoCobro).slice(0, 10) } : {}),
           }).eq("id", f.factura_id);
-          await sb.from("suscripciones").update({ monto: Math.round(Number(f.fijo)), updated_at: new Date().toISOString() }).eq("mp_preapproval_id", f.cobro_preapproval_id);
+          await sb.from("suscripciones").update({ monto: fijoBruto, updated_at: new Date().toISOString() }).eq("mp_preapproval_id", f.cobro_preapproval_id);
           res.revertidas++; if (cobrado) res.pagadas++;
         }
         continue;
@@ -52,7 +57,8 @@ Deno.serve(async (req) => {
         await sb.from("facturas_comision").update({ estado: "pagada", fecha_pago: new Date().toISOString().slice(0, 10), cobro_programado_en: new Date().toISOString(), cobro_revertido_en: new Date().toISOString(), cobro_preapproval_id: f.mp_preapproval_id }).eq("id", f.factura_id);
         res.pagadas++; continue;
       }
-      const monto = Math.round(Number(f.fijo) + Number(f.total_comision));
+      // Próximo cargo: fijo con IVA + comisión neta con IVA
+      const monto = fijoBruto + bruto(f.total_comision);
       const up = await mp("PUT", `/preapproval/${f.mp_preapproval_id}`, { auto_recurring: { transaction_amount: monto, currency_id: "CLP" } });
       if (!up.ok) { res.errores.push(`programar ${f.factura_id}: ${up.status} ${up.data?.message ?? ""}`); continue; }
       await sb.from("facturas_comision").update({ cobro_programado_en: new Date().toISOString(), cobro_preapproval_id: f.mp_preapproval_id }).eq("id", f.factura_id);
