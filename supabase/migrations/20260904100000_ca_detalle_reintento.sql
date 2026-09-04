@@ -18,3 +18,11 @@ as $$
   order by c.detalle_actualizado_at nulls first, c.fecha_cierre asc
   limit greatest(1, least(p_limit, 100));
 $$;
+
+-- Crones del listado de compras ágiles (aplicados en producción el 04-09-2026, documentados aquí):
+--   fetch-compras-agiles-v3-cron (job 54): cada 5 min, {"ttl_cambio_ms":21600000,"max_paginas":3,"reiniciar":true}
+--     => páginas 1-3 de la ventana de 6 h (lo recién publicado), timeout pg_net 120 s.
+--   fetch-compras-agiles-horario (job 60): minuto 35 de cada hora, {"ttl_cambio_ms":21600000,"max_paginas":3,"desde_pagina":4}
+--     => páginas 4-6 de la misma ventana, por si un pico de cambios empuja lo nuevo más abajo.
+--   fetch-compras-agiles-nocturno (job 59): 04:15 UTC, {"ttl_cambio_ms":43200000,"max_paginas":3,"reiniciar":true}.
+-- Con ventanas de 12 h o más la API de ChileCompra supera sus 30 s y responde 504; con 1-3 h devuelve 0 páginas.

@@ -1,12 +1,12 @@
-// ROBOT Compras Ágiles v3.2 — tandas cortas con marca de agua por página.
-// Ventana de 48 h por defecto. La API de Mercado Público tarda 20-60 s por página en ventanas
+// ROBOT Compras Ágiles v3.3 — tandas cortas con marca de agua por página.
+// Ventana de 6 h por defecto: con 12 h o más la API supera sus 30 s y responde 504. La API de Mercado Público tarda 20-60 s por página en ventanas
 // de más de unas horas (con 15 s de timeout NUNCA respondía y la ingesta quedó en cero
 // durante 13 h el 04-09-2026): timeout de 60 s por página y presupuesto de 100 s por corrida.
 // Si una página falla (504/timeout) el cursor vuelve a 1: lo más nuevo siempre está en la página 1.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const cors = { 'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type' };
 const sleep = (ms:number)=>new Promise(r=>setTimeout(r,ms));
-const TTL_NORMAL = 172800000; // 48 h
+const TTL_NORMAL = 21600000; // 6 h
 const PRESUPUESTO_MS = 100000;
 const TIMEOUT_PAGINA_MS = 60000;
 function parseCl(s:any):string|null{
@@ -22,10 +22,12 @@ Deno.serve(async (req)=>{
   const ticket = Deno.env.get('MERCADOPUBLICO_API_KEY');
   const json = (o:any, status=200)=>new Response(JSON.stringify(o),{status,headers:{...cors,'Content-Type':'application/json'}});
   if(!ticket) return json({error:'API key no configurada'},500);
-  let maxPaginas = 8; let ttlOverride:number|null = null; let reiniciar = false;
-  try{ const b = await req.json(); if(b){ if(b.max_paginas) maxPaginas=Math.min(Number(b.max_paginas),20); if(b.ttl_cambio_ms) ttlOverride=Number(b.ttl_cambio_ms); if(b.reiniciar) reiniciar=true; } }catch(_){}
+  let maxPaginas = 8; let ttlOverride:number|null = null; let reiniciar = false; let desdePagina:number|null = null;
+  try{ const b = await req.json(); if(b){ if(b.max_paginas) maxPaginas=Math.min(Number(b.max_paginas),20); if(b.ttl_cambio_ms) ttlOverride=Number(b.ttl_cambio_ms); if(b.reiniciar) reiniciar=true; if(b.desde_pagina) desdePagina=Math.max(1,Number(b.desde_pagina)); } }catch(_){}
   const { data: st } = await sb.from('ingesta_ca_estado').select('*').eq('clave','compra_agil').single();
-  let pagina = reiniciar ? 1 : (st?.pagina_actual ?? 1);
+  // desde_pagina: barrido fijo de páginas más profundas (el cron horario cubre 4-6 mientras el
+  // de cada 5 min cubre 1-3, que es donde aparece lo recién publicado).
+  let pagina = desdePagina ?? (reiniciar ? 1 : (st?.pagina_actual ?? 1));
   const ttl = ttlOverride ?? (st?.ttl_ms ?? TTL_NORMAL);
   const t0 = Date.now();
   const res:any = { desde_pagina:pagina, paginas:0, insertadas:0, total_paginas:st?.total_paginas??null, errores:[] as string[], pasada_completa:false };
