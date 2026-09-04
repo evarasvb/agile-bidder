@@ -161,8 +161,12 @@ ${lista}`;
     // Gemini responde 503 (sobrecarga) por rachas: tres pasadas con pausas de 3 y 8 segundos.
     for (const model of [...MODELOS, "espera:3000", ...MODELOS, "espera:8000", ...MODELOS]) {
       if (model.startsWith("espera:")) { await new Promise((ok) => setTimeout(ok, Number(model.slice(7)))); continue; }
-      const r = await fetch(GEMINI_URL, { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model, temperature: 0.1, max_tokens: 8000, messages: [{ role: "system", content: SYS }, { role: "user", content: datos + "\n\nCompleta el anexo." }] }) });
+      // Tope de 60 s por intento: sin esto una llamada colgada dejaba la función pegada.
+      let r: Response;
+      try {
+        r = await fetch(GEMINI_URL, { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, signal: AbortSignal.timeout(60_000),
+          body: JSON.stringify({ model, temperature: 0.1, max_tokens: 8000, messages: [{ role: "system", content: SYS }, { role: "user", content: datos + "\n\nCompleta el anexo." }] }) });
+      } catch (e) { console.error("gemini", model, String(e).slice(0, 80)); continue; }
       if (!r.ok) { console.error("gemini", model, r.status); continue; }
       let c = String((await r.json()).choices?.[0]?.message?.content ?? "").trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
       const a = c.indexOf("{"), z = c.lastIndexOf("}"); if (a >= 0 && z > a) c = c.slice(a, z + 1);
