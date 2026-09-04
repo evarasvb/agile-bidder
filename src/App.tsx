@@ -5,6 +5,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { HelmetProvider } from "react-helmet-async";
 import { BrowserRouter, Routes, Route, Outlet, Navigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
@@ -28,6 +29,7 @@ const Activar = lazy(() => import("./pages/Activar"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Terminos = lazy(() => import("./pages/Terminos"));
 const Privacidad = lazy(() => import("./pages/Privacidad"));
+const Planes = lazy(() => import("./pages/Planes"));
 
 const MisOportunidades = lazy(() => import("./pages/MisOportunidades"));
 const LicitacionDetalle = lazy(() => import("./pages/LicitacionDetalle"));
@@ -126,6 +128,7 @@ const ProtectedLayoutWrapper = () => (
 );
 
 const App = () => (
+  <HelmetProvider>
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
@@ -153,6 +156,7 @@ const App = () => (
           <Route path="/activar" element={<Activar />} />
           <Route path="/terminos" element={<Terminos />} />
           <Route path="/privacidad" element={<Privacidad />} />
+          <Route path="/planes" element={<Planes />} />
           
           {/* Onboarding - sin sidebar */}
           <Route path="/onboarding" element={<ProtectedRoute><ClienteOnboarding /></ProtectedRoute>} />
@@ -231,7 +235,6 @@ const App = () => (
             <Route path="/cuenta/facturacion" element={<Billing />} />
             
             {/* Redirects de rutas antiguas */}
-            <Route path="/planes" element={<Navigate to="/cuenta" replace />} />
             <Route path="/dashboard-old" element={<Navigate to="/dashboard" replace />} />
             <Route path="/clientes/*" element={<Navigate to="/dashboard" replace />} />
             
@@ -243,6 +246,7 @@ const App = () => (
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
+  </HelmetProvider>
 );
 
 export default App;
