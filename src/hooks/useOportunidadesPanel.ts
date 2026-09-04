@@ -452,7 +452,13 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         }
       }
       if (filtrosRow) {
-        all = aplicarFiltrosCliente(all, filtrosRow as Partial<ClienteFiltros>);
+        // Si el usuario ESCRIBIÓ una búsqueda, manda lo que buscó: no se exige
+        // además que calce con las palabras del rubro (antes buscar "resma" con
+        // rubro "google" botaba casi todo). Se mantienen exclusiones, regiones y monto.
+        const filtrosAplicar: Partial<ClienteFiltros> = textoBusqueda.length >= 2
+          ? { ...(filtrosRow as Partial<ClienteFiltros>), palabras_incluir: [], palabras_incluir_ia: [] }
+          : (filtrosRow as Partial<ClienteFiltros>);
+        all = aplicarFiltrosCliente(all, filtrosAplicar);
       }
       // Lo que coincide con la definición del cliente lleva la PALABRA que calzó
       // (ej: "toner"), para que la tarjeta explique por qué está aquí. Clave para
@@ -486,14 +492,17 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       }
       // Filtro local solo si la búsqueda no corrió en el servidor (ese ya
       // devolvió únicamente lo que calza, incluso por ítem o por raíz de palabra).
+      // Este respaldo exigía la frase completa tal cual: "arriendo vehiculos" no
+      // encontraba nada aunque "arriendo" y "vehículos" por separado sí tuvieran
+      // resultados, y una tilde de más o de menos dejaba la lista vacía. Ahora
+      // busca cada palabra por separado (todas deben aparecer, en cualquier
+      // orden) con `normalizar`, igual criterio que el resto de los filtros.
       if (filters.search && !busquedaEnServidor) {
-        const search = filters.search.toLowerCase();
-        all = all.filter(o =>
-          o.nombre.toLowerCase().includes(search) ||
-          o.codigo.toLowerCase().includes(search) ||
-          o.organismo.toLowerCase().includes(search) ||
-          (o.items_text || '').toLowerCase().includes(search)
-        );
+        const palabras = normalizar(filters.search).split(/\s+/).filter(Boolean);
+        all = all.filter(o => {
+          const texto = normalizar(`${o.nombre} ${o.codigo} ${o.organismo} ${o.items_text || ''}`);
+          return palabras.every(p => texto.includes(p));
+        });
       }
 
       // Sort

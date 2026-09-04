@@ -34,8 +34,11 @@ export interface ClienteFiltros {
 
 // Normaliza a minúsculas sin acentos (mismo criterio que el match del backend,
 // que usa unaccent). Sin esto, "Tóner" del Estado no calzaba con "toner".
+// Se eliminan también los apóstrofes/acentos sueltos: Mercado Público escribe
+// "O´Higgins" (acento agudo suelto) y el cliente "O'Higgins"; sin esto la región
+// nunca calzaba y se ocultaban todas sus oportunidades.
 export const normalizar = (s: string): string =>
-  (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[´`'’‘]/g, '').trim();
 
 // Coincidencia por CONCEPTO (no por palabra exacta). Antes el filtro exigía que
 // el texto contuviera la palabra tal cual, así que "computador" no calzaba con
