@@ -28,7 +28,10 @@ export function AsignarPipelineModal({ open, onOpenChange, item }: AsignarPipeli
     asignarMutation.mutate(
       {
         pipelineId: item.id,
+        oportunidadId: item.oportunidad_id,
         vendedorId: selectedVendedor,
+        montoEstimado: item.monto_estimado ?? undefined,
+        fechaCierre: item.fecha_cierre ?? undefined,
         notas: notas || undefined,
       },
       {
