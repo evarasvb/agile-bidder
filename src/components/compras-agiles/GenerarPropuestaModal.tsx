@@ -13,7 +13,7 @@ import { useUpdateCompraAgil } from "@/hooks/useComprasAgiles";
 import { formatCurrency } from "@/utils/clasificacion";
 import { PrecioMercadoHint } from "./PrecioMercadoHint";
 import { useUserSettings } from "@/hooks/useUserSettings";
-import { IVA_RATE } from "@/lib/constants";
+import { calcularDesgloseOferta } from "@/lib/ofertaCalculo";
 import { aplicarRecargoPorRegion, obtenerRecargoRegion } from "@/utils/regiones";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useInventoryActivo } from "@/hooks/useInventory";
@@ -230,10 +230,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
   };
 
   const itemsActivos = itemsSeleccionados.filter(item => item.precioUnitario > 0);
-  const subtotalItems = itemsActivos.reduce((sum, item) => 
-    sum + (item.precioUnitario * item.cantidad), 0);
-  const iva = subtotalItems * IVA_RATE;
-  const montoTotal = subtotalItems + iva;
+  const { subtotal: subtotalItems, iva, total: montoTotal } = calcularDesgloseOferta(itemsSeleccionados);
   
   // Función para obtener badge de buen pagador
   const getBuenPagadorBadge = (buenPagador: boolean | null) => {
