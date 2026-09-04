@@ -209,17 +209,34 @@ export default function LibroLicitacion() {
     enabled: !!cod && !!token,
     queryFn: async () => { const r = await fetch(`${SUPA}/functions/v1/experto-anexo-word?codigo=${cod}`, { headers: auth }); const j = await r.json().catch(() => ({})); return (j.anexos ?? []) as any[]; },
   });
+  // Devuelve false si hay que detener la tanda (plan o datos de empresa).
+  const completarUno = async (d: any): Promise<boolean> => {
+    const r = await fetch(`${SUPA}/functions/v1/experto-anexo-word`, { method: 'POST', headers: auth, body: JSON.stringify({ codigo: cod, documento_id: d.id }) });
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 402) { toast.error(j.mensaje || 'Requiere Experto Plus', { action: { label: 'Ver planes', onClick: () => navigate('/cuenta') }, duration: 9000 }); return false; }
+    if (r.status === 428) { toast.error(j.mensaje, { action: { label: 'Mi empresa', onClick: () => navigate('/configuracion/empresa') }, duration: 9000 }); return false; }
+    if (!r.ok) { toast.error(`${d.nombre}: ${j.mensaje || j.error || 'no pude completarlo'}`); return true; }
+    if (j.aplica === false) { toast.info(`${d.nombre}: no aplica (${j.motivo})`, { duration: 8000 }); return true; }
+    toast.success(`${j.nombre}: ${j.cambios} campos completados, ${j.campos_validar} en amarillo para validar. ${j.resumen ?? ''}`, { duration: 9000 });
+    qc.invalidateQueries({ queryKey: ['experto_anexos_word', cod] });
+    return true;
+  };
   const completarWord = async (d: any) => {
     setOcupado('word:' + d.id);
-    try {
-      const r = await fetch(`${SUPA}/functions/v1/experto-anexo-word`, { method: 'POST', headers: auth, body: JSON.stringify({ codigo: cod, documento_id: d.id }) });
-      const j = await r.json().catch(() => ({}));
-      if (r.status === 402) { toast.error(j.mensaje || 'Requiere Experto Plus', { action: { label: 'Ver planes', onClick: () => navigate('/cuenta') }, duration: 9000 }); return; }
-      if (r.status === 428) { toast.error(j.mensaje, { action: { label: 'Mi empresa', onClick: () => navigate('/configuracion/empresa') }, duration: 9000 }); return; }
-      if (!r.ok) { toast.error(j.mensaje || j.error || 'No pude completar el anexo'); return; }
-      toast.success(`${j.nombre}: ${j.cambios} campos completados, ${j.campos_validar} en amarillo para que los valides.`, { duration: 8000 });
-      qc.invalidateQueries({ queryKey: ['experto_anexos_word', cod] });
-    } catch (e: any) { toast.error(e.message); } finally { setOcupado(null); }
+    try { await completarUno(d); } catch (e: any) { toast.error(e.message); } finally { setOcupado(null); }
+  };
+  // Todos los Word de la licitación, uno tras otro. Si hay varias copias del mismo anexo
+  // ("Anexo_N_3 (6)", "(7)", "(8)") se usa la última subida.
+  const wordsUnicos = () => {
+    const base = (n: string) => n.replace(/\s*\(\d+\)/g, '').replace(/\.docx$/i, '').trim().toLowerCase();
+    const m = new Map<string, any>();
+    for (const d of documentos.filter((x: any) => x.tipo === 'docx')) { const k = base(d.nombre); if (!m.has(k) || new Date(d.creado_en) > new Date(m.get(k).creado_en)) m.set(k, d); }
+    return Array.from(m.values());
+  };
+  const completarTodos = async () => {
+    const lista = wordsUnicos(); if (!lista.length) return;
+    setOcupado('word:todos');
+    try { for (const d of lista) { if (!(await completarUno(d))) break; } } catch (e: any) { toast.error(e.message); } finally { setOcupado(null); }
   };
   const borrarAnexoWord = async (id: string) => {
     await fetch(`${SUPA}/functions/v1/experto-anexo-word?id=${id}`, { method: 'DELETE', headers: auth });
@@ -394,13 +411,18 @@ export default function LibroLicitacion() {
                     <button onClick={() => borrarDocumento(d.id)} title="Quitar"><Trash2 className="h-3.5 w-3.5" /></button>
                   </div>
                 ))}
+                {documentos.filter((x: any) => x.tipo === 'docx').length > 1 && (
+                  <Button size="sm" variant="outline" className="mt-1 w-full sm:w-auto" onClick={completarTodos} disabled={!!ocupado}>
+                    {ocupado === 'word:todos' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}Completar todos los anexos Word
+                  </Button>
+                )}
                 {anexosWord.length > 0 && (
                   <div className="mt-2 rounded-md border border-yellow-200 bg-yellow-50/40 p-2 space-y-1">
                     <p className="font-medium text-xs flex items-center gap-1"><Sparkles className="h-3.5 w-3.5 text-firmavb-blue" />Anexos completados por el Experto</p>
                     <p className="text-[11px] text-muted-foreground">Mismo Word oficial, con tus datos. Lo amarillo es lo que debes validar o decidir antes de firmar.</p>
                     {anexosWord.map((a: any) => (
                       <div key={a.id} className="flex flex-wrap items-center gap-1 text-xs">
-                        <span className="truncate flex-1 min-w-[140px]" title={a.nombre}>{a.nombre}</span>
+                        <span className="truncate flex-1 min-w-[140px]" title={a.campos?.[0]?.resumen ?? a.nombre}>{a.nombre}{a.campos?.[0]?.tipo ? <span className="ml-1 text-[10px] uppercase text-muted-foreground">{String(a.campos[0].tipo).replace(/_/g, ' ')}</span> : null}</span>
                         <span className={`rounded px-1.5 py-0.5 text-[10px] ${a.campos_validar ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>{a.campos_validar ? `${a.campos_validar} por validar` : 'sin pendientes'}</span>
                         {a.url && <a href={a.url} target="_blank" rel="noreferrer" className="flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-firmavb-blue hover:bg-muted"><FileText className="h-3.5 w-3.5" />Descargar</a>}
                         <button onClick={() => borrarAnexoWord(a.id)} title="Quitar"><Trash2 className="h-3.5 w-3.5 text-muted-foreground" /></button>

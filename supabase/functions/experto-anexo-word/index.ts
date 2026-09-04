@@ -54,8 +54,14 @@ function rellenar(xml: string, texto: string, validar: boolean): string {
   return `${open}${pPr}<w:r>${rPr}${partes}</w:r></w:p>`;
 }
 
-const SYS = `Eres el Experto FirmaVB. Completas un ANEXO OFICIAL de una licitación chilena (documento Word) con los DATOS DE LA EMPRESA, sin cambiar el formato ni el texto legal. Recibes las ranuras del documento numeradas (i), con su texto actual, si están en una celda de tabla y el texto completo de su fila. Responde SOLO con JSON válido: {"cambios":[{"i":número,"texto":"texto completo nuevo de la ranura","validar":true|false}]}.
+const SYS = `Eres el Experto FirmaVB, asesor con 17 años vendiéndole al Estado chileno. Completas un ANEXO OFICIAL de una licitación (documento Word) con los DATOS DE LA EMPRESA, sin cambiar el formato ni el texto legal. Recibes: datos de la empresa, la ficha de la licitación con sus ítems, lo que las BASES dicen de ese anexo, la matriz de postulación del proveedor (si existe) y las ranuras del documento numeradas (i), con su texto actual, si están en una celda de tabla y el texto completo de su fila.
+Primero entiende QUÉ anexo es (identificación, declaración jurada, pacto de integridad, oferta económica, oferta técnica, experiencia, UTP, otro) y si APLICA a este proveedor según las bases (p. ej. un anexo solo para Unión Temporal de Proveedores no aplica si postula solo; un anexo por categoría solo si oferta esa categoría).
+Responde SOLO con JSON válido: {"tipo":"identificacion|declaracion_jurada|pacto_integridad|oferta_economica|oferta_tecnica|experiencia|utp|otro","aplica":true|false,"motivo":"1 frase: por qué aplica o no","resumen":"1 frase: qué completaste y qué queda pendiente","cambios":[{"i":número,"texto":"texto completo nuevo de la ranura","validar":true|false}]}.
 Reglas:
+- Oferta económica: usa los ÍTEMS de la ficha (producto, cantidad, unidad) para llenar las filas de la tabla si el anexo las pide y están vacías; precios y totales siempre [[PRECIO NETO]], [[TOTAL]] con "validar": true. Si el proveedor no oferta todas las líneas, deja N/A en las que no (según la matriz o los documentos).
+- Oferta técnica: responde con las palabras de las bases técnicas (plazo de entrega, garantía, soporte) solo si las bases fijan el valor exigido; el compromiso concreto del proveedor va como [[PLAZO DE ENTREGA]], [[GARANTÍA EN MESES]] con "validar": true. Nunca prometas por él.
+- Experiencia: no inventes contratos ni clientes; filas como [[CLIENTE]] | [[CONTRATO]] | [[MONTO]] | [[AÑO]] con "validar": true, o lo que digan sus documentos.
+- Si el anexo NO aplica: "aplica": false y cambios vacío (no lo modifiques).
 - Rellena solo lo que sabes con certeza por los datos entregados: razón social, RUT, domicilio, comuna y región, correo, teléfono, nombre y RUT del representante legal, ID y nombre de la licitación, organismo comprador. Si el anexo pide marcar persona natural o jurídica, marca con "X" la opción persona jurídica.
 - Celda vacía junto a una etiqueta (fila "Razón social | "): pon solo el valor. Etiqueta y valor en la misma ranura ("Razón social: ________"): devuelve la etiqueta con el valor ("Razón social: FIRMAVB SPA"). Conserva los dos puntos, numeración y el resto del texto de la ranura.
 - Lo que NO sabes (precio, plazo de entrega, garantía, experiencia, montos, cantidades, fecha y lugar de firma, nombre del contacto técnico, certificaciones) va como marcador [[EN MAYÚSCULAS]] con "validar": true. Nunca inventes cifras, experiencia ni certificaciones.
@@ -110,31 +116,59 @@ Deno.serve(async (req) => {
     const xml = await zip.file("word/document.xml")?.async("string");
     if (!xml) return json({ error: "formato", mensaje: "El Word no trae contenido legible." }, 415);
 
-    // 2. Ranuras del documento para el modelo
+    // 2. Ranuras del documento + contexto: ficha con ítems, lo que las bases dicen de ESTE anexo, matriz y documentos
     const rs = ranuras(xml);
     const lista = rs.map((r) => `${r.i}|${r.celda ? "celda" : "parrafo"}|${r.fila}|${r.texto.replace(/\s+/g, " ").slice(0, 300)}`).join("\n").slice(0, 60_000);
-    const { data: ficha } = await sb.rpc("experto_ficha_licitacion", { p_codigo: codigo });
+    const [fichaR, basesR, entregR, docsR] = await Promise.all([
+      sb.rpc("experto_ficha_licitacion", { p_codigo: codigo }),
+      sb.rpc("experto_bases_texto", { p_codigo: codigo }),
+      sb.rpc("experto_entregables_texto", { p_user_id: userId, p_codigo: codigo }),
+      sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: codigo, p_max: 3000 }),
+    ]);
+    const ficha = fichaR.data;
+    const numAnexo = (String(doc.nombre).match(/anexo[\s_]*n?[°º]?[\s_]*(\d+)/i) ?? [])[1] ?? null;
+    const titulo = textoDe(xml).replace(/\s+/g, " ").slice(0, 160);
+    const reAnexo = numAnexo ? new RegExp(`anexo\\s*n?[°º.]?\\s*${numAnexo}\\b`, "i") : null;
+    const secs = ((basesR.data ?? []) as any[]).flatMap((b) => Array.isArray(b.secciones) ? b.secciones : [])
+      .filter((s: any) => reAnexo ? reAnexo.test(String(s.titulo) + " " + String(s.texto)) : /anexo|contenido de la oferta|admisib/i.test(String(s.titulo)))
+      .slice(0, 6).map((s: any) => `## ${s.titulo}\n${String(s.texto).slice(0, 2500)}`).join("\n\n");
+    const matrizTxt = ((entregR.data ?? []) as any[]).find((e) => e.modo === "matriz")?.respuesta;
+    let matrizCtx = "";
+    try { const m = JSON.parse(matrizTxt ?? "null"); if (m) matrizCtx = `MATRIZ DE POSTULACIÓN DEL PROVEEDOR (resumen): ${m.resumen ?? ""}\nAnexos según la matriz: ${(m.anexos ?? []).map((a: any) => `${a.anexo} (${a.cuando ?? "siempre"})`).join("; ")}\nAdmisibilidad con dato del proveedor: ${(m.admisibilidad ?? []).filter((a: any) => a.entrada).map((a: any) => `${a.requisito}: ${a.entrada}`).join("; ") || "sin datos"}`; } catch { /* sin matriz */ }
+    const docsCtx = ((docsR.data ?? []) as any[]).filter((d) => d.id !== documentoId && d.tipo !== "docx").slice(0, 3).map((d) => `### ${d.nombre}\n${String(d.texto).slice(0, 1500)}`).join("\n\n");
+    const items = (ficha?.items ?? []).slice(0, 40).map((i: any, n: number) => `${n + 1}. ${i.producto}${i.cantidad ? ` | cantidad ${i.cantidad} ${i.unidad ?? ""}` : ""}${i.descripcion ? ` | ${String(i.descripcion).slice(0, 120)}` : ""}`).join("\n");
     const datos = `DATOS DE LA EMPRESA (FirmaVB):
 Razón social: ${cli.empresa_nombre} | RUT: ${rutFmt(cli.rut)} | Domicilio: ${cli.direccion ?? "[[DOMICILIO]]"} | Región: ${cli.region ?? "[[REGIÓN]]"}
 Giros: ${Array.isArray(cli.giros) ? cli.giros.join(", ") : cli.giros ?? "s/i"} | Correo: ${cli.email ?? "[[CORREO]]"} | Teléfono: ${cli.telefono || "[[TELÉFONO]]"}
 Representante legal: ${cli.representante_nombre} | RUT representante: ${rutFmt(cli.representante_rut)}
+Postula solo (no en UTP) salvo que sus documentos digan lo contrario.
 
-LICITACIÓN ${codigo}: ${ficha?.nombre ?? ""} | Organismo: ${ficha?.institucion ?? ""} | Cierre: ${ficha?.fecha_cierre ?? "s/i"}
+LICITACIÓN ${codigo}: ${ficha?.nombre ?? ""} | Organismo: ${ficha?.institucion ?? ""} | Tipo: ${ficha?.tipo ?? "s/i"} | Presupuesto: ${ficha?.presupuesto ?? "s/i"} | Cierre: ${ficha?.fecha_cierre ?? "s/i"}
+ÍTEMS LICITADOS:
+${items || "s/i"}
 
-RANURAS DEL ANEXO "${doc.nombre}" (i|tipo|texto de la fila|texto actual):
+LO QUE DICEN LAS BASES DE ESTE ANEXO${numAnexo ? ` (N° ${numAnexo})` : ""}:
+${secs || "(las bases no traen texto específico de este anexo)"}
+
+${matrizCtx}
+
+${docsCtx ? "OTROS DOCUMENTOS DEL PROVEEDOR:\n" + docsCtx : ""}
+
+RANURAS DEL ANEXO "${doc.nombre}" (título: ${titulo}) (i|tipo|texto de la fila|texto actual):
 ${lista}`;
     const key = Deno.env.get("GEMINI_API_KEY"); if (!key) return json({ error: "sin_ia" }, 500);
-    let cambios: any[] | null = null;
+    let cambios: any[] | null = null; let meta: any = {};
     for (const model of [...MODELOS, "espera", ...MODELOS]) {
       if (model === "espera") { await new Promise((ok) => setTimeout(ok, 2500)); continue; }
       const r = await fetch(GEMINI_URL, { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model, temperature: 0.1, max_tokens: 6000, messages: [{ role: "system", content: SYS }, { role: "user", content: datos + "\n\nCompleta el anexo." }] }) });
+        body: JSON.stringify({ model, temperature: 0.1, max_tokens: 8000, messages: [{ role: "system", content: SYS }, { role: "user", content: datos + "\n\nCompleta el anexo." }] }) });
       if (!r.ok) { console.error("gemini", model, r.status); continue; }
       let c = String((await r.json()).choices?.[0]?.message?.content ?? "").trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
       const a = c.indexOf("{"), z = c.lastIndexOf("}"); if (a >= 0 && z > a) c = c.slice(a, z + 1);
-      try { const j = JSON.parse(c); if (Array.isArray(j.cambios)) { cambios = j.cambios; break; } } catch { console.error("json", model); }
+      try { const j = JSON.parse(c); if (Array.isArray(j.cambios)) { cambios = j.cambios; meta = { tipo: j.tipo ?? null, aplica: j.aplica !== false, motivo: j.motivo ?? "", resumen: j.resumen ?? "" }; break; } } catch { console.error("json", model); }
     }
     if (!cambios) return json({ error: "ia_no_disponible", mensaje: "El modelo no respondió bien. Intenta de nuevo en un minuto." }, 502);
+    if (!meta.aplica) return json({ ok: true, aplica: false, tipo: meta.tipo, motivo: meta.motivo, nombre: doc.nombre, mensaje: `Este anexo no aplica: ${meta.motivo}` });
 
     // 3. Aplicar de atrás hacia adelante para no mover posiciones
     const porIndice = new Map<number, { texto: string; validar: boolean }>();
@@ -145,7 +179,7 @@ ${lista}`;
       nuevo = nuevo.slice(0, r.ini) + rellenar(nuevo.slice(r.ini, r.fin), c.texto, c.validar) + nuevo.slice(r.fin);
       aplicados++; campos.push({ texto: c.texto.slice(0, 160), validar: c.validar });
     }
-    if (!aplicados) return json({ error: "sin_cambios", mensaje: "No encontré campos que completar en ese anexo." }, 422);
+    if (!aplicados) return json({ error: "sin_cambios", mensaje: meta.resumen || "No encontré campos que completar en ese anexo." }, 422);
     zip.file("word/document.xml", nuevo);
     const bytes = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
     const nombre = "BORRADOR_" + String(doc.nombre).replace(/^BORRADOR_/i, "").replace(/\s+/g, "_");
@@ -153,7 +187,7 @@ ${lista}`;
     const up = await sb.storage.from(BUCKET).upload(storage_path, bytes, { contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", upsert: true });
     if (up.error) return json({ error: "storage", mensaje: up.error.message }, 500);
     const validar = campos.filter((c) => c.validar).length;
-    const { data: id } = await sb.rpc("experto_anexo_word_insertar", { p_user_id: userId, p_codigo: codigo, p_documento_id: documentoId, p_nombre: nombre, p_storage_path: storage_path, p_campos_validar: validar, p_campos: campos.reverse() });
-    return json({ ok: true, id, nombre, storage_path, url: await firmar(storage_path), cambios: aplicados, campos_validar: validar, campos, ms: Date.now() - t0 });
+    const { data: id } = await sb.rpc("experto_anexo_word_insertar", { p_user_id: userId, p_codigo: codigo, p_documento_id: documentoId, p_nombre: nombre, p_storage_path: storage_path, p_campos_validar: validar, p_campos: [{ tipo: meta.tipo, resumen: meta.resumen }, ...campos.reverse()] });
+    return json({ ok: true, aplica: true, id, nombre, tipo: meta.tipo, resumen: meta.resumen, storage_path, url: await firmar(storage_path), cambios: aplicados, campos_validar: validar, campos, ms: Date.now() - t0 });
   } catch (e) { return json({ error: String((e as Error)?.message ?? e) }, 500); }
 });
