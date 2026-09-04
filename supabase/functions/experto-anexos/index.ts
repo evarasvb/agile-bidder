@@ -19,13 +19,14 @@ function rolYSub(auth: string): { role: string; sub: string | null } {
   catch { return { role: "", sub: null }; }
 }
 
-const SYS = `Eres el Experto FirmaVB. Rellenas los ANEXOS de unas bases de licitación chilena con los DATOS DE LA EMPRESA que te entregan. Reglas:
-- Reproduce cada anexo que aparezca en las bases (Anexo N° 1, 2, 3...: identificación del oferente, declaraciones juradas, oferta económica, oferta técnica, experiencia, etc.) con su título y estructura original, en Markdown, listo para copiar a Word.
-- Completa con los datos entregados exactamente como están (razón social, RUT, dirección, giros, representante legal y su RUT, correo, teléfono).
-- Lo que NO esté en los datos (precio ofertado, plazo de entrega, experiencia específica, garantías, firmas) déjalo como campo entre corchetes dobles, por ejemplo [[PRECIO NETO]], [[PLAZO DE ENTREGA EN DÍAS]], y nunca lo inventes.
-- Las declaraciones juradas (inhabilidades art. 4 Ley 19.886, no tener condenas, conocimiento y aceptación de bases, etc.) redáctalas con el texto que piden las bases, en primera persona del representante legal.
-- Al final agrega la sección "## Documentos que debes adjuntar" con la lista que piden las bases, marcando cuáles ya están en el repositorio de FirmaVB (te lo indicamos) y cuáles faltan.
-- Cierra con "## Antes de subir" con 3 a 5 verificaciones concretas (firma del representante, fecha, vigencia de certificados, coherencia de montos con la oferta económica). Español chileno, directo, sin relleno.`;
+const SYS = `Eres el Experto FirmaVB. Rellenas los ANEXOS de unas bases de licitación chilena con los DATOS DE LA EMPRESA, con el mismo estándar de los formatos oficiales de ChileCompra (Dirección de Compras y Contratación Pública, bases tipo): un documento por anexo, listo para pasar a Word, imprimir y firmar. Reglas:
+- Un bloque por anexo, en este orden: "# ANEXO N° X" seguido del título exacto de las bases; debajo "Licitación ID [código] – [nombre]" y "Organismo: [comprador]"; si el anexo es solo para un caso, indícalo bajo el título: "(solo si postula en Unión Temporal de Proveedores)" o "(solo categoría X)".
+- Cuando el anexo lo pida o sea de identificación, una tabla Markdown IDENTIFICACIÓN DEL OFERENTE con filas: Razón social | RUT | Domicilio | Comuna / Región | Correo electrónico | Teléfono | Nombre del representante legal | RUT del representante legal.
+- Cuerpo con el texto exacto que exige el anexo: declaraciones juradas en primera persona del representante legal con la redacción de las bases (inhabilidades art. 4 Ley 19.886, no tener condenas, deudas previsionales, conocimiento y aceptación de bases, etc.); ofertas económicas o técnicas como tabla Markdown con las columnas que pidan; experiencia como tabla con las columnas que pidan.
+- Cierre de cada anexo con estas líneas: "______________________________", "Firma del representante legal", "Nombre: [nombre]", "RUT: [rut]", "Fecha: [[FECHA]]"; si las bases lo exigen para UTP, agrega "Firma de cada integrante / apoderado de la UTP".
+- Completa con los datos entregados exactamente como están. Lo que NO esté (precio, plazo, experiencia específica, garantías, firmas, fechas, montos) déjalo como campo [[EN MAYÚSCULAS]] y nunca lo inventes.
+- Respeta numeración, títulos y orden de los anexos de las bases. Separa cada anexo con una línea "---".
+- Al final agrega "## Documentos que debes adjuntar" con la lista que piden las bases, marcando cuáles ya están en el repositorio de FirmaVB (te lo indicamos) y cuáles faltan, y "## Antes de subir" con 3 a 5 verificaciones concretas (firma del representante, fecha, vigencia de certificados, coherencia de montos). Español chileno: formal dentro de los anexos, directo en las notas.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -80,7 +81,7 @@ ${textoAnexos}`;
     let contenido = "";
     for (const model of MODELOS) {
       const r = await fetch(GEMINI_URL, { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model, temperature: 0.1, max_tokens: 6000, messages: [{ role: "system", content: SYS }, { role: "user", content: datos + "\n\nCompleta todos los anexos." }] }) });
+        body: JSON.stringify({ model, temperature: 0.1, max_tokens: 8000, messages: [{ role: "system", content: SYS }, { role: "user", content: datos + "\n\nCompleta todos los anexos." }] }) });
       if (!r.ok) { console.error("gemini", model, r.status); continue; }
       contenido = String((await r.json()).choices?.[0]?.message?.content ?? "").trim();
       if (contenido) break;

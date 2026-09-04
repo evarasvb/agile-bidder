@@ -1,6 +1,7 @@
 // PDF con marca FirmaVB de un análisis del Experto (informe, estudio, anexos, respuesta del chat).
 // Se usa para mandarlo por WhatsApp como archivo: en celular se comparte directo, en escritorio se descarga.
 import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import logoBlanco from '@/assets/logo-firmavb-blanco.png';
 
 export interface DatosPdfExperto { titulo: string; empresa?: string | null; contenido: string; url?: string; fecha?: string | null }
@@ -12,17 +13,25 @@ async function aDataUrl(url: string): Promise<string | null> {
   } catch { return null; }
 }
 
-type Linea = { tipo: 'h1' | 'h2' | 'p' | 'li' | 'sep'; t: string };
+type Linea = { tipo: 'h1' | 'h2' | 'p' | 'li' | 'sep' | 'tabla'; t: string; filas?: string[][] };
+// Helvetica no trae flechas ni símbolos: se reemplazan por texto.
+const ascii = (s: string) => s.replace(/→/g, '->').replace(/←/g, '<-').replace(/≤/g, '<=').replace(/≥/g, '>=').replace(/Σ/g, 'suma').replace(/✓|✔/g, 'OK').replace(/✗|✘/g, 'X').replace(/[\u2192\u2713]/g, '');
 // Markdown mínimo del Experto a líneas planas (sin negritas, links ni tablas).
 function aLineas(md: string): Linea[] {
   const limpio = (s: string) => s.replace(/\*\*|__|`/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/\s+/g, ' ').trim();
   const out: Linea[] = [];
-  for (const raw of md.replace(/\r/g, '').split('\n')) {
-    const l = raw.trim();
+  const lineas = md.replace(/\r/g, '').split('\n');
+  for (let i = 0; i < lineas.length; i++) {
+    const l = lineas[i].trim();
     if (!l) continue;
-    if (/^\|?\s*:?-{2,}/.test(l)) continue;                       // separador de tabla
+    if (/^\|?\s*:?-{2,}/.test(l)) continue;                       // separador de tabla suelto
     if (/^(-{3,}|\*{3,})$/.test(l)) { out.push({ tipo: 'sep', t: '' }); continue; }
-    if (l.startsWith('|')) { out.push({ tipo: 'li', t: l.split('|').map(limpio).filter(Boolean).join(' · ') }); continue; }
+    if (l.startsWith('|')) {
+      const celdas = (x: string) => x.trim().replace(/^\||\|$/g, '').split('|').map((c) => ascii(limpio(c)));
+      const filas: string[][] = [celdas(l)];
+      while (i + 1 < lineas.length && lineas[i + 1].trim().startsWith('|')) { i++; const f = lineas[i].trim(); if (!/^\|?\s*:?-{2,}/.test(f)) filas.push(celdas(f)); }
+      out.push({ tipo: 'tabla', t: '', filas }); continue;
+    }
     const h = l.match(/^(#{1,6})\s+(.*)/);
     if (h) { out.push({ tipo: h[1].length <= 2 ? 'h1' : 'h2', t: limpio(h[2]) }); continue; }
     const li = l.match(/^(?:[-*•]|\d+[.)])\s+(.*)/);
@@ -52,7 +61,9 @@ export async function crearPdfExperto(d: DatosPdfExperto): Promise<Blob> {
     doc.text(String(pagina), W - M, PIE, { align: 'right' });
     doc.setFontSize(6.5); doc.text('Generado con fuentes públicas y datos de Mercado Público; no reemplaza la lectura de las bases.', M, PIE + 4);
   };
-  const espacio = (h: number) => { if (y + h > PIE - 8) { pie(); doc.addPage(); pagina++; cabecera(); } };
+  const conPie = new Set<number>();
+  const pieUnaVez = () => { if (!conPie.has(pagina)) { pie(); conPie.add(pagina); } };
+  const espacio = (h: number) => { if (y + h > PIE - 8) { pieUnaVez(); doc.addPage(); pagina++; cabecera(); } };
 
   cabecera();
   doc.setTextColor(27, 37, 64); doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
@@ -61,12 +72,21 @@ export async function crearPdfExperto(d: DatosPdfExperto): Promise<Blob> {
   doc.text(`Hecho por ${empresa} con el Experto FirmaVB · ${new Date(d.fecha ?? Date.now()).toLocaleDateString('es-CL')}`, M, y); y += 8;
 
   for (const l of aLineas(d.contenido)) {
+    if (l.tipo === 'tabla' && l.filas?.length) {
+      espacio(24);
+      autoTable(doc, {
+        startY: y, head: [l.filas[0]], body: l.filas.slice(1), margin: { left: M, right: M, top: 30, bottom: 24 },
+        styles: { fontSize: 8, cellPadding: 1.6, overflow: 'linebreak' }, headStyles: { fillColor: [27, 37, 64], textColor: 255, fontStyle: 'bold' }, alternateRowStyles: { fillColor: [245, 246, 250] },
+        didDrawPage: () => { const n = doc.getNumberOfPages(); if (n > pagina) { pagina = n; cabecera(); } pieUnaVez(); },
+      });
+      y = ((doc as any).lastAutoTable?.finalY ?? y) + 5; continue;
+    }
     if (l.tipo === 'sep') { espacio(4); doc.setDrawColor(225); doc.line(M, y, W - M, y); y += 4; continue; }
     const esH = l.tipo === 'h1' || l.tipo === 'h2';
     doc.setFont('helvetica', esH ? 'bold' : 'normal'); doc.setFontSize(l.tipo === 'h1' ? 12.5 : l.tipo === 'h2' ? 11 : 10);
     doc.setTextColor(esH ? 27 : 40, esH ? 37 : 40, esH ? 64 : 40);
     const sangria = l.tipo === 'li' ? 5 : 0;
-    const lineas = doc.splitTextToSize(l.t, ANCHO - sangria) as string[];
+    const lineas = doc.splitTextToSize(ascii(l.t), ANCHO - sangria) as string[];
     const alto = lineas.length * (esH ? 6 : 5);
     espacio(alto + (esH ? 3 : 1));
     if (esH) y += 2;
@@ -74,7 +94,7 @@ export async function crearPdfExperto(d: DatosPdfExperto): Promise<Blob> {
     doc.text(lineas, M + sangria, y);
     y += alto + (esH ? 1.5 : 1.2);
   }
-  pie();
+  pieUnaVez();
   return doc.output('blob');
 }
 
@@ -83,7 +103,9 @@ export async function compartirPdfExperto(d: DatosPdfExperto, archivo: string): 
   const blob = await crearPdfExperto(d);
   const file = new File([blob], archivo, { type: 'application/pdf' });
   const nav = navigator as Navigator & { canShare?: (x: { files: File[] }) => boolean };
-  if (nav.canShare?.({ files: [file] })) {
+  // Solo en celular se abre la hoja de compartir (ahí sale WhatsApp); en escritorio se descarga directo.
+  const movil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (window.matchMedia?.('(pointer: coarse)').matches && window.innerWidth < 1024);
+  if (movil && nav.canShare?.({ files: [file] })) {
     try { await nav.share({ files: [file], title: d.titulo, text: d.url ? `${d.titulo}\n${d.url}` : d.titulo }); return 'compartido'; } catch { /* cancelado: cae a descarga */ }
   }
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = archivo; a.click();

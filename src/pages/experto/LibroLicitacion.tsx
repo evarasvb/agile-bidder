@@ -1,10 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
+
+// Escritorio: tres paneles ajustables (arrastra el separador). Celular/tablet: pestañas Fuentes · Chat · Entregables.
+function useEscritorio() {
+  const [v, setV] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches);
+  useEffect(() => { const mq = window.matchMedia('(min-width: 1024px)'); const f = () => setV(mq.matches); mq.addEventListener('change', f); return () => mq.removeEventListener('change', f); }, []);
+  return v;
+}
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink, Trash2, Paperclip, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -57,6 +65,8 @@ export default function LibroLicitacion() {
 
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [codigoAbrir, setCodigoAbrir] = useState('');
+  const escritorio = useEscritorio();
+  const [vista, setVista] = useState<'fuentes' | 'chat' | 'entregables'>('chat');
   const [limite, setLimite] = useState<string | null>(null);
   const [compartido, setCompartido] = useState<{ url: string; titulo: string; token: string; tipo: string } | null>(null);
   const autoRef = useRef(false);
@@ -251,9 +261,9 @@ export default function LibroLicitacion() {
         {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
       </div>
       {compartido && (
-        <div className="flex items-center gap-2 flex-wrap text-sm rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
-          <span className="font-medium truncate max-w-[40vw]">Link listo: {compartido.titulo}</span>
-          <Button size="sm" className="h-8 bg-[#25D366] hover:bg-[#1ebe5d] text-white" asChild><a href={waUrl(compartido)} target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4 mr-1" />WhatsApp (link)</a></Button>
+        <div className="flex items-center gap-1 flex-wrap text-xs rounded-md border border-primary/30 bg-primary/5 px-2 py-1">
+          <span className="font-medium truncate max-w-[30vw]" title={compartido.titulo}>Link listo</span>
+          <Button size="sm" className="h-7 bg-[#25D366] hover:bg-[#1ebe5d] text-white" asChild><a href={waUrl(compartido)} target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4 mr-1" />WhatsApp (link)</a></Button>
           {compartido.tipo !== 'mapa' && compartido.tipo !== 'infografia' && <Button size="sm" variant="outline" className="h-8" onClick={pdfCompartido} disabled={ocupado === 'pdf'}>{ocupado === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <FileText className="h-4 w-4 mr-1" />}PDF para WhatsApp</Button>}
           <Button size="sm" variant="outline" className="h-8" onClick={() => { navigator.clipboard.writeText(compartido.url); toast.success('Copiado'); }}><Copy className="h-4 w-4 mr-1" />Copiar link</Button>
           <Button size="sm" variant="outline" className="h-8" asChild><a href={compartido.url} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4 mr-1" />Ver página</a></Button>
@@ -265,9 +275,9 @@ export default function LibroLicitacion() {
         <p className="text-sm text-yellow-800 bg-yellow-50 border border-yellow-200 rounded-md px-3 py-2">No encontré {cod} en la base de Mercado Público. Revisa el ID o sube las bases para trabajar igual.</p>
       )}
 
-      <div className={cod ? 'grid gap-3 lg:grid-cols-[300px_1fr_360px]' : 'grid gap-3 lg:grid-cols-[300px_1fr]'}>
-        {/* Fuentes (sin código: mis libros) */}
-        <div className="space-y-3">
+      {(() => {
+      const panelFuentes = (
+        <div className="space-y-3 h-full overflow-y-auto pr-1">
           {!cod && (
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Mis libros</CardTitle></CardHeader>
@@ -327,13 +337,12 @@ export default function LibroLicitacion() {
               )}
             </CardContent>
           </Card>}
-        </div>
-
-        {/* Chat */}
-        <Card className="flex flex-col min-h-[70vh]">
+        </div>);
+      const panelChat = (
+        <Card className="flex flex-col h-full min-h-[60vh]">
           <CardHeader className="pb-2"><CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Conversación con el Experto</CardTitle></CardHeader>
           <CardContent className="flex-1 flex flex-col gap-2">
-            <div ref={chatRef} className="flex-1 overflow-y-auto space-y-3 pr-1 max-h-[60vh]">
+            <div ref={chatRef} className="flex-1 overflow-y-auto space-y-3 pr-1 max-h-[70vh]">
               {msgs.length === 0 && (
                 <div className="text-sm text-muted-foreground space-y-2">
                   <p>{cod ? 'Pregúntame sobre esta licitación con las fuentes de la izquierda. Ejemplos:' : 'Pregúntame lo que quieras sobre vender al Estado: ley, garantías, un organismo, qué se está licitando, noticias. Si me das un ID de licitación, abro su libro con fuentes y entregables. Ejemplos:'}</p>
@@ -382,10 +391,9 @@ export default function LibroLicitacion() {
               <Button type="submit" disabled={!!ocupado || !pregunta.trim()}>{ocupado === 'chat' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}</Button>
             </form>
           </CardContent>
-        </Card>
-
-        {/* Entregables */}
-        {cod && <Card className="flex flex-col">
+        </Card>);
+      const panelEntregables = cod ? (
+        <Card className="flex flex-col h-full overflow-y-auto">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Entregables</CardTitle>
             <div className="flex flex-wrap gap-1 pt-1">
@@ -416,7 +424,16 @@ export default function LibroLicitacion() {
                 ) : tab === 'infografia' ? (
                   <div className="max-h-[62vh] overflow-y-auto pr-1"><Infografia d={datosInfografia()} /></div>
                 ) : (
-                  <div className="max-h-[62vh] overflow-y-auto pr-1" dangerouslySetInnerHTML={{ __html: conCitas(expertoMd(entregables[tab])) }} />
+                  <div className="max-h-[62vh] overflow-y-auto pr-1">
+                    {f && (tab === 'estudio' || tab === 'informe') && (
+                      <div className="grid grid-cols-2 gap-1 mb-3 text-xs">
+                        {[['Presupuesto', fmt(f.presupuesto)], ['Cierra', fecha(f.fecha_cierre)], ['Pago del organismo', `${o.conducta_pago ?? 's/i'} · ${o.pago_promedio_dias ?? 's/i'} días`], ['Reclamos de pago / 100 procesos', String(o.reclamos_pago_por_100_procesos ?? 's/i')]].map(([k, v]) => (
+                          <div key={k} className="rounded-md border bg-muted/30 px-2 py-1"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">{k}</p><p className="font-semibold truncate">{v}</p></div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="prose-experto" dangerouslySetInnerHTML={{ __html: conCitas(expertoMd(entregables[tab])) }} />
+                  </div>
                 )}
               </div>
             ) : (
@@ -432,8 +449,26 @@ export default function LibroLicitacion() {
               </div>
             )}
           </CardContent>
-        </Card>}
-      </div>
+        </Card>) : null;
+      if (!escritorio) return (
+        <div className="space-y-2">
+          <div className="grid grid-cols-3 gap-1 rounded-md border p-1 text-sm">
+            {([['fuentes', cod ? 'Fuentes' : 'Mis libros'], ['chat', 'Chat'], ['entregables', 'Entregables']] as const).filter(([k]) => k !== 'entregables' || cod).map(([k, n]) => (
+              <button key={k} onClick={() => setVista(k)} className={`rounded px-2 py-1 ${vista === k ? 'bg-firmavb-blue text-white' : 'hover:bg-muted'}`}>{n}</button>
+            ))}
+          </div>
+          {vista === 'fuentes' ? panelFuentes : vista === 'entregables' && panelEntregables ? panelEntregables : panelChat}
+        </div>
+      );
+      return (
+        <ResizablePanelGroup orientation="horizontal" className="min-h-[calc(100vh-11rem)]">
+          <ResizablePanel defaultSize={cod ? 22 : 26} minSize={14} collapsible collapsedSize={0}>{panelFuentes}</ResizablePanel>
+          <ResizableHandle withHandle className="mx-1" />
+          <ResizablePanel defaultSize={cod ? 46 : 74} minSize={30}>{panelChat}</ResizablePanel>
+          {panelEntregables && <><ResizableHandle withHandle className="mx-1" /><ResizablePanel defaultSize={32} minSize={22} collapsible collapsedSize={0}>{panelEntregables}</ResizablePanel></>}
+        </ResizablePanelGroup>
+      );
+      })()}
     </div>
   );
 }
