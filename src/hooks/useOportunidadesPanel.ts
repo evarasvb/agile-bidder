@@ -486,14 +486,17 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       }
       // Filtro local solo si la búsqueda no corrió en el servidor (ese ya
       // devolvió únicamente lo que calza, incluso por ítem o por raíz de palabra).
+      // Este respaldo exigía la frase completa tal cual: "arriendo vehiculos" no
+      // encontraba nada aunque "arriendo" y "vehículos" por separado sí tuvieran
+      // resultados, y una tilde de más o de menos dejaba la lista vacía. Ahora
+      // busca cada palabra por separado (todas deben aparecer, en cualquier
+      // orden) con `normalizar`, igual criterio que el resto de los filtros.
       if (filters.search && !busquedaEnServidor) {
-        const search = filters.search.toLowerCase();
-        all = all.filter(o =>
-          o.nombre.toLowerCase().includes(search) ||
-          o.codigo.toLowerCase().includes(search) ||
-          o.organismo.toLowerCase().includes(search) ||
-          (o.items_text || '').toLowerCase().includes(search)
-        );
+        const palabras = normalizar(filters.search).split(/\s+/).filter(Boolean);
+        all = all.filter(o => {
+          const texto = normalizar(`${o.nombre} ${o.codigo} ${o.organismo} ${o.items_text || ''}`);
+          return palabras.every(p => texto.includes(p));
+        });
       }
 
       // Sort
