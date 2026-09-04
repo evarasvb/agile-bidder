@@ -42,7 +42,12 @@ Deno.serve(async (req)=>{
       const url = `https://api2.mercadopublico.cl/v2/compra-agil/${encodeURIComponent(r.codigo)}`;
       let resp = await fetch(url, { headers:{ 'ticket': ticket, 'Accept':'application/json' } });
       if(resp.status===429 || resp.status>=500){ await sleep(resp.status===429 ? 5000 : 2500); resp = await fetch(url, { headers:{ 'ticket': ticket, 'Accept':'application/json' } }); }
-      if(!resp.ok){ res.errores.push(`HTTP ${resp.status} ${r.codigo}`); return; }
+      if(!resp.ok){
+        res.errores.push(`HTTP ${resp.status} ${r.codigo}`);
+        // Se marca el intento fallido para que no bloquee la cola: la RPC lo reintenta en 2 h.
+        await supabase.from('compras_agiles').update({ detalle_scrapeado: false, detalle_actualizado_at: new Date().toISOString() }).eq('id', r.id);
+        return;
+      }
       const data = await resp.json();
       const p = data?.payload ?? data;
       if(!p || typeof p !== 'object' || !p.codigo){ res.errores.push(`sin payload ${r.codigo}`); return; }
@@ -94,9 +99,9 @@ Deno.serve(async (req)=>{
     }catch(e){ res.errores.push(`${r.codigo}: ${e instanceof Error? e.message:String(e)}`); }
   };
 
-  // De a 6 en paralelo: la API tarda entre 2 y 60 s por código, así una corrida rinde ~6x
+  // De a 12 en paralelo: la API tarda entre 2 y 60 s por código, así una corrida rinde ~12x
   // sin pasarse del presupuesto de tiempo ni gatillar el límite de peticiones.
-  const PARALELO = 6;
+  const PARALELO = 12;
   for(let i=0; i<rows.length && Date.now()-t0 < PRESUPUESTO_MS; i+=PARALELO){
     await Promise.all(rows.slice(i, i+PARALELO).map(procesar));
     await sleep(120);
