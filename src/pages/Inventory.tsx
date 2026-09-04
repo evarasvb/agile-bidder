@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Plus, Upload, Search, MoreHorizontal, Edit2, Trash2, Package, Inbox, Loader2, RefreshCw, FileJson, Download, Trash, Image, FileText, CheckSquare, Square, FileSpreadsheet, Images, HelpCircle, Info, Sparkles } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { useInventory, useUpdateInventoryItem, useDeleteInventoryItem, useDeleteInventoryItems, useCreateInventoryItem, InventoryItem, InventoryInput } from "@/hooks/useInventory";
+import { useInventarioPagina, useInventarioResumen, cargarInventarioCompleto, useUpdateInventoryItem, useDeleteInventoryItem, useDeleteInventoryItems, useCreateInventoryItem, InventoryItem, InventoryInput } from "@/hooks/useInventory";
 import { useEnriquecerInventario } from "@/hooks/useEnriquecerInventario";
 import { BuscarFotosDialog } from "@/components/inventory/BuscarFotosDialog";
 import { EditProductDialog } from "@/components/inventory/EditProductDialog";
@@ -61,7 +61,19 @@ export default function Inventory() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 100; // Show 100 products per page to prevent performance issues
   
-  const { data: inventario = [], isLoading, refetch } = useInventory();
+  // Búsqueda con pausa corta: cada cambio es una consulta al servidor.
+  const [qServidor, setQServidor] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setQServidor(searchQuery.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+  // Una página a la vez desde el servidor (antes bajaba todo el catálogo).
+  const { data: pagina, isLoading, refetch } = useInventarioPagina({
+    page: currentPage, pageSize, q: qServidor, soloIncompletos,
+  });
+  const inventario: InventoryItem[] = pagina?.items ?? [];
+  const totalFiltrado = pagina?.total ?? 0;
+  const { data: resumen } = useInventarioResumen();
   const { data: cliente } = useCliente();
   const enriquecer = useEnriquecerInventario();
   const [oportunidadesProducto, setOportunidadesProducto] = useState<InventoryItem | null>(null);
@@ -114,7 +126,7 @@ export default function Inventory() {
   const FREE_INV_LIMIT = 20;
   const handleAgregarClick = () => {
     // Free: puede cargar hasta el límite; al llegar, ofrece Pro.
-    if (!isPro && inventario.length >= FREE_INV_LIMIT) {
+    if (!isPro && (resumen?.total ?? 0) >= FREE_INV_LIMIT) {
       requirePro(
         undefined,
         `El plan gratuito permite hasta ${FREE_INV_LIMIT} productos. Hazte Pro para inventario ilimitado.`,
@@ -169,23 +181,10 @@ export default function Inventory() {
   // Un producto está "incompleto" si le falta descripción o imagen (lo que
   // resta calidad al matching y a la ficha técnica del PDF).
   const esIncompleto = (item: InventoryItem) => !item.descripcion?.trim() || !item.imagen_url;
-  const incompleteCount = inventario.filter(esIncompleto).length;
+  const incompleteCount = resumen?.incompletos ?? 0;
 
-  // Memoizado: con catálogos grandes (16k+ productos), recalcular este filtro
-  // en CADA render (no solo cuando cambia la búsqueda) se sentía lento al
-  // escribir en el buscador.
-  const filteredInventory = useMemo(() => {
-    const q = searchQuery.toLowerCase();
-    return inventario.filter((item) => {
-      const matchQ =
-        item.nombre_producto.toLowerCase().includes(q) ||
-        item.sku.toLowerCase().includes(q) ||
-        (item.proveedor && item.proveedor.toLowerCase().includes(q));
-      if (!matchQ) return false;
-      if (soloIncompletos && !esIncompleto(item)) return false;
-      return true;
-    });
-  }, [inventario, searchQuery, soloIncompletos]);
+  // La búsqueda y el filtro de incompletos ya vienen aplicados del servidor.
+  const filteredInventory = inventario;
 
   // Reset to page 1 when search changes
   const handleSearchChange = (value: string) => {
@@ -194,9 +193,9 @@ export default function Inventory() {
   };
 
   // Calculate paginated data
-  const totalPages = Math.ceil(filteredInventory.length / pageSize);
+  const totalPages = Math.max(1, Math.ceil(totalFiltrado / pageSize));
   const startIndex = (currentPage - 1) * pageSize;
-  const paginatedInventory = filteredInventory.slice(startIndex, startIndex + pageSize);
+  const paginatedInventory = filteredInventory;
 
   const toggleSelect = (id: string) => {
     const newSelected = new Set(selectedIds);
@@ -216,8 +215,9 @@ export default function Inventory() {
     }
   };
 
-  const getExportData = () => {
-    return inventario.map(item => ({
+  const getExportData = async () => {
+    const todo = await cargarInventarioCompleto();
+    return todo.map(item => ({
       'SKU': item.sku,
       'Producto': item.nombre_producto,
       'Descripción': item.descripcion || '',
@@ -235,13 +235,13 @@ export default function Inventory() {
     }));
   };
 
-  const handleExportExcel = () => {
-    if (inventario.length === 0) {
+  const handleExportExcel = async () => {
+    if (!resumen?.total) {
       toast.error('No hay productos para exportar');
       return;
     }
 
-    const exportData = getExportData();
+    const exportData = await getExportData();
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
@@ -268,13 +268,13 @@ export default function Inventory() {
     toast.success('Inventario exportado a Excel');
   };
 
-  const handleExportCSV = () => {
-    if (inventario.length === 0) {
+  const handleExportCSV = async () => {
+    if (!resumen?.total) {
       toast.error('No hay productos para exportar');
       return;
     }
 
-    const exportData = getExportData();
+    const exportData = await getExportData();
     const headers = Object.keys(exportData[0]);
     
     // Escape CSV values properly
@@ -317,10 +317,10 @@ export default function Inventory() {
     return <Badge className="bg-success/10 text-success border-0">Activo</Badge>;
   };
 
-  const totalProducts = inventario.length;
-  const activeProducts = inventario.filter(p => p.activo).length;
-  const lowStockProducts = inventario.filter(p => p.stock_disponible > 0 && p.stock_disponible < 50).length;
-  const outOfStockProducts = inventario.filter(p => p.stock_disponible === 0).length;
+  const totalProducts = resumen?.total ?? 0;
+  const activeProducts = resumen?.activos ?? 0;
+  const lowStockProducts = resumen?.stock_bajo ?? 0;
+  const outOfStockProducts = resumen?.sin_stock ?? 0;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -467,8 +467,8 @@ export default function Inventory() {
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Package className="h-4 w-4" />
           <span>
-            Mostrando {startIndex + 1}-{Math.min(startIndex + pageSize, filteredInventory.length)} de {filteredInventory.length} productos
-            {filteredInventory.length !== totalProducts && ` (${totalProducts} total)`}
+            Mostrando {totalFiltrado === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + pageSize, totalFiltrado)} de {totalFiltrado} productos
+            {totalFiltrado !== totalProducts && ` (${totalProducts} total)`}
           </span>
         </div>
         
@@ -494,7 +494,7 @@ export default function Inventory() {
         ) : filteredInventory.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <Inbox className="h-12 w-12 mb-4 opacity-50" />
-            {inventario.length === 0 ? (
+            {totalProducts === 0 ? (
               // Inventario realmente vacío: CTA de onboarding.
               <>
                 <p className="text-lg font-medium">No hay productos en el inventario</p>

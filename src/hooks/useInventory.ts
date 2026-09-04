@@ -79,6 +79,109 @@ function mapRowToInventoryItem(row: any): InventoryItem {
   };
 }
 
+// -----------------------------------------------------------------------------
+// Inventario PAGINADO en el servidor (pantalla Inventario). Antes la pantalla
+// bajaba las 16.000 filas al navegador en tandas de 1.000 y filtraba ahí.
+// -----------------------------------------------------------------------------
+export interface InventarioPaginaOpts {
+  page: number;
+  pageSize: number;
+  q?: string;
+  soloIncompletos?: boolean;
+}
+
+const escapaIlike = (s: string) => s.replace(/[%_,()]/g, ' ').trim();
+
+export function useInventarioPagina(opts: InventarioPaginaOpts) {
+  const { user, loading: authLoading } = useAuth();
+  const clienteId = user?.id || null;
+  const q = (opts.q || '').trim();
+
+  return useQuery({
+    queryKey: ['inventory', 'pagina', clienteId, opts.page, opts.pageSize, q, !!opts.soloIncompletos],
+    queryFn: async (): Promise<{ items: InventoryItem[]; total: number }> => {
+      if (!clienteId) return { items: [], total: 0 };
+      const ownerId = await resolverClienteOwnerId();
+      if (!ownerId) return { items: [], total: 0 };
+
+      const from = (opts.page - 1) * opts.pageSize;
+      let query = supabase
+        .from('cliente_inventario')
+        .select('*', { count: 'exact' })
+        .eq('cliente_id', ownerId);
+      if (q) {
+        const t = `%${escapaIlike(q)}%`;
+        query = query.or(`nombre_producto.ilike.${t},sku.ilike.${t},proveedor.ilike.${t}`);
+      }
+      if (opts.soloIncompletos) {
+        // Sin descripción o sin imagen (lo que resta calidad al match y al PDF).
+        query = query.or('descripcion.is.null,descripcion.eq.,imagen_url.is.null,imagen_url.eq.');
+      }
+      const { data, error, count } = await query
+        .order('created_at', { ascending: false })
+        .range(from, from + opts.pageSize - 1);
+      if (error) {
+        console.error('[useInventarioPagina]', error);
+        throw error;
+      }
+      return { items: (data || []).map(mapRowToInventoryItem), total: count ?? 0 };
+    },
+    enabled: !!clienteId && !authLoading,
+    placeholderData: (prev) => prev,
+    staleTime: 60 * 1000,
+  });
+}
+
+export interface InventarioResumen {
+  total: number;
+  activos: number;
+  sin_stock: number;
+  stock_bajo: number;
+  incompletos: number;
+  valor: number;
+  categorias: string[];
+}
+
+// Contadores del inventario en UNA consulta (RPC cliente_inventario_resumen).
+export function useInventarioResumen() {
+  const { user, loading: authLoading } = useAuth();
+  const clienteId = user?.id || null;
+  return useQuery({
+    queryKey: ['inventory', 'resumen', clienteId],
+    queryFn: async (): Promise<InventarioResumen> => {
+      const vacio: InventarioResumen = { total: 0, activos: 0, sin_stock: 0, stock_bajo: 0, incompletos: 0, valor: 0, categorias: [] };
+      if (!clienteId) return vacio;
+      const { data, error } = await (supabase as any).rpc('cliente_inventario_resumen');
+      if (error) {
+        console.error('[useInventarioResumen]', error);
+        throw error;
+      }
+      return { ...vacio, ...(data || {}), categorias: (data?.categorias as string[]) || [] };
+    },
+    enabled: !!clienteId && !authLoading,
+    staleTime: 60 * 1000,
+  });
+}
+
+// Carga completa bajo demanda (exportar a Excel/CSV), en tandas de 1.000.
+export async function cargarInventarioCompleto(): Promise<InventoryItem[]> {
+  const ownerId = await resolverClienteOwnerId();
+  if (!ownerId) return [];
+  const todo: InventoryItem[] = [];
+  for (let page = 0; ; page++) {
+    const { data, error } = await supabase
+      .from('cliente_inventario')
+      .select('*')
+      .eq('cliente_id', ownerId)
+      .order('created_at', { ascending: false })
+      .range(page * 1000, page * 1000 + 999);
+    if (error) throw error;
+    todo.push(...(data || []).map(mapRowToInventoryItem));
+    if (!data || data.length < 1000) break;
+  }
+  return todo;
+}
+
 export function useInventory() {
   const { user, loading: authLoading, isAuthenticated } = useAuth();
   const clienteId = user?.id || null;
