@@ -44,13 +44,22 @@ Deno.serve(async (req)=>{
   while(res.paginas < maxPaginas && Date.now() - t0 < 100_000){
     const url = `${B}?ttl_cambio_ms=${ttl}&tamano_pagina=50&numero_pagina=${pagina}`;
     let data:any;
-    try{
-      const resp = await fetch(url, { headers:{ 'ticket': ticket, 'Accept':'application/json' } });
-      if(resp.status===429){ await sleep(4000); continue; }
-      const texto = await resp.text();
-      try{ data = JSON.parse(texto); }catch{ res.errores.push(`p${pagina}: HTTP ${resp.status} no-JSON: ${texto.slice(0,200)}`); break; }
-      if(data.success!=='OK'){ res.errores.push(`p${pagina}: HTTP ${resp.status} ${JSON.stringify(data.errors ?? data.message ?? data).slice(0,300)}`); break; }
-    }catch(e){ res.errores.push(`p${pagina}: ${e instanceof Error? e.message:String(e)}`); break; }
+    // La API responde 504 "Endpoint request timed out" con frecuencia; un solo
+    // fallo no debe matar la tanda: se reintenta la misma página hasta 3 veces.
+    let fallo: string | null = null;
+    for(let intento = 1; intento <= 3; intento++){
+      fallo = null;
+      try{
+        const resp = await fetch(url, { headers:{ 'ticket': ticket, 'Accept':'application/json' } });
+        if(resp.status===429){ if(Date.now() - t0 > 90_000){ fallo = `p${pagina}: HTTP 429 (sin tiempo para reintentar)`; break; } await sleep(4000); intento--; continue; }
+        const texto = await resp.text();
+        try{ data = JSON.parse(texto); }catch{ fallo = `p${pagina}: HTTP ${resp.status} no-JSON: ${texto.slice(0,200)}`; }
+        if(!fallo && data.success!=='OK') fallo = `p${pagina}: HTTP ${resp.status} ${JSON.stringify(data.errors ?? data.message ?? data).slice(0,300)}`;
+      }catch(e){ fallo = `p${pagina}: ${e instanceof Error? e.message:String(e)}`; }
+      if(!fallo) break;
+      if(intento < 3 && Date.now() - t0 < 90_000) await sleep(3000 * intento);
+    }
+    if(fallo){ res.errores.push(fallo); break; }
 
     const items = data?.payload?.items || [];
     res.total_paginas = data?.payload?.paginacion?.total_paginas ?? res.total_paginas;

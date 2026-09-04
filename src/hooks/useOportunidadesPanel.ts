@@ -452,7 +452,13 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         }
       }
       if (filtrosRow) {
-        all = aplicarFiltrosCliente(all, filtrosRow as Partial<ClienteFiltros>);
+        // Si el usuario ESCRIBIÓ una búsqueda, manda lo que buscó: no se exige
+        // además que calce con las palabras del rubro (antes buscar "resma" con
+        // rubro "google" botaba casi todo). Se mantienen exclusiones, regiones y monto.
+        const filtrosAplicar: Partial<ClienteFiltros> = textoBusqueda.length >= 2
+          ? { ...(filtrosRow as Partial<ClienteFiltros>), palabras_incluir: [], palabras_incluir_ia: [] }
+          : (filtrosRow as Partial<ClienteFiltros>);
+        all = aplicarFiltrosCliente(all, filtrosAplicar);
       }
       // Lo que coincide con la definición del cliente lleva la PALABRA que calzó
       // (ej: "toner"), para que la tarjeta explique por qué está aquí. Clave para
