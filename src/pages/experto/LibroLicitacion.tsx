@@ -216,7 +216,8 @@ export default function LibroLicitacion() {
   };
   // Word / PDF de cualquier texto del Experto (informe, estudio, anexos, respuesta del chat)
   const aWord = (titulo: string, md: string) => descargarWord(titulo, expertoMd(md), `${cod || 'experto'}-${titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}.doc`);
-  const aPdf = async (titulo: string, md: string) => { const r = await compartirPdfExperto({ titulo: `${titulo} · ${cod}`, contenido: md, url: `${window.location.origin}/experto/libro/${cod}` }, `${cod || 'experto'}-${titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}.pdf`); if (r === 'descargado') toast.success('PDF descargado'); };
+  const datosPdf = () => ({ subtitulo: f ? `Licitación ${cod} · ${f.nombre ?? ''} · ${f.institucion ?? ''}` : `Licitación ${cod}`, kpis: f ? [{ k: 'Presupuesto', v: fmt(f.presupuesto) }, { k: 'Cierre', v: fecha(f.fecha_cierre) }, { k: 'Pago del organismo', v: `${o.conducta_pago ?? 's/i'} · ${o.pago_promedio_dias ?? 's/i'} días` }] : [], veredicto: (() => { const v = veredictoDe(entregables.informe); return v ? { t: v.t, tono: (/reservas/.test(v.t) ? 'warn' : v.t === 'Descartar' ? 'bad' : v.t === 'Postular' ? 'ok' : 'neutral') as 'ok' | 'warn' | 'bad' | 'neutral' } : null; })() });
+  const aPdf = async (titulo: string, md: string) => { const r = await compartirPdfExperto({ titulo, ...datosPdf(), contenido: md, url: `${window.location.origin}/experto/libro/${cod}` }, `${cod || 'experto'}-${titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}.pdf`); if (r === 'descargado') toast.success('PDF descargado'); };
 
   const opinar = async (p: string, util: boolean) => {
     const comentario = util ? null : window.prompt('¿Qué faltó? (queda guardado y el Experto lo tendrá en cuenta)') ?? '';
@@ -240,7 +241,7 @@ export default function LibroLicitacion() {
     try {
       const fila = (await (supabase as any).rpc('experto_compartido', { p_token: compartido.token })).data?.[0];
       if (!fila) throw new Error('No encontré el análisis');
-      const r = await compartirPdfExperto({ titulo: fila.titulo ?? compartido.titulo, empresa: fila.empresa, contenido: fila.contenido, url: compartido.url, fecha: fila.creado_en }, `${cod || 'experto'}-${compartido.tipo}.pdf`);
+      const r = await compartirPdfExperto({ titulo: fila.titulo ?? compartido.titulo, ...datosPdf(), empresa: fila.empresa, contenido: fila.contenido, url: compartido.url, fecha: fila.creado_en }, `${cod || 'experto'}-${compartido.tipo}.pdf`);
       if (r === 'descargado') toast.success('PDF descargado: adjúntalo en WhatsApp o correo');
     } catch (e: any) { toast.error(e.message); }
     setOcupado(null);
