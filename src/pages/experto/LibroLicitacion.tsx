@@ -73,7 +73,15 @@ export default function LibroLicitacion() {
     queryFn: async () => (await (supabase as any).rpc('experto_libro', { p_codigo: cod })).data,
   });
 
-  const { data: libros = [] } = useQuery({ queryKey: ['experto_mis_libros'], enabled: !!token, queryFn: async () => ((await (supabase as any).rpc('experto_mis_libros')).data ?? []) as any[] });
+  const [buscarLibro, setBuscarLibro] = useState('');
+  const [verArchivados, setVerArchivados] = useState(false);
+  const { data: libros = [] } = useQuery({ queryKey: ['experto_mis_libros', verArchivados, buscarLibro], enabled: !!token, queryFn: async () => ((await (supabase as any).rpc('experto_mis_libros', { p_archivados: verArchivados, p_buscar: buscarLibro || null })).data ?? []) as any[] });
+  const archivarLibro = async (c: string, archivado: boolean) => {
+    const { error } = await (supabase as any).rpc('experto_libro_archivar', { p_codigo: c, p_archivado: archivado });
+    if (error) { toast.error('No pude archivar'); return; }
+    toast.success(archivado ? 'Libro archivado (sigue guardado, lo ves en Archivados)' : 'Libro reactivado');
+    qc.invalidateQueries({ queryKey: ['experto_mis_libros'] });
+  };
 
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [codigoAbrir, setCodigoAbrir] = useState('');
@@ -269,6 +277,7 @@ export default function LibroLicitacion() {
           </form>
         )}
         <Button size="sm" variant="ghost" className="h-8" onClick={() => navigate('/experto/compartidos')}>Mis compartidos</Button>
+        {cod && <Button size="sm" variant="ghost" className="h-8 text-muted-foreground" onClick={() => archivarLibro(cod, true).then(() => navigate('/experto'))}>Archivar libro</Button>}
         {f && <Button variant="outline" size="sm" onClick={() => navigate(String(f.tipo ?? '').toLowerCase().includes('gil') ? `/compras-agiles/${cod}` : `/oportunidades/licitacion/${cod}`)}>Ver la oportunidad</Button>}
         <BookOpen className="h-5 w-5 text-primary" />
         <h1 className="text-xl font-bold">{cod}</h1>
@@ -299,11 +308,19 @@ export default function LibroLicitacion() {
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Mis libros</CardTitle></CardHeader>
               <CardContent className="space-y-2 text-sm">
-                {libros.length === 0 && <p className="text-muted-foreground">Cada licitación que estudies queda aquí con sus fuentes, bases, chat y entregables. Escribe un ID arriba o desde una oportunidad usa "Libro del Experto".</p>}
-                {libros.slice(0, 15).map((l: any) => (
-                  <button key={l.codigo} onClick={() => navigate(`/experto/libro/${l.codigo}`)} className="block w-full text-left rounded-md border px-2 py-1 hover:border-primary">
-                    <span className="font-medium">{l.codigo}</span>{l.nombre && <span className="text-muted-foreground"> · {l.nombre}</span>}
-                  </button>
+                <div className="flex gap-1">
+                  <Input value={buscarLibro} onChange={(e) => setBuscarLibro(e.target.value)} placeholder="Buscar por ID, nombre u organismo" className="h-8" />
+                  <Button size="sm" variant={verArchivados ? 'default' : 'outline'} className="h-8 shrink-0" onClick={() => setVerArchivados((v) => !v)}>{verArchivados ? 'Archivados' : 'Activos'}</Button>
+                </div>
+                {libros.length === 0 && <p className="text-muted-foreground">{verArchivados ? 'No tienes libros archivados.' : 'Cada licitación que estudies queda aquí con sus fuentes, bases, chat y entregables, sin límite. Escribe un ID arriba o desde una oportunidad usa "Libro del Experto".'}</p>}
+                {libros.map((l: any) => (
+                  <div key={l.codigo} className="flex items-start gap-1 rounded-md border px-2 py-1 hover:border-primary">
+                    <button onClick={() => navigate(`/experto/libro/${l.codigo}`)} className="flex-1 text-left min-w-0">
+                      <span className="font-medium">{l.codigo}</span>{l.nombre && <span className="text-muted-foreground"> · {l.nombre}</span>}
+                      <p className="text-[11px] text-muted-foreground">{l.cierre ? `cierra ${fecha(l.cierre)} · ` : ''}{l.consultas} interacciones</p>
+                    </button>
+                    <button className="text-[11px] text-muted-foreground underline shrink-0" onClick={() => archivarLibro(l.codigo, !l.archivado)}>{l.archivado ? 'Reactivar' : 'Archivar'}</button>
+                  </div>
                 ))}
               </CardContent>
             </Card>
