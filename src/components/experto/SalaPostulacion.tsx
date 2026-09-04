@@ -59,7 +59,7 @@ export function SalaPostulacion(p: SalaProps) {
           {listaParaPostular && <span className="rounded bg-green-600 text-white px-2 py-0.5 text-xs font-medium">Lista para postular</span>}
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-1 text-xs">
-          {[['Presupuesto', presupuestoTexto(f.presupuesto), ''], ['Cierre', dias == null ? 's/i' : dias < 0 ? 'cerrada' : `en ${dias} días`, ''], ['Pago del organismo', pagoOrganismo(o).valor, pagoOrganismo(o).detalle], ['Puntaje estimado', m && ev.length ? `${total.toFixed(1)}${umbral != null ? ` / umbral ${umbral}` : ''}` : 's/i', '']].map(([k, v, d]) => (
+          {[['Presupuesto', presupuestoTexto(f.presupuesto, f.codigo), ''], ['Cierre', dias == null ? 's/i' : dias < 0 ? 'cerrada' : `en ${dias} días`, ''], ['Pago del organismo', pagoOrganismo(o).valor, pagoOrganismo(o).detalle], ['Puntaje estimado', m && ev.length ? `${total.toFixed(1)}${umbral != null ? ` / umbral ${umbral}` : ''}` : 's/i', '']].map(([k, v, d]) => (
             <div key={k} className="rounded-md border bg-muted/30 px-2 py-1" title={d}><p className="text-[10px] uppercase tracking-wide text-muted-foreground">{k}</p><p className="font-semibold truncate">{v}</p>{d && <p className="text-[10px] text-muted-foreground truncate">{d}</p>}</div>
           ))}
         </div>

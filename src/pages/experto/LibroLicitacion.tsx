@@ -217,7 +217,7 @@ export default function LibroLicitacion() {
   };
   // Word / PDF de cualquier texto del Experto (informe, estudio, anexos, respuesta del chat)
   const aWord = (titulo: string, md: string) => descargarWord(titulo, expertoMd(md), `${cod || 'experto'}-${titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}.doc`);
-  const datosPdf = () => ({ subtitulo: f ? `Licitación ${cod} · ${f.nombre ?? ''} · ${nombrePropio(f.institucion)}` : `Licitación ${cod}`, kpis: f ? [{ k: 'Presupuesto', v: presupuestoTexto(f.presupuesto) }, { k: 'Cierre', v: fecha(f.fecha_cierre) }, { k: 'Pago del organismo', v: pagoOrganismo(o).valor, tono: pagoOrganismo(o).tono }] : [], veredicto: (() => { const v = veredictoDe(entregables.informe); return v ? { t: v.t, tono: (/reservas/.test(v.t) ? 'warn' : v.t === 'Descartar' ? 'bad' : v.t === 'Postular' ? 'ok' : 'neutral') as 'ok' | 'warn' | 'bad' | 'neutral' } : null; })() });
+  const datosPdf = () => ({ subtitulo: f ? `Licitación ${cod} · ${f.nombre ?? ''} · ${nombrePropio(f.institucion)}` : `Licitación ${cod}`, kpis: f ? [{ k: 'Presupuesto', v: presupuestoTexto(f.presupuesto, cod) }, { k: 'Cierre', v: fecha(f.fecha_cierre) }, { k: 'Pago del organismo', v: pagoOrganismo(o).valor, tono: pagoOrganismo(o).tono }] : [], veredicto: (() => { const v = veredictoDe(entregables.informe); return v ? { t: v.t, tono: (/reservas/.test(v.t) ? 'warn' : v.t === 'Descartar' ? 'bad' : v.t === 'Postular' ? 'ok' : 'neutral') as 'ok' | 'warn' | 'bad' | 'neutral' } : null; })() });
   const aPdf = async (titulo: string, md: string) => { const r = await compartirPdfExperto({ titulo, ...datosPdf(), contenido: md, url: `${window.location.origin}/experto/libro/${cod}` }, `${cod || 'experto'}-${titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}.pdf`); if (r === 'descargado') toast.success('PDF descargado'); };
 
   const opinar = async (p: string, util: boolean) => {
@@ -471,7 +471,7 @@ export default function LibroLicitacion() {
                   <div className="max-h-[62vh] overflow-y-auto pr-1">
                     {f && (tab === 'estudio' || tab === 'informe') && (
                       <div className="grid grid-cols-2 gap-1 mb-3 text-xs">
-                        {(() => { const pg = pagoOrganismo(o); return [['Presupuesto', presupuestoTexto(f.presupuesto), ''], ['Cierra', fecha(f.fecha_cierre), ''], ['Pago del organismo', pg.valor, pg.detalle], ['Organismo', nombrePropio(f.institucion), f.region ?? '']]; })().map(([k, v, d]) => (
+                        {(() => { const pg = pagoOrganismo(o); return [['Presupuesto', presupuestoTexto(f.presupuesto, cod), ''], ['Cierra', fecha(f.fecha_cierre), ''], ['Pago del organismo', pg.valor, pg.detalle], ['Organismo', nombrePropio(f.institucion), f.region ?? '']]; })().map(([k, v, d]) => (
                           <div key={k} className="rounded-md border bg-muted/30 px-2 py-1" title={d}><p className="text-[10px] uppercase tracking-wide text-muted-foreground">{k}</p><p className="font-semibold truncate">{v}</p>{d && <p className="text-[10px] text-muted-foreground truncate">{d}</p>}</div>
                         ))}
                       </div>

@@ -249,6 +249,7 @@ export function useUltimosMatches() {
         .from('compras_agiles')
         .select('codigo, nombre, nombre_organismo, match_score, created_at')
         .eq('match_encontrado', true)
+        .gte('match_score', 40)
         .order('created_at', { ascending: false })
         .limit(5);
       if (caError) throw caError;
@@ -259,6 +260,7 @@ export function useUltimosMatches() {
         .from('licitaciones_bi')
         .select('codigo, nombre, institucion_nombre, match_score, created_at')
         .eq('match_encontrado', true)
+        .gte('match_score', 40)
         .order('created_at', { ascending: false })
         .limit(5);
       if (licError) throw licError;

@@ -1,4 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
+import { presupuestoTexto } from "@/lib/organismoPago";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -334,7 +335,7 @@ export default function OportunidadDetalle() {
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
                   <div>
                     <p className="text-xs text-muted-foreground">Monto Estimado</p>
-                    <p className="font-medium text-sm">{formatCurrency(oportunidad.monto)}</p>
+                    <p className="font-medium text-sm">{presupuestoTexto(oportunidad.monto, oportunidad.codigo)}</p>
                   </div>
                 </div>
               </CardContent>

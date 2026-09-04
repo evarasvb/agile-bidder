@@ -49,6 +49,8 @@ import {
 } from "@/hooks/useOportunidadesPanel";
 import { useRegistrarSenal } from "@/hooks/useSenales";
 import { useClienteFiltros } from "@/hooks/useClienteFiltros";
+import { presupuestoTexto } from "@/lib/organismoPago";
+import { PISO_MATCH } from "@/hooks/useOportunidadesPanel";
 import { format, differenceInDays, differenceInHours } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -109,7 +111,7 @@ function OpportunityCard({
             {/* La tarjeta dice POR QUÉ está aquí: % si calza con tu inventario,
                 "Tu rubro" si coincide con tus palabras clave del onboarding.
                 (Antes decía "N/A": parecía que el match no funcionaba.) */}
-            {op.match_score ? (
+            {op.match_score && op.match_score >= PISO_MATCH ? (
               <Badge className={getScoreColor(op.match_score)}>
                 {op.match_score}% match
               </Badge>
@@ -153,10 +155,13 @@ function OpportunityCard({
         {/* Bottom row: Amount + Items + Actions */}
         <div className="flex items-center justify-between pt-1 border-t">
           <div className="flex items-center gap-3 text-xs">
-            {op.monto ? (
+            {op.monto && op.monto > 1 ? (
               <span className="font-medium">{formatCurrency(op.monto)}</span>
             ) : (
-              <span className="text-muted-foreground">Sin monto</span>
+              // Sin presupuesto informado (MP pone $1): se muestra el tramo en UTM.
+              <span className="text-muted-foreground" title="Presupuesto no informado por el organismo">
+                {presupuestoTexto(op.monto, op.codigo)}
+              </span>
             )}
             {op.tipo === "compra_agil" && op.items_count > 0 ? (
               // Cobertura producto-a-producto: cuántos ítems pedidos calzan con tu

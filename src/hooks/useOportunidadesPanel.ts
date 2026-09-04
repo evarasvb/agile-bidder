@@ -90,6 +90,9 @@ export interface PanelFilters {
   incluirCerradas?: boolean;
 }
 
+// Piso de match: bajo 40% el calce es ruido y no se muestra como match.
+export const PISO_MATCH = 40;
+
 // Máximo de filas traídas del servidor al incluir cerradas (evita descargar
 // las decenas de miles de oportunidades terminadas al navegador).
 const MAX_CERRADAS = 500;
@@ -363,6 +366,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         for (const m of (((matchesRes as any)?.data) || []) as any[]) {
           const k = m.compra_agil_codigo as string;
           const score = Math.round(Number(m.score) || 0);
+          if (score < PISO_MATCH) continue;
           const prev = bestMatchByCodigo[k];
           if (!prev) {
             bestMatchByCodigo[k] = { score, producto: m.nombre_producto ?? null, count: 1 };
@@ -395,8 +399,8 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         estado: c.estado,
         tipo: 'compra_agil' as const,
         link_oficial: c.url_ficha || c.link_oficial || null,
-        match_score: bestMatchByCodigo[c.codigo]?.score ?? c.match_score ?? null,
-        match_encontrado: (itemMatchCountByCodigo[c.codigo] > 0) || bestMatchByCodigo[c.codigo] ? true : (c.match_encontrado ?? false),
+        match_score: bestMatchByCodigo[c.codigo]?.score ?? (c.match_score >= PISO_MATCH ? c.match_score : null),
+        match_encontrado: (itemMatchCountByCodigo[c.codigo] > 0) || bestMatchByCodigo[c.codigo] ? true : ((c.match_encontrado && c.match_score >= PISO_MATCH) || false),
         items_count: c.compras_agiles_items?.length || 0,
         // Ítems que calzan producto-a-producto (ca_item_matches). Antes era el
         // conteo de filas de ca_matches (match a nivel de compra), poco útil.
@@ -425,8 +429,8 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         link_oficial: l.codigo
           ? `https://www.mercadopublico.cl/Procurement/Modules/RFB/DetailsAcquisition.aspx?idlicitacion=${l.codigo}`
           : null,
-        match_score: l.match_score ?? null,
-        match_encontrado: l.match_encontrado ?? false,
+        match_score: l.match_score >= PISO_MATCH ? l.match_score : null,
+        match_encontrado: (l.match_encontrado && l.match_score >= PISO_MATCH) || false,
         items_count: 0,
         items_matched: 0,
         created_at: l.created_at || l.fecha_publicacion,

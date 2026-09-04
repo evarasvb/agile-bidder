@@ -2,9 +2,26 @@
 export type Tono = 'ok' | 'warn' | 'bad' | 'neutral';
 const n = (v: any): number | null => { const x = Number(v); return v == null || v === '' || !Number.isFinite(x) ? null : x; };
 
-/** Mercado Público pone 1 (o 0) cuando el presupuesto no se informa. */
-export function presupuestoTexto(p: any): string {
-  const v = n(p); if (v == null || v <= 1) return 'No informado';
+/** Tramo de la licitación según la sigla del código (rango en UTM, norma de ChileCompra). */
+export function tramoLicitacion(codigo?: string | null): { sigla: string; rango: string } | null {
+  const m = /-(L1|LE|LP|LQ|LR|LS|COT)\d*$/i.exec((codigo || '').trim());
+  if (!m) return null;
+  const sigla = m[1].toUpperCase();
+  const rango: Record<string, string> = {
+    L1: 'hasta 100 UTM', LE: '100 a 1.000 UTM', LP: '1.000 a 2.000 UTM',
+    LQ: '2.000 a 5.000 UTM', LR: 'más de 5.000 UTM', LS: 'servicios personales especializados',
+    COT: 'compra ágil, hasta 100 UTM',
+  };
+  return { sigla, rango: rango[sigla] };
+}
+
+/** Mercado Público pone 1 (o 0) cuando el presupuesto no se informa: en ese caso se muestra el tramo en UTM. */
+export function presupuestoTexto(p: any, codigo?: string | null): string {
+  const v = n(p);
+  if (v == null || v <= 1) {
+    const t = tramoLicitacion(codigo);
+    return t ? `Tramo ${t.sigla} · ${t.rango}` : 'No informado';
+  }
   return '$' + Math.round(v).toLocaleString('es-CL');
 }
 
