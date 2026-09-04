@@ -8,7 +8,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const cors = { 'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type' };
 const sleep = (ms:number)=>new Promise(r=>setTimeout(r,ms));
-const PRESUPUESTO_MS = 45_000;
+const PRESUPUESTO_MS = 110_000; // el cron corre cada 5 min y la API tarda hasta 30-60 s por consulta
 
 function parseCl(s:any):string|null{
   if(!s) return null; let t=String(s).trim();
@@ -94,9 +94,9 @@ Deno.serve(async (req)=>{
     }catch(e){ res.errores.push(`${r.codigo}: ${e instanceof Error? e.message:String(e)}`); }
   };
 
-  // De a 4 en paralelo: la API tarda ~2 s por código, así una corrida rinde ~4x
+  // De a 6 en paralelo: la API tarda entre 2 y 60 s por código, así una corrida rinde ~6x
   // sin pasarse del presupuesto de tiempo ni gatillar el límite de peticiones.
-  const PARALELO = 4;
+  const PARALELO = 6;
   for(let i=0; i<rows.length && Date.now()-t0 < PRESUPUESTO_MS; i+=PARALELO){
     await Promise.all(rows.slice(i, i+PARALELO).map(procesar));
     await sleep(120);

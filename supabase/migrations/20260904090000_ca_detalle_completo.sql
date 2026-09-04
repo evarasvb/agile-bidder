@@ -27,6 +27,6 @@ as $$
 $$;
 
 -- Cron aplicado en producción (documentado aquí, no se ejecuta en la migración):
---   enrich-ca-items-cron (job 55): cada 5 min, body {"limit":60}; la función procesa de a 4
---   en paralelo con presupuesto de 45 s. Con esto el atraso de ~5.900 compras abiertas sin
+--   enrich-ca-items-cron (job 55): cada 5 min, body {"limit":60}; la función procesa de a 6
+--   en paralelo con presupuesto de 110 s. Con esto el atraso de ~5.900 compras abiertas sin
 --   detalle se limpia en pocas horas en vez de un día.
