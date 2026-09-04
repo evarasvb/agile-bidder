@@ -35,6 +35,17 @@ const conCitas = (html: string, fuentes?: any[]) => html.replace(/\[(\d{1,2})\]/
   const titulo = String(f?.fuente ?? `Fuente ${n}`).replace(/"/g, '&quot;');
   return `<sup><a class="cita text-primary font-semibold no-underline hover:underline" data-n="${n}" href="${f?.url ?? '#'}" title="${titulo}"${f?.url ? ' target="_blank" rel="noreferrer"' : ''}>[${n}]</a></sup>`;
 });
+// Veredicto del informe (sección 1: ¿vale la pena postular? sí / con reservas / no) como semáforo en el encabezado.
+function veredictoDe(informe?: string): { t: string; c: string } | null {
+  if (!informe) return null;
+  const z = informe.slice(0, 2500).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const v = z.match(/veredicto[^\n]{0,200}/)?.[0] ?? z.match(/vale la pena postular[^\n]{0,200}/)?.[0] ?? '';
+  if (!v) return null;
+  if (/con reservas|con condiciones|si corriges|depende/.test(v)) return { t: 'Postular con reservas', c: 'bg-yellow-100 text-yellow-900 border-yellow-300' };
+  if (/\bno\b(?! hay atajos)/.test(v) && !/\bsi\b/.test(v.slice(0, v.indexOf('no')))) return { t: 'Descartar', c: 'bg-red-100 text-red-900 border-red-300' };
+  if (/\bsi\b|vale la pena/.test(v)) return { t: 'Postular', c: 'bg-green-100 text-green-900 border-green-300' };
+  return { t: 'Evaluar', c: 'bg-muted text-foreground' };
+}
 const fecha = (d?: string | null) => d ? new Date(d).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }) : 's/i';
 
 interface Msg { rol: 'yo' | 'exp'; texto: string; fuentes?: any[]; pedirBases?: string | null }
@@ -258,6 +269,7 @@ export default function LibroLicitacion() {
         <h1 className="text-xl font-bold">{cod}</h1>
         {f && <span className="text-muted-foreground truncate max-w-[50vw]">{f.nombre} · {f.institucion}</span>}
         {f && <Badge variant="outline">cierra {fecha(f.fecha_cierre)}</Badge>}
+        {(() => { const v = veredictoDe(entregables.informe); return v ? <Badge variant="outline" className={v.c} title="Veredicto del informe de trabajo">{v.t}</Badge> : null; })()}
         {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
       </div>
       {compartido && (
