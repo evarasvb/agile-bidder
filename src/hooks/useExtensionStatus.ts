@@ -24,6 +24,7 @@ export function useExtensionStatus() {
   // Fetch initial status from database
   const { data: dbStatus, isLoading } = useQuery({
     queryKey: ['extension-status', cliente?.id],
+    placeholderData: (prev) => prev, // no parpadear a "Verificando" en cada recarga
     queryFn: async () => {
       if (!cliente?.id) return null;
 

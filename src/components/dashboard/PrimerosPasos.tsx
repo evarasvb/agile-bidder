@@ -10,6 +10,9 @@ import {
 import { useInventoryStats } from "@/hooks/useInventory";
 import { useClienteOfertas } from "@/hooks/useClienteOfertas";
 import { useExtensionStatus } from "@/hooks/useExtensionStatus";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 const OCULTO_KEY = "fvb_primeros_pasos_oculto";
 const VISTO_OPS_KEY = "fvb_paso_oportunidades_visto";
@@ -38,13 +41,18 @@ export function PrimerosPasos() {
     try { return JSON.parse(localStorage.getItem(SALTADOS_KEY) || "[]"); } catch { return []; }
   });
 
-  const { data: invStats } = useInventoryStats();
-  const { data: ofertas } = useClienteOfertas();
+  const { data: invStats, isLoading: cargandoInv } = useInventoryStats();
+  const { data: ofertas, isLoading: cargandoOf } = useClienteOfertas();
   const { isConnected } = useExtensionStatus();
+  // Eventos reales: libros del Experto (licitaciones analizadas) también cuentan como avance.
+  const { session } = useAuth();
+  const { data: libros, isLoading: cargandoLib } = useQuery({ queryKey: ["experto_mis_libros"], enabled: !!session, queryFn: async () => ((await (supabase as any).rpc("experto_mis_libros")).data ?? []) as any[] });
+  const cargando = cargandoInv || cargandoOf || cargandoLib;
 
   const tieneInventario = (invStats?.total ?? 0) > 0;
   const tieneOfertas = (ofertas?.length ?? 0) > 0;
-  const revisoOportunidades = vistoOps || tieneOfertas;
+  const tieneLibros = (libros?.length ?? 0) > 0;
+  const revisoOportunidades = vistoOps || tieneOfertas || tieneLibros;
 
   const ocultar = () => {
     try { localStorage.setItem(OCULTO_KEY, "1"); } catch { /* noop */ }
@@ -81,9 +89,9 @@ export function PrimerosPasos() {
       aviso: "Estas son las oportunidades que calzan contigo ✨",
     },
     {
-      id: "oferta", done: tieneOfertas, icon: FileText,
-      titulo: "Genera tu primera oferta",
-      desc: "Elige una oportunidad y crea la oferta con tus precios en un par de clics.",
+      id: "oferta", done: tieneOfertas || tieneLibros, icon: FileText,
+      titulo: "Genera tu primera oferta o analiza una licitación",
+      desc: "Elige una oportunidad y crea la oferta con tus precios, o abre su libro con el Experto.",
       to: "/compras-agiles",
       aviso: "Elige una compra ágil y arma tu oferta 📝",
     },
@@ -138,7 +146,8 @@ export function PrimerosPasos() {
   if (oculto) return null;
 
   if (completo) {
-    return (
+    if (cargando) return null; // nunca mostrar "0 de 3" antes de saber
+  return (
       <Card className="border-firmavb-green/30 bg-firmavb-green/5">
         <CardContent className="py-4 flex flex-wrap items-center gap-3">
           <PartyPopper className="h-5 w-5 text-firmavb-green shrink-0" />

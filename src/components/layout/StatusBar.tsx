@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { InfoHint } from "@/components/ui/info-hint";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 import { useExtensionStatus } from "@/hooks/useExtensionStatus";
 import { SystemHealthIndicator } from "@/components/dashboard/SystemHealthIndicator";
 import { formatDistanceToNow } from "date-fns";
@@ -14,7 +15,10 @@ import { es } from "date-fns/locale";
 // nada (estado local sin persistencia, y la sección Auto-Bids ya no existe).
 // Prometer control falso rompe la confianza: se eliminaron ambos.
 export function StatusBar() {
-  const { isConnected, lastActivity, lastAction, isLoading, refetch } = useExtensionStatus();
+  const { isConnected, lastActivity, lastAction, isLoading, refetch, activeKeysCount } = useExtensionStatus();
+  const { user } = useAuth();
+  const esAdmin = (user?.email || "").toLowerCase() === "evaras@firmavb.cl";
+  const sinInstalar = !isLoading && !isConnected && (activeKeysCount ?? 0) === 0;
 
   const formatLastActivity = () => {
     if (!lastActivity) return "Sin actividad";
@@ -30,7 +34,7 @@ export function StatusBar() {
             Centro de Control
             <InfoHint text="Estado en vivo de tu conexión con Mercado Público: si la extensión de Chrome de firmavb está conectada para ayudarte a postular." />
           </h2>
-          <SystemHealthIndicator />
+          {esAdmin && <SystemHealthIndicator />}
         </div>
 
         {/* Right: estado de la extensión (también visible en móvil, como punto) */}
@@ -55,7 +59,7 @@ export function StatusBar() {
                 "hidden sm:inline text-sm font-medium",
                 isConnected ? "text-online" : "text-offline"
               )}>
-                {isLoading ? "Verificando..." : isConnected ? "Conectada" : "Desconectada"}
+                {isLoading ? "Verificando..." : isConnected ? "Conectada" : sinInstalar ? "No instalada" : "Desconectada"}
               </span>
               <Button
                 variant="ghost"

@@ -88,6 +88,12 @@ export function DocumentosEmpresaCard() {
         <CardDescription>
           Con la ficha completa y estos documentos, el Experto Plus completa los anexos de tus licitaciones con los datos reales de tu empresa. Tú revisas, firmas y subes la oferta.
         </CardDescription>
+        <div className="mt-2 rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground space-y-1">
+          <p className="font-medium text-foreground">Cómo cuidamos estos documentos</p>
+          <p>Se guardan en un repositorio privado por empresa; solo tu cuenta y las personas de tu equipo con permiso pueden abrirlos, mediante enlaces que caducan a los 5 minutos.</p>
+          <p>El Experto lee su contenido únicamente cuando pides completar anexos, para copiar razón social, RUT, representante y giros. No se comparten con terceros ni se usan para entrenar modelos.</p>
+          <p>Puedes borrarlos cuando quieras desde aquí y quedan eliminados del repositorio. Si un certificado vence (poderes, proveedores), reemplázalo antes de postular.</p>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         {faltanDatos.length > 0 && (

@@ -175,7 +175,7 @@ const App = () => (
             <Route path="/pipeline" element={<Pipeline />} />
 
             {/* ----- ACADEMIA (contactos del formulario público) ----- */}
-            <Route path="/academia/leads" element={<AcademiaLeads />} />
+            <Route path="/academia/leads" element={<AdminOnlyRoute><AcademiaLeads /></AdminOnlyRoute>} />
 
             {/* ----- EQUIPO ----- */}
             <Route path="/equipo" element={<Equipo />} />

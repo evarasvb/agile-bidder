@@ -556,10 +556,10 @@ export default function ExtensionConfig() {
                 </div>
               </li>
             </ol>
-            <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
-              <p className="text-sm text-amber-800">
-                ℹ️ Chrome mostrará un aviso de que es una extensión en “modo desarrollador”. <strong>Es normal</strong>: la extensión aún no está publicada en la Chrome Web Store. Puedes usarla con confianza.
-              </p>
+            <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-1">
+              <p className="text-sm text-amber-900">ℹ️ Chrome avisará que es una extensión en “modo desarrollador”: la publicación en Chrome Web Store está en trámite y mientras tanto se instala así. Si tu área de TI bloquea ese modo, puedes seguir usando FirmaVB completo y postular a mano.</p>
+              <p className="text-xs text-amber-900"><strong>Qué hace y qué no:</strong> solo actúa en mercadopublico.cl y solo cuando tú postulas. No recibe ni guarda tu clave de Mercado Público: esa sesión queda en tu Chrome. Lo único que viaja a FirmaVB (por HTTPS) es la oferta que estás enviando y el registro de la postulación.</p>
+              <p className="text-xs text-amber-900"><strong>Tu API key:</strong> se guarda cifrada (solo su huella), la ves una única vez, puedes desactivarla o borrarla cuando quieras y aquí queda registrado su último uso.</p>
             </div>
           </div>
 

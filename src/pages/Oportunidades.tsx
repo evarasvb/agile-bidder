@@ -1,4 +1,15 @@
 import { useState } from "react";
+import { useInventoryStats } from "@/hooks/useInventory";
+
+// De dónde sale el % de match, para que nunca parezca magia: inventario (por producto) o palabras clave.
+function OrigenMatch() {
+  const { data: inv, isLoading } = useInventoryStats();
+  if (isLoading) return null;
+  const n = inv?.total ?? 0;
+  return n > 0
+    ? <p className="text-xs text-muted-foreground">Match calculado con tu inventario ({n.toLocaleString("es-CL")} productos) contra los ítems de cada compra.</p>
+    : <p className="text-xs text-amber-700">Sin inventario cargado: el % de match usa tus palabras clave y los ítems publicados. Carga tu inventario para un match por producto.</p>;
+}
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -299,6 +310,7 @@ export default function Oportunidades() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Oportunidades</h1>
+          <OrigenMatch />
           <p className="text-muted-foreground">
             Oportunidades de licitaciones y compras ágiles con match a tu inventario
           </p>

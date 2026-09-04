@@ -5,6 +5,12 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useAuth } from "@/hooks/useAuth";
 import { useMisTickets, ESTADO_LABEL, ESTADO_BADGE, type SoporteTicket } from "@/hooks/useSoporteTickets";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 function EstadoBadge({ estado }: { estado: SoporteTicket["estado"] }) {
   return (
@@ -62,6 +68,20 @@ export default function MisTickets() {
   const { data: tickets, isLoading } = useMisTickets();
   const { user } = useAuth();
   const esFundador = (user?.email || "").toLowerCase() === "evaras@firmavb.cl";
+  const qc = useQueryClient();
+  const [abierto, setAbierto] = useState(false);
+  const [mensaje, setMensaje] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  // Nueva consulta directa (mismo canal que el asistente Evaristo): queda como caso con seguimiento.
+  const enviar = async () => {
+    if (mensaje.trim().length < 10) { toast.error("Cuéntanos un poco más (mínimo 10 caracteres)"); return; }
+    setEnviando(true);
+    const { error } = await supabase.functions.invoke("soporte-ticket", { body: { email: user?.email ?? "", nombre: (user?.user_metadata as any)?.nombre ?? (user?.user_metadata as any)?.full_name ?? "", user_id: user?.id ?? null, canal: "app", pantalla: "Soporte", mensaje: mensaje.trim(), conversacion: [] } });
+    setEnviando(false);
+    if (error) { toast.error("No pude enviar la consulta. Intenta de nuevo."); return; }
+    toast.success("Consulta enviada. Te respondemos por correo y aquí verás el estado.");
+    setMensaje(""); setAbierto(false); qc.invalidateQueries();
+  };
 
   return (
     <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-5">
@@ -71,6 +91,15 @@ export default function MisTickets() {
           <h1 className="text-xl font-bold leading-tight">Mis consultas</h1>
           <p className="text-sm text-muted-foreground">El estado de los casos que dejaste con nuestro equipo.</p>
         </div>
+        <Button size="sm" onClick={() => setAbierto(true)}><MessageCircle className="h-4 w-4 mr-1" />Nueva consulta</Button>
+        <Dialog open={abierto} onOpenChange={setAbierto}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Nueva consulta al equipo FirmaVB</DialogTitle></DialogHeader>
+            <p className="text-sm text-muted-foreground">Cuéntanos qué necesitas (una licitación, un problema en la plataforma, una duda de postulación). Respondemos al correo de tu cuenta.</p>
+            <Textarea value={mensaje} onChange={(e) => setMensaje(e.target.value)} rows={5} placeholder="Ej: no me deja subir las bases de la licitación 2239-2-LR26…" />
+            <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setAbierto(false)}>Cancelar</Button><Button onClick={enviar} disabled={enviando}>{enviando ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}Enviar</Button></div>
+          </DialogContent>
+        </Dialog>
         {esFundador && (
           <Link
             to="/admin/soporte"
@@ -90,8 +119,7 @@ export default function MisTickets() {
           <MessageCircle className="h-8 w-8 mx-auto text-muted-foreground/60" />
           <p className="mt-3 text-sm font-medium">Aún no has dejado ninguna consulta</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            ¿Necesitas ayuda? Abre el asistente <span className="font-medium text-firmavb-blue">Evaristo</span> (abajo a la derecha) y toca
-            «¿Prefieres que te contacte el equipo?». Aquí verás el estado de tu caso.
+            Usa el botón <span className="font-medium text-firmavb-blue">Nueva consulta</span> o el asistente Evaristo (abajo a la derecha). Aquí verás el estado de cada caso.
           </p>
         </div>
       ) : (

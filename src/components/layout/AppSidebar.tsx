@@ -39,6 +39,7 @@ interface NavItem {
   title: string;
   url: string;
   icon: React.ElementType;
+  adminOnly?: boolean;
   children?: { title: string; url: string; icon?: React.ElementType }[];
 }
 
@@ -77,6 +78,7 @@ const navItems: NavItem[] = [
     icon: Package,
   },
   {
+    adminOnly: true,
     title: "Asesorías",
     url: "/academia/leads",
     icon: GraduationCap,
@@ -126,6 +128,7 @@ export function AppSidebar({ open = false, onClose }: AppSidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
+  const esAdmin = (user?.email || "").toLowerCase() === "evaras@firmavb.cl";
 
   // Destino activo = la URL de nav MÁS ESPECÍFICA que calza con la ruta actual
   // (por igualdad o como prefijo de sub-ruta). Usar el match más largo evita que
@@ -240,7 +243,7 @@ export function AppSidebar({ open = false, onClose }: AppSidebarProps) {
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto scrollbar-thin">
         <ul className="space-y-1">
-          {navItems.map((item) => {
+          {navItems.filter((item) => !item.adminOnly || esAdmin).map((item) => {
             const hasChildren = item.children && item.children.length > 0;
             const isExpanded = expandedItems.includes(item.title);
             const isItemActive = hasChildren
