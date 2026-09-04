@@ -24,6 +24,7 @@ import { compartirPdfExperto } from '@/services/expertoPdf';
 import { MatrizPostulacion, type Matriz } from '@/components/experto/MatrizPostulacion';
 import { descargarWord } from '@/services/exportar';
 import { SalaPostulacion } from '@/components/experto/SalaPostulacion';
+import { pagoOrganismo, presupuestoTexto, nombrePropio } from '@/lib/organismoPago';
 
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string;
 const ANON = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
@@ -216,7 +217,7 @@ export default function LibroLicitacion() {
   };
   // Word / PDF de cualquier texto del Experto (informe, estudio, anexos, respuesta del chat)
   const aWord = (titulo: string, md: string) => descargarWord(titulo, expertoMd(md), `${cod || 'experto'}-${titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}.doc`);
-  const datosPdf = () => ({ subtitulo: f ? `Licitación ${cod} · ${f.nombre ?? ''} · ${f.institucion ?? ''}` : `Licitación ${cod}`, kpis: f ? [{ k: 'Presupuesto', v: fmt(f.presupuesto) }, { k: 'Cierre', v: fecha(f.fecha_cierre) }, { k: 'Pago del organismo', v: `${o.conducta_pago ?? 's/i'} · ${o.pago_promedio_dias ?? 's/i'} días` }] : [], veredicto: (() => { const v = veredictoDe(entregables.informe); return v ? { t: v.t, tono: (/reservas/.test(v.t) ? 'warn' : v.t === 'Descartar' ? 'bad' : v.t === 'Postular' ? 'ok' : 'neutral') as 'ok' | 'warn' | 'bad' | 'neutral' } : null; })() });
+  const datosPdf = () => ({ subtitulo: f ? `Licitación ${cod} · ${f.nombre ?? ''} · ${nombrePropio(f.institucion)}` : `Licitación ${cod}`, kpis: f ? [{ k: 'Presupuesto', v: presupuestoTexto(f.presupuesto) }, { k: 'Cierre', v: fecha(f.fecha_cierre) }, { k: 'Pago del organismo', v: pagoOrganismo(o).valor, tono: pagoOrganismo(o).tono }] : [], veredicto: (() => { const v = veredictoDe(entregables.informe); return v ? { t: v.t, tono: (/reservas/.test(v.t) ? 'warn' : v.t === 'Descartar' ? 'bad' : v.t === 'Postular' ? 'ok' : 'neutral') as 'ok' | 'warn' | 'bad' | 'neutral' } : null; })() });
   const aPdf = async (titulo: string, md: string) => { const r = await compartirPdfExperto({ titulo, ...datosPdf(), contenido: md, url: `${window.location.origin}/experto/libro/${cod}` }, `${cod || 'experto'}-${titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}.pdf`); if (r === 'descargado') toast.success('PDF descargado'); };
 
   const opinar = async (p: string, util: boolean) => {
@@ -282,7 +283,7 @@ export default function LibroLicitacion() {
         {f && <Button variant="outline" size="sm" onClick={() => navigate(String(f.tipo ?? '').toLowerCase().includes('gil') ? `/compras-agiles/${cod}` : `/oportunidades/licitacion/${cod}`)}>Ver la oportunidad</Button>}
         <BookOpen className="h-5 w-5 text-primary" />
         <h1 className="text-xl font-bold">{cod}</h1>
-        {f && <span className="text-muted-foreground truncate max-w-[50vw]">{f.nombre} · {f.institucion}</span>}
+        {f && <span className="text-muted-foreground truncate max-w-[50vw]">{f.nombre} · {nombrePropio(f.institucion)}</span>}
         {f && <Badge variant="outline">cierra {fecha(f.fecha_cierre)}</Badge>}
         {(() => { const v = veredictoDe(entregables.informe); return v ? <Badge variant="outline" className={v.c} title="Veredicto del informe de trabajo">{v.t}</Badge> : null; })()}
         {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -470,8 +471,8 @@ export default function LibroLicitacion() {
                   <div className="max-h-[62vh] overflow-y-auto pr-1">
                     {f && (tab === 'estudio' || tab === 'informe') && (
                       <div className="grid grid-cols-2 gap-1 mb-3 text-xs">
-                        {[['Presupuesto', fmt(f.presupuesto)], ['Cierra', fecha(f.fecha_cierre)], ['Pago del organismo', `${o.conducta_pago ?? 's/i'} · ${o.pago_promedio_dias ?? 's/i'} días`], ['Reclamos de pago / 100 procesos', String(o.reclamos_pago_por_100_procesos ?? 's/i')]].map(([k, v]) => (
-                          <div key={k} className="rounded-md border bg-muted/30 px-2 py-1"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">{k}</p><p className="font-semibold truncate">{v}</p></div>
+                        {(() => { const pg = pagoOrganismo(o); return [['Presupuesto', presupuestoTexto(f.presupuesto), ''], ['Cierra', fecha(f.fecha_cierre), ''], ['Pago del organismo', pg.valor, pg.detalle], ['Organismo', nombrePropio(f.institucion), f.region ?? '']]; })().map(([k, v, d]) => (
+                          <div key={k} className="rounded-md border bg-muted/30 px-2 py-1" title={d}><p className="text-[10px] uppercase tracking-wide text-muted-foreground">{k}</p><p className="font-semibold truncate">{v}</p>{d && <p className="text-[10px] text-muted-foreground truncate">{d}</p>}</div>
                         ))}
                       </div>
                     )}

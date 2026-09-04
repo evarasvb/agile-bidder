@@ -4,11 +4,11 @@
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, Circle, AlertTriangle, Sparkles, ExternalLink, ShieldCheck } from 'lucide-react';
 import type { Matriz } from '@/components/experto/MatrizPostulacion';
+import { pagoOrganismo, presupuestoTexto } from '@/lib/organismoPago';
 
 type Paso = { k: string; t: string; listo: boolean; accion?: () => void; ayuda?: string };
 const pond = (r: any): number => { const n = r.ponderacion_num != null ? Number(r.ponderacion_num) : Number(String(r.ponderacion ?? '').replace(/[^0-9.,]/g, '').replace(',', '.')); if (!Number.isFinite(n) || n === 0) return 0; return n > 1 ? n / 100 : n; };
 const num = (v: any): number | null => { const n = Number(String(v ?? '').replace(/[^0-9.,-]/g, '').replace(/\.(?=\d{3})/g, '').replace(',', '.')); return v == null || v === '' || !Number.isFinite(n) ? null : n; };
-const fmt = (n: unknown) => n == null ? 's/i' : '$' + Math.round(Number(n)).toLocaleString('es-CL');
 const ESTADO: Record<string, [string, string]> = { cumple: ['Cumple', 'bg-green-100 text-green-800'], ok: ['OK', 'bg-green-100 text-green-800'], no_cumple: ['No cumple', 'bg-red-100 text-red-800'], revisar: ['Revisar', 'bg-yellow-100 text-yellow-800'], pendiente: ['Pendiente', 'bg-muted text-muted-foreground'] };
 const Chip = ({ e }: { e?: string }) => { const [t, c] = ESTADO[e ?? 'pendiente'] ?? ESTADO.pendiente; return <span className={`rounded px-1.5 py-0.5 text-[11px] ${c}`}>{t}</span>; };
 
@@ -59,8 +59,8 @@ export function SalaPostulacion(p: SalaProps) {
           {listaParaPostular && <span className="rounded bg-green-600 text-white px-2 py-0.5 text-xs font-medium">Lista para postular</span>}
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-1 text-xs">
-          {[['Presupuesto', fmt(f.presupuesto)], ['Cierre', dias == null ? 's/i' : dias < 0 ? 'cerrada' : `en ${dias} días`], ['Pago del organismo', `${o.conducta_pago ?? 's/i'} · ${o.pago_promedio_dias ?? 's/i'} días`], ['Puntaje estimado', m && ev.length ? `${total.toFixed(1)}${umbral != null ? ` / umbral ${umbral}` : ''}` : 's/i']].map(([k, v]) => (
-            <div key={k} className="rounded-md border bg-muted/30 px-2 py-1"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">{k}</p><p className="font-semibold truncate">{v}</p></div>
+          {[['Presupuesto', presupuestoTexto(f.presupuesto), ''], ['Cierre', dias == null ? 's/i' : dias < 0 ? 'cerrada' : `en ${dias} días`, ''], ['Pago del organismo', pagoOrganismo(o).valor, pagoOrganismo(o).detalle], ['Puntaje estimado', m && ev.length ? `${total.toFixed(1)}${umbral != null ? ` / umbral ${umbral}` : ''}` : 's/i', '']].map(([k, v, d]) => (
+            <div key={k} className="rounded-md border bg-muted/30 px-2 py-1" title={d}><p className="text-[10px] uppercase tracking-wide text-muted-foreground">{k}</p><p className="font-semibold truncate">{v}</p>{d && <p className="text-[10px] text-muted-foreground truncate">{d}</p>}</div>
           ))}
         </div>
         {m && ev.length > 0 && umbral != null && <p className={`text-xs ${total >= umbral ? 'text-green-700' : 'text-red-700'}`}>{total >= umbral ? 'Con tu puntaje estimado superas el umbral de adjudicación.' : `Te faltan ${(umbral - total).toFixed(1)} puntos para el umbral: revisa qué criterios puedes subir en Requisitos y puntaje.`}</p>}

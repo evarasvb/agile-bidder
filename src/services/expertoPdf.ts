@@ -4,7 +4,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import logoBlanco from '@/assets/logo-firmavb-blanco.png';
 
-export interface DatosPdfExperto { titulo: string; subtitulo?: string | null; empresa?: string | null; contenido: string; url?: string; fecha?: string | null; kpis?: { k: string; v: string }[]; veredicto?: { t: string; tono: 'ok' | 'warn' | 'bad' | 'neutral' } | null }
+export interface DatosPdfExperto { titulo: string; subtitulo?: string | null; empresa?: string | null; contenido: string; url?: string; fecha?: string | null; kpis?: { k: string; v: string; tono?: 'ok' | 'warn' | 'bad' | 'neutral' }[]; veredicto?: { t: string; tono: 'ok' | 'warn' | 'bad' | 'neutral' } | null }
 
 async function aDataUrl(url: string): Promise<string | null> {
   try {
@@ -18,7 +18,7 @@ type Linea = { tipo: 'h1' | 'h2' | 'p' | 'li' | 'sep' | 'tabla'; t: string; fila
 const ascii = (s: string) => s.replace(/→/g, '->').replace(/←/g, '<-').replace(/≤/g, '<=').replace(/≥/g, '>=').replace(/Σ/g, 'suma').replace(/✓|✔/g, 'OK').replace(/✗|✘/g, 'X').replace(/[\u2192\u2713]/g, '');
 // Markdown mínimo del Experto a líneas planas (sin negritas, links ni tablas).
 function aLineas(md: string): Linea[] {
-  const limpio = (s: string) => s.replace(/\*\*|__|`/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/\s+/g, ' ').trim();
+  const limpio = (s: string) => s.replace(/__|`/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/\s+/g, ' ').trim();
   const out: Linea[] = [];
   const lineas = md.replace(/\r/g, '').split('\n');
   for (let i = 0; i < lineas.length; i++) {
@@ -27,7 +27,7 @@ function aLineas(md: string): Linea[] {
     if (/^\|?\s*:?-{2,}/.test(l)) continue;                       // separador de tabla suelto
     if (/^(-{3,}|\*{3,})$/.test(l)) { out.push({ tipo: 'sep', t: '' }); continue; }
     if (l.startsWith('|')) {
-      const celdas = (x: string) => x.trim().replace(/^\||\|$/g, '').split('|').map((c) => ascii(limpio(c)));
+      const celdas = (x: string) => x.trim().replace(/^\||\|$/g, '').split('|').map((c) => ascii(sinNegrita(limpio(c))));
       const filas: string[][] = [celdas(l)];
       while (i + 1 < lineas.length && lineas[i + 1].trim().startsWith('|')) { i++; const f = lineas[i].trim(); if (!/^\|?\s*:?-{2,}/.test(f)) filas.push(celdas(f)); }
       out.push({ tipo: 'tabla', t: '', filas }); continue;
@@ -40,6 +40,15 @@ function aLineas(md: string): Linea[] {
   }
   return out;
 }
+
+// Texto con **negritas**: se parte en palabras con estilo y se acomoda línea a línea.
+type Run = { t: string; b: boolean };
+function runs(t: string): Run[] {
+  const out: Run[] = []; let b = false;
+  for (const parte of ascii(t).split('**')) { if (parte) out.push({ t: parte, b }); b = !b; }
+  return out;
+}
+const sinNegrita = (t: string) => t.replace(/\*\*/g, '');
 
 export async function crearPdfExperto(d: DatosPdfExperto): Promise<Blob> {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
@@ -66,16 +75,27 @@ export async function crearPdfExperto(d: DatosPdfExperto): Promise<Blob> {
   };
   const salto = () => { pie(); doc.addPage(); pagina++; cabecera(); };
   const espacio = (h: number) => { if (y + h > PIE - 10) salto(); };
-  const parrafo = (t: string, size: number, color: [number, number, number], estilo: 'normal' | 'bold' = 'normal', sangria = 0, alto = 5) => {
-    doc.setFont('helvetica', estilo); doc.setFontSize(size); doc.setTextColor(...color);
-    const lineas = doc.splitTextToSize(ascii(t), ANCHO - sangria) as string[];
-    for (const l of lineas) { espacio(alto); doc.text(l, M + sangria, y); y += alto; }
+  // Escribe texto con negritas inline, con salto de línea por palabra y de página si hace falta.
+  const rico = (t: string, size: number, color: [number, number, number], x: number, ancho: number, alto: number, negritaBase = false) => {
+    doc.setFontSize(size); doc.setTextColor(...color);
+    const palabras: Run[] = [];
+    for (const r of runs(t)) for (const w of r.t.split(/(\s+)/)) if (w) palabras.push({ t: w, b: r.b || negritaBase });
+    let cx = x; espacio(alto);
+    const medir = (w: Run) => { doc.setFont('helvetica', w.b ? 'bold' : 'normal'); return doc.getTextWidth(w.t); };
+    for (const w of palabras) {
+      const esEspacio = /^\s+$/.test(w.t); const ancho_w = medir(w);
+      if (!esEspacio && cx + ancho_w > x + ancho && cx > x) { y += alto; espacio(alto); cx = x; }
+      if (esEspacio && cx === x) continue;
+      doc.setFont('helvetica', w.b ? 'bold' : 'normal'); doc.text(w.t, cx, y); cx += ancho_w;
+    }
+    y += alto;
   };
+  const parrafo = (t: string, size: number, color: [number, number, number], estilo: 'normal' | 'bold' = 'normal', sangria = 0, alto = 5) => rico(t, size, color, M + sangria, ANCHO - sangria, alto, estilo === 'bold');
 
   // Portada compacta: título, subtítulo, autor y tarjetas con las cifras clave
   cabecera();
   doc.setFont('helvetica', 'bold'); doc.setFontSize(17); doc.setTextColor(...NAVY);
-  for (const t of doc.splitTextToSize(ascii(d.titulo), ANCHO) as string[]) { doc.text(t, M, y); y += 7.5; }
+  for (const t of doc.splitTextToSize(ascii(sinNegrita(d.titulo)), ANCHO) as string[]) { doc.text(t, M, y); y += 7.5; }
   if (d.subtitulo) { doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5); doc.setTextColor(...GRIS); for (const t of doc.splitTextToSize(ascii(d.subtitulo), ANCHO) as string[]) { doc.text(t, M, y); y += 5; } }
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...GRIS);
   doc.text(`Hecho por ${empresa} con el Experto FirmaVB · ${new Date(d.fecha ?? Date.now()).toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' })}`, M, y); y += 7;
@@ -86,7 +106,8 @@ export async function crearPdfExperto(d: DatosPdfExperto): Promise<Blob> {
     tiles.slice(0, n).forEach((t, i) => {
       const x = M + i * (w + g);
       const esV = t.k === 'Veredicto';
-      const fill: [number, number, number] = esV ? (d.veredicto?.tono === 'ok' ? [209, 231, 221] : d.veredicto?.tono === 'bad' ? [248, 215, 218] : d.veredicto?.tono === 'warn' ? [255, 243, 205] : SUAVE) : SUAVE;
+      const tono = esV ? d.veredicto?.tono : (t as any).tono;
+      const fill: [number, number, number] = tono === 'ok' ? [209, 231, 221] : tono === 'bad' ? [248, 215, 218] : tono === 'warn' ? [255, 243, 205] : SUAVE;
       doc.setFillColor(...fill); doc.roundedRect(x, y, w, h, 2, 2, 'F');
       doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(...GRIS); doc.text(t.k.toUpperCase(), x + 3, y + 5);
       doc.setFont('helvetica', 'bold'); doc.setFontSize(esV ? 10 : 11); doc.setTextColor(...NAVY);
@@ -111,23 +132,29 @@ export async function crearPdfExperto(d: DatosPdfExperto): Promise<Blob> {
       espacio(14); y += 3;
       doc.setFillColor(...NAVY); doc.rect(M, y - 4.2, 1.4, 5.6, 'F');
       doc.setFont('helvetica', 'bold'); doc.setFontSize(12.5); doc.setTextColor(...NAVY);
-      const t = doc.splitTextToSize(ascii(l.t), ANCHO - 5) as string[]; doc.text(t, M + 4, y); y += t.length * 6 + 1.5; continue;
+      const t = doc.splitTextToSize(ascii(sinNegrita(l.t)), ANCHO - 5) as string[]; doc.text(t, M + 4, y); y += t.length * 6 + 1.5; continue;
     }
-    if (l.tipo === 'h2') { espacio(10); y += 2; parrafo(l.t, 11, NAVY, 'bold', 0, 5.5); y += 0.5; continue; }
+    if (l.tipo === 'h2') { espacio(10); y += 2; parrafo(sinNegrita(l.t), 11, NAVY, 'bold', 0, 5.5); y += 0.5; continue; }
     if (l.tipo === 'li') {
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
-      const lineas = doc.splitTextToSize(ascii(l.t), ANCHO - 6) as string[];
-      espacio(lineas.length * 5 + 1);
-      doc.setFillColor(...NAVY); doc.circle(M + 1.6, y - 1.4, 0.9, 'F');
-      doc.setTextColor(...TEXTO); doc.text(lineas, M + 6, y); y += lineas.length * 5 + 1.2; continue;
+      espacio(6); doc.setFillColor(...NAVY); doc.circle(M + 1.6, y - 1.4, 0.9, 'F');
+      rico(l.t, 10, TEXTO, M + 6, ANCHO - 6, 5); y += 1.2; continue;
+    }
+    // La pregunta del usuario (respuestas del chat) va como cita destacada
+    if (/^pregunta:/i.test(l.t)) {
+      const q = l.t.replace(/^pregunta:\s*/i, '');
+      espacio(16);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(...GRIS); doc.text('TU PREGUNTA', M + 5, y - 0.5);
+      doc.setFillColor(...NAVY); doc.rect(M, y - 4, 1.4, 4, 'F');
+      const y0 = y; y += 4; rico(sinNegrita(q), 11, NAVY, M + 5, ANCHO - 5, 5.5, true);
+      doc.setFillColor(...NAVY); doc.rect(M, y0, 1.4, y - y0 - 3, 'F'); y += 2; continue;
     }
     // Párrafos destacados (veredicto, paso concreto, recomendación) en caja
     if (/^(veredicto|el paso concreto|paso a dar hoy|hoy tu paso|recomendaci[oó]n|mi consejo|estrategia)/i.test(l.t)) {
       doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
-      const lineas = doc.splitTextToSize(ascii(l.t), ANCHO - 10) as string[]; const h = lineas.length * 5 + 6;
+      const lineas = doc.splitTextToSize(ascii(sinNegrita(l.t)), ANCHO - 10) as string[]; const h = lineas.length * 5 + 6;
       espacio(h + 2);
       doc.setFillColor(232, 238, 250); doc.roundedRect(M, y - 4, ANCHO, h, 1.5, 1.5, 'F'); doc.setFillColor(...NAVY); doc.rect(M, y - 4, 1.4, h, 'F');
-      doc.setTextColor(...NAVY); doc.text(lineas, M + 6, y + 1); y += h + 2; continue;
+      const y0 = y; y += 1; rico(l.t, 10, NAVY, M + 6, ANCHO - 10, 5); y = y0 + h + 2; continue;
     }
     parrafo(l.t, 10, TEXTO, 'normal', 0, 5); y += 1.5;
   }
