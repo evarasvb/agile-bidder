@@ -12,8 +12,8 @@ Deno.serve(async (req)=>{
   const ticket = Deno.env.get('MERCADOPUBLICO_API_KEY');
   if(!ticket) return new Response(JSON.stringify({error:'API key no configurada'}),{status:500,headers:{...cors,'Content-Type':'application/json'}});
 
-  let limit = 60;
-  try { const b = await req.json(); if(b && b.limit) limit = Math.min(Number(b.limit)||60, 100); } catch(_){}
+  let limit = 25;
+  try { const b = await req.json(); if(b && b.limit) limit = Math.min(Number(b.limit)||25, 100); } catch(_){}
 
   const { data: pend, error: rpcErr } = await supabase.rpc('compras_agiles_pendientes_items', { p_limit: limit });
   if(rpcErr) return new Response(JSON.stringify({error:rpcErr.message}),{status:500,headers:{...cors,'Content-Type':'application/json'}});
@@ -29,7 +29,7 @@ Deno.serve(async (req)=>{
       const data = await resp.json();
       const p = data?.payload ?? data;
       const prods = Array.isArray(p?.productos_solicitados) ? p.productos_solicitados : [];
-      if(prods.length===0){ res.sin_detalle++; await sleep(700); continue; }
+      if(prods.length===0){ res.sin_detalle++; await sleep(150); continue; }
       await supabase.from('compras_agiles_items').delete().eq('compra_agil_id', r.id);
       const toIns = prods.map((it:any)=>({
         compra_agil_id: r.id,
@@ -43,7 +43,7 @@ Deno.serve(async (req)=>{
       const { error: insErr } = await supabase.from('compras_agiles_items').insert(toIns);
       if(insErr){ res.errores.push(`ins ${r.codigo}: ${insErr.message}`); }
       else { res.con_items++; res.items_insertados += toIns.length; }
-      await sleep(900);
+      await sleep(150);
     }catch(e){ res.errores.push(`${r.codigo}: ${e instanceof Error? e.message:String(e)}`); }
   }
   return new Response(JSON.stringify(res),{headers:{...cors,'Content-Type':'application/json'},status:200});

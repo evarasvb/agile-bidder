@@ -1,18 +1,17 @@
-// ROBOT Compras Ágiles v2 - usa la NUEVA API de ChileCompra:
+// ROBOT Compras Ágiles v2 - API de ChileCompra:
 //   GET https://api2.mercadopublico.cl/v2/compra-agil  (ticket en HEADER)
 //   params: ttl_cambio_ms (requerido), tamano_pagina (10-50), numero_pagina
 // Mapea payload.items -> tabla compras_agiles. Upsert por 'codigo'.
-// Reemplaza el filtro muerto 'oc.Tipo===AG' del robot viejo.
 //
-// NOTA (ventana de cambio): `ttl_cambio_ms` filtra por "cambiado en las últimas
-// N ms". El default era 5h (18000000), demasiado angosto: cada corrida traía
-// solo un delta chico y el panel quedaba con un puñado de compras abiertas
-// (6 vs 200+). Se sube el default a 7 días para capturar todo el stock abierto
-// (las compras ágiles cierran en 1-3 días, así que 7d cubre con margen).
+// Tandas cortas con marca de agua: cada corrida procesa pocas páginas (default 6) y guarda en
+// ingesta_estado la próxima página; al terminar la última vuelve a la 1. Así una corrida nunca
+// muere por tiempo/memoria y si falla, la siguiente retoma donde quedó. Los errores de la API
+// se registran con código HTTP y cuerpo para que "succeeded" del cron no tape un ticket vencido.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const cors = { 'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type' };
 const sleep = (ms:number)=>new Promise(r=>setTimeout(r,ms));
+const CLAVE = 'compras_agiles_v2';
 
 function parseCl(s:any):string|null{
   if(!s) return null; let t=String(s).trim();
@@ -24,30 +23,38 @@ function num(v:any){ return (v===null||v===undefined||v==='')?null:Number(v); }
 
 Deno.serve(async (req)=>{
   if(req.method==='OPTIONS') return new Response('ok',{headers:cors});
+  const t0 = Date.now();
   const supabase = createClient(Deno.env.get('SUPABASE_URL')??'', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')??'');
   const ticket = Deno.env.get('MERCADOPUBLICO_API_KEY');
   if(!ticket) return new Response(JSON.stringify({error:'API key no configurada'}),{status:500,headers:{...cors,'Content-Type':'application/json'}});
 
-  let ttl = 604800000; // 7 días por defecto (captura todo el stock abierto).
-  let maxPaginas = 60; let desdePagina = 1;
+  let ttl = 604800000; // 7 días: todo el stock abierto (las compras ágiles cierran en 1-3 días).
+  let maxPaginas = 6; let desdePagina: number | null = null;
   try{ const b = await req.json(); if(b){ if(b.ttl_cambio_ms) ttl=Number(b.ttl_cambio_ms); if(b.max_paginas) maxPaginas=Number(b.max_paginas); if(b.desde_pagina) desdePagina=Number(b.desde_pagina); } }catch(_){}
 
+  // Marca de agua: dónde quedó la corrida anterior
+  const { data: est } = await supabase.from('ingesta_estado').select('valor').eq('clave', CLAVE).maybeSingle();
+  const estado: any = est?.valor ?? {};
+  let pagina = desdePagina ?? Number(estado.proxima_pagina ?? 1);
+  if(!Number.isFinite(pagina) || pagina < 1) pagina = 1;
+
   const B = 'https://api2.mercadopublico.cl/v2/compra-agil';
-  const res:any = { insertadas:0, paginas:0, total_paginas:null, errores:[], muestra:null };
-  let pagina = desdePagina;
-  while(res.paginas < maxPaginas){
+  const res:any = { desde_pagina: pagina, insertadas:0, paginas:0, total_paginas:null, errores:[], muestra:null, ms:0 };
+  let completo = false;
+  while(res.paginas < maxPaginas && Date.now() - t0 < 100_000){
     const url = `${B}?ttl_cambio_ms=${ttl}&tamano_pagina=50&numero_pagina=${pagina}`;
     let data:any;
     try{
       const resp = await fetch(url, { headers:{ 'ticket': ticket, 'Accept':'application/json' } });
       if(resp.status===429){ await sleep(4000); continue; }
-      data = await resp.json();
-      if(data.success!=='OK'){ res.errores.push(`p${pagina}: ${JSON.stringify(data.errors)}`); break; }
+      const texto = await resp.text();
+      try{ data = JSON.parse(texto); }catch{ res.errores.push(`p${pagina}: HTTP ${resp.status} no-JSON: ${texto.slice(0,200)}`); break; }
+      if(data.success!=='OK'){ res.errores.push(`p${pagina}: HTTP ${resp.status} ${JSON.stringify(data.errors ?? data.message ?? data).slice(0,300)}`); break; }
     }catch(e){ res.errores.push(`p${pagina}: ${e instanceof Error? e.message:String(e)}`); break; }
 
     const items = data?.payload?.items || [];
     res.total_paginas = data?.payload?.paginacion?.total_paginas ?? res.total_paginas;
-    if(items.length===0) break;
+    if(items.length===0){ completo = true; break; }
 
     const filas = items.map((it:any)=>({
       codigo: it.codigo,
@@ -74,19 +81,23 @@ Deno.serve(async (req)=>{
       if(!res.muestra) res.muestra = { codigo:filas[0].codigo, organismo:filas[0].nombre_organismo, monto:filas[0].monto_estimado, cierre:filas[0].fecha_cierre };
     }
     res.paginas++;
-    if(res.total_paginas && pagina >= res.total_paginas) break;
+    if(res.total_paginas && pagina >= res.total_paginas){ completo = true; break; }
     pagina++;
-    await sleep(300);
+    await sleep(200);
   }
 
-  // Encadenar el MATCH: apenas terminamos de traer compras, generamos los
-  // matches contra el inventario de los clientes, para que las oportunidades
-  // lleguen "matcheadas" al panel sin esperar al cron horario. Envuelto en
-  // try/catch para que un fallo del match NO rompa la ingesta.
-  try{
-    const { data: m, error: mErr } = await supabase.rpc('generar_matches_ca_todos');
-    res.matches = mErr ? `error: ${mErr.message}` : m;
-  }catch(e){ res.matches = `error: ${e instanceof Error? e.message:String(e)}`; }
+  // Guardar marca de agua (si terminó la vuelta, parte de nuevo desde la 1)
+  const proxima = completo ? 1 : (res.errores.length ? pagina : pagina);
+  await supabase.from('ingesta_estado').upsert({ clave: CLAVE, valor: { proxima_pagina: proxima, completo, ultimo_ok: res.insertadas ? new Date().toISOString() : (estado.ultimo_ok ?? null), ultimo_error: res.errores[0] ?? null, total_paginas: res.total_paginas, ttl_cambio_ms: ttl }, updated_at: new Date().toISOString() });
+  if(res.errores.length){
+    await supabase.from('system_logs').insert({ tipo: 'scraping', severidad: 'error', mensaje: ('[ingesta-compras-agiles] ' + res.errores[0]).slice(0, 500), detalles: res }).then(()=>{}, ()=>{});
+  }
 
+  // Encadenar el MATCH solo si entró algo nuevo (no gastar CPU en vano).
+  if(res.insertadas){
+    try{ const { data: m, error: mErr } = await supabase.rpc('generar_matches_ca_todos'); res.matches = mErr ? `error: ${mErr.message}` : m; }
+    catch(e){ res.matches = `error: ${e instanceof Error? e.message:String(e)}`; }
+  }
+  res.ms = Date.now() - t0;
   return new Response(JSON.stringify(res),{headers:{...cors,'Content-Type':'application/json'},status:200});
 });
