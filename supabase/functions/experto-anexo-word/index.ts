@@ -61,7 +61,7 @@ Reglas:
 - Oferta económica: usa los ÍTEMS de la ficha (producto, cantidad, unidad) para llenar las filas de la tabla si el anexo las pide y están vacías; precios y totales siempre [[PRECIO NETO]], [[TOTAL]] con "validar": true. Si el proveedor no oferta todas las líneas, deja N/A en las que no (según la matriz o los documentos).
 - Oferta técnica: responde con las palabras de las bases técnicas (plazo de entrega, garantía, soporte) solo si las bases fijan el valor exigido; el compromiso concreto del proveedor va como [[PLAZO DE ENTREGA]], [[GARANTÍA EN MESES]] con "validar": true. Nunca prometas por él.
 - Experiencia: no inventes contratos ni clientes; filas como [[CLIENTE]] | [[CONTRATO]] | [[MONTO]] | [[AÑO]] con "validar": true, o lo que digan sus documentos.
-- Si el anexo NO aplica: "aplica": false y cambios vacío (no lo modifiques).
+- "aplica": false SOLO si el propio anexo dice que es exclusivo para Unión Temporal de Proveedores, que lo completa la entidad compradora, o es un formato de contrato que se firma después de adjudicar; en ese caso cambios vacío. Ante la duda, aplica y se completa.
 - Rellena solo lo que sabes con certeza por los datos entregados: razón social, RUT, domicilio, comuna y región, correo, teléfono, nombre y RUT del representante legal, ID y nombre de la licitación, organismo comprador. Si el anexo pide marcar persona natural o jurídica, marca con "X" la opción persona jurídica.
 - Celda vacía junto a una etiqueta (fila "Razón social | "): pon solo el valor. Etiqueta y valor en la misma ranura ("Razón social: ________"): devuelve la etiqueta con el valor ("Razón social: FIRMAVB SPA"). Conserva los dos puntos, numeración y el resto del texto de la ranura.
 - Lo que NO sabes (precio, plazo de entrega, garantía, experiencia, montos, cantidades, fecha y lugar de firma, nombre del contacto técnico, certificaciones) va como marcador [[EN MAYÚSCULAS]] con "validar": true. Nunca inventes cifras, experiencia ni certificaciones.
@@ -166,9 +166,20 @@ ${lista}`;
       let c = String((await r.json()).choices?.[0]?.message?.content ?? "").trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
       const a = c.indexOf("{"), z = c.lastIndexOf("}"); if (a >= 0 && z > a) c = c.slice(a, z + 1);
       try { const j = JSON.parse(c); if (Array.isArray(j.cambios)) { cambios = j.cambios; meta = { tipo: j.tipo ?? null, aplica: j.aplica !== false, motivo: j.motivo ?? "", resumen: j.resumen ?? "" }; break; } } catch { console.error("json", model); }
+      // JSON cortado (anexos largos): se rescatan los cambios completos uno a uno.
+      const rescatados = [...c.matchAll(/\{\s*"i"\s*:\s*(\d+)\s*,\s*"texto"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,\s*"validar"\s*:\s*(true|false)\s*\}/g)]
+        .map((m) => { try { return { i: Number(m[1]), texto: JSON.parse(`"${m[2]}"`), validar: m[3] === "true" }; } catch { return null; } }).filter(Boolean);
+      if (rescatados.length) {
+        const campo = (k: string) => (c.match(new RegExp(`"${k}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`)) ?? [])[1] ?? "";
+        cambios = rescatados as any[]; meta = { tipo: campo("tipo") || null, aplica: !/"aplica"\s*:\s*false/.test(c), motivo: campo("motivo"), resumen: campo("resumen") || "Respuesta larga: se aplicaron los cambios completos." }; break;
+      }
     }
     if (!cambios) return json({ error: "ia_no_disponible", mensaje: "El modelo no respondió bien. Intenta de nuevo en un minuto." }, 502);
-    if (!meta.aplica) return json({ ok: true, aplica: false, tipo: meta.tipo, motivo: meta.motivo, nombre: doc.nombre, mensaje: `Este anexo no aplica: ${meta.motivo}` });
+    // "No aplica" solo si el propio anexo lo dice (UTP, formulario del comprador); si no, se completa igual y se avisa.
+    const textoDoc = textoDe(xml);
+    const condicional = /uni[oó]n temporal|\bUTP\b|uso exclusivo|entidad compradora|para ser llenado por/i.test(textoDoc);
+    if (!meta.aplica && (condicional || !cambios.length)) return json({ ok: true, aplica: false, tipo: meta.tipo, motivo: meta.motivo, nombre: doc.nombre, mensaje: `Este anexo no aplica: ${meta.motivo}` });
+    if (!meta.aplica) meta.resumen = `Revisar si aplica (${meta.motivo}). ${meta.resumen}`;
 
     // 3. Aplicar de atrás hacia adelante para no mover posiciones
     const porIndice = new Map<number, { texto: string; validar: boolean }>();
