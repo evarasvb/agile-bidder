@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
-import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink, Trash2, Paperclip, Printer, Mail } from 'lucide-react';
+import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink, Trash2, Paperclip, Printer, Mail, Map as MapIcon, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -532,12 +532,31 @@ export default function LibroLicitacion() {
         <Card className="flex flex-col h-full overflow-y-auto">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Entregables</CardTitle>
-            <div className="flex flex-wrap gap-1 pt-1">
-              {([['sala', 'Sala de postulación', ''], ['informe', 'Informe de trabajo', ''], ['matriz', 'Matriz de postulación', 'Experto Pro'], ['estudio', 'Estudio profundo', 'Experto Pro'], ['mapa', 'Mapa conceptual', ''], ['infografia', 'Infografía', ''], ['anexos', 'Anexos completados', 'Experto Plus']] as [Entregable, string, string][]).map(([k, n, tag]) => (
-                <Button key={k} size="sm" variant={tab === k ? 'default' : 'outline'} onClick={() => entregables[k] ? setTab(k) : generar(k)} disabled={!!ocupado && ocupado !== k}>
-                  {ocupado === k ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : entregables[k] ? <ClipboardList className="h-3.5 w-3.5 mr-1" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />}
-                  {n}{tag && <span className="ml-1 text-[10px] opacity-70">{tag}</span>}
-                </Button>
+            {/* Tarjetas estilo "Studio" (NotebookLM): ícono de color + nombre, en vez de una fila de botones. */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              {([
+                ['sala', 'Sala de postulación', '', BookOpen, 'bg-indigo-100 text-indigo-700'],
+                ['informe', 'Informe de trabajo', '', FileText, 'bg-blue-100 text-blue-700'],
+                ['matriz', 'Matriz de postulación', 'Experto Pro', ClipboardList, 'bg-amber-100 text-amber-700'],
+                ['estudio', 'Estudio profundo', 'Experto Pro', Sparkles, 'bg-violet-100 text-violet-700'],
+                ['mapa', 'Mapa conceptual', '', MapIcon, 'bg-emerald-100 text-emerald-700'],
+                ['infografia', 'Infografía', '', ImageIcon, 'bg-pink-100 text-pink-700'],
+                ['anexos', 'Anexos completados', 'Experto Plus', Paperclip, 'bg-cyan-100 text-cyan-700'],
+              ] as [Entregable, string, string, typeof FileText, string][]).map(([k, n, tag, Icono, color]) => (
+                <button
+                  key={k}
+                  onClick={() => entregables[k] ? setTab(k) : generar(k)}
+                  disabled={!!ocupado && ocupado !== k}
+                  className={`flex items-center gap-2 rounded-xl border p-2.5 text-left transition-colors disabled:opacity-50 ${tab === k ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/60'}`}
+                >
+                  <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${color}`}>
+                    {ocupado === k ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icono className="h-4 w-4" />}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-xs font-medium leading-tight">{n}</span>
+                    {tag && <span className="block truncate text-[10px] text-muted-foreground leading-tight">{tag}</span>}
+                  </span>
+                </button>
               ))}
             </div>
           </CardHeader>
