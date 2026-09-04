@@ -23,6 +23,7 @@ import { MapaConceptual, type Nodo } from '@/components/experto/MapaConceptual';
 import { compartirPdfExperto } from '@/services/expertoPdf';
 import { MatrizPostulacion, type Matriz } from '@/components/experto/MatrizPostulacion';
 import { descargarWord } from '@/services/exportar';
+import { SalaPostulacion } from '@/components/experto/SalaPostulacion';
 
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string;
 const ANON = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
@@ -49,7 +50,7 @@ function veredictoDe(informe?: string): { t: string; c: string } | null {
 const fecha = (d?: string | null) => d ? new Date(d).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }) : 's/i';
 
 interface Msg { rol: 'yo' | 'exp'; texto: string; fuentes?: any[]; pedirBases?: string | null }
-type Entregable = 'informe' | 'matriz' | 'estudio' | 'anexos' | 'mapa' | 'infografia';
+type Entregable = 'sala' | 'informe' | 'matriz' | 'estudio' | 'anexos' | 'mapa' | 'infografia';
 
 /**
  * Libro de trabajo de una licitación: Fuentes (ficha, bases, organismo, quién gana) · Chat con el
@@ -83,8 +84,8 @@ export default function LibroLicitacion() {
   const autoRef = useRef(false);
   const [pregunta, setPregunta] = useState('');
   const [ocupado, setOcupado] = useState<string | null>(null);
-  const [tab, setTab] = useState<Entregable>('informe');
-  const [entregables, setEntregables] = useState<Record<Entregable, string>>({ informe: '', matriz: '', estudio: '', anexos: '', mapa: '', infografia: '' });
+  const [tab, setTab] = useState<Entregable>('sala');
+  const [entregables, setEntregables] = useState<Record<Entregable, string>>({ sala: 'ok', informe: '', matriz: '', estudio: '', anexos: '', mapa: '', infografia: '' });
   const [faltantes, setFaltantes] = useState<string[]>([]);
   const chatRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -94,9 +95,8 @@ export default function LibroLicitacion() {
   useEffect(() => {
     if (!libro) return;
     setMsgs((libro.chat ?? []).flatMap((c: any) => [{ rol: 'yo', texto: c.pregunta }, { rol: 'exp', texto: c.respuesta }]));
-    setEntregables({ informe: libro.informe?.texto ?? '', matriz: libro.matriz?.texto ?? '', estudio: libro.estudio?.texto ?? '', anexos: libro.anexos?.texto ?? '', mapa: libro.mapa?.texto ?? '', infografia: libro.ficha ? 'ok' : '' });
+    setEntregables({ sala: 'ok', informe: libro.informe?.texto ?? '', matriz: libro.matriz?.texto ?? '', estudio: libro.estudio?.texto ?? '', anexos: libro.anexos?.texto ?? '', mapa: libro.mapa?.texto ?? '', infografia: libro.ficha ? 'ok' : '' });
     setFaltantes(libro.anexos?.faltantes ?? []);
-    if (libro.estudio?.texto && !libro.informe?.texto) setTab('estudio');
   }, [libro]);
   useEffect(() => { chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight }); }, [msgs]);
 
@@ -201,6 +201,11 @@ export default function LibroLicitacion() {
     if (guardarRef.current) clearTimeout(guardarRef.current);
     guardarRef.current = setTimeout(async () => { const { error } = await (supabase as any).rpc('experto_matriz_guardar', { p_codigo: cod, p_matriz: m }); if (error) toast.error('No pude guardar la matriz'); }, 1200);
   };
+  const aprobarPostulacion = () => {
+    if (!entregables.matriz) { toast.error('Genera primero la matriz de postulación'); return; }
+    const m = JSON.parse(entregables.matriz); m.aprobacion = { por: session?.user?.email ?? 'usuario', en: new Date().toISOString() };
+    matrizCambio(m); toast.success('Postulación marcada como revisada y aprobada');
+  };
   // Word / PDF de cualquier texto del Experto (informe, estudio, anexos, respuesta del chat)
   const aWord = (titulo: string, md: string) => descargarWord(titulo, expertoMd(md), `${cod || 'experto'}-${titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}.doc`);
   const aPdf = async (titulo: string, md: string) => { const r = await compartirPdfExperto({ titulo: `${titulo} · ${cod}`, contenido: md, url: `${window.location.origin}/experto/libro/${cod}` }, `${cod || 'experto'}-${titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}.pdf`); if (r === 'descargado') toast.success('PDF descargado'); };
@@ -239,7 +244,7 @@ export default function LibroLicitacion() {
     competencia: (f?.competencia ?? []).slice(0, 4).map((c: any) => ({ proveedor: c.proveedor, ordenes: c.ordenes, precio: c.precio_unit_mediano })),
     items: (f?.items ?? []).slice(0, 6).map((i: any) => i.producto),
   });
-  const nombresEntregable: Record<Entregable, string> = { informe: 'Informe de trabajo', matriz: 'Matriz de postulación', estudio: 'Estudio profundo', anexos: 'Anexos', mapa: 'Mapa conceptual', infografia: 'Infografía' };
+  const nombresEntregable: Record<Entregable, string> = { sala: 'Sala de postulación', informe: 'Informe de trabajo', matriz: 'Matriz de postulación', estudio: 'Estudio profundo', anexos: 'Anexos', mapa: 'Mapa conceptual', infografia: 'Infografía' };
   const compartirEntregable = async () => {
     const nombres = nombresEntregable;
     const titulo = `${nombres[tab]} · ${cod}${f?.nombre ? ' · ' + f.nombre : ''}`;
@@ -409,7 +414,7 @@ export default function LibroLicitacion() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Entregables</CardTitle>
             <div className="flex flex-wrap gap-1 pt-1">
-              {([['informe', 'Informe de trabajo', ''], ['matriz', 'Matriz de postulación', 'Experto Pro'], ['estudio', 'Estudio profundo', 'Experto Pro'], ['mapa', 'Mapa conceptual', ''], ['infografia', 'Infografía', ''], ['anexos', 'Anexos completados', 'Experto Plus']] as [Entregable, string, string][]).map(([k, n, tag]) => (
+              {([['sala', 'Sala de postulación', ''], ['informe', 'Informe de trabajo', ''], ['matriz', 'Matriz de postulación', 'Experto Pro'], ['estudio', 'Estudio profundo', 'Experto Pro'], ['mapa', 'Mapa conceptual', ''], ['infografia', 'Infografía', ''], ['anexos', 'Anexos completados', 'Experto Plus']] as [Entregable, string, string][]).map(([k, n, tag]) => (
                 <Button key={k} size="sm" variant={tab === k ? 'default' : 'outline'} onClick={() => entregables[k] ? setTab(k) : generar(k)} disabled={!!ocupado && ocupado !== k}>
                   {ocupado === k ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : entregables[k] ? <ClipboardList className="h-3.5 w-3.5 mr-1" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />}
                   {n}{tag && <span className="ml-1 text-[10px] opacity-70">{tag}</span>}
@@ -418,7 +423,15 @@ export default function LibroLicitacion() {
             </div>
           </CardHeader>
           <CardContent className="text-sm flex-1">
-            {entregables[tab] ? (
+            {tab === 'sala' ? (
+              <div className="max-h-[70vh] overflow-y-auto pr-1">
+                <SalaPostulacion cod={cod} ficha={f} bases={bases} documentos={documentos} plan={libro?.plan} informe={entregables.informe}
+                  matriz={entregables.matriz ? JSON.parse(entregables.matriz) : null} anexos={entregables.anexos} faltantes={faltantes} veredicto={veredictoDe(entregables.informe)}
+                  onGenerar={(t) => generar(t)} onIr={(t) => setTab(t)} onMatriz={matrizCambio} onPreguntar={(q) => { setPregunta(q); if (!escritorio) setVista('chat'); }}
+                  irOportunidad={f ? () => navigate(String(f.tipo ?? '').toLowerCase().includes('gil') ? `/compras-agiles/${cod}` : `/oportunidades/licitacion/${cod}`) : undefined}
+                  aprobar={aprobarPostulacion} ocupado={ocupado} />
+              </div>
+            ) : entregables[tab] ? (
               <div>
                 <div className="flex flex-wrap gap-1 mb-2">
                   <Button size="sm" variant="outline" onClick={compartirEntregable}><Share2 className="h-3.5 w-3.5 mr-1" />Compartir · PDF · WhatsApp</Button>
