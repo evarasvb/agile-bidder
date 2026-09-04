@@ -233,6 +233,24 @@ export default function LibroLicitacion() {
     for (const d of documentos.filter((x: any) => x.tipo === 'docx')) { const k = base(d.nombre); if (!m.has(k) || new Date(d.creado_en) > new Date(m.get(k).creado_en)) m.set(k, d); }
     return Array.from(m.values());
   };
+  // Extraer anexos de las bases: comodidad para cuando los anexos NO vienen como Word
+  // separados sino embebidos dentro del PDF. Reutiliza el mismo motor de "Anexos completados"
+  // (Plus/ERP) y entrega cada uno como un .docx aparte en "Mis documentos de trabajo" — quedan
+  // con el botón "Completar" disponible por si se quieren volver a rellenar.
+  const extraerAnexos = async () => {
+    setOcupado('extraer-anexos');
+    try {
+      const r = await fetch(`${SUPA}/functions/v1/experto-extraer-anexos`, { method: 'POST', headers: auth, body: JSON.stringify({ codigo: cod }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.status === 402) { toast.error(j.mensaje || 'Requiere Experto Plus', { action: { label: 'Ver planes', onClick: () => navigate('/cuenta') }, duration: 9000 }); return; }
+      if (r.status === 428) { toast.error(j.mensaje, { action: { label: 'Mi empresa', onClick: () => navigate('/configuracion/empresa') }, duration: 9000 }); return; }
+      if (!r.ok) { toast.error(j.mensaje || j.error || 'No pude extraer los anexos'); return; }
+      if (!j.anexos?.length) { toast.info('No encontré anexos identificables en las bases.'); return; }
+      toast.success(`${j.anexos.length} anexo(s) extraído(s) a "Mis documentos de trabajo"${j.omitidos_por_cupo ? `, ${j.omitidos_por_cupo} sin espacio en tu plan` : ''}.`, { duration: 8000 });
+      qc.invalidateQueries({ queryKey: ['experto_libro', cod] });
+      qc.invalidateQueries({ queryKey: ['experto_anexos_word', cod] });
+    } catch (e: any) { toast.error(e.message); } finally { setOcupado(null); }
+  };
   const completarTodos = async () => {
     const lista = wordsUnicos(); if (!lista.length) return;
     setOcupado('word:todos');
@@ -395,6 +413,11 @@ export default function LibroLicitacion() {
                   {ocupado === 'fuentes' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}Subir fuentes (PDF, Excel, Word, imágenes)
                 </Button>
                 <p className="text-[11px] text-muted-foreground mt-1">Puedes elegir varios a la vez. Los PDF de bases se reconocen solos y quedan para todos; el resto es tuyo. {esPro ? 'Tu plan permite hasta 10 archivos por licitación (Plus y ERP: 50).' : 'Plan gratis: 2 archivos de hasta 5 MB por licitación.'}</p>
+                {bases.length > 0 && (
+                  <Button size="sm" variant="outline" className="mt-2 w-full sm:w-auto" onClick={extraerAnexos} disabled={!!ocupado} title="Cuando los anexos vienen dentro del PDF de bases (no como Word aparte), los separa en documentos individuales">
+                    {ocupado === 'extraer-anexos' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}Extraer anexos de las bases
+                  </Button>
+                )}
               </div>
               <div>
                 <p className="font-medium flex items-center gap-1"><Paperclip className="h-4 w-4" />Mis documentos de trabajo</p>
