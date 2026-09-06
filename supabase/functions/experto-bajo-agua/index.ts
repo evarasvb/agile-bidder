@@ -43,6 +43,86 @@ async function noticiasRss(q: string, max = 5): Promise<{ titulo: string; link: 
   } catch { return []; }
 }
 
+// ---- Ley del Lobby (leylobby.gob.cl). No hay API pública vigente: se leen las páginas HTML públicas de audiencias.
+const LOBBY = "https://www.leylobby.gob.cl";
+const strip = (h: string) => h.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, " ").trim();
+const normalizar = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+async function getHtml(url: string, ms = 8000): Promise<string> {
+  try { const r = await fetch(url, { signal: AbortSignal.timeout(ms), headers: { "User-Agent": "Mozilla/5.0 (compatible; FirmaVB-Experto/1.0)" } }); return r.ok ? await r.text() : ""; } catch { return ""; }
+}
+// Caché de fuentes externas (tabla experto_fuentes_cache): evita repetir descargas lentas.
+async function cache<T>(sb: any, clave: string, dias: number, calc: () => Promise<T>): Promise<T> {
+  try {
+    const { data } = await sb.from("experto_fuentes_cache").select("datos, actualizado_en").eq("clave", clave).maybeSingle();
+    if (data && Date.now() - new Date(data.actualizado_en).getTime() < dias * 86400000) return data.datos as T;
+  } catch { /* sin caché */ }
+  const v = await calc();
+  try { await sb.from("experto_fuentes_cache").upsert({ clave, datos: v, actualizado_en: new Date().toISOString() }); } catch { /* no bloquear */ }
+  return v;
+}
+async function lobbyInstitucion(nombre: string): Promise<{ id: string; nombre: string } | null> {
+  const objetivo = normalizar(nombre);
+  const base = objetivo.replace(/\b(i|ilustre|municipalidad|de|la|el|del|los|las|y|servicio|direccion|regional)\b/g, " ").replace(/\s+/g, " ").trim();
+  const palabras = base.split(" ").filter(Boolean);
+  const intentos = [base, palabras.slice(-2).join(" "), palabras.slice(0, 3).join(" "), palabras.slice(-1).join(" ")].filter((x, i, a) => x && a.indexOf(x) === i);
+  const esMuni = /municipalidad/i.test(nombre);
+  for (const q of intentos) {
+    const html = await getHtml(`${LOBBY}/instituciones?search=${encodeURIComponent(q)}`);
+    const filas = [...html.matchAll(/<tr>\s*<td>([^<]*)<\/td>\s*<td><a href="[^"]*\/instituciones\/([A-Z]{2}\d{3})"/g)].map((m) => ({ nombre: strip(m[1]), id: m[2] }));
+    if (!filas.length) continue;
+    const puntuar = (f: { nombre: string; id: string }) => {
+      const a = new Set(normalizar(f.nombre).split(" ")); let p = 0;
+      for (const w of objetivo.split(" ")) if (w.length > 2 && a.has(w)) p++;
+      if (esMuni && f.id.startsWith("MU")) p += 2;
+      if (/corporaci|fundaci/i.test(f.nombre) && !/corporaci|fundaci/i.test(nombre)) p -= 3;
+      return p;
+    };
+    filas.sort((x, y) => puntuar(y) - puntuar(x));
+    if (puntuar(filas[0]) > 0) return filas[0];
+  }
+  return null;
+}
+type Audiencia = { fecha: string; id: string; sujeto: string; cargo: string; asistentes: string; representados: string; materia: string; url: string };
+async function lobbyAudiencias(inst: string, anios: number[], maxCargos = 8): Promise<{ cargos: { anio: number; nombre: string; cargo: string }[]; audiencias: Audiencia[] }> {
+  const paginas = await Promise.all(anios.map((a) => getHtml(`${LOBBY}/instituciones/${inst}/audiencias/${a}`).then((h) => ({ a, h }))));
+  const cargos: { anio: number; nombre: string; cargo: string; url: string }[] = [];
+  for (const { a, h } of paginas) for (const m of h.matchAll(/<tr>\s*<td>([^<]*)<\/td>\s*<td>([^<]*)<\/td>\s*<td><a href="([^"]*\/audiencias\/\d{4}\/\d+)"/g)) cargos.push({ anio: a, nombre: strip(m[1]), cargo: strip(m[2]), url: m[3] });
+  // Primero quienes deciden compras; hasta maxCargos por año para no demorar el informe.
+  const prio = (c: string) => /adquisic|abastec|compra|alcald|administrador|director|jefe|secretari|gerente|subsecret|ministr|delegad|rector|decano|superintend|presidente/i.test(c) ? 0 : 1;
+  const elegidos = anios.flatMap((a) => cargos.filter((d) => d.anio === a).sort((x, y) => prio(x.cargo) - prio(y.cargo)).slice(0, maxCargos));
+  const htmls = await Promise.all(elegidos.map((d) => getHtml(d.url).then((h) => ({ d, h }))));
+  const audiencias: Audiencia[] = [];
+  for (const { d, h } of htmls) {
+    // Cada audiencia ocupa una o más filas: la primera trae fecha e identificador (rowspan); las siguientes, un asistente más.
+    const filas = [...h.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)].map((m) => [...m[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((c) => strip(c[1])));
+    let actual: Audiencia | null = null;
+    for (const f of filas) {
+      if (f.length >= 6 && /^\d{4}-\d{2}-\d{2}/.test(f[0])) { actual = { fecha: f[0].slice(0, 10), id: f[1], sujeto: d.nombre, cargo: d.cargo, asistentes: `${f[2]}: ${f[3]}`, representados: f[4], materia: f[5], url: d.url }; audiencias.push(actual); }
+      else if (actual && f.length >= 2 && f.length <= 3 && f[1]) { actual.asistentes += ` | ${f[0]}: ${f[1]}`; if (f[2]) actual.representados += (actual.representados ? "; " : "") + f[2]; }
+    }
+  }
+  return { cargos: cargos.map(({ anio, nombre, cargo }) => ({ anio, nombre, cargo })), audiencias };
+}
+// ---- Consultas al Mercado (RFI) de Mercado Público: API pública del portal consulta-mercado con token anónimo.
+const CM_API = "https://servicios-consultas-prd.mercadopublico.cl";
+const CM_FICHA = "https://consulta-mercado.mercadopublico.cl/detalle-consulta-mercado/";
+async function cmToken(): Promise<string | null> {
+  try { const r = await fetch("https://servicios-prd.mercadopublico.cl/v1/auth/publico", { signal: AbortSignal.timeout(6000) }); const j = await r.json(); return j?.payload?.access_token ?? null; } catch { return null; }
+}
+async function cmGet(path: string, tok: string): Promise<any> {
+  try { const r = await fetch(CM_API + path, { headers: { Authorization: `Bearer ${tok}`, Accept: "application/json" }, signal: AbortSignal.timeout(9000) }); const j = await r.json(); return j?.payload ?? null; } catch { return null; }
+}
+// Lista de consultas (formato de fecha exigido por la API: AAAA-MM-DD HH:MM:SS). Tolerante a la forma del payload.
+async function cmListar(tok: string, filtro: Record<string, string>, meses = 30): Promise<any[]> {
+  const d = new Date(); d.setMonth(d.getMonth() - meses);
+  const f = (x: Date) => x.toISOString().slice(0, 10);
+  const q = new URLSearchParams({ desde: `${f(d)} 00:00:00`, hasta: `${f(new Date())} 23:59:59`, estado: "", ordenarPor: "", pagina: "1", ...filtro }).toString();
+  const p = await cmGet(`/v1/consulta-mercado?${q}`, tok);
+  const lista = Array.isArray(p) ? p : (p?.resultados ?? p?.content ?? p?.items ?? p?.registros ?? p?.consultas ?? p?.data ?? []);
+  return Array.isArray(lista) ? lista : [];
+}
+const cmResumen = (c: any) => ({ codigo: c.codigoConsulta ?? c.codigo ?? c.id, nombre: c.nombre ?? c.titulo, organismo: c.nombreInstitucion ?? c.organismo ?? c.nombreOrganismo, rut: c.rutOrganismo, publicada: c.fechaPublicacion, cierre: c.fechaCierre, estado: c.estado ?? c.nombreEstado, motivo: c.motivo, encargado: c.nombreUsuario, descripcion: String(c.descripcion ?? "").slice(0, 400), preguntas: Array.isArray(c.preguntas) ? c.preguntas.length : c.cantidadPreguntas, adjuntos: Array.isArray(c.adjuntos) ? c.adjuntos.map((a: any) => a.nombre).slice(0, 6) : undefined, reuniones: Array.isArray(c.reuniones) ? c.reuniones.length : undefined, url: CM_FICHA + (c.codigoConsulta ?? c.codigo ?? "") });
+
 const SYS = `Eres el Experto FirmaVB en MODO BAJO EL AGUA: 17 años vendiéndole al Estado chileno. Un proveedor pyme te da el ID de una licitación y tú le muestras lo que NO se ve en la ficha. Usa SOLO los datos y fuentes entregados. Hablas como Evaristo Varas en su libro "Véndele al Estado y No Mueras en el Intento": de tú, directo, sin adornos, frases cortas, ejemplos de la calle, un empujón honesto cuando toca. Entra al grano en la primera línea. Siempre con cifras y con cita [n] tras cada afirmación que salga de una fuente numerada; para los datos de la base escribe (FirmaVB) al final de la frase. Si un dato no está, di "no consta en la base" y cómo verificarlo con el enlace que corresponda. NUNCA inventes procesos, montos, personas, reuniones de lobby, dictámenes ni noticias. Formato Markdown con estas secciones exactas:
 
 ## 0. En una mirada
@@ -53,10 +133,10 @@ Lista de 5 a 8 hallazgos, uno por línea, cada uno con el dato y la fuente: si l
 Tabla Markdown: Proveedor | OC en el rubro (36 meses) | Monto | Precio unitario mediano | Última compra | Vía (convenio marco, licitación, compra ágil, trato directo). Luego la cuota del dominante y qué significa para ti. Si no hay OC en el rubro, dilo.
 ## 3. Compras ágiles y convenio marco del mismo producto
 Qué compró el organismo por compra ágil (cantidad, monto, ofertas recibidas) y por convenio marco; el precio que aceptó sin licitar (techo) y el precio de convenio marco (piso). Si licita habiendo convenio marco disponible, plantea por qué.
-## 4. Desiertas, revocadas y reclamos
-Procesos del organismo que quedaron desiertos, revocados o suspendidos (mismo rubro primero) y la oportunidad que abre cada uno. Reclamos contra el organismo por tipo y sobre este proceso.
-## 5. Las personas
-Quién lleva la licitación (nombre y cargo, dato público de la ficha), responsable del contrato y del pago, cuántos procesos ha llevado la misma persona en este organismo y cuántos del mismo rubro. Lobby: no consta en la base; entrega el enlace de verificación y qué buscar (audiencias del organismo con proveedores del rubro en los últimos 24 meses). Solo hechos de función pública, nada de juicios sobre las personas.
+## 4. Antes de licitar: consultas al mercado (RFI), desiertas, revocadas y reclamos
+Consultas al mercado (RFI, código terminado en -RFI) del organismo o del mismo producto (de las CONSULTAS AL MERCADO): quién consultó, cuándo, qué pidió, cuántas preguntas y reuniones hubo, y si esta licitación nació de una de ellas (mismo organismo, mismo objeto, fechas previas). Quien participó en la RFI conoce las bases antes que tú: dilo. Luego procesos del organismo que quedaron desiertos, revocados o suspendidos (mismo rubro primero) y la oportunidad que abre cada uno. Reclamos contra el organismo por tipo y sobre este proceso.
+## 5. Las personas y el lobby (Ley 20.730)
+Quién lleva la licitación (nombre y cargo, dato público de la ficha), responsable del contrato y del pago, cuántos procesos ha llevado la misma persona en este organismo y cuántos del mismo rubro. Audiencias de lobby registradas del organismo (de las AUDIENCIAS DE LOBBY): tabla Fecha | Autoridad y cargo | Con quién (asistentes y a quién representan) | Materia, primero las relacionadas con el rubro, con el proveedor de siempre o con compras; luego el total de audiencias por año y cuáles autoridades reciben más. Si no se encontró el organismo en la plataforma o no tiene audiencias, dilo y entrega el enlace. Solo hechos de registros públicos, nada de juicios sobre las personas.
 ## 6. El precio que gana
 Tabla Markdown con el precio unitario del producto en el Estado (24 meses): Mínimo | P25 | Mediana | P75 | Máximo | Compradores. Luego el precio por vía (convenio marco vs licitación vs compra ágil) y el historial adjudicado/presupuesto del organismo. Tres escenarios en tabla: Escenario | % del tope | Neto | Con IVA (×1,19) | Puntaje precio simulado | Riesgo. Filas: conservador 98%, recomendado 95%, agresivo 90%, más el piso de referencia. El tope es el presupuesto; si no está, usa el tramo del código (L1 hasta 100 UTM, LE 100 a 1.000, LP 1.000 a 2.000, LQ 2.000 a 5.000, LR más de 5.000) con la UTM de hoy y dilo. Fórmula de precio en texto (precio mínimo / precio ofertado × 100) salvo que las bases fijen otra.
 ## 7. Bases y matriz de adjudicación
@@ -126,10 +206,30 @@ Deno.serve(async (req) => {
       // Ficha viva de la API (adjudicación, encargado, renovación) por si la base está atrasada.
       api: ticket ? fetch(`${MP}/licitaciones.json?codigo=${encodeURIComponent(codigo)}&ticket=${ticket}`, { signal: AbortSignal.timeout(6000) }).then((r) => r.ok ? r.json() : null).then((j: any) => j?.Listado?.[0] ?? null) : Promise.resolve(null),
     };
+    const anioHoy = new Date().getFullYear();
+    t.lobby = cache(sb, `lobby:${normalizar(institucion)}:${anioHoy}`, 7, async () => {
+      const inst = await lobbyInstitucion(institucion);
+      if (!inst) return { institucion: null, cargos: [], audiencias: [] };
+      const a = await lobbyAudiencias(inst.id, [anioHoy, anioHoy - 1], 8);
+      return { institucion: inst, ...a };
+    });
     const res: Record<string, any> = {};
     await Promise.all(Object.entries(t).map(async ([k, p]) => { try { res[k] = await p; } catch { res[k] = null; } }));
     const datos = res.datos ?? {};
     const kw: string[] = datos.keywords ?? [];
+    // Consultas al mercado (RFI): las del organismo y las del mismo producto en todo el Estado. Dependen de las palabras clave.
+    res.rfi = await cache(sb, `rfi:${normalizar(institucion)}:${kw.slice(0, 2).join("+")}`, 3, async () => {
+      const tok = await cmToken(); if (!tok) return { organismo: [], producto: [], sin_acceso: true };
+      const orgQ = normalizar(institucion).replace(/\b(i|ilustre|de|la|el|del|los|las|y)\b/g, " ").replace(/\s+/g, " ").trim().split(" ").slice(0, 3).join(" ");
+      const [porOrg, porProd] = await Promise.all([cmListar(tok, { organismoComprador: orgQ }), kw.length ? cmListar(tok, { palabraClave: kw[0] }) : Promise.resolve([])]);
+      const vistos = new Set<string>();
+      const dedup = (l: any[]) => l.map(cmResumen).filter((x) => x.codigo && !vistos.has(String(x.codigo)) && vistos.add(String(x.codigo)));
+      const organismo = dedup(porOrg).slice(0, 8); const producto = dedup(porProd).slice(0, 8);
+      // Detalle de las 3 más relevantes (preguntas, reuniones, adjuntos) para saber quién ya participó.
+      const det = await Promise.all([...organismo.slice(0, 2), ...producto.slice(0, 1)].map((c) => cmGet(`/v1/consulta-mercado/codigo/${encodeURIComponent(String(c.codigo))}`, tok)));
+      const detalles = det.filter(Boolean).map(cmResumen);
+      return { organismo, producto, detalles };
+    });
     res.rss2 = kw.length ? await noticiasRss(`${institucion.split(/\s+/).slice(0, 3).join(" ")} ${kw.slice(0, 2).join(" ")}`, 4) : [];
 
     // Fuentes numeradas: normativa/dictámenes, noticias (RSS + base), bases.
@@ -160,6 +260,20 @@ Deno.serve(async (req) => {
     const adjItems = adjudicados.length ? adjudicados : (con.adjudicados ?? []);
     partes.push(`CONTRATO Y ADJUDICACIÓN (ficha de la API de Mercado Público, FirmaVB):\nModalidad ${si(api?.Modalidad ?? con.modalidad)} | Pago ${si(api?.TipoPago ?? con.tipo_pago)} | Duración ${si(api?.TiempoDuracionContrato ? `${api.TiempoDuracionContrato} ${api.UnidadTiempoDuracionContrato ?? ""}` : con.duracion)} (${si(api?.TipoDuracionContrato ?? con.tipo_duracion)}) | Renovable: ${si(api?.EsRenovable ?? con.es_renovable)} por ${si(api?.ValorTiempoRenovacion ? `${api.ValorTiempoRenovacion} ${api.PeriodoTiempoRenovacion ?? ""}` : con.renovacion)} | Extensión de plazo: ${si(api?.ExtensionPlazo ?? con.extension_plazo)} | Toma de razón: ${si(api?.TomaRazon ?? con.toma_razon)} | Reclamos en ficha: ${si(api?.CantidadReclamos ?? con.reclamos_ficha)}\nAdjudicación: ${adjApi ? `${si(adjApi.Tipo)} | fecha ${fecha(adjApi.Fecha)} | resolución ${si(adjApi.Numero)} | oferentes ${si(adjApi.NumeroOferentes)} | acta ${si(adjApi.UrlActa)}` : "sin adjudicación registrada"}\n${adjItems.length ? "Ítems adjudicados:\n" + adjItems.map((x: any) => `- ${x.producto} (${si(x.cantidad)}): ${si(x.proveedor)} (${si(x.rut)}) a ${fmt(x.monto_unitario)} unitario × ${si(x.cantidad_adjudicada)}`).join("\n") : ""}`);
 
+    const lb = res.lobby ?? {};
+    const provs: string[] = [...(datos.oc_rubro?.proveedores ?? []).map((p: any) => normalizar(String(p.proveedor ?? ""))), ...(res.topadj ?? []).map((x: any) => normalizar(String(x.adjudicatario ?? "")))].filter((x) => x.length > 4);
+    const relevante = (a: Audiencia) => { const txt = normalizar(`${a.materia} ${a.representados} ${a.asistentes}`); return kw.some((w) => txt.includes(w)) || /compra|licitaci|adquisic|proveedor|contrat|convenio|suministro|abastec/.test(txt) || provs.some((p) => txt.includes(p.split(" ").slice(0, 2).join(" "))); };
+    if (lb.institucion) {
+      const auds: Audiencia[] = lb.audiencias ?? [];
+      const porAnio: Record<string, number> = {}; auds.forEach((a) => { const y = a.fecha.slice(0, 4); porAnio[y] = (porAnio[y] ?? 0) + 1; });
+      const porAutoridad: Record<string, number> = {}; auds.forEach((a) => { const k = `${a.sujeto} (${a.cargo})`; porAutoridad[k] = (porAutoridad[k] ?? 0) + 1; });
+      const ordenadas = [...auds].sort((x, y) => (relevante(y) ? 1 : 0) - (relevante(x) ? 1 : 0) || y.fecha.localeCompare(x.fecha)).slice(0, 14);
+      partes.push(`AUDIENCIAS DE LOBBY (Ley 20.730, leylobby.gob.cl, institución "${lb.institucion.nombre}" ${lb.institucion.id}, revisadas ${(lb.cargos ?? []).length} autoridades de ${anioHoy} y ${anioHoy - 1}; ${auds.length} audiencias leídas; por año: ${Object.entries(porAnio).map(([y, n]) => `${y}: ${n}`).join(", ") || "ninguna"}):\nAutoridades con más audiencias: ${Object.entries(porAutoridad).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, n]) => `${k} ${n}`).join("; ") || "s/i"}\n${ordenadas.map((a) => `- ${a.fecha} | ${a.sujeto} (${a.cargo}) | ${a.asistentes} | representan: ${a.representados || "s/i"} | materia: ${a.materia.slice(0, 260)} | ${relevante(a) ? "RELACIONADA con compras o el rubro" : "otra materia"} | ${a.url}`).join("\n") || "- sin audiencias registradas en esos años"}\nEnlace: ${LOBBY}/instituciones/${lb.institucion.id}/audiencias/${anioHoy}`);
+    } else partes.push(`AUDIENCIAS DE LOBBY: no se encontró "${institucion}" en leylobby.gob.cl (búsqueda automática). Verificar a mano en ${LOBBY}/instituciones`);
+    const rfi = res.rfi ?? {};
+    const rfiTxt = (c: any) => `- ${c.codigo} | ${c.organismo ?? "s/i"} (${c.rut ?? "s/i"}) | publicada ${fecha(c.publicada)} | cierre ${fecha(c.cierre)} | estado ${si(c.estado)} | motivo ${si(c.motivo)} | encargado ${si(c.encargado)} | ${c.nombre} | ${c.descripcion ? c.descripcion.slice(0, 220) : ""}${c.preguntas != null ? ` | preguntas ${c.preguntas}` : ""}${c.reuniones != null ? ` | reuniones ${c.reuniones}` : ""}${c.adjuntos?.length ? ` | adjuntos: ${c.adjuntos.join(", ")}` : ""} | ${c.url}`;
+    if (rfi.sin_acceso) partes.push("CONSULTAS AL MERCADO (RFI): el portal no respondió; verificar en https://consulta-mercado.mercadopublico.cl");
+    else partes.push(`CONSULTAS AL MERCADO (RFI, portal consulta-mercado.mercadopublico.cl, últimos 30 meses):\nDel organismo (${(rfi.organismo ?? []).length}):\n${(rfi.organismo ?? []).map(rfiTxt).join("\n") || "- ninguna"}\nDel mismo producto en otros organismos (${(rfi.producto ?? []).length}):\n${(rfi.producto ?? []).map(rfiTxt).join("\n") || "- ninguna"}\n${(rfi.detalles ?? []).length ? "Detalle de las más relevantes:\n" + rfi.detalles.map(rfiTxt).join("\n") : ""}`);
     const oc = datos.oc_rubro ?? {};
     if (oc.ordenes) partes.push(`ÓRDENES DE COMPRA DEL ORGANISMO EN EL RUBRO, 36 meses (FirmaVB): ${oc.ordenes} OC por ${fmt(oc.monto)}, entre ${fecha(oc.desde)} y ${fecha(oc.hasta)}. Por vía: ${Object.entries(oc.por_origen ?? {}).map(([k, v]) => `${k} ${v}`).join(", ") || "s/i"}.\nProveedores:\n${(oc.proveedores ?? []).map((p: any) => `- ${p.proveedor} (${si(p.rut)}): ${p.ordenes} OC (${pct(p.ordenes, oc.ordenes)} del total), ${fmt(p.monto)}, precio unitario mediano ${fmt(p.precio_unit_mediano)}, última ${fecha(p.ultima)}, vía ${p.origenes}`).join("\n")}\nÚltimas líneas:\n${(oc.items ?? []).map((i: any) => `- ${i.oc} | ${fecha(i.fecha)} | ${i.proveedor} | ${i.producto} | ${si(i.cantidad)} × ${fmt(i.precio_unitario)} | ${i.origen}`).join("\n")}`);
     else partes.push("ÓRDENES DE COMPRA DEL ORGANISMO EN EL RUBRO: ninguna en la base FirmaVB en 36 meses con estas palabras clave.");
@@ -214,7 +328,7 @@ Deno.serve(async (req) => {
     const enc = new TextEncoder(); const dec = new TextDecoder(); let respuesta = "";
     const stream = new ReadableStream({
       async start(ctrl) {
-        ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ meta: { modelo, fuentes: fuentesMeta, codigo, cuota: cuotaDespues, historial: hist.length, oc_rubro: oc.ordenes ?? 0, noticias: noticias.length, pedir_bases: bases.length ? null : codigo } })}\n\n`));
+        ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ meta: { modelo, fuentes: fuentesMeta, codigo, cuota: cuotaDespues, historial: hist.length, oc_rubro: oc.ordenes ?? 0, noticias: noticias.length, lobby: (res.lobby?.audiencias ?? []).length, rfi: ((res.rfi?.organismo ?? []).length + (res.rfi?.producto ?? []).length), pedir_bases: bases.length ? null : codigo } })}\n\n`));
         const reader = upstream!.body!.getReader(); let buf = "";
         try {
           while (true) {
