@@ -1,9 +1,9 @@
 // Sincroniza ÓRDENES DE COMPRA frescas desde la API oficial de Mercado Público
-// (api.mercadopublico.cl .../ordenesdecompra.json). El día trae ~20 mil OC, así
-// que la FASE 1 solo guarda las RELEVANTES al rubro de los clientes (palabras a
-// incluir de cliente_filtros_oportunidades + un set base), manteniendo la tabla
-// liviana y útil. La FASE 2 completa comprador/proveedor/montos + ítems por
-// código (en tandas). Modo probe (body.probe=true) devuelve una muestra.
+// (api.mercadopublico.cl .../ordenesdecompra.json). El día trae ~20 mil OC: la FASE 1
+// guarda la CABECERA de todas (mapa completo de quién compra qué) y marca `relevante`
+// las que calzan con el rubro de los clientes (palabras a incluir de
+// cliente_filtros_oportunidades + un set base). La FASE 2 completa comprador/proveedor/
+// montos + ítems por código SOLO para las relevantes (en tandas). Modo probe (body.probe=true) devuelve una muestra.
 //
 // La LISTA por fecha no trae fecha por OC, pero la consulta es POR fecha => ese
 // día es la fecha (provisional) de la OC; el detalle luego la refina al timestamp
@@ -65,9 +65,15 @@ Deno.serve(async (req) => {
   const res: any = { fechas, kw: 0, lista_vistas: 0, lista_relevantes: 0, lista_upsert: 0, detalle_intentadas: 0, detalle_ok: 0, items_insertados: 0, errores: [] as string[] };
   const kws = await keywords(supabase); res.kw = kws.length;
 
-  // ---- FASE 1: LISTA por fecha, solo RELEVANTES ----
+  // ---- FASE 1: LISTA por fecha. Se guarda la CABECERA de TODAS las OC del día (unas
+  // 20 mil) con la marca `relevante` (calza con el rubro de los clientes). Solo las
+  // relevantes entran a la cola de detalle (FASE 2 y enrich-oc-detalle). Así queda el
+  // mapa completo de quién compra qué y a quién, sin bajar 20 mil detalles al día.
+  const t0 = Date.now(); const PRESUPUESTO_LISTA_MS = 120_000;
+  res.lista_no_relevantes_insertadas = 0;
   if (!skipList) {
     for (const fecha of fechas) {
+      if (Date.now() - t0 > PRESUPUESTO_LISTA_MS) { res.errores.push(`lista ${fecha}: sin tiempo, sigue en la próxima corrida`); break; }
       try {
         const fechaIso = ddmmyyyyToIso(fecha); // la lista es POR fecha: ese es el día de la OC
         const lr = await mpFetch(`${MP}/ordenesdecompra.json?fecha=${fecha}&ticket=${ticket}`);
@@ -76,25 +82,35 @@ Deno.serve(async (req) => {
         if (ldata.Codigo === 203) { res.errores.push('ticket invalido'); break; }
         const listado: any[] = ldata.Listado || [];
         res.lista_vistas += listado.length;
-        const rows = listado.map((o: any) => {
-          const codigo = o.Codigo ?? o.codigo; if (!codigo) return null;
+        const relevantes: any[] = []; const resto: any[] = [];
+        for (const o of listado) {
+          const codigo = o.Codigo ?? o.codigo; if (!codigo) continue;
           const nombre = pick(o.Nombre, o.nombre);
-          const n = norm(nombre);
-          if (!kws.some((k) => n.includes(k))) return null;
-          return {
+          const esRelevante = kws.some((k) => norm(nombre).includes(k));
+          const fila: any = {
             codigo: String(codigo), numero_oc: String(codigo), nombre,
             estado: o.CodigoEstado != null ? String(o.CodigoEstado) : (o.Estado != null ? String(o.Estado) : null),
             fecha_envio_oc: fechaIso,
             fecha_emision: fechaIso, // provisional (día); el detalle lo refina al timestamp real
             link_oficial: `https://www.mercadopublico.cl/Procurement/Modules/RFB/DetailsAcquisition.aspx?idlicitacion=${codigo}`,
-            last_scraped_at: new Date().toISOString(), stale: false,
+            relevante: esRelevante,
           };
-        }).filter(Boolean) as any[];
-        res.lista_relevantes += rows.length;
-        for (let i = 0; i < rows.length; i += 200) {
-          const chunk = rows.slice(i, i + 200);
+          if (esRelevante) { fila.last_scraped_at = new Date().toISOString(); fila.stale = false; relevantes.push(fila); }
+          else resto.push(fila);
+        }
+        res.lista_relevantes += relevantes.length;
+        // Relevantes: upsert (refresca estado y marca relevante=true aunque antes no lo fuera).
+        for (let i = 0; i < relevantes.length; i += 200) {
+          const chunk = relevantes.slice(i, i + 200);
           const { error } = await supabase.from('ordenes_compra').upsert(chunk, { onConflict: 'codigo', ignoreDuplicates: false });
           if (error) res.errores.push(`upsert ${fecha}[${i}]: ${error.message}`); else res.lista_upsert += chunk.length;
+        }
+        // Resto: solo se insertan si no existen (no pisan filas ya enriquecidas ni la marca relevante).
+        for (let i = 0; i < resto.length; i += 500) {
+          if (Date.now() - t0 > PRESUPUESTO_LISTA_MS) { res.errores.push(`lista ${fecha}: cabeceras parciales (${i}/${resto.length}), sigue en la próxima corrida`); break; }
+          const chunk = resto.slice(i, i + 500);
+          const { error } = await supabase.from('ordenes_compra').upsert(chunk, { onConflict: 'codigo', ignoreDuplicates: true });
+          if (error) res.errores.push(`cabeceras ${fecha}[${i}]: ${error.message}`); else res.lista_no_relevantes_insertadas += chunk.length;
         }
         await sleep(500);
       } catch (e) { res.errores.push(`lista ${fecha}: ${e instanceof Error ? e.message : String(e)}`); }
@@ -103,7 +119,7 @@ Deno.serve(async (req) => {
 
   // ---- FASE 2: DETALLE por código (relevantes sin organismo aún) ----
   const { data: pend } = await supabase.from('ordenes_compra')
-    .select('codigo').is('organismo_comprador', null)
+    .select('codigo').is('organismo_comprador', null).eq('relevante', true)
     .order('fecha_envio_oc', { ascending: false, nullsFirst: false }).limit(detailLimit);
   for (const r of (pend || [])) {
     res.detalle_intentadas++;
