@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
-import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink, Trash2, Paperclip, Printer, Mail, Map as MapIcon, Image as ImageIcon } from 'lucide-react';
+import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink, Trash2, Paperclip, Printer, Mail, Map as MapIcon, Image as ImageIcon, Presentation } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -251,10 +251,33 @@ export default function LibroLicitacion() {
       qc.invalidateQueries({ queryKey: ['experto_anexos_word', cod] });
     } catch (e: any) { toast.error(e.message); } finally { setOcupado(null); }
   };
+  // PowerPoint de la matriz de postulación (plan Pro): portada, resumen, admisibilidad,
+  // evaluación, tareas por fase, garantías y pendientes. Reutiliza experto-matriz, así que
+  // pide la misma sesión Pro; queda como .pptx en "Mis documentos de trabajo".
+  const generarPptx = async () => {
+    setOcupado('pptx');
+    try {
+      const r = await fetch(`${SUPA}/functions/v1/experto-pptx`, { method: 'POST', headers: auth, body: JSON.stringify({ codigo: cod }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.status === 402) { toast.error(j.mensaje || 'Requiere Experto Pro', { action: { label: 'Ver planes', onClick: () => navigate('/cuenta') }, duration: 9000 }); return; }
+      if (!r.ok) { toast.error(j.mensaje || j.error || 'No pude generar el PowerPoint'); return; }
+      toast.success(`PowerPoint listo en "Mis documentos de trabajo" (${j.slides} láminas).`, { duration: 7000 });
+      qc.invalidateQueries({ queryKey: ['experto_libro', cod] });
+    } catch (e: any) { toast.error(e.message); } finally { setOcupado(null); }
+  };
   const completarTodos = async () => {
     const lista = wordsUnicos(); if (!lista.length) return;
     setOcupado('word:todos');
     try { for (const d of lista) { if (!(await completarUno(d))) break; } } catch (e: any) { toast.error(e.message); } finally { setOcupado(null); }
+  };
+  const descargarDocumento = async (id: string) => {
+    setOcupado('descargar:' + id);
+    try {
+      const r = await fetch(`${SUPA}/functions/v1/experto-documentos?id=${id}`, { headers: auth });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.url) { toast.error(j.mensaje || 'No pude preparar la descarga'); return; }
+      window.open(j.url, '_blank');
+    } catch (e: any) { toast.error(e.message); } finally { setOcupado(null); }
   };
   const borrarAnexoWord = async (id: string) => {
     await fetch(`${SUPA}/functions/v1/experto-anexo-word?id=${id}`, { method: 'DELETE', headers: auth });
@@ -422,6 +445,9 @@ export default function LibroLicitacion() {
               <div>
                 <p className="font-medium flex items-center gap-1"><Paperclip className="h-4 w-4" />Mis documentos de trabajo</p>
                 <p className="text-xs text-muted-foreground">Excel, Word, PDF o imágenes (tu matriz, checklist, anexos a medio llenar). El Experto los lee para anotar qué te falta y ayudarte a completarlos.{documentos.length === 0 ? ' Sube con el botón de arriba.' : ''}</p>
+                <Button size="sm" variant="outline" className="mt-1 mb-1 w-full sm:w-auto" onClick={generarPptx} disabled={!!ocupado} title="Portada, resumen, admisibilidad, evaluación, tareas por fase, garantías y pendientes en un PowerPoint">
+                  {ocupado === 'pptx' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Presentation className="h-4 w-4 mr-1" />}Generar PowerPoint de la matriz
+                </Button>
                 {documentos.map((d: any) => (
                   <div key={d.id} className="flex items-center gap-1 text-muted-foreground">
                     <span className="truncate flex-1" title={d.nombre}>{d.nombre} <span className="text-[10px] uppercase">{d.tipo}</span></span>
@@ -431,6 +457,9 @@ export default function LibroLicitacion() {
                         {ocupado === 'word:' + d.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}<span className="hidden sm:inline">Completar</span>
                       </button>
                     )}
+                    <button onClick={() => descargarDocumento(d.id)} disabled={!!ocupado} title="Descargar" className="flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[11px] text-firmavb-blue hover:bg-muted disabled:opacity-50">
+                      {ocupado === 'descargar:' + d.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}<span className="hidden sm:inline">Descargar</span>
+                    </button>
                     <button onClick={() => borrarDocumento(d.id)} title="Quitar"><Trash2 className="h-3.5 w-3.5" /></button>
                   </div>
                 ))}
