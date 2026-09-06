@@ -46,6 +46,7 @@ grant execute on function public.experto_bajo_agua_mi_cuota() to authenticated;
 create index if not exists compras_agiles_organismo_rut_idx on public.compras_agiles (organismo_rut);
 
 -- Datos "bajo el agua" de una licitación (solo service_role; lo llama la función experto-bajo-agua).
+-- Las palabras clave se comparan por inicio de palabra (\m) para no confundir "presión" con "impresión".
 create or replace function public.experto_bajo_agua_datos(p_codigo text)
 returns jsonb
 language plpgsql stable security definer set search_path = public, extensions as $$
@@ -82,7 +83,7 @@ begin
     'mismo_encargado_mismo_rubro', case when usuario is null or rut is null then null else
       (select count(*) from public.licitaciones_bi b where b.institucion_rut = rut and b.codigo <> l.codigo
          and btrim(coalesce(b.raw_data->'Comprador'->>'NombreUsuario', b.raw_data->'detail'->'Comprador'->>'NombreUsuario')) = usuario
-         and exists (select 1 from unnest(kw) w where lower(unaccent(coalesce(b.nombre, ''))) like '%' || w || '%')) end,
+         and exists (select 1 from unnest(kw) w where lower(unaccent(coalesce(b.nombre, ''))) ~ ('\m' || w))) end,
     'lista', case when usuario is null or rut is null then '[]'::jsonb else
       (select coalesce(jsonb_agg(jsonb_build_object('codigo', b.codigo, 'nombre', left(b.nombre, 90), 'fecha', b.fecha_publicacion::date, 'estado', b.estado) order by b.fecha_publicacion desc), '[]'::jsonb)
          from (select * from public.licitaciones_bi b where b.institucion_rut = rut and b.codigo <> l.codigo
@@ -110,7 +111,7 @@ begin
       from public.ordenes_compra o join public.ordenes_compra_items i on i.numero_oc = o.codigo
       where ((rut is not null and o.rut_demandante = rut) or (rut is null and o.demandante ilike org))
         and o.fecha_envio_oc >= now() - interval '36 months'
-        and exists (select 1 from unnest(kw) w where coalesce(i.producto_norm, lower(unaccent(coalesce(i.producto, '')))) like '%' || w || '%'))
+        and exists (select 1 from unnest(kw) w where coalesce(i.producto_norm, lower(unaccent(coalesce(i.producto, '')))) ~ ('\m' || w)))
     select jsonb_build_object(
       'ordenes', (select count(distinct codigo) from oc),
       'monto', (select coalesce(sum(t), 0) from (select codigo, max(total) t from oc group by codigo) x),
@@ -130,7 +131,7 @@ begin
       select * from public.compras_agiles c
       where ((rut is not null and c.organismo_rut = rut) or c.nombre_organismo ilike org)
         and coalesce(c.fecha_publicacion, c.fecha_cierre) >= now() - interval '18 months'
-        and exists (select 1 from unnest(kw) w where lower(unaccent(coalesce(c.nombre, '') || ' ' || coalesce(c.descripcion, ''))) like '%' || w || '%'))
+        and exists (select 1 from unnest(kw) w where lower(unaccent(coalesce(c.nombre, '') || ' ' || coalesce(c.descripcion, ''))) ~ ('\m' || w)))
     select jsonb_build_object('total', (select count(*) from ca), 'monto', (select coalesce(sum(monto_estimado), 0) from ca),
       'lista', (select coalesce(jsonb_agg(jsonb_build_object('codigo', codigo, 'nombre', left(nombre, 90), 'fecha', coalesce(fecha_publicacion, fecha_cierre)::date, 'monto', monto_estimado, 'estado', estado, 'ofertas', ofertas_recibidas) order by coalesce(fecha_publicacion, fecha_cierre) desc), '[]'::jsonb)
                 from (select * from ca order by coalesce(fecha_publicacion, fecha_cierre) desc limit 10) x))));
@@ -139,12 +140,12 @@ begin
   res := res || jsonb_build_object('desiertas', (
     with d as (
       select o.codigo, o.titulo, coalesce(o.fecha_publicacion, o.fecha_cierre) fecha, coalesce(nullif(o.estado_award, ''), o.estado_tender) estado, o.num_oferentes, o.monto_estimado,
-             exists (select 1 from unnest(kw) w where lower(unaccent(coalesce(o.titulo, ''))) like '%' || w || '%') mismo_rubro
+             exists (select 1 from unnest(kw) w where lower(unaccent(coalesce(o.titulo, ''))) ~ ('\m' || w)) mismo_rubro
       from public.ocds_procesos o
       where rut is not null and o.comprador_rut = rut and (o.estado_tender ~* 'desiert|revocad|suspend' or o.estado_award ~* 'desiert|revocad|suspend')
       union all
       select b.codigo, b.nombre, b.fecha_publicacion, b.estado, null, b.presupuesto_estimado,
-             exists (select 1 from unnest(kw) w where lower(unaccent(coalesce(b.nombre, ''))) like '%' || w || '%')
+             exists (select 1 from unnest(kw) w where lower(unaccent(coalesce(b.nombre, ''))) ~ ('\m' || w))
       from public.licitaciones_bi b
       where rut is not null and b.institucion_rut = rut and b.estado ~* 'desiert|revocad|suspend'
         and not exists (select 1 from public.ocds_procesos o where o.codigo = b.codigo))
@@ -158,7 +159,7 @@ begin
       select o.codigo, o.proveedor, o.rut_proveedor, o.rut_demandante, o.fecha_envio_oc, public.mp_tipo_oc(o.codigo) as origen, i.precio_unitario, i.cantidad, i.producto
       from public.ordenes_compra_items i join public.ordenes_compra o on o.codigo = i.numero_oc
       where o.fecha_envio_oc >= now() - interval '24 months' and i.precio_unitario > 0
-        and exists (select 1 from unnest(kw) w where coalesce(i.producto_norm, lower(unaccent(coalesce(i.producto, '')))) like '%' || w || '%'))
+        and exists (select 1 from unnest(kw) w where coalesce(i.producto_norm, lower(unaccent(coalesce(i.producto, '')))) ~ ('\m' || w)))
     select jsonb_build_object('items', (select count(*) from it), 'compradores', (select count(distinct rut_demandante) from it),
       'mediana', (select percentile_cont(0.5) within group (order by precio_unitario) from it),
       'p25', (select percentile_cont(0.25) within group (order by precio_unitario) from it),
@@ -178,7 +179,7 @@ begin
     'este_proceso', (select coalesce(jsonb_agg(jsonb_build_object('tipo', tipo, 'fecha', fecha, 'reclamante', reclamante, 'estado', estado)), '[]'::jsonb) from public.reclamos_mp where proceso_codigo = l.codigo),
     'mismo_rubro', (select coalesce(jsonb_agg(jsonb_build_object('proceso', x.proceso_codigo, 'tipo', x.tipo, 'fecha', x.fecha, 'reclamante', x.reclamante, 'estado', x.estado) order by x.fecha desc), '[]'::jsonb)
                     from (select m.* from public.reclamos_mp m join public.licitaciones_bi b on b.codigo = m.proceso_codigo
-                          where rut is not null and m.organismo_rut = rut and exists (select 1 from unnest(kw) w where lower(unaccent(coalesce(b.nombre, ''))) like '%' || w || '%')
+                          where rut is not null and m.organismo_rut = rut and exists (select 1 from unnest(kw) w where lower(unaccent(coalesce(b.nombre, ''))) ~ ('\m' || w))
                           order by m.fecha desc limit 8) x)));
 
   -- 8. Enlaces para verificar a mano lo que no está en la base (lobby, dictámenes, prensa, transparencia).
