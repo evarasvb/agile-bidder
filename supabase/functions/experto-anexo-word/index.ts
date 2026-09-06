@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
 
     const codigo = String(body.codigo ?? "").trim().toUpperCase();
     const documentoId = String(body.documento_id ?? "");
-    if (!/^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2}$/.test(codigo) || !documentoId) return json({ error: "datos", mensaje: "Falta el código de la licitación o el documento." }, 400);
+    if (!/^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}$/.test(codigo) || !documentoId) return json({ error: "datos", mensaje: "Falta el código de la licitación o el documento." }, 400);
 
     // 1. Plan (Plus o FirmaVB ERP), datos de la empresa y documento
     const { data: uso } = await sb.rpc("experto_uso_mes", { p_user_id: userId, p_huella: "x" });

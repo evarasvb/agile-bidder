@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
 
     // POST: archivo crudo
     const codigo = decodeURIComponent(req.headers.get("x-codigo") ?? "").trim().toUpperCase();
-    if (codigo && !/^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2}$/.test(codigo)) return json({ error: "codigo", mensaje: "ID de licitación inválido." }, 400);
+    if (codigo && !/^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}$/.test(codigo)) return json({ error: "codigo", mensaje: "ID de licitación inválido." }, 400);
     let nombre = decodeURIComponent(req.headers.get("x-nombre") ?? "documento").replace(/[^\w.\-áéíóúñÁÉÍÓÚÑ ()]/g, "_").slice(0, 120);
     const destino = (req.headers.get("x-destino") ?? "auto").toLowerCase(); // auto | bases | documento
     // Cupo según plan (las bases de la licitación son compartidas y no descuentan cupo)

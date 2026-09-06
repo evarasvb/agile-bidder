@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
     const userId = role === "authenticated" ? sub : role === "service_role" ? (body.user_id ?? null) : null;
     if (!userId) return json({ error: "login", mensaje: "Inicia sesión para generar la matriz." }, 401);
     const codigo = String(body.codigo ?? "").trim().toUpperCase();
-    if (!/^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2}$/.test(codigo)) return json({ error: "codigo" }, 400);
+    if (!/^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}$/.test(codigo)) return json({ error: "codigo" }, 400);
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const { data: uso } = await sb.rpc("experto_uso_mes", { p_user_id: userId, p_huella: "libro" });
     const u = uso?.[0] ?? { plan: "free" };

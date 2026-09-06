@@ -170,7 +170,7 @@ Deno.serve(async (req) => {
     const userId = role === "authenticated" ? sub : role === "service_role" ? (body.user_id ?? null) : null;
     if (!userId) return json({ error: "login", mensaje: "Inicia sesión en FirmaVB para mirar bajo el agua." }, 401);
     const codigo = String(body.codigo ?? "").trim().toUpperCase();
-    if (!/^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2}$/.test(codigo)) return json({ error: "falta_codigo", mensaje: "Indica el ID de la licitación (ej. 2699-35-LE26)." }, 400);
+    if (!/^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}$/.test(codigo)) return json({ error: "falta_codigo", mensaje: "Indica el ID de la licitación (ej. 2699-35-LE26)." }, 400);
     const contextoProv = String(body.pregunta ?? "").trim().slice(0, 500);
     const huella = String(body.huella ?? "").slice(0, 80);
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
