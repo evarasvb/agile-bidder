@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
-import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink, Trash2, Paperclip, Printer, Mail, Map as MapIcon, Image as ImageIcon } from 'lucide-react';
+import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink, Trash2, Paperclip, Printer, Mail, Map as MapIcon, Image as ImageIcon, Waves } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -53,7 +53,7 @@ function veredictoDe(informe?: string): { t: string; c: string } | null {
 const fecha = (d?: string | null) => d ? new Date(d).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }) : 's/i';
 
 interface Msg { rol: 'yo' | 'exp'; texto: string; fuentes?: any[]; pedirBases?: string | null }
-type Entregable = 'sala' | 'informe' | 'matriz' | 'estudio' | 'anexos' | 'mapa' | 'infografia';
+type Entregable = 'sala' | 'informe' | 'matriz' | 'estudio' | 'bajo_agua' | 'anexos' | 'mapa' | 'infografia';
 
 /**
  * Libro de trabajo de una licitación: Fuentes (ficha, bases, organismo, quién gana) · Chat con el
@@ -96,7 +96,7 @@ export default function LibroLicitacion() {
   const [pregunta, setPregunta] = useState('');
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [tab, setTab] = useState<Entregable>('sala');
-  const [entregables, setEntregables] = useState<Record<Entregable, string>>({ sala: 'ok', informe: '', matriz: '', estudio: '', anexos: '', mapa: '', infografia: '' });
+  const [entregables, setEntregables] = useState<Record<Entregable, string>>({ sala: 'ok', informe: '', matriz: '', estudio: '', bajo_agua: '', anexos: '', mapa: '', infografia: '' });
   const [faltantes, setFaltantes] = useState<string[]>([]);
   const chatRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -106,13 +106,22 @@ export default function LibroLicitacion() {
   useEffect(() => {
     if (!libro) return;
     setMsgs((libro.chat ?? []).flatMap((c: any) => [{ rol: 'yo', texto: c.pregunta }, { rol: 'exp', texto: c.respuesta }]));
-    setEntregables({ sala: 'ok', informe: libro.informe?.texto ?? '', matriz: libro.matriz?.texto ?? '', estudio: libro.estudio?.texto ?? '', anexos: libro.anexos?.texto ?? '', mapa: libro.mapa?.texto ?? '', infografia: libro.ficha ? 'ok' : '' });
+    setEntregables({ sala: 'ok', informe: libro.informe?.texto ?? '', matriz: libro.matriz?.texto ?? '', estudio: libro.estudio?.texto ?? '', bajo_agua: libro.bajo_agua?.texto ?? '', anexos: libro.anexos?.texto ?? '', mapa: libro.mapa?.texto ?? '', infografia: libro.ficha ? 'ok' : '' });
     setFaltantes(libro.anexos?.faltantes ?? []);
   }, [libro]);
   useEffect(() => { chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight }); }, [msgs]);
+  const entregableRef = useRef(false);
+  useEffect(() => {
+    const e = sp.get('entregable') as Entregable | null;
+    if (!e || !libro || entregableRef.current) return;
+    entregableRef.current = true;
+    if (!escritorio) setVista('entregables');
+    if (libro[e]?.texto) setTab(e); else generar(e);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [libro]);
 
   // Streaming SSE del Experto (chat, informe y estudio comparten el formato).
-  async function pedir(body: Record<string, unknown>, fn: 'experto-consultar' | 'experto-estudio', onTexto: (t: string, meta?: any) => void) {
+  async function pedir(body: Record<string, unknown>, fn: 'experto-consultar' | 'experto-estudio' | 'experto-bajo-agua', onTexto: (t: string, meta?: any) => void) {
     const r = await fetch(`${SUPA}/functions/v1/${fn}`, { method: 'POST', headers: auth, body: JSON.stringify(body) });
     if (!r.ok) { const j = await r.json().catch(() => ({})); throw Object.assign(new Error(j.mensaje || j.error || `Error ${r.status}`), { status: r.status }); }
     const reader = r.body!.getReader(); const dec = new TextDecoder(); let buf = ''; let texto = ''; let meta: any = null;
@@ -178,7 +187,9 @@ export default function LibroLicitacion() {
         if (!r.ok) throw new Error(j.mensaje || j.error || `Error ${r.status}`);
         setEntregables((e) => ({ ...e, anexos: j.contenido })); setFaltantes(j.faltantes ?? []);
       } else {
-        await pedir({ modo: tipo, codigo: cod, pregunta: '', huella: 'libro' }, tipo === 'estudio' ? 'experto-estudio' : 'experto-consultar', (t) => setEntregables((e) => ({ ...e, [tipo]: t })));
+        await pedir({ modo: tipo, codigo: cod, pregunta: '', huella: 'libro' }, tipo === 'estudio' ? 'experto-estudio' : tipo === 'bajo_agua' ? 'experto-bajo-agua' : 'experto-consultar', (t) => setEntregables((e) => ({ ...e, [tipo]: t })));
+        // Bajo el Agua gasta cuota: se refresca el libro para mostrar cuántos informes quedan.
+        if (tipo === 'bajo_agua') qc.invalidateQueries({ queryKey: ['experto_libro', cod] });
       }
     } catch (e: any) { toast.error(e.message, e.status === 402 ? { action: { label: 'Ver planes', onClick: () => navigate('/cuenta') } } : undefined); }
     setOcupado(null);
@@ -313,7 +324,7 @@ export default function LibroLicitacion() {
     competencia: (f?.competencia ?? []).slice(0, 4).map((c: any) => ({ proveedor: c.proveedor, ordenes: c.ordenes, precio: c.precio_unit_mediano })),
     items: (f?.items ?? []).slice(0, 6).map((i: any) => i.producto),
   });
-  const nombresEntregable: Record<Entregable, string> = { sala: 'Sala de postulación', informe: 'Informe de trabajo', matriz: 'Matriz de postulación', estudio: 'Estudio profundo', anexos: 'Anexos', mapa: 'Mapa conceptual', infografia: 'Infografía' };
+  const nombresEntregable: Record<Entregable, string> = { sala: 'Sala de postulación', informe: 'Informe de trabajo', matriz: 'Matriz de postulación', estudio: 'Estudio profundo', bajo_agua: 'Bajo el Agua', anexos: 'Anexos', mapa: 'Mapa conceptual', infografia: 'Infografía' };
   const compartirEntregable = async () => {
     const nombres = nombresEntregable;
     const titulo = `${nombres[tab]} · ${cod}${f?.nombre ? ' · ' + f.nombre : ''}`;
@@ -324,6 +335,16 @@ export default function LibroLicitacion() {
   const documentos: any[] = libro?.documentos ?? [];
   const top: any[] = libro?.top_adjudicatarios ?? [];
   const esPro = libro?.plan && libro.plan !== 'free';
+  // Cuota del modo Bajo el Agua (1 gratis de por vida; después según plan, configurable en la base).
+  const cuotaBajoAgua = (() => {
+    const c = libro?.bajo_agua_cuota as { plan?: string; usados?: number; maximo?: number | null; periodo?: string } | undefined;
+    if (!c) return { etiqueta: '1 gratis para probar', agotada: false, texto: '' };
+    const usados = c.usados ?? 0; const max = c.maximo ?? null;
+    if (max == null) return { etiqueta: 'Sin límite', agotada: false, texto: 'Tu plan no tiene límite de informes Bajo el Agua.' };
+    const quedan = Math.max(0, max - usados);
+    if (c.plan === 'free') return { etiqueta: quedan > 0 ? '1 gratis para probar' : 'Usado · pasa a Pro', agotada: quedan === 0, texto: quedan > 0 ? 'Tienes 1 informe Bajo el Agua gratis para probar.' : 'Ya usaste tu informe gratis. Con Experto Pro tienes 10 al mes, con Plus 30 y con el ERP sin límite.' };
+    return { etiqueta: `${quedan} de ${max} este mes`, agotada: quedan === 0, texto: quedan > 0 ? `Te quedan ${quedan} de ${max} informes Bajo el Agua este mes.` : `Usaste los ${max} informes Bajo el Agua de tu plan este mes.` };
+  })();
 
   // Oportunidad en el formato que usan los botones de calendario y email; el email
   // lleva además el veredicto del informe y, si existe, el link público del análisis.
@@ -539,6 +560,7 @@ export default function LibroLicitacion() {
                 ['informe', 'Informe de trabajo', '', FileText, 'bg-blue-100 text-blue-700'],
                 ['matriz', 'Matriz de postulación', 'Experto Pro', ClipboardList, 'bg-amber-100 text-amber-700'],
                 ['estudio', 'Estudio profundo', 'Experto Pro', Sparkles, 'bg-violet-100 text-violet-700'],
+                ['bajo_agua', 'Bajo el Agua', cuotaBajoAgua.etiqueta, Waves, 'bg-sky-100 text-sky-700'],
                 ['mapa', 'Mapa conceptual', '', MapIcon, 'bg-emerald-100 text-emerald-700'],
                 ['infografia', 'Infografía', '', ImageIcon, 'bg-pink-100 text-pink-700'],
                 ['anexos', 'Anexos completados', 'Experto Plus', Paperclip, 'bg-cyan-100 text-cyan-700'],
@@ -588,7 +610,7 @@ export default function LibroLicitacion() {
                   <div className="max-h-[62vh] overflow-y-auto pr-1"><Infografia d={datosInfografia()} /></div>
                 ) : (
                   <div className="max-h-[62vh] overflow-y-auto pr-1">
-                    {f && (tab === 'estudio' || tab === 'informe') && (
+                    {f && (tab === 'estudio' || tab === 'informe' || tab === 'bajo_agua') && (
                       <div className="grid grid-cols-2 gap-1 mb-3 text-xs">
                         {(() => { const pg = pagoOrganismo(o); return [['Presupuesto', presupuestoTexto(f.presupuesto, cod), ''], ['Cierra', fecha(f.fecha_cierre), ''], ['Pago del organismo', pg.valor, pg.detalle], ['Organismo', nombrePropio(f.institucion), f.region ?? '']]; })().map(([k, v, d]) => (
                           <div key={k} className="rounded-md border bg-muted/30 px-2 py-1" title={d}><p className="text-[10px] uppercase tracking-wide text-muted-foreground">{k}</p><p className="font-semibold truncate">{v}</p>{d && <p className="text-[10px] text-muted-foreground truncate">{d}</p>}</div>
@@ -606,8 +628,9 @@ export default function LibroLicitacion() {
                    {tab === 'matriz' && 'Matriz de postulación (Pro): checklist de admisibilidad, cómo se puntúa, anexos, reglas especiales y plan de tareas con responsable y plazo. Se edita aquí, se exporta a Excel, Word o PDF, y usa tus documentos de trabajo para marcar lo que ya tienes listo.'}
                    {tab === 'informe' && 'Informe de trabajo: veredicto, fechas, checklist de admisibilidad, cómo se ganan los puntos, riesgos, competencia y próximos pasos.'}
                    {tab === 'estudio' && 'Estudio profundo (Pro): historial de compras parecidas del organismo, quién ganó y con cuánto, precio objetivo.'}
+                   {tab === 'bajo_agua' && `Bajo el Agua: lo que no se ve en la ficha. A quién le compra siempre este organismo y por qué vía, compras ágiles y convenio marco del mismo producto, desiertas, quién lleva el proceso, reclamos, precio real del producto en el Estado, noticias y dictámenes, matriz de adjudicación con simulación y, si ya está adjudicada, por dónde se renueva. ${cuotaBajoAgua.texto}`}
                    {tab === 'anexos' && 'Anexos completados (Plus): los formularios de las bases con los datos de tu empresa, listos para revisar y firmar.'}</p>
-                {!esPro && tab !== 'informe' && <p className="text-xs">Requiere Experto {tab === 'anexos' ? 'Plus' : 'Pro'} o FirmaVB ERP.</p>}
+                {!esPro && tab !== 'informe' && tab !== 'bajo_agua' && <p className="text-xs">Requiere Experto {tab === 'anexos' ? 'Plus' : 'Pro'} o FirmaVB ERP.</p>}
                 <Button size="sm" onClick={() => generar(tab)} disabled={!!ocupado}><Sparkles className="h-4 w-4 mr-1" />Generar</Button>
               </div>
             )}
