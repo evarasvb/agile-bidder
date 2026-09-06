@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
       if (b64.length > MAX_PDF_BYTES * 1.4) return json({ error: "tamano", mensaje: "El PDF supera los 20 MB." }, 413);
       bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
     }
-    if (!/^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2}$/.test(codigo)) return json({ error: "codigo", mensaje: "Indica el ID de la licitación (ej. 2699-35-LE26)." }, 400);
+    if (!/^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}$/.test(codigo)) return json({ error: "codigo", mensaje: "Indica el ID de la licitación (ej. 2699-35-LE26)." }, 400);
     nombre = nombre.replace(/[^\w.\-áéíóúñÁÉÍÓÚÑ ]/g, "_").slice(0, 120);
     if (bytes.length > MAX_PDF_BYTES) return json({ error: "tamano", mensaje: "El PDF supera los 20 MB." }, 413);
     if (bytes.length < 100 || String.fromCharCode(...bytes.slice(0, 5)) !== "%PDF-") return json({ error: "no_pdf", mensaje: "El archivo no es un PDF." }, 400);
