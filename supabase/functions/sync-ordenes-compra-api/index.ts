@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
 
   // ---- FASE 2: DETALLE por código (relevantes sin organismo aún) ----
   const { data: pend } = await supabase.from('ordenes_compra')
-    .select('codigo').is('organismo_comprador', null).eq('relevante', true)
+    .select('codigo').is('organismo_comprador', null).eq('relevante', true).or('stale.is.null,stale.eq.false')
     .order('fecha_envio_oc', { ascending: false, nullsFirst: false }).limit(detailLimit);
   for (const r of (pend || [])) {
     res.detalle_intentadas++;
@@ -128,7 +128,12 @@ Deno.serve(async (req) => {
       if (!dr.ok) { res.errores.push(`det ${r.codigo}: HTTP ${dr.status}`); continue; }
       const dd = await dr.json();
       if (dd.Codigo === 203) { res.errores.push('ticket invalido'); break; }
-      const d = (dd.Listado && dd.Listado[0]) || null; if (!d) continue;
+      const d = (dd.Listado && dd.Listado[0]) || null;
+      if (!d) {
+        // La API no tiene detalle para este código: se marca stale para que no bloquee la cola.
+        await supabase.from('ordenes_compra').update({ stale: true, last_scraped_at: new Date().toISOString() }).eq('codigo', r.codigo);
+        continue;
+      }
       const comp = d.Comprador || {}; const prov = d.Proveedor || {};
       const upd: any = {
         nombre: pick(d.Nombre),
