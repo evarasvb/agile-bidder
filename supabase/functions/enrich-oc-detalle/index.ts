@@ -52,7 +52,8 @@ Deno.serve(async (req) => {
     const limite = Math.min(Math.max(Number(body.limit) || 8, 1), 40);
     const tipo = (body.tipo || 'convenio_marco') as string;
 
-    let q = admin.from('ordenes_compra').select('codigo').is('last_scraped_at', null);
+    // Solo relevantes: las cabeceras no relevantes (relevante=false) no bajan detalle.
+    let q = admin.from('ordenes_compra').select('codigo').is('last_scraped_at', null).eq('relevante', true);
     if (tipo === 'convenio_marco') q = q.ilike('codigo', '%-CM%');
     const { data: pend, error: perr } = await q.limit(limite);
     if (perr) return json({ error: perr.message }, 500);
