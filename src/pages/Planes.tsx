@@ -136,6 +136,10 @@ export default function Planes() {
           suscripción mensual que puedes cancelar cuando quieras. Sin tarjeta de crédito para el
           plan gratuito.
         </p>
+        <p className="text-center text-xs text-muted-foreground mt-2">
+          Modo Bajo el Agua (investigación profunda de una licitación a partir de su ID): 1 informe
+          gratis para probar; Experto Pro 10 al mes, Experto Plus 30 al mes, ERP sin límite.
+        </p>
       </main>
     </div>
   );

@@ -13,6 +13,7 @@ import {
   Copy,
   CheckCircle2,
   Sparkles,
+  Waves,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -331,6 +332,16 @@ export default function LicitacionDetalle() {
           >
             <Sparkles className="h-4 w-4 mr-2" />
             Consultar al experto
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-sky-600 text-sky-700 hover:bg-sky-50"
+            title="Lo que no se ve en la ficha: proveedor de siempre, compras ágiles y convenio marco, desiertas, personas, precio real, noticias y matriz de adjudicación. 1 informe gratis."
+            onClick={() => navigate(`/experto/libro/${licitacion.codigo}?entregable=bajo_agua`)}
+          >
+            <Waves className="h-4 w-4 mr-2" />
+            Bajo el Agua
           </Button>
           <Button
             variant="outline"
