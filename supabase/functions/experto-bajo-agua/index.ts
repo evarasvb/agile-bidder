@@ -112,14 +112,19 @@ async function cmToken(): Promise<string | null> {
 async function cmGet(path: string, tok: string): Promise<any> {
   try { const r = await fetch(CM_API + path, { headers: { Authorization: `Bearer ${tok}`, Accept: "application/json" }, signal: AbortSignal.timeout(9000) }); const j = await r.json(); return j?.payload ?? null; } catch { return null; }
 }
-// Lista de consultas (formato de fecha exigido por la API: AAAA-MM-DD HH:MM:SS). Tolerante a la forma del payload.
-async function cmListar(tok: string, filtro: Record<string, string>, meses = 30): Promise<any[]> {
+// Lista de consultas. La API exige fechas AAAA-MM-DD HH:MM:SS, pagina de 15 y ordena de la más antigua a la más nueva:
+// se lee la primera página para saber cuántas hay y luego las últimas (las más recientes).
+async function cmListar(tok: string, filtro: Record<string, string>, meses = 30, maxPaginas = 2): Promise<any[]> {
   const d = new Date(); d.setMonth(d.getMonth() - meses);
   const f = (x: Date) => x.toISOString().slice(0, 10);
-  const q = new URLSearchParams({ desde: `${f(d)} 00:00:00`, hasta: `${f(new Date())} 23:59:59`, estado: "", ordenarPor: "", pagina: "1", ...filtro }).toString();
-  const p = await cmGet(`/v1/consulta-mercado?${q}`, tok);
-  const lista = Array.isArray(p) ? p : (p?.resultados ?? p?.content ?? p?.items ?? p?.registros ?? p?.consultas ?? p?.data ?? []);
-  return Array.isArray(lista) ? lista : [];
+  const q = (pagina: number) => new URLSearchParams({ desde: `${f(d)} 00:00:00`, hasta: `${f(new Date())} 23:59:59`, estado: "", ordenarPor: "", pagina: String(pagina), ...filtro }).toString();
+  const p1 = await cmGet(`/v1/consulta-mercado?${q(1)}`, tok);
+  const lista = (p: any) => Array.isArray(p) ? p : (p?.resultados ?? p?.content ?? p?.items ?? []);
+  const total = Number(p1?.pageCount ?? 1);
+  if (total <= 1) return lista(p1);
+  const paginas = Array.from({ length: Math.min(maxPaginas, total) }, (_, i) => total - i);
+  const resto = await Promise.all(paginas.map((n) => cmGet(`/v1/consulta-mercado?${q(n)}`, tok)));
+  return [...resto.flatMap(lista), ...lista(p1)].reverse();
 }
 const cmResumen = (c: any) => ({ codigo: c.codigoConsulta ?? c.codigo ?? c.id, nombre: c.nombre ?? c.titulo, organismo: c.nombreInstitucion ?? c.organismo ?? c.nombreOrganismo, rut: c.rutOrganismo, publicada: c.fechaPublicacion, cierre: c.fechaCierre, estado: c.estado ?? c.nombreEstado, motivo: c.motivo, encargado: c.nombreUsuario, descripcion: String(c.descripcion ?? "").slice(0, 400), preguntas: Array.isArray(c.preguntas) ? c.preguntas.length : c.cantidadPreguntas, adjuntos: Array.isArray(c.adjuntos) ? c.adjuntos.map((a: any) => a.nombre).slice(0, 6) : undefined, reuniones: Array.isArray(c.reuniones) ? c.reuniones.length : undefined, url: CM_FICHA + (c.codigoConsulta ?? c.codigo ?? "") });
 
@@ -220,8 +225,13 @@ Deno.serve(async (req) => {
     // Consultas al mercado (RFI): las del organismo y las del mismo producto en todo el Estado. Dependen de las palabras clave.
     res.rfi = await cache(sb, `rfi:${normalizar(institucion)}:${kw.slice(0, 2).join("+")}`, 3, async () => {
       const tok = await cmToken(); if (!tok) return { organismo: [], producto: [], sin_acceso: true };
-      const orgQ = normalizar(institucion).replace(/\b(i|ilustre|de|la|el|del|los|las|y)\b/g, " ").replace(/\s+/g, " ").trim().split(" ").slice(0, 3).join(" ");
-      const [porOrg, porProd] = await Promise.all([cmListar(tok, { organismoComprador: orgQ }), kw.length ? cmListar(tok, { palabraClave: kw[0] }) : Promise.resolve([])]);
+      // Del organismo: por RUT si el filtro lo acepta; si no, por su palabra más distintiva y filtrando por RUT o nombre.
+      const rutOrg = String(rut ?? "").replace(/\./g, "");
+      const mismoOrg = (c: any) => (rutOrg && String(c.rutOrganismo ?? "").replace(/\./g, "") === rutOrg) || (normalizar(String(c.nombreInstitucion ?? "")) === normalizar(institucion));
+      const palabrasOrg = normalizar(institucion).replace(/\b(i|ilustre|municipalidad|de|la|el|del|los|las|y|servicio|direccion|regional|hospital|salud|nacional)\b/g, " ").split(" ").filter((w) => w.length > 3);
+      let porOrg: any[] = rut ? await cmListar(tok, { organismoComprador: String(rut) }) : [];
+      if (!porOrg.length && palabrasOrg.length) porOrg = (await cmListar(tok, { palabraClave: palabrasOrg[palabrasOrg.length - 1] }, 36, 3)).filter(mismoOrg);
+      const porProd: any[] = kw.length ? await cmListar(tok, { palabraClave: kw[0] }) : [];
       const vistos = new Set<string>();
       const dedup = (l: any[]) => l.map(cmResumen).filter((x) => x.codigo && !vistos.has(String(x.codigo)) && vistos.add(String(x.codigo)));
       const organismo = dedup(porOrg).slice(0, 8); const producto = dedup(porProd).slice(0, 8);
