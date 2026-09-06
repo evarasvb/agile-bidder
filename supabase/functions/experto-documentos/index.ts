@@ -90,6 +90,14 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
 
     if (req.method === "GET") {
+      const idDescarga = url.searchParams.get("id");
+      if (idDescarga) {
+        const { data: doc } = await sb.rpc("experto_documento_ruta", { p_user_id: userId, p_id: idDescarga }).then((r) => ({ data: r.data?.[0] }));
+        if (!doc?.storage_path) return json({ error: "no_encontrado" }, 404);
+        const { data: firmada, error: errFirma } = await sb.storage.from(BUCKET).createSignedUrl(doc.storage_path, 300, { download: doc.nombre });
+        if (errFirma || !firmada) return json({ error: "firma", mensaje: errFirma?.message }, 500);
+        return json({ ok: true, url: firmada.signedUrl, nombre: doc.nombre });
+      }
       const codigo = (url.searchParams.get("codigo") ?? "").trim().toUpperCase();
       const { data, error } = await sb.rpc("experto_documentos_listar", { p_user_id: userId, p_codigo: codigo || null });
       if (error) return json({ error: error.message }, 500);
