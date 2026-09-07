@@ -49,6 +49,8 @@ export interface OportunidadDetalle extends OportunidadPanel {
   buyer: BuyerProfile | null;
   /** Solo compras ágiles: detalle completo bajado por código (entrega, ofertas, adjuntos). */
   detalle?: DetalleCompraAgilDatos | null;
+  /** Licitaciones: raw_data de licitaciones_bi (ficha completa de la API de Mercado Público). */
+  ficha?: Record<string, unknown> | null;
 }
 
 export interface OportunidadItem {
@@ -796,6 +798,7 @@ export function useOportunidadDetalle(id: string | null, tipo: 'compra_agil' | '
         created_at: (lic as any).created_at || (lic as any).fecha_publicacion,
         items: licItems,
         buyer,
+        ficha: (lic as any).raw_data ?? null,
       };
     },
     enabled: !!id && !!tipo,

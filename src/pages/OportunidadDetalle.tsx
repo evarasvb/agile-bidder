@@ -46,6 +46,8 @@ import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { AccionesCompartir } from '@/components/oportunidades/AccionesCompartir';
 import { DetalleCompraAgil } from '@/components/compras-agiles/DetalleCompraAgil';
+import { FichaMercadoPublico } from '@/components/licitaciones/FichaMercadoPublico';
+import { AdjuntosLicitacion } from '@/components/licitaciones/AdjuntosLicitacion';
 import { RiesgoOrganismoCard } from '@/components/organismo/RiesgoOrganismoCard';
 
 function formatCurrency(value: number | null) {
@@ -376,6 +378,11 @@ export default function OportunidadDetalle() {
           {oportunidad.tipo === 'compra_agil' && oportunidad.detalle && (
             <DetalleCompraAgil datos={oportunidad.detalle} />
           )}
+          {/* Licitación: ficha completa con lo que guardamos de la API de Mercado Público */}
+          {oportunidad.tipo === 'licitacion' && oportunidad.ficha && (
+            <FichaMercadoPublico codigo={oportunidad.codigo} raw={oportunidad.ficha} />
+          )}
+          {oportunidad.tipo === 'licitacion' && <AdjuntosLicitacion codigo={oportunidad.codigo} />}
           {/* Description (licitaciones) */}
           {oportunidad.tipo !== 'compra_agil' && oportunidad.descripcion && (
             <Card>

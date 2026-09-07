@@ -13,7 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
-import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink, Trash2, Paperclip, Printer, Mail, Map as MapIcon, Image as ImageIcon, Presentation, Waves } from 'lucide-react';
+import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink, Trash2, Paperclip, Printer, Mail, Map as MapIcon, Image as ImageIcon, Presentation, Waves, Download } from 'lucide-react';
+import { useTraerAdjuntos } from '@/hooks/useAdjuntosLicitacion';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -197,6 +198,19 @@ export default function LibroLicitacion() {
 
   // Fuentes subidas (una sola entrada): PDF de bases (se reconocen solos y quedan para todos), Excel, Word,
   // imágenes o texto (privados, cuentan para el cupo del plan). Varios archivos a la vez, uno tras otro.
+  // Bases y anexos directo desde la ficha de Mercado Público (robot licitacion-adjuntos).
+  const traerAdjuntos = useTraerAdjuntos(cod);
+  const traerBasesMP = () =>
+    traerAdjuntos.mutate(undefined, {
+      onSuccess: (r) => {
+        if (!r.encontrados) toast.info('Mercado Público no muestra anexos para esta licitación todavía.');
+        else if (!r.nuevos) toast.info('Ya teníamos todos los anexos publicados.');
+        else toast.success(`${r.nuevos} archivo(s) bajado(s)${r.bases ? ` · ${r.bases} leído(s) como bases` : ''}`);
+        if (r.errores?.length) toast.warning(r.errores[0]);
+      },
+      onError: (e) => toast.error(e.message),
+    });
+
   const subirFuentes = async (files: FileList | File[]) => {
     const lista = Array.from(files); if (!lista.length) return;
     setOcupado('fuentes');
@@ -453,6 +467,9 @@ export default function LibroLicitacion() {
                 <p className="font-medium flex items-center gap-1"><Upload className="h-4 w-4" />Fuentes subidas · bases (PDF)</p>
                 {bases.length ? bases.map((b) => <p key={b.id} className="text-muted-foreground truncate">{b.archivo} · {b.paginas} pág.</p>) : <p className="text-muted-foreground">Nadie las ha subido aún.</p>}
                 <input ref={fileRef} type="file" multiple accept=".pdf,.xlsx,.xls,.xlsm,.csv,.docx,.txt,.md,.png,.jpg,.jpeg,.gif,.webp" className="hidden" onChange={(e) => { if (e.target.files?.length) subirFuentes(e.target.files); e.target.value = ''; }} />
+                <Button size="sm" variant="outline" className="mt-1 mr-2" onClick={traerBasesMP} disabled={!!ocupado || traerAdjuntos.isPending} title="Baja las bases y anexos publicados en la ficha de Mercado Público y el Experto los lee">
+                  {traerAdjuntos.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Download className="h-4 w-4 mr-1" />}Traer bases desde Mercado Público
+                </Button>
                 <Button size="sm" variant="outline" className="mt-1" onClick={() => fileRef.current?.click()} disabled={ocupado === 'fuentes'}>
                   {ocupado === 'fuentes' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}Subir fuentes (PDF, Excel, Word, imágenes)
                 </Button>
