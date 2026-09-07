@@ -146,6 +146,18 @@ function OpportunityCard({
           <Building2 className="h-3 w-3 shrink-0" />
           <span className="truncate">{op.organismo}</span>
         </div>
+        {op.tipo === "compra_agil" && op.items_detalle && op.items_detalle.length > 0 ? (
+          // Lo que realmente piden, ítem por ítem (cantidad · descripción de la ficha).
+          // El título de la compra suele ser genérico ("Materiales de reparación").
+          <ul className="text-xs text-foreground/80 space-y-0.5">
+            {op.items_detalle.slice(0, 3).map((t, i) => (
+              <li key={i} className="truncate" title={t}>· {t}</li>
+            ))}
+            {op.items_detalle.length > 3 ? (
+              <li className="text-muted-foreground">+{op.items_detalle.length - 3} ítems más</li>
+            ) : null}
+          </ul>
+        ) : null}
         {op.coincidencia ? (
           // Por qué aparece: el ítem de la lista de productos que calzó con la búsqueda.
           <p className="text-xs text-firmavb-blue truncate" title={op.coincidencia}>

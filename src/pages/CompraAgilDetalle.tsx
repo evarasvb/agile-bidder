@@ -361,9 +361,12 @@ export default function CompraAgilDetalle() {
                   <div key={f.id} className={`rounded-xl border p-3 ${f.estado === 'descartado' ? 'border-border/60 opacity-60' : f.match ? 'border-firmavb-blue/30' : 'border-border/60'}`}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium ${f.estado === 'descartado' ? 'line-through' : ''}`}>
-                          {f.solicitado ?? <span className="italic text-muted-foreground">Agregado por ti</span>}
+                        <p className={`text-sm font-medium whitespace-pre-line ${f.estado === 'descartado' ? 'line-through' : ''}`}>
+                          {f.descripcion || f.solicitado || <span className="italic text-muted-foreground">Agregado por ti</span>}
                         </p>
+                        {f.descripcion && f.solicitado && (
+                          <p className="text-xs text-muted-foreground">Categoría: {f.solicitado}</p>
+                        )}
                         <EstadoBadge estado={f.estado} />
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
@@ -414,11 +417,13 @@ export default function CompraAgilDetalle() {
                   {filasTotal.map((f) => (
                     <TableRow key={f.id} className={f.estado === 'descartado' ? 'opacity-60' : ''}>
                       <TableCell className="align-top">
-                        <p className={`font-medium ${f.estado === 'descartado' ? 'line-through' : ''}`}>
-                          {f.solicitado ?? <span className="italic text-muted-foreground">Agregado por ti</span>}
+                        {/* Lo que piden de verdad es la descripción de la ficha; el
+                            nombre_producto es la categoría ONU genérica ("Sillas"). */}
+                        <p className={`font-medium max-w-md whitespace-pre-line ${f.estado === 'descartado' ? 'line-through' : ''}`}>
+                          {f.descripcion || f.solicitado || <span className="italic text-muted-foreground">Agregado por ti</span>}
                         </p>
-                        {f.descripcion && (
-                          <p className="text-xs text-muted-foreground max-w-xs truncate">{f.descripcion}</p>
+                        {f.descripcion && f.solicitado && (
+                          <p className="text-xs text-muted-foreground">Categoría: {f.solicitado}</p>
                         )}
                         <EstadoBadge estado={f.estado} />
                       </TableCell>
