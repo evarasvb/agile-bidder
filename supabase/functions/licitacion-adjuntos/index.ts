@@ -7,6 +7,9 @@
 //   GET  ?codigo=X             -> adjuntos guardados (con link firmado de 1 h si hay sesión)
 //   POST {codigo}              -> baja lo que falte (sesión o service_role)
 //   POST {auto:true, limit:2}  -> service_role (cron): licitaciones con match aún sin revisar
+//   POST {bases:true, limit:2} -> service_role (cron): PDF de bases que el Experto aún no leyó
+// Leer las bases (texto + Gemini) tarda más que bajarlas, así que se hace aparte: el archivo
+// queda marcado bases_pendiente y se lee con el tiempo que sobre o en la pasada del cron.
 import { createClient, SupabaseClient } from "jsr:@supabase/supabase-js@2";
 
 const cors = {
@@ -21,6 +24,8 @@ const MAX_BASES_BYTES = 20 * 1024 * 1024;
 const MAX_BASES_POR_LIC = 4;
 const PRESUPUESTO_MS = 110_000;
 const RE_CODIGO = /^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}$/;
+const RE_BASES = /bases|resol|administrativ|t[ée]cnic|licitaci|aprueba/i;
+const MIN_MS_LECTURA = 45_000;
 const MIME: Record<string, string> = {
   pdf: "application/pdf",
   doc: "application/msword",
@@ -85,7 +90,6 @@ async function procesar(sb: SupabaseClient, codigo: string, deadline: number): P
     const guardados = new Set<string>((previos ?? []).map((p: { nombre: string }) => p.nombre));
     const { data: basesPrev } = await sb.from("bases_licitacion").select("archivo").eq("codigo", codigo);
     const basesNombres = new Set<string>((basesPrev ?? []).map((b: { archivo: string }) => b.archivo));
-    let basesCount = basesNombres.size;
 
     for (const enc of encs) {
       if (Date.now() > deadline) { res.pendientes++; continue; }
@@ -122,22 +126,12 @@ async function procesar(sb: SupabaseClient, codigo: string, deadline: number): P
           const up = await sb.storage.from(BUCKET).upload(storagePath, bytes, { contentType, upsert: true });
           if (up.error) { res.errores.push(`${f.nombre}: storage ${up.error.message}`); continue; }
 
-          // PDF que parece bases: lo lee el Experto (texto + resumen), como si lo hubiera subido un usuario.
-          let basesId: string | null = null;
+          // PDF que parece bases: queda pendiente para que el Experto lo lea (texto + resumen).
           const pinta = `${f.nombre} ${f.tipo ?? ""} ${f.descripcion ?? ""}`;
-          if (esPdf && bytes.length <= MAX_BASES_BYTES && basesCount < MAX_BASES_POR_LIC && !basesNombres.has(f.nombre) && /bases|resol|administrativ|t[ée]cnic|licitaci|aprueba/i.test(pinta)) {
-            const sk = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-            const r4 = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/experto-bases`, {
-              method: "POST", body: bytes, signal: AbortSignal.timeout(90000),
-              headers: { "Content-Type": "application/pdf", Authorization: `Bearer ${sk}`, apikey: sk, "X-Codigo": codigo, "X-Nombre": encodeURIComponent(f.nombre) },
-            }).catch((e) => { console.error("experto-bases", String(e)); return null; });
-            const j = r4 ? await r4.json().catch(() => ({})) : {};
-            if (r4?.ok && j.id) { basesId = j.id; basesCount++; basesNombres.add(f.nombre); res.bases++; }
-            else if (j?.error) console.log(`bases omitidas ${f.nombre}: ${j.error}`);
-          }
+          const basesPendiente = esPdf && bytes.length <= MAX_BASES_BYTES && !basesNombres.has(f.nombre) && RE_BASES.test(pinta);
           const { error: errFila } = await sb.from("licitaciones_adjuntos").upsert({
             codigo, nombre: f.nombre, tipo: f.tipo, descripcion: f.descripcion, fecha_adjunto: f.fecha, bytes: bytes.length,
-            content_type: contentType, storage_path: storagePath, es_bases: !!basesId, bases_id: basesId, bajado_en: new Date().toISOString(),
+            content_type: contentType, storage_path: storagePath, es_bases: false, bases_id: null, bases_pendiente: basesPendiente, bajado_en: new Date().toISOString(),
           }, { onConflict: "codigo,nombre" });
           if (errFila) { res.errores.push(`${f.nombre}: ${errFila.message}`); continue; }
           guardados.add(f.nombre);
@@ -147,6 +141,7 @@ async function procesar(sb: SupabaseClient, codigo: string, deadline: number): P
         }
       }
     }
+    res.bases = await leerBasesPendientes(sb, deadline, codigo);
     await sb.from("licitaciones_adjuntos_estado").upsert({
       codigo, revisado_en: new Date().toISOString(), archivos: guardados.size, pendientes: res.pendientes,
       error: res.errores.length ? res.errores.join(" | ").slice(0, 500) : null,
@@ -156,6 +151,43 @@ async function procesar(sb: SupabaseClient, codigo: string, deadline: number): P
     await sb.from("licitaciones_adjuntos_estado").upsert({ codigo, revisado_en: new Date().toISOString(), pendientes: 1, error: res.errores.join(" | ").slice(0, 500) });
   }
   return finalizar(sb, res, t0);
+}
+
+// Lee con experto-bases los PDF marcados bases_pendiente (de una licitación o de todas), de a uno,
+// respetando MAX_BASES_POR_LIC y el tiempo que queda. Devuelve cuántos quedaron leídos.
+async function leerBasesPendientes(sb: SupabaseClient, deadline: number, codigo?: string, limite = 20): Promise<number> {
+  let leidas = 0;
+  let q = sb.from("licitaciones_adjuntos").select("id, codigo, nombre, storage_path, bytes").eq("bases_pendiente", true).order("bajado_en").limit(limite);
+  if (codigo) q = q.eq("codigo", codigo);
+  const { data: filas } = await q;
+  const sk = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  for (const f of (filas ?? []) as { id: string; codigo: string; nombre: string; storage_path: string; bytes: number }[]) {
+    const restante = deadline - Date.now();
+    if (restante < MIN_MS_LECTURA) break;
+    const { count } = await sb.from("bases_licitacion").select("id", { count: "exact", head: true }).eq("codigo", f.codigo);
+    if ((count ?? 0) >= MAX_BASES_POR_LIC) { await sb.from("licitaciones_adjuntos").update({ bases_pendiente: false }).eq("id", f.id); continue; }
+    const { data: blob, error: errBajar } = await sb.storage.from(BUCKET).download(f.storage_path);
+    if (errBajar || !blob) { console.error("bases download", f.storage_path, errBajar?.message); await sb.from("licitaciones_adjuntos").update({ bases_pendiente: false }).eq("id", f.id); continue; }
+    try {
+      const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/experto-bases`, {
+        method: "POST", body: await blob.arrayBuffer(), signal: AbortSignal.timeout(restante - 5000),
+        headers: { "Content-Type": "application/pdf", Authorization: `Bearer ${sk}`, apikey: sk, "X-Codigo": f.codigo, "X-Nombre": encodeURIComponent(f.nombre) },
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.id) {
+        await sb.from("licitaciones_adjuntos").update({ es_bases: true, bases_id: j.id, bases_pendiente: false }).eq("id", f.id);
+        leidas++;
+      } else {
+        // PDF escaneado, ilegible o demasiado grande: no se reintenta. Otros errores (Gemini caído) sí.
+        console.log(`bases no leídas ${f.codigo} ${f.nombre}: ${j.error ?? r.status}`);
+        if (["sin_texto", "lectura", "no_pdf", "tamano"].includes(String(j.error))) await sb.from("licitaciones_adjuntos").update({ bases_pendiente: false }).eq("id", f.id);
+      }
+    } catch (e) {
+      console.log(`bases timeout ${f.codigo} ${f.nombre}: ${String(e).slice(0, 80)}`); // queda pendiente para la próxima pasada
+      break;
+    }
+  }
+  return leidas;
 }
 
 function finalizar(_sb: SupabaseClient, res: Resultado, t0: number): Resultado {
@@ -174,7 +206,7 @@ Deno.serve(async (req) => {
       const codigo = (new URL(req.url).searchParams.get("codigo") ?? "").trim().toUpperCase();
       if (!RE_CODIGO.test(codigo)) return json({ error: "codigo" }, 400);
       const [{ data: filas }, { data: estado }] = await Promise.all([
-        sb.from("licitaciones_adjuntos").select("id, nombre, tipo, descripcion, fecha_adjunto, bytes, content_type, storage_path, es_bases, bajado_en").eq("codigo", codigo).order("bajado_en"),
+        sb.from("licitaciones_adjuntos").select("id, nombre, tipo, descripcion, fecha_adjunto, bytes, content_type, storage_path, es_bases, bases_pendiente, bajado_en").eq("codigo", codigo).order("bajado_en"),
         sb.from("licitaciones_adjuntos_estado").select("revisado_en, archivos, pendientes, error").eq("codigo", codigo).maybeSingle(),
       ]);
       let adjuntos = (filas ?? []) as Record<string, unknown>[];
@@ -189,6 +221,11 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const deadline = t0 + PRESUPUESTO_MS;
+    if (body.bases) {
+      if (role !== "service_role") return json({ error: "solo_servicio" }, 403);
+      const leidas = await leerBasesPendientes(sb, deadline, undefined, Number(body.limit ?? 2));
+      return json({ leidas, ms: Date.now() - t0 });
+    }
     if (body.auto) {
       if (role !== "service_role") return json({ error: "solo_servicio" }, 403);
       const { data: cods, error } = await sb.rpc("licitaciones_adjuntos_pendientes", { p_limite: Number(body.limit ?? 2) });

@@ -14,6 +14,7 @@ export interface AdjuntoLicitacion {
   bytes: number | null;
   content_type: string | null;
   es_bases: boolean;
+  bases_pendiente?: boolean;
   bajado_en: string;
   /** Link firmado (1 h). Solo viene con sesión iniciada. */
   url?: string | null;

@@ -70,3 +70,17 @@ select cron.schedule('licitacion-adjuntos-auto', '25,55 * * * *', $$
       'Authorization','Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'service_role_jwt_legacy')),
     body := '{"auto":true,"limit":2}'::jsonb, timeout_milliseconds := 120000);
 $$);
+
+-- Leer las bases (texto + Gemini) tarda más que bajarlas: el PDF queda marcado bases_pendiente
+-- y lo lee el tiempo que sobre de la descarga o esta pasada cada 10 minutos.
+alter table public.licitaciones_adjuntos add column if not exists bases_pendiente boolean not null default false;
+create index if not exists licitaciones_adjuntos_bases_pendiente_idx on public.licitaciones_adjuntos (bajado_en) where bases_pendiente;
+
+select cron.unschedule(jobid) from cron.job where jobname = 'licitacion-bases-pendientes';
+select cron.schedule('licitacion-bases-pendientes', '3,13,23,33,43,53 * * * *', $$
+  select net.http_post(
+    url := 'https://juiskeeutbaipwbeeezw.supabase.co/functions/v1/licitacion-adjuntos',
+    headers := jsonb_build_object('Content-Type','application/json',
+      'Authorization','Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'service_role_jwt_legacy')),
+    body := '{"bases":true,"limit":2}'::jsonb, timeout_milliseconds := 120000);
+$$);

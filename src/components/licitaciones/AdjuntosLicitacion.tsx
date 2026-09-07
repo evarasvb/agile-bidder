@@ -59,9 +59,11 @@ export function AdjuntosLicitacion({ codigo }: { codigo: string }) {
                     {[a.tipo, tamano(a.bytes), a.fecha_adjunto].filter(Boolean).join(' · ')}
                   </p>
                 </div>
-                {a.es_bases && (
+                {a.es_bases ? (
                   <Badge variant="secondary" className="shrink-0 gap-1"><Sparkles className="h-3 w-3" />Leído por el Experto</Badge>
-                )}
+                ) : a.bases_pendiente ? (
+                  <Badge variant="outline" className="shrink-0 gap-1"><Loader2 className="h-3 w-3 animate-spin" />El Experto lo está leyendo</Badge>
+                ) : null}
               </li>
             ))}
           </ul>
