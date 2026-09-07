@@ -19,10 +19,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, Upload, Image as ImageIcon } from 'lucide-react';
+import { Loader2, Upload, Image as ImageIcon, Sparkles, Check } from 'lucide-react';
 import { InventoryInput } from '@/hooks/useInventory';
 import { useAuthUser } from '@/hooks/useCliente';
 import { uploadProductImage, isValidImageFile } from '@/hooks/useProductImageUpload';
+import { useSugerirProductoNuevo } from '@/hooks/useEnriquecerInventario';
 import { toast } from 'sonner';
 
 interface AddProductDialogProps {
@@ -81,6 +82,36 @@ export function AddProductDialog({
   const [keywordsInput, setKeywordsInput] = useState('');
   const { user } = useAuthUser();
   const [subiendoFoto, setSubiendoFoto] = useState(false);
+  const sugerir = useSugerirProductoNuevo();
+  const [candidatasFoto, setCandidatasFoto] = useState<{ url: string; thumb: string }[]>([]);
+
+  const handleSugerirIA = async () => {
+    if (!formData.nombre_producto.trim()) {
+      toast.error('Escribe primero el nombre del producto');
+      return;
+    }
+    try {
+      const r = await sugerir.mutateAsync({
+        nombre: formData.nombre_producto,
+        categoria: formData.categoria,
+        descripcion: formData.descripcion || undefined,
+      });
+      if (r.descripcion && !formData.descripcion) {
+        setFormData((prev) => ({ ...prev, descripcion: r.descripcion! }));
+      }
+      if (r.palabras_clave?.length && !keywordsInput) {
+        setKeywordsInput(r.palabras_clave.join(', '));
+      }
+      setCandidatasFoto(r.candidatas || []);
+      if (!r.candidatas?.length && !r.descripcion) {
+        toast.error('La IA no encontró sugerencias para este producto');
+      } else {
+        toast.success('Sugerencias listas: revisa descripción y fotos');
+      }
+    } catch {
+      // el hook ya muestra el toast de error
+    }
+  };
 
   const handleFoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -131,6 +162,7 @@ export function AddProductDialog({
         activo: true,
       });
       setKeywordsInput('');
+      setCandidatasFoto([]);
     } catch (error) {
       console.error('Error saving product:', error);
     }
@@ -192,15 +224,54 @@ export function AddProductDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="descripcion">Descripción</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="descripcion">Descripción</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 text-xs text-primary"
+                onClick={handleSugerirIA}
+                disabled={sugerir.isPending}
+              >
+                {sugerir.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                Sugerir con IA
+              </Button>
+            </div>
             <Textarea
               id="descripcion"
-              placeholder="Descripción detallada del producto..."
+              placeholder="Descripción detallada del producto... o usa 'Sugerir con IA' arriba"
               value={formData.descripcion || ''}
               onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
               rows={2}
             />
+            <p className="text-xs text-muted-foreground">
+              La IA también propone palabras clave y fotos genéricas del producto (abajo) a partir del nombre y la categoría.
+            </p>
           </div>
+
+          {candidatasFoto.length > 0 && (
+            <div className="space-y-2">
+              <Label>Fotos sugeridas por IA</Label>
+              <div className="flex gap-2 flex-wrap">
+                {candidatasFoto.map((c) => (
+                  <button
+                    key={c.url}
+                    type="button"
+                    onClick={() => { setFormData((prev) => ({ ...prev, imagen_url: c.url })); toast.success('Foto seleccionada'); }}
+                    className="relative h-16 w-16 rounded-lg border overflow-hidden shrink-0 hover:ring-2 hover:ring-primary transition"
+                  >
+                    <img src={c.thumb || c.url} alt="Sugerencia" className="h-full w-full object-cover" />
+                    {formData.imagen_url === c.url && (
+                      <span className="absolute inset-0 bg-primary/40 flex items-center justify-center">
+                        <Check className="h-6 w-6 text-white" />
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Foto del producto</Label>
