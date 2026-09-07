@@ -101,7 +101,7 @@ export function ExpertoComodin() {
               <PhoneCall className="h-6 w-6" />
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="text-2xl font-bold">¿Te trabaste en una licitación? Usa tu comodín telefónico: llama al Experto</h2>
+              <h2 className="text-2xl font-bold">¿Dudas de Mercado Público? Pregúntale a Evaristo, tu experto</h2>
               <p className="mt-2 text-muted-foreground">
                 17 años vendiéndole al Estado, la Ley 19.886, 3.148 dictámenes de Contraloría y los datos vivos de Mercado Público
                 (quién gana, cómo paga cada organismo). Tu primera pregunta es gratis y se responde aquí mismo.
@@ -111,9 +111,9 @@ export function ExpertoComodin() {
                   <form className="mt-5 flex flex-col sm:flex-row gap-2" onSubmit={(e) => { e.preventDefault(); preguntar(q); }}>
                     <Input value={q} onChange={(e) => setQ(e.target.value)} disabled={estado === "cargando"}
                       placeholder="Escribe tu pregunta, ej. ¿Puedo reclamar si evaluaron mal mi oferta?"
-                      className="h-12 text-base" aria-label="Pregunta para el Experto FirmaVB" />
+                      className="h-12 text-base" aria-label="Pregunta para Evaristo" />
                     <Button type="submit" size="lg" disabled={estado === "cargando"} className="h-12 bg-firmavb-blue hover:bg-firmavb-blue/90 whitespace-nowrap">
-                      {estado === "cargando" ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Llamar al Experto<ArrowRight className="ml-2 h-4 w-4" /></>}
+                      {estado === "cargando" ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Preguntar a Evaristo<ArrowRight className="ml-2 h-4 w-4" /></>}
                     </Button>
                   </form>
                   {estado === "idle" && (
