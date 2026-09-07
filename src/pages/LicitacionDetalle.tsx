@@ -27,6 +27,7 @@ import { supabaseClient } from '@/lib/supabaseClient';
 import { useLicitacionItemsReal } from '@/hooks/useLicitacionItemsReal';
 import LicitacionesSimilares from '@/components/licitaciones/LicitacionesSimilares';
 import { LicitacionItemsMatch } from '@/components/licitaciones/LicitacionItemsMatch';
+import { FichaMercadoPublico } from '@/components/licitaciones/FichaMercadoPublico';
 import { useDocumentosLicitacion } from '@/hooks/useChatIA';
 import { RiesgoOrganismoCard } from '@/components/organismo/RiesgoOrganismoCard';
 import { AccionesCompartir } from '@/components/oportunidades/AccionesCompartir';
@@ -386,6 +387,10 @@ export default function LicitacionDetalle() {
           )}
 
           {/* Productos solicitados con match e corrección por ítem */}
+          {licitacion.tipo === 'licitacion_bi' && (
+            <FichaMercadoPublico codigo={licitacion.codigo} raw={licitacion.datos_json} />
+          )}
+
           <LicitacionItemsMatch codigo={licitacion.codigo} items={items} />
 
           {/* Similar Tenders */}
