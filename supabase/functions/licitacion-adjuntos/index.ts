@@ -20,7 +20,8 @@ const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,
 const MP = "https://www.mercadopublico.cl/Procurement/Modules";
 const BUCKET = "bases-licitacion";
 const MAX_BYTES = 30 * 1024 * 1024;
-const MAX_BASES_BYTES = 20 * 1024 * 1024;
+// experto-bases corre en una sola petición (tope ~150 s de la plataforma): sobre 6 MB no alcanza a leer.
+const MAX_BASES_BYTES = 6 * 1024 * 1024;
 const MAX_BASES_POR_LIC = 4;
 const PRESUPUESTO_MS = 110_000;
 // Leer bases (unpdf + Gemini sobre PDF grandes) puede pasar los 2 minutos: en modo bases se usa
@@ -171,6 +172,7 @@ async function leerBasesPendientes(sb: SupabaseClient, deadline: number, codigo?
     const restante = deadline - Date.now();
     if (restante < MIN_MS_LECTURA) break;
     await sb.from("licitaciones_adjuntos").update({ bases_intento_en: new Date().toISOString() }).eq("id", f.id);
+    if (f.bytes > MAX_BASES_BYTES) { await sb.from("licitaciones_adjuntos").update({ bases_pendiente: false }).eq("id", f.id); continue; }
     const { count } = await sb.from("bases_licitacion").select("id", { count: "exact", head: true }).eq("codigo", f.codigo);
     if ((count ?? 0) >= MAX_BASES_POR_LIC) { await sb.from("licitaciones_adjuntos").update({ bases_pendiente: false }).eq("id", f.id); continue; }
     const { data: blob, error: errBajar } = await sb.storage.from(BUCKET).download(f.storage_path);
@@ -185,9 +187,10 @@ async function leerBasesPendientes(sb: SupabaseClient, deadline: number, codigo?
         await sb.from("licitaciones_adjuntos").update({ es_bases: true, bases_id: j.id, bases_pendiente: false }).eq("id", f.id);
         leidas++;
       } else {
-        // PDF escaneado, ilegible o demasiado grande: no se reintenta. Otros errores (Gemini caído) sí.
+        // PDF escaneado, ilegible, demasiado grande o que agota el tiempo de experto-bases (504): no se
+        // reintenta. Otros errores (Gemini caído, 5xx transitorio distinto) sí.
         console.log(`bases no leídas ${f.codigo} ${f.nombre}: ${j.error ?? r.status}`);
-        if (["sin_texto", "lectura", "no_pdf", "tamano"].includes(String(j.error))) await sb.from("licitaciones_adjuntos").update({ bases_pendiente: false }).eq("id", f.id);
+        if (["sin_texto", "lectura", "no_pdf", "tamano"].includes(String(j.error)) || r.status === 504) await sb.from("licitaciones_adjuntos").update({ bases_pendiente: false }).eq("id", f.id);
       }
     } catch (e) {
       console.log(`bases timeout ${f.codigo} ${f.nombre}: ${String(e).slice(0, 80)}`); // queda pendiente para la próxima pasada

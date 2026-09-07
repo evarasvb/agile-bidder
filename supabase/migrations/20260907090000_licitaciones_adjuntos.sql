@@ -87,3 +87,6 @@ $$);
 
 -- Guarda contra corridas solapadas del cron de lectura: cuándo se tomó el archivo por última vez.
 alter table public.licitaciones_adjuntos add column if not exists bases_intento_en timestamptz;
+
+-- Guarda contra corridas superpuestas del cron de lectura: cuándo se intentó leer cada PDF.
+alter table public.licitaciones_adjuntos add column if not exists bases_intento_en timestamptz;
