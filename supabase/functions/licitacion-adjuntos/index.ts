@@ -23,6 +23,9 @@ const MAX_BYTES = 30 * 1024 * 1024;
 const MAX_BASES_BYTES = 20 * 1024 * 1024;
 const MAX_BASES_POR_LIC = 4;
 const PRESUPUESTO_MS = 110_000;
+// Leer bases (unpdf + Gemini sobre PDF grandes) puede pasar los 2 minutos: en modo bases se usa
+// casi todo el tope del plan Pro (400 s). pg_net corta su espera a los 120 s, pero la corrida sigue.
+const PRESUPUESTO_BASES_MS = 330_000;
 const RE_CODIGO = /^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}$/;
 const RE_BASES = /bases|resol|administrativ|t[ée]cnic|licitaci|aprueba/i;
 const MIN_MS_LECTURA = 45_000;
@@ -157,13 +160,17 @@ async function procesar(sb: SupabaseClient, codigo: string, deadline: number): P
 // respetando MAX_BASES_POR_LIC y el tiempo que queda. Devuelve cuántos quedaron leídos.
 async function leerBasesPendientes(sb: SupabaseClient, deadline: number, codigo?: string, limite = 20): Promise<number> {
   let leidas = 0;
-  let q = sb.from("licitaciones_adjuntos").select("id, codigo, nombre, storage_path, bytes").eq("bases_pendiente", true).order("bajado_en").limit(limite);
+  // Se saltan las filas que otra corrida tomó hace menos de 10 minutos (el cron puede solaparse).
+  const hace10 = new Date(Date.now() - 10 * 60_000).toISOString();
+  let q = sb.from("licitaciones_adjuntos").select("id, codigo, nombre, storage_path, bytes").eq("bases_pendiente", true)
+    .or(`bases_intento_en.is.null,bases_intento_en.lt.${hace10}`).order("bajado_en").limit(limite);
   if (codigo) q = q.eq("codigo", codigo);
   const { data: filas } = await q;
   const sk = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   for (const f of (filas ?? []) as { id: string; codigo: string; nombre: string; storage_path: string; bytes: number }[]) {
     const restante = deadline - Date.now();
     if (restante < MIN_MS_LECTURA) break;
+    await sb.from("licitaciones_adjuntos").update({ bases_intento_en: new Date().toISOString() }).eq("id", f.id);
     const { count } = await sb.from("bases_licitacion").select("id", { count: "exact", head: true }).eq("codigo", f.codigo);
     if ((count ?? 0) >= MAX_BASES_POR_LIC) { await sb.from("licitaciones_adjuntos").update({ bases_pendiente: false }).eq("id", f.id); continue; }
     const { data: blob, error: errBajar } = await sb.storage.from(BUCKET).download(f.storage_path);
@@ -223,7 +230,7 @@ Deno.serve(async (req) => {
     const deadline = t0 + PRESUPUESTO_MS;
     if (body.bases) {
       if (role !== "service_role") return json({ error: "solo_servicio" }, 403);
-      const leidas = await leerBasesPendientes(sb, deadline, undefined, Number(body.limit ?? 2));
+      const leidas = await leerBasesPendientes(sb, t0 + PRESUPUESTO_BASES_MS, undefined, Number(body.limit ?? 2));
       return json({ leidas, ms: Date.now() - t0 });
     }
     if (body.auto) {

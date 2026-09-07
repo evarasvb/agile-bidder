@@ -84,3 +84,6 @@ select cron.schedule('licitacion-bases-pendientes', '3,13,23,33,43,53 * * * *', 
       'Authorization','Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'service_role_jwt_legacy')),
     body := '{"bases":true,"limit":2}'::jsonb, timeout_milliseconds := 120000);
 $$);
+
+-- Guarda contra corridas solapadas del cron de lectura: cuándo se tomó el archivo por última vez.
+alter table public.licitaciones_adjuntos add column if not exists bases_intento_en timestamptz;
