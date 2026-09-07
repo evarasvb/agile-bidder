@@ -20,6 +20,33 @@ export interface EnriquecerResumen {
   mensaje?: string;
 }
 
+export interface SugerenciaBorrador {
+  descripcion: string | null;
+  palabras_clave: string[];
+  marca: string | null;
+  candidatas: { url: string; thumb: string; fuente: string }[];
+  fuente_texto: 'ia' | 'sin_ia';
+}
+
+/**
+ * Sugiere descripción, palabras clave y fotos de banco para un producto que el
+ * usuario todavía está creando (sin guardar, sin id). No toca la base de datos.
+ */
+export function useSugerirProductoNuevo() {
+  return useMutation({
+    mutationFn: async (borrador: { nombre: string; categoria?: string; marca?: string; descripcion?: string }) => {
+      const { data, error } = await supabase.functions.invoke('enriquecer-inventario', {
+        body: { borrador },
+      });
+      if (error) throw error;
+      return data as SugerenciaBorrador;
+    },
+    onError: (e: Error) => {
+      toast.error(e.message || 'No se pudo sugerir con IA');
+    },
+  });
+}
+
 /**
  * Enriquece el inventario con IA: descripción robusta, palabras clave, marca y
  * una foto de banco (Pexels). Por defecto completa lo que falta (no pisa lo que

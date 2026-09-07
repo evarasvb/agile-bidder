@@ -183,7 +183,48 @@ serve(async (req) => {
   );
 
   try {
-    const body = await req.json().catch(() => ({})) as { ids?: string[]; overwrite?: boolean; limite?: number };
+    const body = await req.json().catch(() => ({})) as {
+      ids?: string[]; overwrite?: boolean; limite?: number;
+      borrador?: { nombre?: string; categoria?: string; marca?: string; descripcion?: string };
+    };
+
+    // Modo borrador: producto que el usuario todavía está creando (sin guardar
+    // aún, sin id). Sugerimos descripción + palabras clave + fotos candidatas
+    // sin tocar la base de datos; el frontend decide qué aplicar al formulario.
+    if (body.borrador) {
+      if (!body.borrador.nombre) {
+        return new Response(JSON.stringify({ error: 'Falta el nombre del producto' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const draft: ProductoRow = {
+        id: 'borrador',
+        sku: null,
+        nombre_producto: body.borrador.nombre,
+        nombre: null,
+        descripcion: body.borrador.descripcion || null,
+        categoria: body.borrador.categoria || null,
+        marca: body.borrador.marca || null,
+        imagen_url: null,
+        palabras_clave: null,
+      };
+      const iaItems = await enriquecerConIA([draft]);
+      const ia = iaItems?.[0] || {};
+      const query = ia.query_imagen || draft.nombre_producto || draft.categoria || '';
+      const urls = query ? await buscarFotos(query, 4) : [];
+      const candidatas = urls.map((u) => ({ url: u, thumb: u }));
+      return new Response(
+        JSON.stringify({
+          descripcion: ia.descripcion || null,
+          palabras_clave: ia.palabras_clave || [],
+          marca: ia.marca || null,
+          candidatas,
+          fuente_texto: iaItems ? 'ia' : 'sin_ia',
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const overwrite = body.overwrite ?? false;
     // Con galería (hasta 3 fotos por producto) bajamos el lote para no exceder
     // el tiempo de la función; el usuario puede volver a ejecutarlo.
