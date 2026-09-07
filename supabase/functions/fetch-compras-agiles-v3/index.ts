@@ -1,19 +1,32 @@
-// ROBOT Compras Ágiles v3.3 — tandas cortas con marca de agua por página.
+// ROBOT Compras Ágiles v3.4 — tandas cortas con marca de agua por página.
 // Ventana de 6 h por defecto: con 12 h o más la API supera sus 30 s y responde 504. La API de Mercado Público tarda 20-60 s por página en ventanas
 // de más de unas horas (con 15 s de timeout NUNCA respondía y la ingesta quedó en cero
 // durante 13 h el 04-09-2026): timeout de 60 s por página y presupuesto de 100 s por corrida.
 // Si una página falla (504/timeout) el cursor vuelve a 1: lo más nuevo siempre está en la página 1.
+// v3.4: ante un 504 se reintenta la misma página con una ventana más corta (6 h -> 4 h -> 2 h),
+// porque la API responde más rápido con menos cambios que devolver (07-09-2026: 6 h daba 504
+// seguido y 4 h respondía en 30 s). Las horas se convierten con la zona America/Santiago real
+// (la API entrega hora chilena, a veces con una "Z" falsa) y fecha_cierre es la vigente.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const cors = { 'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type' };
 const sleep = (ms:number)=>new Promise(r=>setTimeout(r,ms));
 const TTL_NORMAL = 21600000; // 6 h
+const ESCALERA_TTL = [14400000, 7200000]; // 4 h, 2 h: ventanas de respaldo cuando la API da 504
 const PRESUPUESTO_MS = 100000;
 const TIMEOUT_PAGINA_MS = 60000;
+const FMT_CL = new Intl.DateTimeFormat('en-US',{ timeZone:'America/Santiago', hourCycle:'h23', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+function offsetCl(d:Date):number{
+  const p:any = Object.fromEntries(FMT_CL.formatToParts(d).map(x=>[x.type,x.value]));
+  return Math.round((Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute) - d.getTime())/60000);
+}
+// Hora de pared chilena ("2026-09-08 12:15", "2026-09-08T12:15:00Z" con Z falsa) -> ISO UTC real.
 function parseCl(s:any):string|null{
-  if(!s) return null; let t=String(s).trim();
-  if(/(Z|[+\-]\d\d:?\d\d)$/.test(t)){ const d=new Date(t); return isNaN(d.getTime())?null:d.toISOString(); }
-  t = t.replace(' ','T'); if(t.length===16) t+=':00';
-  const d=new Date(t+'-04:00'); return isNaN(d.getTime())?null:d.toISOString();
+  if(!s) return null;
+  let t = String(s).trim().replace(' ','T').replace(/(\.\d+)?(Z|[+\-]\d\d:?\d\d)$/,'');
+  if(t.length===16) t += ':00';
+  const pared = new Date(t+'Z'); if(isNaN(pared.getTime())) return null;
+  const d = new Date(pared.getTime() - offsetCl(pared)*60000);
+  return isNaN(d.getTime()) ? null : d.toISOString();
 }
 const num=(v:any)=>(v===null||v===undefined||v==='')?null:Number(v);
 Deno.serve(async (req)=>{
@@ -28,9 +41,10 @@ Deno.serve(async (req)=>{
   // desde_pagina: barrido fijo de páginas más profundas (el cron horario cubre 4-6 mientras el
   // de cada 5 min cubre 1-3, que es donde aparece lo recién publicado).
   let pagina = desdePagina ?? (reiniciar ? 1 : (st?.pagina_actual ?? 1));
-  const ttl = ttlOverride ?? (st?.ttl_ms ?? TTL_NORMAL);
+  let ttl = ttlOverride ?? (st?.ttl_ms ?? TTL_NORMAL);
+  const escalera = ESCALERA_TTL.filter(t=>t<ttl);
   const t0 = Date.now();
-  const res:any = { desde_pagina:pagina, paginas:0, insertadas:0, total_paginas:st?.total_paginas??null, errores:[] as string[], pasada_completa:false };
+  const res:any = { desde_pagina:pagina, paginas:0, insertadas:0, total_paginas:st?.total_paginas??null, ttl_usado:ttl, errores:[] as string[], pasada_completa:false };
   const estado = async (extra:any)=>{ await sb.from('ingesta_ca_estado').update({ ...extra, updated_at:new Date().toISOString() }).eq('clave','compra_agil'); };
   await estado({ ultima_corrida:new Date().toISOString() });
   const B = 'https://api2.mercadopublico.cl/v2/compra-agil';
@@ -41,7 +55,12 @@ Deno.serve(async (req)=>{
     let data:any;
     try{
       let resp = await fetchT(url);
-      if(resp.status===429 || resp.status===504){ await sleep(2000); resp = await fetchT(url); }
+      if(resp.status===429){ await sleep(2000); resp = await fetchT(url); }
+      if(resp.status===504 && escalera.length && (Date.now()-t0) < PRESUPUESTO_MS - TIMEOUT_PAGINA_MS/2){
+        // La API no alcanza a responder con esta ventana: se baja un escalón y se reintenta la misma página.
+        ttl = escalera.shift()!; res.ttl_usado = ttl; res.errores.push(`p${pagina}: 504, reintento con ventana ${ttl/3600000} h`);
+        continue;
+      }
       if(!resp.ok){ res.errores.push(`p${pagina}: HTTP ${resp.status}`); fallo = true; break; }
       data = await resp.json();
       if(data.success!=='OK'){ res.errores.push(`p${pagina}: ${JSON.stringify(data.errors)}`); fallo = true; break; }
@@ -53,7 +72,8 @@ Deno.serve(async (req)=>{
       codigo: it.codigo, nombre: it.nombre||null,
       estado: it.estado?.glosa || it.estado?.codigo || null,
       fecha_publicacion: parseCl(it.fechas?.fecha_publicacion),
-      fecha_cierre: parseCl(it.fechas?.fecha_cierre_primer_llamado ?? it.fechas?.fecha_cierre),
+      // fecha_cierre es el cierre vigente (si hubo segundo llamado, el del segundo llamado).
+      fecha_cierre: parseCl(it.fechas?.fecha_cierre ?? it.fechas?.fecha_cierre_primer_llamado),
       fecha_cierre_segundo_llamado: parseCl(it.fechas?.fecha_cierre_segundo_llamado),
       monto_estimado: num(it.montos?.monto_disponible_clp ?? it.montos?.monto_disponible),
       moneda: it.montos?.moneda||'CLP',
@@ -77,7 +97,7 @@ Deno.serve(async (req)=>{
   }
   const upd:any = { total_paginas:res.total_paginas, insertadas_ultima:res.insertadas, ttl_ms: ttlOverride ?? TTL_NORMAL,
                     ultimo_error: res.errores.length? res.errores.join(' | ').slice(0,500) : null };
-  if(res.errores.length===0) upd.ultimo_exito = new Date().toISOString();
+  if(res.paginas>0) upd.ultimo_exito = new Date().toISOString();
   if(res.pasada_completa || fallo){ upd.pagina_actual = 1; if(res.pasada_completa) upd.pasadas_completas = (st?.pasadas_completas??0)+1; }
   await estado(upd);
   res.siguiente_pagina = upd.pagina_actual ?? pagina; res.ms = Date.now()-t0;
