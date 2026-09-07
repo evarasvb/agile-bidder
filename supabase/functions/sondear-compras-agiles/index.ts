@@ -11,7 +11,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const cors = { 'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type' };
 const sleep = (ms:number)=>new Promise(r=>setTimeout(r,ms));
 const PRESUPUESTO_MS = 110_000;
-const PARALELO = 10;
+const PARALELO = 6; // con 10 y otra corrida encima la API devolvió 429 (07-09-2026)
 const SALTO_MAX = 3;       // huecos consecutivos tolerados (cotizaciones borradas o no publicadas)
 const NUEVAS_MAX_POR_UNIDAD = 6;
 
@@ -87,11 +87,16 @@ Deno.serve(async (req)=>{
   const res:any = { omitido:false, unidades:0, probados:0, nuevas:0, items:0, codigos_nuevos:[] as string[], errores:[] as string[], ms:0 };
 
   // ¿El listado está sano? Si trajo filas hace menos de 20 min, no hace falta sondear.
+  // ¿Hay otra corrida encima? Dos sondeos a la vez gatillan el 429 de la API.
   if(!forzar && codigos.length===0){
-    const { data: st } = await sb.from('ingesta_ca_estado').select('ultimo_exito, insertadas_ultima').eq('clave','compra_agil').maybeSingle();
+    const { data: sts } = await sb.from('ingesta_ca_estado').select('clave, ultimo_exito, insertadas_ultima, ultima_corrida').in('clave',['compra_agil','sondeo']);
+    const st = (sts||[]).find((s:any)=>s.clave==='compra_agil'); const so = (sts||[]).find((s:any)=>s.clave==='sondeo');
     const hace = st?.ultimo_exito ? Date.now() - new Date(st.ultimo_exito).getTime() : Infinity;
     if(hace < 20*60000 && (st?.insertadas_ultima ?? 0) > 0){ res.omitido = true; res.motivo = 'listado sano'; res.ms = Date.now()-t0; return json(res); }
+    const corriendo = so?.ultima_corrida ? Date.now() - new Date(so.ultima_corrida).getTime() : Infinity;
+    if(corriendo < 3*60000){ res.omitido = true; res.motivo = 'sondeo en curso'; res.ms = Date.now()-t0; return json(res); }
   }
+  await sb.from('ingesta_ca_estado').upsert({ clave:'sondeo', ultima_corrida: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict:'clave' });
 
   const fetchDetalle = async (codigo:string)=>{
     const url = `https://api2.mercadopublico.cl/v2/compra-agil/${encodeURIComponent(codigo)}`;

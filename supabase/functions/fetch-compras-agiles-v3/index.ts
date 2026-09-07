@@ -3,7 +3,7 @@
 // de más de unas horas (con 15 s de timeout NUNCA respondía y la ingesta quedó en cero
 // durante 13 h el 04-09-2026): timeout de 60 s por página y presupuesto de 100 s por corrida.
 // Si una página falla (504/timeout) el cursor vuelve a 1: lo más nuevo siempre está en la página 1.
-// v3.4: ante un 504 se reintenta la misma página con una ventana más corta (6 h -> 4 h -> 2 h),
+// v3.4: ante un 504 se reintenta la misma página con una ventana más corta (6 h -> 4 h),
 // porque la API responde más rápido con menos cambios que devolver (07-09-2026: 6 h daba 504
 // seguido y 4 h respondía en 30 s). Las horas se convierten con la zona America/Santiago real
 // (la API entrega hora chilena, a veces con una "Z" falsa) y fecha_cierre es la vigente.
@@ -11,7 +11,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const cors = { 'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type' };
 const sleep = (ms:number)=>new Promise(r=>setTimeout(r,ms));
 const TTL_NORMAL = 21600000; // 6 h
-const ESCALERA_TTL = [14400000, 7200000]; // 4 h, 2 h: ventanas de respaldo cuando la API da 504
+// Ventana de respaldo cuando la API da 504. Solo 4 h: con 3 h o menos la API devuelve 0 páginas
+// (probado el 07-09-2026: 3 h -> 0 páginas en 2 s; 2 h -> 0 páginas; 4 h -> 38 páginas en 30 s).
+const ESCALERA_TTL = [14400000];
 const PRESUPUESTO_MS = 100000;
 const TIMEOUT_PAGINA_MS = 60000;
 const FMT_CL = new Intl.DateTimeFormat('en-US',{ timeZone:'America/Santiago', hourCycle:'h23', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
