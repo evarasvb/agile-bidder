@@ -80,7 +80,7 @@ export function LandingChat({ open, onClose }: LandingChatProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      text: "¡Hola! 👋 Soy el asistente de FirmaVB. ¿En qué puedo ayudarte hoy?",
+      text: "¡Hola! 👋 Soy Evaristo, tu experto en Mercado Público. ¿En qué te ayudo hoy?",
       isBot: true,
       timestamp: new Date(),
     },
@@ -162,8 +162,8 @@ export function LandingChat({ open, onClose }: LandingChatProps) {
             <Bot className="h-4 w-4 text-white" />
           </div>
           <div>
-            <p className="font-medium text-white text-sm">Asistente FirmaVB</p>
-            <p className="text-xs text-white/70">Te respondo al toque</p>
+            <p className="font-medium text-white text-sm">Evaristo</p>
+            <p className="text-xs text-white/70">Tu experto en Mercado Público</p>
           </div>
         </div>
         <Button
