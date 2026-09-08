@@ -292,7 +292,7 @@ serve(async (req) => {
           .from('product_images')
           .select('id', { count: 'exact', head: true })
           .eq('product_id', p.id)
-          .eq('product_type', 'cliente_inventario');
+          .eq('product_type', 'inventory');
 
         if (overwrite || !yaTiene) {
           const query = ia.query_imagen || p.nombre_producto || p.nombre || p.categoria || '';
@@ -303,7 +303,7 @@ serve(async (req) => {
             const esPrincipal = fotosAgregadas === 0;
             await admin.from('product_images').insert({
               product_id: p.id,
-              product_type: 'cliente_inventario',
+              product_type: 'inventory',
               image_url: subida.url,
               storage_path: subida.path,
               orden: k,

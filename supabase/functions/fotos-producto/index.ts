@@ -178,11 +178,11 @@ serve(async (req) => {
         .from('product_images')
         .select('id', { count: 'exact', head: true })
         .eq('product_id', prod.id)
-        .eq('product_type', 'cliente_inventario');
+        .eq('product_type', 'inventory');
       const esPrincipal = !prod.imagen_url;
       await admin.from('product_images').insert({
         product_id: prod.id,
-        product_type: 'cliente_inventario',
+        product_type: 'inventory',
         image_url: pub.publicUrl,
         storage_path: path,
         orden: count || 0,
