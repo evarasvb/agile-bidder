@@ -12,6 +12,22 @@ ventana de adjuntos de Mercado Público (la que pide captcha, que el robot no pu
 archivo se manda solo a FirmaVB. Los PDF de bases quedan disponibles para todos y el Experto los lee.
 Si abres la ventana de adjuntos por tu cuenta, la extensión también ofrece enviarlos.
 
+## Convenio Marco — Subir productos (v1.4)
+
+Dentro de tu escritorio de proveedor en `conveniomarco.mercadopublico.cl`, la extensión agrega un
+panel flotante con el botón **"Procesar este producto"**. Al presionarlo, en la ficha del producto:
+
+- Si el producto pide subir un PDF/Word obligatorio, lo salta sin tocar nada (precio ni guardado).
+- Si no, detecta el **precio referencial** y deja el precio de venta en referencial − $1.
+- Marca las regiones de cobertura que configuraste en el popup → Configuración.
+- Por defecto **no hace clic en Guardar/Publicar**: tú revisas y confirmas manualmente. Si activas
+  "Publicar automáticamente" en Configuración, además hace clic en Guardar/Publicar por ti.
+
+Configura regiones, marcas prioritarias y si quiere publicar automático desde el popup → ⚙️ Configuración
+→ sección "Convenio Marco — Subir productos". Es una primera versión: si el panel no encuentra el precio
+referencial o el campo editable en algún producto, lo indica en el panel en vez de fallar en silencio —
+en ese caso conviene revisar los selectores con una captura de esa ficha.
+
 ## Instalación rápida
 
 1. Ve a `chrome://extensions/` y activa **Modo desarrollador**.
@@ -40,6 +56,7 @@ chrome-extension/
 ├── config.js            # URLs y constantes compartidas
 ├── background.js        # Service Worker (orquestación)
 ├── content.js           # Script inyectado en MercadoPúblico
+├── cm-publisher.js      # Script inyectado en Convenio Marco (publicación de productos)
 ├── scraper.js           # Extracción de datos de páginas
 ├── popup.js / popup.html / popup.css
 ├── content.css
