@@ -388,6 +388,19 @@ export function useCreateInventoryItem() {
         throw error;
       }
 
+      // La foto (subida, elegida del banco o sugerida por IA) también va a la
+      // galería (product_images); si no, la ficha de "Editar" la muestra vacía
+      // aunque la lista sí tenga la miniatura.
+      if (item.imagen_url) {
+        await supabase.from('product_images').insert({
+          product_id: data.id,
+          product_type: 'inventory',
+          image_url: item.imagen_url,
+          orden: 0,
+          es_principal: true,
+        });
+      }
+
       console.log('[useCreateInventoryItem] Created successfully:', data.id);
       return mapRowToInventoryItem(data);
     },
