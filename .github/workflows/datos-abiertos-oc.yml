@@ -11,9 +11,13 @@ on:
         required: true
         default: '2026'
       mes:
-        description: 'Mes sin cero (ej. 8)'
+        description: 'Mes inicial sin cero (ej. 1)'
         required: true
         default: '8'
+      mes_hasta:
+        description: 'Mes final sin cero (para rango; vacío = solo el inicial)'
+        required: false
+        default: ''
       modo:
         description: 'probe (medir) o load (insertar)'
         required: true
@@ -40,23 +44,26 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Descargar y descomprimir
+      - name: Cargar rango de meses
         env:
           ANIO: ${{ github.event.inputs.anio }}
           MES: ${{ github.event.inputs.mes }}
-        run: |
-          URL="https://transparenciachc.blob.core.windows.net/oc-da/${ANIO}-${MES}.zip"
-          echo "Descargando $URL"
-          curl -sSL --fail "$URL" -o oc.zip || { echo "::error::No se pudo descargar $URL"; exit 1; }
-          ls -la oc.zip
-          mkdir -p ocdata
-          if unzip -o oc.zip -d ocdata >/dev/null 2>&1; then echo "unzip ok"; else
-            echo "unzip falló, intento 7z"; sudo apt-get -y install p7zip-full >/dev/null 2>&1; 7z x -y -oocdata oc.zip >/dev/null;
-          fi
-          echo "=== contenido ==="; ls -laR ocdata | head -50
-      - name: Procesar
-        env:
+          MES_HASTA: ${{ github.event.inputs.mes_hasta }}
           MODO: ${{ github.event.inputs.modo }}
           FILTRAR: ${{ github.event.inputs.filtrar }}
-          OCDIR: ocdata
-        run: node scripts/datos-abiertos-oc.mjs
+        run: |
+          FIN="${MES_HASTA:-$MES}"
+          echo "Procesando meses ${MES}..${FIN} de ${ANIO} (modo=${MODO}, filtrar=${FILTRAR})"
+          for M in $(seq "$MES" "$FIN"); do
+            URL="https://transparenciachc.blob.core.windows.net/oc-da/${ANIO}-${M}.zip"
+            echo "::group::Mes ${M} — ${URL}"
+            rm -rf ocdata oc.zip; mkdir -p ocdata
+            if ! curl -sSL --fail "$URL" -o oc.zip; then echo "::warning::No se pudo descargar $URL (mes sin archivo aún); sigo"; echo "::endgroup::"; continue; fi
+            ls -la oc.zip
+            if ! unzip -o oc.zip -d ocdata >/dev/null 2>&1; then
+              sudo apt-get -y install p7zip-full >/dev/null 2>&1; 7z x -y -oocdata oc.zip >/dev/null;
+            fi
+            OCDIR=ocdata node scripts/datos-abiertos-oc.mjs
+            echo "::endgroup::"
+          done
+          echo "Rango completo."
