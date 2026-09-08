@@ -290,6 +290,10 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
       );
     }
     try {
+      // Guardamos la lista con foto/sku/código: la Edge Function solo redacta el
+      // texto (resumen, características, garantía) y no los devuelve, así que
+      // hay que volver a pegarlos aquí antes de armar el PDF.
+      const productosFicha = construirProductosFicha();
       const r = await fichaTecnica.mutateAsync({
         compra: {
           id: compra.id,
@@ -298,7 +302,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
           organismo: compra.organismo,
           datos_json: compra.datos_json,
         },
-        productos: construirProductosFicha(),
+        productos: productosFicha,
         empresa: empresaFicha,
         descargar: false,
         persistir: true,
@@ -307,7 +311,14 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
         compra: { codigo: compra.codigo, nombre: compra.nombre, organismo: compra.organismo },
         empresa: empresaFicha,
         fecha: new Date(),
-        fichas: r.fichas,
+        fichas: r.fichas.map((f, i) => ({
+          ...f,
+          sku: productosFicha[i]?.sku,
+          codigo: productosFicha[i]?.codigo,
+          imagen_url: productosFicha[i]?.imagenUrl ?? null,
+          cantidad: productosFicha[i]?.cantidad,
+          unidad: productosFicha[i]?.unidad,
+        })),
       };
       const url = await blobFichaTecnicaPDF(datos);
       if (win) win.location.href = url;
