@@ -35,11 +35,19 @@ function json(obj: unknown, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 }
 
-// Fetch con reintento ante 429/5xx (el ticket de MP lo comparten varios crons).
-async function fetchOC(url: string): Promise<Response | null> {
+// Fetch con reintento ante 429/5xx (el ticket de MP lo comparten varios crons) y tope de
+// espera por llamada: en hora punta la API se cuelga sin responder y una sola llamada
+// colgada se comía el presupuesto entero de la corrida (procesadas 0).
+const TIMEOUT_MS = 15_000;
+async function fetchOC(url: string): Promise<Response | null | 'timeout'> {
   let espera = 1000;
-  for (let intento = 0; intento < 4; intento++) {
-    const resp = await fetch(url);
+  for (let intento = 0; intento < 3; intento++) {
+    let resp: Response;
+    try {
+      resp = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+    } catch (_) {
+      return 'timeout';
+    }
     if (resp.status !== 429 && resp.status < 500) return resp;
     await sleep(espera);
     espera *= 2;
@@ -74,13 +82,15 @@ Deno.serve(async (req) => {
     const codigos = (pend || []).map((r: any) => r.codigo).filter(Boolean);
     if (codigos.length === 0) return json({ ok: true, procesadas: 0, mensaje: 'nada pendiente' });
 
-    let procesadas = 0, items_insertados = 0, errores = 0, rate_limited = 0;
+    let procesadas = 0, items_insertados = 0, errores = 0, rate_limited = 0, timeouts = 0;
     let ultimo_error: string | null = null;
 
     for (const codigo of codigos) {
       if (Date.now() - t0 > presupuesto) break;
       try {
         const resp = await fetchOC(`${MP_BASE}?codigo=${encodeURIComponent(codigo)}&ticket=${ticket}`);
+        // La OC no se marca: vuelve a la cola para cuando la API responda.
+        if (resp === 'timeout') { timeouts++; ultimo_error = `timeout ${codigo}`; if (timeouts >= 5) break; continue; }
         if (!resp) { rate_limited++; ultimo_error = `rate-limit ${codigo}`; await sleep(800); continue; }
         if (!resp.ok) {
           await admin.from('ordenes_compra').update({ last_scraped_at: new Date().toISOString(), stale: true }).eq('codigo', codigo);
@@ -147,7 +157,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    return json({ ok: true, procesadas, items_insertados, errores, rate_limited, lote: codigos.length, ms: Date.now() - t0, ultimo_error });
+    return json({ ok: true, procesadas, items_insertados, errores, rate_limited, timeouts, lote: codigos.length, ms: Date.now() - t0, ultimo_error });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);
   }
