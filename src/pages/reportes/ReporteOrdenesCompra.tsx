@@ -16,8 +16,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   FileText, Building2, User, Calendar, Package, Search, X, Download,
-  FileSearch, Briefcase, Store, ShoppingCart, Tag, Layers, CalendarRange, Filter,
+  FileSearch, Briefcase, Store, ShoppingCart, Tag, Tags, Layers, CalendarRange, Filter,
 } from "lucide-react";
+import { clasificarRubro } from "@/utils/rubroProducto";
 import { ReportHero } from "@/components/reportes/ReportHero";
 import { PeriodoSelector } from "@/components/reportes/PeriodoSelector";
 import type { PeriodoPreset } from "@/hooks/useBI";
@@ -32,10 +33,11 @@ import { toast } from "sonner";
 // Cada eje del "cubo": clic en un valor filtra TODO el reporte (los otros ejes,
 // los KPIs y el detalle) — así se navega la información cruzada, no en tablas
 // sueltas. tipo=categoría de compra; el resto habla solo.
-type Dim = "tipo" | "institucion" | "proveedor" | "producto" | "mes";
+type Dim = "categoria" | "tipo" | "institucion" | "proveedor" | "producto" | "mes";
 interface CuboFiltro { dim: Dim; value: string; label: string }
 
 const DIM_LABEL: Record<Dim, string> = {
+  categoria: "Categoría",
   tipo: "Tipo de compra",
   institucion: "Institución",
   proveedor: "Proveedor",
@@ -108,6 +110,7 @@ export default function ReporteOrdenesCompra() {
           case "proveedor": return (o.proveedor_nombre || "—") === f.value;
           case "mes": return (o.fecha_creacion?.slice(0, 7) || "—") === f.value;
           case "producto": return (o.items || []).some((i) => i.nombre_producto === f.value);
+          case "categoria": return (o.items || []).some((i) => clasificarRubro(i.nombre_producto, i.descripcion).id === f.value);
           default: return true;
         }
       })
@@ -147,6 +150,22 @@ export default function ReporteOrdenesCompra() {
     const m = o.fecha_creacion?.slice(0, 7);
     return m ? format(parseISO(m + "-01"), "MMM yyyy", { locale: es }) : "Sin fecha";
   }, ).sort((a, b) => a.key.localeCompare(b.key)), [ordenesFiltradas]);
+
+  // Categoría = rubro real del producto (clasificado por keywords). El monto
+  // suma el valor de los ítems; el conteo son órdenes distintas con ese rubro.
+  const porCategoria = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; monto: number; ordenes: Set<string> }>();
+    for (const o of ordenesFiltradas) {
+      for (const it of o.items || []) {
+        const r = clasificarRubro(it.nombre_producto, it.descripcion);
+        const cur = map.get(r.id) || { key: r.id, label: r.label, monto: 0, ordenes: new Set<string>() };
+        cur.monto += it.total_neto || 0;
+        cur.ordenes.add(o.id);
+        map.set(r.id, cur);
+      }
+    }
+    return [...map.values()].map((f) => ({ key: f.key, label: f.label, monto: f.monto, count: f.ordenes.size })).sort((a, b) => b.monto - a.monto);
+  }, [ordenesFiltradas]);
 
   const porProducto = useMemo(() => {
     const map = new Map<string, Fila>();
@@ -324,6 +343,8 @@ export default function ReporteOrdenesCompra() {
         <>
           {/* Ejes del cubo */}
           <div className="grid gap-4 lg:grid-cols-2">
+            <Breakdown title="Por categoría (rubro)" icon={Tags} filas={porCategoria} dim="categoria"
+              activo={cuboActivo} onToggle={toggleCubo} />
             <Breakdown title="Por tipo de compra" icon={Layers} filas={porTipo} dim="tipo"
               activo={cuboActivo} onToggle={toggleCubo} />
             <Breakdown title="Por mes" icon={CalendarRange} filas={porMes} dim="mes"
