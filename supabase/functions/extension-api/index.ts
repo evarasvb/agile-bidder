@@ -436,6 +436,67 @@ Deno.serve(async (req) => {
         );
       }
 
+      // Documentos de una compra ágil (términos de referencia, fotos): la API pública de ChileCompra
+      // solo entrega id y nombre; la descarga exige sesión de Mercado Público, así que la hace la
+      // extensión en el navegador del usuario y la sube a extension-adjuntos. Aquí se le dice qué falta.
+      case 'ca-documentos': {
+        if (!clienteId) {
+          return new Response(JSON.stringify({ error: 'API key requerida' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        const body = await req.json().catch(() => ({}));
+        const codigo = String(body.codigo || '').trim().toUpperCase();
+        if (!/^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}$/.test(codigo)) {
+          return new Response(JSON.stringify({ error: 'codigo' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        const [{ data: ca }, { data: bajados }] = await Promise.all([
+          supabase.from('compras_agiles').select('codigo, nombre, documentos, fecha_cierre').eq('codigo', codigo).maybeSingle(),
+          supabase.from('licitaciones_adjuntos').select('nombre, es_bases, bases_pendiente').eq('codigo', codigo),
+        ]);
+        const nombresBajados = new Map((bajados || []).map((b: any) => [String(b.nombre), b]));
+        const documentos = (Array.isArray(ca?.documentos) ? ca!.documentos : []).filter((d: any) => d && d.id && d.nombre).map((d: any) => ({
+          id: d.id, nombre: String(d.nombre), bajado: nombresBajados.has(String(d.nombre)), leido: !!nombresBajados.get(String(d.nombre))?.es_bases,
+        }));
+        return new Response(
+          JSON.stringify({ success: true, codigo, nombre: ca?.nombre ?? null, fecha_cierre: ca?.fecha_cierre ?? null, documentos }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Cola de descarga en lote: compras ágiles abiertas con documentos que aún no tenemos,
+      // primero las que son match del cliente y luego las que cierran antes.
+      case 'ca-pendientes': {
+        if (!clienteId) {
+          return new Response(JSON.stringify({ error: 'API key requerida' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        const body = await req.json().catch(() => ({}));
+        const limite = Math.min(Math.max(Number(body.limit) || 15, 1), 40);
+        const ahora = new Date().toISOString();
+        const { data: ofertas } = await supabase.from('cliente_ofertas').select('licitacion_id').eq('cliente_id', clienteId).in('estado', ['pendiente', 'borrador']);
+        const codigosMatch = [...new Set((ofertas || []).map((o: any) => String(o.licitacion_id)).filter((c: string) => /-COT\d{2}$/.test(c)))];
+        const candidatas: any[] = [];
+        if (codigosMatch.length) {
+          const { data } = await supabase.from('compras_agiles').select('codigo, nombre, documentos, fecha_cierre').in('codigo', codigosMatch.slice(0, 200)).gt('fecha_cierre', ahora).order('fecha_cierre', { ascending: true });
+          for (const c of data || []) candidatas.push({ ...c, match: true });
+        }
+        if (body.solo_match !== true && candidatas.length < limite) {
+          const { data } = await supabase.from('compras_agiles').select('codigo, nombre, documentos, fecha_cierre').gt('fecha_cierre', ahora).not('documentos', 'is', null).neq('documentos', '[]').order('fecha_cierre', { ascending: true }).limit(limite * 3);
+          for (const c of data || []) if (!candidatas.some((x) => x.codigo === c.codigo)) candidatas.push({ ...c, match: false });
+        }
+        const conDocs = candidatas.filter((c) => Array.isArray(c.documentos) && c.documentos.some((d: any) => d && d.id && d.nombre));
+        const codigos = conDocs.map((c) => c.codigo);
+        const { data: bajados } = codigos.length ? await supabase.from('licitaciones_adjuntos').select('codigo, nombre').in('codigo', codigos) : { data: [] };
+        const tengo = new Set((bajados || []).map((b: any) => `${b.codigo}|${b.nombre}`));
+        const pendientes = conDocs.map((c) => ({
+          codigo: c.codigo, nombre: c.nombre, fecha_cierre: c.fecha_cierre, match: c.match,
+          documentos: c.documentos.filter((d: any) => d && d.id && d.nombre && !tengo.has(`${c.codigo}|${d.nombre}`)).map((d: any) => ({ id: d.id, nombre: String(d.nombre) })),
+        })).filter((c) => c.documentos.length).slice(0, limite);
+        await logActivity(supabase, apiKeyId, clienteId, 'ca-pendientes', null, null, { compras: pendientes.length, documentos: pendientes.reduce((n, c) => n + c.documentos.length, 0) }, req);
+        return new Response(
+          JSON.stringify({ success: true, pendientes }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       case 'get-offer': {
         if (!clienteId) {
           return new Response(
@@ -756,7 +817,7 @@ Deno.serve(async (req) => {
 
       default:
         return new Response(
-          JSON.stringify({ error: 'Acción no válida. Acciones: verify, get-matches, get-offer, submit-result, sync-licitacion, get-licitaciones' }),
+          JSON.stringify({ error: 'Acción no válida. Acciones: verify, get-matches, get-offer, submit-result, sync-licitacion, get-licitaciones, ca-documentos, ca-pendientes' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
     }

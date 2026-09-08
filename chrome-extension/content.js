@@ -832,9 +832,32 @@
   }
 
   // ==========================================================================
-  // COMPRA ÁGIL (compra-agil.mercadopublico.cl): la ficha ya la trae el robot; los
-  // adjuntos son enlaces directos (sin captcha). Se ofrece extraerlos y postular.
+  // COMPRA ÁGIL (compra-agil.mercadopublico.cl): la ficha ya la trae el robot. Los documentos
+  // (términos de referencia, fotos) se descargan por la misma ruta que usa la app de Mercado
+  // Público, que exige la sesión del usuario: por eso lo hace la extensión, aquí en su navegador.
+  // FirmaVB dice qué documentos existen (id + nombre) y cuáles faltan; cada uno se sube a
+  // extension-adjuntos y el Experto lo lee. Además se ofrece una pasada en lote para los matches.
   // ==========================================================================
+  const CA_DESCARGA = 'https://servicios-compra-agil.mercadopublico.cl/v1/compra-agil/comprador/descargar?id=';
+  const CA_TOKEN = 'access_token_ccr';
+  const TIPO_DOC_CA = 'Documentos de compra ágil (vía extensión)';
+
+  // Token de sesión de la app de compras ágiles (cookie o storage, con el nombre que usa la app).
+  function tokenCompraAgil() {
+    const m = document.cookie.match(new RegExp('(?:^|;\\s*)' + CA_TOKEN + '=([^;]*)'));
+    if (m && m[1]) { try { return decodeURIComponent(m[1]).replace(/^"|"$/g, ''); } catch (_) { return m[1]; } }
+    for (const st of [window.localStorage, window.sessionStorage]) {
+      try {
+        for (const k of [CA_TOKEN, 'access_token', 'token']) {
+          const v = st.getItem(k);
+          if (v && v.length > 20) return v.replace(/^"|"$/g, '');
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  // Enlaces directos a archivos, si la página los tuviera (respaldo).
   function enlacesAdjuntosCA() {
     const out = [];
     const vistos = new Set();
@@ -854,35 +877,89 @@
     return out;
   }
 
-  // La ficha es una app React: los enlaces aparecen después de cargar los datos.
-  function esperarEnlacesCA(ms) {
-    return new Promise((resolve) => {
-      const t0 = Date.now();
-      const tick = () => {
-        const enlaces = enlacesAdjuntosCA();
-        if (enlaces.length || Date.now() - t0 > ms) resolve(enlaces);
-        else setTimeout(tick, 700);
-      };
-      tick();
-    });
-  }
-
-  // Primero desde la página (misma sesión); si el archivo vive en otro dominio y el navegador
-  // bloquea la lectura, lo baja el service worker de la extensión.
-  async function descargarEnlace(e) {
+  async function descargarBytes(url, headers) {
     try {
-      const r = await fetch(e.href, { credentials: 'include' });
+      const r = await fetch(url, { credentials: 'include', headers });
       const ct = (r.headers.get('content-type') || 'application/octet-stream').split(';')[0];
-      if (!r.ok || ct.includes('text/html')) throw new Error('Mercado Público no entregó el archivo');
+      if (r.status === 401 || r.status === 403) throw new Error('sesion');
+      if (!r.ok || ct.includes('text/html') || ct.includes('application/json')) throw new Error('Mercado Público no entregó el archivo (' + r.status + ')');
       return { blob: await r.blob(), contentType: ct };
-    } catch (_) {
-      const r = await chrome.runtime.sendMessage({ action: 'DESCARGAR_URL', data: { url: e.href } });
+    } catch (e) {
+      if (e && e.message === 'sesion') throw e;
+      const r = await chrome.runtime.sendMessage({ action: 'DESCARGAR_URL', data: { url, headers } });
       if (!r || !r.success) throw new Error((r && r.error) || 'no se pudo descargar');
       const bin = atob(r.base64);
       const bytes = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
       return { blob: new Blob([bytes], { type: r.contentType }), contentType: r.contentType };
     }
+  }
+
+  // Un documento por id (ruta de la app de MP, con el token de sesión) o por enlace directo.
+  async function descargarDocumentoCA(doc, token) {
+    if (doc.href) return descargarBytes(doc.href, undefined);
+    if (!token) throw new Error('sesion');
+    return descargarBytes(CA_DESCARGA + encodeURIComponent(doc.id), { Authorization: 'Bearer ' + token, Accept: '*/*' });
+  }
+
+  // Sube los documentos de UNA compra ágil. Devuelve { ok, errores, bases, sesion }.
+  async function enviarDocumentosCA(codigo, docs, token, progreso) {
+    let ok = 0, errores = 0, bases = 0, sesion = false;
+    for (let i = 0; i < docs.length; i++) {
+      const d = docs[i];
+      if (progreso) progreso(i + 1, docs.length, d.nombre);
+      try {
+        const { blob, contentType } = await descargarDocumentoCA(d, token);
+        if (blob.size > 30 * 1024 * 1024) { errores++; continue; }
+        const base64 = await blobABase64(blob);
+        const r = await chrome.runtime.sendMessage({
+          action: 'ENVIAR_ADJUNTO',
+          data: { codigo, nombre: d.nombre, descripcion: 'Documento de compra ágil', tipo: TIPO_DOC_CA, contentType, base64 }
+        });
+        if (r && r.success) { ok++; if (r.bases_pendiente) bases++; }
+        else { errores++; console.warn('FirmaVB documento CA', d.nombre, r && r.error); }
+      } catch (e) {
+        if (e && e.message === 'sesion') { sesion = true; break; }
+        errores++;
+        console.warn('FirmaVB documento CA', d.nombre, e);
+      }
+    }
+    return { ok, errores, bases, sesion };
+  }
+
+  const resumenEnvio = (r) =>
+    `Listo: ${r.ok} archivo${r.ok === 1 ? '' : 's'} enviado${r.ok === 1 ? '' : 's'} a FirmaVB` +
+    (r.bases ? `; ${r.bases} PDF que el Experto leerá en minutos` : '') +
+    (r.errores ? ` · ${r.errores} con error` : '') + '.';
+
+  const TEXTO_SESION = 'Mercado Público solo entrega los documentos con tu sesión iniciada. Inicia sesión en Mercado Público (arriba a la derecha) y vuelve a esta ficha.';
+
+  // Lote: documentos pendientes de otras compras ágiles (matches primero) mientras hay sesión.
+  async function extraerLoteCA(token) {
+    const r = await chrome.runtime.sendMessage({ action: 'CA_PENDIENTES', data: { limit: 15 } });
+    const lista = (r && r.success && r.pendientes) || [];
+    if (!lista.length) { actualizarBanner('No quedan documentos pendientes en tus compras ágiles abiertas.', [{ label: 'Cerrar', onClick: cerrarBanner }]); return; }
+    const total = lista.reduce((n, c) => n + c.documentos.length, 0);
+    let ok = 0, errores = 0, bases = 0, hechos = 0;
+    for (const c of lista) {
+      const res = await enviarDocumentosCA(c.codigo, c.documentos, token, (i, n, nombre) => {
+        hechos++;
+        actualizarBanner(`Lote: ${hechos} de ${total} · ${c.codigo}: ${nombre}`, []);
+      });
+      ok += res.ok; errores += res.errores; bases += res.bases;
+      if (res.sesion) { actualizarBanner(TEXTO_SESION, [{ label: 'Cerrar', onClick: cerrarBanner }]); return; }
+    }
+    sessionStorage.setItem('firmavb-lote-ca', '1');
+    actualizarBanner(`Lote terminado: ${ok} documento${ok === 1 ? '' : 's'} de ${lista.length} compra${lista.length === 1 ? '' : 's'} ágil${lista.length === 1 ? '' : 'es'} enviado${ok === 1 ? '' : 's'} a FirmaVB` +
+      (bases ? `; ${bases} PDF que el Experto leerá` : '') + (errores ? ` · ${errores} con error` : '') + '.', [{ label: 'Cerrar', onClick: cerrarBanner }]);
+  }
+
+  function ofrecerLoteCA(token, texto) {
+    if (sessionStorage.getItem('firmavb-lote-ca')) { actualizarBanner(texto, [{ label: 'Cerrar', onClick: cerrarBanner }]); return; }
+    actualizarBanner(texto + ' ¿Traigo también los documentos pendientes de tus otras compras ágiles (matches primero)?', [
+      { label: 'Sí, traer en lote', primary: true, onClick: () => extraerLoteCA(token) },
+      { label: 'Cerrar', onClick: () => { sessionStorage.setItem('firmavb-lote-ca', '1'); cerrarBanner(); } }
+    ]);
   }
 
   // Match guardado por el panel (get-matches) para esta compra ágil, si lo hay.
@@ -898,20 +975,40 @@
     if (!(await extensionConectada())) {
       if (sessionStorage.getItem('firmavb-conectar-no')) return;
       mostrarBanner({
-        texto: 'Para extraer los adjuntos de esta compra ágil y postular con FirmaVB, conecta la extensión: haz clic en el ícono de FirmaVB Postulador (arriba a la derecha) y pega tu API key. La generas en FirmaVB → Configuración → Extensión.',
+        texto: 'Para extraer los documentos de esta compra ágil y postular con FirmaVB, conecta la extensión: haz clic en el ícono de FirmaVB Postulador (arriba a la derecha) y pega tu API key. La generas en FirmaVB → Configuración → Extensión.',
         acciones: [{ label: 'Entendido', onClick: () => { sessionStorage.setItem('firmavb-conectar-no', '1'); cerrarBanner(); } }]
       });
       return;
     }
-    const [enlaces, match] = await Promise.all([esperarEnlacesCA(10000), matchGuardado(codigo)]);
-    const n = enlaces.length;
+    const [info, match] = await Promise.all([
+      chrome.runtime.sendMessage({ action: 'CA_DOCUMENTOS', data: { codigo } }).catch(() => null),
+      matchGuardado(codigo)
+    ]);
+    const conocidos = (info && info.success && info.documentos) || [];
+    const faltan = conocidos.filter((d) => !d.bajado);
+    // Respaldo: enlaces directos en la página que FirmaVB no conozca.
+    const enlaces = enlacesAdjuntosCA().filter((e) => !conocidos.some((d) => d.nombre === e.nombre));
+    const docs = faltan.concat(enlaces);
+    const token = tokenCompraAgil();
     const partes = [`Compra ágil ${codigo}.`];
     if (match && match.match_score != null) partes.push(`Está en tus matches de FirmaVB (${Math.round(Number(match.match_score))}%).`);
-    partes.push(n ? `Tiene ${n} adjunto${n === 1 ? '' : 's'} (términos de referencia, fotos, etc.).` : 'No encontré adjuntos descargables en esta página.');
+    if (conocidos.length && !faltan.length && !enlaces.length) partes.push(`Sus ${conocidos.length} documento${conocidos.length === 1 ? ' ya está' : 's ya están'} en FirmaVB.`);
+    else if (docs.length) partes.push(`Tiene ${docs.length} documento${docs.length === 1 ? '' : 's'} por traer (términos de referencia, fotos, etc.).`);
+    else partes.push('No tiene documentos adjuntos.');
+    if (docs.length && !token && !enlaces.length) partes.push('Para bajarlos necesitas tener la sesión de Mercado Público iniciada.');
     partes.push('¿Qué quieres hacer?');
     const acciones = [];
-    if (n) acciones.push({ label: 'Extraer adjuntos a FirmaVB', primary: true, onClick: () => enviarAdjuntos(codigo, enlaces, descargarEnlace) });
-    acciones.push({ label: 'Postular con FirmaVB', primary: !n, onClick: () => { cerrarBanner(); startAutofill(codigo); } });
+    if (docs.length) acciones.push({
+      label: `Extraer ${docs.length} documento${docs.length === 1 ? '' : 's'} a FirmaVB`, primary: true,
+      onClick: async () => {
+        const tk = tokenCompraAgil();
+        const res = await enviarDocumentosCA(codigo, docs, tk, (i, n, nombre) => actualizarBanner(`Enviando ${i} de ${n} a FirmaVB: ${nombre}`, []));
+        if (res.sesion) { actualizarBanner(TEXTO_SESION, [{ label: 'Cerrar', onClick: cerrarBanner }]); return; }
+        ofrecerLoteCA(tk, resumenEnvio(res));
+      }
+    });
+    else if (token) acciones.push({ label: 'Traer documentos de mis otras compras ágiles', primary: true, onClick: () => extraerLoteCA(token) });
+    acciones.push({ label: 'Postular con FirmaVB', primary: !docs.length && !token, onClick: () => { cerrarBanner(); startAutofill(codigo); } });
     acciones.push({ label: 'Ahora no', onClick: () => { sessionStorage.setItem('firmavb-extraer-no-' + codigo, '1'); cerrarBanner(); } });
     mostrarBanner({ texto: partes.join(' '), acciones });
   }
