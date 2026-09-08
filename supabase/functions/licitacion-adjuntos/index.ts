@@ -6,7 +6,7 @@
 // (texto + resumen) para que el Libro del Experto los use directo.
 //   GET  ?codigo=X             -> adjuntos guardados (con link firmado de 1 h si hay sesión)
 //   POST {codigo}              -> baja lo que falte (sesión o service_role)
-//   POST {auto:true, limit:2}  -> service_role (cron): licitaciones con match aún sin revisar
+//   POST {auto:true, limit:6}  -> service_role (cron): licitaciones abiertas aún sin revisar (primero las que calzan)
 //   POST {bases:true, limit:2} -> service_role (cron): PDF de bases que el Experto aún no leyó
 // Leer las bases (texto + Gemini) tarda más que bajarlas, así que se hace aparte: el archivo
 // queda marcado bases_pendiente y se lee con el tiempo que sobre o en la pasada del cron.
@@ -85,6 +85,10 @@ async function procesar(sb: SupabaseClient, codigo: string, deadline: number): P
   const res: Resultado = { codigo, encontrados: 0, nuevos: 0, bases: 0, omitidos: [], errores: [], pendientes: 0, ms: 0 };
   const ref = `${MP}/RFB/DetailsAcquisition.aspx?idlicitacion=${codigo}`;
   try {
+    // Se reserva la licitación antes de bajar nada: el cron corre cada 2 minutos y dos corridas
+    // solapadas tomarían las mismas candidatas. Si esta corrida muere, queda pendiente y se
+    // reintenta a las 2 horas.
+    await sb.from("licitaciones_adjuntos_estado").upsert({ codigo, revisado_en: new Date().toISOString(), pendientes: 1, error: null });
     const r1 = await fetch(ref, { headers: { "User-Agent": UA, "Accept-Language": "es-CL" }, signal: AbortSignal.timeout(30000) });
     if (!r1.ok) { res.errores.push(`ficha HTTP ${r1.status}`); return finalizar(sb, res, t0); }
     const h1 = await r1.text();
