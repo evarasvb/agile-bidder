@@ -1,13 +1,15 @@
 // Enriquecimiento de ÓRDENES DE COMPRA: baja el detalle (proveedor, comprador,
 // montos y LÍNEAS DE PRODUCTO) desde la API pública de MercadoPúblico y lo guarda
-// en ordenes_compra + ordenes_compra_items. Corre por cron cada 2 minutos con un
+// en ordenes_compra + ordenes_compra_items. Corre por cron cada 5 minutos con un
 // presupuesto de tiempo (gentil con la API, con reintento ante 429). Idempotente.
 //
 // Cola: TODAS las cabeceras sin organismo (no solo las `relevante`): sin el detalle
 // no se sabe quién compra, a quién ni qué. Se atienden primero las relevantes y,
 // dentro de cada grupo, las más recientes, para que las OC del día queden completas
 // el mismo día. Las que la API no conoce se marcan `stale` y salen de la cola.
-// body: { limit?: 1..120 (60), tipo?: 'todos' | 'convenio_marco', presupuesto_ms?: n }
+// body: { limit?: 1..120 (60), tipo?: 'todos' | 'convenio_marco', presupuesto_ms?: n, cupo_diario?: n (6000), probe?: bool }
+// Cuota: el ticket de MP tiene cuota diaria compartida; este robot se limita a `cupo_diario`
+// llamadas por día (día Chile) y se pausa 30 min si la API responde "superó la cuota".
 // Requiere el secreto MERCADOPUBLICO_API_KEY (ticket).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -65,9 +67,31 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({} as any));
     const limite = Math.min(Math.max(Number(body.limit) || 60, 1), 120);
     const tipo = (body.tipo || 'todos') as string;
-    // El cron dispara cada 2 min: la corrida se corta antes para no pisarse con la siguiente.
+    // El cron dispara cada 5 min: la corrida se corta antes para no pisarse con la siguiente.
     const presupuesto = Math.min(Math.max(Number(body.presupuesto_ms) || 100_000, 10_000), 140_000);
     const t0 = Date.now();
+
+    // Cuota diaria del ticket de MP (la comparten varios robots). Se lleva el conteo del día en
+    // ingesta_ca_estado (clave oc_detalle): pagina_actual = llamadas hechas hoy; ultimo_error =
+    // 'cuota' cuando la API respondió "Ticket superó la cuota diaria" (se pausa 30 min).
+    const diaChile = (d: string | number | Date) => new Date(new Date(d).getTime() - 4 * 3600 * 1000).toISOString().slice(0, 10); // UTC-4
+    const DIA = diaChile(Date.now());
+    const cupoDiario = Math.min(Math.max(Number(body.cupo_diario) || 6000, 100), 20000);
+    const { data: est } = await admin.from('ingesta_ca_estado').select('pagina_actual, ultimo_error, ultima_corrida, updated_at').eq('clave', 'oc_detalle').maybeSingle();
+    const mismoDia = !!est?.updated_at && diaChile(est.updated_at) === DIA;
+    let usadasHoy = mismoDia ? Number(est?.pagina_actual || 0) : 0;
+    if (!body.probe) {
+      if (mismoDia && est?.ultimo_error === 'cuota' && est?.ultima_corrida && Date.now() - new Date(est.ultima_corrida).getTime() < 30 * 60000) {
+        return json({ ok: true, procesadas: 0, omitido: true, motivo: 'cuota diaria agotada (pausa 30 min)', usadas_hoy: usadasHoy });
+      }
+      if (usadasHoy >= cupoDiario) return json({ ok: true, procesadas: 0, omitido: true, motivo: `cupo diario propio alcanzado (${usadasHoy}/${cupoDiario})` });
+    }
+    const guardarEstado = async (marcaCuota: boolean) => {
+      await admin.from('ingesta_ca_estado').upsert({
+        clave: 'oc_detalle', pagina_actual: usadasHoy, ultima_corrida: new Date().toISOString(),
+        ultimo_error: marcaCuota ? 'cuota' : null, updated_at: new Date().toISOString(),
+      }, { onConflict: 'clave' });
+    };
 
     // Cola: cabeceras sin organismo (detalle no bajado), relevantes primero, más nuevas primero.
     let q = admin.from('ordenes_compra').select('codigo')
@@ -77,7 +101,7 @@ Deno.serve(async (req) => {
     const { data: pend, error: perr } = await q
       .order('relevante', { ascending: false, nullsFirst: false })
       .order('fecha_envio_oc', { ascending: false, nullsFirst: false })
-      .limit(limite);
+      .limit(Math.min(limite, Math.max(1, cupoDiario - usadasHoy)));
     if (perr) return json({ error: perr.message }, 500);
     const codigos = (pend || []).map((r: any) => r.codigo).filter(Boolean);
     if (codigos.length === 0) return json({ ok: true, procesadas: 0, mensaje: 'nada pendiente' });
@@ -95,9 +119,11 @@ Deno.serve(async (req) => {
     let procesadas = 0, items_insertados = 0, errores = 0, rate_limited = 0, timeouts = 0, sin_detalle = 0, stale = 0;
     let ultimo_error: string | null = null;
 
+    let cuotaAgotada = false;
     for (const codigo of codigos) {
       if (Date.now() - t0 > presupuesto) break;
       try {
+        usadasHoy++;
         const resp = await fetchOC(`${MP_BASE}?codigo=${encodeURIComponent(codigo)}&ticket=${ticket}`);
         // La OC no se marca: vuelve a la cola para cuando la API responda.
         if (resp === 'timeout') { timeouts++; ultimo_error = `timeout ${codigo}`; if (timeouts >= 5) break; continue; }
@@ -113,6 +139,7 @@ Deno.serve(async (req) => {
           // Se deja en cola y, si se repite, la corrida cede el turno. Solo con Cantidad 0 real se marca stale.
           if (data?.Mensaje || data?.Codigo === 500 || data?.Cantidad === undefined) {
             sin_detalle++; ultimo_error = `sin listado ${codigo}: ${String(data?.Mensaje ?? JSON.stringify(data)).slice(0, 120)}`;
+            if (/cuota/i.test(String(data?.Mensaje || ''))) { cuotaAgotada = true; break; }
             if (sin_detalle >= 5) break;
             await sleep(1500); continue;
           }
@@ -175,7 +202,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    return json({ ok: true, procesadas, items_insertados, errores, rate_limited, timeouts, sin_detalle, stale, lote: codigos.length, ms: Date.now() - t0, ultimo_error });
+    await guardarEstado(cuotaAgotada);
+    return json({ ok: true, procesadas, items_insertados, errores, rate_limited, timeouts, sin_detalle, stale, cuota_agotada: cuotaAgotada, usadas_hoy: usadasHoy, cupo_diario: cupoDiario, lote: codigos.length, ms: Date.now() - t0, ultimo_error });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);
   }
