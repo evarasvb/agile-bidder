@@ -388,30 +388,42 @@ Deno.serve(async (req) => {
           );
         }
 
-        // Get licitacion details for each oferta
-        const licitacionIds = ofertas?.map(o => o.licitacion_id) || [];
-        
-        const { data: licitaciones } = await supabase
-          .from('licitaciones')
-          .select('id_licitacion, titulo, organismo, presupuesto, fecha_cierre, link_oficial')
-          .in('id_licitacion', licitacionIds);
+        // Detalle de cada oferta. licitacion_id guarda el CÓDIGO de Mercado Público, que puede ser
+        // una compra ágil (…-COT26) o una licitación (…-LE26). Antes se buscaba en la tabla vieja
+        // `licitaciones` por una columna que no existe, y el popup mostraba todo "Sin título".
+        const licitacionIds = [...new Set(ofertas?.map(o => o.licitacion_id).filter(Boolean) || [])];
+        type Detalle = { titulo: string | null; organismo: string | null; presupuesto: number | null; fecha_cierre: string | null; link_oficial: string | null };
+        const detalles = new Map<string, Detalle>();
+        if (licitacionIds.length) {
+          const [{ data: compras }, { data: licBi }] = await Promise.all([
+            supabase.from('compras_agiles').select('codigo, nombre, nombre_organismo, monto_estimado, fecha_cierre, url_ficha').in('codigo', licitacionIds),
+            supabase.from('licitaciones_bi').select('codigo, nombre, institucion_nombre, presupuesto_estimado, fecha_cierre').in('codigo', licitacionIds),
+          ]);
+          for (const c of compras || []) {
+            detalles.set(c.codigo, { titulo: c.nombre, organismo: c.nombre_organismo, presupuesto: c.monto_estimado, fecha_cierre: c.fecha_cierre, link_oficial: c.url_ficha ?? `https://compra-agil.mercadopublico.cl/resumen-cotizacion/${c.codigo}` });
+          }
+          for (const l of licBi || []) {
+            if (!detalles.has(l.codigo)) detalles.set(l.codigo, { titulo: l.nombre, organismo: l.institucion_nombre, presupuesto: l.presupuesto_estimado, fecha_cierre: l.fecha_cierre, link_oficial: `https://www.mercadopublico.cl/Procurement/Modules/RFB/DetailsAcquisition.aspx?idlicitacion=${l.codigo}` });
+          }
+        }
 
-        // Combine data
-        const matches = ofertas?.map(oferta => {
-          const licitacion = licitaciones?.find(l => l.id_licitacion === oferta.licitacion_id);
+        // Solo lo que sigue abierto (o sin fecha conocida): lo cerrado no sirve para postular.
+        const ahora = Date.now();
+        const matches = (ofertas || []).map(oferta => {
+          const d = detalles.get(oferta.licitacion_id);
           return {
             oferta_id: oferta.id,
             licitacion_id: oferta.licitacion_id,
             match_score: oferta.match_score,
             estado: oferta.estado,
             valor_total: oferta.valor_total,
-            titulo: licitacion?.titulo,
-            organismo: licitacion?.organismo,
-            presupuesto: licitacion?.presupuesto,
-            fecha_cierre: licitacion?.fecha_cierre,
-            link_oficial: licitacion?.link_oficial
+            titulo: d?.titulo ?? null,
+            organismo: d?.organismo ?? null,
+            presupuesto: d?.presupuesto ?? null,
+            fecha_cierre: d?.fecha_cierre ?? null,
+            link_oficial: d?.link_oficial ?? null
           };
-        }) || [];
+        }).filter(m => !m.fecha_cierre || new Date(m.fecha_cierre).getTime() > ahora);
 
         // Log activity
         await logActivity(supabase, apiKeyId, clienteId, 'get-matches', null, null, {
