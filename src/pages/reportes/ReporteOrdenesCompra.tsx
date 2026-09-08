@@ -68,7 +68,10 @@ export default function ReporteOrdenesCompra() {
   // Alcance: "Mis OC" (mi RUT como proveedor) es el foco por defecto; "Mercado"
   // abre el buscador libre para explorar/comparar cualquier proveedor u organismo.
   const [alcance, setAlcance] = useState<"mis" | "mercado">("mis");
-  const [periodo, setPeriodo] = useState<PeriodoPreset>("12m");
+  // Por defecto "histórico total": el reporte de OC muestra ventas/compras que
+  // pueden ser de años atrás; con "últimos 12 meses" se ocultaban órdenes reales
+  // y parecía que faltaban datos.
+  const [periodo, setPeriodo] = useState<PeriodoPreset>("total");
   const [cubo, setCubo] = useState<CuboFiltro[]>([]);
 
   // Buscador libre (solo modo Mercado).
