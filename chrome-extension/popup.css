@@ -402,3 +402,61 @@ body {
   background: rgba(70, 87, 162, 0.1);
   color: var(--firmavb-blue);
 }
+
+/* Convenio Marco config */
+.cm-section {
+  background: white;
+  padding: 16px;
+  border-radius: 10px;
+  margin-top: 8px;
+}
+
+.cm-section h2 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--firmavb-blue);
+  margin-bottom: 8px;
+}
+
+.cm-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  margin: 12px 0 6px;
+}
+
+.cm-regiones-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 8px;
+  max-height: 140px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--firmavb-gray);
+  border-radius: 8px;
+}
+
+.cm-regiones-grid label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: #374151;
+  cursor: pointer;
+}
+
+#cm-marcas {
+  width: 100%;
+  font-family: inherit;
+  font-size: 12.5px;
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  resize: vertical;
+}
+
+#cm-guardar-btn {
+  margin-top: 12px;
+  width: 100%;
+}
