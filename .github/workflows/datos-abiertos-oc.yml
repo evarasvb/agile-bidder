@@ -20,6 +20,12 @@ on:
         default: 'probe'
         type: choice
         options: [probe, load]
+      filtrar:
+        description: 'Filtrar a rubros de firmavb (si/no)'
+        required: true
+        default: 'si'
+        type: choice
+        options: [si, no]
 
 env:
   SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -51,5 +57,6 @@ jobs:
       - name: Procesar
         env:
           MODO: ${{ github.event.inputs.modo }}
+          FILTRAR: ${{ github.event.inputs.filtrar }}
           OCDIR: ocdata
         run: node scripts/datos-abiertos-oc.mjs
