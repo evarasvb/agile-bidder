@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -70,7 +70,16 @@ export default function ConfiguracionOportunidades() {
   // definió palabras en su ONBOARDING (clientes.palabras_clave_busqueda), las
   // precargamos: antes esta pantalla aparecía vacía aunque ya respondió
   // "¿qué vendes?" al registrarse — configuraba dos veces.
+  //
+  // IMPORTANTE: se hidrata UNA SOLA VEZ (al terminar de cargar). Antes corría
+  // con cada cambio de referencia de `filtros`/`cliente` — y `filtros` cambia
+  // al guardar y con el auto-refresco de la IA (expandir-conceptos) —, así que
+  // pisaba las palabras/sugerencias que el usuario agregaba antes de guardar:
+  // "las agrego, se suman, pero no puedo guardarlas / desaparecen".
+  const hidratado = useRef(false);
   useEffect(() => {
+    if (hidratado.current || isLoading) return;
+    hidratado.current = true;
     // Si alguien escribió "google , licencia" en un solo chip, se separa.
     const incluirGuardado = separarPalabras((filtros?.palabras_incluir || []).join(','));
     const delOnboarding = (cliente?.palabras_clave_busqueda as string[] | undefined) || [];
@@ -81,7 +90,7 @@ export default function ConfiguracionOportunidades() {
       setMontoMin(filtros.monto_min?.toString() || "");
       setMontoMax(filtros.monto_max?.toString() || "");
     }
-  }, [filtros, cliente]);
+  }, [isLoading, filtros, cliente]);
 
   const handleAddPalabraIncluir = () => {
     const nuevas = separarPalabras(newPalabraIncluir).filter((w) => !palabrasIncluir.includes(w));
@@ -100,6 +109,10 @@ export default function ConfiguracionOportunidades() {
   const usarConceptoIA = (palabra: string) => {
     if (!palabrasIncluir.includes(palabra)) setPalabrasIncluir((prev) => [...prev, palabra]);
   };
+  // Conceptos que la IA propone y que AÚN no están como palabra explícita: al
+  // tocar "+" el concepto pasa a tus palabras y desaparece de las sugerencias
+  // (antes se quedaba pegado aunque ya lo habías agregado).
+  const conceptosIA = (filtros?.palabras_incluir_ia || []).filter((p) => !palabrasIncluir.includes(p));
 
   const handleRemovePalabraIncluir = (palabra: string) => {
     setPalabrasIncluir(palabrasIncluir.filter((p) => p !== palabra));
@@ -300,7 +313,7 @@ export default function ConfiguracionOportunidades() {
                 ))
               )}
             </div>
-            {(expandirConceptos.isPending || !!filtros?.palabras_incluir_ia?.length) && (
+            {(expandirConceptos.isPending || conceptosIA.length > 0) && (
               <div className="space-y-1.5">
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Sparkles className="h-3 w-3" />
@@ -308,9 +321,9 @@ export default function ConfiguracionOportunidades() {
                     ? "Ampliando con IA a conceptos relacionados..."
                     : "También busca por estos conceptos (toca uno para apagarlo o encenderlo; + lo agrega a tus palabras):"}
                 </div>
-                {!!filtros?.palabras_incluir_ia?.length && (
+                {conceptosIA.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
-                    {filtros.palabras_incluir_ia.map((palabra) => {
+                    {conceptosIA.map((palabra) => {
                       const apagada = descartadas.includes(palabra);
                       return (
                         <Badge
