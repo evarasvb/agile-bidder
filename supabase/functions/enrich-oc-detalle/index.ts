@@ -1,8 +1,14 @@
 // Enriquecimiento de ÓRDENES DE COMPRA: baja el detalle (proveedor, comprador,
 // montos y LÍNEAS DE PRODUCTO) desde la API pública de MercadoPúblico y lo guarda
-// en ordenes_compra + ordenes_compra_items. Corre por cron en lotes pequeños
-// (gentil con la API, con reintento ante 429). Idempotente. Prioriza Convenio
-// Marco (código '-CM'). Requiere el secreto MERCADOPUBLICO_API_KEY (ticket).
+// en ordenes_compra + ordenes_compra_items. Corre por cron cada 2 minutos con un
+// presupuesto de tiempo (gentil con la API, con reintento ante 429). Idempotente.
+//
+// Cola: TODAS las cabeceras sin organismo (no solo las `relevante`): sin el detalle
+// no se sabe quién compra, a quién ni qué. Se atienden primero las relevantes y,
+// dentro de cada grupo, las más recientes, para que las OC del día queden completas
+// el mismo día. Las que la API no conoce se marcan `stale` y salen de la cola.
+// body: { limit?: 1..120 (60), tipo?: 'todos' | 'convenio_marco', presupuesto_ms?: n }
+// Requiere el secreto MERCADOPUBLICO_API_KEY (ticket).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -49,13 +55,21 @@ Deno.serve(async (req) => {
     if (!ticket) return json({ error: 'Falta MERCADOPUBLICO_API_KEY' }, 500);
 
     const body = await req.json().catch(() => ({} as any));
-    const limite = Math.min(Math.max(Number(body.limit) || 8, 1), 40);
-    const tipo = (body.tipo || 'convenio_marco') as string;
+    const limite = Math.min(Math.max(Number(body.limit) || 60, 1), 120);
+    const tipo = (body.tipo || 'todos') as string;
+    // El cron dispara cada 2 min: la corrida se corta antes para no pisarse con la siguiente.
+    const presupuesto = Math.min(Math.max(Number(body.presupuesto_ms) || 100_000, 10_000), 140_000);
+    const t0 = Date.now();
 
-    // Solo relevantes: las cabeceras no relevantes (relevante=false) no bajan detalle.
-    let q = admin.from('ordenes_compra').select('codigo').is('last_scraped_at', null).eq('relevante', true);
+    // Cola: cabeceras sin organismo (detalle no bajado), relevantes primero, más nuevas primero.
+    let q = admin.from('ordenes_compra').select('codigo')
+      .is('organismo_comprador', null)
+      .or('stale.is.null,stale.eq.false');
     if (tipo === 'convenio_marco') q = q.ilike('codigo', '%-CM%');
-    const { data: pend, error: perr } = await q.limit(limite);
+    const { data: pend, error: perr } = await q
+      .order('relevante', { ascending: false, nullsFirst: false })
+      .order('fecha_envio_oc', { ascending: false, nullsFirst: false })
+      .limit(limite);
     if (perr) return json({ error: perr.message }, 500);
     const codigos = (pend || []).map((r: any) => r.codigo).filter(Boolean);
     if (codigos.length === 0) return json({ ok: true, procesadas: 0, mensaje: 'nada pendiente' });
@@ -64,6 +78,7 @@ Deno.serve(async (req) => {
     let ultimo_error: string | null = null;
 
     for (const codigo of codigos) {
+      if (Date.now() - t0 > presupuesto) break;
       try {
         const resp = await fetchOC(`${MP_BASE}?codigo=${encodeURIComponent(codigo)}&ticket=${ticket}`);
         if (!resp) { rate_limited++; ultimo_error = `rate-limit ${codigo}`; await sleep(800); continue; }
@@ -125,14 +140,14 @@ Deno.serve(async (req) => {
           else items_insertados += filas.length;
         }
         procesadas++;
-        await sleep(600);
+        await sleep(350);
       } catch (e) {
         errores++; ultimo_error = `catch ${codigo}: ${e instanceof Error ? e.message : String(e)}`;
         await sleep(500);
       }
     }
 
-    return json({ ok: true, procesadas, items_insertados, errores, rate_limited, lote: codigos.length, ultimo_error });
+    return json({ ok: true, procesadas, items_insertados, errores, rate_limited, lote: codigos.length, ms: Date.now() - t0, ultimo_error });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);
   }
