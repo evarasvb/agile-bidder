@@ -85,11 +85,11 @@ const navItems: NavItem[] = [
     title: "Reportes",
     url: "/reportes",
     icon: BarChart3,
-  },
-  {
-    title: "Órdenes de Compra",
-    url: "/mercado/ordenes",
-    icon: FileText,
+    children: [
+      { title: "Todos los reportes", url: "/reportes", icon: BarChart3 },
+      // Órdenes de Compra dejó de ser un ítem suelto: ahora es un reporte-cubo.
+      { title: "Órdenes de compra", url: "/reportes/ordenes-compra", icon: FileText },
+    ],
   },
   {
     title: "Equipo",

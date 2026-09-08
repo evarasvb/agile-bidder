@@ -43,6 +43,7 @@ const reports: {
   { title: "¿Qué pide el Estado?", description: "Los productos más demandados, su precio de referencia y quién los vende", icon: Package, href: "/reportes/productos", accent: "green" },
   { title: "¿Quién le vende al Estado?", description: "Ranking de proveedores por monto adjudicado y participación de mercado", icon: Users, href: "/reportes/proveedores", accent: "blue" },
   { title: "¿Cómo se mueve el mercado?", description: "Tendencias, regiones, volúmenes y tipos de compra pública", icon: TrendingUp, href: "/reportes/mercado", accent: "violet" },
+  { title: "¿Qué compró el Estado (y a mí)?", description: "Cubo de órdenes de compra: cruza tipo, institución, producto y mes. Filtra por «Mis OC» para ver lo que vendiste", icon: FileText, href: "/reportes/ordenes-compra", accent: "orange" },
 ];
 
 export default function ReportesHub() {
