@@ -14,14 +14,21 @@ Si abres la ventana de adjuntos por tu cuenta, la extensión también ofrece env
 
 ## Convenio Marco — Subir productos (v1.4)
 
-Dentro de tu escritorio de proveedor en `conveniomarco.mercadopublico.cl`, la extensión agrega un
-panel flotante con el botón **"Procesar este producto"**. Al presionarlo, en la ficha del producto:
+Dentro de la ficha "Asignación de producto" en tu escritorio de proveedor en
+`conveniomarco.mercadopublico.cl`, la extensión agrega un panel flotante con el botón
+**"Procesar este producto"**. Esa ficha trae una tabla con **una fila por región**, cada una con
+su propio precio de referencia. Al presionar el botón:
 
+- Si el nombre del producto no coincide con ninguna marca configurada en Configuración, lo salta
+  sin tocar nada (si no configuraste marcas, procesa cualquier producto).
 - Si el producto pide subir un PDF/Word obligatorio, lo salta sin tocar nada (precio ni guardado).
-- Si no, detecta el **precio referencial** y deja el precio de venta en referencial − $1.
-- Marca las regiones de cobertura que configuraste en el popup → Configuración.
+- Si no, por cada fila cuya región esté configurada: detecta su **precio referencial** y deja el
+  precio de venta en referencial − $1, y marca "Stock Disponible: Sí". Las filas de regiones no
+  configuradas quedan intactas.
 - Por defecto **no hace clic en Guardar/Publicar**: tú revisas y confirmas manualmente. Si activas
   "Publicar automáticamente" en Configuración, además hace clic en Guardar/Publicar por ti.
+- Si una ficha no trae esa tabla (otro tipo de producto), cae a un modo genérico basado en texto
+  y lo avisa en el panel.
 
 Configura regiones, marcas prioritarias y si quiere publicar automático desde el popup → ⚙️ Configuración
 → sección "Convenio Marco — Subir productos". Es una primera versión: si el panel no encuentra el precio
