@@ -80,7 +80,9 @@ function parsearFilas(h: string): Fila[] {
 
 type Resultado = { codigo: string; encontrados: number; nuevos: number; bases: number; omitidos: string[]; errores: string[]; pendientes: number; ms: number };
 
-async function procesar(sb: SupabaseClient, codigo: string, deadline: number): Promise<Resultado> {
+// leerInline: leer aquí mismo las bases bajadas (petición de un usuario). El cron de descarga lo deja
+// en false para no gastar su presupuesto en Gemini: las lee el cron de lectura.
+async function procesar(sb: SupabaseClient, codigo: string, deadline: number, leerInline = true): Promise<Resultado> {
   const t0 = Date.now();
   const res: Resultado = { codigo, encontrados: 0, nuevos: 0, bases: 0, omitidos: [], errores: [], pendientes: 0, ms: 0 };
   const ref = `${MP}/RFB/DetailsAcquisition.aspx?idlicitacion=${codigo}`;
@@ -153,7 +155,7 @@ async function procesar(sb: SupabaseClient, codigo: string, deadline: number): P
         }
       }
     }
-    res.bases = await leerBasesPendientes(sb, deadline, codigo);
+    res.bases = leerInline ? await leerBasesPendientes(sb, deadline, codigo) : 0;
     await sb.from("licitaciones_adjuntos_estado").upsert({
       codigo, revisado_en: new Date().toISOString(), archivos: guardados.size, pendientes: res.pendientes,
       error: res.errores.length ? res.errores.join(" | ").slice(0, 500) : null,
@@ -272,7 +274,7 @@ Deno.serve(async (req) => {
         for (const c of nuevas) {
           vistas.add(c.codigo);
           if (Date.now() > deadline - 15000 || procesadas.length >= max) break;
-          procesadas.push(await procesar(sb, c.codigo, deadline));
+          procesadas.push(await procesar(sb, c.codigo, deadline, false));
         }
       }
       return json({ candidatas, procesadas, ms: Date.now() - t0 });

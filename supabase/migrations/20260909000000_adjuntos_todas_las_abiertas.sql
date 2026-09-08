@@ -29,9 +29,10 @@ select cron.schedule('licitacion-adjuntos-auto', '*/2 * * * *', $$
     body := '{"auto":true,"limit":6,"max":40}'::jsonb, timeout_milliseconds := 120000);
 $$);
 
--- Lectura de bases (texto + resumen): cada 5 minutos, hasta 6 PDF por corrida (unos 20 s cada uno).
+-- Lectura de bases (texto + resumen): cada 3 minutos, hasta 6 PDF por corrida (unos 20-40 s cada uno;
+-- las corridas pueden solaparse, bases_intento_en evita leer dos veces el mismo PDF).
 select cron.unschedule(jobid) from cron.job where jobname = 'licitacion-bases-pendientes';
-select cron.schedule('licitacion-bases-pendientes', '1,6,11,16,21,26,31,36,41,46,51,56 * * * *', $$
+select cron.schedule('licitacion-bases-pendientes', '1-59/3 * * * *', $$
   select net.http_post(
     url := 'https://juiskeeutbaipwbeeezw.supabase.co/functions/v1/licitacion-adjuntos',
     headers := jsonb_build_object('Content-Type','application/json',
