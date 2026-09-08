@@ -308,3 +308,19 @@ export async function enviarAdjunto({ codigo, nombre, descripcion, contentType, 
   if (!response.ok) return { success: false, error: result.mensaje || result.error || `HTTP ${response.status}` };
   return { success: true, ...result };
 }
+
+// Descarga un adjunto desde el service worker (para archivos en dominios donde la página no
+// puede leer la respuesta). Solo hosts permitidos en el manifest; devuelve base64 para el content script.
+export async function descargarUrl({ url }) {
+  if (!/^https:\/\/([a-z0-9-]+\.)*mercadopublico\.cl\//i.test(url || '')) {
+    return { success: false, error: 'Solo se descargan archivos de mercadopublico.cl' };
+  }
+  const r = await fetch(url, { credentials: 'include' });
+  const contentType = (r.headers.get('content-type') || 'application/octet-stream').split(';')[0];
+  if (!r.ok || contentType.includes('text/html')) return { success: false, error: `Mercado Público no entregó el archivo (HTTP ${r.status})` };
+  const bytes = new Uint8Array(await r.arrayBuffer());
+  if (bytes.length > 30 * 1024 * 1024) return { success: false, error: 'Archivo mayor a 30 MB' };
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return { success: true, base64: btoa(bin), contentType };
+}

@@ -298,7 +298,7 @@ function renderMatches() {
     
     const codeSpan = document.createElement('span');
     codeSpan.className = 'match-code';
-    codeSpan.textContent = match.id_licitacion || 'N/A';
+    codeSpan.textContent = match.licitacion_id || match.id_licitacion || 'N/A';
     
     const scoreSpan = document.createElement('span');
     scoreSpan.className = 'match-score';

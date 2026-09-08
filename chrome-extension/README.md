@@ -12,6 +12,10 @@ ventana de adjuntos de Mercado Público (la que pide captcha, que el robot no pu
 archivo se manda solo a FirmaVB. Los PDF de bases quedan disponibles para todos y el Experto los lee.
 Si abres la ventana de adjuntos por tu cuenta, la extensión también ofrece enviarlos.
 
+Desde v1.4.1 también funciona en las **compras ágiles** (compra-agil.mercadopublico.cl): al abrir el
+detalle de una cotización aparece el aviso con tres opciones: extraer sus adjuntos a FirmaVB (aquí no
+hay captcha), postular con FirmaVB (rellena los precios con el match del inventario) o "Ahora no".
+
 ## Convenio Marco — Subir productos (v1.4)
 
 Dentro de la ficha "Asignación de producto" en tu escritorio de proveedor en
