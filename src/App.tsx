@@ -43,7 +43,7 @@ const OportunidadesPanel = lazy(() => import("./pages/Oportunidades"));
 const OportunidadDetalle = lazy(() => import("./pages/OportunidadDetalle"));
 
 const CompraAgilDetalle = lazy(() => import("./pages/CompraAgilDetalle"));
-const OrdenesCompra = lazy(() => import("./pages/OrdenesCompra"));
+const ReporteOrdenesCompra = lazy(() => import("./pages/reportes/ReporteOrdenesCompra"));
 
 const Inventory = lazy(() => import("./pages/Inventory"));
 
@@ -191,7 +191,8 @@ const App = () => (
               <Route path="/compras-agiles" element={<Navigate to="/oportunidades?tipo=compra_agil" replace />} />
               <Route path="/compras-agiles/:codigo" element={<CompraAgilDetalle />} />
             <Route path="/mercado/instituciones" element={<Navigate to="/reportes/compradores" replace />} />
-            <Route path="/mercado/ordenes" element={<OrdenesCompra />} />
+            {/* Órdenes de Compra ahora vive dentro de Reportes (reporte-cubo). */}
+            <Route path="/mercado/ordenes" element={<Navigate to="/reportes/ordenes-compra" replace />} />
 
             {/* ----- PIPELINE ----- */}
             <Route path="/pipeline" element={<Pipeline />} />
@@ -220,6 +221,7 @@ const App = () => (
             <Route path="/reportes/mercado" element={<ReporteMercado />} />
             <Route path="/reportes/competidores" element={<ReporteCompetidores />} />
             <Route path="/reportes/convenio-marco" element={<ReporteConvenioMarco />} />
+            <Route path="/reportes/ordenes-compra" element={<ReporteOrdenesCompra />} />
 
             {/* ----- CONFIGURACION ----- */}
             <Route path="/configuracion" element={<ConfiguracionOportunidades />} />
