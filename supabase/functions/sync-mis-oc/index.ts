@@ -104,34 +104,37 @@ Deno.serve(async (req) => {
   }
   const code = res.codigo_proveedor;
 
-  // 2) Listar códigos de OC del proveedor. Primero intento sin fecha (toda la
-  //    historia); si la API lo exige, itero por día en la ventana pedida.
+  // 2) Listar códigos de OC del proveedor. MP SOLO entrega OC por FECHA (no hay
+  //    "todas las del proveedor" de una vez), así que se escanea día a día un año
+  //    calendario (body.anio) o los últimos 365 días por defecto, filtrando por
+  //    CodigoProveedor (devuelve solo las suyas por día => liviano).
   const codigos = new Set<string>();
-  const t0 = Date.now(); const PRESUPUESTO_LISTA_MS = 70_000;
-  try {
-    const lr = await mpFetch(`${MP}/ordenesdecompra.json?CodigoProveedor=${encodeURIComponent(code)}&ticket=${ticket}`);
-    if (lr.ok) {
+  const t0 = Date.now(); const PRESUPUESTO_LISTA_MS = 110_000;
+  const hoy = new Date();
+  let inicio: Date; let fin: Date;
+  if (body.anio) {
+    const y = Number(body.anio);
+    inicio = new Date(Date.UTC(y, 0, 1));
+    fin = new Date(Date.UTC(y, 11, 31));
+    if (fin > hoy) fin = hoy;
+    res.anio = y;
+  } else {
+    fin = hoy;
+    inicio = new Date(hoy); inicio.setUTCDate(inicio.getUTCDate() - 365);
+  }
+  res.dias_escaneados = 0;
+  for (const d = new Date(fin); d >= inicio; d.setUTCDate(d.getUTCDate() - 1)) {
+    if (Date.now() - t0 > PRESUPUESTO_LISTA_MS) { res.parcial = true; res.errores.push(`escaneo parcial (${res.dias_escaneados} días); vuelve a tocar o elige otro año`); break; }
+    const fecha = ddmmyyyy(d);
+    try {
+      const lr = await mpFetch(`${MP}/ordenesdecompra.json?fecha=${fecha}&CodigoProveedor=${encodeURIComponent(code)}&ticket=${ticket}`);
+      if (!lr.ok) { res.errores.push(`lista ${fecha}: HTTP ${lr.status}`); continue; }
       const ld = await lr.json();
+      if (ld?.Codigo === 203) { res.errores.push('ticket invalido'); break; }
       for (const o of (ld?.Listado || [])) { const c = o?.Codigo ?? o?.codigo; if (c) codigos.add(String(c)); }
-    }
-  } catch (_) { /* fallback a iteración por día */ }
-
-  if (codigos.size === 0) {
-    const dias = Math.min(Math.max(Number(body.dias) || 180, 1), 365);
-    const now = new Date();
-    for (let i = 0; i < dias; i++) {
-      if (Date.now() - t0 > PRESUPUESTO_LISTA_MS) { res.parcial = true; res.errores.push(`listado parcial: revisé ${i} de ${dias} días, vuelve a ejecutar para seguir`); break; }
-      const d = new Date(now); d.setUTCDate(d.getUTCDate() - i);
-      const fecha = ddmmyyyy(d);
-      try {
-        const lr = await mpFetch(`${MP}/ordenesdecompra.json?fecha=${fecha}&CodigoProveedor=${encodeURIComponent(code)}&ticket=${ticket}`);
-        if (!lr.ok) { res.errores.push(`lista ${fecha}: HTTP ${lr.status}`); continue; }
-        const ld = await lr.json();
-        if (ld?.Codigo === 203) { res.errores.push('ticket invalido'); break; }
-        for (const o of (ld?.Listado || [])) { const c = o?.Codigo ?? o?.codigo; if (c) codigos.add(String(c)); }
-      } catch (e) { res.errores.push(`lista ${fecha}: ${e instanceof Error ? e.message : String(e)}`); }
-      await sleep(120);
-    }
+      res.dias_escaneados++;
+    } catch (e) { res.errores.push(`lista ${fecha}: ${e instanceof Error ? e.message : String(e)}`); }
+    await sleep(40);
   }
   res.encontradas = codigos.size;
   if (codigos.size === 0) return new Response(JSON.stringify(res), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } });
