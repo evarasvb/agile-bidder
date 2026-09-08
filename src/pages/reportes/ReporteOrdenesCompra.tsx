@@ -3,6 +3,7 @@ import {
   useOrdenesCompra,
   useOrdenCompra,
   useSyncMisOC,
+  useRutProveedor,
   type OrdenCompra,
   type OrdenesCompraFilters,
 } from "@/hooks/useOrdenesCompra";
@@ -88,6 +89,10 @@ export default function ReporteOrdenesCompra() {
   const anioActual = new Date().getFullYear();
   const [anioMisOC, setAnioMisOC] = useState<number>(anioActual);
   const ANIOS = Array.from({ length: 6 }, (_, i) => anioActual - i); // año actual y 5 atrás
+  // En Mercado: si hay exactamente 1 proveedor elegido, se puede traer TODAS sus
+  // OC del año desde MP (bajo demanda). Resolvemos su RUT desde la base.
+  const provSel = alcance === "mercado" && proveedores.length === 1 ? proveedores[0] : null;
+  const { data: rutProvSel } = useRutProveedor(provSel);
 
   const misOC = alcance === "mis";
   const tengoRut = !!cliente?.rut;
@@ -238,6 +243,26 @@ export default function ReporteOrdenesCompra() {
     }
   };
 
+  // Mercado: traer TODAS las OC del año del proveedor elegido, desde MP.
+  const traerProveedorOC = async () => {
+    if (!provSel) return;
+    if (!rutProvSel) { toast.error("No tengo el RUT de ese proveedor para consultarlo en Mercado Público."); return; }
+    try {
+      const r = await syncMisOC.mutateAsync({ rut: rutProvSel, anio: anioMisOC });
+      if ((r?.encontradas ?? 0) === 0) {
+        toast.info(`${provSel} no tuvo órdenes en ${anioMisOC} (según Mercado Público). Prueba otro año.`);
+      } else {
+        toast.success(`Listo: ${r.enriquecidas} de ${r.encontradas} OC de ${provSel} en ${anioMisOC}${r.parcial ? " (año parcial: vuelve a tocar)" : ""}.`);
+        // Mostrar por RUT exacto (robusto ante variaciones del nombre en MP).
+        setApplied({ proveedor_rut: rutProvSel });
+        setBuscoMercado(true);
+        setCubo([]);
+      }
+    } catch (e) {
+      toast.error("No pudimos traer esas OC: " + ((e as Error).message || "error"));
+    }
+  };
+
   const exportarCSV = () => {
     exportToCSV(
       ordenesFiltradas.map((o) => ({
@@ -311,6 +336,19 @@ export default function ReporteOrdenesCompra() {
                   </Select>
                   <Button size="sm" variant="outline" className="gap-2 border-firmavb-blue/30 text-firmavb-blue hover:bg-firmavb-blue/10" onClick={actualizarMisOC} disabled={syncMisOC.isPending}>
                     <RefreshCw className={`h-4 w-4 ${syncMisOC.isPending ? "animate-spin" : ""}`} /> {syncMisOC.isPending ? "Trayendo…" : "Traer mis OC"}
+                  </Button>
+                </>
+              )}
+              {provSel && (
+                <>
+                  <Select value={String(anioMisOC)} onValueChange={(v) => setAnioMisOC(Number(v))}>
+                    <SelectTrigger className="h-9 w-[110px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {ANIOS.map((y) => <SelectItem key={y} value={String(y)}>Año {y}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Button size="sm" variant="outline" className="gap-2 border-firmavb-blue/30 text-firmavb-blue hover:bg-firmavb-blue/10" onClick={traerProveedorOC} disabled={syncMisOC.isPending || !rutProvSel} title={!rutProvSel ? "Sin RUT para este proveedor" : ""}>
+                    <RefreshCw className={`h-4 w-4 ${syncMisOC.isPending ? "animate-spin" : ""}`} /> {syncMisOC.isPending ? "Trayendo…" : "Traer sus OC de MP"}
                   </Button>
                 </>
               )}
