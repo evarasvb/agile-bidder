@@ -97,7 +97,7 @@ export default function AcademiaLeads() {
           <GraduationCap className="h-6 w-6 text-firmavb-blue" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Asesorías — Contactos</h1>
+          <h1 className="text-2xl font-bold text-foreground">Academia — Contactos</h1>
           <p className="text-sm text-muted-foreground">
             Solicitudes recibidas desde el formulario de la Academia (firmavb.cl/academia)
           </p>

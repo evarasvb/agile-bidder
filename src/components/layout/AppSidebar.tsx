@@ -77,7 +77,7 @@ const navItems: NavItem[] = [
   },
   {
     adminOnly: true,
-    title: "Asesorías",
+    title: "Academia",
     url: "/academia/leads",
     icon: GraduationCap,
   },

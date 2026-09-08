@@ -123,18 +123,29 @@ Deno.serve(async (req) => {
     inicio = new Date(hoy); inicio.setUTCDate(inicio.getUTCDate() - 365);
   }
   res.dias_escaneados = 0;
-  for (const d = new Date(fin); d >= inicio; d.setUTCDate(d.getUTCDate() - 1)) {
-    if (Date.now() - t0 > PRESUPUESTO_LISTA_MS) { res.parcial = true; res.errores.push(`escaneo parcial (${res.dias_escaneados} días); vuelve a tocar o elige otro año`); break; }
-    const fecha = ddmmyyyy(d);
-    try {
-      const lr = await mpFetch(`${MP}/ordenesdecompra.json?fecha=${fecha}&CodigoProveedor=${encodeURIComponent(code)}&ticket=${ticket}`);
-      if (!lr.ok) { res.errores.push(`lista ${fecha}: HTTP ${lr.status}`); continue; }
-      const ld = await lr.json();
-      if (ld?.Codigo === 203) { res.errores.push('ticket invalido'); break; }
-      for (const o of (ld?.Listado || [])) { const c = o?.Codigo ?? o?.codigo; if (c) codigos.add(String(c)); }
+  // Fechas del rango, más recientes primero.
+  const fechas: string[] = [];
+  for (const d = new Date(fin); d >= inicio; d.setUTCDate(d.getUTCDate() - 1)) fechas.push(ddmmyyyy(new Date(d)));
+  res.dias_total = fechas.length;
+  // Cada consulta a MP tarda ~2s: en serie no alcanza a cubrir el año. Se hace en
+  // TANDAS PARALELAS para cubrir los ~365 días dentro del presupuesto de tiempo.
+  const BATCH = 12;
+  for (let i = 0; i < fechas.length; i += BATCH) {
+    if (Date.now() - t0 > PRESUPUESTO_LISTA_MS) { res.parcial = true; res.errores.push(`escaneo parcial (${res.dias_escaneados} de ${fechas.length} días); vuelve a tocar`); break; }
+    const chunk = fechas.slice(i, i + BATCH);
+    const results = await Promise.all(chunk.map(async (fecha) => {
+      try {
+        const lr = await mpFetch(`${MP}/ordenesdecompra.json?fecha=${fecha}&CodigoProveedor=${encodeURIComponent(code)}&ticket=${ticket}`);
+        if (!lr.ok) return null;
+        return await lr.json();
+      } catch { return null; }
+    }));
+    for (const ld of results) {
+      if (ld?.Codigo === 203) res.errores.push('ticket invalido');
+      for (const o of ((ld as any)?.Listado || [])) { const c = o?.Codigo ?? o?.codigo; if (c) codigos.add(String(c)); }
       res.dias_escaneados++;
-    } catch (e) { res.errores.push(`lista ${fecha}: ${e instanceof Error ? e.message : String(e)}`); }
-    await sleep(40);
+    }
+    await sleep(60);
   }
   res.encontradas = codigos.size;
   if (codigos.size === 0) return new Response(JSON.stringify(res), { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } });
