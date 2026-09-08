@@ -10,7 +10,8 @@
 // body: { limit?: 1..120 (60), tipo?: 'todos' | 'convenio_marco', presupuesto_ms?: n, cupo_diario?: n (6000), probe?: bool }
 // Cuota: el ticket de MP tiene cuota diaria compartida; este robot se limita a `cupo_diario`
 // llamadas por día (día Chile) y se pausa 30 min si la API responde "superó la cuota".
-// Requiere el secreto MERCADOPUBLICO_API_KEY (ticket).
+// Ticket: primero el dedicado en la bóveda ('mercadopublico_ticket_oc', vía public.secreto_vault);
+// si no existe, el general MERCADOPUBLICO_API_KEY que comparten los demás robots.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -61,10 +62,15 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   try {
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-    const ticket = Deno.env.get('MERCADOPUBLICO_API_KEY') || '';
+    const body = await req.json().catch(() => ({} as any));
+    // Ticket dedicado (bóveda, nombre en body.ticket_vault o 'mercadopublico_ticket_oc'); si no existe,
+    // el ticket general de MERCADOPUBLICO_API_KEY, que comparten los demás robots.
+    const nombreVault = String(body.ticket_vault || 'mercadopublico_ticket_oc');
+    const { data: ticketVault } = await admin.rpc('secreto_vault', { p_nombre: nombreVault });
+    const ticketDedicado = typeof ticketVault === 'string' && ticketVault.trim().length >= 20;
+    const ticket = ticketDedicado ? ticketVault.trim() : (Deno.env.get('MERCADOPUBLICO_API_KEY') || '');
     if (!ticket) return json({ error: 'Falta MERCADOPUBLICO_API_KEY' }, 500);
 
-    const body = await req.json().catch(() => ({} as any));
     const limite = Math.min(Math.max(Number(body.limit) || 60, 1), 120);
     const tipo = (body.tipo || 'todos') as string;
     // El cron dispara cada 5 min: la corrida se corta antes para no pisarse con la siguiente.
@@ -113,7 +119,7 @@ Deno.serve(async (req) => {
       const resp = await fetchOC(`${MP_BASE}?codigo=${encodeURIComponent(codigo)}&ticket=${ticket}`);
       if (resp === 'timeout' || !resp) return json({ probe: true, codigo, resultado: resp === 'timeout' ? 'timeout' : 'rate-limit', ms: Date.now() - t1 });
       const texto = await resp.text();
-      return json({ probe: true, codigo, status: resp.status, ms: Date.now() - t1, cuerpo: texto.slice(0, 800) });
+      return json({ probe: true, codigo, ticket_dedicado: ticketDedicado, status: resp.status, ms: Date.now() - t1, cuerpo: texto.slice(0, 800) });
     }
 
     let procesadas = 0, items_insertados = 0, errores = 0, rate_limited = 0, timeouts = 0, sin_detalle = 0, stale = 0;
@@ -203,7 +209,7 @@ Deno.serve(async (req) => {
     }
 
     await guardarEstado(cuotaAgotada);
-    return json({ ok: true, procesadas, items_insertados, errores, rate_limited, timeouts, sin_detalle, stale, cuota_agotada: cuotaAgotada, usadas_hoy: usadasHoy, cupo_diario: cupoDiario, lote: codigos.length, ms: Date.now() - t0, ultimo_error });
+    return json({ ok: true, procesadas, items_insertados, errores, rate_limited, timeouts, sin_detalle, stale, cuota_agotada: cuotaAgotada, usadas_hoy: usadasHoy, cupo_diario: cupoDiario, ticket_dedicado: ticketDedicado, lote: codigos.length, ms: Date.now() - t0, ultimo_error });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);
   }
