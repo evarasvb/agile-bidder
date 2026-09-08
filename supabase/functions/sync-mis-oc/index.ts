@@ -94,6 +94,8 @@ Deno.serve(async (req) => {
       const ed = await er.json();
       if (ed?.Codigo === 203) { res.errores.push('ticket invalido'); }
       res.codigo_proveedor = buscarCodigoEmpresa(ed);
+      res.empresas_cantidad = (ed as any)?.Cantidad ?? null;
+      res.empresas = ((ed as any)?.listaEmpresas || (ed as any)?.ListaEmpresas || []).map((e: any) => ({ codigo: e?.CodigoEmpresa ?? e?.Codigo, nombre: e?.NombreEmpresa ?? e?.Nombre }));
       if (!nombreEmpresa) nombreEmpresa = buscarNombre(ed);
     }
   } catch (e) { res.errores.push(`BuscarProveedor: ${e instanceof Error ? e.message : String(e)}`); }
