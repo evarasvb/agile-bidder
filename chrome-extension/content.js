@@ -39,6 +39,13 @@
       }
     }
     
+    // La ficha de licitación redirige a ?qs=<cifrado>: eso no es un ID. Si lo que salió de
+    // la URL no tiene forma de ID (1234-56-LE26), se busca el ID real en el texto de la página.
+    if (codigoLicitacion && !/^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}$/.test(codigoLicitacion) && document.body) {
+      const enPagina = document.body.textContent.match(/\b\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}\b/);
+      if (enPagina) codigoLicitacion = enPagina[0];
+    }
+
     // Si no está en la URL, buscar en la página
     if (!codigoLicitacion) {
       const codePatterns = [
@@ -704,9 +711,20 @@
 
   // En la ficha de la licitación: preguntar apenas la extensión está conectada.
   async function ofrecerExtraccion(codigo) {
-    if (!RE_CODIGO_LIC.test(codigo)) return;
+    if (!RE_CODIGO_LIC.test(codigo)) {
+      const enPagina = (document.body.textContent.match(RE_CODIGO_LIC) || [])[0];
+      if (!enPagina) { console.log('FirmaVB: sin ID de licitación reconocible para ofrecer extracción'); return; }
+      codigo = enPagina;
+    }
     if (sessionStorage.getItem('firmavb-extraer-no-' + codigo)) return;
-    if (!(await extensionConectada())) return;
+    if (!(await extensionConectada())) {
+      if (sessionStorage.getItem('firmavb-conectar-no')) return;
+      mostrarBanner({
+        texto: 'Para extraer las bases de esta licitación a FirmaVB, conecta la extensión: haz clic en el ícono de FirmaVB Postulador (arriba a la derecha) y pega tu API key. La generas en FirmaVB → Configuración → Extensión.',
+        acciones: [{ label: 'Entendido', onClick: () => { sessionStorage.setItem('firmavb-conectar-no', '1'); cerrarBanner(); } }]
+      });
+      return;
+    }
     mostrarBanner({
       texto: `¿Quieres extraer la información y las bases de la licitación ${codigo} a FirmaVB? Se abre la ventana de adjuntos de Mercado Público y se envían solos.`,
       acciones: [
@@ -892,6 +910,13 @@
     `;
     indicator.textContent = '🟢 FirmaVB Conectada';
     document.body.appendChild(indicator);
+    // Sin API key la extensión no puede enviar nada: se dice claro.
+    extensionConectada().then((ok) => {
+      if (!ok) {
+        indicator.textContent = '🟠 FirmaVB sin conectar (pega tu API key en el ícono)';
+        indicator.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+      }
+    });
     
     // Auto-hide after 3 seconds
     setTimeout(() => {
