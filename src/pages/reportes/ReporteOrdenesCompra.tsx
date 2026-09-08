@@ -180,17 +180,19 @@ export default function ReporteOrdenesCompra() {
   }, [ordenesFiltradas]);
 
   const porProducto = useMemo(() => {
-    const map = new Map<string, Fila>();
+    // count = órdenes DISTINTAS con ese producto (no líneas: una OC puede tener
+    // varias líneas del mismo producto y antes se contaban como "órdenes").
+    const map = new Map<string, { key: string; label: string; monto: number; ordenes: Set<string> }>();
     for (const o of ordenesFiltradas) {
       for (const it of o.items || []) {
         const key = it.nombre_producto || "Ítem";
-        const cur = map.get(key) || { key, label: key, monto: 0, count: 0 };
+        const cur = map.get(key) || { key, label: key, monto: 0, ordenes: new Set<string>() };
         cur.monto += it.total_neto || 0;
-        cur.count += 1;
+        cur.ordenes.add(o.id);
         map.set(key, cur);
       }
     }
-    return [...map.values()].sort((a, b) => b.monto - a.monto);
+    return [...map.values()].map((f) => ({ key: f.key, label: f.label, monto: f.monto, count: f.ordenes.size })).sort((a, b) => b.monto - a.monto);
   }, [ordenesFiltradas]);
 
   // Toggle de un filtro del cubo (clic en una fila de cualquier eje).
