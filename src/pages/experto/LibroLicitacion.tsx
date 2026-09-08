@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
-import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink, Trash2, Paperclip, Printer, Mail, Map as MapIcon, Image as ImageIcon, Presentation, Waves, Download } from 'lucide-react';
+import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink, Trash2, Paperclip, Printer, Mail, Map as MapIcon, Image as ImageIcon, Presentation, Waves, Download, Receipt } from 'lucide-react';
 import { useTraerAdjuntos } from '@/hooks/useAdjuntosLicitacion';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,6 +28,13 @@ import { SalaPostulacion } from '@/components/experto/SalaPostulacion';
 import { pagoOrganismo, presupuestoTexto, nombrePropio } from '@/lib/organismoPago';
 import { AccionesCompartir } from '@/components/oportunidades/AccionesCompartir';
 import { mailtoOportunidad } from '@/lib/compartir';
+import { LicitacionItemsMatch } from '@/components/licitaciones/LicitacionItemsMatch';
+import { useLicitacionItemsReal } from '@/hooks/useLicitacionItemsReal';
+import { useProductMatching } from '@/hooks/useProductMatching';
+import { useMatchOverrides } from '@/hooks/useMatchOverrides';
+import { useInventoryActivo } from '@/hooks/useInventory';
+import { useCliente } from '@/hooks/useCliente';
+import { descargarCotizacionPDF, type ItemCotizacion, type DatosCotizacion } from '@/services/pdfGenerator';
 
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string;
 const ANON = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
@@ -76,6 +83,20 @@ export default function LibroLicitacion() {
     enabled: !!cod && !!token,
     queryFn: async () => (await (supabase as any).rpc('experto_libro', { p_codigo: cod })).data,
   });
+
+  // Productos solicitados de la licitación con match contra el inventario (para
+  // mostrar "Productos Solicitados" y armar la cotización comercial). El libro
+  // trae la ficha resumida por RPC, pero los ítems detallados están aparte.
+  const { data: licRow } = useQuery({
+    queryKey: ['licitacion_bi_id', cod],
+    enabled: !!cod,
+    queryFn: async () => (await (supabase as any).from('licitaciones_bi').select('id').eq('codigo', cod).maybeSingle()).data,
+  });
+  const { data: licItems = [] } = useLicitacionItemsReal(licRow?.id);
+  const { procesarCompra } = useProductMatching();
+  const { data: matchOverrides = {} } = useMatchOverrides(cod, 'licitacion');
+  const { data: inventarioActivo = [] } = useInventoryActivo();
+  const { data: cliente } = useCliente();
 
   const [buscarLibro, setBuscarLibro] = useState('');
   const [verArchivados, setVerArchivados] = useState(false);
@@ -290,6 +311,69 @@ export default function LibroLicitacion() {
       qc.invalidateQueries({ queryKey: ['experto_libro', cod] });
     } catch (e: any) { toast.error(e.message); } finally { setOcupado(null); }
   };
+  // Ítems de la licitación con match confirmado o sugerido contra el inventario
+  // (mismo criterio que la sección "Productos Solicitados" de más arriba): se
+  // excluyen los descartados por el usuario y se respeta la reasignación manual.
+  const itemsParaCotizar = (): ItemCotizacion[] => {
+    if (!licItems.length) return [];
+    const mapped = licItems.map((it: any, idx: number) => ({
+      id: String(it.id ?? `idx-${idx}`),
+      nombre: it.nombre_producto || '',
+      descripcion: it.descripcion || '',
+      cantidad: it.cantidad ?? 1,
+      unidad: it.unidad || 'unidad',
+    }));
+    const inventarioById = new Map((inventarioActivo as any[]).map((p: any) => [p.id, p]));
+    return procesarCompra(mapped)
+      .map((item: any) => {
+        const ov = (matchOverrides as any)[String(item.id)];
+        if (ov?.accion === 'descartado') return null;
+        let match = item.bestMatch ? { inventoryItem: item.bestMatch.inventoryItem, score: item.bestMatch.score } : null;
+        if (ov?.accion === 'reasignado' && ov.inventario_id) {
+          const prod = inventarioById.get(ov.inventario_id);
+          if (prod) match = { inventoryItem: prod, score: ov.score_manual ?? 100 };
+        }
+        if (!match) return null;
+        return {
+          itemRequerido: item.nombre,
+          productoOfertado: match.inventoryItem.nombre_producto,
+          sku: match.inventoryItem.sku || 'N/A',
+          cantidad: item.cantidad,
+          unidad: item.unidad,
+          precioUnitario: match.inventoryItem.precio_unitario,
+          total: match.inventoryItem.precio_unitario * item.cantidad,
+          matchScore: match.score,
+        } as ItemCotizacion;
+      })
+      .filter((x): x is ItemCotizacion => x !== null);
+  };
+  // Cotización comercial en PDF (mismo formato que usan las compras ágiles) con
+  // los productos ofertados: útil cuando la licitación pide subir una oferta
+  // comercial además de los anexos (típico en artículos de oficina y similares).
+  const generarCotizacion = async () => {
+    const items = itemsParaCotizar();
+    if (!items.length) { toast.error('No hay productos con match para cotizar. Revisa "Productos Solicitados" más arriba y corrige el match si hace falta.', { duration: 7000 }); return; }
+    setOcupado('cotizacion');
+    try {
+      const datosPDF: DatosCotizacion = {
+        numero: `COT-${Date.now().toString().slice(-8)}`,
+        fecha: new Date(),
+        validezDias: 15,
+        compra: { codigo: cod, organismo: f?.institucion || 'Organismo', nombre: f?.nombre || cod },
+        items,
+        empresa: {
+          nombre: cliente?.empresa_nombre || 'FirmaVB',
+          rut: cliente?.rut || '',
+          direccion: cliente?.direccion || '',
+          telefono: cliente?.telefono || '',
+          email: cliente?.email_contacto || cliente?.email || 'contacto@firmavb.cl',
+          logo: cliente?.logo_url || undefined,
+        },
+      };
+      await descargarCotizacionPDF(datosPDF);
+      toast.success('Cotización descargada');
+    } catch (e: any) { toast.error(e.message || 'No pude generar la cotización'); } finally { setOcupado(null); }
+  };
   const completarTodos = async () => {
     const lista = wordsUnicos(); if (!lista.length) return;
     setOcupado('word:todos');
@@ -483,8 +567,11 @@ export default function LibroLicitacion() {
               <div>
                 <p className="font-medium flex items-center gap-1"><Paperclip className="h-4 w-4" />Mis documentos de trabajo</p>
                 <p className="text-xs text-muted-foreground">Excel, Word, PDF o imágenes (tu matriz, checklist, anexos a medio llenar). El Experto los lee para anotar qué te falta y ayudarte a completarlos.{documentos.length === 0 ? ' Sube con el botón de arriba.' : ''}</p>
-                <Button size="sm" variant="outline" className="mt-1 mb-1 w-full sm:w-auto" onClick={generarPptx} disabled={!!ocupado} title="Portada, resumen, admisibilidad, evaluación, tareas por fase, garantías y pendientes en un PowerPoint">
+                <Button size="sm" variant="outline" className="mt-1 mb-1 mr-2 w-full sm:w-auto" onClick={generarPptx} disabled={!!ocupado} title="Portada, resumen, admisibilidad, evaluación, tareas por fase, garantías y pendientes en un PowerPoint">
                   {ocupado === 'pptx' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Presentation className="h-4 w-4 mr-1" />}Generar PowerPoint de la matriz
+                </Button>
+                <Button size="sm" variant="outline" className="mt-1 mb-1 w-full sm:w-auto" onClick={generarCotizacion} disabled={!!ocupado} title="Cotización en PDF con los productos de tu inventario que hacen match, lista para subir como oferta comercial">
+                  {ocupado === 'cotizacion' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Receipt className="h-4 w-4 mr-1" />}Generar cotización comercial
                 </Button>
                 {documentos.map((d: any) => (
                   <div key={d.id} className="flex items-center gap-1 text-muted-foreground">
@@ -540,6 +627,7 @@ export default function LibroLicitacion() {
               )}
             </CardContent>
           </Card>}
+          {cod && licItems.length > 0 && <LicitacionItemsMatch codigo={cod} items={licItems} />}
         </div>);
       const panelChat = (
         <Card className="flex flex-col h-full min-h-[60vh]">
