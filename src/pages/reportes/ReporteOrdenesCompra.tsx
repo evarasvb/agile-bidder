@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import {
   useOrdenesCompra,
   useOrdenCompra,
+  useSyncMisOC,
   type OrdenCompra,
   type OrdenesCompraFilters,
 } from "@/hooks/useOrdenesCompra";
@@ -16,7 +17,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   FileText, Building2, User, Calendar, Package, Search, X, Download,
-  FileSearch, Briefcase, Store, ShoppingCart, Tag, Tags, Layers, CalendarRange, Filter,
+  FileSearch, Briefcase, Store, ShoppingCart, Tag, Tags, Layers, CalendarRange, Filter, RefreshCw,
 } from "lucide-react";
 import { clasificarRubro } from "@/utils/rubroProducto";
 import { ReportHero } from "@/components/reportes/ReportHero";
@@ -76,6 +77,7 @@ export default function ReporteOrdenesCompra() {
   const [buscoMercado, setBuscoMercado] = useState(false);
 
   const [ordenSeleccionada, setOrdenSeleccionada] = useState<string | null>(null);
+  const syncMisOC = useSyncMisOC();
 
   const misOC = alcance === "mis";
   const tengoRut = !!cliente?.rut;
@@ -203,6 +205,21 @@ export default function ReporteOrdenesCompra() {
     setCubo([]);
   };
 
+  const actualizarMisOC = async () => {
+    const cid = (cliente as any)?.id;
+    if (!cid) { toast.error("No encontramos tu cliente. Recarga e intenta de nuevo."); return; }
+    try {
+      const r = await syncMisOC.mutateAsync(cid);
+      if ((r?.encontradas ?? 0) === 0) {
+        toast.info("No encontramos órdenes de compra tuyas en Mercado Público para este RUT.");
+      } else {
+        toast.success(`Listo: ${r.enriquecidas} de ${r.encontradas} OC cargadas${r.parcial ? " (parcial: vuelve a tocar para completar el resto)" : ""}.`);
+      }
+    } catch (e) {
+      toast.error("No pudimos traer tus OC: " + ((e as Error).message || "error"));
+    }
+  };
+
   const exportarCSV = () => {
     exportToCSV(
       ordenesFiltradas.map((o) => ({
@@ -264,6 +281,11 @@ export default function ReporteOrdenesCompra() {
               </Badge>
             )}
             <div className="ml-auto flex gap-2">
+              {misOC && tengoRut && (
+                <Button size="sm" variant="outline" className="gap-2 border-firmavb-blue/30 text-firmavb-blue hover:bg-firmavb-blue/10" onClick={actualizarMisOC} disabled={syncMisOC.isPending}>
+                  <RefreshCw className={`h-4 w-4 ${syncMisOC.isPending ? "animate-spin" : ""}`} /> {syncMisOC.isPending ? "Trayendo…" : "Actualizar mis OC"}
+                </Button>
+              )}
               <Button size="sm" variant="outline" className="gap-2" onClick={exportarCSV} disabled={!ordenesFiltradas.length}>
                 <FileText className="h-4 w-4" /> CSV
               </Button>
