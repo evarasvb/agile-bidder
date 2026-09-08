@@ -261,12 +261,12 @@ serve(async (req) => {
     const iaItems = await enriquecerConIA(productos as ProductoRow[]);
     const fuenteTexto = iaItems ? 'ia' : 'sin_ia';
 
-    const resultados: any[] = [];
-    let conImagen = 0;
-
-    for (let i = 0; i < productos.length; i++) {
-      const p = productos[i] as ProductoRow;
-      const ia = iaItems?.[i] || {};
+    // Procesamos cada producto de forma independiente (y todos en paralelo):
+    // antes se bajaba y subía cada foto una por una, en fila, lo que hacía muy
+    // lento el botón con varios productos (hasta 3 fotos x cada uno). Ahora las
+    // 3 fotos de un producto se bajan/suben a la vez, y los productos entre sí
+    // también corren en paralelo.
+    const procesarProducto = async (p: ProductoRow, ia: EnriquecidoIA) => {
       const update: Record<string, unknown> = {};
 
       // Descripcion (completar o sobrescribir).
@@ -297,24 +297,25 @@ serve(async (req) => {
         if (overwrite || !yaTiene) {
           const query = ia.query_imagen || p.nombre_producto || p.nombre || p.categoria || '';
           const urls = await buscarFotos(query, 3);
-          for (let k = 0; k < urls.length; k++) {
-            const subida = await subirImagen(admin, cli.id, p.sku || p.id, urls[k], k);
-            if (!subida) continue;
-            const esPrincipal = fotosAgregadas === 0;
-            await admin.from('product_images').insert({
-              product_id: p.id,
-              product_type: 'inventory',
-              image_url: subida.url,
-              storage_path: subida.path,
-              orden: k,
-              es_principal: esPrincipal,
-            });
-            if (esPrincipal) nuevaImagen = subida.url;
-            fotosAgregadas++;
+          const subidas = await Promise.all(
+            urls.map((url, k) => subirImagen(admin, cli.id, p.sku || p.id, url, k))
+          );
+          const validas = subidas.filter((s): s is { url: string; path: string } => s !== null);
+          const rows = validas.map((subida, k) => ({
+            product_id: p.id,
+            product_type: 'inventory',
+            image_url: subida.url,
+            storage_path: subida.path,
+            orden: k,
+            es_principal: k === 0,
+          }));
+          if (rows.length > 0) {
+            await admin.from('product_images').insert(rows);
+            nuevaImagen = rows[0].image_url;
+            fotosAgregadas = rows.length;
           }
           if (nuevaImagen) {
             update.imagen_url = nuevaImagen;
-            conImagen++;
           }
         }
       }
@@ -323,7 +324,7 @@ serve(async (req) => {
         await admin.from('cliente_inventario').update(update).eq('id', p.id).eq('cliente_id', cli.id);
       }
 
-      resultados.push({
+      return {
         id: p.id,
         nombre: p.nombre_producto || p.nombre,
         descripcion: (update.descripcion as string) ?? p.descripcion ?? null,
@@ -331,8 +332,13 @@ serve(async (req) => {
         con_imagen_nueva: !!nuevaImagen,
         fotos_agregadas: fotosAgregadas,
         actualizado: Object.keys(update).length > 0,
-      });
-    }
+      };
+    };
+
+    const resultados = await Promise.all(
+      (productos as ProductoRow[]).map((p, i) => procesarProducto(p, iaItems?.[i] || {}))
+    );
+    const conImagen = resultados.filter((r) => r.con_imagen_nueva).length;
 
     return new Response(
       JSON.stringify({
