@@ -349,6 +349,27 @@ export function useUpsertOrdenCompra() {
   });
 }
 
+// Trae las OC PROPIAS del cliente (donde es proveedor) desde Mercado Público y
+// las guarda en la base, para que "Mis OC" muestre sus ventas reales. La edge
+// function resuelve RUT -> código de proveedor y baja detalle + ítems.
+export function useSyncMisOC() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (clienteId: string) => {
+      const { data, error } = await (supabase as any).functions.invoke('sync-mis-oc', {
+        body: { cliente_id: clienteId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data as { encontradas: number; enriquecidas: number; parcial: boolean; errores: string[] };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ordenes_compra'] });
+      queryClient.invalidateQueries({ queryKey: ['orden_compra'] });
+    },
+  });
+}
+
 export function useOrdenesCompraStats() {
   return useQuery({
     queryKey: ['ordenes_compra_stats'],
