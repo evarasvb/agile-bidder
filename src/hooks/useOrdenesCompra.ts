@@ -388,12 +388,39 @@ export function useOpcionesOC(campo: 'proveedor_nombre' | 'organismo_comprador',
   });
 }
 
+// Resuelve el RUT de un proveedor a partir de su nombre (para traer sus OC desde
+// MP bajo demanda). Toma el rut_proveedor no nulo más frecuente de sus OC en base.
+export function useRutProveedor(nombre: string | null) {
+  return useQuery({
+    queryKey: ['rut-proveedor', nombre],
+    enabled: !!nombre,
+    queryFn: async (): Promise<string | null> => {
+      if (!nombre) return null;
+      const { data, error } = await (supabase as any)
+        .from('ordenes_compra')
+        .select('rut_proveedor')
+        .eq('proveedor_nombre', nombre)
+        .not('rut_proveedor', 'is', null)
+        .limit(200);
+      if (error) throw error;
+      const conteo = new Map<string, number>();
+      for (const r of (data || [])) { const v = (r as any).rut_proveedor; if (v) conteo.set(v, (conteo.get(v) || 0) + 1); }
+      let mejor: string | null = null; let max = 0;
+      for (const [rut, n] of conteo) { if (n > max) { max = n; mejor = rut; } }
+      return mejor;
+    },
+    staleTime: 60000,
+  });
+}
+
 export function useSyncMisOC() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ clienteId, anio }: { clienteId: string; anio?: number }) => {
+    // clienteId → trae las OC del cliente logueado; rut → trae las de CUALQUIER
+    // proveedor (modo Mercado, bajo demanda). Uno de los dos.
+    mutationFn: async ({ clienteId, rut, anio }: { clienteId?: string; rut?: string; anio?: number }) => {
       const { data, error } = await (supabase as any).functions.invoke('sync-mis-oc', {
-        body: { cliente_id: clienteId, anio },
+        body: { cliente_id: clienteId, rut, anio },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
