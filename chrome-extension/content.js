@@ -873,6 +873,17 @@
         flujoAdjuntos();
         return;
       }
+
+      // Buscador de licitaciones: recordar (una vez por sesión) que la extracción se ofrece en la ficha.
+      if (/BusquedaLicitacion/i.test(pageInfo.url) && !sessionStorage.getItem('firmavb-pista-busqueda')) {
+        extensionConectada().then((ok) => {
+          if (!ok) return;
+          mostrarBanner({
+            texto: 'Abre cualquier licitación de esta lista y te ofreceré extraer su información y sus bases a FirmaVB.',
+            acciones: [{ label: 'Entendido', onClick: () => { sessionStorage.setItem('firmavb-pista-busqueda', '1'); cerrarBanner(); } }]
+          });
+        });
+      }
       
       // Mostrar botón si hay código de licitación
       if (pageInfo.codigoLicitacion) {
