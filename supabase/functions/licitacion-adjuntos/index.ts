@@ -89,6 +89,10 @@ async function procesar(sb: SupabaseClient, codigo: string, deadline: number): P
     if (!r1.ok) { res.errores.push(`ficha HTTP ${r1.status}`); return finalizar(sb, res, t0); }
     const h1 = await r1.text();
     const encs = [...new Set(Array.from(h1.matchAll(/VerAntecedentes\.aspx\?enc=([^"'&\s]+)/g)).map((m) => m[1]))];
+    // La sección "Adjuntos" de la ficha (donde suelen ir las bases en PDF) exige reCAPTCHA: no se
+    // baja sola, pero se guarda su URL para que el usuario la abra con un clic y suba el PDF.
+    const encAdjuntos = h1.match(/ViewAttachment\.aspx\?enc=([^"'&\s]+)/)?.[1] ?? null;
+    const urlAdjuntosMp = encAdjuntos ? `${MP}/Attachment/ViewAttachment.aspx?enc=${encAdjuntos}` : null;
 
     const { data: previos } = await sb.from("licitaciones_adjuntos").select("nombre").eq("codigo", codigo);
     const guardados = new Set<string>((previos ?? []).map((p: { nombre: string }) => p.nombre));
@@ -149,6 +153,7 @@ async function procesar(sb: SupabaseClient, codigo: string, deadline: number): P
     await sb.from("licitaciones_adjuntos_estado").upsert({
       codigo, revisado_en: new Date().toISOString(), archivos: guardados.size, pendientes: res.pendientes,
       error: res.errores.length ? res.errores.join(" | ").slice(0, 500) : null,
+      url_adjuntos_mp: urlAdjuntosMp, adjuntos_mp_solo_captcha: encs.length === 0 && !!urlAdjuntosMp,
     });
   } catch (e) {
     res.errores.push(String((e as Error)?.message ?? e).slice(0, 200));
@@ -215,18 +220,28 @@ Deno.serve(async (req) => {
     if (req.method === "GET") {
       const codigo = (new URL(req.url).searchParams.get("codigo") ?? "").trim().toUpperCase();
       if (!RE_CODIGO.test(codigo)) return json({ error: "codigo" }, 400);
-      const [{ data: filas }, { data: estado }] = await Promise.all([
+      const [{ data: filas }, { data: estado }, { data: basesFilas }] = await Promise.all([
         sb.from("licitaciones_adjuntos").select("id, nombre, tipo, descripcion, fecha_adjunto, bytes, content_type, storage_path, es_bases, bases_pendiente, bajado_en").eq("codigo", codigo).order("bajado_en"),
-        sb.from("licitaciones_adjuntos_estado").select("revisado_en, archivos, pendientes, error").eq("codigo", codigo).maybeSingle(),
+        sb.from("licitaciones_adjuntos_estado").select("revisado_en, archivos, pendientes, error, url_adjuntos_mp, adjuntos_mp_solo_captcha").eq("codigo", codigo).maybeSingle(),
+        // Bases que subió un usuario (o el robot) y que el Experto ya leyó: quedan para todos.
+        sb.from("bases_licitacion").select("id, archivo, paginas, storage_path, creado_en, resumen").eq("codigo", codigo).gt("caracteres", 200).order("creado_en"),
       ]);
       let adjuntos = (filas ?? []) as Record<string, unknown>[];
-      if (conSesion && adjuntos.length) {
-        const rutas = adjuntos.map((a) => String(a.storage_path ?? "")).filter(Boolean);
-        const { data: firmadas } = await sb.storage.from(BUCKET).createSignedUrls(rutas, 3600);
+      let bases = ((basesFilas ?? []) as Record<string, unknown>[]).map((b) => ({ ...b, resumen_ok: !!b.resumen, resumen: undefined }));
+      if (conSesion && (adjuntos.length || bases.length)) {
+        const rutas = [...adjuntos, ...bases].map((a) => String(a.storage_path ?? "")).filter(Boolean);
+        const { data: firmadas } = rutas.length ? await sb.storage.from(BUCKET).createSignedUrls(rutas, 3600) : { data: [] };
         const mapa = new Map((firmadas ?? []).map((f) => [f.path, f.signedUrl]));
         adjuntos = adjuntos.map((a) => ({ ...a, url: mapa.get(String(a.storage_path)) ?? null }));
+        bases = bases.map((b) => ({ ...b, url: mapa.get(String(b.storage_path)) ?? null }));
       }
-      return json({ codigo, adjuntos: adjuntos.map(({ storage_path: _p, ...r }) => r), estado: estado ?? null });
+      return json({
+        codigo,
+        adjuntos: adjuntos.map(({ storage_path: _p, ...r }) => r),
+        bases: bases.map(({ storage_path: _p, resumen: _r, ...b }) => b),
+        estado: estado ?? null,
+        ficha_url: `${MP}/RFB/DetailsAcquisition.aspx?idlicitacion=${codigo}`,
+      });
     }
 
     const body = await req.json().catch(() => ({}));
