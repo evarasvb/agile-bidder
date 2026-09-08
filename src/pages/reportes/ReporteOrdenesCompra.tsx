@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   FileText, Building2, User, Calendar, Package, Search, X, Download,
@@ -84,6 +85,9 @@ export default function ReporteOrdenesCompra() {
 
   const [ordenSeleccionada, setOrdenSeleccionada] = useState<string | null>(null);
   const syncMisOC = useSyncMisOC();
+  const anioActual = new Date().getFullYear();
+  const [anioMisOC, setAnioMisOC] = useState<number>(anioActual);
+  const ANIOS = Array.from({ length: 6 }, (_, i) => anioActual - i); // año actual y 5 atrás
 
   const misOC = alcance === "mis";
   const tengoRut = !!cliente?.rut;
@@ -219,13 +223,13 @@ export default function ReporteOrdenesCompra() {
     const cid = (cliente as any)?.id;
     if (!cid) { toast.error("No encontramos tu cliente. Recarga e intenta de nuevo."); return; }
     try {
-      const r = await syncMisOC.mutateAsync(cid);
+      const r = await syncMisOC.mutateAsync({ clienteId: cid, anio: anioMisOC });
       if (!r?.codigo_proveedor) {
         toast.warning("Mercado Público no reconoció tu RUT como proveedor (no encontré tu código). Revisa que el RUT en Mi empresa sea el que usas para vender al Estado.");
       } else if ((r?.encontradas ?? 0) === 0) {
-        toast.info(`Identifiqué tu proveedor (código ${r.codigo_proveedor}), pero Mercado Público no devolvió órdenes en este periodo.`);
+        toast.info(`Identifiqué tu proveedor (código ${r.codigo_proveedor}), pero no tuviste órdenes en ${anioMisOC}. Prueba otro año.`);
       } else {
-        toast.success(`Listo: ${r.enriquecidas} de ${r.encontradas} OC cargadas${r.parcial ? " (parcial: vuelve a tocar para completar el resto)" : ""}.`);
+        toast.success(`Listo: ${r.enriquecidas} de ${r.encontradas} OC de ${anioMisOC} cargadas${r.parcial ? " (año parcial: vuelve a tocar para completar)" : ""}.`);
       }
     } catch (e) {
       toast.error("No pudimos traer tus OC: " + ((e as Error).message || "error"));
@@ -296,9 +300,17 @@ export default function ReporteOrdenesCompra() {
             )}
             <div className="ml-auto flex gap-2">
               {misOC && tengoRut && (
-                <Button size="sm" variant="outline" className="gap-2 border-firmavb-blue/30 text-firmavb-blue hover:bg-firmavb-blue/10" onClick={actualizarMisOC} disabled={syncMisOC.isPending}>
-                  <RefreshCw className={`h-4 w-4 ${syncMisOC.isPending ? "animate-spin" : ""}`} /> {syncMisOC.isPending ? "Trayendo…" : "Actualizar mis OC"}
-                </Button>
+                <>
+                  <Select value={String(anioMisOC)} onValueChange={(v) => setAnioMisOC(Number(v))}>
+                    <SelectTrigger className="h-9 w-[110px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {ANIOS.map((y) => <SelectItem key={y} value={String(y)}>Año {y}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Button size="sm" variant="outline" className="gap-2 border-firmavb-blue/30 text-firmavb-blue hover:bg-firmavb-blue/10" onClick={actualizarMisOC} disabled={syncMisOC.isPending}>
+                    <RefreshCw className={`h-4 w-4 ${syncMisOC.isPending ? "animate-spin" : ""}`} /> {syncMisOC.isPending ? "Trayendo…" : "Traer mis OC"}
+                  </Button>
+                </>
               )}
               <Button size="sm" variant="outline" className="gap-2" onClick={exportarCSV} disabled={!ordenesFiltradas.length}>
                 <FileText className="h-4 w-4" /> CSV

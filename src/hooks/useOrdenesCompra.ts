@@ -391,13 +391,13 @@ export function useOpcionesOC(campo: 'proveedor_nombre' | 'organismo_comprador',
 export function useSyncMisOC() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (clienteId: string) => {
+    mutationFn: async ({ clienteId, anio }: { clienteId: string; anio?: number }) => {
       const { data, error } = await (supabase as any).functions.invoke('sync-mis-oc', {
-        body: { cliente_id: clienteId },
+        body: { cliente_id: clienteId, anio },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      return data as { codigo_proveedor: string | null; encontradas: number; enriquecidas: number; parcial: boolean; errores: string[] };
+      return data as { codigo_proveedor: string | null; anio?: number; encontradas: number; enriquecidas: number; parcial: boolean; errores: string[] };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ordenes_compra'] });
