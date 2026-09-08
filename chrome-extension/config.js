@@ -6,6 +6,9 @@ export const SUPABASE_URL = 'https://juiskeeutbaipwbeeezw.supabase.co';
 export const EXTENSION_API_ENDPOINT = `${SUPABASE_URL}/functions/v1/extension-api`;
 export const SYNC_COMPRAS_AGILES_ENDPOINT = `${SUPABASE_URL}/functions/v1/sync-compras-agiles`;
 export const SYNC_ORDENES_COMPRA_ENDPOINT = `${SUPABASE_URL}/functions/v1/sync-ordenes-compra`;
+// Adjuntos (bases y anexos) de una licitación, tomados por la extensión desde la sección
+// "Adjuntos" de Mercado Público (que exige captcha y por eso el robot no puede bajar).
+export const EXTENSION_ADJUNTOS_ENDPOINT = `${SUPABASE_URL}/functions/v1/extension-adjuntos`;
 
 export const PENDING_SYNC_URL = 'https://compraagil-pending-sync.onrender.com';
 

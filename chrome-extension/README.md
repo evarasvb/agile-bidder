@@ -4,6 +4,14 @@ Extensión de Chrome (Manifest V3) para automatizar postulaciones a Compras Ági
 
 > Para documentación completa de instalación, arquitectura y publicación en Chrome Web Store, consulta [`docs/CHROME_EXTENSION.md`](../docs/CHROME_EXTENSION.md).
 
+## Extractor de bases y anexos (v1.3)
+
+Al abrir la ficha de una licitación en Mercado Público con la extensión conectada, aparece el aviso
+"¿Quieres extraer la información y las bases…?". Al aceptar se envía la ficha a FirmaVB y se abre la
+ventana de adjuntos de Mercado Público (la que pide captcha, que el robot no puede bajar): ahí cada
+archivo se manda solo a FirmaVB. Los PDF de bases quedan disponibles para todos y el Experto los lee.
+Si abres la ventana de adjuntos por tu cuenta, la extensión también ofrece enviarlos.
+
 ## Instalación rápida
 
 1. Ve a `chrome://extensions/` y activa **Modo desarrollador**.
