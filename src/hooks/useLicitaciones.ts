@@ -49,6 +49,9 @@ interface CompraAgilRow {
   monto: number | null;
   fecha_cierre: string | null;
   estado: string | null;
+  // Opcional: el archivo de tipos generado de Supabase está desactualizado y
+  // no siempre declara esta columna real, aunque sí exista en la fila.
+  url_ficha?: string | null;
   link_oficial: string | null;
   created_at: string;
   match_encontrado: boolean | null;
@@ -63,7 +66,8 @@ function mapCompraAgilToLicitacion(compra: CompraAgilRow): Licitacion {
     presupuesto: compra.monto ?? null,
     fecha_cierre: compra.fecha_cierre,
     estado: compra.estado,
-    link_oficial: compra.link_oficial,
+    // Columna real es `url_ficha` (compras_agiles no tiene `link_oficial`).
+    link_oficial: compra.url_ficha || compra.link_oficial || null,
     created_at: compra.created_at,
     procesada: compra.match_encontrado ?? false,
     match_encontrado: compra.match_encontrado ?? false,

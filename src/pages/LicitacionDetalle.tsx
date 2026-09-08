@@ -77,7 +77,9 @@ function useLicitacionDetalle(id: string | undefined) {
           monto: compraAgil.monto,
           fecha_cierre: compraAgil.fecha_cierre,
           estado: compraAgil.estado,
-          link_oficial: compraAgil.link_oficial,
+          // Columna real es `url_ficha` (compras_agiles no tiene `link_oficial`);
+          // sin esto el botón "Ver en Mercado Público" quedaba sin URL.
+          link_oficial: compraAgil.url_ficha || compraAgil.link_oficial || null,
           match_score: compraAgil.match_score,
           match_encontrado: compraAgil.match_encontrado,
           datos_json: compraAgil.datos_json,
@@ -104,7 +106,8 @@ function useLicitacionDetalle(id: string | undefined) {
           monto: licitacion.presupuesto,
           fecha_cierre: licitacion.fecha_cierre,
           estado: licitacion.estado,
-          link_oficial: licitacion.link_oficial,
+          // Columna real es `link_detalle` (licitaciones no tiene `link_oficial`).
+          link_oficial: licitacion.link_detalle || licitacion.link_oficial || null,
           match_score: licitacion.match_score,
           match_encontrado: licitacion.match_encontrado,
           datos_json: null,

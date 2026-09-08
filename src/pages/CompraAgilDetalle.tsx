@@ -249,24 +249,30 @@ export default function CompraAgilDetalle() {
           Libro del Experto
         </Button>
         {/* Siempre visible, no solo tras guardar la propuesta: antes el único
-            camino hacia Mercado Público quedaba escondido en Postulaciones. */}
-        <Button asChild variant="outline" className="gap-2 shrink-0">
-          <a
-            href={`https://www.mercadopublico.cl/CompraAgil/Cotizacion/${compra.codigo}`}
-            target="_blank"
-            rel="noreferrer"
-          >
+            camino hacia Mercado Público quedaba escondido en Postulaciones.
+            Usa el link real scrapeado (compra.link_oficial): la URL antes se
+            armaba a mano con el código y esa ruta no existe en el sitio real
+            (daba 404). */}
+        {compra.link_oficial ? (
+          <Button asChild variant="outline" className="gap-2 shrink-0">
+            <a href={compra.link_oficial} target="_blank" rel="noreferrer">
+              <ExternalLink className="h-4 w-4" />
+              Postular en Mercado Público
+            </a>
+          </Button>
+        ) : (
+          <Button variant="outline" className="gap-2 shrink-0" disabled title="Aún no tenemos el enlace oficial de esta compra">
             <ExternalLink className="h-4 w-4" />
             Postular en Mercado Público
-          </a>
-        </Button>
+          </Button>
+        )}
         <Button onClick={() => setPropuestaOpen(true)} className="gap-2 shrink-0">
           <Sparkles className="h-4 w-4" />
           Generar propuesta
         </Button>
       </div>
       <div className="flex flex-wrap gap-2">
-        <AccionesCompartir size="default" oportunidad={{ codigo: compra.codigo, nombre: compra.nombre, tipo: 'compra_agil', organismo: compra.organismo, monto: compra.monto, moneda: compra.moneda, fecha_cierre: compra.fecha_cierre, fecha_publicacion: compra.fecha_publicacion, descripcion: compra.descripcion }} />
+        <AccionesCompartir size="default" oportunidad={{ codigo: compra.codigo, nombre: compra.nombre, tipo: 'compra_agil', organismo: compra.organismo, monto: compra.monto, moneda: compra.moneda, fecha_cierre: compra.fecha_cierre, fecha_publicacion: compra.fecha_publicacion, link: compra.link_oficial, descripcion: compra.descripcion }} />
       </div>
 
       <RiesgoOrganismoCard codigo={compra.codigo} organismo={compra.organismo} />

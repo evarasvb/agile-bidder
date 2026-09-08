@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -37,7 +38,31 @@ import {
   type PipelineEtapa,
 } from './pipelineConstants';
 import { useUpdatePipelineItem, useMovePipelineItem, useDeletePipelineItem } from '@/hooks/usePipeline';
+import { supabaseClient as supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
+
+// Link real a la ficha en Mercado Público (scrapeado), buscado por código. Antes
+// se armaba a mano con el código y esa URL no existe en el sitio real (404).
+function useLinkOficialOportunidad(tipo: string | undefined, codigo: string | undefined, habilitado: boolean) {
+  return useQuery({
+    queryKey: ['pipeline-link-oficial', tipo, codigo],
+    queryFn: async () => {
+      // Cast a `any`: estas columnas son reales en la base pero el archivo de
+      // tipos generado de Supabase está desactualizado y no las conoce.
+      if (tipo === 'compra_agil') {
+        const { data } = await (supabase as any).from('compras_agiles').select('url_ficha').eq('codigo', codigo).maybeSingle();
+        return data?.url_ficha ?? null;
+      }
+      if (tipo === 'licitacion') {
+        const { data } = await (supabase as any).from('licitaciones').select('link_detalle').eq('id_licitacion', codigo).maybeSingle();
+        return data?.link_detalle ?? null;
+      }
+      return null;
+    },
+    enabled: habilitado && !!codigo && (tipo === 'compra_agil' || tipo === 'licitacion'),
+    staleTime: 5 * 60_000,
+  });
+}
 
 interface PipelineDetailModalProps {
   item: PipelineItem | null;
@@ -63,6 +88,7 @@ export function PipelineDetailModal({
   const updateItem = useUpdatePipelineItem();
   const moveItem = useMovePipelineItem();
   const deleteItem = useDeletePipelineItem();
+  const { data: linkOficial } = useLinkOficialOportunidad(item?.oportunidad_tipo, item?.oportunidad_id, open);
 
   // Sync notas when item changes
   const displayNotas = notasEdited ? notas : (item?.notas || '');
@@ -115,14 +141,10 @@ export function PipelineDetailModal({
       ? `/licitaciones/${item.oportunidad_id}`
       : null;
 
-  // Ficha oficial en Mercado Público (URL determinística por código). Es el
-  // paso que faltaba: la propuesta quedaba lista pero no había cómo POSTULAR.
-  const mpUrl =
-    item.oportunidad_tipo === 'compra_agil'
-      ? `https://www.mercadopublico.cl/CompraAgil/Cotizacion/${item.oportunidad_id}`
-      : item.oportunidad_tipo === 'licitacion'
-      ? `https://www.mercadopublico.cl/Procurement/Modules/RFB/DetailsAcquisition.aspx?idlicitacion=${item.oportunidad_id}`
-      : null;
+  // Ficha oficial en Mercado Público: usa el link real scrapeado
+  // (useLinkOficialOportunidad). Antes se armaba a mano con el código y esa
+  // URL no existe en el sitio real (404).
+  const mpUrl = linkOficial ?? null;
   const prePostulacion = item.etapa === 'descubierta' || item.etapa === 'seguimiento' || item.etapa === 'preparacion';
 
   const handleYaPostule = () => {
