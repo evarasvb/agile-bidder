@@ -628,6 +628,216 @@
     }
   }
 
+  // ==========================================================================
+  // EXTRACTOR: ficha + bases y anexos a FirmaVB
+  // La sección "Adjuntos" de Mercado Público (donde van las bases en PDF) exige
+  // reCAPTCHA, así que el robot de FirmaVB no puede bajarla. Aquí, en el navegador
+  // del usuario (que ya pasó el captcha), se ofrece extraer la ficha y, al aceptar,
+  // se abre la ventana de adjuntos y cada archivo se manda a FirmaVB.
+  // ==========================================================================
+  const BANNER_ID = 'firmavb-extractor-banner';
+  const RE_ARCHIVO = /\.(pdf|docx?|xlsx?|pptx?|zip|rar|7z|jpe?g|png|txt|csv)$/i;
+  const RE_CODIGO_LIC = /\b\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}\b/;
+  const TITULO_BANNER = 'FirmaVB Postulador';
+
+  async function extensionConectada() {
+    try {
+      const r = await chrome.runtime.sendMessage({ action: 'GET_CONFIG' });
+      return !!(r && r.hasApiKey);
+    } catch (_) { return false; }
+  }
+
+  function cerrarBanner() {
+    const b = document.getElementById(BANNER_ID);
+    if (b) b.remove();
+  }
+
+  // Tarjeta fija abajo a la izquierda (el botón "Postular" ya usa la derecha). Solo DOM, sin innerHTML.
+  function mostrarBanner({ texto, acciones = [] }) {
+    cerrarBanner();
+    const card = document.createElement('div');
+    card.id = BANNER_ID;
+    card.style.cssText = `
+      position: fixed; bottom: 20px; left: 20px; z-index: 10001; max-width: 380px;
+      padding: 14px 16px; background: #ffffff; color: #0f172a; border: 1px solid #dbeafe;
+      border-left: 5px solid #2563eb; border-radius: 12px; box-shadow: 0 8px 30px rgba(15, 23, 42, 0.18);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.4;
+    `;
+    const titulo = document.createElement('div');
+    titulo.textContent = TITULO_BANNER;
+    titulo.style.cssText = 'font-weight: 700; color: #2563eb; margin-bottom: 4px; font-size: 13px;';
+    const cuerpo = document.createElement('div');
+    cuerpo.id = BANNER_ID + '-texto';
+    cuerpo.textContent = texto;
+    const fila = document.createElement('div');
+    fila.id = BANNER_ID + '-acciones';
+    fila.style.cssText = 'display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;';
+    card.appendChild(titulo);
+    card.appendChild(cuerpo);
+    card.appendChild(fila);
+    document.body.appendChild(card);
+    setAccionesBanner(acciones);
+  }
+
+  function setAccionesBanner(acciones) {
+    const fila = document.getElementById(BANNER_ID + '-acciones');
+    if (!fila) return;
+    while (fila.firstChild) fila.removeChild(fila.firstChild);
+    acciones.forEach((a) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = a.label;
+      btn.style.cssText = a.primary
+        ? 'padding: 8px 14px; border: none; border-radius: 8px; background: #2563eb; color: #fff; font-weight: 600; cursor: pointer;'
+        : 'padding: 8px 14px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #334155; cursor: pointer;';
+      btn.addEventListener('click', a.onClick);
+      fila.appendChild(btn);
+    });
+  }
+
+  function actualizarBanner(texto, acciones) {
+    const cuerpo = document.getElementById(BANNER_ID + '-texto');
+    if (!cuerpo) { mostrarBanner({ texto, acciones: acciones || [] }); return; }
+    cuerpo.textContent = texto;
+    if (acciones) setAccionesBanner(acciones);
+  }
+
+  // En la ficha de la licitación: preguntar apenas la extensión está conectada.
+  async function ofrecerExtraccion(codigo) {
+    if (!RE_CODIGO_LIC.test(codigo)) return;
+    if (sessionStorage.getItem('firmavb-extraer-no-' + codigo)) return;
+    if (!(await extensionConectada())) return;
+    mostrarBanner({
+      texto: `¿Quieres extraer la información y las bases de la licitación ${codigo} a FirmaVB? Se abre la ventana de adjuntos de Mercado Público y se envían solos.`,
+      acciones: [
+        { label: 'Sí, extraer', primary: true, onClick: () => iniciarExtraccion(codigo) },
+        { label: 'Ahora no', onClick: () => { sessionStorage.setItem('firmavb-extraer-no-' + codigo, '1'); cerrarBanner(); } }
+      ]
+    });
+  }
+
+  function iniciarExtraccion(codigo) {
+    const img = document.getElementById('imgAdjuntos');
+    // Se abre la ventana DENTRO del clic del usuario (si no, el navegador bloquea el popup).
+    if (img) {
+      chrome.storage.local.set({ firmavbExtraer: { codigo, ts: Date.now() } }).catch(() => {});
+      img.click();
+      actualizarBanner(`Ficha en camino a FirmaVB. Se abrió la ventana de adjuntos de ${codigo}: ahí mismo se envían las bases y anexos (si el navegador bloqueó la ventana emergente, permítela y vuelve a hacer clic).`, [
+        { label: 'Cerrar', onClick: cerrarBanner }
+      ]);
+    } else {
+      actualizarBanner('Ficha en camino a FirmaVB. Esta licitación no tiene sección de adjuntos en Mercado Público.', [
+        { label: 'Cerrar', onClick: cerrarBanner }
+      ]);
+    }
+    syncLicitacion();
+  }
+
+  // En la ventana de adjuntos: filas con un archivo y su botón de descarga (postback ASP.NET).
+  function filasAdjuntos() {
+    const out = [];
+    const vistos = new Set();
+    document.querySelectorAll('tr').forEach((tr) => {
+      const btn = tr.querySelector('input[type="image"][name*="$"], input[type="submit"][name*="$"]');
+      if (!btn || !btn.name) return;
+      const textos = Array.from(tr.querySelectorAll('td')).map((td) => td.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean);
+      const nombre = textos.find((t) => RE_ARCHIVO.test(t));
+      if (!nombre || vistos.has(btn.name)) return;
+      vistos.add(btn.name);
+      out.push({ nombre, boton: btn.name, form: btn.form, descripcion: textos.filter((t) => t !== nombre && t.length < 120).slice(0, 2).join(' · ') || null });
+    });
+    return out;
+  }
+
+  function esperarAdjuntos(ms) {
+    return new Promise((resolve) => {
+      const t0 = Date.now();
+      const tick = () => {
+        const filas = filasAdjuntos();
+        if (filas.length || Date.now() - t0 > ms) resolve(filas);
+        else setTimeout(tick, 600);
+      };
+      tick();
+    });
+  }
+
+  async function descargarFila(f) {
+    const form = f.form || document.forms[0];
+    if (!form) throw new Error('sin formulario');
+    const datos = new URLSearchParams(new FormData(form));
+    datos.set(f.boton + '.x', '1');
+    datos.set(f.boton + '.y', '1');
+    const r = await fetch(window.location.href, { method: 'POST', body: datos, credentials: 'include' });
+    const ct = r.headers.get('content-type') || '';
+    if (!r.ok || ct.includes('text/html')) throw new Error('Mercado Público no entregó el archivo');
+    return { blob: await r.blob(), contentType: ct.split(';')[0] };
+  }
+
+  function blobABase64(blob) {
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(String(fr.result).split(',')[1] || '');
+      fr.onerror = () => reject(fr.error);
+      fr.readAsDataURL(blob);
+    });
+  }
+
+  async function enviarAdjuntos(codigo, filas) {
+    let ok = 0, errores = 0, bases = 0;
+    for (let i = 0; i < filas.length; i++) {
+      const f = filas[i];
+      actualizarBanner(`Enviando ${i + 1} de ${filas.length} a FirmaVB: ${f.nombre}`, []);
+      try {
+        const { blob, contentType } = await descargarFila(f);
+        if (blob.size > 30 * 1024 * 1024) { errores++; continue; }
+        const base64 = await blobABase64(blob);
+        const r = await chrome.runtime.sendMessage({
+          action: 'ENVIAR_ADJUNTO',
+          data: { codigo, nombre: f.nombre, descripcion: f.descripcion, contentType, base64 }
+        });
+        if (r && r.success) { ok++; if (r.bases_pendiente) bases++; }
+        else { errores++; console.warn('FirmaVB adjunto', f.nombre, r && r.error); }
+      } catch (e) {
+        errores++;
+        console.warn('FirmaVB adjunto', f.nombre, e);
+      }
+    }
+    const resumen = `Listo: ${ok} archivo${ok === 1 ? '' : 's'} enviado${ok === 1 ? '' : 's'} a FirmaVB` +
+      (bases ? `; ${bases} PDF de bases que el Experto leerá en minutos` : '') +
+      (errores ? ` · ${errores} con error` : '') + '.';
+    actualizarBanner(resumen, [{ label: 'Cerrar', onClick: cerrarBanner }]);
+  }
+
+  async function flujoAdjuntos() {
+    if (!(await extensionConectada())) return;
+    const filas = await esperarAdjuntos(25000);
+    if (!filas.length) return;
+    let pedido = null;
+    try { pedido = (await chrome.storage.local.get('firmavbExtraer')).firmavbExtraer || null; } catch (_) {}
+    const auto = !!(pedido && pedido.codigo && Date.now() - pedido.ts < 30 * 60 * 1000);
+    const codigo = (auto && pedido.codigo) || (document.body.textContent.match(RE_CODIGO_LIC) || [])[0] || null;
+    if (!codigo) {
+      mostrarBanner({ texto: 'No pude identificar a qué licitación pertenecen estos adjuntos. Ábrelos desde la ficha de la licitación.', acciones: [{ label: 'Cerrar', onClick: cerrarBanner }] });
+      return;
+    }
+    const enviar = () => {
+      chrome.storage.local.remove('firmavbExtraer').catch(() => {});
+      enviarAdjuntos(codigo, filas);
+    };
+    if (auto) {
+      mostrarBanner({ texto: `Enviando ${filas.length} adjunto${filas.length === 1 ? '' : 's'} de ${codigo} a FirmaVB…`, acciones: [] });
+      enviar();
+    } else {
+      mostrarBanner({
+        texto: `Encontré ${filas.length} adjunto${filas.length === 1 ? '' : 's'} de la licitación ${codigo}. ¿Los envío a FirmaVB para que el Experto tenga las bases?`,
+        acciones: [
+          { label: 'Sí, enviar', primary: true, onClick: enviar },
+          { label: 'Ahora no', onClick: cerrarBanner }
+        ]
+      });
+    }
+  }
+
   // Inicialización
   function init() {
     const pageInfo = detectPageInfo();
@@ -639,11 +849,19 @@
         action: 'PAGE_DETECTED',
         data: pageInfo
       }).catch(() => {});
+
+      // Ventana de adjuntos (bases y anexos): solo el flujo de envío a FirmaVB.
+      if (pageInfo.url.includes('ViewAttachment.aspx')) {
+        flujoAdjuntos();
+        return;
+      }
       
       // Mostrar botón si hay código de licitación
       if (pageInfo.codigoLicitacion) {
         injectButton(pageInfo.codigoLicitacion);
         setTimeout(() => syncLicitacion(), 1500);
+        // Ficha de licitación: ofrecer extraer ficha + bases a FirmaVB.
+        if (pageInfo.isDetalle) setTimeout(() => ofrecerExtraccion(pageInfo.codigoLicitacion), 800);
       }
       
       // Mostrar indicador de conexión

@@ -18,7 +18,8 @@ import {
   getOffer,
   submitResult,
   syncLicitacion,
-  handleScrapedData
+  handleScrapedData,
+  enviarAdjunto
 } from './modules/supabase-api.js';
 
 import {
@@ -102,6 +103,7 @@ async function handleMessage(message, sender) {
     case 'CHECK_PENDING_TASKS':     return checkPendingTasks();
     case 'GET_PENDING_SYNC_STATUS': return getPendingSyncStatus();
     case 'SCRAPED_DATA':            return handleScrapedData(data, sender);
+    case 'ENVIAR_ADJUNTO':          return enviarAdjunto(data);
     default:
       throw new Error(`Unknown action: ${action}`);
   }

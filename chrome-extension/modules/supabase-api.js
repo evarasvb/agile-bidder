@@ -7,6 +7,7 @@ import {
   SUPABASE_URL,
   SYNC_COMPRAS_AGILES_ENDPOINT,
   SYNC_ORDENES_COMPRA_ENDPOINT,
+  EXTENSION_ADJUNTOS_ENDPOINT,
   MAX_RETRY_ATTEMPTS,
   RETRY_DELAY_MS
 } from '../config.js';
@@ -275,4 +276,35 @@ export async function syncOrdenCompra(ordenCompra, items = []) {
     const error = await response.json();
     console.warn('[FirmaVB] Error sincronizando OC a Supabase:', error);
   }
+}
+
+// ============================================
+// ADJUNTOS DE LICITACIÓN (bases y anexos)
+// ============================================
+// El content script baja el archivo desde Mercado Público (misma sesión del usuario, captcha ya
+// resuelto) y lo manda en base64; aquí se reenvía crudo a FirmaVB con la API key.
+
+export async function enviarAdjunto({ codigo, nombre, descripcion, contentType, base64 }) {
+  const { apiKey } = await chrome.storage.local.get('apiKey');
+  if (!apiKey) return { success: false, error: 'La extensión no está conectada a FirmaVB (falta la API key)' };
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+
+  const response = await withRetry(() =>
+    fetch(EXTENSION_ADJUNTOS_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': contentType || 'application/octet-stream',
+        'x-api-key': apiKey,
+        'X-Codigo': codigo,
+        'X-Nombre': encodeURIComponent(nombre),
+        'X-Descripcion': encodeURIComponent(descripcion || '')
+      },
+      body: bytes
+    })
+  );
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) return { success: false, error: result.mensaje || result.error || `HTTP ${response.status}` };
+  return { success: true, ...result };
 }
