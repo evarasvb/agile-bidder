@@ -1,0 +1,39 @@
+#!/bin/bash
+# © 2024-2026 Firma VB SpA. Protección de derechos de autor.
+
+echo "🔐 Verificando cumplimiento legal de commits..."
+
+# Verifica que archivos nuevos TypeScript/JavaScript tengan copyright header
+NUEVO_TS_ARCH=$(git diff --cached --name-only --diff-filter=A | grep -E '\.(tsx?|jsx?)$')
+
+for archivo in $NUEVO_TS_ARCH; do
+  if [ -f "$archivo" ]; then
+    # Verifica si el archivo comienza con copyright
+    if ! head -1 "$archivo" | grep -q "©"; then
+      echo "❌ Error: $archivo falta header de copyright"
+      echo "Agrega esto al inicio del archivo:"
+      echo "/**"
+      echo " * © 2024-2026 Firma VB SpA. Todos los derechos reservados."
+      echo " * Software propietario - Prohibida reproducción o modificación."
+      echo " */"
+      exit 1
+    fi
+  fi
+done
+
+# Verifica que no haya secretos en el commit
+if git diff --cached | grep -E '(SUPABASE_KEY|API_KEY|SECRET|PASSWORD)' | grep -v '.gitignore'; then
+  echo "❌ Error: Detectados posibles secretos en el commit"
+  echo "Revisa tus cambios con: git diff --cached"
+  exit 1
+fi
+
+# Verifica que no haya archivos de config sensibles
+if git diff --cached --name-only | grep -E '\.env|secrets|credentials'; then
+  echo "❌ Error: Intentaste commitear archivo sensible"
+  echo "Asegúrate de que esté en .gitignore"
+  exit 1
+fi
+
+echo "✅ Verificaciones de seguridad pasadas"
+exit 0

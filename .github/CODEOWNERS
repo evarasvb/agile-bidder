@@ -1,0 +1,38 @@
+# GitHub Code Owners
+# Requiere aprobación de propietarios para cambios
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Propietario por defecto - REQUERIDO PARA TODOS
+* @evarasvb
+
+# Documentos legales - CRÍTICO
+LICENSE @evarasvb
+INTELLECTUAL_PROPERTY.md @evarasvb
+TERMS_OF_SERVICE.md @evarasvb
+PRIVACY_POLICY.md @evarasvb
+CONTRIBUTING.md @evarasvb
+LEGAL_SHIELD.md @evarasvb
+GITHUB_SECURITY_SETUP.md @evarasvb
+
+# Seguridad
+.github/SECURITY.md @evarasvb
+.github/CODEOWNERS @evarasvb
+.github/workflows/ @evarasvb
+.husky/ @evarasvb
+scripts/add-copyright-header.js @evarasvb
+
+# Configuración crítica
+package.json @evarasvb
+package-lock.json @evarasvb
+pnpm-lock.yaml @evarasvb
+yarn.lock @evarasvb
+tsconfig.json @evarasvb
+vite.config.ts @evarasvb
+
+# Privacidad y datos
+src/integrations/ @evarasvb
+src/services/ @evarasvb
+
+# Headers de copyright
+src/main.tsx @evarasvb
+src/App.tsx @evarasvb

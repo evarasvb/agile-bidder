@@ -1,3 +1,9 @@
+/**
+ * © 2024-2026 Firma VB SpA. Todos los derechos reservados.
+ * Software propietario - Prohibida reproducción o modificación sin autorización.
+ * Ley 19.912 - Protección de Derechos de Autor (Chile) | Marca registrada INAPI
+ */
+
 import { lazy, Suspense } from "react";
 import { Loader2 } from "lucide-react";
 import { Toaster } from "@/components/ui/toaster";
