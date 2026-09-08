@@ -59,6 +59,10 @@ export interface OrdenesCompraFilters {
   institucion_nombre?: string;
   proveedor_rut?: string;
   proveedor_nombre?: string;
+  /** Multi-selección: varios proveedores / instituciones a la vez (match exacto
+   *  por nombre, tal cual salen del desplegable). */
+  proveedor_nombres?: string[];
+  institucion_nombres?: string[];
   estado?: string;
   fecha_desde?: string;
   fecha_hasta?: string;
@@ -174,6 +178,14 @@ export function useOrdenesCompra(
       } else {
         if (filters?.institucion_nombre) query = query.ilike('organismo_comprador', `%${filters.institucion_nombre}%`);
         if (filters?.proveedor_nombre) query = query.ilike('proveedor_nombre', `%${filters.proveedor_nombre}%`);
+      }
+
+      // Multi-selección (desplegables): match exacto por nombre.
+      if (filters?.proveedor_nombres && filters.proveedor_nombres.length > 0) {
+        query = query.in('proveedor_nombre', filters.proveedor_nombres);
+      }
+      if (filters?.institucion_nombres && filters.institucion_nombres.length > 0) {
+        query = query.in('organismo_comprador', filters.institucion_nombres);
       }
 
       if (filters?.fecha_desde) query = query.gte('fecha_emision', filters.fecha_desde);
@@ -352,6 +364,30 @@ export function useUpsertOrdenCompra() {
 // Trae las OC PROPIAS del cliente (donde es proveedor) desde Mercado Público y
 // las guarda en la base, para que "Mis OC" muestre sus ventas reales. La edge
 // function resuelve RUT -> código de proveedor y baja detalle + ítems.
+// Opciones para los desplegables de proveedor / institución: nombres reales que
+// existen en ordenes_compra y calzan con el texto tecleado. Se sacan de la misma
+// tabla para que lo que eliges siempre tenga OC (dedup + orden en el cliente).
+export function useOpcionesOC(campo: 'proveedor_nombre' | 'organismo_comprador', q: string) {
+  const term = q.trim();
+  return useQuery({
+    queryKey: ['opciones-oc', campo, term],
+    queryFn: async (): Promise<string[]> => {
+      let query = (supabase as any)
+        .from('ordenes_compra')
+        .select(campo)
+        .not(campo, 'is', null)
+        .limit(400);
+      if (term.length >= 2) query = query.ilike(campo, `%${term}%`);
+      const { data, error } = await query;
+      if (error) throw error;
+      const set = new Set<string>();
+      for (const row of (data || [])) { const v = (row as any)[campo]; if (v) set.add(String(v)); }
+      return Array.from(set).sort((a, b) => a.localeCompare(b, 'es')).slice(0, 40);
+    },
+    staleTime: 60000,
+  });
+}
+
 export function useSyncMisOC() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -361,7 +397,7 @@ export function useSyncMisOC() {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      return data as { encontradas: number; enriquecidas: number; parcial: boolean; errores: string[] };
+      return data as { codigo_proveedor: string | null; encontradas: number; enriquecidas: number; parcial: boolean; errores: string[] };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ordenes_compra'] });

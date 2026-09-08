@@ -45,10 +45,18 @@ function buscarCodigoEmpresa(obj: any): string | null {
     const cur = stack.pop();
     if (!cur || typeof cur !== 'object' || visto.has(cur)) continue;
     visto.add(cur);
+    // 1ª pasada: claves específicas de empresa/proveedor.
     for (const [k, v] of Object.entries(cur)) {
       if (v && typeof v === 'object') { stack.push(v); continue; }
       const key = k.toLowerCase();
-      if (/(codigo|id).*empresa|empresa.*(codigo|id)|codigoproveedor/.test(key) && v != null && String(v).trim() !== '') {
+      if (/(codigo|id).*empresa|empresa.*(codigo|id)|codigoproveedor|codigosucursal/.test(key) && v != null && String(v).trim() !== '') {
+        return String(v).trim();
+      }
+    }
+    // 2ª pasada: una clave "codigo"/"id" numérica suelta (evitando estados).
+    for (const [k, v] of Object.entries(cur)) {
+      const key = k.toLowerCase();
+      if (/^(codigo|id)$/.test(key) && !/estado/.test(key) && v != null && /^\d+$/.test(String(v).trim())) {
         return String(v).trim();
       }
     }

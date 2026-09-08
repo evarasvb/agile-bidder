@@ -20,6 +20,7 @@ import {
   FileSearch, Briefcase, Store, ShoppingCart, Tag, Tags, Layers, CalendarRange, Filter, RefreshCw,
 } from "lucide-react";
 import { clasificarRubro } from "@/utils/rubroProducto";
+import { MultiSelectOC } from "@/components/reportes/MultiSelectOC";
 import { ReportHero } from "@/components/reportes/ReportHero";
 import { PeriodoSelector } from "@/components/reportes/PeriodoSelector";
 import type { PeriodoPreset } from "@/hooks/useBI";
@@ -73,6 +74,8 @@ export default function ReporteOrdenesCompra() {
   // Buscador libre (solo modo Mercado).
   const emptyForm = { search: "", proveedor: "", comprador: "" };
   const [form, setForm] = useState({ ...emptyForm });
+  const [proveedores, setProveedores] = useState<string[]>([]);
+  const [instituciones, setInstituciones] = useState<string[]>([]);
   const [applied, setApplied] = useState<OrdenesCompraFilters | null>(null);
   const [buscoMercado, setBuscoMercado] = useState(false);
 
@@ -197,12 +200,16 @@ export default function ReporteOrdenesCompra() {
   const buscarMercado = () => {
     const f: OrdenesCompraFilters = {};
     if (form.search.trim()) f.search = form.search.trim();
-    if (form.proveedor.trim()) f.proveedor_nombre = form.proveedor.trim();
-    if (form.comprador.trim()) f.institucion_nombre = form.comprador.trim();
-    if (!Object.keys(f).length) { toast.info("Escribe al menos un filtro para buscar en el mercado."); return; }
+    if (proveedores.length) f.proveedor_nombres = proveedores;
+    if (instituciones.length) f.institucion_nombres = instituciones;
+    if (!Object.keys(f).length) { toast.info("Elige un proveedor o institución (o escribe una búsqueda) para explorar el mercado."); return; }
     setApplied(f);
     setBuscoMercado(true);
     setCubo([]);
+  };
+  const limpiarMercado = () => {
+    setForm({ ...emptyForm }); setProveedores([]); setInstituciones([]);
+    setApplied(null); setBuscoMercado(false); setCubo([]);
   };
 
   const actualizarMisOC = async () => {
@@ -210,8 +217,10 @@ export default function ReporteOrdenesCompra() {
     if (!cid) { toast.error("No encontramos tu cliente. Recarga e intenta de nuevo."); return; }
     try {
       const r = await syncMisOC.mutateAsync(cid);
-      if ((r?.encontradas ?? 0) === 0) {
-        toast.info("No encontramos órdenes de compra tuyas en Mercado Público para este RUT.");
+      if (!r?.codigo_proveedor) {
+        toast.warning("Mercado Público no reconoció tu RUT como proveedor (no encontré tu código). Revisa que el RUT en Mi empresa sea el que usas para vender al Estado.");
+      } else if ((r?.encontradas ?? 0) === 0) {
+        toast.info(`Identifiqué tu proveedor (código ${r.codigo_proveedor}), pero Mercado Público no devolvió órdenes en este periodo.`);
       } else {
         toast.success(`Listo: ${r.enriquecidas} de ${r.encontradas} OC cargadas${r.parcial ? " (parcial: vuelve a tocar para completar el resto)" : ""}.`);
       }
@@ -229,6 +238,8 @@ export default function ReporteOrdenesCompra() {
         proveedor: o.proveedor_nombre ?? "",
         rut_proveedor: o.proveedor_rut ?? "",
         institucion: o.institucion_nombre ?? "",
+        rut_institucion: o.institucion_rut ?? "",
+        monto_neto: o.total_neto ?? 0,
         total: o.total ?? 0,
         estado: o.estado ?? "",
         fecha: o.fecha_creacion ?? "",
@@ -303,24 +314,30 @@ export default function ReporteOrdenesCompra() {
           )}
 
           {!misOC && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="space-y-1.5 lg:col-span-2">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+              <MultiSelectOC
+                campo="proveedor_nombre"
+                label="Proveedor (uno o varios)"
+                placeholder="Elegir proveedor…"
+                values={proveedores}
+                onChange={setProveedores}
+              />
+              <MultiSelectOC
+                campo="organismo_comprador"
+                label="Institución (una o varias)"
+                placeholder="Elegir institución…"
+                values={instituciones}
+                onChange={setInstituciones}
+              />
+              <div className="space-y-1.5">
                 <Label className="text-xs">Búsqueda libre (código, nombre, RUT)</Label>
-                <Input placeholder="Ej: papel, 96.xxx.xxx-x, 2591-33-TD26…" value={form.search}
+                <Input placeholder="Ej: papel, 2591-33-TD26…" value={form.search}
                   onChange={(e) => setForm({ ...form, search: e.target.value })}
                   onKeyDown={(e) => e.key === "Enter" && buscarMercado()} />
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Proveedor</Label>
-                <Input placeholder="Nombre" value={form.proveedor} onChange={(e) => setForm({ ...form, proveedor: e.target.value })} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Institución</Label>
-                <Input placeholder="Organismo" value={form.comprador} onChange={(e) => setForm({ ...form, comprador: e.target.value })} />
-              </div>
-              <div className="sm:col-span-2 lg:col-span-4 flex gap-2">
+              <div className="lg:col-span-3 flex gap-2">
                 <Button onClick={buscarMercado} className="gap-2 bg-firmavb-blue hover:bg-firmavb-blue/90"><Search className="h-4 w-4" /> Buscar</Button>
-                <Button variant="outline" onClick={() => { setForm({ ...emptyForm }); setApplied(null); setBuscoMercado(false); setCubo([]); }} className="gap-2"><X className="h-4 w-4" /> Limpiar</Button>
+                <Button variant="outline" onClick={limpiarMercado} className="gap-2"><X className="h-4 w-4" /> Limpiar</Button>
               </div>
             </div>
           )}
@@ -394,12 +411,15 @@ export default function ReporteOrdenesCompra() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50">
-                      <TableHead className="font-semibold">Código</TableHead>
-                      <TableHead className="font-semibold">Nombre</TableHead>
+                      <TableHead className="font-semibold">ID / Código</TableHead>
+                      <TableHead className="font-semibold">Glosa</TableHead>
                       <TableHead className="font-semibold">Institución</TableHead>
+                      <TableHead className="font-semibold whitespace-nowrap">RUT institución</TableHead>
                       {!misOC && <TableHead className="font-semibold">Proveedor</TableHead>}
-                      <TableHead className="font-semibold text-right">Total</TableHead>
+                      <TableHead className="font-semibold">Estado</TableHead>
                       <TableHead className="font-semibold whitespace-nowrap">Fecha</TableHead>
+                      <TableHead className="font-semibold text-right whitespace-nowrap">Monto neto</TableHead>
+                      <TableHead className="font-semibold text-right">Monto</TableHead>
                       <TableHead className="font-semibold">Tipo</TableHead>
                       <TableHead className="font-semibold text-center">Ver</TableHead>
                     </TableRow>
@@ -410,9 +430,12 @@ export default function ReporteOrdenesCompra() {
                         <TableCell className="font-mono text-xs font-medium whitespace-nowrap">{orden.codigo}</TableCell>
                         <TableCell className="max-w-[240px]"><div className="truncate" title={orden.nombre || ""}>{orden.nombre || "Sin nombre"}</div></TableCell>
                         <TableCell><span className="truncate max-w-[180px] block" title={orden.institucion_nombre || ""}>{orden.institucion_nombre || "N/A"}</span></TableCell>
+                        <TableCell className="font-mono text-xs whitespace-nowrap">{orden.institucion_rut || "—"}</TableCell>
                         {!misOC && <TableCell><span className="truncate max-w-[160px] block" title={orden.proveedor_nombre || ""}>{orden.proveedor_nombre || "N/A"}</span></TableCell>}
-                        <TableCell className="text-right font-medium whitespace-nowrap">{orden.total ? formatCurrency(orden.total) : "N/A"}</TableCell>
+                        <TableCell className="text-sm whitespace-nowrap">{orden.estado || "—"}</TableCell>
                         <TableCell className="whitespace-nowrap text-sm">{orden.fecha_creacion ? format(parseISO(orden.fecha_creacion), "dd MMM yyyy", { locale: es }) : "N/A"}</TableCell>
+                        <TableCell className="text-right whitespace-nowrap text-sm">{orden.total_neto ? formatCurrency(orden.total_neto) : "—"}</TableCell>
+                        <TableCell className="text-right font-medium whitespace-nowrap">{orden.total ? formatCurrency(orden.total) : "N/A"}</TableCell>
                         <TableCell>{esTratoDirecto(orden.tipo) ? <Badge variant="destructive" className="whitespace-nowrap">Trato Directo</Badge> : <Badge variant="outline" className="whitespace-nowrap">{getTipoOCLabel(orden.tipo)}</Badge>}</TableCell>
                         <TableCell className="text-center">
                           <Dialog>
