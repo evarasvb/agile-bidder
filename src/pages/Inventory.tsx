@@ -181,6 +181,11 @@ export default function Inventory() {
   // Un producto está "incompleto" si le falta descripción o imagen (lo que
   // resta calidad al matching y a la ficha técnica del PDF).
   const esIncompleto = (item: InventoryItem) => !item.descripcion?.trim() || !item.imagen_url;
+  const queFalta = (item: InventoryItem) => {
+    const faltaDesc = !item.descripcion?.trim();
+    const faltaFoto = !item.imagen_url;
+    return faltaDesc && faltaFoto ? 'Falta descripción y foto' : faltaDesc ? 'Falta descripción' : 'Falta foto';
+  };
   const incompleteCount = resumen?.incompletos ?? 0;
 
   // La búsqueda y el filtro de incompletos ya vienen aplicados del servidor.
@@ -585,17 +590,19 @@ export default function Inventory() {
                             <TooltipTrigger asChild>
                               <Badge className="bg-warning/10 text-warning border-0 gap-1">
                                 <Info className="h-3 w-3" />
-                                Incompleto
+                                {queFalta(item)}
                               </Badge>
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p className="text-xs">Falta descripción o imagen para la ficha del PDF</p>
+                              <p className="text-xs">{queFalta(item)} para la ficha técnica del PDF y el matching</p>
                             </TooltipContent>
                           </Tooltip>
                         )}
                       </div>
-                      {item.descripcion && (
-                        <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                      {/* La descripción solo se muestra si dice algo distinto del nombre (la carga
+                          antigua copió el nombre en la descripción) y completa, no cortada. */}
+                      {item.descripcion && item.descripcion.trim() !== item.nombre_producto?.trim() && (
+                        <p className="text-xs text-muted-foreground line-clamp-2 max-w-[420px]" title={item.descripcion}>
                           {item.descripcion}
                         </p>
                       )}

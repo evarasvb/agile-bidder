@@ -145,10 +145,18 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
       }
 
       // Map columns to expected format - flexible column matching
-      const rows: BulkProductRow[] = jsonData.map((row: any) => ({
+      // Nombre y descripción: si el archivo trae una columna de nombre (Nombre,
+      // Producto), esa manda y "Descripción" pasa a ser la descripción. Antes
+      // "Descripción" siempre se tomaba como nombre y el nombre real se perdía.
+      // La plantilla de FirmaVB (Código, Descripción, Detalle) sigue funcionando.
+      const rows: BulkProductRow[] = jsonData.map((row: any) => {
+        const nombreCol = String(row['Nombre'] || row['nombre'] || row['Producto'] || row['producto'] || row['Nombre Producto'] || row['nombre_producto'] || '').trim();
+        const descCol = String(row['Descripción'] || row['Descripcion'] || row['descripcion'] || '').trim();
+        const detalleCol = String(row['Detalle'] || row['detalle'] || '').trim();
+        return {
         sku: row['Código'] || row['Codigo'] || row['SKU'] || row['sku'] || row['Sku'] || '',
-        nombre: row['Descripción'] || row['Descripcion'] || row['descripcion'] || row['Nombre'] || row['nombre'] || '',
-        descripcion: row['Detalle'] || row['detalle'] || '',
+        nombre: nombreCol || descCol,
+        descripcion: detalleCol || (nombreCol ? descCol : ''),
         categoria: row['Categoría'] || row['Categoria'] || row['categoria'] || '',
         precio_unitario: Number(row['Precio de Venta'] || row['Precio Neto'] || row['Precio'] || row['Precio Unitario'] || row['precio'] || row['precio_unitario'] || 0),
         unidad_medida: row['Unidad'] || row['Unidad de Medida'] || row['unidad'] || row['unidad_medida'] || '',
@@ -159,7 +167,8 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
         proveedor: row['Proveedor'] || row['proveedor'] || '',
         keywords: row['Keywords'] || row['keywords'] || row['Palabras Clave'] || row['palabras_clave'] || '',
         imagen_url: row['URL Imagen'] || row['Imagen'] || row['imagen_url'] || row['Image URL'] || '',
-      }));
+        };
+      });
 
       // Pre-validate for display
       const errors: string[] = [];
@@ -179,7 +188,7 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
         
         // Required: Descripción
         if (!row.nombre || row.nombre.trim() === '') {
-          errors.push(`Fila ${rowNum}: Descripción es obligatoria`);
+          errors.push(`Fila ${rowNum}: Nombre (o Descripción) es obligatorio`);
         }
         
         // Required: Precio de Venta
