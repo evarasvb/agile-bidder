@@ -284,7 +284,7 @@ export async function syncOrdenCompra(ordenCompra, items = []) {
 // El content script baja el archivo desde Mercado Público (misma sesión del usuario, captcha ya
 // resuelto) y lo manda en base64; aquí se reenvía crudo a FirmaVB con la API key.
 
-export async function enviarAdjunto({ codigo, nombre, descripcion, contentType, base64 }) {
+export async function enviarAdjunto({ codigo, nombre, descripcion, tipo, contentType, base64 }) {
   const { apiKey } = await chrome.storage.local.get('apiKey');
   if (!apiKey) return { success: false, error: 'La extensión no está conectada a FirmaVB (falta la API key)' };
   const bin = atob(base64);
@@ -299,7 +299,8 @@ export async function enviarAdjunto({ codigo, nombre, descripcion, contentType, 
         'x-api-key': apiKey,
         'X-Codigo': codigo,
         'X-Nombre': encodeURIComponent(nombre),
-        'X-Descripcion': encodeURIComponent(descripcion || '')
+        'X-Descripcion': encodeURIComponent(descripcion || ''),
+        ...(tipo ? { 'X-Tipo': encodeURIComponent(tipo) } : {})
       },
       body: bytes
     })
@@ -311,11 +312,11 @@ export async function enviarAdjunto({ codigo, nombre, descripcion, contentType, 
 
 // Descarga un adjunto desde el service worker (para archivos en dominios donde la página no
 // puede leer la respuesta). Solo hosts permitidos en el manifest; devuelve base64 para el content script.
-export async function descargarUrl({ url }) {
+export async function descargarUrl({ url, headers }) {
   if (!/^https:\/\/([a-z0-9-]+\.)*mercadopublico\.cl\//i.test(url || '')) {
     return { success: false, error: 'Solo se descargan archivos de mercadopublico.cl' };
   }
-  const r = await fetch(url, { credentials: 'include' });
+  const r = await fetch(url, { credentials: 'include', headers: headers && typeof headers === 'object' ? headers : undefined });
   const contentType = (r.headers.get('content-type') || 'application/octet-stream').split(';')[0];
   if (!r.ok || contentType.includes('text/html')) return { success: false, error: `Mercado Público no entregó el archivo (HTTP ${r.status})` };
   const bytes = new Uint8Array(await r.arrayBuffer());
@@ -323,4 +324,17 @@ export async function descargarUrl({ url }) {
   let bin = '';
   for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
   return { success: true, base64: btoa(bin), contentType };
+}
+
+// Documentos de una compra ágil según FirmaVB (id, nombre, si ya lo tenemos) y cola en lote.
+export async function caDocumentos({ codigo }) {
+  const { apiKey } = await chrome.storage.local.get('apiKey');
+  if (!apiKey) return { success: false, error: 'La extensión no está conectada a FirmaVB' };
+  return supabaseApiRequest(apiKey, 'ca-documentos', { codigo });
+}
+
+export async function caPendientes({ limit, soloMatch } = {}) {
+  const { apiKey } = await chrome.storage.local.get('apiKey');
+  if (!apiKey) return { success: false, error: 'La extensión no está conectada a FirmaVB' };
+  return supabaseApiRequest(apiKey, 'ca-pendientes', { limit: limit || 15, solo_match: !!soloMatch });
 }

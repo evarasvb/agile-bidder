@@ -71,7 +71,9 @@ Deno.serve(async (req) => {
     if (up.error) return json({ error: "storage", mensaje: up.error.message }, 500);
 
     const { data: yaLeida } = await sb.from("bases_licitacion").select("id").eq("codigo", codigo).eq("archivo", nombre).limit(1);
-    const basesPendiente = esPdf && bytes.length <= MAX_BASES_BYTES && !(yaLeida ?? []).length && RE_BASES.test(`${nombre} ${descripcion ?? ""}`);
+    // En una compra ágil todo PDF adjunto son los términos de referencia: el Experto lo lee siempre.
+    const esCompraAgil = /-COT\d{2}$/.test(codigo) || /compra\s*[áa]gil/i.test(tipo);
+    const basesPendiente = esPdf && bytes.length <= MAX_BASES_BYTES && !(yaLeida ?? []).length && (esCompraAgil || RE_BASES.test(`${nombre} ${descripcion ?? ""}`));
     const { error: errFila } = await sb.from("licitaciones_adjuntos").upsert({
       codigo, nombre, tipo, descripcion, fecha_adjunto: null, bytes: bytes.length, content_type: contentType, storage_path: storagePath,
       es_bases: false, bases_id: null, bases_pendiente: basesPendiente, bajado_en: new Date().toISOString(),

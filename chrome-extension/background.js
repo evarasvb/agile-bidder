@@ -20,7 +20,9 @@ import {
   syncLicitacion,
   handleScrapedData,
   enviarAdjunto,
-  descargarUrl
+  descargarUrl,
+  caDocumentos,
+  caPendientes
 } from './modules/supabase-api.js';
 
 import {
@@ -106,6 +108,8 @@ async function handleMessage(message, sender) {
     case 'SCRAPED_DATA':            return handleScrapedData(data, sender);
     case 'ENVIAR_ADJUNTO':          return enviarAdjunto(data);
     case 'DESCARGAR_URL':           return descargarUrl(data);
+    case 'CA_DOCUMENTOS':           return caDocumentos(data);
+    case 'CA_PENDIENTES':           return caPendientes(data);
     default:
       throw new Error(`Unknown action: ${action}`);
   }
