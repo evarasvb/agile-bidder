@@ -512,9 +512,20 @@ export default function Oportunidades() {
 
       {/* Results count */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {oportunidades.length} oportunidades encontradas
-        </p>
+        <div>
+          <p className="text-sm text-muted-foreground">
+            {oportunidades.length} oportunidades encontradas
+          </p>
+          {stats.busqueda && (
+            <p className="text-xs text-muted-foreground">
+              El servidor encontró {stats.busqueda.coincidencias} coincidencia{stats.busqueda.coincidencias === 1 ? "" : "s"} para
+              &quot;{stats.busqueda.texto}&quot; ({stats.busqueda.licitaciones} licitaciones, {stats.busqueda.comprasAgiles} compras ágiles)
+              {stats.busqueda.ocultas > 0
+                ? `; ${stats.busqueda.ocultas} quedaron fuera por tus filtros (tipo, score mínimo, regiones, palabras excluidas o monto).`
+                : "."}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Card Grid */}

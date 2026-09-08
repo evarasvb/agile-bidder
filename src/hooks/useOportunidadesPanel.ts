@@ -126,6 +126,8 @@ export interface PanelStats {
   avgMatchScore: number;
   cierranEstaSemana: number;
   valorTotal: number;
+  /** Solo con búsqueda por texto: lo que encontró el servidor y cuánto ocultaron los filtros. */
+  busqueda?: { texto: string; coincidencias: number; licitaciones: number; comprasAgiles: number; ocultas: number };
 }
 
 // =============================================================================
@@ -584,6 +586,15 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
           return t > now && t < now + oneWeek;
         }).length,
         valorTotal: all.reduce((sum, o) => sum + (o.monto || 0), 0),
+        busqueda: busquedaEnServidor
+          ? {
+              texto: textoBusqueda,
+              coincidencias: (codigosLic?.length ?? 0) + (codigosCA?.length ?? 0),
+              licitaciones: codigosLic?.length ?? 0,
+              comprasAgiles: codigosCA?.length ?? 0,
+              ocultas: Math.max(0, (codigosLic?.length ?? 0) + (codigosCA?.length ?? 0) - all.length),
+            }
+          : undefined,
       };
 
       return { data: all, stats };
