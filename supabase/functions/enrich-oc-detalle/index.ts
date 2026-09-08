@@ -82,7 +82,17 @@ Deno.serve(async (req) => {
     const codigos = (pend || []).map((r: any) => r.codigo).filter(Boolean);
     if (codigos.length === 0) return json({ ok: true, procesadas: 0, mensaje: 'nada pendiente' });
 
-    let procesadas = 0, items_insertados = 0, errores = 0, rate_limited = 0, timeouts = 0;
+    // Modo sonda: devuelve la respuesta cruda de la API para el primer código (diagnóstico).
+    if (body.probe === true) {
+      const codigo = body.codigo || codigos[0];
+      const t1 = Date.now();
+      const resp = await fetchOC(`${MP_BASE}?codigo=${encodeURIComponent(codigo)}&ticket=${ticket}`);
+      if (resp === 'timeout' || !resp) return json({ probe: true, codigo, resultado: resp === 'timeout' ? 'timeout' : 'rate-limit', ms: Date.now() - t1 });
+      const texto = await resp.text();
+      return json({ probe: true, codigo, status: resp.status, ms: Date.now() - t1, cuerpo: texto.slice(0, 800) });
+    }
+
+    let procesadas = 0, items_insertados = 0, errores = 0, rate_limited = 0, timeouts = 0, sin_detalle = 0, stale = 0;
     let ultimo_error: string | null = null;
 
     for (const codigo of codigos) {
@@ -99,7 +109,15 @@ Deno.serve(async (req) => {
         const data = await resp.json();
         const L = Array.isArray(data?.Listado) ? data.Listado[0] : null;
         if (!L) {
-          await admin.from('ordenes_compra').update({ last_scraped_at: new Date().toISOString(), stale: true }).eq('codigo', codigo);
+          // 200 sin Listado: si la API trae un Mensaje (cuota, mantención) NO es que la OC no exista.
+          // Se deja en cola y, si se repite, la corrida cede el turno. Solo con Cantidad 0 real se marca stale.
+          if (data?.Mensaje || data?.Codigo === 500 || data?.Cantidad === undefined) {
+            sin_detalle++; ultimo_error = `sin listado ${codigo}: ${String(data?.Mensaje ?? JSON.stringify(data)).slice(0, 120)}`;
+            if (sin_detalle >= 5) break;
+            await sleep(1500); continue;
+          }
+          await admin.from('ordenes_compra').update({ last_scraped_at: new Date().toISOString(), stale: true, stale_marked_at: new Date().toISOString() }).eq('codigo', codigo);
+          stale++;
           await sleep(500); continue;
         }
 
@@ -157,7 +175,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    return json({ ok: true, procesadas, items_insertados, errores, rate_limited, timeouts, lote: codigos.length, ms: Date.now() - t0, ultimo_error });
+    return json({ ok: true, procesadas, items_insertados, errores, rate_limited, timeouts, sin_detalle, stale, lote: codigos.length, ms: Date.now() - t0, ultimo_error });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);
   }
