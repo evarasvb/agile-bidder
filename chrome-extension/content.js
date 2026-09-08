@@ -14,7 +14,9 @@
     
     // Verificar que estamos en MercadoPúblico
     const isMercadoPublico = hostname.includes('mercadopublico.cl');
-    const isCompraAgil = url.includes('/CompraAgil/') || url.includes('/Portal/Modules/Menu/');
+    // La compra ágil vive en su propio subdominio: compra-agil.mercadopublico.cl/resumen-cotizacion/<código>
+    const isFichaCompraAgil = RE_FICHA_CA.test(url);
+    const isCompraAgil = isFichaCompraAgil || url.includes('/CompraAgil/') || url.includes('/Portal/Modules/Menu/');
     const isDetalle = url.includes('DetailsAcquisition.aspx') || url.includes('Details.aspx');
     const isListado = url.includes('/Procurement/') || url.includes('/StoreSearch/') || url.includes('/Search/');
     const isOferta = url.includes('/Offer/') || url.includes('/Postulacion/');
@@ -24,6 +26,7 @@
     
     // Extraer código de la URL - múltiples patrones
     const urlPatterns = [
+      RE_FICHA_CA,
       /idLicitacion=([^&]+)/i,
       /CodigoExterno=([^&]+)/i,
       /idAdquisicion=([^&]+)/i,
@@ -69,6 +72,7 @@
     return {
       isMercadoPublico,
       isCompraAgil,
+      isFichaCompraAgil,
       isDetalle,
       isListado,
       isOferta,
@@ -81,7 +85,7 @@
   }
 
   function getPageType(url) {
-    if (url.includes('/CompraAgil/')) return 'compra_agil';
+    if (RE_FICHA_CA.test(url) || url.includes('/CompraAgil/')) return 'compra_agil';
     if (url.includes('DetailsAcquisition.aspx')) return 'detalle_licitacion';
     if (url.includes('/Offer/')) return 'formulario_oferta';
     if (url.includes('/Portal/Modules/Menu/')) return 'menu_principal';
@@ -643,6 +647,7 @@
   // se abre la ventana de adjuntos y cada archivo se manda a FirmaVB.
   // ==========================================================================
   const BANNER_ID = 'firmavb-extractor-banner';
+  const RE_FICHA_CA = /\/resumen-cotizacion\/([^/?#]+)/i;
   const RE_ARCHIVO = /\.(pdf|docx?|xlsx?|pptx?|zip|rar|7z|jpe?g|png|txt|csv)$/i;
   const RE_CODIGO_LIC = /\b\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}\b/;
   const TITULO_BANNER = 'FirmaVB Postulador';
@@ -800,13 +805,13 @@
     });
   }
 
-  async function enviarAdjuntos(codigo, filas) {
+  async function enviarAdjuntos(codigo, filas, descargar = descargarFila) {
     let ok = 0, errores = 0, bases = 0;
     for (let i = 0; i < filas.length; i++) {
       const f = filas[i];
       actualizarBanner(`Enviando ${i + 1} de ${filas.length} a FirmaVB: ${f.nombre}`, []);
       try {
-        const { blob, contentType } = await descargarFila(f);
+        const { blob, contentType } = await descargar(f);
         if (blob.size > 30 * 1024 * 1024) { errores++; continue; }
         const base64 = await blobABase64(blob);
         const r = await chrome.runtime.sendMessage({
@@ -824,6 +829,91 @@
       (bases ? `; ${bases} PDF de bases que el Experto leerá en minutos` : '') +
       (errores ? ` · ${errores} con error` : '') + '.';
     actualizarBanner(resumen, [{ label: 'Cerrar', onClick: cerrarBanner }]);
+  }
+
+  // ==========================================================================
+  // COMPRA ÁGIL (compra-agil.mercadopublico.cl): la ficha ya la trae el robot; los
+  // adjuntos son enlaces directos (sin captcha). Se ofrece extraerlos y postular.
+  // ==========================================================================
+  function enlacesAdjuntosCA() {
+    const out = [];
+    const vistos = new Set();
+    document.querySelectorAll('a[href]').forEach((a) => {
+      if (a.closest('#' + BANNER_ID)) return;
+      const href = a.href || '';
+      if (!/^https?:/i.test(href)) return;
+      const texto = (a.textContent || '').replace(/\s+/g, ' ').trim();
+      const ruta = href.split('?')[0];
+      if (!RE_ARCHIVO.test(texto) && !RE_ARCHIVO.test(ruta)) return;
+      if (vistos.has(href)) return;
+      vistos.add(href);
+      let nombre = texto;
+      if (!RE_ARCHIVO.test(nombre)) { try { nombre = decodeURIComponent(ruta.split('/').pop() || '') || texto; } catch (_) { nombre = texto; } }
+      out.push({ nombre, href, descripcion: 'Adjunto de compra ágil' });
+    });
+    return out;
+  }
+
+  // La ficha es una app React: los enlaces aparecen después de cargar los datos.
+  function esperarEnlacesCA(ms) {
+    return new Promise((resolve) => {
+      const t0 = Date.now();
+      const tick = () => {
+        const enlaces = enlacesAdjuntosCA();
+        if (enlaces.length || Date.now() - t0 > ms) resolve(enlaces);
+        else setTimeout(tick, 700);
+      };
+      tick();
+    });
+  }
+
+  // Primero desde la página (misma sesión); si el archivo vive en otro dominio y el navegador
+  // bloquea la lectura, lo baja el service worker de la extensión.
+  async function descargarEnlace(e) {
+    try {
+      const r = await fetch(e.href, { credentials: 'include' });
+      const ct = (r.headers.get('content-type') || 'application/octet-stream').split(';')[0];
+      if (!r.ok || ct.includes('text/html')) throw new Error('Mercado Público no entregó el archivo');
+      return { blob: await r.blob(), contentType: ct };
+    } catch (_) {
+      const r = await chrome.runtime.sendMessage({ action: 'DESCARGAR_URL', data: { url: e.href } });
+      if (!r || !r.success) throw new Error((r && r.error) || 'no se pudo descargar');
+      const bin = atob(r.base64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return { blob: new Blob([bytes], { type: r.contentType }), contentType: r.contentType };
+    }
+  }
+
+  // Match guardado por el panel (get-matches) para esta compra ágil, si lo hay.
+  async function matchGuardado(codigo) {
+    try {
+      const { matches } = await chrome.storage.local.get('matches');
+      return (matches || []).find((m) => (m.licitacion_id || m.id_licitacion) === codigo) || null;
+    } catch (_) { return null; }
+  }
+
+  async function ofrecerExtraccionCompraAgil(codigo) {
+    if (sessionStorage.getItem('firmavb-extraer-no-' + codigo)) return;
+    if (!(await extensionConectada())) {
+      if (sessionStorage.getItem('firmavb-conectar-no')) return;
+      mostrarBanner({
+        texto: 'Para extraer los adjuntos de esta compra ágil y postular con FirmaVB, conecta la extensión: haz clic en el ícono de FirmaVB Postulador (arriba a la derecha) y pega tu API key. La generas en FirmaVB → Configuración → Extensión.',
+        acciones: [{ label: 'Entendido', onClick: () => { sessionStorage.setItem('firmavb-conectar-no', '1'); cerrarBanner(); } }]
+      });
+      return;
+    }
+    const [enlaces, match] = await Promise.all([esperarEnlacesCA(10000), matchGuardado(codigo)]);
+    const n = enlaces.length;
+    const partes = [`Compra ágil ${codigo}.`];
+    if (match && match.match_score != null) partes.push(`Está en tus matches de FirmaVB (${Math.round(Number(match.match_score))}%).`);
+    partes.push(n ? `Tiene ${n} adjunto${n === 1 ? '' : 's'} (términos de referencia, fotos, etc.).` : 'No encontré adjuntos descargables en esta página.');
+    partes.push('¿Qué quieres hacer?');
+    const acciones = [];
+    if (n) acciones.push({ label: 'Extraer adjuntos a FirmaVB', primary: true, onClick: () => enviarAdjuntos(codigo, enlaces, descargarEnlace) });
+    acciones.push({ label: 'Postular con FirmaVB', primary: !n, onClick: () => { cerrarBanner(); startAutofill(codigo); } });
+    acciones.push({ label: 'Ahora no', onClick: () => { sessionStorage.setItem('firmavb-extraer-no-' + codigo, '1'); cerrarBanner(); } });
+    mostrarBanner({ texto: partes.join(' '), acciones });
   }
 
   async function flujoAdjuntos() {
@@ -885,6 +975,17 @@
         });
       }
       
+      // Ficha de compra ágil: botón de postulación + oferta de extraer adjuntos. La ficha en sí
+      // ya la trae el robot de FirmaVB, así que no se sincroniza desde aquí.
+      if (pageInfo.isFichaCompraAgil) {
+        if (pageInfo.codigoLicitacion) {
+          injectButton(pageInfo.codigoLicitacion);
+          setTimeout(() => ofrecerExtraccionCompraAgil(pageInfo.codigoLicitacion), 1200);
+        }
+        showConnectionIndicator();
+        return;
+      }
+
       // Mostrar botón si hay código de licitación
       if (pageInfo.codigoLicitacion) {
         injectButton(pageInfo.codigoLicitacion);
