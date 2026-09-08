@@ -6,8 +6,8 @@
 // (texto + resumen) para que el Libro del Experto los use directo.
 //   GET  ?codigo=X             -> adjuntos guardados (con link firmado de 1 h si hay sesión)
 //   POST {codigo}              -> baja lo que falte (sesión o service_role)
-//   POST {auto:true, limit:6}  -> service_role (cron): licitaciones abiertas aún sin revisar (primero las que calzan)
-//   POST {bases:true, limit:2} -> service_role (cron): PDF de bases que el Experto aún no leyó
+//   POST {auto:true, limit:6, max:40} -> service_role (cron): licitaciones abiertas aún sin revisar (primero las que calzan)
+//   POST {bases:true, limit:6} -> service_role (cron): PDF de bases que el Experto aún no leyó
 // Leer las bases (texto + Gemini) tarda más que bajarlas, así que se hace aparte: el archivo
 // queda marcado bases_pendiente y se lee con el tiempo que sobre o en la pasada del cron.
 import { createClient, SupabaseClient } from "jsr:@supabase/supabase-js@2";
@@ -257,14 +257,25 @@ Deno.serve(async (req) => {
     }
     if (body.auto) {
       if (role !== "service_role") return json({ error: "solo_servicio" }, 403);
-      const { data: cods, error } = await sb.rpc("licitaciones_adjuntos_pendientes", { p_limite: Number(body.limit ?? 2) });
-      if (error) return json({ error: error.message }, 500);
+      // Una licitación sin "Ver Anexo" se resuelve en menos de 1 s, así que la corrida sigue pidiendo
+      // candidatas (ya reservadas al procesarlas) hasta agotar el presupuesto o el tope `max`.
+      const lote = Number(body.limit ?? 2), max = Number(body.max ?? 40);
       const procesadas: Resultado[] = [];
-      for (const c of (cods ?? []) as { codigo: string }[]) {
-        if (Date.now() > deadline - 15000) break;
-        procesadas.push(await procesar(sb, c.codigo, deadline));
+      const vistas = new Set<string>();
+      let candidatas = 0;
+      while (procesadas.length < max && Date.now() < deadline - 15000) {
+        const { data: cods, error } = await sb.rpc("licitaciones_adjuntos_pendientes", { p_limite: lote });
+        if (error) return json({ error: error.message, procesadas }, 500);
+        const nuevas = ((cods ?? []) as { codigo: string }[]).filter((c) => !vistas.has(c.codigo));
+        if (!nuevas.length) break;
+        candidatas += nuevas.length;
+        for (const c of nuevas) {
+          vistas.add(c.codigo);
+          if (Date.now() > deadline - 15000 || procesadas.length >= max) break;
+          procesadas.push(await procesar(sb, c.codigo, deadline));
+        }
       }
-      return json({ candidatas: (cods ?? []).length, procesadas, ms: Date.now() - t0 });
+      return json({ candidatas, procesadas, ms: Date.now() - t0 });
     }
 
     if (!conSesion) return json({ error: "login", mensaje: "Inicia sesión en FirmaVB (es gratis) para traer las bases." }, 401);
