@@ -29,6 +29,10 @@ export interface CompraAgil {
   fecha_publicacion: string | null;
   estado: string | null;
   descripcion: string | null;
+  // URL real de la ficha en Mercado Público (scrapeada) — usar SIEMPRE esta y
+  // nunca una URL armada a mano con el código: la ruta real varía según el
+  // tipo de proceso y una URL adivinada termina en 404.
+  link_oficial: string | null;
   // Detalle completo bajado por código desde ChileCompra (puede faltar si el robot aún no pasó).
   plazo_entrega: string | null;
   direccion_entrega: string | null;
@@ -71,6 +75,7 @@ function mapRowToCompraAgil(row: any): CompraAgil {
     fecha_publicacion: row.fecha_publicacion || row.datos_json?.fecha_publicacion || null,
     estado: row.estado || null,
     descripcion: row.descripcion || null,
+    link_oficial: row.url_ficha || row.link_oficial || null,
     plazo_entrega: row.plazo_entrega ?? null,
     direccion_entrega: row.direccion_entrega ?? null,
     unidad_compra: row.unidad_compra ?? null,

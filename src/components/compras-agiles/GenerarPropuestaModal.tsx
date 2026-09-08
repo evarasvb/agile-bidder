@@ -531,19 +531,22 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
       // tenía que adivinar que debía ir a Postulaciones (Pipeline) y abrir la
       // tarjeta para encontrar el link real a Mercado Público. Ahora el link
       // sale directo en el mismo toast de éxito, en el momento de mayor
-      // intención de compra.
-      const mpUrl = `https://www.mercadopublico.cl/CompraAgil/Cotizacion/${compra.codigo}`;
+      // intención de compra. Usa el link real scrapeado (compra.link_oficial):
+      // una URL armada a mano con el código no existe en el sitio real (404).
+      const mpUrl = compra.link_oficial;
       toast.success(
         ficha_tecnica
           ? 'Propuesta y ficha técnica guardadas · en tu pipeline'
           : 'Propuesta guardada · en tu pipeline',
-        {
-          duration: 10000,
-          action: {
-            label: 'Postular en Mercado Público',
-            onClick: () => window.open(mpUrl, '_blank', 'noopener,noreferrer'),
-          },
-        }
+        mpUrl
+          ? {
+              duration: 10000,
+              action: {
+                label: 'Postular en Mercado Público',
+                onClick: () => window.open(mpUrl, '_blank', 'noopener,noreferrer'),
+              },
+            }
+          : { duration: 10000 }
       );
       onOpenChange(false);
     } catch (error) {
