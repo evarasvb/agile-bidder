@@ -90,3 +90,7 @@ alter table public.licitaciones_adjuntos add column if not exists bases_intento_
 
 -- Guarda contra corridas superpuestas del cron de lectura: cuándo se intentó leer cada PDF.
 alter table public.licitaciones_adjuntos add column if not exists bases_intento_en timestamptz;
+
+-- Puerta a la sección "Adjuntos" de la ficha (exige reCAPTCHA: el usuario la abre y sube el PDF).
+alter table public.licitaciones_adjuntos_estado add column if not exists url_adjuntos_mp text;
+alter table public.licitaciones_adjuntos_estado add column if not exists adjuntos_mp_solo_captcha boolean;
