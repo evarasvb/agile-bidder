@@ -25,11 +25,9 @@ on:
         type: choice
         options: [probe, load]
       filtrar:
-        description: 'Filtrar a rubros de firmavb (si/no)'
+        description: 'Filtrar a rubros de firmavb: escribe si o no'
         required: true
-        default: 'si'
-        type: choice
-        options: [si, no]
+        default: 'no'
 
 env:
   SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
