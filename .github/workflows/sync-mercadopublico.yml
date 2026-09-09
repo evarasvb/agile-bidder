@@ -203,9 +203,13 @@ jobs:
             exit 1
           fi
 
+      # Paso legado: las compras ágiles las trae el cron fetch-compras-agiles-v3 (api2, sin ticket) cada
+      # pocos minutos. fetch-compras-agiles (API + CSV) falla desde hace días y ponía en rojo toda la
+      # corrida aunque licitaciones y órdenes hubieran salido bien. No bloquea.
       - name: Sync Compras Ágiles
         id: sync-compras-agiles
         if: ${{ github.event.inputs.tipo != 'licitaciones' && github.event.inputs.tipo != 'ordenes' }}
+        continue-on-error: true
         run: |
           echo "=== Sincronizando Compras Ágiles ==="
 
