@@ -178,12 +178,12 @@ async function leerBasesPendientes(sb: SupabaseClient, deadline: number, codigo?
   // Se saltan las filas que otra corrida tomó hace menos de 10 minutos (el cron puede solaparse).
   const hace10 = new Date(Date.now() - 10 * 60_000).toISOString();
   // Primero los que nunca se intentaron: un archivo que falla siempre no bloquea al resto de la cola.
-  let q = sb.from("licitaciones_adjuntos").select("id, codigo, nombre, storage_path, bytes, content_type").eq("bases_pendiente", true)
+  let q = sb.from("licitaciones_adjuntos").select("id, codigo, nombre, storage_path, bytes, content_type, ocr_hecho").eq("bases_pendiente", true)
     .or(`bases_intento_en.is.null,bases_intento_en.lt.${hace10}`).order("bases_intento_en", { ascending: true, nullsFirst: true }).order("bajado_en").limit(limite);
   if (codigo) q = q.eq("codigo", codigo);
   const { data: filas } = await q;
   const sk = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  for (const f of (filas ?? []) as { id: string; codigo: string; nombre: string; storage_path: string; bytes: number; content_type: string | null }[]) {
+  for (const f of (filas ?? []) as { id: string; codigo: string; nombre: string; storage_path: string; bytes: number; content_type: string | null; ocr_hecho: boolean | null }[]) {
     const restante = deadline - Date.now();
     if (restante < MIN_MS_LECTURA) break;
     await sb.from("licitaciones_adjuntos").update({ bases_intento_en: new Date().toISOString() }).eq("id", f.id);
@@ -205,8 +205,9 @@ async function leerBasesPendientes(sb: SupabaseClient, deadline: number, codigo?
         // Escaneado, ilegible, formato raro, demasiado grande o que agota el tiempo de experto-bases (504):
         // no se reintenta. Otros errores (Gemini caído, 5xx transitorio distinto) sí.
         console.log(`bases no leídas ${f.codigo} ${f.nombre}: ${j.error ?? r.status}`);
-        // PDF sin capa de texto: pasa a la cola de OCR (Tesseract en GitHub Actions), que lo reencola con texto.
-        const escaneado = j.error === "sin_texto" && (f.content_type ?? "").includes("pdf");
+        // PDF sin capa de texto: pasa a la cola de OCR (Tesseract en GitHub Actions), que lo reencola con
+        // texto. Si ya pasó por OCR y sigue sin texto, se descarta (no se reintenta en bucle).
+        const escaneado = j.error === "sin_texto" && (f.content_type ?? "").includes("pdf") && !f.ocr_hecho;
         if (["sin_texto", "lectura", "no_pdf", "tamano", "codigo"].includes(String(j.error)) || r.status === 504) await sb.from("licitaciones_adjuntos").update({ bases_pendiente: false, ocr_pendiente: escaneado }).eq("id", f.id);
       }
     } catch (e) {
