@@ -146,13 +146,40 @@ begin
     actualizado_en = now();
 end $$;
 
--- Sincroniza contactos del webinar a marketing_contactos
+-- Trigger para sincronizar automáticamente cada nueva inscripción de webinar
+create or replace function public.marketing_sincronizar_webinar()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.marketing_contactos (email, nombre, empresa, categoria, origen, estado_suscripcion)
+  values (
+    new.email,
+    new.nombre,
+    new.empresa,
+    case when new.notificado then 'webinar_asistente' else 'webinar_no_asistente' end,
+    'webinar',
+    'suscrito'
+  )
+  on conflict (email) do update set
+    categoria = case
+      when new.notificado then 'webinar_asistente'
+      else 'webinar_no_asistente'
+    end,
+    actualizado_en = now();
+  return new;
+end $$;
+
+drop trigger if exists trg_marketing_sincronizar_webinar on public.webinar_inscripciones;
+create trigger trg_marketing_sincronizar_webinar
+  after insert or update on public.webinar_inscripciones
+  for each row execute function public.marketing_sincronizar_webinar();
+
+-- Sincroniza contactos existentes del webinar
 insert into public.marketing_contactos (email, nombre, empresa, categoria, origen, estado_suscripcion)
 select
   email,
   nombre,
   empresa,
-  'webinar_no_asistente',
+  case when notificado then 'webinar_asistente' else 'webinar_no_asistente' end,
   'webinar',
   'suscrito'
 from public.webinar_inscripciones
