@@ -8,6 +8,7 @@
 //   POST {codigo}              -> baja lo que falte (sesión o service_role)
 //   POST {auto:true, limit:6, max:40} -> service_role (cron): licitaciones abiertas aún sin revisar (primero las que calzan)
 //   POST {bases:true, limit:6} -> service_role (cron): PDF de bases que el Experto aún no leyó
+//   POST {limpiar:true, dias:60, limit:300} -> service_role (cron diario): borra adjuntos de procesos cerrados hace más de 60 días
 // Leer las bases (texto + Gemini) tarda más que bajarlas, así que se hace aparte: el archivo
 // queda marcado bases_pendiente y se lee con el tiempo que sobre o en la pasada del cron.
 import { createClient, SupabaseClient } from "jsr:@supabase/supabase-js@2";
@@ -256,6 +257,28 @@ Deno.serve(async (req) => {
       if (role !== "service_role") return json({ error: "solo_servicio" }, 403);
       const leidas = await leerBasesPendientes(sb, t0 + PRESUPUESTO_BASES_MS, undefined, Number(body.limit ?? 2));
       return json({ leidas, ms: Date.now() - t0 });
+    }
+    if (body.limpiar) {
+      // Retención: los adjuntos de procesos cerrados hace más de `dias` (60 por defecto, mínimo 30) se
+      // borran del bucket y de licitaciones_adjuntos. Las bases que el Experto ya leyó siguen en
+      // bases_licitacion (texto, secciones y resumen), que no se toca.
+      if (role !== "service_role") return json({ error: "solo_servicio" }, 403);
+      const { data: cods, error } = await sb.rpc("licitaciones_adjuntos_vencidos", { p_dias: Number(body.dias ?? 60), p_limite: Number(body.limit ?? 200) });
+      if (error) return json({ error: error.message }, 500);
+      let procesos = 0, archivos = 0; const errores: string[] = [];
+      for (const c of (cods ?? []) as { codigo: string }[]) {
+        if (Date.now() > deadline - 10000) break;
+        try {
+          const { data: objs, error: errList } = await sb.storage.from(BUCKET).list(`${c.codigo}/mp`, { limit: 1000 });
+          if (errList) throw new Error(errList.message);
+          const rutas = (objs ?? []).map((o) => `${c.codigo}/mp/${o.name}`);
+          if (rutas.length) { const { error: errRm } = await sb.storage.from(BUCKET).remove(rutas); if (errRm) throw new Error(errRm.message); }
+          await sb.from("licitaciones_adjuntos").delete().eq("codigo", c.codigo);
+          await sb.from("licitaciones_adjuntos_estado").delete().eq("codigo", c.codigo);
+          archivos += rutas.length; procesos++;
+        } catch (e) { errores.push(`${c.codigo}: ${String((e as Error)?.message ?? e).slice(0, 100)}`); }
+      }
+      return json({ candidatos: (cods ?? []).length, procesos, archivos, errores, ms: Date.now() - t0 });
     }
     if (body.auto) {
       if (role !== "service_role") return json({ error: "solo_servicio" }, 403);
