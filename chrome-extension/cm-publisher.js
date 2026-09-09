@@ -246,28 +246,66 @@
   // ---------- panel flotante ----------
 
   function crearPanel() {
+    if (document.getElementById('firmavb-cm-panel')) return;
     const panel = document.createElement('div');
     panel.id = 'firmavb-cm-panel';
+    // Abajo a la IZQUIERDA: en la ficha, los precios van a la derecha, así el
+    // panel ya no los tapa. Además es movible y minimizable.
     Object.assign(panel.style, {
-      position: 'fixed', bottom: '16px', right: '16px', zIndex: 999999,
-      width: '320px', background: '#fff', border: '2px solid #4657A2',
-      borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+      position: 'fixed', bottom: '16px', left: '16px', zIndex: 2147483647,
+      width: '300px', background: '#fff', border: '2px solid #4657A2',
+      borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
       fontFamily: 'system-ui, sans-serif', fontSize: '13px', color: '#0F0F0F',
-      padding: '14px', maxHeight: '70vh', overflowY: 'auto',
     });
     panel.innerHTML = `
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        <strong style="color:#4657A2;font-size:14px;">FirmaVB · Convenio Marco</strong>
+      <div id="firmavb-cm-head" style="display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:move;background:#f7f8fc;border-radius:12px 12px 0 0;border-bottom:1px solid #eef;">
+        <strong style="color:#4657A2;font-size:14px;flex:1;">FirmaVB · Convenio Marco</strong>
+        <button id="firmavb-cm-min" title="Minimizar" style="background:none;border:none;cursor:pointer;font-size:16px;line-height:1;color:#64748b;">–</button>
       </div>
-      <div id="firmavb-cm-status" style="color:#475569;margin-bottom:10px;line-height:1.4;">
-        Listo. Abre la ficha del producto y presiona el botón.
+      <div id="firmavb-cm-body" style="padding:12px;max-height:60vh;overflow-y:auto;">
+        <div id="firmavb-cm-status" style="color:#475569;margin-bottom:10px;line-height:1.4;">
+          Listo. Abre la ficha del producto y presiona el botón.
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;margin-bottom:10px;color:#334155;cursor:pointer;">
+          <input type="checkbox" id="firmavb-cm-autoguardar"> Guardar automáticamente al procesar
+        </label>
+        <button id="firmavb-cm-procesar" style="width:100%;background:#4657A2;color:#fff;border:none;border-radius:8px;padding:10px;font-weight:600;cursor:pointer;">
+          Procesar este producto
+        </button>
       </div>
-      <button id="firmavb-cm-procesar" style="width:100%;background:#4657A2;color:#fff;border:none;border-radius:8px;padding:10px;font-weight:600;cursor:pointer;">
-        Procesar este producto
-      </button>
     `;
     document.body.appendChild(panel);
     document.getElementById('firmavb-cm-procesar').addEventListener('click', procesarProducto);
+    document.getElementById('firmavb-cm-min').addEventListener('click', () => {
+      const body = document.getElementById('firmavb-cm-body');
+      const min = document.getElementById('firmavb-cm-min');
+      const oculto = body.style.display === 'none';
+      body.style.display = oculto ? 'block' : 'none';
+      min.textContent = oculto ? '–' : '+';
+    });
+    hacerArrastrable(panel, document.getElementById('firmavb-cm-head'));
+  }
+
+  // Arrastrar el panel desde su cabecera (antes tapaba la tabla y no se movía).
+  function hacerArrastrable(panel, asa) {
+    let sx = 0, sy = 0, ox = 0, oy = 0, mov = false;
+    asa.addEventListener('mousedown', (e) => {
+      if (e.target && e.target.id === 'firmavb-cm-min') return;
+      mov = true;
+      const r = panel.getBoundingClientRect();
+      ox = r.left; oy = r.top; sx = e.clientX; sy = e.clientY;
+      panel.style.right = 'auto'; panel.style.bottom = 'auto';
+      panel.style.left = ox + 'px'; panel.style.top = oy + 'px';
+      e.preventDefault();
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!mov) return;
+      let x = ox + (e.clientX - sx), y = oy + (e.clientY - sy);
+      x = Math.max(0, Math.min(x, window.innerWidth - 60));
+      y = Math.max(0, Math.min(y, window.innerHeight - 40));
+      panel.style.left = x + 'px'; panel.style.top = y + 'px';
+    });
+    window.addEventListener('mouseup', () => { mov = false; });
   }
 
   function setEstado(html) {
@@ -284,6 +322,9 @@
   async function procesarProducto() {
     const { cmConfig } = await chrome.storage.local.get('cmConfig');
     const config = cmConfig || { regiones: [], marcas: [], autoPublicar: false };
+    // La casilla del panel manda para este turno (guardar sin tener que ir a Config).
+    const chk = document.getElementById('firmavb-cm-autoguardar');
+    if (chk && chk.checked) config.autoPublicar = true;
     const pasos = [];
 
     if (!productoCoincideConMarcas(config.marcas)) {

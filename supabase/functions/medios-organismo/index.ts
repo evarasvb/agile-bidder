@@ -114,7 +114,10 @@ Deno.serve(async (req) => {
       const revisados = [];
       for (const o of (orgs ?? []) as { organismo: string }[]) {
         if (Date.now() > deadline - 20000) break;
-        revisados.push(await revisar(sb, o.organismo, deadline));
+        const res = await revisar(sb, o.organismo, deadline);
+        revisados.push(res);
+        // 503 / 429 de Google es limitación de tasa: se corta la corrida y se reintenta a la hora.
+        if (/HTTP (503|429)/.test(res.error ?? "")) break;
         await new Promise((ok) => setTimeout(ok, 1500)); // pausa entre consultas a Google
       }
       return json({ candidatos: (orgs ?? []).length, revisados, ms: Date.now() - t0 });
