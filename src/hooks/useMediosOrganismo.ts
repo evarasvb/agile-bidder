@@ -38,7 +38,7 @@ export function useMediosOrganismo(codigo?: string | null, organismo?: string | 
 export function useRefrescarMedios(codigo?: string | null, organismo?: string | null) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (forzar = false) => {
+    mutationFn: async (forzar: boolean) => {
       const { data: s } = await supabase.auth.getSession();
       const token = s.session?.access_token;
       if (!token) throw new Error('Inicia sesión para ver qué dicen los medios.');
