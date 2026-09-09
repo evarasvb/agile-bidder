@@ -1,0 +1,50 @@
+# Actualización automática de Órdenes de Compra desde Datos Abiertos de ChileCompra.
+# Corre sola cada semana: baja el mes en curso y el anterior (ChileCompra sigue
+# agregando OC al archivo del mes durante semanas), y actualiza CABECERAS + LÍNEAS
+# con la misma descarga. El upsert es idempotente, así que re-cargar no duplica.
+# También se puede disparar a mano (workflow_dispatch).
+name: Datos Abiertos OC (auto mensual)
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'   # lunes 06:00 UTC (03:00 Chile)
+  workflow_dispatch:
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Bajar y cargar mes en curso + anterior
+        env:
+          MODO: load
+          FILTRAR: 'no'   # cabeceras completas (sin filtrar por rubro)
+        run: |
+          # Mes en curso y mes anterior (sin cero a la izquierda), en UTC.
+          Y_CUR=$(date -u +%Y);  M_CUR=$(date -u +%-m)
+          Y_PREV=$(date -u -d "$(date -u +%Y-%m-01) -1 month" +%Y)
+          M_PREV=$(date -u -d "$(date -u +%Y-%m-01) -1 month" +%-m)
+          echo "Actualizando ${Y_PREV}-${M_PREV} y ${Y_CUR}-${M_CUR}"
+          for PAIR in "${Y_PREV} ${M_PREV}" "${Y_CUR} ${M_CUR}"; do
+            set -- $PAIR; ANIO=$1; M=$2
+            URL="https://transparenciachc.blob.core.windows.net/oc-da/${ANIO}-${M}.zip"
+            echo "::group::${ANIO}-${M} — ${URL}"
+            rm -rf ocdata oc.zip; mkdir -p ocdata
+            if ! curl -sSL --fail "$URL" -o oc.zip; then echo "::warning::No se pudo descargar $URL (mes sin archivo aún); sigo"; echo "::endgroup::"; continue; fi
+            ls -la oc.zip
+            if ! unzip -o oc.zip -d ocdata >/dev/null 2>&1; then
+              sudo apt-get -y install p7zip-full >/dev/null 2>&1; 7z x -y -oocdata oc.zip >/dev/null;
+            fi
+            echo "-- cabeceras --"; OCDIR=ocdata node scripts/datos-abiertos-oc.mjs
+            echo "-- líneas --";    OCDIR=ocdata node scripts/datos-abiertos-lineas.mjs
+            echo "::endgroup::"
+          done
+          echo "Actualización completa."
