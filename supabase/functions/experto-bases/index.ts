@@ -71,9 +71,12 @@ function seccionar(texto: string): { titulo: string; texto: string }[] {
 // sin tope, una pasada por todos los modelos con Google saturado (503) dejaba la petición colgada
 // hasta el 504 del gateway y el PDF quedaba como "no leído" aunque el texto ya estaba extraído.
 const GEMINI_TIMEOUT_MS = 45_000;
+// Queda en true cuando la última pasada de resumir() recibió 429 (sin cuota) de todos los modelos.
+let sinCuota = false;
 async function resumir(texto: string, plazo = Date.now() + 100_000): Promise<Record<string, unknown> | null> {
   const key = Deno.env.get("GEMINI_API_KEY");
   if (!key) return null;
+  let hubo429 = false, huboOtro = false;
   const sys = `Eres un experto en licitaciones públicas chilenas (Ley 19.886 y su reglamento). Lee las bases y extrae SOLO lo que diga el documento. Responde únicamente con JSON válido, sin markdown, con esta forma:
 {"objeto":"qué se compra, en una línea",
  "presupuesto":"monto y si es con o sin impuestos, o null",
@@ -102,15 +105,17 @@ Si algo no está en el texto, usa null o lista vacía. No inventes.`;
           { role: "user", content: "BASES:\n\n" + texto.slice(0, 90_000) },
         ] }),
       });
-      if (!r.ok) { console.error("gemini", model, r.status, (await r.text()).slice(0, 200)); continue; }
+      if (!r.ok) { console.error("gemini", model, r.status, (await r.text()).slice(0, 200)); if (r.status === 429) hubo429 = true; else huboOtro = true; continue; }
       const j = await r.json();
       let c = String(j.choices?.[0]?.message?.content ?? "").trim();
       c = c.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
       const a = c.indexOf("{"), z = c.lastIndexOf("}");
       if (a >= 0 && z > a) c = c.slice(a, z + 1);
+      sinCuota = false;
       return JSON.parse(c);
-    } catch (e) { console.error("resumen", model, String(e)); }
+    } catch (e) { console.error("resumen", model, String(e)); huboOtro = true; }
   }
+  sinCuota = hubo429 && !huboOtro;
   return null;
 }
 
@@ -167,28 +172,29 @@ Deno.serve(async (req) => {
     if (role !== "authenticated" && role !== "service_role") {
       return json({ error: "login", mensaje: "Inicia sesión en FirmaVB (es gratis) para subir las bases." }, 401);
     }
+    const ct = req.headers.get("content-type") ?? "";
+    // El cuerpo JSON se lee una sola vez: sirve al cron y a la carga en base64.
+    const bodyJson = ct.includes("application/json") ? await req.json().catch(() => ({})) : null;
     // Cron (service_role): bases guardadas sin resumen porque Gemini no tenía cuota en ese momento.
-    // Se resumen de a pocas; si el primer intento vuelve sin cuota, la pasada termina para no gastar llamadas.
-    if (role === "service_role" && (req.headers.get("content-type") ?? "").includes("application/json")) {
-      const body = await req.json().catch(() => ({}));
-      if (body.resumir_pendientes) {
-        const limite = Math.min(Number(body.limit ?? 5), 20);
-        const { data: filas } = await sb.from("bases_licitacion").select("id, texto").is("resumen", null).gt("caracteres", 200).order("creado_en", { ascending: false }).limit(limite);
-        let hechas = 0;
-        for (const f of (filas ?? []) as { id: string; texto: string }[]) {
-          if (Date.now() - t0 > 150_000) break;
-          const resumen = await resumir(f.texto, Date.now() + 60_000);
-          if (!resumen) break;
-          await sb.from("bases_licitacion").update({ resumen }).eq("id", f.id);
-          hechas++;
-        }
-        return json({ hechas, candidatas: (filas ?? []).length, ms: Date.now() - t0 });
+    // Se resumen de a pocas, de la más antigua a la más nueva y con tope de 3 intentos por base; si la
+    // falla es por cuota (429 en todos los modelos) la pasada termina para no gastar llamadas.
+    if (role === "service_role" && bodyJson?.resumir_pendientes) {
+      const limite = Math.min(Number(bodyJson.limit ?? 5), 20);
+      const { data: filas } = await sb.from("bases_licitacion").select("id, texto, resumen_intentos").is("resumen", null).gt("caracteres", 200).lt("resumen_intentos", 3).order("creado_en", { ascending: true }).limit(limite);
+      let hechas = 0, fallidas = 0;
+      for (const f of (filas ?? []) as { id: string; texto: string; resumen_intentos: number | null }[]) {
+        if (Date.now() - t0 > 150_000) break;
+        const resumen = await resumir(f.texto, Date.now() + 60_000);
+        if (resumen) { await sb.from("bases_licitacion").update({ resumen }).eq("id", f.id); hechas++; continue; }
+        if (sinCuota) break;
+        await sb.from("bases_licitacion").update({ resumen_intentos: (f.resumen_intentos ?? 0) + 1 }).eq("id", f.id);
+        fallidas++;
       }
+      return json({ hechas, fallidas, sin_cuota: sinCuota, candidatas: (filas ?? []).length, ms: Date.now() - t0 });
     }
     // El PDF llega crudo (Content-Type application/pdf + cabeceras X-Codigo / X-Nombre): sin base64
     // se usa la mitad de memoria y no se cae el worker con bases grandes.
     let codigo = "", nombre = "", bytes: Uint8Array;
-    const ct = req.headers.get("content-type") ?? "";
     if (ct.includes("application/pdf") || ct.includes("wordprocessingml") || ct.includes("application/octet-stream")) {
       codigo = decodeURIComponent(req.headers.get("x-codigo") ?? "").trim().toUpperCase();
       nombre = decodeURIComponent(req.headers.get("x-nombre") ?? "bases.pdf");
@@ -196,7 +202,7 @@ Deno.serve(async (req) => {
       if (len > MAX_PDF_BYTES) return json({ error: "tamano", mensaje: "El archivo supera los 20 MB." }, 413);
       bytes = new Uint8Array(await req.arrayBuffer());
     } else {
-      const body = await req.json();
+      const body = bodyJson ?? await req.json();
       codigo = String(body.codigo ?? "").trim().toUpperCase();
       nombre = String(body.nombre ?? "bases.pdf");
       const b64 = String(body.pdf_base64 ?? "").replace(/^data:[^,]*,/, "");
