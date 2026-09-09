@@ -180,7 +180,8 @@ Deno.serve(async (req) => {
     const resumen = await resumir(texto, t0 + 120_000);
 
     // 3. Archivo original (mejor esfuerzo) y fila
-    let storage_path: string | null = `${codigo}/${Date.now()}_${nombre.replace(/\s+/g, "_")}`;
+    // Storage rechaza claves con tildes o símbolos: la ruta va sin ellos (el nombre original queda en la fila).
+    let storage_path: string | null = `${codigo}/${Date.now()}_${nombre.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w.\-]/g, "_").replace(/_+/g, "_")}`;
     const up = await sb.storage.from("bases-licitacion").upload(storage_path, bytes, { contentType: esDocx ? DOCX_MIME : "application/pdf", upsert: false });
     if (up.error) { console.error("storage", up.error.message); storage_path = null; }
     const { data: fila, error } = await sb.from("bases_licitacion").insert({
