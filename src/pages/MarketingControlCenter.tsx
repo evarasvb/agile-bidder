@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { useCampaigns, useCampaignPiezas, useCampaignMetricas } from '@/hooks/useMarketingCampaigns';
 import { NuevaCampanaRapida } from '@/components/marketing/NuevaCampanaRapida';
 import { Button } from '@/components/ui/button';
