@@ -6,11 +6,13 @@ name: OCR bases escaneadas
 
 on:
   schedule:
-    - cron: '17 * * * *'
+    # GitHub suele atrasar los cron: se pide cada 30 min y cada corrida sigue procesando lotes
+    # hasta vaciar la cola o agotar su presupuesto de tiempo.
+    - cron: '17,47 * * * *'
   workflow_dispatch:
     inputs:
       limite:
-        description: 'PDF por corrida'
+        description: 'PDF por lote'
         required: false
         default: '40'
 
@@ -48,9 +50,17 @@ jobs:
           set -uo pipefail
           H=(-H "apikey: $SUPABASE_SERVICE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_KEY")
           patch() { curl -s "${H[@]}" -X PATCH -H "Content-Type: application/json" -H "Prefer: return=minimal" "$SUPABASE_URL/rest/v1/licitaciones_adjuntos?id=eq.$1" -d "$2" > /dev/null; }
-          n=$(jq length pendientes.json)
-          ok=0; sin=0; err=0
+          inicio=$(date +%s); ok=0; sin=0; err=0; lote=0
+          # Lotes sucesivos hasta vaciar la cola o llegar a 45 minutos (tope del job: 55).
+          while :; do
+          lote=$((lote+1))
+          if [ "$lote" -gt 1 ]; then
+            curl -sf "${H[@]}" "$SUPABASE_URL/rest/v1/licitaciones_adjuntos?ocr_pendiente=eq.true&content_type=eq.application/pdf&select=id,codigo,nombre,storage_path&order=bajado_en.asc&limit=$LIMITE" > pendientes.json || break
+          fi
+          n=$(jq length pendientes.json); echo "--- lote $lote: $n PDF"
+          [ "$n" -gt 0 ] || break
           for i in $(seq 0 $((n-1))); do
+            if [ $(( $(date +%s) - inicio )) -gt 2700 ]; then echo "   presupuesto de tiempo agotado; el resto queda para la próxima corrida"; n=0; break; fi
             id=$(jq -r ".[$i].id" pendientes.json); codigo=$(jq -r ".[$i].codigo" pendientes.json)
             nombre=$(jq -r ".[$i].nombre" pendientes.json); ruta=$(jq -r ".[$i].storage_path" pendientes.json)
             ruta_uri=$(jq -rn --arg p "$ruta" '$p|@uri' | sed 's/%2F/\//g')
@@ -95,5 +105,7 @@ jobs:
               fi
             fi
           done
+          [ "$n" -gt 0 ] || break
+          done
           echo "======================================"
-          echo "OCR listo: $ok · sin texto: $sin · errores: $err"
+          echo "OCR listo: $ok · sin texto: $sin · errores: $err · lotes: $lote"
