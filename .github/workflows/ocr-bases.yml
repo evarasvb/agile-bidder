@@ -6,43 +6,61 @@ name: OCR bases escaneadas
 
 on:
   schedule:
-    - cron: '17 * * * *'
+    # GitHub suele atrasar los cron: se pide cada 30 min y cada corrida sigue procesando lotes
+    # hasta vaciar la cola o agotar su presupuesto de tiempo.
+    - cron: '17,47 * * * *'
   workflow_dispatch:
     inputs:
       limite:
-        description: 'PDF por corrida'
+        description: 'PDF por lote'
         required: false
-        default: '15'
+        default: '40'
 
 env:
   SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
   SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
   BUCKET: bases-licitacion
+  LIMITE: ${{ github.event.inputs.limite || '40' }}
 
 jobs:
   ocr:
     runs-on: ubuntu-latest
     timeout-minutes: 55
     steps:
+      # Se consulta antes de instalar nada: si no hay PDF pendientes la corrida termina en segundos
+      # y no gasta minutos de Actions.
+      - name: Listar PDF pendientes
+        id: lista
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_KEY" ]; then echo "::error::Faltan SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY"; exit 1; fi
+          curl -sf -H "apikey: $SUPABASE_SERVICE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+            "$SUPABASE_URL/rest/v1/licitaciones_adjuntos?ocr_pendiente=eq.true&content_type=eq.application/pdf&select=id,codigo,nombre,storage_path&order=bajado_en.asc&limit=$LIMITE" > pendientes.json \
+            || { echo "::error::No pude listar pendientes"; exit 1; }
+          n=$(jq length pendientes.json); echo "PDF pendientes de OCR: $n"; echo "n=$n" >> "$GITHUB_OUTPUT"
+
       - name: Instalar Tesseract y ocrmypdf
+        if: steps.lista.outputs.n != '0'
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y -q ocrmypdf tesseract-ocr-spa poppler-utils jq
+          sudo apt-get install -y -q ocrmypdf tesseract-ocr-spa poppler-utils ghostscript jq
 
       - name: Procesar PDF pendientes
-        env:
-          LIMITE: ${{ github.event.inputs.limite || '15' }}
+        if: steps.lista.outputs.n != '0'
         run: |
           set -uo pipefail
-          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_KEY" ]; then echo "::error::Faltan SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY"; exit 1; fi
           H=(-H "apikey: $SUPABASE_SERVICE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_KEY")
           patch() { curl -s "${H[@]}" -X PATCH -H "Content-Type: application/json" -H "Prefer: return=minimal" "$SUPABASE_URL/rest/v1/licitaciones_adjuntos?id=eq.$1" -d "$2" > /dev/null; }
-
-          curl -sf "${H[@]}" "$SUPABASE_URL/rest/v1/licitaciones_adjuntos?ocr_pendiente=eq.true&content_type=eq.application/pdf&select=id,codigo,nombre,storage_path&order=bajado_en.asc&limit=$LIMITE" > pendientes.json \
-            || { echo "::error::No pude listar pendientes"; exit 1; }
-          n=$(jq length pendientes.json); echo "PDF pendientes de OCR: $n"
-          ok=0; sin=0; err=0
+          inicio=$(date +%s); ok=0; sin=0; err=0; lote=0
+          # Lotes sucesivos hasta vaciar la cola o llegar a 45 minutos (tope del job: 55).
+          while :; do
+          lote=$((lote+1))
+          if [ "$lote" -gt 1 ]; then
+            curl -sf "${H[@]}" "$SUPABASE_URL/rest/v1/licitaciones_adjuntos?ocr_pendiente=eq.true&content_type=eq.application/pdf&select=id,codigo,nombre,storage_path&order=bajado_en.asc&limit=$LIMITE" > pendientes.json || break
+          fi
+          n=$(jq length pendientes.json); echo "--- lote $lote: $n PDF"
+          [ "$n" -gt 0 ] || break
           for i in $(seq 0 $((n-1))); do
+            if [ $(( $(date +%s) - inicio )) -gt 2700 ]; then echo "   presupuesto de tiempo agotado; el resto queda para la próxima corrida"; n=0; break; fi
             id=$(jq -r ".[$i].id" pendientes.json); codigo=$(jq -r ".[$i].codigo" pendientes.json)
             nombre=$(jq -r ".[$i].nombre" pendientes.json); ruta=$(jq -r ".[$i].storage_path" pendientes.json)
             ruta_uri=$(jq -rn --arg p "$ruta" '$p|@uri' | sed 's/%2F/\//g')
@@ -60,6 +78,12 @@ jobs:
               echo "   ocrmypdf terminó con error:"; tail -n 3 ocr.log
             fi
             [ -s out.pdf ] || cp in.pdf out.pdf
+            # El lector no acepta más de 6 MB: si el OCR engordó el PDF, Ghostscript baja las imágenes a 150 dpi (conserva el texto).
+            if [ "$(stat -c%s out.pdf)" -gt 6000000 ]; then
+              if timeout 300 gs -q -sDEVICE=pdfwrite -dCompatibilityLevel=1.5 -dPDFSETTINGS=/ebook -dNOPAUSE -dBATCH -sOutputFile=small.pdf out.pdf 2>/dev/null && [ -s small.pdf ]; then
+                echo "   comprimido: $(stat -c%s out.pdf) -> $(stat -c%s small.pdf) bytes"; mv small.pdf out.pdf
+              fi
+            fi
             chars=$(pdftotext -layout out.pdf - 2>/dev/null | tr -d '[:space:]' | wc -c)
             echo "   caracteres de texto tras OCR: $chars"
             if [ "$chars" -ge 200 ]; then
@@ -81,5 +105,7 @@ jobs:
               fi
             fi
           done
+          [ "$n" -gt 0 ] || break
+          done
           echo "======================================"
-          echo "OCR listo: $ok · sin texto: $sin · errores: $err"
+          echo "OCR listo: $ok · sin texto: $sin · errores: $err · lotes: $lote"
