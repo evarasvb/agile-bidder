@@ -178,15 +178,18 @@ async function leerBasesPendientes(sb: SupabaseClient, deadline: number, codigo?
   // Se saltan las filas que otra corrida tomó hace menos de 10 minutos (el cron puede solaparse).
   const hace10 = new Date(Date.now() - 10 * 60_000).toISOString();
   // Primero los que nunca se intentaron: un archivo que falla siempre no bloquea al resto de la cola.
-  let q = sb.from("licitaciones_adjuntos").select("id, codigo, nombre, storage_path, bytes, content_type, ocr_hecho").eq("bases_pendiente", true)
+  let q = sb.from("licitaciones_adjuntos").select("id, codigo, nombre, storage_path, bytes, content_type, ocr_hecho, bases_intentos").eq("bases_pendiente", true)
     .or(`bases_intento_en.is.null,bases_intento_en.lt.${hace10}`).order("bases_intento_en", { ascending: true, nullsFirst: true }).order("bajado_en").limit(limite);
   if (codigo) q = q.eq("codigo", codigo);
   const { data: filas } = await q;
   const sk = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  for (const f of (filas ?? []) as { id: string; codigo: string; nombre: string; storage_path: string; bytes: number; content_type: string | null; ocr_hecho: boolean | null }[]) {
+  for (const f of (filas ?? []) as { id: string; codigo: string; nombre: string; storage_path: string; bytes: number; content_type: string | null; ocr_hecho: boolean | null; bases_intentos: number | null }[]) {
     const restante = deadline - Date.now();
     if (restante < MIN_MS_LECTURA) break;
-    await sb.from("licitaciones_adjuntos").update({ bases_intento_en: new Date().toISOString() }).eq("id", f.id);
+    // Tres intentos fallidos (errores raros de Gemini, Storage o Postgres) y el archivo sale de la cola.
+    const intentos = (f.bases_intentos ?? 0) + 1;
+    await sb.from("licitaciones_adjuntos").update({ bases_intento_en: new Date().toISOString(), bases_intentos: intentos, ...(intentos > 3 ? { bases_pendiente: false } : {}) }).eq("id", f.id);
+    if (intentos > 3) { console.log(`bases descartada tras ${intentos - 1} intentos ${f.codigo} ${f.nombre}`); continue; }
     if (f.bytes > MAX_BASES_BYTES) { await sb.from("licitaciones_adjuntos").update({ bases_pendiente: false }).eq("id", f.id); continue; }
     const { count } = await sb.from("bases_licitacion").select("id", { count: "exact", head: true }).eq("codigo", f.codigo);
     if ((count ?? 0) >= MAX_BASES_POR_LIC) { await sb.from("licitaciones_adjuntos").update({ bases_pendiente: false }).eq("id", f.id); continue; }

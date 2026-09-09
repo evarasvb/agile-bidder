@@ -35,8 +35,9 @@ function rolYSub(auth: string): { role: string; sub: string | null } {
   } catch { return { role: "", sub: null }; }
 }
 
+// Sin \u0000 (Postgres lo rechaza dentro de jsonb: "unsupported Unicode escape sequence").
 function limpiar(t: string): string {
-  return t.replace(/\r/g, "").replace(/[ \t\f\v]+/g, " ").replace(/ ?\n ?/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  return t.replace(/\u0000/g, "").replace(/\r/g, "").replace(/[ \t\f\v]+/g, " ").replace(/ ?\n ?/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 const desXml = (s: string) => s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'");
 
@@ -165,6 +166,24 @@ Deno.serve(async (req) => {
     const { role, sub } = rolYSub(req.headers.get("Authorization") ?? "");
     if (role !== "authenticated" && role !== "service_role") {
       return json({ error: "login", mensaje: "Inicia sesión en FirmaVB (es gratis) para subir las bases." }, 401);
+    }
+    // Cron (service_role): bases guardadas sin resumen porque Gemini no tenía cuota en ese momento.
+    // Se resumen de a pocas; si el primer intento vuelve sin cuota, la pasada termina para no gastar llamadas.
+    if (role === "service_role" && (req.headers.get("content-type") ?? "").includes("application/json")) {
+      const body = await req.json().catch(() => ({}));
+      if (body.resumir_pendientes) {
+        const limite = Math.min(Number(body.limit ?? 5), 20);
+        const { data: filas } = await sb.from("bases_licitacion").select("id, texto").is("resumen", null).gt("caracteres", 200).order("creado_en", { ascending: false }).limit(limite);
+        let hechas = 0;
+        for (const f of (filas ?? []) as { id: string; texto: string }[]) {
+          if (Date.now() - t0 > 150_000) break;
+          const resumen = await resumir(f.texto, Date.now() + 60_000);
+          if (!resumen) break;
+          await sb.from("bases_licitacion").update({ resumen }).eq("id", f.id);
+          hechas++;
+        }
+        return json({ hechas, candidatas: (filas ?? []).length, ms: Date.now() - t0 });
+      }
     }
     // El PDF llega crudo (Content-Type application/pdf + cabeceras X-Codigo / X-Nombre): sin base64
     // se usa la mitad de memoria y no se cae el worker con bases grandes.
