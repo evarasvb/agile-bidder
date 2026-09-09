@@ -139,9 +139,8 @@ async function ocrPdf(bytes: Uint8Array, plazo: number): Promise<string> {
         const j = await r.json();
         const t = ((j.candidates?.[0]?.content?.parts ?? []) as { text?: string }[]).map((p) => p.text ?? "").join("\n");
         if (t.trim().length >= 200) return limpiar(t);
-        const motivo = String(j.candidates?.[0]?.finishReason ?? "");
-        console.error("ocr", model, "sin texto", motivo);
-        if (motivo !== "RECITATION") break;
+        // Salida vacía o mínima (RECITATION, o el modelo contestó en vez de transcribir): se prueba el otro pedido.
+        console.error("ocr", model, "corto", String(j.candidates?.[0]?.finishReason ?? ""), JSON.stringify(t.slice(0, 160)));
       } catch (e) { console.error("ocr", model, String(e)); break; }
     }
   }
