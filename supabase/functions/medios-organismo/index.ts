@@ -37,7 +37,7 @@ const REDES = /twitter\.com|x\.com|facebook\.com|instagram\.com|tiktok\.com|yout
 function tipoMedio(url: string, medio: string): string {
   const s = `${url} ${medio}`;
   if (REDES.test(s)) return "redes";
-  if (RADIOS.test(s) || /radio/i.test(medio)) return "radio";
+  if (RADIOS.test(s) || /radio|\bfm\b/i.test(medio)) return "radio";
   if (TV.test(s)) return "tv";
   if (OFICIAL.test(s)) return "oficial";
   if (GREMIO.test(s)) return "gremio";
