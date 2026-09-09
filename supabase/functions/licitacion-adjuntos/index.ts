@@ -22,13 +22,15 @@ const BUCKET = "bases-licitacion";
 const MAX_BYTES = 30 * 1024 * 1024;
 // experto-bases corre en una sola petición (tope ~150 s de la plataforma): sobre 6 MB no alcanza a leer.
 const MAX_BASES_BYTES = 6 * 1024 * 1024;
-const MAX_BASES_POR_LIC = 4;
+const MAX_BASES_POR_LIC = 5;
 const PRESUPUESTO_MS = 110_000;
 // Leer bases (unpdf + Gemini sobre PDF grandes) puede pasar los 2 minutos: en modo bases se usa
 // casi todo el tope del plan Pro (400 s). pg_net corta su espera a los 120 s, pero la corrida sigue.
 const PRESUPUESTO_BASES_MS = 330_000;
 const RE_CODIGO = /^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}$/;
 const RE_BASES = /bases|resol|administrativ|t[ée]cnic|licitaci|aprueba/i;
+// Formularios para llenar ("Anexo 2 - Aceptación de Bases") no son bases aunque las nombren.
+const RE_NO_BASES = /^\s*(anexo|formulario|formato|declaraci[oó]n|carta|acta)/i;
 const MIN_MS_LECTURA = 45_000;
 const MIME: Record<string, string> = {
   pdf: "application/pdf",
@@ -135,14 +137,15 @@ async function procesar(sb: SupabaseClient, codigo: string, deadline: number, le
           if (bytes.length < 16) { res.errores.push(`${f.nombre}: archivo vacío`); continue; }
           const esPdf = bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
           const ext = (f.nombre.match(/\.([a-z0-9]{2,5})$/i)?.[1] ?? "").toLowerCase();
+          const esDocx = !esPdf && ext === "docx" && bytes[0] === 0x50 && bytes[1] === 0x4b;
           const contentType = esPdf ? "application/pdf" : (MIME[ext] ?? "application/octet-stream");
           const storagePath = `${codigo}/mp/${sanitizar(f.nombre)}`;
           const up = await sb.storage.from(BUCKET).upload(storagePath, bytes, { contentType, upsert: true });
           if (up.error) { res.errores.push(`${f.nombre}: storage ${up.error.message}`); continue; }
 
-          // PDF que parece bases: queda pendiente para que el Experto lo lea (texto + resumen).
+          // PDF o Word que parece bases: queda pendiente para que el Experto lo lea (texto + resumen).
           const pinta = `${f.nombre} ${f.tipo ?? ""} ${f.descripcion ?? ""}`;
-          const basesPendiente = esPdf && bytes.length <= MAX_BASES_BYTES && !basesNombres.has(f.nombre) && RE_BASES.test(pinta);
+          const basesPendiente = (esPdf || esDocx) && bytes.length <= MAX_BASES_BYTES && !basesNombres.has(f.nombre) && RE_BASES.test(pinta) && !RE_NO_BASES.test(f.nombre);
           const { error: errFila } = await sb.from("licitaciones_adjuntos").upsert({
             codigo, nombre: f.nombre, tipo: f.tipo, descripcion: f.descripcion, fecha_adjunto: f.fecha, bytes: bytes.length,
             content_type: contentType, storage_path: storagePath, es_bases: false, bases_id: null, bases_pendiente: basesPendiente, bajado_en: new Date().toISOString(),
@@ -174,12 +177,13 @@ async function leerBasesPendientes(sb: SupabaseClient, deadline: number, codigo?
   let leidas = 0;
   // Se saltan las filas que otra corrida tomó hace menos de 10 minutos (el cron puede solaparse).
   const hace10 = new Date(Date.now() - 10 * 60_000).toISOString();
-  let q = sb.from("licitaciones_adjuntos").select("id, codigo, nombre, storage_path, bytes").eq("bases_pendiente", true)
-    .or(`bases_intento_en.is.null,bases_intento_en.lt.${hace10}`).order("bajado_en").limit(limite);
+  // Primero los que nunca se intentaron: un archivo que falla siempre no bloquea al resto de la cola.
+  let q = sb.from("licitaciones_adjuntos").select("id, codigo, nombre, storage_path, bytes, content_type").eq("bases_pendiente", true)
+    .or(`bases_intento_en.is.null,bases_intento_en.lt.${hace10}`).order("bases_intento_en", { ascending: true, nullsFirst: true }).order("bajado_en").limit(limite);
   if (codigo) q = q.eq("codigo", codigo);
   const { data: filas } = await q;
   const sk = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  for (const f of (filas ?? []) as { id: string; codigo: string; nombre: string; storage_path: string; bytes: number }[]) {
+  for (const f of (filas ?? []) as { id: string; codigo: string; nombre: string; storage_path: string; bytes: number; content_type: string | null }[]) {
     const restante = deadline - Date.now();
     if (restante < MIN_MS_LECTURA) break;
     await sb.from("licitaciones_adjuntos").update({ bases_intento_en: new Date().toISOString() }).eq("id", f.id);
@@ -191,17 +195,17 @@ async function leerBasesPendientes(sb: SupabaseClient, deadline: number, codigo?
     try {
       const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/experto-bases`, {
         method: "POST", body: await blob.arrayBuffer(), signal: AbortSignal.timeout(restante - 5000),
-        headers: { "Content-Type": "application/pdf", Authorization: `Bearer ${sk}`, apikey: sk, "X-Codigo": f.codigo, "X-Nombre": encodeURIComponent(f.nombre) },
+        headers: { "Content-Type": f.content_type || "application/pdf", Authorization: `Bearer ${sk}`, apikey: sk, "X-Codigo": f.codigo, "X-Nombre": encodeURIComponent(f.nombre) },
       });
       const j = await r.json().catch(() => ({}));
       if (r.ok && j.id) {
         await sb.from("licitaciones_adjuntos").update({ es_bases: true, bases_id: j.id, bases_pendiente: false }).eq("id", f.id);
         leidas++;
       } else {
-        // PDF escaneado, ilegible, demasiado grande o que agota el tiempo de experto-bases (504): no se
-        // reintenta. Otros errores (Gemini caído, 5xx transitorio distinto) sí.
+        // Escaneado, ilegible, formato raro, demasiado grande o que agota el tiempo de experto-bases (504):
+        // no se reintenta. Otros errores (Gemini caído, 5xx transitorio distinto) sí.
         console.log(`bases no leídas ${f.codigo} ${f.nombre}: ${j.error ?? r.status}`);
-        if (["sin_texto", "lectura", "no_pdf", "tamano"].includes(String(j.error)) || r.status === 504) await sb.from("licitaciones_adjuntos").update({ bases_pendiente: false }).eq("id", f.id);
+        if (["sin_texto", "lectura", "no_pdf", "tamano", "codigo"].includes(String(j.error)) || r.status === 504) await sb.from("licitaciones_adjuntos").update({ bases_pendiente: false }).eq("id", f.id);
       }
     } catch (e) {
       console.log(`bases timeout ${f.codigo} ${f.nombre}: ${String(e).slice(0, 80)}`); // queda pendiente para la próxima pasada
