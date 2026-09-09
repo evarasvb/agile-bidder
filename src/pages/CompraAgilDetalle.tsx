@@ -28,6 +28,7 @@ import { MatchItemActions } from '@/components/compras-agiles/MatchItemActions';
 import { AgregarProductoManual } from '@/components/compras-agiles/AgregarProductoManual';
 import { AccionesCompartir } from '@/components/oportunidades/AccionesCompartir';
 import { DetalleCompraAgil } from '@/components/compras-agiles/DetalleCompraAgil';
+import { unidadLabel } from '@/utils/unidades';
 
 // Color del badge de match según el %.
 const matchBadge = (score: number) =>
@@ -394,11 +395,11 @@ export default function CompraAgilDetalle() {
                       <div className="mt-1.5 text-sm">
                         <p className="text-firmavb-blue font-medium">→ {f.match.nombre}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          {f.cantidad} {f.unidad} × {clp(f.match.precio || 0)} = <span className="font-semibold text-foreground">{clp(f.match.subtotal)}</span>
+                          {f.cantidad} {unidadLabel(f.unidad)} × {clp(f.match.precio || 0)} = <span className="font-semibold text-foreground">{clp(f.match.subtotal)}</span>
                         </p>
                       </div>
                     ) : f.estado !== 'descartado' ? (
-                      <p className="mt-1 text-xs text-muted-foreground">Sin match en tu inventario · {f.cantidad} {f.unidad}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Sin match en tu inventario · {f.cantidad} {unidadLabel(f.unidad)}</p>
                     ) : (
                       <p className="mt-1 text-xs text-muted-foreground">No aparecerá en la cotización.</p>
                     )}
@@ -452,7 +453,7 @@ export default function CompraAgilDetalle() {
                           <span className="text-muted-foreground">—</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right align-top">{f.cantidad} {f.unidad}</TableCell>
+                      <TableCell className="text-right align-top">{f.cantidad} {unidadLabel(f.unidad)}</TableCell>
                       <TableCell className="text-right align-top">{f.match?.precio ? clp(f.match.precio) : '—'}</TableCell>
                       <TableCell className="text-right align-top font-medium">{f.match?.precio ? clp(f.match.subtotal) : '—'}</TableCell>
                       <TableCell className="align-top">
