@@ -69,7 +69,9 @@ async function extraer(nombre: string, bytes: Uint8Array): Promise<{ tipo: strin
     const zip = await JSZip.loadAsync(bytes);
     const xml = await zip.file("word/document.xml")?.async("string");
     if (!xml) throw new Error("docx sin contenido");
-    const texto = xml.replace(/<\/w:p>/g, "\n").replace(/<w:tab\/>/g, "\t").replace(/<\/w:tc>/g, " | ").replace(/<[^>]+>/g, "");
+    // Texto borrado por control de cambios (<w:del>, <w:moveFrom>) no es parte del documento vigente.
+    const vigente = xml.replace(/<w:del\b[\s\S]*?<\/w:del>/g, "").replace(/<w:moveFrom\b[\s\S]*?<\/w:moveFrom>/g, "").replace(/<w:delText\b[^>]*>[\s\S]*?<\/w:delText>/g, "");
+    const texto = vigente.replace(/<\/w:p>/g, "\n").replace(/<w:tab\/>/g, "\t").replace(/<\/w:tc>/g, " | ").replace(/<[^>]+>/g, "");
     return { tipo: "docx", texto: limpiar(desXml(texto)) };
   }
   if (MIME_IMG[ext]) return { tipo: "imagen", texto: limpiar(await leerImagen(bytes, MIME_IMG[ext])) };
@@ -134,11 +136,12 @@ Deno.serve(async (req) => {
     texto = texto.slice(0, MAX_TEXTO);
     if (texto.length < 20) return json({ error: "sin_texto", mensaje: "El archivo no trae texto legible (¿escaneado?)." }, 422);
 
-    // PDF que parece ser las bases de la licitación: va al repositorio compartido de bases (experto-bases).
-    const pareceBases = tipo === "pdf" && !!codigo && (destino === "bases" || (destino === "auto" && (/bases/i.test(nombre) || /\bBASES\s+(ADMINISTRATIVAS|T[ÉE]CNICAS|DE\s+LICITACI[ÓO]N|GENERALES|TIPO)|APRUEBA\s+(LAS\s+)?BASES/i.test(texto.slice(0, 8000)))));
+    // PDF o Word que parece ser las bases de la licitación: va al repositorio compartido de bases (experto-bases).
+    const pareceBases = (tipo === "pdf" || tipo === "docx") && !!codigo && (destino === "bases" || (destino === "auto" && (/bases/i.test(nombre) || /\bBASES\s+(ADMINISTRATIVAS|T[ÉE]CNICAS|DE\s+LICITACI[ÓO]N|GENERALES|TIPO)|APRUEBA\s+(LAS\s+)?BASES/i.test(texto.slice(0, 8000)))));
     if (pareceBases) {
       const sk = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-      const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/experto-bases`, { method: "POST", headers: { "Content-Type": "application/pdf", Authorization: `Bearer ${sk}`, apikey: sk, "X-Codigo": codigo, "X-Nombre": encodeURIComponent(nombre) }, body: bytes });
+      const ctBases = tipo === "docx" ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" : "application/pdf";
+      const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/experto-bases`, { method: "POST", headers: { "Content-Type": ctBases, Authorization: `Bearer ${sk}`, apikey: sk, "X-Codigo": codigo, "X-Nombre": encodeURIComponent(nombre) }, body: bytes });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) return json({ error: j.error ?? "bases", mensaje: j.mensaje ?? "No pude leer las bases." }, r.status);
       return json({ ok: true, destino: "bases", nombre, tipo: "bases", paginas: j.paginas, caracteres: j.caracteres, secciones: j.secciones });
