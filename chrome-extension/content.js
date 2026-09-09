@@ -481,10 +481,52 @@
         filledFields++;
       });
 
+      // Además de los precios, poblar los campos de la cotización que antes
+      // quedaban vacíos (el usuario tenía que llenarlos a mano): "Detalle de la
+      // cotización" y "Fecha de vigencia". Aprovechamos que ya estamos en la
+      // página con la sesión activa.
+      const buscarCampoPorTexto = (re, tags) => {
+        const nodos = Array.from(document.querySelectorAll('label, span, p, legend'));
+        for (const n of nodos) {
+          if (!re.test(n.textContent || '')) continue;
+          let c = n;
+          for (let k = 0; k < 4 && c; k++) {
+            c = c.parentElement;
+            if (!c) break;
+            for (const t of tags) { const el = c.querySelector(t); if (el) return el; }
+          }
+        }
+        return null;
+      };
+
+      let extras = 0;
+
+      // Detalle de la cotización (textarea, máx 255): usa las notas de la oferta
+      // o arma una descripción breve. No pisa lo que el usuario ya haya escrito.
+      const detalleTxt = (oferta.notas && String(oferta.notas).trim())
+        || `Cotización vía FirmaVB — ${productos.length} producto(s).`;
+      const detalleEl = buscarCampoPorTexto(/detalle\s*(de\s*la\s*)?cotiz/i, ['textarea', 'input']);
+      if (detalleEl && !String(detalleEl.value || '').trim()) {
+        setReactValue(detalleEl, detalleTxt.slice(0, 255));
+        extras++;
+      }
+
+      // Fecha de vigencia: +30 días (dd/mm/aaaa) si está vacía. Best-effort:
+      // algunos date-pickers de MP son quisquillosos; si no toma, se avisa que
+      // se revise a mano.
+      const vigEl = buscarCampoPorTexto(/fecha\s*de\s*vigencia|vigencia/i, ['input']);
+      if (vigEl && !String(vigEl.value || '').trim()) {
+        const d = new Date(); d.setDate(d.getDate() + 30);
+        const s = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+        setReactValue(vigEl, s);
+        extras++;
+      }
+
       if (filledFields > 0) {
         showMessage(
           'success',
-          `✓ ${filledFields} precios completados. Revisa los montos, adjunta tu documento, resuelve el captcha y presiona "Enviar cotización".`
+          `✓ ${filledFields} precios${extras ? ` + ${extras} campo(s) (detalle/vigencia)` : ''} completados. ` +
+          `Revisa los montos, adjunta tu documento si aplica, resuelve el captcha y presiona "Enviar cotización".`
         );
       } else {
         showMessage(
