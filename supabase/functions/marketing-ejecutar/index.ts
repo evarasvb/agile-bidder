@@ -78,22 +78,63 @@ serve(async (req) => {
       );
     }
 
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const sb = createClient(supabaseUrl, supabaseServiceKey);
+    const { data: { user }, error: authError } = await sb.auth.getUser(authHeader.replace('Bearer ', ''));
+
+    if (authError || !user || user.email !== 'evaras@firmavb.cl') {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const body: ExecuteRequest = await req.json();
     const { pieza_id, contactos_ids, categoria_filtro } = body;
 
-    // Obtener pieza
+    // Obtener y atomically claim pieza (idempotency)
     const { data: pieza, error: piezaError } = await sb
       .from('marketing_piezas')
-      .select('id, campana_id, contenido, asunto, tipo, canal')
+      .select('id, campana_id, contenido, asunto, tipo, canal, estado')
       .eq('id', pieza_id)
+      .eq('estado', 'draft')
       .single();
 
     if (piezaError || !pieza) {
       return new Response(
-        JSON.stringify({ error: 'Pieza no encontrada' }),
+        JSON.stringify({ error: 'Pieza no encontrada o ya fue ejecutada' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Mark as executing to prevent concurrent executions
+    const { error: claimError } = await sb
+      .from('marketing_piezas')
+      .update({ estado: 'ejecutando' })
+      .eq('id', pieza_id)
+      .eq('estado', 'draft');
+
+    if (claimError || !claimError) {
+      // Check if update succeeded
+      const { data: updated } = await sb
+        .from('marketing_piezas')
+        .select('estado')
+        .eq('id', pieza_id)
+        .single();
+
+      if (updated?.estado !== 'ejecutando') {
+        return new Response(
+          JSON.stringify({ error: 'Pieza está siendo ejecutada por otro request' }),
+          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Obtener contactos objetivo

@@ -127,7 +127,7 @@ begin
   where mp.campana_id = campana_id_in
     and date(me.fecha_envio) = fecha_in;
 
-  insert into public.marketing_metricas (campana_id, fecha, total_enviados, total_entregados, total_abiertos, total_clicks, total_conversiones)
+  insert into public.marketing_metricas (campana_id, fecha, total_enviados, total_entregados, total_abiertos, total_clicks, total_conversiones, tasa_entrega, tasa_apertura, tasa_click, tasa_conversion)
   values (
     campana_id_in,
     fecha_in,
@@ -135,7 +135,11 @@ begin
     coalesce(v_entregados, 0),
     coalesce(v_abiertos, 0),
     coalesce(v_clicks, 0),
-    coalesce(v_conversiones, 0)
+    coalesce(v_conversiones, 0),
+    case when coalesce(v_enviados, 0) > 0 then round(coalesce(v_entregados, 0)::numeric / v_enviados, 4) else 0 end,
+    case when coalesce(v_enviados, 0) > 0 then round(coalesce(v_abiertos, 0)::numeric / v_enviados, 4) else 0 end,
+    case when coalesce(v_enviados, 0) > 0 then round(coalesce(v_clicks, 0)::numeric / v_enviados, 4) else 0 end,
+    case when coalesce(v_conversiones, 0) > 0 then round(coalesce(v_conversiones, 0)::numeric / v_enviados, 4) else 0 end
   )
   on conflict (campana_id, fecha) do update set
     total_enviados = excluded.total_enviados,
@@ -143,6 +147,10 @@ begin
     total_abiertos = excluded.total_abiertos,
     total_clicks = excluded.total_clicks,
     total_conversiones = excluded.total_conversiones,
+    tasa_entrega = excluded.tasa_entrega,
+    tasa_apertura = excluded.tasa_apertura,
+    tasa_click = excluded.tasa_click,
+    tasa_conversion = excluded.tasa_conversion,
     actualizado_en = now();
 end $$;
 

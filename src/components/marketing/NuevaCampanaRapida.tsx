@@ -162,7 +162,7 @@ export function NuevaCampanaRapida({ open, onOpenChange, onCampaignCreated }: Nu
           </div>
 
           <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
             <Button disabled={loading}>
