@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 import { useUpdateCompraAgil } from "@/hooks/useComprasAgiles";
 import { formatCurrency } from "@/utils/clasificacion";
+import { unidadLabel } from "@/utils/unidades";
 import { PrecioMercadoHint } from "./PrecioMercadoHint";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { calcularDesgloseOferta } from "@/lib/ofertaCalculo";
@@ -422,41 +423,20 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
       estado: 'borrador',
     };
 
-    // Automático: al guardar la propuesta también generamos la ficha técnica
-    // (sin forzar descarga) y la dejamos guardada junto a la propuesta en una
-    // sola escritura, para no pisar datos_json.
-    let ficha_tecnica: Record<string, unknown> | null = null;
-    try {
-      const res = await fichaTecnica.mutateAsync({
-        compra: {
-          id: compra.id,
-          codigo: compra.codigo,
-          nombre: compra.nombre,
-          organismo: compra.organismo,
-          datos_json: compra.datos_json,
-        },
-        productos: construirProductosFicha(),
-        empresa: empresaFicha,
-        descargar: false,
-        persistir: false,
-      });
-      ficha_tecnica = {
-        generada_en: new Date().toISOString(),
-        fuente: res.fuente,
-        fichas: res.fichas,
-      };
-    } catch {
-      // Si la IA falla, guardamos igual la propuesta sin ficha.
-    }
+    // La ficha técnica la genera la IA y puede tardar (o colgarse). NO se espera
+    // aquí: antes se generaba ANTES de guardar y bloqueaba todo — el botón
+    // quedaba girando y el modal "pegado" sin que ningún botón respondiera.
+    // Ahora se guarda primero la propuesta (rápido) y la ficha se genera en
+    // segundo plano tras cerrar (ver más abajo).
+    const datosBase = {
+      ...(compra.datos_json ?? {}),
+      propuesta,
+    };
 
     try {
       await updateCompra.mutateAsync({
         id: compra.id,
-        datos_json: {
-          ...(compra.datos_json ?? {}),
-          propuesta,
-          ...(ficha_tecnica ? { ficha_tecnica } : {}),
-        },
+        datos_json: datosBase,
       });
 
       // Publicar la oferta para la EXTENSIÓN de Chrome. La extensión SOLO lee la
@@ -535,9 +515,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
       // una URL armada a mano con el código no existe en el sitio real (404).
       const mpUrl = compra.link_oficial;
       toast.success(
-        ficha_tecnica
-          ? 'Propuesta y ficha técnica guardadas · en tu pipeline'
-          : 'Propuesta guardada · en tu pipeline',
+        'Propuesta guardada · en tu pipeline',
         mpUrl
           ? {
               duration: 10000,
@@ -549,6 +527,25 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
           : { duration: 10000 }
       );
       onOpenChange(false);
+
+      // Ficha técnica en SEGUNDO PLANO: no bloquea el guardado ni el cierre. Si
+      // la IA responde, se anexa a datos_json sin pisar la propuesta; si falla o
+      // tarda, la propuesta ya quedó guardada igual.
+      fichaTecnica
+        .mutateAsync({
+          compra: { id: compra.id, codigo: compra.codigo, nombre: compra.nombre, organismo: compra.organismo, datos_json: compra.datos_json },
+          productos: construirProductosFicha(),
+          empresa: empresaFicha,
+          descargar: false,
+          persistir: false,
+        })
+        .then((res) =>
+          updateCompra.mutateAsync({
+            id: compra.id,
+            datos_json: { ...datosBase, ficha_tecnica: { generada_en: new Date().toISOString(), fuente: res.fuente, fichas: res.fichas } },
+          })
+        )
+        .catch(() => { /* la propuesta ya quedó guardada; la ficha es opcional */ });
     } catch (error) {
       console.error('Error saving proposal:', error);
       toast.error('Error al guardar la propuesta');
@@ -675,7 +672,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                           )}
                           <div className="flex items-center gap-3 mt-2">
                             <span className="text-xs bg-muted px-2 py-1 rounded">
-                              Solicitado: {item.cantidadSolicitada} {item.unidadMedida}
+                              Solicitado: {item.cantidadSolicitada} {unidadLabel(item.unidadMedida)}
                             </span>
                             {item.match && (
                               <Badge variant="secondary" className="text-xs">
@@ -749,8 +746,20 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                       )}
                       {!item.match && (
                         <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-yellow-800">Sin producto asignado</span>
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <span className="text-xs text-yellow-800">
+                              Sin match en tu inventario · puedes buscarlo u ofertarlo con precio manual
+                            </span>
+                            <div className="flex items-center gap-2">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => { if (!item.selected) handleToggleItem(item.itemId); }}
+                              title="Ofrecer este ítem con tu propio precio, sin producto del inventario"
+                            >
+                              <Plus className="h-3.5 w-3.5 mr-1" />
+                              Ofertar manual
+                            </Button>
                             <Popover open={productoSeleccionando === item.itemId} onOpenChange={(open) => setProductoSeleccionando(open ? item.itemId : null)}>
                               <PopoverTrigger asChild>
                                 <Button variant="outline" size="sm">
@@ -782,6 +791,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                                 </Command>
                               </PopoverContent>
                             </Popover>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -924,7 +934,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
             </DropdownMenu>
             <Button
               onClick={handleGuardarPropuesta}
-              disabled={itemsActivos.length === 0 || updateCompra.isPending || fichaTecnica.isPending}
+              disabled={itemsActivos.length === 0 || updateCompra.isPending}
             >
               {updateCompra.isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
