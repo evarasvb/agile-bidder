@@ -8,6 +8,7 @@ create table if not exists public.oc_lineas (
   producto text,
   categoria text,                     -- rubro real del ítem
   rubro_n1 text,
+  tipo text,                          -- tipo de OC (compra ágil, trato directo, etc.)
   cantidad numeric,
   precio_neto numeric,
   moneda text,

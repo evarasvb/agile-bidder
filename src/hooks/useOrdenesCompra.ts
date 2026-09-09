@@ -51,6 +51,9 @@ export interface OrdenCompraItem {
   unidad: string | null;
   precio_unitario_neto: number | null;
   total_neto: number | null;
+  /** Rubro real del ítem (Datos Abiertos). Cuando existe, el reporte lo usa como
+   *  categoría en vez de adivinar por palabras clave. */
+  categoria?: string | null;
   created_at: string;
 }
 
@@ -134,8 +137,65 @@ function mapItem(i: RawOC): OrdenCompraItem {
     unidad: i.unidad ?? null,
     precio_unitario_neto: i.precio_unitario ?? null,
     total_neto: i.valor_total ?? null,
+    categoria: null,
     created_at: i.created_at,
   };
+}
+
+// Línea de producto desde `oc_lineas` (Datos Abiertos, detalle completo del
+// mercado) mapeada a la misma interfaz de ítem que usa la UI.
+function mapLinea(l: RawOC): OrdenCompraItem {
+  return {
+    id: String(l.linea_id),
+    orden_compra_id: l.codigo,
+    correlativo: l.correlativo ?? null,
+    codigo_producto: null,
+    nombre_producto: l.producto ?? 'Ítem',
+    descripcion: null,
+    cantidad: Number(l.cantidad ?? 0),
+    unidad: null,
+    precio_unitario_neto: l.precio_neto ?? null,
+    total_neto: l.monto_linea ?? null,
+    categoria: l.rubro_n1 ?? l.categoria ?? null,
+    created_at: '',
+  };
+}
+
+// Ítems de un conjunto de OC (por código). Fuente principal: `oc_lineas` (detalle
+// completo del mercado desde Datos Abiertos). Para los códigos que aún no están
+// ahí (ej. OC recién traídas desde MP), cae a `ordenes_compra_items`.
+async function fetchItemsPorCodigos(codigos: string[]): Promise<Map<string, OrdenCompraItem[]>> {
+  const map = new Map<string, OrdenCompraItem[]>();
+  const cods = codigos.filter(Boolean);
+  if (!cods.length) return map;
+
+  const { data: lineas, error: lErr } = await (supabase as any)
+    .from('oc_lineas')
+    .select('linea_id, codigo, correlativo, producto, categoria, rubro_n1, cantidad, precio_neto, monto_linea')
+    .in('codigo', cods)
+    .limit(20000);
+  if (lErr) console.error('Error obteniendo líneas (oc_lineas):', lErr);
+  for (const raw of (lineas || [])) {
+    const it = mapLinea(raw);
+    if (!map.has(raw.codigo)) map.set(raw.codigo, []);
+    map.get(raw.codigo)!.push(it);
+  }
+
+  const faltan = cods.filter((c) => !map.has(c));
+  if (faltan.length) {
+    const { data: items, error: iErr } = await (supabase as any)
+      .from('ordenes_compra_items')
+      .select('*')
+      .in('numero_oc', faltan);
+    if (iErr) console.error('Error obteniendo items (fallback):', iErr);
+    for (const raw of (items || [])) {
+      const it = mapItem(raw);
+      const key = raw.numero_oc as string;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(it);
+    }
+  }
+  return map;
 }
 
 export function useOrdenesCompra(
@@ -212,26 +272,10 @@ export function useOrdenesCompra(
       const ordenes = (data || []) as RawOC[];
       const mapped = ordenes.map(mapOrden);
 
-      // Cargar ítems (enlazados por numero_oc == codigo) si se piden.
+      // Cargar ítems (detalle por producto) si se piden.
       if (includeItems && mapped.length > 0) {
-        const codigos = mapped.map((o) => o.codigo).filter(Boolean);
-        const { data: itemsData, error: itemsError } = await (supabase as any)
-          .from('ordenes_compra_items')
-          .select('*')
-          .in('numero_oc', codigos);
-
-        if (itemsError) {
-          console.error('Error obteniendo items:', itemsError);
-        } else {
-          const itemsMap = new Map<string, OrdenCompraItem[]>();
-          (itemsData || []).forEach((raw: RawOC) => {
-            const item = mapItem(raw);
-            const key = raw.numero_oc as string;
-            if (!itemsMap.has(key)) itemsMap.set(key, []);
-            itemsMap.get(key)!.push(item);
-          });
-          return mapped.map((o) => ({ ...o, items: itemsMap.get(o.codigo) || [] }));
-        }
+        const itemsMap = await fetchItemsPorCodigos(mapped.map((o) => o.codigo));
+        return mapped.map((o) => ({ ...o, items: itemsMap.get(o.codigo) || [] }));
       }
 
       return mapped;
@@ -262,15 +306,8 @@ export function useOrdenCompra(codigo: string | null, includeItems = true) {
       const mapped = mapOrden(orden as RawOC);
 
       if (includeItems) {
-        const { data: itemsData, error: itemsError } = await (supabase as any)
-          .from('ordenes_compra_items')
-          .select('*')
-          .eq('numero_oc', codigo);
-        if (itemsError) {
-          console.error('Error obteniendo items:', itemsError);
-        } else {
-          mapped.items = (itemsData || []).map((raw: RawOC) => mapItem(raw));
-        }
+        const itemsMap = await fetchItemsPorCodigos([codigo]);
+        mapped.items = itemsMap.get(codigo) || [];
       }
 
       return mapped;

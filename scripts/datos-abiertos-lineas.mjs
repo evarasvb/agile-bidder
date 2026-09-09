@@ -71,18 +71,22 @@ for (const path of csvs){
     if(!codigo) continue;
     ocs.add(codigo);
 
-    const correlativo=(g(['Correlativo','CorrelativoLinea','NumeroLinea','Linea','Item'])||String(lineas)).toString().trim();
+    const idItem=(g(['IDItem'])||'').trim();
+    const cant=numCL(g(['cantidad','Cantidad']));
+    const precio=numCL(g(['precioNeto','PrecioNeto']));
+    const totLinea=numCL(g(['totalLineaNeto','TotalLineaNeto','MontoLinea']));
     const row={
-      linea_id: `${codigo}#${correlativo}`,
+      linea_id: idItem ? `I${idItem}` : `${codigo}#${lineas}`,
       codigo,
-      correlativo: numCL(correlativo),
-      producto: g(['NombreProducto','Producto','NombreroductoGenerico','NombreProductoGenerico','EspecificacionComprador','Nombre'])||null,
+      correlativo: numCL(idItem)||null,
+      producto: g(['NombreroductoGenerico','EspecificacionComprador','EspecificacionProveedor','Nombre'])||null,
       categoria: g(['Categoria','RubroN3','RubroN2','RubroN1'])||null,
       rubro_n1: g(['RubroN1'])||null,
-      cantidad: numCL(g(['Cantidad','CantidadOC','CantidadProducto'])),
-      precio_neto: numCL(g(['PrecioNeto','PrecioUnitario','PrecioNetoOC'])),
-      moneda: (g(['TipoMonedaOC','Moneda'])||'CLP').trim()||'CLP',
-      monto_linea: numCL(g(['TotalLineaNeto','MontoLinea','ValorTotalLinea','TotalLinea','TotalCargos'])),
+      tipo: g(['DescripcionTipoOC','Tipo'])||null,
+      cantidad: cant,
+      precio_neto: precio,
+      moneda: (g(['monedaItem','TipoMonedaOC','Moneda'])||'CLP').trim()||'CLP',
+      monto_linea: totLinea!=null ? totLinea : ((cant!=null&&precio!=null)?cant*precio:null),
       rut_proveedor: formatearRUT(g(['RutSucursal','RutProveedor'])),
       proveedor_nombre: g(['NombreProveedor','Sucursal'])||null,
       organismo: g(['OrganismoPublico'])||null,
