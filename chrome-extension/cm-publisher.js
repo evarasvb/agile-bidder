@@ -269,13 +269,21 @@
         <label style="display:flex;align-items:center;gap:6px;margin-bottom:10px;color:#334155;cursor:pointer;">
           <input type="checkbox" id="firmavb-cm-autoguardar"> Guardar automáticamente al procesar
         </label>
-        <button id="firmavb-cm-procesar" style="width:100%;background:#4657A2;color:#fff;border:none;border-radius:8px;padding:10px;font-weight:600;cursor:pointer;">
+        <button id="firmavb-cm-procesar" style="width:100%;background:#4657A2;color:#fff;border:none;border-radius:8px;padding:10px;font-weight:600;cursor:pointer;margin-bottom:8px;">
           Procesar este producto
+        </button>
+        <button id="firmavb-cm-lote" style="width:100%;background:#0ea5e9;color:#fff;border:none;border-radius:8px;padding:10px;font-weight:600;cursor:pointer;">
+          Procesar TODO (continuo)
+        </button>
+        <button id="firmavb-cm-detener" style="display:none;width:100%;background:#ef4444;color:#fff;border:none;border-radius:8px;padding:10px;font-weight:600;cursor:pointer;margin-top:8px;">
+          Detener modo continuo
         </button>
       </div>
     `;
     document.body.appendChild(panel);
     document.getElementById('firmavb-cm-procesar').addEventListener('click', procesarProducto);
+    document.getElementById('firmavb-cm-lote').addEventListener('click', iniciarLote);
+    document.getElementById('firmavb-cm-detener').addEventListener('click', () => detenerLote('Detenido por ti.'));
     document.getElementById('firmavb-cm-min').addEventListener('click', () => {
       const body = document.getElementById('firmavb-cm-body');
       const min = document.getElementById('firmavb-cm-min');
@@ -400,11 +408,151 @@
     }
 
     setEstado(pasos.join('<br>'));
+    return true; // procesó (con o sin cambios); útil para el modo continuo
   }
 
+  // ================= modo continuo (encadena producto tras producto) =================
+  // Diseño a prueba de bloqueos: el botón manual SIEMPRE queda visible; el lote
+  // auto-expira a los 10 min; todo va en try/catch que desactiva ante cualquier
+  // error; hay tope de seguridad y botón Detener.
+
+  const RE_FICHA = /\/mpassignproduct\/product\/(?:add|edit)\/id\/(\d+)/i;
+  const RE_LISTA = /\/mpassignproduct\/product\/(?:productlist|view)/i;
+  const TOPE_LOTE = 400;         // máximo de fichas por corrida (evita runaway)
+  const EXPIRA_MS = 10 * 60000;  // un lote más viejo que esto se ignora
+
+  function esFicha() { return RE_FICHA.test(location.href); }
+  function esLista() { return RE_LISTA.test(location.href); }
+  function idFichaActual() { const m = location.href.match(RE_FICHA); return m ? m[1] : null; }
+
+  // Enlaces a fichas presentes en una lista/resultados (anclas con la URL de ficha).
+  function enlacesFichaEnPagina() {
+    const out = []; const vistos = new Set();
+    document.querySelectorAll('a[href]').forEach((a) => {
+      const m = (a.getAttribute('href') || '').match(RE_FICHA);
+      if (m && !vistos.has(m[1])) { vistos.add(m[1]); out.push({ id: m[1], href: a.href }); }
+    });
+    return out;
+  }
+
+  function botonPaginaSiguiente() {
+    const cands = Array.from(document.querySelectorAll('a, button, li')).filter(elementoVisible);
+    return cands.find((el) => {
+      const dis = el.disabled || el.getAttribute('aria-disabled') === 'true' || /disabled/.test(el.className || '');
+      if (dis) return false;
+      const t = (el.getAttribute('aria-label') || el.title || textoVisible(el) || '').toLowerCase().trim();
+      return el.getAttribute('rel') === 'next' || t === 'next' || t === 'siguiente' || t === '›' || t === '>' || /p[aá]gina siguiente/.test(t);
+    }) || null;
+  }
+
+  function mostrarDetener(activo) {
+    const d = document.getElementById('firmavb-cm-detener');
+    const l = document.getElementById('firmavb-cm-lote');
+    if (d) d.style.display = activo ? 'block' : 'none';
+    if (l) l.style.display = activo ? 'none' : 'block';
+    // OJO: el botón "Procesar este producto" NUNCA se oculta (esa fue la regresión).
+  }
+
+  async function leerLote() {
+    try {
+      const { cmLote } = await chrome.storage.local.get('cmLote');
+      if (!cmLote || !cmLote.activo) return null;
+      if (Date.now() - (cmLote.ts || 0) > EXPIRA_MS) { await chrome.storage.local.set({ cmLote: null }); return null; }
+      return cmLote;
+    } catch { return null; }
+  }
+  async function guardarLote(lote) { try { await chrome.storage.local.set({ cmLote: { ...lote, ts: Date.now() } }); } catch {} }
+
+  function resumenLote(l) {
+    return `Continuo: ${l.stats.guardados} guardados · ${l.stats.saltados} saltados · ${l.stats.vacios} sin precio.`;
+  }
+
+  async function iniciarLote() {
+    try {
+      if (!esLista()) {
+        setEstado('Para el modo continuo, ábrelo desde la <b>lista de productos</b> (Mis productos) o desde los resultados de <b>Agregar producto</b>, y vuelve a darle.');
+        return;
+      }
+      const enlaces = enlacesFichaEnPagina();
+      if (enlaces.length === 0) {
+        setEstado('No encontré enlaces a las fichas en esta lista (el menú puede armar el link al abrirlo). Mándale a Claude una captura del menú "SELECCIONE" abierto.');
+        return;
+      }
+      if (!window.confirm(`Modo continuo: abriré cada producto, pondré el precio (referencia − $1) y GUARDARÉ, uno tras otro (${enlaces.length} en esta página, sigue con las demás).\n\nSe publican precios reales. Puedes Detener cuando quieras.\n\n¿Empezar?`)) return;
+      const lote = { activo: true, ts: Date.now(), listaUrl: location.href, procesados: [], stats: { guardados: 0, saltados: 0, vacios: 0 } };
+      await guardarLote(lote);
+      mostrarDetener(true);
+      setEstado('Modo continuo iniciado…');
+      location.href = enlaces[0].href;
+    } catch (e) { detenerLote('Error al iniciar el continuo: ' + (e && e.message)); }
+  }
+
+  async function detenerLote(msg) {
+    try { await chrome.storage.local.set({ cmLote: null }); } catch {}
+    mostrarDetener(false);
+    setEstado(msg || 'Modo continuo detenido.');
+  }
+
+  async function loteEnFicha(lote) {
+    mostrarDetener(true);
+    const id = idFichaActual();
+    if (id && !lote.procesados.includes(id)) lote.procesados.push(id);
+    if (lote.procesados.length > TOPE_LOTE) { await detenerLote(`Tope de ${TOPE_LOTE} alcanzado. Corta acá; vuelve a darle para seguir.`); return; }
+
+    // Forzar guardado en el continuo (independiente del check del panel).
+    const chk = document.getElementById('firmavb-cm-autoguardar');
+    const marcado = chk ? chk.checked : false;
+    if (chk) chk.checked = true;
+    let guardo = false;
+    try { await procesarProducto(); guardo = true; } catch {}
+    if (chk) chk.checked = marcado;
+
+    // Detectar si de verdad se guardó mirando el estado del panel.
+    const estado = (document.getElementById('firmavb-cm-status') || {}).innerHTML || '';
+    if (/Publicado autom|Guardado/i.test(estado)) lote.stats.guardados++;
+    else if (/salto|PDF\/Word|no coincide/i.test(estado)) lote.stats.saltados++;
+    else lote.stats.vacios++;
+    await guardarLote(lote);
+    setEstado(`${estado}<br><br>${resumenLote(lote)}`);
+
+    // Si guardó, Mercado Público redirige solo a la lista; si no, volvemos nosotros.
+    setTimeout(() => { if (esFicha()) location.href = lote.listaUrl; }, guardo ? 6000 : 1200);
+  }
+
+  async function loteEnLista(lote) {
+    mostrarDetener(true);
+    const enlaces = enlacesFichaEnPagina();
+    const siguiente = enlaces.find((e) => !lote.procesados.includes(e.id));
+    if (siguiente) {
+      setEstado(`${resumenLote(lote)}<br>Abriendo siguiente…`);
+      setTimeout(() => { location.href = siguiente.href; }, 700);
+      return;
+    }
+    const next = botonPaginaSiguiente();
+    if (next) {
+      setEstado(`${resumenLote(lote)}<br>Pasando a la página siguiente…`);
+      lote.listaUrl = location.href;
+      await guardarLote(lote);
+      next.click();
+      setTimeout(() => { leerLote().then((l) => { if (l && esLista()) loteEnLista(l); }); }, 2500);
+      return;
+    }
+    await detenerLote(`✅ Modo continuo terminado. ${resumenLote(lote)}`);
+  }
+
+  async function reanudarLote() {
+    try {
+      const lote = await leerLote();
+      if (!lote) return;
+      if (esFicha()) loteEnFicha(lote);
+      else if (esLista()) loteEnLista(lote);
+    } catch (e) { detenerLote('Se detuvo el continuo por un error: ' + (e && e.message)); }
+  }
+
+  function init() { crearPanel(); reanudarLote(); }
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', crearPanel);
+    document.addEventListener('DOMContentLoaded', init);
   } else {
-    crearPanel();
+    init();
   }
 })();
