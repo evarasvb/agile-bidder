@@ -20,6 +20,11 @@ const MODELOS = [Deno.env.get("GEMINI_MODEL_INFORME"), "gemini-3.6-flash", "gemi
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
 function rolYSub(auth: string): { role: string; sub: string | null } {
+  // La clave de servicio del runtime puede no ser un JWT (formato sb_secret_...): si la cabecera trae
+  // exactamente esa clave, es una llamada interna (licitacion-adjuntos, extension-adjuntos).
+  const token = auth.replace(/^Bearer\s+/i, "").trim();
+  const sk = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (sk && token === sk) return { role: "service_role", sub: null };
   try {
     const p = JSON.parse(atob(auth.replace(/^Bearer\s+/i, "").split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
     return { role: p.role ?? "", sub: p.sub ?? null };
@@ -45,7 +50,11 @@ function seccionar(texto: string): { titulo: string; texto: string }[] {
   return out.slice(0, 400);
 }
 
-async function resumir(texto: string): Promise<Record<string, unknown> | null> {
+// Cada llamada a Gemini espera como máximo GEMINI_TIMEOUT_MS y el conjunto no pasa de `plazo`:
+// sin tope, una pasada por todos los modelos con Google saturado (503) dejaba la petición colgada
+// hasta el 504 del gateway y el PDF quedaba como "no leído" aunque el texto ya estaba extraído.
+const GEMINI_TIMEOUT_MS = 45_000;
+async function resumir(texto: string, plazo = Date.now() + 100_000): Promise<Record<string, unknown> | null> {
   const key = Deno.env.get("GEMINI_API_KEY");
   if (!key) return null;
   const sys = `Eres un experto en licitaciones públicas chilenas (Ley 19.886 y su reglamento). Lee las bases y extrae SOLO lo que diga el documento. Responde únicamente con JSON válido, sin markdown, con esta forma:
@@ -63,9 +72,11 @@ Si algo no está en el texto, usa null o lista vacía. No inventes.`;
   // Google devuelve 503 por alta demanda a ratos: segunda pasada por todos los modelos tras una pausa.
   for (const model of [...MODELOS, "espera", ...MODELOS]) {
     if (model === "espera") { await new Promise((ok) => setTimeout(ok, 2500)); continue; }
+    if (Date.now() > plazo - 10_000) break;
     try {
       const r = await fetch(GEMINI_URL, {
         method: "POST",
+        signal: AbortSignal.timeout(Math.min(GEMINI_TIMEOUT_MS, Math.max(5_000, plazo - Date.now()))),
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify({ model, temperature: 0.1, max_tokens: 3000, messages: [
           { role: "system", content: sys },
@@ -147,7 +158,7 @@ Deno.serve(async (req) => {
     const secciones = seccionar(texto);
 
     // 2. Resumen estructurado
-    const resumen = await resumir(texto);
+    const resumen = await resumir(texto, t0 + 120_000);
 
     // 3. Archivo original (mejor esfuerzo) y fila
     let storage_path: string | null = `${codigo}/${Date.now()}_${nombre.replace(/\s+/g, "_")}`;

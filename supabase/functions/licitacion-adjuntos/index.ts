@@ -6,8 +6,8 @@
 // (texto + resumen) para que el Libro del Experto los use directo.
 //   GET  ?codigo=X             -> adjuntos guardados (con link firmado de 1 h si hay sesión)
 //   POST {codigo}              -> baja lo que falte (sesión o service_role)
-//   POST {auto:true, limit:2}  -> service_role (cron): licitaciones con match aún sin revisar
-//   POST {bases:true, limit:2} -> service_role (cron): PDF de bases que el Experto aún no leyó
+//   POST {auto:true, limit:6, max:40} -> service_role (cron): licitaciones abiertas aún sin revisar (primero las que calzan)
+//   POST {bases:true, limit:6} -> service_role (cron): PDF de bases que el Experto aún no leyó
 // Leer las bases (texto + Gemini) tarda más que bajarlas, así que se hace aparte: el archivo
 // queda marcado bases_pendiente y se lee con el tiempo que sobre o en la pasada del cron.
 import { createClient, SupabaseClient } from "jsr:@supabase/supabase-js@2";
@@ -80,11 +80,17 @@ function parsearFilas(h: string): Fila[] {
 
 type Resultado = { codigo: string; encontrados: number; nuevos: number; bases: number; omitidos: string[]; errores: string[]; pendientes: number; ms: number };
 
-async function procesar(sb: SupabaseClient, codigo: string, deadline: number): Promise<Resultado> {
+// leerInline: leer aquí mismo las bases bajadas (petición de un usuario). El cron de descarga lo deja
+// en false para no gastar su presupuesto en Gemini: las lee el cron de lectura.
+async function procesar(sb: SupabaseClient, codigo: string, deadline: number, leerInline = true): Promise<Resultado> {
   const t0 = Date.now();
   const res: Resultado = { codigo, encontrados: 0, nuevos: 0, bases: 0, omitidos: [], errores: [], pendientes: 0, ms: 0 };
   const ref = `${MP}/RFB/DetailsAcquisition.aspx?idlicitacion=${codigo}`;
   try {
+    // Se reserva la licitación antes de bajar nada: el cron corre cada 2 minutos y dos corridas
+    // solapadas tomarían las mismas candidatas. Si esta corrida muere, queda pendiente y se
+    // reintenta a las 2 horas.
+    await sb.from("licitaciones_adjuntos_estado").upsert({ codigo, revisado_en: new Date().toISOString(), pendientes: 1, error: null });
     const r1 = await fetch(ref, { headers: { "User-Agent": UA, "Accept-Language": "es-CL" }, signal: AbortSignal.timeout(30000) });
     if (!r1.ok) { res.errores.push(`ficha HTTP ${r1.status}`); return finalizar(sb, res, t0); }
     const h1 = await r1.text();
@@ -149,7 +155,7 @@ async function procesar(sb: SupabaseClient, codigo: string, deadline: number): P
         }
       }
     }
-    res.bases = await leerBasesPendientes(sb, deadline, codigo);
+    res.bases = leerInline ? await leerBasesPendientes(sb, deadline, codigo) : 0;
     await sb.from("licitaciones_adjuntos_estado").upsert({
       codigo, revisado_en: new Date().toISOString(), archivos: guardados.size, pendientes: res.pendientes,
       error: res.errores.length ? res.errores.join(" | ").slice(0, 500) : null,
@@ -253,14 +259,25 @@ Deno.serve(async (req) => {
     }
     if (body.auto) {
       if (role !== "service_role") return json({ error: "solo_servicio" }, 403);
-      const { data: cods, error } = await sb.rpc("licitaciones_adjuntos_pendientes", { p_limite: Number(body.limit ?? 2) });
-      if (error) return json({ error: error.message }, 500);
+      // Una licitación sin "Ver Anexo" se resuelve en menos de 1 s, así que la corrida sigue pidiendo
+      // candidatas (ya reservadas al procesarlas) hasta agotar el presupuesto o el tope `max`.
+      const lote = Number(body.limit ?? 2), max = Number(body.max ?? 40);
       const procesadas: Resultado[] = [];
-      for (const c of (cods ?? []) as { codigo: string }[]) {
-        if (Date.now() > deadline - 15000) break;
-        procesadas.push(await procesar(sb, c.codigo, deadline));
+      const vistas = new Set<string>();
+      let candidatas = 0;
+      while (procesadas.length < max && Date.now() < deadline - 15000) {
+        const { data: cods, error } = await sb.rpc("licitaciones_adjuntos_pendientes", { p_limite: lote });
+        if (error) return json({ error: error.message, procesadas }, 500);
+        const nuevas = ((cods ?? []) as { codigo: string }[]).filter((c) => !vistas.has(c.codigo));
+        if (!nuevas.length) break;
+        candidatas += nuevas.length;
+        for (const c of nuevas) {
+          vistas.add(c.codigo);
+          if (Date.now() > deadline - 15000 || procesadas.length >= max) break;
+          procesadas.push(await procesar(sb, c.codigo, deadline, false));
+        }
       }
-      return json({ candidatas: (cods ?? []).length, procesadas, ms: Date.now() - t0 });
+      return json({ candidatas, procesadas, ms: Date.now() - t0 });
     }
 
     if (!conSesion) return json({ error: "login", mensaje: "Inicia sesión en FirmaVB (es gratis) para traer las bases." }, 401);
