@@ -17,6 +17,18 @@ const MAX_TEXTO = 400_000;
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
 const GEMINI_NATIVE = "https://generativelanguage.googleapis.com/v1beta/models";
+// Respaldo gratuito cuando Gemini se queda sin cuota: la clave vive en Vault (tabla vault.secrets),
+// no en variables de entorno, y se lee una sola vez por instancia con experto_bases_secreto().
+const MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions";
+const MISTRAL_MODEL = Deno.env.get("MISTRAL_MODEL") || "mistral-small-latest";
+let mistralKeyCache: string | null | undefined;
+async function claveMistral(sb: ReturnType<typeof createClient>): Promise<string | null> {
+  if (mistralKeyCache !== undefined) return mistralKeyCache;
+  const { data, error } = await sb.rpc("experto_bases_secreto", { p_nombre: "mistral_api_key" });
+  mistralKeyCache = error ? null : ((data as string | null) ?? null);
+  if (error) console.error("mistral_key", error.message);
+  return mistralKeyCache;
+}
 // PDF escaneado: se manda entero a Gemini (lee las páginas como imágenes). Sobre 6 MB el base64 no cabe en el tiempo.
 const MAX_OCR_BYTES = 6 * 1024 * 1024;
 const MODELOS = [Deno.env.get("GEMINI_MODEL_INFORME"), "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.5-flash-lite"].filter(Boolean) as string[];
@@ -71,13 +83,7 @@ function seccionar(texto: string): { titulo: string; texto: string }[] {
 // sin tope, una pasada por todos los modelos con Google saturado (503) dejaba la petición colgada
 // hasta el 504 del gateway y el PDF quedaba como "no leído" aunque el texto ya estaba extraído.
 const GEMINI_TIMEOUT_MS = 45_000;
-// Queda en true cuando la última pasada de resumir() recibió 429 (sin cuota) de todos los modelos.
-let sinCuota = false;
-async function resumir(texto: string, plazo = Date.now() + 100_000): Promise<Record<string, unknown> | null> {
-  const key = Deno.env.get("GEMINI_API_KEY");
-  if (!key) return null;
-  let hubo429 = false, huboOtro = false;
-  const sys = `Eres un experto en licitaciones públicas chilenas (Ley 19.886 y su reglamento). Lee las bases y extrae SOLO lo que diga el documento. Responde únicamente con JSON válido, sin markdown, con esta forma:
+const SYS_RESUMEN = `Eres un experto en licitaciones públicas chilenas (Ley 19.886 y su reglamento). Lee las bases y extrae SOLO lo que diga el documento. Responde únicamente con JSON válido, sin markdown, con esta forma:
 {"objeto":"qué se compra, en una línea",
  "presupuesto":"monto y si es con o sin impuestos, o null",
  "criterios_evaluacion":[{"criterio":"nombre","ponderacion":"porcentaje o puntaje","como_se_puntua":"fórmula o escala resumida"}],
@@ -89,6 +95,40 @@ async function resumir(texto: string, plazo = Date.now() + 100_000): Promise<Rec
  "multas_y_clausulas_riesgosas":["multa o cláusula con su monto/porcentaje y por qué es riesgosa"],
  "advertencias":["cualquier cosa rara: criterios subjetivos, experiencia imposible de acreditar, plazos de entrega irreales, exclusividad, etc."]}
 Si algo no está en el texto, usa null o lista vacía. No inventes.`;
+// Respuesta de un modelo tipo chat/completions (Gemini u openai-compat): saca el primer bloque {...}.
+function jsonDeRespuesta(c: string): Record<string, unknown> {
+  c = c.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  const a = c.indexOf("{"), z = c.lastIndexOf("}");
+  if (a >= 0 && z > a) c = c.slice(a, z + 1);
+  return JSON.parse(c);
+}
+// Mistral (plan Experiment, gratis): mismo formato openai-compat que Gemini. Único intento: es el
+// respaldo cuando Gemini ya se quedó sin cuota, no hace falta reintentar varios modelos.
+async function resumirMistral(texto: string, plazo: number, sb: ReturnType<typeof createClient>): Promise<Record<string, unknown> | null> {
+  const key = await claveMistral(sb);
+  if (!key || Date.now() > plazo - 5_000) return null;
+  try {
+    const r = await fetch(MISTRAL_URL, {
+      method: "POST",
+      signal: AbortSignal.timeout(Math.min(GEMINI_TIMEOUT_MS, Math.max(5_000, plazo - Date.now()))),
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: MISTRAL_MODEL, temperature: 0.1, max_tokens: 3000, response_format: { type: "json_object" }, messages: [
+        { role: "system", content: SYS_RESUMEN },
+        { role: "user", content: "BASES:\n\n" + texto.slice(0, 90_000) },
+      ] }),
+    });
+    if (!r.ok) { console.error("mistral", r.status, (await r.text()).slice(0, 200)); return null; }
+    const j = await r.json();
+    return jsonDeRespuesta(String(j.choices?.[0]?.message?.content ?? ""));
+  } catch (e) { console.error("mistral", String(e)); return null; }
+}
+// Queda en true cuando la última pasada de resumir() recibió 429 (sin cuota) de todos los modelos
+// y Mistral tampoco pudo (sin clave o también sin cuota).
+let sinCuota = false;
+async function resumir(texto: string, sb: ReturnType<typeof createClient>, plazo = Date.now() + 100_000): Promise<Record<string, unknown> | null> {
+  const key = Deno.env.get("GEMINI_API_KEY");
+  if (!key) { const m = await resumirMistral(texto, plazo, sb); sinCuota = !m; return m; }
+  let hubo429 = false, huboOtro = false;
   // Primero el modelo lite (cuota gratis amplia); los grandes solo si falla. Google devuelve 503 por
   // alta demanda a ratos: segunda pasada por todos los modelos tras una pausa.
   const orden = [...new Set(["gemini-3.5-flash-lite", ...MODELOS])];
@@ -101,20 +141,19 @@ Si algo no está en el texto, usa null o lista vacía. No inventes.`;
         signal: AbortSignal.timeout(Math.min(GEMINI_TIMEOUT_MS, Math.max(5_000, plazo - Date.now()))),
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify({ model, temperature: 0.1, max_tokens: 3000, response_format: { type: "json_object" }, messages: [
-          { role: "system", content: sys },
+          { role: "system", content: SYS_RESUMEN },
           { role: "user", content: "BASES:\n\n" + texto.slice(0, 90_000) },
         ] }),
       });
       if (!r.ok) { console.error("gemini", model, r.status, (await r.text()).slice(0, 200)); if (r.status === 429) hubo429 = true; else huboOtro = true; continue; }
       const j = await r.json();
-      let c = String(j.choices?.[0]?.message?.content ?? "").trim();
-      c = c.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-      const a = c.indexOf("{"), z = c.lastIndexOf("}");
-      if (a >= 0 && z > a) c = c.slice(a, z + 1);
       sinCuota = false;
-      return JSON.parse(c);
+      return jsonDeRespuesta(String(j.choices?.[0]?.message?.content ?? ""));
     } catch (e) { console.error("resumen", model, String(e)); huboOtro = true; }
   }
+  // Gemini no pudo (cuota u otro error): se prueba Mistral antes de rendirse.
+  const m = await resumirMistral(texto, plazo, sb);
+  if (m) { sinCuota = false; return m; }
   sinCuota = hubo429 && !huboOtro;
   return null;
 }
@@ -184,7 +223,7 @@ Deno.serve(async (req) => {
       let hechas = 0, fallidas = 0;
       for (const f of (filas ?? []) as { id: string; texto: string; resumen_intentos: number | null }[]) {
         if (Date.now() - t0 > 150_000) break;
-        const resumen = await resumir(f.texto, Date.now() + 60_000);
+        const resumen = await resumir(f.texto, sb, Date.now() + 60_000);
         if (resumen) { await sb.from("bases_licitacion").update({ resumen }).eq("id", f.id); hechas++; continue; }
         if (sinCuota) break;
         await sb.from("bases_licitacion").update({ resumen_intentos: (f.resumen_intentos ?? 0) + 1 }).eq("id", f.id);
@@ -254,7 +293,7 @@ Deno.serve(async (req) => {
     const secciones = seccionar(texto);
 
     // 2. Resumen estructurado (si hubo OCR, se le da su propio tiempo)
-    const resumen = await resumir(texto, Math.max(t0 + 120_000, Date.now() + 90_000));
+    const resumen = await resumir(texto, sb, Math.max(t0 + 120_000, Date.now() + 90_000));
 
     // 3. Archivo original (mejor esfuerzo) y fila
     // Storage rechaza claves con tildes o símbolos: la ruta va sin ellos (el nombre original queda en la fila).
