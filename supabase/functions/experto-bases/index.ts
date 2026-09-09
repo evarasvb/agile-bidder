@@ -102,25 +102,35 @@ function jsonDeRespuesta(c: string): Record<string, unknown> {
   if (a >= 0 && z > a) c = c.slice(a, z + 1);
   return JSON.parse(c);
 }
-// Mistral (plan Experiment, gratis): mismo formato openai-compat que Gemini. Único intento: es el
-// respaldo cuando Gemini ya se quedó sin cuota, no hace falta reintentar varios modelos.
+// Mistral (plan Experiment, gratis): mismo formato openai-compat que Gemini. El plan gratis limita
+// las solicitudes por segundo (429 "Rate limit exceeded") y con varios cron corriendo en paralelo se
+// pisan seguido: dos reintentos con pausa creciente antes de rendirse.
 async function resumirMistral(texto: string, plazo: number, sb: ReturnType<typeof createClient>): Promise<Record<string, unknown> | null> {
   const key = await claveMistral(sb);
-  if (!key || Date.now() > plazo - 5_000) return null;
-  try {
-    const r = await fetch(MISTRAL_URL, {
-      method: "POST",
-      signal: AbortSignal.timeout(Math.min(GEMINI_TIMEOUT_MS, Math.max(5_000, plazo - Date.now()))),
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: MISTRAL_MODEL, temperature: 0.1, max_tokens: 3000, response_format: { type: "json_object" }, messages: [
-        { role: "system", content: SYS_RESUMEN },
-        { role: "user", content: "BASES:\n\n" + texto.slice(0, 90_000) },
-      ] }),
-    });
-    if (!r.ok) { console.error("mistral", r.status, (await r.text()).slice(0, 200)); return null; }
-    const j = await r.json();
-    return jsonDeRespuesta(String(j.choices?.[0]?.message?.content ?? ""));
-  } catch (e) { console.error("mistral", String(e)); return null; }
+  if (!key) return null;
+  for (const espera of [0, 3000, 8000]) {
+    if (espera) await new Promise((ok) => setTimeout(ok, espera));
+    if (Date.now() > plazo - 5_000) return null;
+    try {
+      const r = await fetch(MISTRAL_URL, {
+        method: "POST",
+        signal: AbortSignal.timeout(Math.min(GEMINI_TIMEOUT_MS, Math.max(5_000, plazo - Date.now()))),
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: MISTRAL_MODEL, temperature: 0.1, max_tokens: 3000, response_format: { type: "json_object" }, messages: [
+          { role: "system", content: SYS_RESUMEN },
+          { role: "user", content: "BASES:\n\n" + texto.slice(0, 90_000) },
+        ] }),
+      });
+      if (!r.ok) {
+        console.error("mistral", r.status, (await r.text()).slice(0, 200));
+        if (r.status === 429) continue; // sobrecarga momentánea del plan gratis: se reintenta
+        return null;
+      }
+      const j = await r.json();
+      return jsonDeRespuesta(String(j.choices?.[0]?.message?.content ?? ""));
+    } catch (e) { console.error("mistral", String(e)); return null; }
+  }
+  return null;
 }
 // Queda en true cuando la última pasada de resumir() recibió 429 (sin cuota) de todos los modelos
 // y Mistral tampoco pudo (sin clave o también sin cuota).
