@@ -117,25 +117,32 @@ async function ocrPdf(bytes: Uint8Array, plazo: number): Promise<string> {
   const key = Deno.env.get("GEMINI_API_KEY");
   if (!key) return "";
   let b64 = ""; for (let i = 0; i < bytes.length; i += 0x8000) b64 += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); b64 = btoa(b64);
-  const prompt = "Transcribe TODO el texto de este documento, página por página y en orden, tal como está escrito (español). Conserva títulos, numeración de artículos y tablas (filas separadas por ' | '). No resumas ni comentes.";
+  const prompts = [
+    "Transcribe TODO el texto de este documento, página por página y en orden, tal como está escrito (español). Conserva títulos, numeración de artículos y tablas (filas separadas por ' | '). No resumas ni comentes.",
+    // Google a veces corta la transcripción literal (finishReason RECITATION): se pide el contenido completo con otras palabras.
+    "Lee este documento completo y entrega TODO su contenido en texto plano, sección por sección y en orden, con tus propias palabras pero sin omitir nada: cifras, fechas, plazos, montos, porcentajes, garantías, multas, criterios de evaluación con sus ponderaciones, requisitos, anexos exigidos y numeración de artículos. Las tablas como filas separadas por ' | '. Sin comentarios.",
+  ];
   for (const model of [...new Set(["gemini-3.5-flash-lite", ...MODELOS])]) {
-    const restante = plazo - Date.now();
-    if (restante < 20_000) break;
-    try {
-      const r = await fetch(`${GEMINI_NATIVE}/${model}:generateContent`, {
-        method: "POST", signal: AbortSignal.timeout(restante),
-        headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ inline_data: { mime_type: "application/pdf", data: b64 } }, { text: prompt }] }],
-          generationConfig: { temperature: 0, maxOutputTokens: 60000 },
-        }),
-      });
-      if (!r.ok) { console.error("ocr", model, r.status, (await r.text()).slice(0, 200)); continue; }
-      const j = await r.json();
-      const t = ((j.candidates?.[0]?.content?.parts ?? []) as { text?: string }[]).map((p) => p.text ?? "").join("\n");
-      if (t.trim().length >= 200) return limpiar(t);
-      console.error("ocr", model, "sin texto", String(j.candidates?.[0]?.finishReason ?? ""));
-    } catch (e) { console.error("ocr", model, String(e)); }
+    for (const prompt of prompts) {
+      const restante = plazo - Date.now();
+      if (restante < 20_000) return "";
+      try {
+        const r = await fetch(`${GEMINI_NATIVE}/${model}:generateContent`, {
+          method: "POST", signal: AbortSignal.timeout(restante),
+          headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ inline_data: { mime_type: "application/pdf", data: b64 } }, { text: prompt }] }],
+            generationConfig: { temperature: 0, maxOutputTokens: 60000 },
+          }),
+        });
+        if (!r.ok) { console.error("ocr", model, r.status, (await r.text()).slice(0, 200)); break; } // sin cuota o caído: siguiente modelo
+        const j = await r.json();
+        const t = ((j.candidates?.[0]?.content?.parts ?? []) as { text?: string }[]).map((p) => p.text ?? "").join("\n");
+        if (t.trim().length >= 200) return limpiar(t);
+        // Salida vacía o mínima (RECITATION, o el modelo contestó en vez de transcribir): se prueba el otro pedido.
+        console.error("ocr", model, "corto", String(j.candidates?.[0]?.finishReason ?? ""), JSON.stringify(t.slice(0, 160)));
+      } catch (e) { console.error("ocr", model, String(e)); break; }
+    }
   }
   return "";
 }
