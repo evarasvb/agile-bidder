@@ -31,6 +31,7 @@ import { FichaMercadoPublico } from '@/components/licitaciones/FichaMercadoPubli
 import { AdjuntosLicitacion } from '@/components/licitaciones/AdjuntosLicitacion';
 import { useDocumentosLicitacion } from '@/hooks/useChatIA';
 import { RiesgoOrganismoCard } from '@/components/organismo/RiesgoOrganismoCard';
+import { MediosOrganismoCard } from '@/components/organismo/MediosOrganismoCard';
 import { AccionesCompartir } from '@/components/oportunidades/AccionesCompartir';
 
 interface LicitacionBIItem {
@@ -426,6 +427,8 @@ export default function LicitacionDetalle() {
           </Card>
 
           <RiesgoOrganismoCard codigo={licitacion.codigo} organismo={licitacion.organismo} />
+
+          <MediosOrganismoCard codigo={licitacion.codigo} organismo={licitacion.organismo} />
 
           {/* Buyer Info */}
           <Card>
