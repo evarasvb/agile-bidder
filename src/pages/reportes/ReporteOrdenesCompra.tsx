@@ -127,7 +127,7 @@ export default function ReporteOrdenesCompra() {
           case "proveedor": return (o.proveedor_nombre || "—") === f.value;
           case "mes": return (o.fecha_creacion?.slice(0, 7) || "—") === f.value;
           case "producto": return (o.items || []).some((i) => i.nombre_producto === f.value);
-          case "categoria": return (o.items || []).some((i) => clasificarRubro(i.nombre_producto, i.descripcion).id === f.value);
+          case "categoria": return (o.items || []).some((i) => (i.categoria ? i.categoria : clasificarRubro(i.nombre_producto, i.descripcion).id) === f.value);
           default: return true;
         }
       })
@@ -174,7 +174,8 @@ export default function ReporteOrdenesCompra() {
     const map = new Map<string, { key: string; label: string; monto: number; ordenes: Set<string> }>();
     for (const o of ordenesFiltradas) {
       for (const it of o.items || []) {
-        const r = clasificarRubro(it.nombre_producto, it.descripcion);
+        // Rubro real (Datos Abiertos) si viene; si no, se adivina por keywords.
+        const r = it.categoria ? { id: it.categoria, label: it.categoria } : clasificarRubro(it.nombre_producto, it.descripcion);
         const cur = map.get(r.id) || { key: r.id, label: r.label, monto: 0, ordenes: new Set<string>() };
         cur.monto += it.total_neto || 0;
         cur.ordenes.add(o.id);
