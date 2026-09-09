@@ -205,7 +205,9 @@ async function leerBasesPendientes(sb: SupabaseClient, deadline: number, codigo?
         // Escaneado, ilegible, formato raro, demasiado grande o que agota el tiempo de experto-bases (504):
         // no se reintenta. Otros errores (Gemini caído, 5xx transitorio distinto) sí.
         console.log(`bases no leídas ${f.codigo} ${f.nombre}: ${j.error ?? r.status}`);
-        if (["sin_texto", "lectura", "no_pdf", "tamano", "codigo"].includes(String(j.error)) || r.status === 504) await sb.from("licitaciones_adjuntos").update({ bases_pendiente: false }).eq("id", f.id);
+        // PDF sin capa de texto: pasa a la cola de OCR (Tesseract en GitHub Actions), que lo reencola con texto.
+        const escaneado = j.error === "sin_texto" && (f.content_type ?? "").includes("pdf");
+        if (["sin_texto", "lectura", "no_pdf", "tamano", "codigo"].includes(String(j.error)) || r.status === 504) await sb.from("licitaciones_adjuntos").update({ bases_pendiente: false, ocr_pendiente: escaneado }).eq("id", f.id);
       }
     } catch (e) {
       console.log(`bases timeout ${f.codigo} ${f.nombre}: ${String(e).slice(0, 80)}`); // queda pendiente para la próxima pasada

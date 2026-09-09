@@ -10,7 +10,7 @@ import JSZip from "npm:jszip@3.10.1";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-codigo, x-nombre",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-codigo, x-nombre, x-ocr-ia",
 };
 const MAX_PDF_BYTES = 20 * 1024 * 1024;
 const MAX_TEXTO = 400_000;
@@ -85,8 +85,10 @@ async function resumir(texto: string, plazo = Date.now() + 100_000): Promise<Rec
  "multas_y_clausulas_riesgosas":["multa o cláusula con su monto/porcentaje y por qué es riesgosa"],
  "advertencias":["cualquier cosa rara: criterios subjetivos, experiencia imposible de acreditar, plazos de entrega irreales, exclusividad, etc."]}
 Si algo no está en el texto, usa null o lista vacía. No inventes.`;
-  // Google devuelve 503 por alta demanda a ratos: segunda pasada por todos los modelos tras una pausa.
-  for (const model of [...MODELOS, "espera", ...MODELOS]) {
+  // Primero el modelo lite (cuota gratis amplia); los grandes solo si falla. Google devuelve 503 por
+  // alta demanda a ratos: segunda pasada por todos los modelos tras una pausa.
+  const orden = [...new Set(["gemini-3.5-flash-lite", ...MODELOS])];
+  for (const model of [...orden, "espera", ...orden]) {
     if (model === "espera") { await new Promise((ok) => setTimeout(ok, 2500)); continue; }
     if (Date.now() > plazo - 10_000) break;
     try {
@@ -214,9 +216,11 @@ Deno.serve(async (req) => {
       console.error("extract", String(e));
       return json({ error: "lectura", mensaje: "No pude leer ese archivo. Prueba con otro archivo o con la versión con texto." }, 422);
     }
-    // PDF escaneado (1 de cada 4 en Mercado Público): OCR con Gemini antes de darlo por ilegible.
+    // PDF escaneado (1 de cada 4 en Mercado Público): el OCR normal lo hace Tesseract en GitHub Actions
+    // (workflow ocr-bases, gratis e ilimitado) y reencola el PDF con capa de texto. El OCR con Gemini
+    // queda como último recurso y solo si quien llama lo pide (cabecera X-OCR-IA).
     let ocr = false;
-    if (texto.length < 200 && esPdf && bytes.length <= MAX_OCR_BYTES) {
+    if (texto.length < 200 && esPdf && bytes.length <= MAX_OCR_BYTES && req.headers.get("x-ocr-ia") === "1") {
       texto = await ocrPdf(bytes, t0 + 170_000);
       ocr = texto.length >= 200;
     }
