@@ -16,6 +16,9 @@ const MAX_PDF_BYTES = 20 * 1024 * 1024;
 const MAX_TEXTO = 400_000;
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+const GEMINI_NATIVE = "https://generativelanguage.googleapis.com/v1beta/models";
+// PDF escaneado: se manda entero a Gemini (lee las páginas como imágenes). Sobre 6 MB el base64 no cabe en el tiempo.
+const MAX_OCR_BYTES = 6 * 1024 * 1024;
 const MODELOS = [Deno.env.get("GEMINI_MODEL_INFORME"), "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.5-flash-lite"].filter(Boolean) as string[];
 
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...cors, "Content-Type": "application/json" } });
@@ -38,11 +41,14 @@ function limpiar(t: string): string {
 const desXml = (s: string) => s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'");
 
 // Word (.docx): texto de word/document.xml; párrafos como líneas y celdas separadas por " | ".
+// Con control de cambios activo, el XML conserva el texto borrado (<w:del>, <w:moveFrom>): se quita
+// antes de aplanar para no resucitar precios o plazos ya reemplazados.
 async function textoDocx(bytes: Uint8Array): Promise<string> {
   const zip = await JSZip.loadAsync(bytes);
   const xml = await zip.file("word/document.xml")?.async("string");
   if (!xml) throw new Error("docx_vacio");
-  return limpiar(desXml(xml.replace(/<\/w:p>/g, "\n").replace(/<w:tab\/>/g, "\t").replace(/<\/w:tc>/g, " | ").replace(/<w:br[^>]*\/>/g, "\n").replace(/<[^>]+>/g, "")));
+  const vigente = xml.replace(/<w:del\b[\s\S]*?<\/w:del>/g, "").replace(/<w:moveFrom\b[\s\S]*?<\/w:moveFrom>/g, "").replace(/<w:delText\b[^>]*>[\s\S]*?<\/w:delText>/g, "");
+  return limpiar(desXml(vigente.replace(/<\/w:p>/g, "\n").replace(/<w:tab\/>/g, "\t").replace(/<\/w:tc>/g, " | ").replace(/<w:br[^>]*\/>/g, "\n").replace(/<[^>]+>/g, "")));
 }
 
 // Secciones por encabezados típicos de bases chilenas; las largas se parten en trozos de ~3.500 caracteres.
@@ -103,6 +109,35 @@ Si algo no está en el texto, usa null o lista vacía. No inventes.`;
     } catch (e) { console.error("resumen", model, String(e)); }
   }
   return null;
+}
+
+// OCR de un PDF sin capa de texto (escaneado): Gemini transcribe página por página. Primero el modelo
+// lite (más cuota y más barato por token de salida); si falla, los demás. Devuelve "" si no se pudo.
+async function ocrPdf(bytes: Uint8Array, plazo: number): Promise<string> {
+  const key = Deno.env.get("GEMINI_API_KEY");
+  if (!key) return "";
+  let b64 = ""; for (let i = 0; i < bytes.length; i += 0x8000) b64 += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); b64 = btoa(b64);
+  const prompt = "Transcribe TODO el texto de este documento, página por página y en orden, tal como está escrito (español). Conserva títulos, numeración de artículos y tablas (filas separadas por ' | '). No resumas ni comentes.";
+  for (const model of [...new Set(["gemini-3.5-flash-lite", ...MODELOS])]) {
+    const restante = plazo - Date.now();
+    if (restante < 20_000) break;
+    try {
+      const r = await fetch(`${GEMINI_NATIVE}/${model}:generateContent`, {
+        method: "POST", signal: AbortSignal.timeout(restante),
+        headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ inline_data: { mime_type: "application/pdf", data: b64 } }, { text: prompt }] }],
+          generationConfig: { temperature: 0, maxOutputTokens: 60000 },
+        }),
+      });
+      if (!r.ok) { console.error("ocr", model, r.status, (await r.text()).slice(0, 200)); continue; }
+      const j = await r.json();
+      const t = ((j.candidates?.[0]?.content?.parts ?? []) as { text?: string }[]).map((p) => p.text ?? "").join("\n");
+      if (t.trim().length >= 200) return limpiar(t);
+      console.error("ocr", model, "sin texto", String(j.candidates?.[0]?.finishReason ?? ""));
+    } catch (e) { console.error("ocr", model, String(e)); }
+  }
+  return "";
 }
 
 Deno.serve(async (req) => {
@@ -172,12 +207,18 @@ Deno.serve(async (req) => {
       console.error("extract", String(e));
       return json({ error: "lectura", mensaje: "No pude leer ese archivo. Prueba con otro archivo o con la versión con texto." }, 422);
     }
-    if (texto.length < 200) return json({ error: "sin_texto", mensaje: esDocx ? "El Word viene casi vacío: no trae texto para leer." : `El PDF (${paginas} páginas) parece escaneado: no trae texto. Sube la versión con texto seleccionable.` }, 422);
+    // PDF escaneado (1 de cada 4 en Mercado Público): OCR con Gemini antes de darlo por ilegible.
+    let ocr = false;
+    if (texto.length < 200 && esPdf && bytes.length <= MAX_OCR_BYTES) {
+      texto = await ocrPdf(bytes, t0 + 170_000);
+      ocr = texto.length >= 200;
+    }
+    if (texto.length < 200) return json({ error: "sin_texto", mensaje: esDocx ? "El Word viene casi vacío: no trae texto para leer." : `El PDF (${paginas} páginas) parece escaneado y no pude transcribirlo. Sube la versión con texto seleccionable.` }, 422);
     texto = texto.slice(0, MAX_TEXTO);
     const secciones = seccionar(texto);
 
-    // 2. Resumen estructurado
-    const resumen = await resumir(texto, t0 + 120_000);
+    // 2. Resumen estructurado (si hubo OCR, se le da su propio tiempo)
+    const resumen = await resumir(texto, Math.max(t0 + 120_000, Date.now() + 90_000));
 
     // 3. Archivo original (mejor esfuerzo) y fila
     // Storage rechaza claves con tildes o símbolos: la ruta va sin ellos (el nombre original queda en la fila).
@@ -190,7 +231,7 @@ Deno.serve(async (req) => {
     }).select("id").single();
     if (error) return json({ error: error.message }, 500);
 
-    return json({ ok: true, id: fila.id, codigo, archivo: nombre, paginas, caracteres: texto.length, secciones: secciones.length, resumen, ms: Date.now() - t0 });
+    return json({ ok: true, id: fila.id, codigo, archivo: nombre, paginas, caracteres: texto.length, secciones: secciones.length, ocr, resumen, ms: Date.now() - t0 });
   } catch (e) {
     return json({ error: String((e as Error)?.message ?? e) }, 500);
   }

@@ -69,7 +69,9 @@ async function extraer(nombre: string, bytes: Uint8Array): Promise<{ tipo: strin
     const zip = await JSZip.loadAsync(bytes);
     const xml = await zip.file("word/document.xml")?.async("string");
     if (!xml) throw new Error("docx sin contenido");
-    const texto = xml.replace(/<\/w:p>/g, "\n").replace(/<w:tab\/>/g, "\t").replace(/<\/w:tc>/g, " | ").replace(/<[^>]+>/g, "");
+    // Texto borrado por control de cambios (<w:del>, <w:moveFrom>) no es parte del documento vigente.
+    const vigente = xml.replace(/<w:del\b[\s\S]*?<\/w:del>/g, "").replace(/<w:moveFrom\b[\s\S]*?<\/w:moveFrom>/g, "").replace(/<w:delText\b[^>]*>[\s\S]*?<\/w:delText>/g, "");
+    const texto = vigente.replace(/<\/w:p>/g, "\n").replace(/<w:tab\/>/g, "\t").replace(/<\/w:tc>/g, " | ").replace(/<[^>]+>/g, "");
     return { tipo: "docx", texto: limpiar(desXml(texto)) };
   }
   if (MIME_IMG[ext]) return { tipo: "imagen", texto: limpiar(await leerImagen(bytes, MIME_IMG[ext])) };
