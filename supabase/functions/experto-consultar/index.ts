@@ -195,7 +195,7 @@ Deno.serve(async (req) => {
     }
 
     // Detección de código de licitación en la pregunta
-    const m = (pregunta + " " + (codigo ?? "")).match(/\b\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2}\b/i);
+    const m = (pregunta + " " + (codigo ?? "")).match(/\b\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}\b/i);
     if (m) codigo = m[0].toUpperCase();
     if (modo === "informe" && !codigo) {
       return new Response(JSON.stringify({ error: "falta_codigo", mensaje: "Indica el ID de la licitación (ej. 2699-35-LE26)." }), { status: 400, headers: { ...cors, "Content-Type": "application/json" } });
