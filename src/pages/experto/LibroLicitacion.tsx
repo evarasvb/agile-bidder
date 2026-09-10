@@ -39,7 +39,7 @@ import { descargarCotizacionPDF, type ItemCotizacion, type DatosCotizacion } fro
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string;
 const ANON = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
 const fmt = (n: unknown) => n == null ? 's/i' : '$' + Math.round(Number(n)).toLocaleString('es-CL');
-const RE_ID = /\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2}/;
+const RE_ID = /\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}/;
 const idEn = (t: string) => t.toUpperCase().match(RE_ID)?.[0];
 // Citas [n] como en NotebookLM: clic abre la fuente (o despliega la lista si no tiene link); al pasar el mouse muestra cuál es.
 const conCitas = (html: string, fuentes?: any[]) => html.replace(/\[(\d{1,2})\]/g, (_m, n) => {
