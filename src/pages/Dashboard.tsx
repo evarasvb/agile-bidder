@@ -57,6 +57,7 @@ import {
   ChartSkeleton,
 } from "@/components/dashboard/DashboardSkeleton";
 import { PrimerosPasos } from "@/components/dashboard/PrimerosPasos";
+import { TutorialBienvenida } from "@/components/dashboard/TutorialBienvenida";
 import { ResumenEjecutivo } from "@/components/dashboard/ResumenEjecutivo";
 import { FirmaVBHeader } from "@/components/layout/FirmaVBHeader";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -152,6 +153,7 @@ export default function Dashboard() {
           subtitle="Resumen de oportunidades y rendimiento"
         />
         <div className="flex items-center gap-3">
+          <TutorialBienvenida />
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
