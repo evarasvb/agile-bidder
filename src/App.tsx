@@ -30,6 +30,7 @@ const WebinarConvenioMarcoSaas = lazy(() => import("./pages/WebinarConvenioMarco
 const WebinarVendeleAlEstado = lazy(() => import("./pages/WebinarVendeleAlEstado"));
 const AcademiaCurso = lazy(() => import("./pages/AcademiaCurso"));
 const AcademiaLeads = lazy(() => import("./pages/AcademiaLeads"));
+const ProveedoresEstado = lazy(() => import("./pages/ProveedoresEstado"));
 const Auth = lazy(() => import("./pages/Auth"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const ClienteOnboarding = lazy(() => import("./pages/ClienteOnboarding"));
@@ -207,6 +208,7 @@ const App = () => (
 
             {/* ----- ACADEMIA (contactos del formulario público) ----- */}
             <Route path="/academia/leads" element={<AdminOnlyRoute><AcademiaLeads /></AdminOnlyRoute>} />
+            <Route path="/proveedores-estado" element={<AdminOnlyRoute><ProveedoresEstado /></AdminOnlyRoute>} />
 
             {/* ----- EQUIPO ----- */}
             <Route path="/equipo" element={<Equipo />} />
