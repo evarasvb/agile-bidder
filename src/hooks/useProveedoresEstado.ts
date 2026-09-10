@@ -13,16 +13,35 @@ export interface ProveedorEstado {
   ultima_fecha: string | null;
 }
 
-export function useProveedoresEstado(q: string, limit = 50) {
+export function useProveedoresEstado(q: string, rubro = '', institucion = '', limit = 50) {
   const term = q.trim();
   return useQuery({
-    queryKey: ['proveedores-estado', term, limit],
+    queryKey: ['proveedores-estado', term, rubro, institucion.trim(), limit],
     queryFn: async (): Promise<ProveedorEstado[]> => {
-      const { data, error } = await (supabase as any).rpc('proveedores_estado', { q: term || null, lim: limit, off: 0 });
+      const { data, error } = await (supabase as any).rpc('proveedores_estado', {
+        q: term || null,
+        rubro: rubro || null,
+        institucion: institucion.trim() || null,
+        lim: limit,
+        off: 0,
+      });
       if (error) throw error;
       return (data || []) as ProveedorEstado[];
     },
     staleTime: 60000,
+  });
+}
+
+// Lista de rubros (RubroN1) para el desplegable del filtro. Solo admin.
+export function useRubrosEstado() {
+  return useQuery({
+    queryKey: ['rubros-estado'],
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await (supabase as any).rpc('rubros_estado');
+      if (error) throw error;
+      return ((data || []) as { rubro: string }[]).map((r) => r.rubro).filter(Boolean);
+    },
+    staleTime: 300000,
   });
 }
 

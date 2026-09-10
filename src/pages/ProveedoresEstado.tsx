@@ -3,10 +3,12 @@
 // (ruta AdminOnlyRoute + RPC security-definer). No trae correos (Mercado Público no
 // los expone); sirve para saber a quién conviene contactar y priorizar.
 import { Fragment, useMemo, useState } from "react";
-import { useProveedoresEstado, useProveedorEstadoDetalle, type ProveedorEstado } from "@/hooks/useProveedoresEstado";
+import { useProveedoresEstado, useProveedorEstadoDetalle, useRubrosEstado, type ProveedorEstado } from "@/hooks/useProveedoresEstado";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Building2, Search, Store, Tags, TrendingUp } from "lucide-react";
@@ -49,8 +51,12 @@ function DetalleProveedor({ rut }: { rut: string }) {
 
 export default function ProveedoresEstado() {
   const [q, setQ] = useState("");
-  const { data: proveedores = [], isLoading } = useProveedoresEstado(q, 50);
+  const [rubro, setRubro] = useState("");
+  const [institucion, setInstitucion] = useState("");
+  const { data: rubros = [] } = useRubrosEstado();
+  const { data: proveedores = [], isLoading } = useProveedoresEstado(q, rubro, institucion, 50);
   const [abierto, setAbierto] = useState<string | null>(null);
+  const hayFiltro = !!(q.trim() || rubro || institucion.trim());
 
   const totales = useMemo(() => {
     const monto = proveedores.reduce((s, p) => s + Number(p.monto_2026 || 0), 0);
@@ -68,19 +74,35 @@ export default function ProveedoresEstado() {
       </div>
 
       <Card>
-        <CardContent className="pt-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <CardContent className="pt-6 space-y-3">
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Proveedor por nombre o RUT…"
+                className="pl-9"
+              />
+            </div>
+            <Select value={rubro || "__all__"} onValueChange={(v) => setRubro(v === "__all__" ? "" : v)}>
+              <SelectTrigger><SelectValue placeholder="Todos los rubros" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Todos los rubros</SelectItem>
+                {rubros.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+              </SelectContent>
+            </Select>
             <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Buscar proveedor por nombre o RUT…"
-              className="pl-9"
+              value={institucion}
+              onChange={(e) => setInstitucion(e.target.value)}
+              placeholder="Institución (ej: municipalidad, salud)…"
             />
           </div>
-          {q.trim() === "" && (
-            <p className="text-xs text-muted-foreground mt-2">Mostrando el top por monto 2026. Escribe para buscar cualquier proveedor.</p>
-          )}
+          <div className="flex items-center gap-3">
+            {hayFiltro
+              ? <Button variant="ghost" size="sm" onClick={() => { setQ(""); setRubro(""); setInstitucion(""); }}>Limpiar filtros</Button>
+              : <p className="text-xs text-muted-foreground">Mostrando el top por monto 2026. Filtra por nombre, rubro o institución.</p>}
+          </div>
         </CardContent>
       </Card>
 
