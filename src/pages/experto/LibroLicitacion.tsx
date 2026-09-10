@@ -454,6 +454,16 @@ export default function LibroLicitacion() {
   const f = libro?.ficha; const o = f?.organismo ?? {};
   const bases: any[] = libro?.bases ?? [];
   const documentos: any[] = libro?.documentos ?? [];
+  // Apenas se abre el libro, si nadie ha subido bases todavía se intenta traerlas solo desde
+  // Mercado Público (silencioso, sin toasts): la mayoría de las veces el cliente ni se entera
+  // de que hizo falta un paso, las bases ya están cuando pregunta. Un intento por código.
+  const autoBasesIntentado = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!libro || !cod || autoBasesIntentado.current.has(cod)) return;
+    autoBasesIntentado.current.add(cod);
+    if (!bases.length) traerAdjuntos.mutate(undefined, { onError: () => {} });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [libro, cod]);
   const top: any[] = libro?.top_adjudicatarios ?? [];
   const esPro = libro?.plan && libro.plan !== 'free';
   // Cuota del modo Bajo el Agua (1 gratis de por vida; después según plan, configurable en la base).
@@ -549,7 +559,7 @@ export default function LibroLicitacion() {
               </div>
               <div>
                 <p className="font-medium flex items-center gap-1"><Upload className="h-4 w-4" />Fuentes subidas · bases (PDF)</p>
-                {bases.length ? bases.map((b) => <p key={b.id} className="text-muted-foreground truncate">{b.archivo} · {b.paginas} pág.</p>) : <p className="text-muted-foreground">Nadie las ha subido aún.</p>}
+                {bases.length ? bases.map((b) => <p key={b.id} className="text-muted-foreground truncate">{b.archivo} · {b.paginas} pág.</p>) : traerAdjuntos.isPending ? <p className="text-muted-foreground flex items-center gap-1"><Loader2 className="h-3.5 w-3.5 animate-spin" />Buscando las bases en Mercado Público…</p> : <p className="text-muted-foreground">Mercado Público no las tiene publicadas todavía (o el robot no las encontró). Tráelas de nuevo o súbelas tú abajo.</p>}
                 <input ref={fileRef} type="file" multiple accept=".pdf,.xlsx,.xls,.xlsm,.csv,.docx,.txt,.md,.png,.jpg,.jpeg,.gif,.webp" className="hidden" onChange={(e) => { if (e.target.files?.length) subirFuentes(e.target.files); e.target.value = ''; }} />
                 <Button size="sm" variant="outline" className="mt-1 mr-2" onClick={traerBasesMP} disabled={!!ocupado || traerAdjuntos.isPending} title="Baja las bases y anexos publicados en la ficha de Mercado Público y el Experto los lee">
                   {traerAdjuntos.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Download className="h-4 w-4 mr-1" />}Traer bases desde Mercado Público
@@ -652,7 +662,19 @@ export default function LibroLicitacion() {
                     e.preventDefault(); const d = document.getElementById(`fuentes-${i}`) as HTMLDetailsElement | null; if (d) d.open = true;
                     const fila = document.getElementById(`fuente-${i}-${a.dataset.n}`); if (fila) { fila.scrollIntoView({ block: 'nearest' }); fila.classList.add('bg-yellow-100'); setTimeout(() => fila.classList.remove('bg-yellow-100'), 1500); }
                   }} /> : <span className="text-muted-foreground">Buscando en las fuentes…</span>}
-                  {m.pedirBases && <p className="mt-2 text-xs text-muted-foreground">Sube las bases en el panel de Fuentes y vuelve a preguntar.</p>}
+                  {m.pedirBases && (
+                    <div className="mt-2 rounded-md border border-firmavb-blue/30 bg-firmavb-blue/5 px-2 py-2 text-xs space-y-1.5">
+                      <p>Para esto necesito las bases en PDF y todavía no las tengo — Mercado Público puede no haberlas publicado, o el robot aún no las encontró. Mientras tanto te respondo con lo que sé.</p>
+                      <div className="flex flex-wrap gap-1">
+                        <Button size="sm" variant="outline" className="h-7" disabled={traerAdjuntos.isPending} onClick={traerBasesMP}>
+                          {traerAdjuntos.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Download className="h-3.5 w-3.5 mr-1" />}Reintentar desde Mercado Público
+                        </Button>
+                        <Button size="sm" className="h-7" onClick={() => { if (!escritorio) { setVista('fuentes'); setTimeout(() => fileRef.current?.click(), 150); } else fileRef.current?.click(); }}>
+                          <Upload className="h-3.5 w-3.5 mr-1" />Subir bases (PDF)
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                   {!cod && m.texto && idEn(msgs[i - 1]?.texto ?? '') && <Button size="sm" variant="outline" className="mt-2" onClick={() => navigate(`/experto/libro/${idEn(msgs[i - 1].texto)}`)}><BookOpen className="h-3.5 w-3.5 mr-1" />Abrir el libro de {idEn(msgs[i - 1].texto)}</Button>}
                   {m.texto && m.fuentes && m.fuentes.length > 0 && (
                     <details id={`fuentes-${i}`} className="mt-2 text-xs text-muted-foreground"><summary className="cursor-pointer">Fuentes ({m.fuentes.length}) · haz clic en un [n] del texto para ver de dónde salió</summary>
