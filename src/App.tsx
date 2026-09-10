@@ -27,6 +27,7 @@ import { UpgradeProProvider } from "@/components/pro/UpgradeProProvider";
 const Index = lazy(() => import("./pages/Index"));
 const Academia = lazy(() => import("./pages/Academia"));
 const WebinarConvenioMarcoSaas = lazy(() => import("./pages/WebinarConvenioMarcoSaas"));
+const WebinarVendeleAlEstado = lazy(() => import("./pages/WebinarVendeleAlEstado"));
 const AcademiaCurso = lazy(() => import("./pages/AcademiaCurso"));
 const AcademiaLeads = lazy(() => import("./pages/AcademiaLeads"));
 const Auth = lazy(() => import("./pages/Auth"));
@@ -155,6 +156,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/academia" element={<Academia />} />
           <Route path="/webinar/convenio-marco-saas" element={<WebinarConvenioMarcoSaas />} />
+          <Route path="/webinar/vendele-al-estado" element={<WebinarVendeleAlEstado />} />
           <Route path="/academia/curso/:slug" element={<AcademiaCurso />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/experto/c/:token" element={<Compartido />} />
