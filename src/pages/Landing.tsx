@@ -35,7 +35,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Link, useNavigate } from "react-router-dom";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { DemoModal } from "@/components/landing/DemoModal";
 import { LandingChat, LandingChatButton } from "@/components/landing/LandingChat";
@@ -49,9 +49,15 @@ export default function Landing() {
   const [searchQuery, setSearchQuery] = useState("");
   const [teaserTermino, setTeaserTermino] = useState("");
   const [demoOpen, setDemoOpen] = useState(false);
-  const { isAuthenticated, signOut, user } = useAuth();
+  const { isAuthenticated, signOut, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const teaserRef = useRef<HTMLDivElement>(null);
+
+  // Si ya tienes sesión, entras directo a la plataforma (antes te quedabas en la
+  // portada con un botón "Dashboard" poco visible y parecía que el login no pasó).
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) navigate('/dashboard', { replace: true });
+  }, [authLoading, isAuthenticated, navigate]);
 
   const handleLogout = async () => {
     await signOut();
