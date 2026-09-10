@@ -24,6 +24,7 @@ const MAX_BYTES = 30 * 1024 * 1024;
 // experto-bases corre en una sola petición (tope ~150 s de la plataforma): sobre 6 MB no alcanza a leer.
 const MAX_BASES_BYTES = 6 * 1024 * 1024;
 const MAX_BASES_POR_LIC = 5;
+const MAX_ANEXOS_POR_LIC = 10;
 const PRESUPUESTO_MS = 110_000;
 // Leer bases (unpdf + Gemini sobre PDF grandes) puede pasar los 2 minutos: en modo bases se usa
 // casi todo el tope del plan Pro (400 s). pg_net corta su espera a los 120 s, pero la corrida sigue.
@@ -144,9 +145,10 @@ async function procesar(sb: SupabaseClient, codigo: string, deadline: number, le
           const up = await sb.storage.from(BUCKET).upload(storagePath, bytes, { contentType, upsert: true });
           if (up.error) { res.errores.push(`${f.nombre}: storage ${up.error.message}`); continue; }
 
-          // PDF o Word que parece bases: queda pendiente para que el Experto lo lea (texto + resumen).
-          const pinta = `${f.nombre} ${f.tipo ?? ""} ${f.descripcion ?? ""}`;
-          const basesPendiente = (esPdf || esDocx) && bytes.length <= MAX_BASES_BYTES && !basesNombres.has(f.nombre) && RE_BASES.test(pinta) && !RE_NO_BASES.test(f.nombre);
+          // Todo PDF o Word (bases o anexo) queda pendiente para que el Experto lo lea: la bases
+          // principal se resume con Gemini, los anexos solo se leen (leerBasesPendientes decide
+          // el tipo con el mismo criterio de siempre, RE_BASES/RE_NO_BASES, y lo avisa a experto-bases).
+          const basesPendiente = (esPdf || esDocx) && bytes.length <= MAX_BASES_BYTES && !basesNombres.has(f.nombre);
           const { error: errFila } = await sb.from("licitaciones_adjuntos").upsert({
             codigo, nombre: f.nombre, tipo: f.tipo, descripcion: f.descripcion, fecha_adjunto: f.fecha, bytes: bytes.length,
             content_type: contentType, storage_path: storagePath, es_bases: false, bases_id: null, bases_pendiente: basesPendiente, bajado_en: new Date().toISOString(),
@@ -179,12 +181,12 @@ async function leerBasesPendientes(sb: SupabaseClient, deadline: number, codigo?
   // Se saltan las filas que otra corrida tomó hace menos de 10 minutos (el cron puede solaparse).
   const hace10 = new Date(Date.now() - 10 * 60_000).toISOString();
   // Primero los que nunca se intentaron: un archivo que falla siempre no bloquea al resto de la cola.
-  let q = sb.from("licitaciones_adjuntos").select("id, codigo, nombre, storage_path, bytes, content_type, ocr_hecho, bases_intentos").eq("bases_pendiente", true)
+  let q = sb.from("licitaciones_adjuntos").select("id, codigo, nombre, tipo, descripcion, storage_path, bytes, content_type, ocr_hecho, bases_intentos").eq("bases_pendiente", true)
     .or(`bases_intento_en.is.null,bases_intento_en.lt.${hace10}`).order("bases_intento_en", { ascending: true, nullsFirst: true }).order("bajado_en").limit(limite);
   if (codigo) q = q.eq("codigo", codigo);
   const { data: filas } = await q;
   const sk = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  for (const f of (filas ?? []) as { id: string; codigo: string; nombre: string; storage_path: string; bytes: number; content_type: string | null; ocr_hecho: boolean | null; bases_intentos: number | null }[]) {
+  for (const f of (filas ?? []) as { id: string; codigo: string; nombre: string; tipo: string | null; descripcion: string | null; storage_path: string; bytes: number; content_type: string | null; ocr_hecho: boolean | null; bases_intentos: number | null }[]) {
     const restante = deadline - Date.now();
     if (restante < MIN_MS_LECTURA) break;
     // Tres intentos fallidos (errores raros de Gemini, Storage o Postgres) y el archivo sale de la cola.
@@ -192,14 +194,19 @@ async function leerBasesPendientes(sb: SupabaseClient, deadline: number, codigo?
     await sb.from("licitaciones_adjuntos").update({ bases_intento_en: new Date().toISOString(), bases_intentos: intentos, ...(intentos > 3 ? { bases_pendiente: false } : {}) }).eq("id", f.id);
     if (intentos > 3) { console.log(`bases descartada tras ${intentos - 1} intentos ${f.codigo} ${f.nombre}`); continue; }
     if (f.bytes > MAX_BASES_BYTES) { await sb.from("licitaciones_adjuntos").update({ bases_pendiente: false }).eq("id", f.id); continue; }
-    const { count } = await sb.from("bases_licitacion").select("id", { count: "exact", head: true }).eq("codigo", f.codigo);
-    if ((count ?? 0) >= MAX_BASES_POR_LIC) { await sb.from("licitaciones_adjuntos").update({ bases_pendiente: false }).eq("id", f.id); continue; }
+    // Mismo criterio que al bajarlo: si parece la bases principal se resume con Gemini; si no
+    // (formulario, anexo, acta, declaración) solo se lee el texto, sin gastar cuota de resumen.
+    const pinta = `${f.nombre} ${f.tipo ?? ""} ${f.descripcion ?? ""}`;
+    const tipoDoc = RE_BASES.test(pinta) && !RE_NO_BASES.test(f.nombre) ? "bases" : "anexo";
+    const tope = tipoDoc === "bases" ? MAX_BASES_POR_LIC : MAX_ANEXOS_POR_LIC;
+    const { count } = await sb.from("bases_licitacion").select("id", { count: "exact", head: true }).eq("codigo", f.codigo).eq("tipo", tipoDoc);
+    if ((count ?? 0) >= tope) { await sb.from("licitaciones_adjuntos").update({ bases_pendiente: false }).eq("id", f.id); continue; }
     const { data: blob, error: errBajar } = await sb.storage.from(BUCKET).download(f.storage_path);
     if (errBajar || !blob) { console.error("bases download", f.storage_path, errBajar?.message); await sb.from("licitaciones_adjuntos").update({ bases_pendiente: false }).eq("id", f.id); continue; }
     try {
       const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/experto-bases`, {
         method: "POST", body: await blob.arrayBuffer(), signal: AbortSignal.timeout(restante - 5000),
-        headers: { "Content-Type": f.content_type || "application/pdf", Authorization: `Bearer ${sk}`, apikey: sk, "X-Codigo": f.codigo, "X-Nombre": encodeURIComponent(f.nombre) },
+        headers: { "Content-Type": f.content_type || "application/pdf", Authorization: `Bearer ${sk}`, apikey: sk, "X-Codigo": f.codigo, "X-Nombre": encodeURIComponent(f.nombre), "X-Tipo-Doc": tipoDoc },
       });
       const j = await r.json().catch(() => ({}));
       if (r.ok && j.id) {
