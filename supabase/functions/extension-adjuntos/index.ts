@@ -14,9 +14,8 @@ const BUCKET = "bases-licitacion";
 const MAX_BYTES = 30 * 1024 * 1024;
 const MAX_BASES_BYTES = 6 * 1024 * 1024;
 const RE_CODIGO = /^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}$/;
-const RE_BASES = /bases|resol|administrativ|t[ée]cnic|licitaci|aprueba/i;
-// Formularios para llenar ("Anexo 2 - Aceptación de Bases") no son bases aunque las nombren.
-const RE_NO_BASES = /^\s*(anexo|formulario|formato|declaraci[oó]n|carta|acta)/i;
+// La clasificación bases/anexo (RE_BASES/RE_NO_BASES) la hace leerBasesPendientes en
+// licitacion-adjuntos al leer, con los mismos nombre/tipo/descripcion guardados aquí.
 const MIME: Record<string, string> = {
   pdf: "application/pdf",
   doc: "application/msword",
@@ -73,10 +72,10 @@ Deno.serve(async (req) => {
     if (up.error) return json({ error: "storage", mensaje: up.error.message }, 500);
 
     const { data: yaLeida } = await sb.from("bases_licitacion").select("id").eq("codigo", codigo).eq("archivo", nombre).limit(1);
-    // En una compra ágil todo PDF adjunto son los términos de referencia: el Experto lo lee siempre.
-    const esCompraAgil = /-COT\d{2}$/.test(codigo) || /compra\s*[áa]gil/i.test(tipo);
     const esDocx = !esPdf && ext === "docx" && bytes[0] === 0x50 && bytes[1] === 0x4b;
-    const basesPendiente = (esPdf || esDocx) && bytes.length <= MAX_BASES_BYTES && !(yaLeida ?? []).length && (esCompraAgil || (RE_BASES.test(`${nombre} ${descripcion ?? ""}`) && !RE_NO_BASES.test(nombre)));
+    // Todo PDF o Word (bases o anexo) se lee: la bases principal se resume con Gemini, los demás
+    // adjuntos vivos (anexos, formularios) solo se leen para que el Experto los cite, sin gastar cuota.
+    const basesPendiente = (esPdf || esDocx) && bytes.length <= MAX_BASES_BYTES && !(yaLeida ?? []).length;
     const { error: errFila } = await sb.from("licitaciones_adjuntos").upsert({
       codigo, nombre, tipo, descripcion, fecha_adjunto: null, bytes: bytes.length, content_type: contentType, storage_path: storagePath,
       es_bases: false, bases_id: null, bases_pendiente: basesPendiente, bajado_en: new Date().toISOString(),

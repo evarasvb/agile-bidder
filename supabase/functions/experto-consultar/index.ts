@@ -112,6 +112,26 @@ ${elegidas.map((c) => `## ${c.s.titulo}\n${c.s.texto}`).join("\n\n") || "(sin se
   });
   return out.join("\n\n");
 }
+// Anexos y demás adjuntos vivos de la licitación (formularios, actas, declaraciones): no llevan
+// resumen (no se les gasta cuota de IA), solo las secciones del texto más relacionadas con la pregunta.
+function textoAnexos(anexos: any[], pregunta: string, maxChars: number, nDesde: number, codigo: string): string {
+  const claves = palabrasClave(pregunta).map((w) => w.normalize("NFD").replace(/[̀-ͯ]/g, ""));
+  const norm = (t: string) => t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const out: string[] = [];
+  anexos.forEach((a, i) => {
+    const n = nDesde + i + 1;
+    let presupuesto = Math.max(1500, Math.floor(maxChars / anexos.length));
+    const secs: any[] = Array.isArray(a.secciones) ? a.secciones : [];
+    const puntuadas = secs.map((s, idx) => { const t = norm(String(s.texto ?? "")); return { idx, s, p: claves.length ? claves.reduce((acc, k) => acc + (t.split(k).length - 1), 0) : 0 }; })
+      .sort((x, y) => y.p - x.p || x.idx - y.idx);
+    const elegidas: any[] = [];
+    for (const c of puntuadas) { const len = String(c.s.texto ?? "").length + 40; if (len > presupuesto) continue; elegidas.push(c); presupuesto -= len; if (!claves.length && elegidas.length >= 2) break; }
+    elegidas.sort((x, y) => x.idx - y.idx);
+    out.push(`[${n}] ANEXO/ADJUNTO DE LA LICITACIÓN ${codigo} — archivo "${a.archivo}" (${a.paginas ?? "?"} páginas; documento vivo en el sistema, no es el cuerpo principal de las bases)
+${elegidas.map((c) => `## ${c.s.titulo}\n${c.s.texto}`).join("\n\n") || "(sin contenido relevante para esta pregunta)"}`);
+  });
+  return out.join("\n\n");
+}
 
 const SYS_CHAT = `Eres el Experto FirmaVB, asesor con 17 años vendiéndole al Estado chileno por Mercado Público / ChileCompra.
 Hablas como Evaristo Varas en su libro "Véndele al Estado y No Mueras en el Intento": de tú, cercano, directo, como un amigo que ya pasó por esto y te lo cuenta sin adornos. Frases cortas. Nada de "estimado", "revisor en mano" ni saludos largos; entra al grano en la primera línea. Ejemplos concretos de la calle antes que teoría. Cuando toca, un empujón honesto ("no hay atajos", "no basta con querer ganar, hay que poder cumplir"). Si algo es riesgoso, dilo sin rodeos. Cierra siempre con el paso concreto que daría hoy.
@@ -209,6 +229,7 @@ Deno.serve(async (req) => {
     const tareas: Record<string, Promise<any>> = {};
     if (codigo) tareas.ficha = sb.rpc("experto_ficha_licitacion", { p_codigo: codigo }).then((r) => r.data);
     if (codigo) tareas.bases = sb.rpc("experto_bases_texto", { p_codigo: codigo }).then((r) => r.data ?? []);
+    if (codigo) tareas.anexos = sb.rpc("experto_anexos_texto", { p_codigo: codigo }).then((r) => r.data ?? []);
     if (codigo && userId) tareas.docs = sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: codigo, p_max: 8000 }).then((r) => r.data ?? []);
     if (modo === "chat") {
       if (kws.length) {
@@ -285,9 +306,11 @@ Deno.serve(async (req) => {
       pedirBases = codigo;
       partes.push(`NO HAY BASES CARGADAS para ${codigo}. Si la respuesta requiere las bases (criterios, ponderación, garantías, multas, cláusulas, anexos), dile al usuario que las suba con el botón "Subir bases (PDF)" que aparece bajo esta respuesta: las leerás al instante y quedarán disponibles para todos.`);
     }
+    const anexos: any[] = Array.isArray(res.anexos) ? res.anexos : [];
+    if (codigo && anexos.length) partes.push(textoAnexos(anexos, modo === "chat" ? pregunta : "criterios requisitos plazos garantia formulario declaracion", modo === "chat" ? 8000 : 10000, fragmentos.length + bases.length, codigo));
     if (res.docs?.length) partes.push("DOCUMENTOS DE TRABAJO DEL USUARIO (Excel, Word o PDF que él subió: su matriz, checklist o anexos a medio llenar; úsalos para anotar qué le falta, corregir y ayudarle a completarlos):\n" + res.docs.map((d: any) => `### ${d.nombre} (${d.tipo})\n${d.texto}`).join("\n\n"));
     const noticias: any[] = Array.isArray(res.noticias) ? res.noticias : [];
-    if (noticias.length) partes.push("NOTICIAS RECIENTES (fuente externa, prensa y ChileCompra; distingue lo que dice la prensa de nuestros datos):\n" + noticias.map((n, i) => `[${fragmentos.length + bases.length + i + 1}] ${n.fuente} — ${n.seccion}\n${String(n.texto).slice(0, 700)}`).join("\n\n"));
+    if (noticias.length) partes.push("NOTICIAS RECIENTES (fuente externa, prensa y ChileCompra; distingue lo que dice la prensa de nuestros datos):\n" + noticias.map((n, i) => `[${fragmentos.length + bases.length + anexos.length + i + 1}] ${n.fuente} — ${n.seccion}\n${String(n.texto).slice(0, 700)}`).join("\n\n"));
     if (res.perfil) partes.push(`PERFIL DEL USUARIO (personaliza con esto, sin repetirlo): empresa ${res.perfil.empresa_nombre ?? "s/i"}; rubro ${res.perfil.categoria_negocio ?? "s/i"}; industrias ${(res.perfil.industrias ?? []).join(", ") || "s/i"}; vende/busca: ${(res.perfil.palabras_clave_busqueda ?? []).slice(0, 12).join(", ") || "s/i"}; región ${res.perfil.region ?? "s/i"}.`);
     if (res.memoria?.length) partes.push("LO QUE ESTE USUARIO PIDIÓ MEJORAR EN RESPUESTAS ANTERIORES (tenlo en cuenta):\n" + res.memoria.map((m: any) => `- ${m.util === false ? "No le sirvió" : "Comentó"} en "${String(m.pregunta ?? "").slice(0, 80)}": ${m.comentario}`).join("\n"));
     if (tareas.lic && !res.lic?.length) partes.push(`BÚSQUEDA DE LICITACIONES ABIERTAS para "${qDatos}": sin resultados en títulos, descripciones ni ítems de los últimos 180 días (Datos Mercado Público vía FirmaVB). Dilo así (no digas que no tienes fuente) y sugiere otras palabras o el rubro.`);
@@ -326,7 +349,8 @@ Deno.serve(async (req) => {
     const fuentesMeta = [
       ...fragmentos.map((f, i) => ({ n: i + 1, fuente: f.fuente, seccion: f.seccion, url: f.url })),
       ...bases.map((b, i) => ({ n: fragmentos.length + i + 1, fuente: `Bases de la licitación ${codigo}: ${b.archivo}`, seccion: `${b.paginas ?? "?"} páginas, PDF subido por un usuario de FirmaVB el ${fecha(b.creado_en)}`, url: null })),
-      ...noticias.map((n, i) => ({ n: fragmentos.length + bases.length + i + 1, fuente: n.fuente, seccion: n.seccion, url: n.url })),
+      ...anexos.map((a, i) => ({ n: fragmentos.length + bases.length + i + 1, fuente: `Anexo/adjunto de la licitación ${codigo}: ${a.archivo}`, seccion: `${a.paginas ?? "?"} páginas`, url: null })),
+      ...noticias.map((n, i) => ({ n: fragmentos.length + bases.length + anexos.length + i + 1, fuente: n.fuente, seccion: n.seccion, url: n.url })),
     ];
     const enc = new TextEncoder(); const dec = new TextDecoder();
     let respuesta = "";

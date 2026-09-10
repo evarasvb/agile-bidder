@@ -10,7 +10,7 @@ import JSZip from "npm:jszip@3.10.1";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-codigo, x-nombre, x-ocr-ia",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-codigo, x-nombre, x-ocr-ia, x-tipo-doc",
 };
 const MAX_PDF_BYTES = 20 * 1024 * 1024;
 const MAX_TEXTO = 400_000;
@@ -224,12 +224,16 @@ Deno.serve(async (req) => {
     const ct = req.headers.get("content-type") ?? "";
     // El cuerpo JSON se lee una sola vez: sirve al cron y a la carga en base64.
     const bodyJson = ct.includes("application/json") ? await req.json().catch(() => ({})) : null;
+    // Anexos y demás adjuntos vivos (no la bases principal): solo se lee el texto, sin resumen de
+    // Gemini (son formularios cortos y así no gastan cuota). Lo decide licitacion-adjuntos al leer.
+    const tipoDoc = (req.headers.get("x-tipo-doc") ?? "bases").toLowerCase() === "anexo" ? "anexo" : "bases";
     // Cron (service_role): bases guardadas sin resumen porque Gemini no tenía cuota en ese momento.
     // Se resumen de a pocas, de la más antigua a la más nueva y con tope de 3 intentos por base; si la
     // falla es por cuota (429 en todos los modelos) la pasada termina para no gastar llamadas.
     if (role === "service_role" && bodyJson?.resumir_pendientes) {
       const limite = Math.min(Number(bodyJson.limit ?? 5), 20);
-      const { data: filas } = await sb.from("bases_licitacion").select("id, texto, resumen_intentos").is("resumen", null).gt("caracteres", 200).lt("resumen_intentos", 3).order("creado_en", { ascending: true }).limit(limite);
+      // Los anexos (tipo='anexo') nunca se resumen a propósito: se excluyen para no gastarles cuota.
+      const { data: filas } = await sb.from("bases_licitacion").select("id, texto, resumen_intentos").is("resumen", null).eq("tipo", "bases").gt("caracteres", 200).lt("resumen_intentos", 3).order("creado_en", { ascending: true }).limit(limite);
       let hechas = 0, fallidas = 0;
       for (const f of (filas ?? []) as { id: string; texto: string; resumen_intentos: number | null }[]) {
         if (Date.now() - t0 > 150_000) break;
@@ -302,8 +306,9 @@ Deno.serve(async (req) => {
     texto = texto.slice(0, MAX_TEXTO);
     const secciones = seccionar(texto);
 
-    // 2. Resumen estructurado (si hubo OCR, se le da su propio tiempo)
-    const resumen = await resumir(texto, sb, Math.max(t0 + 120_000, Date.now() + 90_000));
+    // 2. Resumen estructurado (si hubo OCR, se le da su propio tiempo). Los anexos no se resumen:
+    // son formularios cortos y así no gastan cuota de Gemini/Mistral.
+    const resumen = tipoDoc === "anexo" ? null : await resumir(texto, sb, Math.max(t0 + 120_000, Date.now() + 90_000));
 
     // 3. Archivo original (mejor esfuerzo) y fila
     // Storage rechaza claves con tildes o símbolos: la ruta va sin ellos (el nombre original queda en la fila).
@@ -311,12 +316,12 @@ Deno.serve(async (req) => {
     const up = await sb.storage.from("bases-licitacion").upload(storage_path, bytes, { contentType: esDocx ? DOCX_MIME : "application/pdf", upsert: false });
     if (up.error) { console.error("storage", up.error.message); storage_path = null; }
     const { data: fila, error } = await sb.from("bases_licitacion").insert({
-      codigo, archivo: nombre, storage_path, paginas, caracteres: texto.length, texto, secciones, resumen,
+      codigo, archivo: nombre, storage_path, paginas, caracteres: texto.length, texto, secciones, resumen, tipo: tipoDoc,
       subido_por: role === "authenticated" ? sub : null,
     }).select("id").single();
     if (error) return json({ error: error.message }, 500);
 
-    return json({ ok: true, id: fila.id, codigo, archivo: nombre, paginas, caracteres: texto.length, secciones: secciones.length, ocr, resumen, ms: Date.now() - t0 });
+    return json({ ok: true, id: fila.id, codigo, archivo: nombre, tipo: tipoDoc, paginas, caracteres: texto.length, secciones: secciones.length, ocr, resumen, ms: Date.now() - t0 });
   } catch (e) {
     return json({ error: String((e as Error)?.message ?? e) }, 500);
   }
