@@ -3,19 +3,20 @@
 -- rápido, y la función de búsqueda ampliada. Se pueblan por REFRESH (runtime/cron semanal).
 create extension if not exists pg_trgm;
 
+-- Se pueblan al crearse (en un entorno nuevo las tablas base están vacías → instantáneo).
+-- En producción ya existen pobladas, así que `if not exists` las deja intactas. Un cron
+-- semanal las refresca junto con mv_proveedores_estado.
 create materialized view if not exists public.mv_prov_rubro as
 select distinct rut_proveedor, rubro_n1
 from public.oc_lineas
-where rut_proveedor is not null and rut_proveedor <> '' and rubro_n1 is not null and rubro_n1 <> ''
-with no data;
+where rut_proveedor is not null and rut_proveedor <> '' and rubro_n1 is not null and rubro_n1 <> '';
 create index if not exists idx_prov_rubro_rubro on public.mv_prov_rubro(rubro_n1);
 create index if not exists idx_prov_rubro_rut on public.mv_prov_rubro(rut_proveedor);
 
 create materialized view if not exists public.mv_prov_institucion as
 select distinct rut_proveedor, organismo_comprador
 from public.ordenes_compra
-where rut_proveedor is not null and rut_proveedor <> '' and organismo_comprador is not null and organismo_comprador <> ''
-with no data;
+where rut_proveedor is not null and rut_proveedor <> '' and organismo_comprador is not null and organismo_comprador <> '';
 create index if not exists idx_prov_inst_rut on public.mv_prov_institucion(rut_proveedor);
 create index if not exists idx_prov_inst_org_trgm on public.mv_prov_institucion using gin (organismo_comprador gin_trgm_ops);
 
