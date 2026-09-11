@@ -495,14 +495,6 @@ export default function OportunidadDetalle() {
               <Sparkles className="h-4 w-4" />
               Consultar al experto
             </Button>
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() => navigate(`/oportunidades/${tipo}/${id}/chat`)}
-            >
-              <Sparkles className="h-4 w-4" />
-              Libro del Experto
-            </Button>
             <Button className="gap-2" onClick={handleCotizar}>
               <FileText className="h-4 w-4" />
               Ir a cotizar
