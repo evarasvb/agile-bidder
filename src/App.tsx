@@ -80,6 +80,7 @@ const ReporteMercado = lazy(() => import("./pages/reportes/ReporteMercado"));
 const ReporteCompetidores = lazy(() => import("./pages/reportes/ReporteCompetidores"));
 const ReporteConvenioMarco = lazy(() => import("./pages/reportes/ReporteConvenioMarco"));
 
+const AdminTraccion = lazy(() => import("./pages/AdminTraccion"));
 const AdminEvaristo = lazy(() => import("./pages/AdminEvaristo"));
 const AdminSoporte = lazy(() => import("./pages/AdminSoporte"));
 const MisTickets = lazy(() => import("./pages/MisTickets"));
@@ -209,6 +210,7 @@ const App = () => (
             {/* ----- ACADEMIA (contactos del formulario público) ----- */}
             <Route path="/academia/leads" element={<AdminOnlyRoute><AcademiaLeads /></AdminOnlyRoute>} />
             <Route path="/proveedores-estado" element={<AdminOnlyRoute><ProveedoresEstado /></AdminOnlyRoute>} />
+            <Route path="/admin/traccion" element={<AdminOnlyRoute><AdminTraccion /></AdminOnlyRoute>} />
 
             {/* ----- EQUIPO ----- */}
             <Route path="/equipo" element={<Equipo />} />
