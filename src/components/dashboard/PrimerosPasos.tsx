@@ -5,11 +5,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
-  CheckCircle2, Package, Sparkles, FileText, Plug, X, ChevronRight, Rocket, PartyPopper,
+  CheckCircle2, Package, Sparkles, FileText, Plug, X, ChevronRight, Rocket, PartyPopper, Tag,
 } from "lucide-react";
 import { useInventoryStats } from "@/hooks/useInventory";
 import { useClienteOfertas } from "@/hooks/useClienteOfertas";
 import { useExtensionStatus } from "@/hooks/useExtensionStatus";
+import { useCliente } from "@/hooks/useCliente";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -44,11 +45,17 @@ export function PrimerosPasos() {
   const { data: invStats, isLoading: cargandoInv } = useInventoryStats();
   const { data: ofertas, isLoading: cargandoOf } = useClienteOfertas();
   const { isConnected } = useExtensionStatus();
+  // El wizard de bienvenida (industria, palabras clave, qué no vendes) es el primer
+  // paso de la MISMA guía: antes vivía aparte y el cliente lo terminaba viendo "100%"
+  // para dos segundos después aterrizar acá con OTRA lista arrancando en 0% — dos
+  // guías seguidas se sentían como "¿de nuevo?". Ahora es un solo hilo continuo.
+  const { data: cliente, isLoading: cargandoCliente } = useCliente();
   // Eventos reales: libros del Experto (licitaciones analizadas) también cuentan como avance.
   const { session } = useAuth();
   const { data: libros, isLoading: cargandoLib } = useQuery({ queryKey: ["experto_mis_libros"], enabled: !!session, queryFn: async () => ((await (supabase as any).rpc("experto_mis_libros")).data ?? []) as any[] });
-  const cargando = cargandoInv || cargandoOf || cargandoLib;
+  const cargando = cargandoInv || cargandoOf || cargandoLib || cargandoCliente;
 
+  const perfilListo = cliente?.onboarding_completado === true;
   const tieneInventario = (invStats?.total ?? 0) > 0;
   const tieneOfertas = (ofertas?.length ?? 0) > 0;
   const tieneLibros = (libros?.length ?? 0) > 0;
@@ -72,6 +79,13 @@ export function PrimerosPasos() {
   };
 
   const pasos = [
+    {
+      id: "perfil", done: perfilListo, icon: Tag,
+      titulo: "Cuéntanos qué vendes",
+      desc: "Industria, palabras clave y qué NO vendes: es lo que arma tus primeras oportunidades.",
+      to: "/onboarding",
+      aviso: "Vamos a armar tu perfil 🏷️",
+    },
     {
       id: "inventario", done: tieneInventario, icon: Package,
       titulo: "Carga tu inventario",
@@ -123,6 +137,7 @@ export function PrimerosPasos() {
   const prevDone = useRef<Record<string, boolean>>({});
   useEffect(() => {
     const celebra: Record<string, string> = {
+      perfil: "¡Perfil armado! 🏷️",
       inventario: "¡Listo! Cargaste tu inventario ✅",
       oportunidades: "¡Ya viste tus oportunidades! 🎯",
       oferta: "¡Bien ahí! Creaste tu primera oferta 🎉",
@@ -135,7 +150,7 @@ export function PrimerosPasos() {
       prevDone.current[p.id] = p.done;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tieneInventario, revisoOportunidades, tieneOfertas, isConnected]);
+  }, [perfilListo, tieneInventario, revisoOportunidades, tieneOfertas, isConnected]);
 
   const irAlPaso = (p: typeof pasos[number]) => {
     p.onClick?.();
