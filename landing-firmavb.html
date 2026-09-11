@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firmavb | Vende al Estado sin Complicaciones</title>
+    <style>
+        :root {
+            --primary: #003366;
+            --secondary: #00a86b;
+            --accent: #ff6b35;
+            --neutral-900: #1a1a1a;
+            --neutral-700: #333;
+            --neutral-400: #999;
+            --neutral-100: #f5f5f5;
+            --bg: #ffffff;
+            --text: #1a1a1a;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --primary: #4d94ff;
+                --secondary: #00d999;
+                --accent: #ff8555;
+                --neutral-900: #f5f5f5;
+                --neutral-700: #ccc;
+                --neutral-400: #666;
+                --neutral-100: #222;
+                --bg: #1a1a1a;
+                --text: #f5f5f5;
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            color: var(--text);
+            background: var(--bg);
+            line-height: 1.6;
+        }
+
+        /* Hero */
+        .hero {
+            padding: 80px 20px;
+            text-align: center;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary) 100%);
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -10%;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .hero h1 {
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-weight: 700;
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+
+        .hero-subtitle {
+            font-size: clamp(1rem, 2vw, 1.25rem);
+            margin-bottom: 40px;
+            opacity: 0.95;
+            font-weight: 300;
+        }
+
+        .hero-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 30px;
+            margin-bottom: 50px;
+            padding: 30px 0;
+        }
+
+        .stat {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--secondary);
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+
+        .cta-primary {
+            display: inline-block;
+            background: var(--secondary);
+            color: white;
+            padding: 16px 40px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1rem;
+            text-decoration: none;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s ease;
+            margin: 10px;
+        }
+
+        .cta-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 168, 107, 0.3);
+        }
+
+        .cta-secondary {
+            display: inline-block;
+            background: transparent;
+            color: white;
+            padding: 16px 40px;
+            border: 2px solid white;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1rem;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+        }
+
+        .cta-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Problema */
+        .section {
+            padding: 60px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section-title {
+            font-size: clamp(1.5rem, 3vw, 2.5rem);
+            font-weight: 700;
+            margin-bottom: 40px;
+            text-align: center;
+        }
+
+        .problem-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+
+        .problem-card {
+            background: var(--neutral-100);
+            padding: 30px;
+            border-radius: 8px;
+            border-left: 4px solid var(--accent);
+        }
+
+        .problem-card h3 {
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            color: var(--primary);
+        }
+
+        .problem-card p {
+            font-size: 0.95rem;
+            color: var(--neutral-700);
+        }
+
+        /* Solución */
+        .solution-section {
+            background: linear-gradient(135deg, var(--primary) 0%, #002244 100%);
+            color: white;
+        }
+
+        .solution-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+        }
+
+        .solution-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .solution-card h3 {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            color: var(--secondary);
+        }
+
+        .solution-card p {
+            font-size: 0.95rem;
+            opacity: 0.95;
+        }
+
+        /* Características */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .feature {
+            padding: 20px;
+            border-radius: 8px;
+            background: var(--neutral-100);
+            text-align: center;
+        }
+
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+        }
+
+        .feature h4 {
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+            color: var(--primary);
+        }
+
+        .feature p {
+            font-size: 0.9rem;
+            color: var(--neutral-700);
+        }
+
+        /* CTA Final */
+        .cta-section {
+            background: var(--primary);
+            color: white;
+            padding: 60px 20px;
+            text-align: center;
+        }
+
+        .cta-section h2 {
+            font-size: clamp(1.5rem, 3vw, 2rem);
+            margin-bottom: 30px;
+        }
+
+        .cta-section p {
+            font-size: 1.1rem;
+            margin-bottom: 30px;
+            opacity: 0.95;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Footer */
+        footer {
+            background: var(--neutral-900);
+            color: var(--neutral-400);
+            padding: 30px 20px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero {
+                padding: 50px 20px;
+            }
+
+            .section {
+                padding: 40px 20px;
+            }
+
+            .cta-primary, .cta-secondary {
+                width: 100%;
+                max-width: 300px;
+                display: block;
+                margin: 10px auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Hero -->
+    <section class="hero">
+        <div class="hero-content">
+            <h1>Vende al Estado sin Complicaciones</h1>
+            <p class="hero-subtitle">Acceso a 5.000+ oportunidades de compra pública. Nosotros simplificamos todo.</p>
+
+            <div class="hero-stats">
+                <div class="stat">
+                    <span class="stat-number">5.000+</span>
+                    <span class="stat-label">Oportunidades anuales</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number">850+</span>
+                    <span class="stat-label">Organismos públicos</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number">123K</span>
+                    <span class="stat-label">Empresas venden</span>
+                </div>
+            </div>
+
+            <div>
+                <button class="cta-primary">Agendar Demo Gratis</button>
+                <button class="cta-secondary">Ver Caso de Éxito</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Problema -->
+    <section class="section">
+        <h2 class="section-title">El Problema: Vender al Estado es Difícil</h2>
+        <div class="problem-grid">
+            <div class="problem-card">
+                <h3>📋 Requisitos Complejos</h3>
+                <p>ChileProveedores, rubros, certificaciones. Nadie te explica qué es realmente necesario.</p>
+            </div>
+            <div class="problem-card">
+                <h3>⏰ Plazos que No Esperar</h3>
+                <p>Las licitaciones se cierran automáticamente. Pierdes oportunidades por no verlas a tiempo.</p>
+            </div>
+            <div class="problem-card">
+                <h3>📚 Bases Incomprensibles</h3>
+                <p>Documentos de 50 páginas con jerga estatal. No sabes si puedes participar.</p>
+            </div>
+            <div class="problem-card">
+                <h3>💰 Costo de Aprender</h3>
+                <p>Contratar abogados, consultores. Gastos enormes antes de tu primer venta.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Solución -->
+    <section class="section solution-section">
+        <h2 class="section-title">La Solución: Tu Experto en Compras Públicas</h2>
+        <div class="solution-grid">
+            <div class="solution-card">
+                <h3>✅ Acceso Instantáneo</h3>
+                <p>Todas las licitaciones relevantes para ti, filtradas, organizadas, lista para actuar.</p>
+            </div>
+            <div class="solution-card">
+                <h3>🚀 Postulación Simplificada</h3>
+                <p>Nosotros te guiamos paso a paso. Documentos listos, formularios precompletados.</p>
+            </div>
+            <div class="solution-card">
+                <h3>📊 Alertas Inteligentes</h3>
+                <p>No pierdas plazos. Notificaciones para cada oportunidad que calza con tu negocio.</p>
+            </div>
+            <div class="solution-card">
+                <h3>💼 Soporte Expert</h3>
+                <p>Preguntas sobre las bases, estrategia de precio, dudas legales. Respuesta en horas.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section class="section">
+        <h2 class="section-title">Lo Que Incluye Firmavb</h2>
+        <div class="features-grid">
+            <div class="feature">
+                <div class="feature-icon">🎯</div>
+                <h4>Perfilación Inteligente</h4>
+                <p>Configura tus rubros una vez. Recibe solo oportunidades que ganes.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">📱</div>
+                <h4>Dashboard Personalizado</h4>
+                <p>Lo urgente primero. Licitaciones que cierran hoy, a la vista.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">📄</div>
+                <h4>Templates Listos</h4>
+                <p>Documentos precompletados. Reduce tiempo de postulación a minutos.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">💬</div>
+                <h4>Chat con Expertos</h4>
+                <p>Duda sobre una base, precio, requisito. Pregunta y recibe respuesta inmediata.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">📈</div>
+                <h4>Análisis de Éxito</h4>
+                <p>Aprende qué postulaciones ganan. Mejora tu tasa de ganancia.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🔒</div>
+                <h4>Seguridad de Datos</h4>
+                <p>Cumple normativa, encriptación, auditoría. Totalmente seguro.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Final -->
+    <section class="cta-section">
+        <h2>¿Listo para Vender al Estado sin Estrés?</h2>
+        <p>Cientos de empresas ya usan Firmavb. Tu siguiente licitación ganada está más cerca de lo que crees.</p>
+        <button class="cta-primary" style="background: var(--secondary);">Cotizar Ahora</button>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2026 Firmavb. Especialistas en compras públicas chilenas.</p>
+    </footer>
+</body>
+</html>

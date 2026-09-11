@@ -85,6 +85,8 @@ const AdminEvaristo = lazy(() => import("./pages/AdminEvaristo"));
 const AdminSoporte = lazy(() => import("./pages/AdminSoporte"));
 const MisTickets = lazy(() => import("./pages/MisTickets"));
 
+const MarketingControlCenter = lazy(() => import("./pages/MarketingControlCenter"));
+
 // Defaults de React Query para que la app se sienta más rápida: cachea 1 min,
 // no re-consulta al volver a la pestaña y reintenta solo 1 vez. Antes cada
 // navegación volvía a pedir todo (staleTime 0), lo que se sentía lento.
@@ -234,6 +236,9 @@ const App = () => (
             <Route path="/reportes/competidores" element={<ReporteCompetidores />} />
             <Route path="/reportes/convenio-marco" element={<ReporteConvenioMarco />} />
             <Route path="/reportes/ordenes-compra" element={<ReporteOrdenesCompra />} />
+
+            {/* ----- MARKETING ----- */}
+            <Route path="/marketing/control" element={<AdminOnlyRoute><MarketingControlCenter /></AdminOnlyRoute>} />
 
             {/* ----- CONFIGURACION ----- */}
             <Route path="/configuracion" element={<ConfiguracionOportunidades />} />
