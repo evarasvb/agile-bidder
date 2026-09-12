@@ -1,5 +1,11 @@
 {
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "crons": [
+    {
+      "path": "/api/contact-enrichment-cron",
+      "schedule": "0 2 * * *"
+    }
   ]
 }
