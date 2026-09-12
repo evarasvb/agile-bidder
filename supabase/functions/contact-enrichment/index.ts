@@ -608,6 +608,461 @@ async function sincronizarClientes(supabase: any): Promise<EnrichmentResult> {
   }
 }
 
+// Sincronizar webinar_invitacion (tabla separada de webinar_inscripciones) - con paginación
+async function sincronizarWebinarInvitacion(supabase: any): Promise<EnrichmentResult> {
+  const inicio = Date.now()
+  let procesados = 0, nuevos = 0, actualizados = 0, errores = 0
+  let desde = 0
+  const limit = 1000
+
+  try {
+    let hasMore = true
+    while (hasMore) {
+      const { data: registros, error: fetchError } = await supabase
+        .from('webinar_invitacion')
+        .select('id, email, nombre, empresa, campana')
+        .not('email', 'is', null)
+        .range(desde, desde + limit - 1)
+
+      if (fetchError) {
+        console.error('Error fetching webinar_invitacion:', fetchError)
+        errores++
+        break
+      }
+
+      if (!registros || registros.length === 0) {
+        hasMore = false
+        break
+      }
+
+      for (const registro of registros) {
+        try {
+          procesados++
+          const email = registro.email?.toLowerCase().trim()
+
+          if (!email || !esEmailValido(email)) continue
+
+          const { data: existente, error: existeError } = await supabase
+            .from('marketing_contactos')
+            .select('id')
+            .eq('email', email)
+            .single()
+
+          if (existente) {
+            await supabase
+              .from('marketing_contactos')
+              .update({
+                fuente_primaria: 'webinar_invitacion',
+                actualizado_en: new Date().toISOString()
+              })
+              .eq('id', existente.id)
+            actualizados++
+          } else if (!existeError || existeError.code === 'PGRST116') {
+            await supabase
+              .from('marketing_contactos')
+              .insert({
+                email,
+                nombre: registro.nombre,
+                empresa: registro.empresa,
+                categoria: 'webinar_invitado',
+                fuente_datos: 'webinar_invitacion',
+                fuente_primaria: 'webinar_invitacion',
+                estado_suscripcion: 'suscrito',
+                email_validado: true,
+                estado_email: 'valido',
+                consentimiento_marketing: false,
+                consentimiento_fecha: null,
+                datos_enriquecimiento: { campana: registro.campana }
+              })
+            nuevos++
+          }
+        } catch (e) {
+          console.error('Error procesando webinar_invitacion:', e)
+          errores++
+        }
+      }
+
+      desde += limit
+      hasMore = registros.length === limit
+    }
+  } catch (error) {
+    console.error('Error sincronizando webinar_invitacion:', error)
+    errores++
+  }
+
+  return {
+    procesados,
+    nuevos,
+    actualizados,
+    errores,
+    tiempo_segundos: (Date.now() - inicio) / 1000
+  }
+}
+
+// Sincronizar profiles (usuarios del sistema) - con paginación
+async function sincronizarProfiles(supabase: any): Promise<EnrichmentResult> {
+  const inicio = Date.now()
+  let procesados = 0, nuevos = 0, actualizados = 0, errores = 0
+  let desde = 0
+  const limit = 1000
+
+  try {
+    let hasMore = true
+    while (hasMore) {
+      const { data: profiles, error: fetchError } = await supabase
+        .from('profiles')
+        .select('id, email, full_name')
+        .not('email', 'is', null)
+        .range(desde, desde + limit - 1)
+
+      if (fetchError) {
+        console.error('Error fetching profiles:', fetchError)
+        errores++
+        break
+      }
+
+      if (!profiles || profiles.length === 0) {
+        hasMore = false
+        break
+      }
+
+      for (const profile of profiles) {
+        try {
+          procesados++
+          const email = profile.email?.toLowerCase().trim()
+
+          if (!email || !esEmailValido(email)) continue
+
+          const { data: existente, error: existeError } = await supabase
+            .from('marketing_contactos')
+            .select('id')
+            .eq('email', email)
+            .single()
+
+          if (existente) {
+            await supabase
+              .from('marketing_contactos')
+              .update({
+                fuente_primaria: 'profiles',
+                actualizado_en: new Date().toISOString()
+              })
+              .eq('id', existente.id)
+            actualizados++
+          } else if (!existeError || existeError.code === 'PGRST116') {
+            await supabase
+              .from('marketing_contactos')
+              .insert({
+                email,
+                nombre: profile.full_name,
+                categoria: 'usuario',
+                fuente_datos: 'profiles',
+                fuente_primaria: 'profiles',
+                estado_suscripcion: 'suscrito',
+                email_validado: true,
+                estado_email: 'valido',
+                consentimiento_marketing: false,
+                consentimiento_fecha: null
+              })
+            nuevos++
+          }
+        } catch (e) {
+          console.error('Error procesando profile:', e)
+          errores++
+        }
+      }
+
+      desde += limit
+      hasMore = profiles.length === limit
+    }
+  } catch (error) {
+    console.error('Error sincronizando profiles:', error)
+    errores++
+  }
+
+  return {
+    procesados,
+    nuevos,
+    actualizados,
+    errores,
+    tiempo_segundos: (Date.now() - inicio) / 1000
+  }
+}
+
+// Sincronizar vista_contacto_prospectos (view con prospectos validados) - con paginación
+async function sincronizarProspectos(supabase: any): Promise<EnrichmentResult> {
+  const inicio = Date.now()
+  let procesados = 0, nuevos = 0, actualizados = 0, errores = 0
+  let desde = 0
+  const limit = 1000
+
+  try {
+    let hasMore = true
+    while (hasMore) {
+      const { data: prospectos, error: fetchError } = await supabase
+        .from('vista_contacto_prospectos')
+        .select('id, email, contacto, empresa, categorias, puntaje')
+        .not('email', 'is', null)
+        .range(desde, desde + limit - 1)
+
+      if (fetchError) {
+        console.error('Error fetching vista_contacto_prospectos:', fetchError)
+        errores++
+        break
+      }
+
+      if (!prospectos || prospectos.length === 0) {
+        hasMore = false
+        break
+      }
+
+      for (const prospecto of prospectos) {
+        try {
+          procesados++
+          const email = prospecto.email?.toLowerCase().trim()
+
+          if (!email || !esEmailValido(email)) continue
+
+          const rubro = prospecto.categorias ? clasificarRubro(prospecto.categorias, prospecto.empresa) : 'otros'
+
+          const { data: existente, error: existeError } = await supabase
+            .from('marketing_contactos')
+            .select('id')
+            .eq('email', email)
+            .single()
+
+          if (existente) {
+            await supabase
+              .from('marketing_contactos')
+              .update({
+                rubro,
+                fuente_primaria: 'prospecto',
+                actualizado_en: new Date().toISOString()
+              })
+              .eq('id', existente.id)
+            actualizados++
+          } else if (!existeError || existeError.code === 'PGRST116') {
+            await supabase
+              .from('marketing_contactos')
+              .insert({
+                email,
+                nombre: prospecto.contacto,
+                empresa: prospecto.empresa,
+                categoria: 'prospecto_validado',
+                fuente_datos: 'prospectos',
+                fuente_primaria: 'prospecto',
+                rubro,
+                estado_suscripcion: 'suscrito',
+                email_validado: true,
+                estado_email: 'valido',
+                consentimiento_marketing: false,
+                consentimiento_fecha: null,
+                datos_enriquecimiento: { puntaje: prospecto.puntaje }
+              })
+            nuevos++
+          }
+        } catch (e) {
+          console.error('Error procesando prospecto:', e)
+          errores++
+        }
+      }
+
+      desde += limit
+      hasMore = prospectos.length === limit
+    }
+  } catch (error) {
+    console.error('Error sincronizando prospectos:', error)
+    errores++
+  }
+
+  return {
+    procesados,
+    nuevos,
+    actualizados,
+    errores,
+    tiempo_segundos: (Date.now() - inicio) / 1000
+  }
+}
+
+// Sincronizar academia_leads (leads de academias) - con paginación
+async function sincronizarAcademiaLeads(supabase: any): Promise<EnrichmentResult> {
+  const inicio = Date.now()
+  let procesados = 0, nuevos = 0, actualizados = 0, errores = 0
+  let desde = 0
+  const limit = 1000
+
+  try {
+    let hasMore = true
+    while (hasMore) {
+      const { data: leads, error: fetchError } = await supabase
+        .from('academia_leads')
+        .select('id, email, nombre_contacto, nombre_empresa')
+        .not('email', 'is', null)
+        .range(desde, desde + limit - 1)
+
+      if (fetchError) {
+        console.error('Error fetching academia_leads:', fetchError)
+        errores++
+        break
+      }
+
+      if (!leads || leads.length === 0) {
+        hasMore = false
+        break
+      }
+
+      for (const lead of leads) {
+        try {
+          procesados++
+          const email = lead.email?.toLowerCase().trim()
+
+          if (!email || !esEmailValido(email)) continue
+
+          const { data: existente, error: existeError } = await supabase
+            .from('marketing_contactos')
+            .select('id')
+            .eq('email', email)
+            .single()
+
+          if (existente) {
+            await supabase
+              .from('marketing_contactos')
+              .update({
+                fuente_primaria: 'academia',
+                actualizado_en: new Date().toISOString()
+              })
+              .eq('id', existente.id)
+            actualizados++
+          } else if (!existeError || existeError.code === 'PGRST116') {
+            await supabase
+              .from('marketing_contactos')
+              .insert({
+                email,
+                nombre: lead.nombre_contacto,
+                empresa: lead.nombre_empresa,
+                categoria: 'academia_lead',
+                fuente_datos: 'academia',
+                fuente_primaria: 'academia',
+                estado_suscripcion: 'suscrito',
+                email_validado: true,
+                estado_email: 'valido',
+                consentimiento_marketing: false,
+                consentimiento_fecha: null
+              })
+            nuevos++
+          }
+        } catch (e) {
+          console.error('Error procesando academia_lead:', e)
+          errores++
+        }
+      }
+
+      desde += limit
+      hasMore = leads.length === limit
+    }
+  } catch (error) {
+    console.error('Error sincronizando academia_leads:', error)
+    errores++
+  }
+
+  return {
+    procesados,
+    nuevos,
+    actualizados,
+    errores,
+    tiempo_segundos: (Date.now() - inicio) / 1000
+  }
+}
+
+// Sincronizar agendamientos_meet (leads con agendamientos) - con paginación
+async function sincronizarAgendamientos(supabase: any): Promise<EnrichmentResult> {
+  const inicio = Date.now()
+  let procesados = 0, nuevos = 0, actualizados = 0, errores = 0
+  let desde = 0
+  const limit = 1000
+
+  try {
+    let hasMore = true
+    while (hasMore) {
+      const { data: agendamientos, error: fetchError } = await supabase
+        .from('agendamientos_meet')
+        .select('id, email, nombre, empresa')
+        .not('email', 'is', null)
+        .range(desde, desde + limit - 1)
+
+      if (fetchError) {
+        console.error('Error fetching agendamientos_meet:', fetchError)
+        errores++
+        break
+      }
+
+      if (!agendamientos || agendamientos.length === 0) {
+        hasMore = false
+        break
+      }
+
+      for (const agendamiento of agendamientos) {
+        try {
+          procesados++
+          const email = agendamiento.email?.toLowerCase().trim()
+
+          if (!email || !esEmailValido(email)) continue
+
+          const { data: existente, error: existeError } = await supabase
+            .from('marketing_contactos')
+            .select('id')
+            .eq('email', email)
+            .single()
+
+          if (existente) {
+            await supabase
+              .from('marketing_contactos')
+              .update({
+                fuente_primaria: 'agendamiento',
+                actualizado_en: new Date().toISOString()
+              })
+              .eq('id', existente.id)
+            actualizados++
+          } else if (!existeError || existeError.code === 'PGRST116') {
+            await supabase
+              .from('marketing_contactos')
+              .insert({
+                email,
+                nombre: agendamiento.nombre,
+                empresa: agendamiento.empresa,
+                categoria: 'agendamiento_meet',
+                fuente_datos: 'agendamientos',
+                fuente_primaria: 'agendamiento',
+                estado_suscripcion: 'suscrito',
+                email_validado: true,
+                estado_email: 'valido',
+                consentimiento_marketing: false,
+                consentimiento_fecha: null
+              })
+            nuevos++
+          }
+        } catch (e) {
+          console.error('Error procesando agendamiento:', e)
+          errores++
+        }
+      }
+
+      desde += limit
+      hasMore = agendamientos.length === limit
+    }
+  } catch (error) {
+    console.error('Error sincronizando agendamientos:', error)
+    errores++
+  }
+
+  return {
+    procesados,
+    nuevos,
+    actualizados,
+    errores,
+    tiempo_segundos: (Date.now() - inicio) / 1000
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -622,12 +1077,17 @@ Deno.serve(async (req) => {
     console.log('Iniciando enriquecimiento de contactos...')
 
     // Ejecutar todas las operaciones en paralelo
-    const [resultMercado, resultProveedores, resultWebinars, resultYouTube, resultClientes, resultValidacion, resultDuplicados] = await Promise.all([
+    const [resultMercado, resultProveedores, resultWebinars, resultYouTube, resultClientes, resultWebinarInvitacion, resultProfiles, resultProspectos, resultAcademia, resultAgendamientos, resultValidacion, resultDuplicados] = await Promise.all([
       sincronizarMercadoPublico(supabase),
       sincronizarProveedoresEstado(supabase),
       sincronizarWebinars(supabase),
       sincronizarYouTube(supabase),
       sincronizarClientes(supabase),
+      sincronizarWebinarInvitacion(supabase),
+      sincronizarProfiles(supabase),
+      sincronizarProspectos(supabase),
+      sincronizarAcademiaLeads(supabase),
+      sincronizarAgendamientos(supabase),
       validarEmails(supabase),
       eliminarDuplicados(supabase)
     ])
@@ -637,10 +1097,10 @@ Deno.serve(async (req) => {
       .from('contact_enrichment_logs')
       .insert({
         proceso: 'enriquecimiento_completo',
-        registros_procesados: resultMercado.procesados + resultProveedores.procesados + resultWebinars.procesados + resultYouTube.procesados + resultClientes.procesados + resultValidacion.procesados + resultDuplicados.procesados,
-        registros_nuevos: resultMercado.nuevos + resultProveedores.nuevos + resultWebinars.nuevos + resultYouTube.nuevos + resultClientes.nuevos + resultValidacion.nuevos,
-        registros_actualizados: resultMercado.actualizados + resultProveedores.actualizados + resultWebinars.actualizados + resultYouTube.actualizados + resultClientes.actualizados + resultValidacion.actualizados + resultDuplicados.actualizados,
-        errores: resultMercado.errores + resultProveedores.errores + resultWebinars.errores + resultYouTube.errores + resultClientes.errores + resultValidacion.errores + resultDuplicados.errores,
+        registros_procesados: resultMercado.procesados + resultProveedores.procesados + resultWebinars.procesados + resultYouTube.procesados + resultClientes.procesados + resultWebinarInvitacion.procesados + resultProfiles.procesados + resultProspectos.procesados + resultAcademia.procesados + resultAgendamientos.procesados + resultValidacion.procesados + resultDuplicados.procesados,
+        registros_nuevos: resultMercado.nuevos + resultProveedores.nuevos + resultWebinars.nuevos + resultYouTube.nuevos + resultClientes.nuevos + resultWebinarInvitacion.nuevos + resultProfiles.nuevos + resultProspectos.nuevos + resultAcademia.nuevos + resultAgendamientos.nuevos + resultValidacion.nuevos,
+        registros_actualizados: resultMercado.actualizados + resultProveedores.actualizados + resultWebinars.actualizados + resultYouTube.actualizados + resultClientes.actualizados + resultWebinarInvitacion.actualizados + resultProfiles.actualizados + resultProspectos.actualizados + resultAcademia.actualizados + resultAgendamientos.actualizados + resultValidacion.actualizados + resultDuplicados.actualizados,
+        errores: resultMercado.errores + resultProveedores.errores + resultWebinars.errores + resultYouTube.errores + resultClientes.errores + resultWebinarInvitacion.errores + resultProfiles.errores + resultProspectos.errores + resultAcademia.errores + resultAgendamientos.errores + resultValidacion.errores + resultDuplicados.errores,
         estado: 'completado',
         fecha_fin: new Date().toISOString(),
         metadata: {
@@ -649,6 +1109,11 @@ Deno.serve(async (req) => {
           webinars: resultWebinars,
           youtube: resultYouTube,
           clientes: resultClientes,
+          webinar_invitacion: resultWebinarInvitacion,
+          profiles: resultProfiles,
+          prospectos: resultProspectos,
+          academia_leads: resultAcademia,
+          agendamientos: resultAgendamientos,
           validacion: resultValidacion,
           duplicados: resultDuplicados
         }
@@ -663,6 +1128,11 @@ Deno.serve(async (req) => {
           webinars: resultWebinars,
           youtube: resultYouTube,
           clientes: resultClientes,
+          webinar_invitacion: resultWebinarInvitacion,
+          profiles: resultProfiles,
+          prospectos: resultProspectos,
+          academia_leads: resultAcademia,
+          agendamientos: resultAgendamientos,
           validacion: resultValidacion,
           duplicados: resultDuplicados
         }
