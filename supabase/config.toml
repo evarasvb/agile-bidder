@@ -70,3 +70,7 @@ verify_jwt = true
 
 [functions.enrichment-scheduler]
 verify_jwt = false
+
+# extract-proveedores-instituciones is called by cron job (public access)
+[functions.extract-proveedores-instituciones]
+verify_jwt = false
