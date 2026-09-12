@@ -316,6 +316,298 @@ async function sincronizarProveedoresEstado(supabase: any): Promise<EnrichmentRe
   }
 }
 
+// Sincronizar contactos de webinars (convenios marcos) - con paginación
+async function sincronizarWebinars(supabase: any): Promise<EnrichmentResult> {
+  const inicio = Date.now()
+  let procesados = 0, nuevos = 0, actualizados = 0, errores = 0
+  let desde = 0
+  const limit = 1000
+
+  try {
+    let hasMore = true
+    while (hasMore) {
+      const { data: webinars, error: fetchError } = await supabase
+        .from('webinar_inscripciones')
+        .select('id, email, nombre, empresa')
+        .not('email', 'is', null)
+        .range(desde, desde + limit - 1)
+
+      if (fetchError) {
+        console.error('Error fetching webinar inscriptions:', fetchError)
+        errores++
+        break
+      }
+
+      if (!webinars || webinars.length === 0) {
+        hasMore = false
+        break
+      }
+
+      // Procesar cada registro
+      for (const registro of webinars) {
+        try {
+          procesados++
+          const email = registro.email?.toLowerCase().trim()
+
+          if (!email || !esEmailValido(email)) {
+            console.log(`Email inválido en webinar: ${email}`)
+            continue
+          }
+
+          // Buscar si ya existe - con await y error check
+          const { data: existente, error: existeError } = await supabase
+            .from('marketing_contactos')
+            .select('id')
+            .eq('email', email)
+            .single()
+
+          if (existente) {
+            await supabase
+              .from('marketing_contactos')
+              .update({
+                fuente_primaria: 'webinar',
+                actualizado_en: new Date().toISOString()
+              })
+              .eq('id', existente.id)
+            actualizados++
+          } else if (!existeError || existeError.code === 'PGRST116') {
+            // PGRST116 = no row found (expected)
+            await supabase
+              .from('marketing_contactos')
+              .insert({
+                email,
+                nombre: registro.nombre,
+                empresa: registro.empresa,
+                categoria: 'webinar_inscrito',
+                fuente_datos: 'webinar',
+                fuente_primaria: 'webinar',
+                estado_suscripcion: 'suscrito',
+                email_validado: true,
+                estado_email: 'valido',
+                consentimiento_marketing: true,
+                consentimiento_fecha: new Date().toISOString()
+              })
+            nuevos++
+          }
+        } catch (e) {
+          console.error('Error procesando registro webinar:', e)
+          errores++
+        }
+      }
+
+      desde += limit
+      hasMore = webinars.length === limit
+    }
+  } catch (error) {
+    console.error('Error sincronizando webinars:', error)
+    errores++
+  }
+
+  return {
+    procesados,
+    nuevos,
+    actualizados,
+    errores,
+    tiempo_segundos: (Date.now() - inicio) / 1000
+  }
+}
+
+// Sincronizar suscriptores de YouTube - con paginación
+async function sincronizarYouTube(supabase: any): Promise<EnrichmentResult> {
+  const inicio = Date.now()
+  let procesados = 0, nuevos = 0, actualizados = 0, errores = 0
+  let desde = 0
+  const limit = 1000
+
+  try {
+    let hasMore = true
+    while (hasMore) {
+      const { data: youtubers, error: fetchError } = await supabase
+        .from('youtube_subscribers')
+        .select('id, nombre, email')
+        .not('email', 'is', null)
+        .range(desde, desde + limit - 1)
+
+      if (fetchError) {
+        console.error('Error fetching YouTube subscribers:', fetchError)
+        errores++
+        break
+      }
+
+      if (!youtubers || youtubers.length === 0) {
+        hasMore = false
+        break
+      }
+
+      // Procesar cada suscriptor
+      for (const youtuber of youtubers) {
+        try {
+          procesados++
+          const email = youtuber.email?.toLowerCase().trim()
+
+          if (!email || !esEmailValido(email)) {
+            console.log(`Email inválido en YouTube: ${email}`)
+            continue
+          }
+
+          // Buscar si ya existe - con await y error check
+          const { data: existente, error: existeError } = await supabase
+            .from('marketing_contactos')
+            .select('id')
+            .eq('email', email)
+            .single()
+
+          if (existente) {
+            await supabase
+              .from('marketing_contactos')
+              .update({
+                fuente_primaria: 'youtube',
+                actualizado_en: new Date().toISOString()
+              })
+              .eq('id', existente.id)
+            actualizados++
+          } else if (!existeError || existeError.code === 'PGRST116') {
+            // PGRST116 = no row found (expected)
+            await supabase
+              .from('marketing_contactos')
+              .insert({
+                email,
+                nombre: youtuber.nombre,
+                categoria: 'youtube_subscriber',
+                fuente_datos: 'youtube',
+                fuente_primaria: 'youtube',
+                estado_suscripcion: 'suscrito',
+                email_validado: true,
+                estado_email: 'valido',
+                consentimiento_marketing: false,
+                consentimiento_fecha: null
+              })
+            nuevos++
+          }
+        } catch (e) {
+          console.error('Error procesando suscriptor YouTube:', e)
+          errores++
+        }
+      }
+
+      desde += limit
+      hasMore = youtubers.length === limit
+    }
+  } catch (error) {
+    console.error('Error sincronizando YouTube:', error)
+    errores++
+  }
+
+  return {
+    procesados,
+    nuevos,
+    actualizados,
+    errores,
+    tiempo_segundos: (Date.now() - inicio) / 1000
+  }
+}
+
+// Sincronizar clientes existentes - con paginación y columnas correctas
+async function sincronizarClientes(supabase: any): Promise<EnrichmentResult> {
+  const inicio = Date.now()
+  let procesados = 0, nuevos = 0, actualizados = 0, errores = 0
+  let desde = 0
+  const limit = 1000
+
+  try {
+    let hasMore = true
+    while (hasMore) {
+      // Columnas correctas: nombre_responsable, empresa_nombre, categoria_negocio
+      const { data: clientes, error: fetchError } = await supabase
+        .from('clientes')
+        .select('id, nombre_responsable, email, empresa_nombre, categoria_negocio')
+        .not('email', 'is', null)
+        .range(desde, desde + limit - 1)
+
+      if (fetchError) {
+        console.error('Error fetching clientes:', fetchError)
+        errores++
+        break
+      }
+
+      if (!clientes || clientes.length === 0) {
+        hasMore = false
+        break
+      }
+
+      // Procesar cada cliente
+      for (const cliente of clientes) {
+        try {
+          procesados++
+          const email = cliente.email?.toLowerCase().trim()
+
+          if (!email || !esEmailValido(email)) {
+            console.log(`Email inválido para cliente ${cliente.nombre_responsable}: ${email}`)
+            continue
+          }
+
+          const rubro = cliente.categoria_negocio || clasificarRubro(cliente.empresa_nombre || cliente.nombre_responsable)
+
+          // Buscar si ya existe - con await y error check
+          const { data: existente, error: existeError } = await supabase
+            .from('marketing_contactos')
+            .select('id')
+            .eq('email', email)
+            .single()
+
+          if (existente) {
+            await supabase
+              .from('marketing_contactos')
+              .update({
+                rubro,
+                fuente_primaria: 'clientes',
+                actualizado_en: new Date().toISOString()
+              })
+              .eq('id', existente.id)
+            actualizados++
+          } else if (!existeError || existeError.code === 'PGRST116') {
+            // PGRST116 = no row found (expected)
+            await supabase
+              .from('marketing_contactos')
+              .insert({
+                email,
+                nombre: cliente.nombre_responsable,
+                empresa: cliente.empresa_nombre || cliente.nombre_responsable,
+                categoria: 'cliente',
+                fuente_datos: 'clientes',
+                fuente_primaria: 'clientes',
+                rubro,
+                estado_suscripcion: 'suscrito',
+                email_validado: true,
+                estado_email: 'valido',
+                consentimiento_marketing: true,
+                consentimiento_fecha: new Date().toISOString()
+              })
+            nuevos++
+          }
+        } catch (e) {
+          console.error('Error procesando cliente:', e)
+          errores++
+        }
+      }
+
+      desde += limit
+      hasMore = clientes.length === limit
+    }
+  } catch (error) {
+    console.error('Error sincronizando clientes:', error)
+    errores++
+  }
+
+  return {
+    procesados,
+    nuevos,
+    actualizados,
+    errores,
+    tiempo_segundos: (Date.now() - inicio) / 1000
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -330,9 +622,12 @@ Deno.serve(async (req) => {
     console.log('Iniciando enriquecimiento de contactos...')
 
     // Ejecutar todas las operaciones en paralelo
-    const [resultMercado, resultProveedores, resultValidacion, resultDuplicados] = await Promise.all([
+    const [resultMercado, resultProveedores, resultWebinars, resultYouTube, resultClientes, resultValidacion, resultDuplicados] = await Promise.all([
       sincronizarMercadoPublico(supabase),
       sincronizarProveedoresEstado(supabase),
+      sincronizarWebinars(supabase),
+      sincronizarYouTube(supabase),
+      sincronizarClientes(supabase),
       validarEmails(supabase),
       eliminarDuplicados(supabase)
     ])
@@ -342,15 +637,18 @@ Deno.serve(async (req) => {
       .from('contact_enrichment_logs')
       .insert({
         proceso: 'enriquecimiento_completo',
-        registros_procesados: resultMercado.procesados + resultProveedores.procesados + resultValidacion.procesados + resultDuplicados.procesados,
-        registros_nuevos: resultMercado.nuevos + resultProveedores.nuevos + resultValidacion.nuevos,
-        registros_actualizados: resultMercado.actualizados + resultProveedores.actualizados + resultValidacion.actualizados + resultDuplicados.actualizados,
-        errores: resultMercado.errores + resultProveedores.errores + resultValidacion.errores + resultDuplicados.errores,
+        registros_procesados: resultMercado.procesados + resultProveedores.procesados + resultWebinars.procesados + resultYouTube.procesados + resultClientes.procesados + resultValidacion.procesados + resultDuplicados.procesados,
+        registros_nuevos: resultMercado.nuevos + resultProveedores.nuevos + resultWebinars.nuevos + resultYouTube.nuevos + resultClientes.nuevos + resultValidacion.nuevos,
+        registros_actualizados: resultMercado.actualizados + resultProveedores.actualizados + resultWebinars.actualizados + resultYouTube.actualizados + resultClientes.actualizados + resultValidacion.actualizados + resultDuplicados.actualizados,
+        errores: resultMercado.errores + resultProveedores.errores + resultWebinars.errores + resultYouTube.errores + resultClientes.errores + resultValidacion.errores + resultDuplicados.errores,
         estado: 'completado',
         fecha_fin: new Date().toISOString(),
         metadata: {
           mercadopublico: resultMercado,
           proveedores_estado: resultProveedores,
+          webinars: resultWebinars,
+          youtube: resultYouTube,
+          clientes: resultClientes,
           validacion: resultValidacion,
           duplicados: resultDuplicados
         }
@@ -362,6 +660,9 @@ Deno.serve(async (req) => {
         resultados: {
           mercadopublico: resultMercado,
           proveedores_estado: resultProveedores,
+          webinars: resultWebinars,
+          youtube: resultYouTube,
+          clientes: resultClientes,
           validacion: resultValidacion,
           duplicados: resultDuplicados
         }
