@@ -15,13 +15,16 @@ Scheduler (cada 24h)
 Enrichment Edge Function (paralelo)
     ├── Sincronizar MercadoPublico
     ├── Sincronizar Proveedores del Estado (tabla proveedores)
+    ├── Sincronizar Webinars (convenios marcos)
+    ├── Sincronizar YouTube Suscriptores
+    ├── Sincronizar Clientes existentes
     ├── Validar emails (lógica propia)
     ├── Clasificar por rubro
     └── Eliminar duplicados
     ↓
 contact_enrichment_logs (registro)
     ↓
-marketing_contactos (base unificada mejorada con todos los proveedores)
+marketing_contactos (base unificada: TODOS los contactos del negocio)
 ```
 
 ## Configuración
@@ -120,24 +123,37 @@ Detecta automáticamente por palabras clave:
 - **Servicios**: consultoría, asesoría, limpieza, mantenimiento
 - **Empresas Extranjeras**: import, export, internacional
 
-### Fuentes de Datos
+### Fuentes de Datos Consolidadas
 
-1. **Mercado Público API** - Proveedores registrados en MercadoPublico
-2. **Tabla proveedores** - Proveedores del Estado de órdenes de compra (fuente primaria consolidada)
-3. **Datos Abiertos** - Registros públicos (datos.gob.cl)
-4. **Empresas Chilenas** - Base SII cuando esté disponible
-5. **APIs estatales** - Conforme se agreguen
+1. **Tabla proveedores** - Proveedores del Estado de órdenes de compra (personas que compraron al Estado)
+2. **Mercado Público API** - Proveedores registrados en MercadoPublico
+3. **Webinars** (tabla webinar_inscripciones) - Inscritos a convenios marcos y eventos
+4. **YouTube** (tabla youtube_subscribers) - Suscriptores de canales corporativos
+5. **Clientes** (tabla clientes) - Base de clientes existentes
+
+### Fuentes Futuras
+
+- Datos Abiertos - Registros públicos (datos.gob.cl)
+- Empresas Chilanas - Base SII cuando esté disponible
+- APIs estatales - Conforme se agreguen
 
 ## Consolidación Centralizada
 
-**marketing_contactos** es el repositorio unificado de TODOS los contactos:
+**marketing_contactos** es el repositorio unificado de TODOS los contactos del negocio:
 
-- Proveedores del Estado (desde tabla `proveedores` local)
-- Proveedores de Mercado Público
-- Datos de APIs públicas
-- Todos los robots de extracción convergen aquí
+- ✅ **Proveedores del Estado** - Desde tabla `proveedores` (órdenes de compra)
+- ✅ **MercadoPublico** - API pública de proveedores
+- ✅ **Webinars** - Inscritos a convenios marcos y eventos corporativos
+- ✅ **YouTube** - Suscriptores de canales de marketing
+- ✅ **Clientes** - Base de clientes existentes de la empresa
 
-Deduplicación automática por email lowercase, manteniendo el registro más reciente.
+**Automatización:**
+- Sincronización automática cada 24h sin intervención manual
+- Ejecuta en paralelo (más rápido)
+- Deduplicación por email lowercase, mantiene registro más reciente
+- Email validation con lógica propia (sin costo)
+- Clasificación por rubro automática (keywords)
+- Auditoría completa en `contact_enrichment_logs`
 
 ## Dashboard
 
