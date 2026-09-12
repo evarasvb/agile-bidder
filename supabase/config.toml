@@ -64,3 +64,9 @@ verify_jwt = false
 
 [functions.youtube-sync]
 verify_jwt = true
+
+[functions.contact-enrichment]
+verify_jwt = true
+
+[functions.enrichment-scheduler]
+verify_jwt = false
