@@ -59,6 +59,7 @@ const CONTENIDO = {
     canalUrl: "https://youtube.com/@firmavb", // ← tu canal
     videos: [
       // Pega el ID de cada video (la parte después de watch?v= o youtu.be/ ).
+      { id: "oNsOWfAb6cM", titulo: "Cómo postular al Convenio Marco de SaaS (webinar completo)" },
       { id: "ktBYadx4CD4", titulo: "" },
       { id: "OuTCy3DESxQ", titulo: "" },
       { id: "SJ7PZZw1vNM", titulo: "" },
