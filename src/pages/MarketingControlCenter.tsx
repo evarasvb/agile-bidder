@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCampaigns, useCampaignPiezas, useCampaignMetricas, useMarketingEjecucionesRecientes, type MarketingPieza } from '@/hooks/useMarketingCampaigns';
 import { NuevaCampanaRapida } from '@/components/marketing/NuevaCampanaRapida';
 import { PiezaDetalleDialog } from '@/components/marketing/PiezaDetalleDialog';
+import { ContactosSaludPanel } from '@/components/marketing/ContactosSaludPanel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -130,6 +131,7 @@ export default function MarketingControlCenter() {
         <TabsList>
           <TabsTrigger value="campaigns">Mis Campañas</TabsTrigger>
           <TabsTrigger value="contactos">Gestión de Contactos</TabsTrigger>
+          <TabsTrigger value="salud">Salud de Base</TabsTrigger>
           <TabsTrigger value="metricas">Métricas</TabsTrigger>
           <TabsTrigger value="ejecucion">Ejecución</TabsTrigger>
         </TabsList>
@@ -377,6 +379,17 @@ export default function MarketingControlCenter() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        {/* HEALTH TAB */}
+        <TabsContent value="salud" className="space-y-4">
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold">Salud de la Base de Contactos</h2>
+            <p className="text-muted-foreground">
+              Monitoreo automático: validación de emails, eliminación de duplicados, enriquecimiento de datos.
+            </p>
+          </div>
+          <ContactosSaludPanel />
         </TabsContent>
 
         {/* METRICS TAB */}
