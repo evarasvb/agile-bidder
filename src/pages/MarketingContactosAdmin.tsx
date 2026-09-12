@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertCircle, Upload, Users, Filter, Trash2, Download } from 'lucide-react';
+import { AlertCircle, Upload, Users, Filter, Trash2, Download, Youtube, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ContactoStats {
@@ -147,6 +147,59 @@ export default function MarketingContactosAdmin() {
     }
   };
 
+  const handleImportarDeClientes = async () => {
+    try {
+      setLoading(true);
+
+      const { data: clientes, error: clientesError } = await supabase
+        .from('clientes')
+        .select('email, empresa_nombre, nombre_responsable, rut')
+        .limit(1000);
+
+      if (clientesError) {
+        toast.error('No se encontró tabla de clientes o error al acceder');
+        return;
+      }
+
+      if (!clientes || clientes.length === 0) {
+        toast.info('No hay registros en clientes para importar');
+        return;
+      }
+
+      const contactosParaImportar = clientes.map((c: any) => ({
+        email: c.email,
+        nombre: c.nombre_responsable,
+        empresa: c.empresa_nombre,
+        categoria: 'cliente',
+        fuente_datos: 'clientes',
+        estado_suscripcion: 'suscrito',
+        estado_contacto: 'activo',
+        consentimiento_marketing: true,
+        consentimiento_fecha: new Date().toISOString(),
+      }));
+
+      const { error: insertError } = await supabase
+        .from('marketing_contactos')
+        .upsert(contactosParaImportar, { onConflict: 'email' });
+
+      if (insertError) throw insertError;
+
+      await supabase.rpc('marketing_registrar_auditoria', {
+        p_accion: 'importacion',
+        p_fuente: 'clientes',
+        p_cantidad: clientes.length,
+      });
+
+      toast.success(`Importados ${clientes.length} clientes`);
+      setTimeout(cargarDatos, 1000);
+    } catch (error) {
+      console.error('Error importando clientes:', error);
+      toast.error(`Error: ${error instanceof Error ? error.message : 'Desconocido'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleEliminarContacto = async (id: string) => {
     if (!confirm('¿Eliminar este contacto?')) return;
 
@@ -184,6 +237,7 @@ export default function MarketingContactosAdmin() {
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
           <TabsTrigger value="contactos">Contactos</TabsTrigger>
           <TabsTrigger value="importar">Importar</TabsTrigger>
+          <TabsTrigger value="youtube">YouTube</TabsTrigger>
         </TabsList>
 
         {/* RESUMEN TAB */}
@@ -391,7 +445,7 @@ export default function MarketingContactosAdmin() {
               </CardContent>
             </Card>
 
-            <Card className="opacity-50">
+            <Card className="cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition">
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <Upload className="w-4 h-4" />
@@ -400,10 +454,14 @@ export default function MarketingContactosAdmin() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Próximamente: importar desde tabla clientes
+                  Importar contactos de la tabla clientes. Se clasifican automáticamente.
                 </p>
-                <Button disabled className="w-full">
-                  Próximamente
+                <Button
+                  onClick={handleImportarDeClientes}
+                  disabled={loading}
+                  className="w-full"
+                >
+                  {loading ? 'Importando...' : 'Importar Clientes'}
                 </Button>
               </CardContent>
             </Card>
@@ -425,6 +483,69 @@ export default function MarketingContactosAdmin() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* YOUTUBE TAB */}
+        <TabsContent value="youtube" className="space-y-4">
+          <h2 className="text-2xl font-bold">Integración con YouTube</h2>
+
+          <Alert>
+            <Youtube className="h-4 w-4" />
+            <AlertDescription>
+              Conecta tu canal de YouTube para sincronizar suscriptores como contactos de marketing. Tus suscriptores se importarán automáticamente a la base de datos unificada.
+            </AlertDescription>
+          </Alert>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Youtube className="w-5 h-5 text-red-600" />
+                Conectar Canal de YouTube
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-sm font-medium">Pasos para conectar:</Label>
+                  <ol className="text-sm text-muted-foreground mt-2 space-y-1 ml-4 list-decimal">
+                    <li>Ve a <a href="https://console.cloud.google.com" target="_blank" rel="noopener" className="text-blue-600 hover:underline">Google Cloud Console</a></li>
+                    <li>Crea un nuevo proyecto (o selecciona uno existente)</li>
+                    <li>Habilita la YouTube Data API v3</li>
+                    <li>Crea credenciales OAuth 2.0 (tipo: Aplicación Web)</li>
+                    <li>Descarga el archivo JSON con las credenciales</li>
+                    <li>Pega aquí tu <code className="bg-gray-100 px-2 py-1 rounded text-xs">client_id</code> y <code className="bg-gray-100 px-2 py-1 rounded text-xs">client_secret</code></li>
+                  </ol>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
+                  <p className="text-sm font-medium">OAuth Redirect URI:</p>
+                  <code className="block bg-white p-2 rounded text-xs border text-gray-600 truncate">
+                    {`${window.location.origin}/auth/youtube/callback`}
+                  </code>
+                  <p className="text-xs text-blue-600">Agrega esta URL a los "Orígenes autorizados" en Google Cloud</p>
+                </div>
+
+                <Button disabled className="w-full gap-2 mt-4">
+                  <Settings className="w-4 h-4" />
+                  Configurar cuando tengas credenciales
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  Esta función se activará cuando proporciones tus credenciales OAuth de YouTube
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Canales Conectados</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground text-center py-8">
+                No hay canales conectados aún. Completa la configuración arriba para empezar.
+              </p>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
