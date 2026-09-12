@@ -377,27 +377,54 @@ export default function Academia() {
       <Seccion
         id="videos"
         icon={Youtube}
-        titulo="Mis videos"
-        subtitulo="Contenido en YouTube sobre compras públicas y cómo venderle al Estado."
+        titulo="Videos y grabaciones"
+        subtitulo="Las grabaciones de los webinars y el mejor contenido sobre cómo venderle al Estado. Míralas cuando quieras."
         alt
       >
         {videosCargados.length > 0 ? (
           <>
             {/* Video destacado */}
-            <div className="rounded-2xl overflow-hidden shadow-lg border border-border/50 bg-black mb-6 max-w-3xl">
-              <div className="aspect-video">
-                <iframe
-                  className="w-full h-full"
-                  src={`https://www.youtube.com/embed/${youtubeId(videosCargados[0].id)}?rel=0`}
-                  title={videosCargados[0].titulo || "Video destacado"}
-                  loading="lazy"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
+            <div className="max-w-4xl mb-8">
+              <Badge className="mb-3 bg-firmavb-red/10 text-firmavb-red border border-firmavb-red/20 hover:bg-firmavb-red/10">
+                🔴 Grabación del webinar
+              </Badge>
+              <div className="rounded-2xl overflow-hidden shadow-xl border border-border/50 bg-black ring-1 ring-firmavb-blue/10">
+                <div className="aspect-video">
+                  <iframe
+                    className="w-full h-full"
+                    src={`https://www.youtube.com/embed/${youtubeId(videosCargados[0].id)}?rel=0`}
+                    title={videosCargados[0].titulo || "Video destacado"}
+                    loading="lazy"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+              </div>
+              {videosCargados[0].titulo && (
+                <h3 className="mt-4 text-xl md:text-2xl font-bold text-foreground">
+                  {videosCargados[0].titulo}
+                </h3>
+              )}
+              {/* CTA: inscríbete al próximo webinar */}
+              <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-firmavb-blue/20 bg-firmavb-blue/5 p-4">
+                <div className="flex-1">
+                  <p className="font-semibold text-foreground">¿Te lo perdiste en vivo?</p>
+                  <p className="text-sm text-muted-foreground">
+                    Hacemos uno nuevo todos los martes, 19:00 a 19:30. Gratis y en vivo.
+                  </p>
+                </div>
+                <Button asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2 shrink-0">
+                  <Link to="/webinar/vendele-al-estado">
+                    Inscríbete al próximo
+                    <ExternalLink className="h-4 w-4" />
+                  </Link>
+                </Button>
               </div>
             </div>
             {/* Resto de videos */}
             {videosCargados.length > 1 && (
+              <>
+              <h3 className="text-lg font-bold text-foreground mb-4">Más videos y grabaciones</h3>
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {videosCargados.slice(1).map((v, i) => (
                   <Card
@@ -422,6 +449,7 @@ export default function Academia() {
                   </Card>
                 ))}
               </div>
+              </>
             )}
           </>
         ) : (
