@@ -12,15 +12,16 @@ Sistema completamente automático que:
 ```
 Scheduler (cada 24h)
     ↓
-Enrichment Edge Function
+Enrichment Edge Function (paralelo)
     ├── Sincronizar MercadoPublico
+    ├── Sincronizar Proveedores del Estado (tabla proveedores)
     ├── Validar emails (lógica propia)
     ├── Clasificar por rubro
     └── Eliminar duplicados
     ↓
 contact_enrichment_logs (registro)
     ↓
-marketing_contactos (base unificada mejorada)
+marketing_contactos (base unificada mejorada con todos los proveedores)
 ```
 
 ## Configuración
@@ -121,20 +122,33 @@ Detecta automáticamente por palabras clave:
 
 ### Fuentes de Datos
 
-1. **Mercado Público** - Proveedores registrados
-2. **Datos Abiertos** - Registros públicos (datos.gob.cl)
-3. **Empresas Chilenas** - Base SII cuando esté disponible
-4. **APIs estatales** - Conforme se agreguen
+1. **Mercado Público API** - Proveedores registrados en MercadoPublico
+2. **Tabla proveedores** - Proveedores del Estado de órdenes de compra (fuente primaria consolidada)
+3. **Datos Abiertos** - Registros públicos (datos.gob.cl)
+4. **Empresas Chilenas** - Base SII cuando esté disponible
+5. **APIs estatales** - Conforme se agreguen
+
+## Consolidación Centralizada
+
+**marketing_contactos** es el repositorio unificado de TODOS los contactos:
+
+- Proveedores del Estado (desde tabla `proveedores` local)
+- Proveedores de Mercado Público
+- Datos de APIs públicas
+- Todos los robots de extracción convergen aquí
+
+Deduplicación automática por email lowercase, manteniendo el registro más reciente.
 
 ## Dashboard
 
 En Marketing → Centro de Control → Salud de Base:
 
-- ✅ Total de contactos
+- ✅ Total de contactos (consolidados de todas fuentes)
 - ✅ Porcentaje de emails válidos
 - ✅ Distribución por rubro
 - ✅ Histórico de sincronizaciones
 - ✅ Botón manual para enriquecer ahora
+- ✅ Estadísticas de cada fuente de datos
 
 ## Monitoreo
 
