@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   ArrowLeft,
   Youtube,
@@ -11,6 +12,9 @@ import {
   ExternalLink,
   Star,
   Sparkles,
+  Clock,
+  CalendarClock,
+  Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -59,7 +63,18 @@ const CONTENIDO = {
     canalUrl: "https://youtube.com/@firmavb", // ← tu canal
     videos: [
       // Pega el ID de cada video (la parte después de watch?v= o youtu.be/ ).
-      { id: "oNsOWfAb6cM", titulo: "Cómo postular al Convenio Marco de SaaS (webinar completo)" },
+      {
+        id: "oNsOWfAb6cM",
+        titulo: "Cómo postular al Convenio Marco de SaaS (webinar completo)",
+        // Capítulos: saltan al minuto exacto del video (segundos).
+        capitulos: [
+          { t: 20, label: "El error del 99% de descuento" },
+          { t: 141, label: "Postula a las DOS categorías (SaaS + Proyecto)" },
+          { t: 828, label: "Anexo 3: la firma del hosting (AWS/Azure)" },
+          { t: 988, label: "Anexo 4: acreditar tu experiencia" },
+          { t: 2820, label: "Fórmula pyme: 4 anexos + giro = 66 puntos" },
+        ],
+      },
       { id: "ktBYadx4CD4", titulo: "" },
       { id: "OuTCy3DESxQ", titulo: "" },
       { id: "SJ7PZZw1vNM", titulo: "" },
@@ -239,9 +254,26 @@ function PendientePorCargar({ texto }: { texto: string }) {
   );
 }
 
+// Formatea segundos a m:ss para las etiquetas de capítulos.
+function fmtTiempo(seg: number): string {
+  const m = Math.floor(seg / 60);
+  const s = seg % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+// Días hasta el próximo martes (0 = hoy es martes). El webinar es todos los martes.
+function diasHastaProximoMartes(): number {
+  return (2 - new Date().getDay() + 7) % 7;
+}
+
 export default function Academia() {
   const { perfil, banner, youtube, musica, linkedin, libros, cursos, asesoria, asesoriaPago, whatsappGrupo, contacto } =
     CONTENIDO;
+
+  // Salto por capítulos en el video destacado: al elegir un capítulo, recargamos
+  // el iframe con ?start= en ese segundo.
+  const [inicioSeg, setInicioSeg] = useState<number | null>(null);
+  const diasMartes = diasHastaProximoMartes();
 
   const videosCargados = youtube.videos.filter((v) => v.id.trim() !== "");
   const musicaCargada = musica.filter((m) => m.url.trim() !== "");
@@ -391,8 +423,9 @@ export default function Academia() {
               <div className="rounded-2xl overflow-hidden shadow-xl border border-border/50 bg-black ring-1 ring-firmavb-blue/10">
                 <div className="aspect-video">
                   <iframe
+                    key={inicioSeg ?? "start"}
                     className="w-full h-full"
-                    src={`https://www.youtube.com/embed/${youtubeId(videosCargados[0].id)}?rel=0`}
+                    src={`https://www.youtube.com/embed/${youtubeId(videosCargados[0].id)}?rel=0${inicioSeg != null ? `&start=${inicioSeg}&autoplay=1` : ""}`}
                     title={videosCargados[0].titulo || "Video destacado"}
                     loading="lazy"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -405,12 +438,45 @@ export default function Academia() {
                   {videosCargados[0].titulo}
                 </h3>
               )}
+              {/* Capítulos: saltan al minuto exacto del video */}
+              {(videosCargados[0] as any).capitulos?.length > 0 && (
+                <div className="mt-4 rounded-xl border border-border/60 bg-card p-3">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                    <Clock className="h-3.5 w-3.5" /> Capítulos · salta al tema que te interesa
+                  </p>
+                  <div className="flex flex-col gap-1">
+                    {((videosCargados[0] as any).capitulos as { t: number; label: string }[]).map((c) => (
+                      <button
+                        key={c.t}
+                        type="button"
+                        onClick={() => setInicioSeg(c.t)}
+                        className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-firmavb-blue/5 ${
+                          inicioSeg === c.t ? "bg-firmavb-blue/10" : ""
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5 font-mono text-xs font-medium text-firmavb-blue shrink-0 w-14">
+                          <Play className="h-3 w-3 fill-current" /> {fmtTiempo(c.t)}
+                        </span>
+                        <span className="text-foreground group-hover:text-firmavb-blue">{c.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               {/* CTA: inscríbete al próximo webinar */}
               <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-firmavb-blue/20 bg-firmavb-blue/5 p-4">
                 <div className="flex-1">
                   <p className="font-semibold text-foreground">¿Te lo perdiste en vivo?</p>
                   <p className="text-sm text-muted-foreground">
                     Hacemos uno nuevo todos los martes, 19:00 a 19:30. Gratis y en vivo.
+                  </p>
+                  <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-firmavb-blue/10 px-3 py-1 text-xs font-semibold text-firmavb-blue">
+                    <CalendarClock className="h-3.5 w-3.5" />
+                    {diasMartes === 0
+                      ? "¡El próximo es HOY, martes 19:00!"
+                      : diasMartes === 1
+                        ? "Falta 1 día para el próximo martes"
+                        : `Faltan ${diasMartes} días para el próximo martes`}
                   </p>
                 </div>
                 <Button asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2 shrink-0">
