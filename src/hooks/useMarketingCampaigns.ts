@@ -48,6 +48,20 @@ export interface MarketingMetricas {
   tasa_conversion?: number;
 }
 
+export interface MarketingEjecucion {
+  id: string;
+  pieza_id: string;
+  contacto_id?: string;
+  email: string;
+  estado: 'pendiente' | 'enviado' | 'entregado' | 'click' | 'fallo' | 'rebote';
+  respuesta_codigo?: number;
+  respuesta_mensaje?: string;
+  abierto: boolean;
+  clicks: number;
+  fecha_envio?: string;
+  creado_en: string;
+}
+
 export function useCampaigns() {
   const queryClient = useQueryClient();
 
@@ -157,9 +171,27 @@ export function useCampaignPiezas(campaignId: string) {
       if (!response.ok) throw new Error('Error executing campaign');
       return await response.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, piezaId) => {
       queryClient.invalidateQueries({ queryKey: ['marketing_piezas', campaignId] });
       queryClient.invalidateQueries({ queryKey: ['marketing_metricas', campaignId] });
+      queryClient.invalidateQueries({ queryKey: ['marketing_ejecucion', piezaId] });
+    },
+  });
+
+  const updatePieza = useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<MarketingPieza> & { id: string }) => {
+      const { data, error } = await (supabase as any)
+        .from('marketing_piezas')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['marketing_piezas', campaignId] });
     },
   });
 
@@ -168,7 +200,53 @@ export function useCampaignPiezas(campaignId: string) {
     isLoading,
     createPieza: createPieza.mutate,
     ejecutarPieza: ejecutarPieza.mutate,
+    ejecutandoPieza: ejecutarPieza.isPending,
+    updatePieza: updatePieza.mutate,
+    actualizandoPieza: updatePieza.isPending,
   };
+}
+
+// Lista de contactos/emails a los que se envió (o intentó enviar) una pieza —
+// para email es real (marketing-ejecutar la llena); whatsapp/redes todavía se
+// mandan a mano, así que para esas piezas no hay filas acá.
+export function usePiezaEjecuciones(piezaId: string) {
+  const { data: ejecuciones, isLoading } = useQuery({
+    queryKey: ['marketing_ejecucion', piezaId],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('marketing_ejecucion')
+        .select('id, pieza_id, contacto_id, email, estado, respuesta_codigo, respuesta_mensaje, abierto, clicks, fecha_envio, creado_en')
+        .eq('pieza_id', piezaId)
+        .order('fecha_envio', { ascending: false });
+
+      if (error) throw error;
+      return (data || []) as MarketingEjecucion[];
+    },
+    enabled: !!piezaId,
+  });
+
+  return { ejecuciones: ejecuciones || [], isLoading };
+}
+
+// Historial global de envíos (para la pestaña "Ejecución" del Centro de Control).
+export function useMarketingEjecucionesRecientes(limit: number = 100) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['marketing_ejecucion_recientes', limit],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('marketing_ejecucion')
+        .select('id, email, estado, abierto, clicks, fecha_envio, creado_en, marketing_piezas(nombre, canal, campana_id, marketing_campanas(nombre))')
+        .order('creado_en', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+      return (data || []) as Array<MarketingEjecucion & {
+        marketing_piezas: { nombre: string; canal: string; campana_id: string; marketing_campanas: { nombre: string } } | null;
+      }>;
+    },
+  });
+
+  return { ejecuciones: data || [], isLoading };
 }
 
 export function useCampaignMetricas(campaignId: string, days: number = 7) {
