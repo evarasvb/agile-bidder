@@ -209,6 +209,113 @@ async function eliminarDuplicados(supabase: any): Promise<EnrichmentResult> {
   }
 }
 
+// Sincronizar proveedores del Estado (tabla proveedores local)
+async function sincronizarProveedoresEstado(supabase: any): Promise<EnrichmentResult> {
+  const inicio = Date.now()
+  let procesados = 0, nuevos = 0, actualizados = 0, errores = 0
+
+  try {
+    // Obtener todos los proveedores con email de la tabla proveedores
+    const { data: proveedores, error: fetchError } = await supabase
+      .from('proveedores')
+      .select('id, rut, nombre, razon_social, email, rubro, actividad_economica, tamanio_empresa')
+      .not('email', 'is', null)
+
+    if (fetchError) {
+      console.error('Error fetching proveedores:', fetchError)
+      return { procesados, nuevos, actualizados, errores: 1, tiempo_segundos: (Date.now() - inicio) / 1000 }
+    }
+
+    if (!proveedores || proveedores.length === 0) {
+      console.log('No proveedores encontrados')
+      return { procesados: 0, nuevos: 0, actualizados: 0, errores: 0, tiempo_segundos: (Date.now() - inicio) / 1000 }
+    }
+
+    // Procesar cada proveedor
+    for (const proveedor of proveedores) {
+      try {
+        procesados++
+        const email = proveedor.email?.toLowerCase().trim()
+
+        if (!email || !esEmailValido(email)) {
+          console.log(`Email inválido para proveedor ${proveedor.nombre}: ${email}`)
+          continue
+        }
+
+        const rubro = proveedor.rubro || clasificarRubro(proveedor.razon_social || proveedor.nombre, proveedor.actividad_economica)
+
+        // Buscar si ya existe
+        const { data: existente } = await supabase
+          .from('marketing_contactos')
+          .select('id')
+          .eq('email', email)
+          .single()
+          .catch(() => ({ data: null }))
+
+        if (existente) {
+          // Actualizar si no viene de proveedores_estado o con datos más recientes
+          await supabase
+            .from('marketing_contactos')
+            .update({
+              rubro,
+              fuente_primaria: 'proveedores_estado',
+              datos_enriquecimiento: {
+                proveedor_local: true,
+                rut: proveedor.rut,
+                razon_social: proveedor.razon_social,
+                tamanio_empresa: proveedor.tamanio_empresa,
+                actividad_economica: proveedor.actividad_economica
+              },
+              actualizado_en: new Date().toISOString()
+            })
+            .eq('id', existente.id)
+          actualizados++
+        } else {
+          // Insertar nuevo
+          await supabase
+            .from('marketing_contactos')
+            .insert({
+              email,
+              nombre: proveedor.nombre,
+              empresa: proveedor.razon_social || proveedor.nombre,
+              categoria: 'proveedor_estado',
+              fuente_datos: 'proveedores_estado',
+              fuente_primaria: 'proveedores_estado',
+              rubro,
+              estado_suscripcion: 'suscrito',
+              email_validado: true,
+              estado_email: 'valido',
+              datos_enriquecimiento: {
+                proveedor_local: true,
+                rut: proveedor.rut,
+                razon_social: proveedor.razon_social,
+                tamanio_empresa: proveedor.tamanio_empresa,
+                actividad_economica: proveedor.actividad_economica
+              },
+              consentimiento_marketing: false,
+              consentimiento_fecha: null
+            })
+          nuevos++
+        }
+      } catch (e) {
+        console.error('Error procesando proveedor:', e)
+        errores++
+      }
+    }
+  } catch (error) {
+    console.error('Error sincronizando proveedores:', error)
+    errores++
+  }
+
+  return {
+    procesados,
+    nuevos,
+    actualizados,
+    errores,
+    tiempo_segundos: (Date.now() - inicio) / 1000
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -223,8 +330,9 @@ Deno.serve(async (req) => {
     console.log('Iniciando enriquecimiento de contactos...')
 
     // Ejecutar todas las operaciones en paralelo
-    const [resultMercado, resultValidacion, resultDuplicados] = await Promise.all([
+    const [resultMercado, resultProveedores, resultValidacion, resultDuplicados] = await Promise.all([
       sincronizarMercadoPublico(supabase),
+      sincronizarProveedoresEstado(supabase),
       validarEmails(supabase),
       eliminarDuplicados(supabase)
     ])
@@ -234,14 +342,15 @@ Deno.serve(async (req) => {
       .from('contact_enrichment_logs')
       .insert({
         proceso: 'enriquecimiento_completo',
-        registros_procesados: resultMercado.procesados + resultValidacion.procesados + resultDuplicados.procesados,
-        registros_nuevos: resultMercado.nuevos + resultValidacion.nuevos,
-        registros_actualizados: resultMercado.actualizados + resultValidacion.actualizados + resultDuplicados.actualizados,
-        errores: resultMercado.errores + resultValidacion.errores + resultDuplicados.errores,
+        registros_procesados: resultMercado.procesados + resultProveedores.procesados + resultValidacion.procesados + resultDuplicados.procesados,
+        registros_nuevos: resultMercado.nuevos + resultProveedores.nuevos + resultValidacion.nuevos,
+        registros_actualizados: resultMercado.actualizados + resultProveedores.actualizados + resultValidacion.actualizados + resultDuplicados.actualizados,
+        errores: resultMercado.errores + resultProveedores.errores + resultValidacion.errores + resultDuplicados.errores,
         estado: 'completado',
         fecha_fin: new Date().toISOString(),
         metadata: {
           mercadopublico: resultMercado,
+          proveedores_estado: resultProveedores,
           validacion: resultValidacion,
           duplicados: resultDuplicados
         }
@@ -252,6 +361,7 @@ Deno.serve(async (req) => {
         success: true,
         resultados: {
           mercadopublico: resultMercado,
+          proveedores_estado: resultProveedores,
           validacion: resultValidacion,
           duplicados: resultDuplicados
         }
