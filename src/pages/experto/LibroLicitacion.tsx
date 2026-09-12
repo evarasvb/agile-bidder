@@ -13,7 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
-import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink, Trash2, Paperclip, Printer, Mail, Map as MapIcon, Image as ImageIcon, Presentation, Waves } from 'lucide-react';
+import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink, Trash2, Paperclip, Printer, Mail, Map as MapIcon, Image as ImageIcon, Presentation, Waves, Download, Receipt } from 'lucide-react';
+import { useTraerAdjuntos } from '@/hooks/useAdjuntosLicitacion';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -27,11 +28,18 @@ import { SalaPostulacion } from '@/components/experto/SalaPostulacion';
 import { pagoOrganismo, presupuestoTexto, nombrePropio } from '@/lib/organismoPago';
 import { AccionesCompartir } from '@/components/oportunidades/AccionesCompartir';
 import { mailtoOportunidad } from '@/lib/compartir';
+import { LicitacionItemsMatch } from '@/components/licitaciones/LicitacionItemsMatch';
+import { useLicitacionItemsReal } from '@/hooks/useLicitacionItemsReal';
+import { useProductMatching } from '@/hooks/useProductMatching';
+import { useMatchOverrides } from '@/hooks/useMatchOverrides';
+import { useInventoryActivo } from '@/hooks/useInventory';
+import { useCliente } from '@/hooks/useCliente';
+import { descargarCotizacionPDF, type ItemCotizacion, type DatosCotizacion } from '@/services/pdfGenerator';
 
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string;
 const ANON = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
 const fmt = (n: unknown) => n == null ? 's/i' : '$' + Math.round(Number(n)).toLocaleString('es-CL');
-const RE_ID = /\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2}/;
+const RE_ID = /\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}/;
 const idEn = (t: string) => t.toUpperCase().match(RE_ID)?.[0];
 // Citas [n] como en NotebookLM: clic abre la fuente (o despliega la lista si no tiene link); al pasar el mouse muestra cuál es.
 const conCitas = (html: string, fuentes?: any[]) => html.replace(/\[(\d{1,2})\]/g, (_m, n) => {
@@ -75,6 +83,20 @@ export default function LibroLicitacion() {
     enabled: !!cod && !!token,
     queryFn: async () => (await (supabase as any).rpc('experto_libro', { p_codigo: cod })).data,
   });
+
+  // Productos solicitados de la licitación con match contra el inventario (para
+  // mostrar "Productos Solicitados" y armar la cotización comercial). El libro
+  // trae la ficha resumida por RPC, pero los ítems detallados están aparte.
+  const { data: licRow } = useQuery({
+    queryKey: ['licitacion_bi_id', cod],
+    enabled: !!cod,
+    queryFn: async () => (await (supabase as any).from('licitaciones_bi').select('id').eq('codigo', cod).maybeSingle()).data,
+  });
+  const { data: licItems = [] } = useLicitacionItemsReal(licRow?.id);
+  const { procesarCompra } = useProductMatching();
+  const { data: matchOverrides = {} } = useMatchOverrides(cod, 'licitacion');
+  const { data: inventarioActivo = [] } = useInventoryActivo();
+  const { data: cliente } = useCliente();
 
   const [buscarLibro, setBuscarLibro] = useState('');
   const [verArchivados, setVerArchivados] = useState(false);
@@ -197,6 +219,19 @@ export default function LibroLicitacion() {
 
   // Fuentes subidas (una sola entrada): PDF de bases (se reconocen solos y quedan para todos), Excel, Word,
   // imágenes o texto (privados, cuentan para el cupo del plan). Varios archivos a la vez, uno tras otro.
+  // Bases y anexos directo desde la ficha de Mercado Público (robot licitacion-adjuntos).
+  const traerAdjuntos = useTraerAdjuntos(cod);
+  const traerBasesMP = () =>
+    traerAdjuntos.mutate(undefined, {
+      onSuccess: (r) => {
+        if (!r.encontrados) toast.info('Mercado Público no muestra anexos para esta licitación todavía.');
+        else if (!r.nuevos) toast.info('Ya teníamos todos los anexos publicados.');
+        else toast.success(`${r.nuevos} archivo(s) bajado(s)${r.bases ? ` · ${r.bases} leído(s) como bases` : ''}`);
+        if (r.errores?.length) toast.warning(r.errores[0]);
+      },
+      onError: (e) => toast.error(e.message),
+    });
+
   const subirFuentes = async (files: FileList | File[]) => {
     const lista = Array.from(files); if (!lista.length) return;
     setOcupado('fuentes');
@@ -275,6 +310,69 @@ export default function LibroLicitacion() {
       toast.success(`PowerPoint listo en "Mis documentos de trabajo" (${j.slides} láminas).`, { duration: 7000 });
       qc.invalidateQueries({ queryKey: ['experto_libro', cod] });
     } catch (e: any) { toast.error(e.message); } finally { setOcupado(null); }
+  };
+  // Ítems de la licitación con match confirmado o sugerido contra el inventario
+  // (mismo criterio que la sección "Productos Solicitados" de más arriba): se
+  // excluyen los descartados por el usuario y se respeta la reasignación manual.
+  const itemsParaCotizar = (): ItemCotizacion[] => {
+    if (!licItems.length) return [];
+    const mapped = licItems.map((it: any, idx: number) => ({
+      id: String(it.id ?? `idx-${idx}`),
+      nombre: it.nombre_producto || '',
+      descripcion: it.descripcion || '',
+      cantidad: it.cantidad ?? 1,
+      unidad: it.unidad || 'unidad',
+    }));
+    const inventarioById = new Map((inventarioActivo as any[]).map((p: any) => [p.id, p]));
+    return procesarCompra(mapped)
+      .map((item: any) => {
+        const ov = (matchOverrides as any)[String(item.id)];
+        if (ov?.accion === 'descartado') return null;
+        let match = item.bestMatch ? { inventoryItem: item.bestMatch.inventoryItem, score: item.bestMatch.score } : null;
+        if (ov?.accion === 'reasignado' && ov.inventario_id) {
+          const prod = inventarioById.get(ov.inventario_id);
+          if (prod) match = { inventoryItem: prod, score: ov.score_manual ?? 100 };
+        }
+        if (!match) return null;
+        return {
+          itemRequerido: item.nombre,
+          productoOfertado: match.inventoryItem.nombre_producto,
+          sku: match.inventoryItem.sku || 'N/A',
+          cantidad: item.cantidad,
+          unidad: item.unidad,
+          precioUnitario: match.inventoryItem.precio_unitario,
+          total: match.inventoryItem.precio_unitario * item.cantidad,
+          matchScore: match.score,
+        } as ItemCotizacion;
+      })
+      .filter((x): x is ItemCotizacion => x !== null);
+  };
+  // Cotización comercial en PDF (mismo formato que usan las compras ágiles) con
+  // los productos ofertados: útil cuando la licitación pide subir una oferta
+  // comercial además de los anexos (típico en artículos de oficina y similares).
+  const generarCotizacion = async () => {
+    const items = itemsParaCotizar();
+    if (!items.length) { toast.error('No hay productos con match para cotizar. Revisa "Productos Solicitados" más arriba y corrige el match si hace falta.', { duration: 7000 }); return; }
+    setOcupado('cotizacion');
+    try {
+      const datosPDF: DatosCotizacion = {
+        numero: `COT-${Date.now().toString().slice(-8)}`,
+        fecha: new Date(),
+        validezDias: 15,
+        compra: { codigo: cod, organismo: f?.institucion || 'Organismo', nombre: f?.nombre || cod },
+        items,
+        empresa: {
+          nombre: cliente?.empresa_nombre || 'FirmaVB',
+          rut: cliente?.rut || '',
+          direccion: cliente?.direccion || '',
+          telefono: cliente?.telefono || '',
+          email: cliente?.email_contacto || cliente?.email || 'contacto@firmavb.cl',
+          logo: cliente?.logo_url || undefined,
+        },
+      };
+      await descargarCotizacionPDF(datosPDF);
+      toast.success('Cotización descargada');
+    } catch (e: any) { toast.error(e.message || 'No pude generar la cotización'); } finally { setOcupado(null); }
   };
   const completarTodos = async () => {
     const lista = wordsUnicos(); if (!lista.length) return;
@@ -356,6 +454,16 @@ export default function LibroLicitacion() {
   const f = libro?.ficha; const o = f?.organismo ?? {};
   const bases: any[] = libro?.bases ?? [];
   const documentos: any[] = libro?.documentos ?? [];
+  // Apenas se abre el libro, si nadie ha subido bases todavía se intenta traerlas solo desde
+  // Mercado Público (silencioso, sin toasts): la mayoría de las veces el cliente ni se entera
+  // de que hizo falta un paso, las bases ya están cuando pregunta. Un intento por código.
+  const autoBasesIntentado = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!libro || !cod || autoBasesIntentado.current.has(cod)) return;
+    autoBasesIntentado.current.add(cod);
+    if (!bases.length) traerAdjuntos.mutate(undefined, { onError: () => {} });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [libro, cod]);
   const top: any[] = libro?.top_adjudicatarios ?? [];
   const esPro = libro?.plan && libro.plan !== 'free';
   // Cuota del modo Bajo el Agua (1 gratis de por vida; después según plan, configurable en la base).
@@ -451,8 +559,11 @@ export default function LibroLicitacion() {
               </div>
               <div>
                 <p className="font-medium flex items-center gap-1"><Upload className="h-4 w-4" />Fuentes subidas · bases (PDF)</p>
-                {bases.length ? bases.map((b) => <p key={b.id} className="text-muted-foreground truncate">{b.archivo} · {b.paginas} pág.</p>) : <p className="text-muted-foreground">Nadie las ha subido aún.</p>}
+                {bases.length ? bases.map((b) => <p key={b.id} className="text-muted-foreground truncate">{b.archivo} · {b.paginas} pág.</p>) : traerAdjuntos.isPending ? <p className="text-muted-foreground flex items-center gap-1"><Loader2 className="h-3.5 w-3.5 animate-spin" />Buscando las bases en Mercado Público…</p> : <p className="text-muted-foreground">Mercado Público no las tiene publicadas todavía (o el robot no las encontró). Tráelas de nuevo o súbelas tú abajo.</p>}
                 <input ref={fileRef} type="file" multiple accept=".pdf,.xlsx,.xls,.xlsm,.csv,.docx,.txt,.md,.png,.jpg,.jpeg,.gif,.webp" className="hidden" onChange={(e) => { if (e.target.files?.length) subirFuentes(e.target.files); e.target.value = ''; }} />
+                <Button size="sm" variant="outline" className="mt-1 mr-2" onClick={traerBasesMP} disabled={!!ocupado || traerAdjuntos.isPending} title="Baja las bases y anexos publicados en la ficha de Mercado Público y el Experto los lee">
+                  {traerAdjuntos.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Download className="h-4 w-4 mr-1" />}Traer bases desde Mercado Público
+                </Button>
                 <Button size="sm" variant="outline" className="mt-1" onClick={() => fileRef.current?.click()} disabled={ocupado === 'fuentes'}>
                   {ocupado === 'fuentes' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}Subir fuentes (PDF, Excel, Word, imágenes)
                 </Button>
@@ -466,8 +577,11 @@ export default function LibroLicitacion() {
               <div>
                 <p className="font-medium flex items-center gap-1"><Paperclip className="h-4 w-4" />Mis documentos de trabajo</p>
                 <p className="text-xs text-muted-foreground">Excel, Word, PDF o imágenes (tu matriz, checklist, anexos a medio llenar). El Experto los lee para anotar qué te falta y ayudarte a completarlos.{documentos.length === 0 ? ' Sube con el botón de arriba.' : ''}</p>
-                <Button size="sm" variant="outline" className="mt-1 mb-1 w-full sm:w-auto" onClick={generarPptx} disabled={!!ocupado} title="Portada, resumen, admisibilidad, evaluación, tareas por fase, garantías y pendientes en un PowerPoint">
+                <Button size="sm" variant="outline" className="mt-1 mb-1 mr-2 w-full sm:w-auto" onClick={generarPptx} disabled={!!ocupado} title="Portada, resumen, admisibilidad, evaluación, tareas por fase, garantías y pendientes en un PowerPoint">
                   {ocupado === 'pptx' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Presentation className="h-4 w-4 mr-1" />}Generar PowerPoint de la matriz
+                </Button>
+                <Button size="sm" variant="outline" className="mt-1 mb-1 w-full sm:w-auto" onClick={generarCotizacion} disabled={!!ocupado} title="Cotización en PDF con los productos de tu inventario que hacen match, lista para subir como oferta comercial">
+                  {ocupado === 'cotizacion' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Receipt className="h-4 w-4 mr-1" />}Generar cotización comercial
                 </Button>
                 {documentos.map((d: any) => (
                   <div key={d.id} className="flex items-center gap-1 text-muted-foreground">
@@ -523,6 +637,7 @@ export default function LibroLicitacion() {
               )}
             </CardContent>
           </Card>}
+          {cod && licItems.length > 0 && <LicitacionItemsMatch codigo={cod} items={licItems} />}
         </div>);
       const panelChat = (
         <Card className="flex flex-col h-full min-h-[60vh]">
@@ -547,7 +662,19 @@ export default function LibroLicitacion() {
                     e.preventDefault(); const d = document.getElementById(`fuentes-${i}`) as HTMLDetailsElement | null; if (d) d.open = true;
                     const fila = document.getElementById(`fuente-${i}-${a.dataset.n}`); if (fila) { fila.scrollIntoView({ block: 'nearest' }); fila.classList.add('bg-yellow-100'); setTimeout(() => fila.classList.remove('bg-yellow-100'), 1500); }
                   }} /> : <span className="text-muted-foreground">Buscando en las fuentes…</span>}
-                  {m.pedirBases && <p className="mt-2 text-xs text-muted-foreground">Sube las bases en el panel de Fuentes y vuelve a preguntar.</p>}
+                  {m.pedirBases && (
+                    <div className="mt-2 rounded-md border border-firmavb-blue/30 bg-firmavb-blue/5 px-2 py-2 text-xs space-y-1.5">
+                      <p>Para esto necesito las bases en PDF y todavía no las tengo — Mercado Público puede no haberlas publicado, o el robot aún no las encontró. Mientras tanto te respondo con lo que sé.</p>
+                      <div className="flex flex-wrap gap-1">
+                        <Button size="sm" variant="outline" className="h-7" disabled={traerAdjuntos.isPending} onClick={traerBasesMP}>
+                          {traerAdjuntos.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Download className="h-3.5 w-3.5 mr-1" />}Reintentar desde Mercado Público
+                        </Button>
+                        <Button size="sm" className="h-7" onClick={() => { if (!escritorio) { setVista('fuentes'); setTimeout(() => fileRef.current?.click(), 150); } else fileRef.current?.click(); }}>
+                          <Upload className="h-3.5 w-3.5 mr-1" />Subir bases (PDF)
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                   {!cod && m.texto && idEn(msgs[i - 1]?.texto ?? '') && <Button size="sm" variant="outline" className="mt-2" onClick={() => navigate(`/experto/libro/${idEn(msgs[i - 1].texto)}`)}><BookOpen className="h-3.5 w-3.5 mr-1" />Abrir el libro de {idEn(msgs[i - 1].texto)}</Button>}
                   {m.texto && m.fuentes && m.fuentes.length > 0 && (
                     <details id={`fuentes-${i}`} className="mt-2 text-xs text-muted-foreground"><summary className="cursor-pointer">Fuentes ({m.fuentes.length}) · haz clic en un [n] del texto para ver de dónde salió</summary>

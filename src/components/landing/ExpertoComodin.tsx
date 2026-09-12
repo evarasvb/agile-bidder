@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { PhoneCall, ArrowRight, Loader2 } from "lucide-react";
+import { PhoneCall } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 // Misma URL/llave pública que usa el cliente canónico (src/integrations/supabase/client.ts),
@@ -101,31 +100,22 @@ export function ExpertoComodin() {
               <PhoneCall className="h-6 w-6" />
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="text-2xl font-bold">¿Te trabaste en una licitación? Usa tu comodín telefónico: llama al Experto</h2>
+              <h2 className="text-2xl font-bold">¿Dudas de Mercado Público? Pregúntale a Evaristo, tu experto</h2>
               <p className="mt-2 text-muted-foreground">
                 17 años vendiéndole al Estado, la Ley 19.886, 3.148 dictámenes de Contraloría y los datos vivos de Mercado Público
                 (quién gana, cómo paga cada organismo). Tu primera pregunta es gratis y se responde aquí mismo.
               </p>
               {!usado && (
                 <>
-                  <form className="mt-5 flex flex-col sm:flex-row gap-2" onSubmit={(e) => { e.preventDefault(); preguntar(q); }}>
-                    <Input value={q} onChange={(e) => setQ(e.target.value)} disabled={estado === "cargando"}
-                      placeholder="Escribe tu pregunta, ej. ¿Puedo reclamar si evaluaron mal mi oferta?"
-                      className="h-12 text-base" aria-label="Pregunta para el Experto FirmaVB" />
-                    <Button type="submit" size="lg" disabled={estado === "cargando"} className="h-12 bg-firmavb-blue hover:bg-firmavb-blue/90 whitespace-nowrap">
-                      {estado === "cargando" ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Llamar al Experto<ArrowRight className="ml-2 h-4 w-4" /></>}
-                    </Button>
-                  </form>
-                  {estado === "idle" && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {EJEMPLOS.map((e) => (
-                        <button key={e} type="button" onClick={() => { setQ(e); preguntar(e); }}
-                          className="rounded-full border bg-background px-3 py-1 text-sm text-muted-foreground hover:border-firmavb-blue hover:text-foreground transition-colors">
-                          {e}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  <p className="mt-5 text-sm font-medium text-foreground">Elige una pregunta para probar:</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {EJEMPLOS.map((e) => (
+                      <button key={e} type="button" disabled={estado === "cargando"} onClick={() => { setQ(e); preguntar(e); }}
+                        className="rounded-full border bg-background px-3 py-1 text-sm text-muted-foreground hover:border-firmavb-blue hover:text-foreground transition-colors disabled:opacity-50">
+                        {e}
+                      </button>
+                    ))}
+                  </div>
                 </>
               )}
               {(texto || estado === "cargando") && (

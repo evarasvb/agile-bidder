@@ -1,0 +1,67 @@
+# Piloto: cargar Órdenes de Compra desde Datos Abiertos de ChileCompra.
+# Fuente: https://transparenciachc.blob.core.windows.net/oc-da/AAAA-M.zip (CSV ; UTF-8).
+# Se corre a mano (workflow_dispatch). MODO=probe mide sin insertar; MODO=load inserta.
+name: Datos Abiertos OC (piloto)
+
+on:
+  workflow_dispatch:
+    inputs:
+      anio:
+        description: 'Año (ej. 2026)'
+        required: true
+        default: '2026'
+      mes:
+        description: 'Mes inicial sin cero (ej. 1)'
+        required: true
+        default: '8'
+      mes_hasta:
+        description: 'Mes final sin cero (para rango; vacío = solo el inicial)'
+        required: false
+        default: ''
+      modo:
+        description: 'probe (medir) o load (insertar)'
+        required: true
+        default: 'probe'
+        type: choice
+        options: [probe, load]
+      filtrar:
+        description: 'Filtrar a rubros de firmavb: escribe si o no'
+        required: true
+        default: 'no'
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+jobs:
+  cargar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Cargar rango de meses
+        env:
+          ANIO: ${{ github.event.inputs.anio }}
+          MES: ${{ github.event.inputs.mes }}
+          MES_HASTA: ${{ github.event.inputs.mes_hasta }}
+          MODO: ${{ github.event.inputs.modo }}
+          FILTRAR: ${{ github.event.inputs.filtrar }}
+        run: |
+          FIN="${MES_HASTA:-$MES}"
+          echo "Procesando meses ${MES}..${FIN} de ${ANIO} (modo=${MODO}, filtrar=${FILTRAR})"
+          for M in $(seq "$MES" "$FIN"); do
+            URL="https://transparenciachc.blob.core.windows.net/oc-da/${ANIO}-${M}.zip"
+            echo "::group::Mes ${M} — ${URL}"
+            rm -rf ocdata oc.zip; mkdir -p ocdata
+            if ! curl -sSL --fail "$URL" -o oc.zip; then echo "::warning::No se pudo descargar $URL (mes sin archivo aún); sigo"; echo "::endgroup::"; continue; fi
+            ls -la oc.zip
+            if ! unzip -o oc.zip -d ocdata >/dev/null 2>&1; then
+              sudo apt-get -y install p7zip-full >/dev/null 2>&1; 7z x -y -oocdata oc.zip >/dev/null;
+            fi
+            OCDIR=ocdata node scripts/datos-abiertos-oc.mjs
+            echo "::endgroup::"
+          done
+          echo "Rango completo."

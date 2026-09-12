@@ -35,7 +35,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Link, useNavigate } from "react-router-dom";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { DemoModal } from "@/components/landing/DemoModal";
 import { LandingChat, LandingChatButton } from "@/components/landing/LandingChat";
@@ -49,9 +49,15 @@ export default function Landing() {
   const [searchQuery, setSearchQuery] = useState("");
   const [teaserTermino, setTeaserTermino] = useState("");
   const [demoOpen, setDemoOpen] = useState(false);
-  const { isAuthenticated, signOut, user } = useAuth();
+  const { isAuthenticated, signOut, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const teaserRef = useRef<HTMLDivElement>(null);
+
+  // Si ya tienes sesión, entras directo a la plataforma (antes te quedabas en la
+  // portada con un botón "Dashboard" poco visible y parecía que el login no pasó).
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) navigate('/dashboard', { replace: true });
+  }, [authLoading, isAuthenticated, navigate]);
 
   const handleLogout = async () => {
     await signOut();
@@ -111,12 +117,12 @@ export default function Landing() {
               asChild
               className="gap-1.5 border-firmavb-green/40 text-firmavb-green hover:bg-firmavb-green/10 transition-colors px-2.5 sm:px-4 hidden sm:inline-flex"
             >
-              <Link to="/webinar/convenio-marco-saas">
+              <Link to="/webinar/vendele-al-estado">
                 <span className="relative flex h-2 w-2 mr-0.5">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-firmavb-green opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-firmavb-green" />
                 </span>
-                Webinar gratis
+                En vivo · martes
               </Link>
             </Button>
             <Button
@@ -163,15 +169,15 @@ export default function Landing() {
         </div>
       </header>
 
-      {/* Banner: webinar gratis del Convenio Marco de SaaS */}
+      {/* Banner: conversación semanal en vivo (todos los martes) */}
       <div className="pt-20 px-6">
         <Link
-          to="/webinar/convenio-marco-saas"
+          to="/webinar/vendele-al-estado"
           className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-2 rounded-xl bg-firmavb-green/10 border border-firmavb-green/20 px-4 py-2.5 text-sm text-firmavb-green hover:bg-firmavb-green/15 transition-colors"
         >
           <MonitorPlay className="h-4 w-4 shrink-0" />
           <span>
-            <b>Webinar gratis</b> · Martes 8 de septiembre, 19:00 hrs: cómo postular al Convenio Marco de SaaS y no morir en el intento
+            <b>En vivo, gratis · todos los martes 19:00 hrs:</b> Véndele al Estado y no mueras en el intento — inscríbete y te llega la cita al calendario
           </span>
           <ArrowRight className="h-4 w-4 shrink-0" />
         </Link>

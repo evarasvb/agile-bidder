@@ -28,6 +28,7 @@ import { MatchItemActions } from '@/components/compras-agiles/MatchItemActions';
 import { AgregarProductoManual } from '@/components/compras-agiles/AgregarProductoManual';
 import { AccionesCompartir } from '@/components/oportunidades/AccionesCompartir';
 import { DetalleCompraAgil } from '@/components/compras-agiles/DetalleCompraAgil';
+import { unidadLabel } from '@/utils/unidades';
 
 // Color del badge de match según el %.
 const matchBadge = (score: number) =>
@@ -249,24 +250,30 @@ export default function CompraAgilDetalle() {
           Libro del Experto
         </Button>
         {/* Siempre visible, no solo tras guardar la propuesta: antes el único
-            camino hacia Mercado Público quedaba escondido en Postulaciones. */}
-        <Button asChild variant="outline" className="gap-2 shrink-0">
-          <a
-            href={`https://www.mercadopublico.cl/CompraAgil/Cotizacion/${compra.codigo}`}
-            target="_blank"
-            rel="noreferrer"
-          >
+            camino hacia Mercado Público quedaba escondido en Postulaciones.
+            Usa el link real scrapeado (compra.link_oficial): la URL antes se
+            armaba a mano con el código y esa ruta no existe en el sitio real
+            (daba 404). */}
+        {compra.link_oficial ? (
+          <Button asChild variant="outline" className="gap-2 shrink-0">
+            <a href={compra.link_oficial} target="_blank" rel="noreferrer">
+              <ExternalLink className="h-4 w-4" />
+              Postular en Mercado Público
+            </a>
+          </Button>
+        ) : (
+          <Button variant="outline" className="gap-2 shrink-0" disabled title="Aún no tenemos el enlace oficial de esta compra">
             <ExternalLink className="h-4 w-4" />
             Postular en Mercado Público
-          </a>
-        </Button>
+          </Button>
+        )}
         <Button onClick={() => setPropuestaOpen(true)} className="gap-2 shrink-0">
           <Sparkles className="h-4 w-4" />
           Generar propuesta
         </Button>
       </div>
       <div className="flex flex-wrap gap-2">
-        <AccionesCompartir size="default" oportunidad={{ codigo: compra.codigo, nombre: compra.nombre, tipo: 'compra_agil', organismo: compra.organismo, monto: compra.monto, moneda: compra.moneda, fecha_cierre: compra.fecha_cierre, fecha_publicacion: compra.fecha_publicacion, descripcion: compra.descripcion }} />
+        <AccionesCompartir size="default" oportunidad={{ codigo: compra.codigo, nombre: compra.nombre, tipo: 'compra_agil', organismo: compra.organismo, monto: compra.monto, moneda: compra.moneda, fecha_cierre: compra.fecha_cierre, fecha_publicacion: compra.fecha_publicacion, link: compra.link_oficial, descripcion: compra.descripcion }} />
       </div>
 
       <RiesgoOrganismoCard codigo={compra.codigo} organismo={compra.organismo} />
@@ -361,9 +368,12 @@ export default function CompraAgilDetalle() {
                   <div key={f.id} className={`rounded-xl border p-3 ${f.estado === 'descartado' ? 'border-border/60 opacity-60' : f.match ? 'border-firmavb-blue/30' : 'border-border/60'}`}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium ${f.estado === 'descartado' ? 'line-through' : ''}`}>
-                          {f.solicitado ?? <span className="italic text-muted-foreground">Agregado por ti</span>}
+                        <p className={`text-sm font-medium whitespace-pre-line ${f.estado === 'descartado' ? 'line-through' : ''}`}>
+                          {f.descripcion || f.solicitado || <span className="italic text-muted-foreground">Agregado por ti</span>}
                         </p>
+                        {f.descripcion && f.solicitado && (
+                          <p className="text-xs text-muted-foreground">Categoría: {f.solicitado}</p>
+                        )}
                         <EstadoBadge estado={f.estado} />
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
@@ -385,11 +395,11 @@ export default function CompraAgilDetalle() {
                       <div className="mt-1.5 text-sm">
                         <p className="text-firmavb-blue font-medium">→ {f.match.nombre}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          {f.cantidad} {f.unidad} × {clp(f.match.precio || 0)} = <span className="font-semibold text-foreground">{clp(f.match.subtotal)}</span>
+                          {f.cantidad} {unidadLabel(f.unidad)} × {clp(f.match.precio || 0)} = <span className="font-semibold text-foreground">{clp(f.match.subtotal)}</span>
                         </p>
                       </div>
                     ) : f.estado !== 'descartado' ? (
-                      <p className="mt-1 text-xs text-muted-foreground">Sin match en tu inventario · {f.cantidad} {f.unidad}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Sin match en tu inventario · {f.cantidad} {unidadLabel(f.unidad)}</p>
                     ) : (
                       <p className="mt-1 text-xs text-muted-foreground">No aparecerá en la cotización.</p>
                     )}
@@ -414,11 +424,13 @@ export default function CompraAgilDetalle() {
                   {filasTotal.map((f) => (
                     <TableRow key={f.id} className={f.estado === 'descartado' ? 'opacity-60' : ''}>
                       <TableCell className="align-top">
-                        <p className={`font-medium ${f.estado === 'descartado' ? 'line-through' : ''}`}>
-                          {f.solicitado ?? <span className="italic text-muted-foreground">Agregado por ti</span>}
+                        {/* Lo que piden de verdad es la descripción de la ficha; el
+                            nombre_producto es la categoría ONU genérica ("Sillas"). */}
+                        <p className={`font-medium max-w-md whitespace-pre-line ${f.estado === 'descartado' ? 'line-through' : ''}`}>
+                          {f.descripcion || f.solicitado || <span className="italic text-muted-foreground">Agregado por ti</span>}
                         </p>
-                        {f.descripcion && (
-                          <p className="text-xs text-muted-foreground max-w-xs truncate">{f.descripcion}</p>
+                        {f.descripcion && f.solicitado && (
+                          <p className="text-xs text-muted-foreground">Categoría: {f.solicitado}</p>
                         )}
                         <EstadoBadge estado={f.estado} />
                       </TableCell>
@@ -441,7 +453,7 @@ export default function CompraAgilDetalle() {
                           <span className="text-muted-foreground">—</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right align-top">{f.cantidad} {f.unidad}</TableCell>
+                      <TableCell className="text-right align-top">{f.cantidad} {unidadLabel(f.unidad)}</TableCell>
                       <TableCell className="text-right align-top">{f.match?.precio ? clp(f.match.precio) : '—'}</TableCell>
                       <TableCell className="text-right align-top font-medium">{f.match?.precio ? clp(f.match.subtotal) : '—'}</TableCell>
                       <TableCell className="align-top">

@@ -6,8 +6,15 @@
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import type { CompraAgil } from '@/hooks/useComprasAgiles';
 import { IVA_RATE } from '@/lib/constants';
+
+// Datos mínimos del proceso (compra ágil o licitación) que necesita el
+// encabezado "REFERENCIA DE COMPRA" del PDF: código, organismo y nombre.
+export interface ReferenciaProcesoCotizacion {
+  codigo: string;
+  organismo: string;
+  nombre: string;
+}
 
 export interface ItemCotizacion {
   itemRequerido: string;
@@ -33,7 +40,7 @@ export interface DatosCotizacion {
   numero: string;
   fecha: Date;
   validezDias: number;
-  compra: CompraAgil;
+  compra: ReferenciaProcesoCotizacion;
   items: ItemCotizacion[];
   empresa: DatosEmpresa;
   observaciones?: string;

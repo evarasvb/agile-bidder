@@ -28,6 +28,10 @@ export interface OportunidadPanel {
   // Texto concatenado de los productos de la compra, para buscar por ítem
   // (una compra "Insumos de oficina" que en su lista tiene tóner debe calzar).
   items_text?: string;
+  // Detalle de cada producto pedido ("2 EA · UNION AMERICANA 90 MM PVC"), en el
+  // orden de la ficha. El nombre_producto es la categoría ONU genérica ("Cloruro
+  // de polivinilo"); lo que el comprador realmente pide va en la descripción.
+  items_detalle?: string[];
   // Ítem (o descripción) que calzó con lo que el usuario buscó, cuando la
   // búsqueda corrió en el servidor. Sirve para explicar por qué aparece.
   coincidencia?: string | null;
@@ -45,6 +49,8 @@ export interface OportunidadDetalle extends OportunidadPanel {
   buyer: BuyerProfile | null;
   /** Solo compras ágiles: detalle completo bajado por código (entrega, ofertas, adjuntos). */
   detalle?: DetalleCompraAgilDatos | null;
+  /** Licitaciones: raw_data de licitaciones_bi (ficha completa de la API de Mercado Público). */
+  ficha?: Record<string, unknown> | null;
 }
 
 export interface OportunidadItem {
@@ -99,15 +105,29 @@ export const PISO_MATCH = 40;
 // Máximo de filas traídas del servidor al incluir cerradas (evita descargar
 // las decenas de miles de oportunidades terminadas al navegador).
 const MAX_CERRADAS = 500;
-// Tope de seguridad para la vista de activas (hoy son decenas; el límite evita
-// sorpresas si alguna carga futura deja muchas con fecha futura).
-const MAX_ACTIVAS = 500;
+// Tope de la vista de activas. Con las horas corregidas (07-09-2026) hay ~2.300
+// compras ágiles abiertas y ~1.000 nuevas al día: con 500 quedaba fuera todo lo
+// publicado hace más de medio día y el usuario no encontraba compras que sí
+// estaban en la base. 1.500 cubre ~1,5 días; lo anterior se alcanza buscando.
+const MAX_ACTIVAS = 1500;
+
+// "2 EA · UNION AMERICANA 90 MM PVC": cantidad, unidad y lo que realmente piden.
+function detalleItem(i: any): string {
+  const spec = String(i?.descripcion_producto || '').replace(/\s+/g, ' ').trim();
+  const nombre = String(i?.nombre_producto || '').trim();
+  const texto = spec && spec.toLowerCase() !== nombre.toLowerCase() ? spec : nombre;
+  if (!texto) return '';
+  const cant = i?.cantidad != null && Number(i.cantidad) > 0 ? `${Number(i.cantidad)} ${i.unidad || ''}`.trim() : '';
+  return cant ? `${cant} · ${texto}` : texto;
+}
 
 export interface PanelStats {
   totalActivas: number;
   avgMatchScore: number;
   cierranEstaSemana: number;
   valorTotal: number;
+  /** Solo con búsqueda por texto: lo que encontró el servidor y cuánto ocultaron los filtros. */
+  busqueda?: { texto: string; coincidencias: number; licitaciones: number; comprasAgiles: number; ocultas: number };
 }
 
 // =============================================================================
@@ -160,7 +180,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         .select(`
           id, codigo, nombre, descripcion, nombre_organismo, region, monto_estimado,
           fecha_cierre, created_at, estado, match_score, match_encontrado, url_ficha,
-          compras_agiles_items(id, nombre_producto)
+          compras_agiles_items(id, nombre_producto, descripcion_producto, cantidad, unidad)
         `)
         .order('created_at', { ascending: false });
 
@@ -259,7 +279,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
           .select(`
           id, codigo, nombre, descripcion, nombre_organismo, region, monto_estimado,
           fecha_cierre, created_at, estado, match_score, match_encontrado, url_ficha,
-          compras_agiles_items(id, nombre_producto)
+          compras_agiles_items(id, nombre_producto, descripcion_producto, cantidad, unidad)
         `)
           .in('codigo', lote),
       );
@@ -410,9 +430,9 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         items_matched: itemMatchCountByCodigo[c.codigo] ?? 0,
         created_at: c.created_at,
         items_text: (c.compras_agiles_items || [])
-          .map((i: any) => i.nombre_producto)
-          .filter(Boolean)
+          .map((i: any) => `${i.nombre_producto || ''} ${i.descripcion_producto || ''}`)
           .join(' '),
+        items_detalle: (c.compras_agiles_items || []).map((i: any) => detalleItem(i)).filter(Boolean),
         coincidencia: coincidenciaPorCodigo[c.codigo] ?? null,
       }));
 
@@ -566,6 +586,15 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
           return t > now && t < now + oneWeek;
         }).length,
         valorTotal: all.reduce((sum, o) => sum + (o.monto || 0), 0),
+        busqueda: busquedaEnServidor
+          ? {
+              texto: textoBusqueda,
+              coincidencias: (codigosLic?.length ?? 0) + (codigosCA?.length ?? 0),
+              licitaciones: codigosLic?.length ?? 0,
+              comprasAgiles: codigosCA?.length ?? 0,
+              ocultas: Math.max(0, (codigosLic?.length ?? 0) + (codigosCA?.length ?? 0) - all.length),
+            }
+          : undefined,
       };
 
       return { data: all, stats };
@@ -780,6 +809,7 @@ export function useOportunidadDetalle(id: string | null, tipo: 'compra_agil' | '
         created_at: (lic as any).created_at || (lic as any).fecha_publicacion,
         items: licItems,
         buyer,
+        ficha: (lic as any).raw_data ?? null,
       };
     },
     enabled: !!id && !!tipo,

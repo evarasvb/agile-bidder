@@ -1,6 +1,13 @@
 // FirmaVB Postulador - Popup Script
 import { EXTENSION_API_ENDPOINT } from './config.js';
 
+// Regiones de Chile (para marcar cobertura al publicar un producto en Convenio Marco).
+const REGIONES_CHILE = [
+  'Arica y Parinacota', 'Tarapacá', 'Antofagasta', 'Atacama', 'Coquimbo',
+  'Valparaíso', 'Metropolitana', "O'Higgins", 'Maule', 'Ñuble',
+  'Biobío', 'La Araucanía', 'Los Ríos', 'Los Lagos', 'Aysén', 'Magallanes',
+];
+
 // Estado de la aplicación
 let currentView = 'loading';
 let clienteInfo = null;
@@ -32,7 +39,7 @@ function bindEvents() {
 
   // Main view
   document.getElementById('sync-btn').addEventListener('click', handleSync);
-  document.getElementById('settings-btn').addEventListener('click', () => showView('settings'));
+  document.getElementById('settings-btn').addEventListener('click', () => { showView('settings'); loadConvenioMarcoConfig(); });
 
   // Settings
   document.getElementById('back-btn').addEventListener('click', () => showView('main'));
@@ -41,6 +48,56 @@ function bindEvents() {
   // Settings checkboxes
   document.getElementById('notifications-enabled').addEventListener('change', saveSettings);
   document.getElementById('auto-sync-enabled').addEventListener('change', saveSettings);
+
+  // Convenio Marco
+  renderRegionesCM();
+  document.getElementById('cm-guardar-btn').addEventListener('click', saveConvenioMarcoConfig);
+}
+
+// ============================================
+// CONVENIO MARCO — config (leída por cm-publisher.js en conveniomarco.mercadopublico.cl)
+// ============================================
+
+function renderRegionesCM() {
+  const contenedor = document.getElementById('cm-regiones');
+  contenedor.innerHTML = '';
+  REGIONES_CHILE.forEach((region) => {
+    const label = document.createElement('label');
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.value = region;
+    input.id = `cm-region-${region}`;
+    label.appendChild(input);
+    label.appendChild(document.createTextNode(region));
+    contenedor.appendChild(label);
+  });
+}
+
+async function loadConvenioMarcoConfig() {
+  const { cmConfig } = await chrome.storage.local.get('cmConfig');
+  const config = cmConfig || { regiones: [], marcas: [], autoPublicar: false };
+
+  document.getElementById('cm-auto-publicar').checked = !!config.autoPublicar;
+  document.getElementById('cm-marcas').value = (config.marcas || []).join('\n');
+  REGIONES_CHILE.forEach((region) => {
+    const input = document.getElementById(`cm-region-${region}`);
+    if (input) input.checked = (config.regiones || []).includes(region);
+  });
+}
+
+async function saveConvenioMarcoConfig() {
+  const regiones = REGIONES_CHILE.filter((region) => document.getElementById(`cm-region-${region}`)?.checked);
+  const marcas = document.getElementById('cm-marcas').value
+    .split('\n')
+    .map((m) => m.trim())
+    .filter(Boolean);
+  const autoPublicar = document.getElementById('cm-auto-publicar').checked;
+
+  await chrome.storage.local.set({ cmConfig: { regiones, marcas, autoPublicar } });
+
+  const aviso = document.getElementById('cm-guardado');
+  aviso.classList.remove('hidden');
+  setTimeout(() => aviso.classList.add('hidden'), 2000);
 }
 
 function showView(viewName) {
@@ -241,7 +298,7 @@ function renderMatches() {
     
     const codeSpan = document.createElement('span');
     codeSpan.className = 'match-code';
-    codeSpan.textContent = match.id_licitacion || 'N/A';
+    codeSpan.textContent = match.licitacion_id || match.id_licitacion || 'N/A';
     
     const scoreSpan = document.createElement('span');
     scoreSpan.className = 'match-score';

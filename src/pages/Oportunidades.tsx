@@ -146,6 +146,18 @@ function OpportunityCard({
           <Building2 className="h-3 w-3 shrink-0" />
           <span className="truncate">{op.organismo}</span>
         </div>
+        {op.tipo === "compra_agil" && op.items_detalle && op.items_detalle.length > 0 ? (
+          // Lo que realmente piden, ítem por ítem (cantidad · descripción de la ficha).
+          // El título de la compra suele ser genérico ("Materiales de reparación").
+          <ul className="text-xs text-foreground/80 space-y-0.5">
+            {op.items_detalle.slice(0, 3).map((t, i) => (
+              <li key={i} className="truncate" title={t}>· {t}</li>
+            ))}
+            {op.items_detalle.length > 3 ? (
+              <li className="text-muted-foreground">+{op.items_detalle.length - 3} ítems más</li>
+            ) : null}
+          </ul>
+        ) : null}
         {op.coincidencia ? (
           // Por qué aparece: el ítem de la lista de productos que calzó con la búsqueda.
           <p className="text-xs text-firmavb-blue truncate" title={op.coincidencia}>
@@ -500,9 +512,20 @@ export default function Oportunidades() {
 
       {/* Results count */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {oportunidades.length} oportunidades encontradas
-        </p>
+        <div>
+          <p className="text-sm text-muted-foreground">
+            {oportunidades.length} oportunidades encontradas
+          </p>
+          {stats.busqueda && (
+            <p className="text-xs text-muted-foreground">
+              El servidor encontró {stats.busqueda.coincidencias} coincidencia{stats.busqueda.coincidencias === 1 ? "" : "s"} para
+              &quot;{stats.busqueda.texto}&quot; ({stats.busqueda.licitaciones} licitaciones, {stats.busqueda.comprasAgiles} compras ágiles)
+              {stats.busqueda.ocultas > 0
+                ? `; ${stats.busqueda.ocultas} quedaron fuera por tus filtros (tipo, score mínimo, regiones, palabras excluidas o monto).`
+                : "."}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Card Grid */}

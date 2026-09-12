@@ -51,6 +51,9 @@ export interface OrdenCompraItem {
   unidad: string | null;
   precio_unitario_neto: number | null;
   total_neto: number | null;
+  /** Rubro real del ítem (Datos Abiertos). Cuando existe, el reporte lo usa como
+   *  categoría en vez de adivinar por palabras clave. */
+  categoria?: string | null;
   created_at: string;
 }
 
@@ -59,6 +62,10 @@ export interface OrdenesCompraFilters {
   institucion_nombre?: string;
   proveedor_rut?: string;
   proveedor_nombre?: string;
+  /** Multi-selección: varios proveedores / instituciones a la vez (match exacto
+   *  por nombre, tal cual salen del desplegable). */
+  proveedor_nombres?: string[];
+  institucion_nombres?: string[];
   estado?: string;
   fecha_desde?: string;
   fecha_hasta?: string;
@@ -130,8 +137,65 @@ function mapItem(i: RawOC): OrdenCompraItem {
     unidad: i.unidad ?? null,
     precio_unitario_neto: i.precio_unitario ?? null,
     total_neto: i.valor_total ?? null,
+    categoria: null,
     created_at: i.created_at,
   };
+}
+
+// Línea de producto desde `oc_lineas` (Datos Abiertos, detalle completo del
+// mercado) mapeada a la misma interfaz de ítem que usa la UI.
+function mapLinea(l: RawOC): OrdenCompraItem {
+  return {
+    id: String(l.linea_id),
+    orden_compra_id: l.codigo,
+    correlativo: l.correlativo ?? null,
+    codigo_producto: null,
+    nombre_producto: l.producto ?? 'Ítem',
+    descripcion: null,
+    cantidad: Number(l.cantidad ?? 0),
+    unidad: null,
+    precio_unitario_neto: l.precio_neto ?? null,
+    total_neto: l.monto_linea ?? null,
+    categoria: l.rubro_n1 ?? l.categoria ?? null,
+    created_at: '',
+  };
+}
+
+// Ítems de un conjunto de OC (por código). Fuente principal: `oc_lineas` (detalle
+// completo del mercado desde Datos Abiertos). Para los códigos que aún no están
+// ahí (ej. OC recién traídas desde MP), cae a `ordenes_compra_items`.
+async function fetchItemsPorCodigos(codigos: string[]): Promise<Map<string, OrdenCompraItem[]>> {
+  const map = new Map<string, OrdenCompraItem[]>();
+  const cods = codigos.filter(Boolean);
+  if (!cods.length) return map;
+
+  const { data: lineas, error: lErr } = await (supabase as any)
+    .from('oc_lineas')
+    .select('linea_id, codigo, correlativo, producto, categoria, rubro_n1, cantidad, precio_neto, monto_linea')
+    .in('codigo', cods)
+    .limit(20000);
+  if (lErr) console.error('Error obteniendo líneas (oc_lineas):', lErr);
+  for (const raw of (lineas || [])) {
+    const it = mapLinea(raw);
+    if (!map.has(raw.codigo)) map.set(raw.codigo, []);
+    map.get(raw.codigo)!.push(it);
+  }
+
+  const faltan = cods.filter((c) => !map.has(c));
+  if (faltan.length) {
+    const { data: items, error: iErr } = await (supabase as any)
+      .from('ordenes_compra_items')
+      .select('*')
+      .in('numero_oc', faltan);
+    if (iErr) console.error('Error obteniendo items (fallback):', iErr);
+    for (const raw of (items || [])) {
+      const it = mapItem(raw);
+      const key = raw.numero_oc as string;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(it);
+    }
+  }
+  return map;
 }
 
 export function useOrdenesCompra(
@@ -176,6 +240,14 @@ export function useOrdenesCompra(
         if (filters?.proveedor_nombre) query = query.ilike('proveedor_nombre', `%${filters.proveedor_nombre}%`);
       }
 
+      // Multi-selección (desplegables): match exacto por nombre.
+      if (filters?.proveedor_nombres && filters.proveedor_nombres.length > 0) {
+        query = query.in('proveedor_nombre', filters.proveedor_nombres);
+      }
+      if (filters?.institucion_nombres && filters.institucion_nombres.length > 0) {
+        query = query.in('organismo_comprador', filters.institucion_nombres);
+      }
+
       if (filters?.fecha_desde) query = query.gte('fecha_emision', filters.fecha_desde);
       if (filters?.fecha_hasta) query = query.lte('fecha_emision', filters.fecha_hasta);
 
@@ -200,26 +272,10 @@ export function useOrdenesCompra(
       const ordenes = (data || []) as RawOC[];
       const mapped = ordenes.map(mapOrden);
 
-      // Cargar ítems (enlazados por numero_oc == codigo) si se piden.
+      // Cargar ítems (detalle por producto) si se piden.
       if (includeItems && mapped.length > 0) {
-        const codigos = mapped.map((o) => o.codigo).filter(Boolean);
-        const { data: itemsData, error: itemsError } = await (supabase as any)
-          .from('ordenes_compra_items')
-          .select('*')
-          .in('numero_oc', codigos);
-
-        if (itemsError) {
-          console.error('Error obteniendo items:', itemsError);
-        } else {
-          const itemsMap = new Map<string, OrdenCompraItem[]>();
-          (itemsData || []).forEach((raw: RawOC) => {
-            const item = mapItem(raw);
-            const key = raw.numero_oc as string;
-            if (!itemsMap.has(key)) itemsMap.set(key, []);
-            itemsMap.get(key)!.push(item);
-          });
-          return mapped.map((o) => ({ ...o, items: itemsMap.get(o.codigo) || [] }));
-        }
+        const itemsMap = await fetchItemsPorCodigos(mapped.map((o) => o.codigo));
+        return mapped.map((o) => ({ ...o, items: itemsMap.get(o.codigo) || [] }));
       }
 
       return mapped;
@@ -250,15 +306,8 @@ export function useOrdenCompra(codigo: string | null, includeItems = true) {
       const mapped = mapOrden(orden as RawOC);
 
       if (includeItems) {
-        const { data: itemsData, error: itemsError } = await (supabase as any)
-          .from('ordenes_compra_items')
-          .select('*')
-          .eq('numero_oc', codigo);
-        if (itemsError) {
-          console.error('Error obteniendo items:', itemsError);
-        } else {
-          mapped.items = (itemsData || []).map((raw: RawOC) => mapItem(raw));
-        }
+        const itemsMap = await fetchItemsPorCodigos([codigo]);
+        mapped.items = itemsMap.get(codigo) || [];
       }
 
       return mapped;
@@ -341,6 +390,78 @@ export function useUpsertOrdenCompra() {
       }
 
       return savedOrden;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ordenes_compra'] });
+      queryClient.invalidateQueries({ queryKey: ['orden_compra'] });
+    },
+  });
+}
+
+// Trae las OC PROPIAS del cliente (donde es proveedor) desde Mercado Público y
+// las guarda en la base, para que "Mis OC" muestre sus ventas reales. La edge
+// function resuelve RUT -> código de proveedor y baja detalle + ítems.
+// Opciones para los desplegables de proveedor / institución: nombres reales que
+// existen en ordenes_compra y calzan con el texto tecleado. Se sacan de la misma
+// tabla para que lo que eliges siempre tenga OC (dedup + orden en el cliente).
+export function useOpcionesOC(campo: 'proveedor_nombre' | 'organismo_comprador', q: string) {
+  const term = q.trim();
+  return useQuery({
+    queryKey: ['opciones-oc', campo, term],
+    queryFn: async (): Promise<string[]> => {
+      let query = (supabase as any)
+        .from('ordenes_compra')
+        .select(campo)
+        .not(campo, 'is', null)
+        .limit(400);
+      if (term.length >= 2) query = query.ilike(campo, `%${term}%`);
+      const { data, error } = await query;
+      if (error) throw error;
+      const set = new Set<string>();
+      for (const row of (data || [])) { const v = (row as any)[campo]; if (v) set.add(String(v)); }
+      return Array.from(set).sort((a, b) => a.localeCompare(b, 'es')).slice(0, 40);
+    },
+    staleTime: 60000,
+  });
+}
+
+// Resuelve el RUT de un proveedor a partir de su nombre (para traer sus OC desde
+// MP bajo demanda). Toma el rut_proveedor no nulo más frecuente de sus OC en base.
+export function useRutProveedor(nombre: string | null) {
+  return useQuery({
+    queryKey: ['rut-proveedor', nombre],
+    enabled: !!nombre,
+    queryFn: async (): Promise<string | null> => {
+      if (!nombre) return null;
+      const { data, error } = await (supabase as any)
+        .from('ordenes_compra')
+        .select('rut_proveedor')
+        .eq('proveedor_nombre', nombre)
+        .not('rut_proveedor', 'is', null)
+        .limit(200);
+      if (error) throw error;
+      const conteo = new Map<string, number>();
+      for (const r of (data || [])) { const v = (r as any).rut_proveedor; if (v) conteo.set(v, (conteo.get(v) || 0) + 1); }
+      let mejor: string | null = null; let max = 0;
+      for (const [rut, n] of conteo) { if (n > max) { max = n; mejor = rut; } }
+      return mejor;
+    },
+    staleTime: 60000,
+  });
+}
+
+export function useSyncMisOC() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    // clienteId → trae las OC del cliente logueado; rut → trae las de CUALQUIER
+    // proveedor (modo Mercado, bajo demanda). Uno de los dos.
+    mutationFn: async ({ clienteId, rut, anio }: { clienteId?: string; rut?: string; anio?: number }) => {
+      const { data, error } = await (supabase as any).functions.invoke('sync-mis-oc', {
+        body: { cliente_id: clienteId, rut, anio },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data as { codigo_proveedor: string | null; anio?: number; encontradas: number; enriquecidas: number; parcial: boolean; errores: string[] };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ordenes_compra'] });

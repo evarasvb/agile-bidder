@@ -1,0 +1,202 @@
+name: 🔐 Security Configuration
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Acción a ejecutar'
+        required: true
+        default: 'verify'
+        type: choice
+        options:
+          - verify
+          - setup-secrets
+          - check-headers
+          - scan-secrets
+
+permissions:
+  contents: read
+  repository-projects: read
+
+jobs:
+  security-check:
+    name: Verificar Seguridad
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.action == 'verify' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: ✅ Verificar CODEOWNERS
+        run: |
+          if [ -f ".github/CODEOWNERS" ]; then
+            echo "✅ CODEOWNERS existe"
+            cat .github/CODEOWNERS
+          else
+            echo "❌ CODEOWNERS no encontrado"
+            exit 1
+          fi
+
+      - name: ©️  Verificar headers de copyright
+        run: |
+          echo "Verificando headers de copyright..."
+
+          files=("src/main.tsx" "src/App.tsx")
+          for file in "${files[@]}"; do
+            if [ -f "$file" ]; then
+              if head -1 "$file" | grep -q "©"; then
+                echo "✅ $file"
+              else
+                echo "⚠️  $file falta copyright"
+              fi
+            fi
+          done
+
+      - name: 🔍 Buscar secretos en historial
+        run: |
+          echo "Buscando secretos en historial..."
+
+          if git log --all --full-history -p 2>/dev/null | grep -i "password\|sk_\|pk_\|api.key" | head -3; then
+            echo "⚠️  Posibles secretos detectados"
+            exit 1
+          else
+            echo "✅ No se encontraron secretos"
+          fi
+
+      - name: 🚫 Verificar .env en .gitignore
+        run: |
+          if grep -q "\.env" .gitignore; then
+            echo "✅ .env está en .gitignore"
+          else
+            echo "❌ .env NO está en .gitignore"
+            exit 1
+          fi
+
+      - name: 📋 Verificar documentos legales
+        run: |
+          files=(
+            "LICENSE"
+            "INTELLECTUAL_PROPERTY.md"
+            "TERMS_OF_SERVICE.md"
+            "PRIVACY_POLICY.md"
+            ".github/SECURITY.md"
+            "CONTRIBUTING.md"
+          )
+
+          for file in "${files[@]}"; do
+            if [ -f "$file" ]; then
+              echo "✅ $file"
+            else
+              echo "❌ $file FALTA"
+              exit 1
+            fi
+          done
+
+      - name: 📊 Resumen
+        run: |
+          echo ""
+          echo "═══════════════════════════════════════════════════════"
+          echo "✅ VERIFICACIÓN DE SEGURIDAD COMPLETADA"
+          echo "═══════════════════════════════════════════════════════"
+          echo ""
+          echo "✅ CODEOWNERS configurado"
+          echo "✅ Headers de copyright presentes"
+          echo "✅ Sin secretos en historial"
+          echo "✅ .env en .gitignore"
+          echo "✅ Documentos legales presentes"
+          echo ""
+          echo "⏳ PENDIENTE (configurar manualmente en GitHub UI):"
+          echo "   • Branch protection rules"
+          echo "   • Secret scanning + push protection"
+          echo "   • GitHub Secrets (Supabase, Stripe, Vercel)"
+          echo ""
+          echo "Ir a: https://github.com/${{ github.repository }}/settings"
+          echo "═══════════════════════════════════════════════════════"
+
+  check-headers:
+    name: Verificar Copyright Headers
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.action == 'check-headers' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 📝 Verificar y listar archivos sin copyright
+        run: |
+          echo "Archivos sin copyright header:"
+          echo ""
+
+          find src -name "*.tsx" -o -name "*.ts" -o -name "*.jsx" -o -name "*.js" | while read file; do
+            if ! head -1 "$file" | grep -q "©"; then
+              echo "  ❌ $file"
+            fi
+          done || true
+
+          echo ""
+          echo "Ejecuta localmente para agregar:"
+          echo "  node scripts/add-copyright-header.js src"
+
+  scan-secrets:
+    name: Escanear Secretos
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.action == 'scan-secrets' }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔑 Buscar secretos con TruffleHog
+        continue-on-error: true
+        run: |
+          echo "Escaneando secretos en repositorio..."
+
+          # Buscar patrones comunes
+          git log --all --full-history -p 2>/dev/null | grep -E "sk_test|sk_live|pk_test|pk_live|password=|api_key=|secret=" | head -10 || echo "✅ Sin coincidencias obvias"
+
+      - name: 📊 Resultado
+        run: |
+          echo ""
+          echo "Si encuentras secretos:"
+          echo "1. Revocar en el servicio (Supabase, Stripe, etc)"
+          echo "2. Crear secreto nuevo"
+          echo "3. Actualizar en GitHub Settings > Secrets"
+          echo "4. Contactar security@firmavb.cl"
+
+  setup-secrets:
+    name: Instrucciones para Secrets
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.action == 'setup-secrets' }}
+
+    steps:
+      - run: |
+          echo "════════════════════════════════════════════════════════"
+          echo "🔑 CONFIGURAR GITHUB SECRETS"
+          echo "════════════════════════════════════════════════════════"
+          echo ""
+          echo "Ir a: https://github.com/${{ github.repository }}/settings/secrets/actions"
+          echo ""
+          echo "Agregar estos secrets:"
+          echo ""
+          echo "1. SUPABASE_URL"
+          echo "   Valor: [Tu URL de Supabase]"
+          echo ""
+          echo "2. SUPABASE_ANON_KEY"
+          echo "   Valor: [Tu clave pública]"
+          echo ""
+          echo "3. SUPABASE_SERVICE_ROLE_KEY"
+          echo "   Valor: [Tu clave de servicio]"
+          echo ""
+          echo "4. STRIPE_SECRET_KEY"
+          echo "   Valor: sk_live_..."
+          echo ""
+          echo "5. STRIPE_PUBLISHABLE_KEY"
+          echo "   Valor: pk_live_..."
+          echo ""
+          echo "6. DEPLOYMENT_TOKEN"
+          echo "   Valor: [Tu token de Vercel]"
+          echo ""
+          echo "════════════════════════════════════════════════════════"

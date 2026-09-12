@@ -93,6 +93,29 @@
         <input type="checkbox" id="auto-sync-enabled">
         Sincronización automática
       </label>
+
+      <div class="cm-section">
+        <h2>Convenio Marco — Subir productos</h2>
+        <p class="help-text">
+          Entra a la ficha de un producto en tu escritorio de Convenio Marco (conveniomarco.mercadopublico.cl)
+          y usa el botón que aparece ahí. Precio: lo deja $1 bajo el referencial. Si pide subir PDF o Word,
+          lo salta sin tocarlo.
+        </p>
+
+        <label class="checkbox-label">
+          <input type="checkbox" id="cm-auto-publicar">
+          Publicar automáticamente (si no, solo deja el precio listo para que tú revises y guardes)
+        </label>
+
+        <label for="cm-regiones" class="cm-label">Regiones de cobertura a marcar</label>
+        <div id="cm-regiones" class="cm-regiones-grid"></div>
+
+        <label for="cm-marcas" class="cm-label">Marcas a priorizar (una por línea)</label>
+        <textarea id="cm-marcas" rows="4" placeholder="Ej:&#10;Torre&#10;Ross&#10;Staedtler"></textarea>
+
+        <button id="cm-guardar-btn" class="btn-primary">Guardar configuración de Convenio Marco</button>
+        <p id="cm-guardado" class="help-text hidden">Guardado ✓</p>
+      </div>
     </div>
   </div>
 

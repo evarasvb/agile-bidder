@@ -4,6 +4,44 @@ Extensión de Chrome (Manifest V3) para automatizar postulaciones a Compras Ági
 
 > Para documentación completa de instalación, arquitectura y publicación en Chrome Web Store, consulta [`docs/CHROME_EXTENSION.md`](../docs/CHROME_EXTENSION.md).
 
+## Extractor de bases y anexos (v1.3)
+
+Al abrir la ficha de una licitación en Mercado Público con la extensión conectada, aparece el aviso
+"¿Quieres extraer la información y las bases…?". Al aceptar se envía la ficha a FirmaVB y se abre la
+ventana de adjuntos de Mercado Público (la que pide captcha, que el robot no puede bajar): ahí cada
+archivo se manda solo a FirmaVB. Los PDF de bases quedan disponibles para todos y el Experto los lee.
+Si abres la ventana de adjuntos por tu cuenta, la extensión también ofrece enviarlos.
+
+Desde v1.4.1 también funciona en las **compras ágiles** (compra-agil.mercadopublico.cl) y desde v1.5.0
+baja sus documentos de verdad: Mercado Público solo los entrega con la sesión del usuario iniciada, así
+que la extensión usa esa sesión (el token que guarda la propia app) y sube cada documento a FirmaVB,
+donde el Experto lee los PDF. Al abrir una cotización, el aviso dice cuántos documentos faltan y ofrece
+extraerlos, postular con FirmaVB o "Ahora no". Tras extraer, ofrece una **pasada en lote** por los
+documentos pendientes de las demás compras ágiles abiertas (matches primero), hasta 15 por pasada.
+
+## Convenio Marco — Subir productos (v1.4)
+
+Dentro de la ficha "Asignación de producto" en tu escritorio de proveedor en
+`conveniomarco.mercadopublico.cl`, la extensión agrega un panel flotante con el botón
+**"Procesar este producto"**. Esa ficha trae una tabla con **una fila por región**, cada una con
+su propio precio de referencia. Al presionar el botón:
+
+- Si el nombre del producto no coincide con ninguna marca configurada en Configuración, lo salta
+  sin tocar nada (si no configuraste marcas, procesa cualquier producto).
+- Si el producto pide subir un PDF/Word obligatorio, lo salta sin tocar nada (precio ni guardado).
+- Si no, por cada fila cuya región esté configurada: detecta su **precio referencial** y deja el
+  precio de venta en referencial − $1, y marca "Stock Disponible: Sí". Las filas de regiones no
+  configuradas quedan intactas.
+- Por defecto **no hace clic en Guardar/Publicar**: tú revisas y confirmas manualmente. Si activas
+  "Publicar automáticamente" en Configuración, además hace clic en Guardar/Publicar por ti.
+- Si una ficha no trae esa tabla (otro tipo de producto), cae a un modo genérico basado en texto
+  y lo avisa en el panel.
+
+Configura regiones, marcas prioritarias y si quiere publicar automático desde el popup → ⚙️ Configuración
+→ sección "Convenio Marco — Subir productos". Es una primera versión: si el panel no encuentra el precio
+referencial o el campo editable en algún producto, lo indica en el panel en vez de fallar en silencio —
+en ese caso conviene revisar los selectores con una captura de esa ficha.
+
 ## Instalación rápida
 
 1. Ve a `chrome://extensions/` y activa **Modo desarrollador**.
@@ -32,6 +70,7 @@ chrome-extension/
 ├── config.js            # URLs y constantes compartidas
 ├── background.js        # Service Worker (orquestación)
 ├── content.js           # Script inyectado en MercadoPúblico
+├── cm-publisher.js      # Script inyectado en Convenio Marco (publicación de productos)
 ├── scraper.js           # Extracción de datos de páginas
 ├── popup.js / popup.html / popup.css
 ├── content.css

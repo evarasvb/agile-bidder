@@ -1,3 +1,9 @@
+/**
+ * © 2024-2026 Firma VB SpA. Todos los derechos reservados.
+ * Software propietario - Prohibida reproducción o modificación sin autorización.
+ * Ley 19.912 - Protección de Derechos de Autor (Chile) | Marca registrada INAPI
+ */
+
 import { lazy, Suspense } from "react";
 import { Loader2 } from "lucide-react";
 import { Toaster } from "@/components/ui/toaster";
@@ -21,8 +27,10 @@ import { UpgradeProProvider } from "@/components/pro/UpgradeProProvider";
 const Index = lazy(() => import("./pages/Index"));
 const Academia = lazy(() => import("./pages/Academia"));
 const WebinarConvenioMarcoSaas = lazy(() => import("./pages/WebinarConvenioMarcoSaas"));
+const WebinarVendeleAlEstado = lazy(() => import("./pages/WebinarVendeleAlEstado"));
 const AcademiaCurso = lazy(() => import("./pages/AcademiaCurso"));
 const AcademiaLeads = lazy(() => import("./pages/AcademiaLeads"));
+const ProveedoresEstado = lazy(() => import("./pages/ProveedoresEstado"));
 const Auth = lazy(() => import("./pages/Auth"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const ClienteOnboarding = lazy(() => import("./pages/ClienteOnboarding"));
@@ -43,7 +51,7 @@ const OportunidadesPanel = lazy(() => import("./pages/Oportunidades"));
 const OportunidadDetalle = lazy(() => import("./pages/OportunidadDetalle"));
 
 const CompraAgilDetalle = lazy(() => import("./pages/CompraAgilDetalle"));
-const OrdenesCompra = lazy(() => import("./pages/OrdenesCompra"));
+const ReporteOrdenesCompra = lazy(() => import("./pages/reportes/ReporteOrdenesCompra"));
 
 const Inventory = lazy(() => import("./pages/Inventory"));
 
@@ -72,6 +80,7 @@ const ReporteMercado = lazy(() => import("./pages/reportes/ReporteMercado"));
 const ReporteCompetidores = lazy(() => import("./pages/reportes/ReporteCompetidores"));
 const ReporteConvenioMarco = lazy(() => import("./pages/reportes/ReporteConvenioMarco"));
 
+const AdminTraccion = lazy(() => import("./pages/AdminTraccion"));
 const AdminEvaristo = lazy(() => import("./pages/AdminEvaristo"));
 const AdminSoporte = lazy(() => import("./pages/AdminSoporte"));
 const MisTickets = lazy(() => import("./pages/MisTickets"));
@@ -152,6 +161,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/academia" element={<Academia />} />
           <Route path="/webinar/convenio-marco-saas" element={<WebinarConvenioMarcoSaas />} />
+          <Route path="/webinar/vendele-al-estado" element={<WebinarVendeleAlEstado />} />
           <Route path="/academia/curso/:slug" element={<AcademiaCurso />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/experto/c/:token" element={<Compartido />} />
@@ -194,13 +204,16 @@ const App = () => (
               <Route path="/compras-agiles" element={<Navigate to="/oportunidades?tipo=compra_agil" replace />} />
               <Route path="/compras-agiles/:codigo" element={<CompraAgilDetalle />} />
             <Route path="/mercado/instituciones" element={<Navigate to="/reportes/compradores" replace />} />
-            <Route path="/mercado/ordenes" element={<OrdenesCompra />} />
+            {/* Órdenes de Compra ahora vive dentro de Reportes (reporte-cubo). */}
+            <Route path="/mercado/ordenes" element={<Navigate to="/reportes/ordenes-compra" replace />} />
 
             {/* ----- PIPELINE ----- */}
             <Route path="/pipeline" element={<Pipeline />} />
 
             {/* ----- ACADEMIA (contactos del formulario público) ----- */}
             <Route path="/academia/leads" element={<AdminOnlyRoute><AcademiaLeads /></AdminOnlyRoute>} />
+            <Route path="/proveedores-estado" element={<AdminOnlyRoute><ProveedoresEstado /></AdminOnlyRoute>} />
+            <Route path="/admin/traccion" element={<AdminOnlyRoute><AdminTraccion /></AdminOnlyRoute>} />
 
             {/* ----- EQUIPO ----- */}
             <Route path="/equipo" element={<Equipo />} />
@@ -223,6 +236,7 @@ const App = () => (
             <Route path="/reportes/mercado" element={<ReporteMercado />} />
             <Route path="/reportes/competidores" element={<ReporteCompetidores />} />
             <Route path="/reportes/convenio-marco" element={<ReporteConvenioMarco />} />
+            <Route path="/reportes/ordenes-compra" element={<ReporteOrdenesCompra />} />
 
             {/* ----- MARKETING ----- */}
             <Route path="/marketing/control" element={<AdminOnlyRoute><MarketingControlCenter /></AdminOnlyRoute>} />

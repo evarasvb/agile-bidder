@@ -1,25 +1,28 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useCampaigns, useCampaignPiezas, useCampaignMetricas } from '@/hooks/useMarketingCampaigns';
+import { useCampaigns, useCampaignPiezas, useCampaignMetricas, useMarketingEjecucionesRecientes, type MarketingPieza } from '@/hooks/useMarketingCampaigns';
 import { NuevaCampanaRapida } from '@/components/marketing/NuevaCampanaRapida';
+import { PiezaDetalleDialog } from '@/components/marketing/PiezaDetalleDialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AlertCircle, BarChart3, Rocket, Plus, Send, Users } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { AlertCircle, BarChart3, Rocket, Plus, Send } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function MarketingControlCenter() {
-  const navigate = useNavigate();
   const { campaigns, isLoading } = useCampaigns();
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [showNewCampaign, setShowNewCampaign] = useState(false);
+  const [piezaAbierta, setPiezaAbierta] = useState<MarketingPieza | null>(null);
   const queryClient = useQueryClient();
 
   const selectedCampaign = campaigns.find(c => c.id === selectedCampaignId);
-  const { piezas } = useCampaignPiezas(selectedCampaignId || '');
+  const { piezas, updatePieza, actualizandoPieza, ejecutarPieza, ejecutandoPieza } = useCampaignPiezas(selectedCampaignId || '');
   const { metricas, totalEnviados, totalConversiones, promTasaApertura } = useCampaignMetricas(selectedCampaignId || '');
+  const { ejecuciones: ejecucionesRecientes, isLoading: cargandoEjecuciones } = useMarketingEjecucionesRecientes();
 
   const handleExecutePieza = async (piezaId: string) => {
     try {
@@ -46,19 +49,9 @@ export default function MarketingControlCenter() {
 
   return (
     <div className="w-full max-w-7xl mx-auto p-6 space-y-8">
-      <div className="flex justify-between items-start">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold">Centro de Control de Marketing</h1>
-          <p className="text-muted-foreground">Planifica, ejecuta y monitorea tus campañas automáticamente</p>
-        </div>
-        <Button
-          variant="outline"
-          onClick={() => navigate('/marketing/contactos')}
-          className="gap-2"
-        >
-          <Users className="w-4 h-4" />
-          Gestionar Contactos
-        </Button>
+      <div className="space-y-2">
+        <h1 className="text-3xl font-bold">Centro de Control de Marketing</h1>
+        <p className="text-muted-foreground">Planifica, ejecuta y monitorea tus campañas automáticamente</p>
       </div>
 
       <Alert>
@@ -139,18 +132,22 @@ export default function MarketingControlCenter() {
                 ) : (
                   <div className="space-y-2">
                     {piezas.map(pieza => (
-                      <div key={pieza.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div
+                        key={pieza.id}
+                        className="flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:border-primary/40 transition-colors"
+                        onClick={() => setPiezaAbierta(pieza)}
+                      >
                         <div>
                           <p className="font-medium">{pieza.nombre}</p>
                           <p className="text-sm text-muted-foreground">{pieza.tipo} • {pieza.canal}</p>
                         </div>
                         <Button
                           size="sm"
-                          onClick={() => handleExecutePieza(pieza.id)}
-                          disabled={pieza.estado === 'ejecutado'}
+                          onClick={(e) => { e.stopPropagation(); handleExecutePieza(pieza.id); }}
+                          disabled={pieza.estado === 'ejecutado' || pieza.canal !== 'email'}
                         >
                           <Send className="w-3 h-3 mr-1" />
-                          {pieza.estado === 'ejecutado' ? 'Ejecutado' : 'Ejecutar'}
+                          {pieza.estado === 'ejecutado' ? 'Ejecutado' : pieza.canal !== 'email' ? 'Manual' : 'Ejecutar'}
                         </Button>
                       </div>
                     ))}
@@ -254,12 +251,51 @@ export default function MarketingControlCenter() {
         {/* EXECUTION TAB */}
         <TabsContent value="ejecucion" className="space-y-4">
           <h2 className="text-2xl font-bold">Historial de Ejecuciones</h2>
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Aquí se mostrará el historial detallado de envíos, entregas, aperturas y clicks de cada pieza ejecutada.
-            </AlertDescription>
-          </Alert>
+          <p className="text-sm text-muted-foreground">
+            Cada envío de email queda acá con a quién se le mandó y qué pasó. Facebook/Instagram/WhatsApp todavía se publican/mandan a mano, así que no aparecen en esta lista.
+          </p>
+
+          {cargandoEjecuciones ? (
+            <div className="text-center py-8 text-muted-foreground">Cargando…</div>
+          ) : ejecucionesRecientes.length === 0 ? (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>Todavía no se ha ejecutado ningún envío.</AlertDescription>
+            </Alert>
+          ) : (
+            <div className="border rounded-lg overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Campaña</TableHead>
+                    <TableHead>Pieza</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>Abierto</TableHead>
+                    <TableHead>Clicks</TableHead>
+                    <TableHead>Fecha</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {ejecucionesRecientes.map((e) => (
+                    <TableRow key={e.id}>
+                      <TableCell className="text-sm">{e.marketing_piezas?.marketing_campanas?.nombre || '—'}</TableCell>
+                      <TableCell className="text-sm">{e.marketing_piezas?.nombre || '—'}</TableCell>
+                      <TableCell className="text-sm">{e.email}</TableCell>
+                      <TableCell>
+                        <Badge variant={e.estado === 'fallo' || e.estado === 'rebote' ? 'destructive' : 'secondary'} className="text-[10px]">
+                          {e.estado}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm">{e.abierto ? 'Sí' : 'No'}</TableCell>
+                      <TableCell className="text-sm">{e.clicks || 0}</TableCell>
+                      <TableCell className="text-sm">{e.fecha_envio ? new Date(e.fecha_envio).toLocaleString('es-CL') : '—'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 
@@ -269,6 +305,15 @@ export default function MarketingControlCenter() {
         onCampaignCreated={() => {
           queryClient.invalidateQueries({ queryKey: ['marketing_campaigns'] });
         }}
+      />
+
+      <PiezaDetalleDialog
+        pieza={piezaAbierta}
+        onOpenChange={(open) => !open && setPiezaAbierta(null)}
+        onGuardar={(id, updates) => updatePieza({ id, ...updates })}
+        onEjecutar={(id) => { ejecutarPieza(id); setPiezaAbierta(null); }}
+        guardando={actualizandoPieza}
+        ejecutando={ejecutandoPieza}
       />
     </div>
   );

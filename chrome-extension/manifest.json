@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "FirmaVB Postulador",
-  "version": "1.2.0",
-  "description": "Automatiza postulaciones a Compras Ágiles en MercadoPúblico.cl - Conectado con FirmaVB",
+  "version": "1.5.5",
+  "description": "Automatiza postulaciones en MercadoPúblico.cl y envía las bases y anexos de cada licitación a FirmaVB - Conectado con FirmaVB",
   "author": "FirmaVB",
-  
+
   "permissions": [
     "activeTab",
     "storage",
@@ -13,27 +13,36 @@
     "tabs",
     "scripting"
   ],
-  
+
   "host_permissions": [
     "*://www.mercadopublico.cl/*",
     "*://mercadopublico.cl/*",
+    "*://*.mercadopublico.cl/*",
     "*://*.supabase.co/*",
     "https://compraagil-pending-sync.onrender.com/*"
   ],
-  
+
   "background": {
     "service_worker": "background.js",
     "type": "module"
   },
-  
+
   "content_scripts": [
     {
       "matches": [
         "*://www.mercadopublico.cl/*",
-        "*://mercadopublico.cl/*"
+        "*://mercadopublico.cl/*",
+        "*://compra-agil.mercadopublico.cl/*"
       ],
       "js": ["content.js"],
       "css": ["content.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "*://conveniomarco.mercadopublico.cl/*"
+      ],
+      "js": ["cm-publisher.js"],
       "run_at": "document_idle"
     }
   ],
@@ -59,7 +68,7 @@
   "web_accessible_resources": [
     {
       "resources": ["icons/*", "scraper.js"],
-      "matches": ["*://www.mercadopublico.cl/*", "*://mercadopublico.cl/*"]
+      "matches": ["*://www.mercadopublico.cl/*", "*://mercadopublico.cl/*", "*://*.mercadopublico.cl/*"]
     }
   ]
 }

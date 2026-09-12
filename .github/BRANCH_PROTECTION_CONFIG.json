@@ -1,0 +1,210 @@
+{
+  "description": "GitHub Branch Protection Rules Configuration for Agile Bidder",
+  "created": "2026-09-08",
+  "instructions": "Use GITHUB_SECURITY_SETUP.md para configurar manualmente en GitHub UI",
+  "branches": {
+    "main": {
+      "pattern": "main",
+      "required_pull_request_reviews": {
+        "required_approving_review_count": 2,
+        "require_code_owner_reviews": true,
+        "dismiss_stale_reviews": true,
+        "require_last_push_approval": false
+      },
+      "required_status_checks": {
+        "strict": true,
+        "contexts": [
+          "build",
+          "lint",
+          "test",
+          "type-check"
+        ]
+      },
+      "enforce_admins": true,
+      "require_linear_history": true,
+      "require_conversation_resolution": true,
+      "required_signatures": true,
+      "restrict_pushes": {
+        "is_enabled": true,
+        "allows_deletions": false,
+        "allows_force_pushes": false,
+        "push_allowances": [
+          "@evarasvb"
+        ]
+      },
+      "allow_fork_syncing": false,
+      "allow_deletions": false,
+      "block_creations": false
+    },
+    "develop": {
+      "pattern": "develop",
+      "required_pull_request_reviews": {
+        "required_approving_review_count": 1,
+        "require_code_owner_reviews": true,
+        "dismiss_stale_reviews": true,
+        "require_last_push_approval": false
+      },
+      "required_status_checks": {
+        "strict": true,
+        "contexts": [
+          "build",
+          "lint",
+          "test"
+        ]
+      },
+      "enforce_admins": true,
+      "require_linear_history": false,
+      "require_conversation_resolution": true,
+      "required_signatures": false,
+      "restrict_pushes": {
+        "is_enabled": true,
+        "allows_deletions": false,
+        "allows_force_pushes": false,
+        "push_allowances": [
+          "@evarasvb"
+        ]
+      },
+      "allow_fork_syncing": false,
+      "allow_deletions": false,
+      "block_creations": false
+    },
+    "release": {
+      "pattern": "release/*",
+      "required_pull_request_reviews": {
+        "required_approving_review_count": 2,
+        "require_code_owner_reviews": true,
+        "dismiss_stale_reviews": true,
+        "require_last_push_approval": false
+      },
+      "required_status_checks": {
+        "strict": true,
+        "contexts": [
+          "build",
+          "lint",
+          "test",
+          "type-check"
+        ]
+      },
+      "enforce_admins": true,
+      "require_linear_history": true,
+      "require_conversation_resolution": true,
+      "required_signatures": true,
+      "restrict_pushes": {
+        "is_enabled": true,
+        "allows_deletions": false,
+        "allows_force_pushes": false,
+        "push_allowances": []
+      },
+      "allow_fork_syncing": false,
+      "allow_deletions": false,
+      "block_creations": false
+    }
+  },
+  "repository_settings": {
+    "private": true,
+    "visibility": "private",
+    "has_wiki": false,
+    "has_discussions": false,
+    "has_projects": false,
+    "has_downloads": false,
+    "allow_forking": false,
+    "allow_auto_merge": false,
+    "delete_branch_on_merge": true,
+    "allow_squash_merge": true,
+    "allow_merge_commit": false,
+    "allow_rebase_merge": true,
+    "require_commit_signing": true,
+    "web_commit_signoff_required": false
+  },
+  "secrets_to_configure": [
+    {
+      "name": "SUPABASE_URL",
+      "description": "URL de la base de datos Supabase",
+      "example": "https://xxxxx.supabase.co",
+      "visibility": "actions"
+    },
+    {
+      "name": "SUPABASE_ANON_KEY",
+      "description": "Clave pública de Supabase (client-side)",
+      "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "visibility": "actions"
+    },
+    {
+      "name": "SUPABASE_SERVICE_ROLE_KEY",
+      "description": "Clave de servicio de Supabase (server-side, CI/CD only)",
+      "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "visibility": "actions"
+    },
+    {
+      "name": "STRIPE_SECRET_KEY",
+      "description": "Clave secreta de Stripe",
+      "example": "sk_live_xxxxx",
+      "visibility": "actions"
+    },
+    {
+      "name": "STRIPE_PUBLISHABLE_KEY",
+      "description": "Clave publicable de Stripe",
+      "example": "pk_live_xxxxx",
+      "visibility": "actions"
+    },
+    {
+      "name": "DEPLOYMENT_TOKEN",
+      "description": "Token de Vercel para deployments automáticos",
+      "example": "vercel_xxxxx",
+      "visibility": "actions"
+    }
+  ],
+  "security_features_to_enable": {
+    "secret_scanning": {
+      "enabled": true,
+      "description": "Detecta automáticamente secretos en commits"
+    },
+    "push_protection": {
+      "enabled": true,
+      "description": "Bloquea push si contiene secretos"
+    },
+    "dependabot_alerts": {
+      "enabled": true,
+      "description": "Alertas de vulnerabilidades en dependencias"
+    },
+    "dependabot_security_updates": {
+      "enabled": true,
+      "description": "PRs automáticos para parchear vulnerabilidades"
+    },
+    "code_scanning": {
+      "enabled": false,
+      "description": "Análisis estático de código (opcional, requiere setup)"
+    }
+  },
+  "collaborator_permissions": {
+    "admin": [
+      "@evarasvb"
+    ],
+    "maintain": [],
+    "write": [],
+    "triage": [],
+    "read": []
+  },
+  "audit_log_monitoring": {
+    "review_frequency": "Monthly",
+    "alert_on": [
+      "Unauthorized access attempts",
+      "Branch protection changes",
+      "Secret management changes",
+      "Collaborator permission changes",
+      "Repository setting changes"
+    ]
+  },
+  "testing_validation": {
+    "test_branch_protection": {
+      "step1": "Intentar push directo a main desde rama normal",
+      "step2": "Esperado: 'Protected branch rule violations found'",
+      "step3": "Crear PR y verificar requisitos de merge"
+    },
+    "test_secret_scanning": {
+      "step1": "Intentar commitear secret falso (para test)",
+      "step2": "Esperado: Push bloqueado",
+      "step3": "Limpiar después de test"
+    }
+  }
+}

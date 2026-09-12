@@ -27,8 +27,11 @@ import { supabaseClient } from '@/lib/supabaseClient';
 import { useLicitacionItemsReal } from '@/hooks/useLicitacionItemsReal';
 import LicitacionesSimilares from '@/components/licitaciones/LicitacionesSimilares';
 import { LicitacionItemsMatch } from '@/components/licitaciones/LicitacionItemsMatch';
+import { FichaMercadoPublico } from '@/components/licitaciones/FichaMercadoPublico';
+import { AdjuntosLicitacion } from '@/components/licitaciones/AdjuntosLicitacion';
 import { useDocumentosLicitacion } from '@/hooks/useChatIA';
 import { RiesgoOrganismoCard } from '@/components/organismo/RiesgoOrganismoCard';
+import { MediosOrganismoCard } from '@/components/organismo/MediosOrganismoCard';
 import { AccionesCompartir } from '@/components/oportunidades/AccionesCompartir';
 
 interface LicitacionBIItem {
@@ -75,7 +78,9 @@ function useLicitacionDetalle(id: string | undefined) {
           monto: compraAgil.monto,
           fecha_cierre: compraAgil.fecha_cierre,
           estado: compraAgil.estado,
-          link_oficial: compraAgil.link_oficial,
+          // Columna real es `url_ficha` (compras_agiles no tiene `link_oficial`);
+          // sin esto el botón "Ver en Mercado Público" quedaba sin URL.
+          link_oficial: compraAgil.url_ficha || compraAgil.link_oficial || null,
           match_score: compraAgil.match_score,
           match_encontrado: compraAgil.match_encontrado,
           datos_json: compraAgil.datos_json,
@@ -102,7 +107,8 @@ function useLicitacionDetalle(id: string | undefined) {
           monto: licitacion.presupuesto,
           fecha_cierre: licitacion.fecha_cierre,
           estado: licitacion.estado,
-          link_oficial: licitacion.link_oficial,
+          // Columna real es `link_detalle` (licitaciones no tiene `link_oficial`).
+          link_oficial: licitacion.link_detalle || licitacion.link_oficial || null,
           match_score: licitacion.match_score,
           match_encontrado: licitacion.match_encontrado,
           datos_json: null,
@@ -386,6 +392,13 @@ export default function LicitacionDetalle() {
           )}
 
           {/* Productos solicitados con match e corrección por ítem */}
+          {licitacion.tipo === 'licitacion_bi' && (
+            <>
+              <FichaMercadoPublico codigo={licitacion.codigo} raw={licitacion.datos_json} />
+              <AdjuntosLicitacion codigo={licitacion.codigo} />
+            </>
+          )}
+
           <LicitacionItemsMatch codigo={licitacion.codigo} items={items} />
 
           {/* Similar Tenders */}
@@ -414,6 +427,8 @@ export default function LicitacionDetalle() {
           </Card>
 
           <RiesgoOrganismoCard codigo={licitacion.codigo} organismo={licitacion.organismo} />
+
+          <MediosOrganismoCard codigo={licitacion.codigo} organismo={licitacion.organismo} />
 
           {/* Buyer Info */}
           <Card>

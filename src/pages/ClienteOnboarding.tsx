@@ -93,6 +93,12 @@ export default function ClienteOnboarding() {
   }
 
   const progress = (currentStep / STEPS.length) * 100;
+  // Sin esto, un usuario podía llegar al paso 3 sin haber elegido nada y toparse
+  // con "cuéntanos qué vendes... vuelve al paso 1" — mejor frenarlo antes, en el
+  // mismo paso 1, que dejarlo avanzar para después devolverlo.
+  const sinNadaElegido = currentStep === 1
+    && (cliente.industrias?.length ?? 0) === 0
+    && (cliente.palabras_clave_busqueda?.length ?? 0) === 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -100,7 +106,7 @@ export default function ClienteOnboarding() {
       <div className="border-b">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between gap-3">
-            <h1 className="text-xl font-bold">Configuración inicial</h1>
+            <h1 className="text-xl font-bold">Arma tus primeras oportunidades</h1>
             <div className="flex items-center gap-3">
               <span className="hidden sm:inline text-sm text-muted-foreground">
                 {cliente.empresa_nombre}
@@ -122,7 +128,7 @@ export default function ClienteOnboarding() {
 
       {/* Steps indicator */}
       <div className="container mx-auto px-4 py-6">
-        <div className="flex justify-center gap-4 mb-8">
+        <div className="flex flex-wrap justify-center gap-2 sm:gap-4 mb-8">
           {STEPS.map((step) => {
             const Icon = step.icon;
             const isActive = step.id === currentStep;
@@ -131,7 +137,7 @@ export default function ClienteOnboarding() {
             return (
               <div
                 key={step.id}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium transition-colors ${
                   isActive
                     ? 'bg-primary text-primary-foreground'
                     : isCompleted
@@ -140,11 +146,11 @@ export default function ClienteOnboarding() {
                 }`}
               >
                 {isCompleted ? (
-                  <Check className="w-4 h-4" />
+                  <Check className="w-4 h-4 shrink-0" />
                 ) : (
-                  <Icon className="w-4 h-4" />
+                  <Icon className="w-4 h-4 shrink-0" />
                 )}
-                <span className="hidden sm:inline">{step.title}</span>
+                <span>{step.title}</span>
               </div>
             );
           })}
@@ -157,7 +163,7 @@ export default function ClienteOnboarding() {
           {currentStep === 3 && <OnboardingResultados cliente={cliente} />}
 
           {/* Navigation */}
-          <div className="flex justify-between mt-8 pt-6 border-t">
+          <div className="flex items-center justify-between mt-8 pt-6 border-t">
             <Button
               variant="outline"
               onClick={handleBack}
@@ -167,9 +173,16 @@ export default function ClienteOnboarding() {
               Anterior
             </Button>
 
+            {sinNadaElegido && (
+              <p className="text-xs text-muted-foreground text-center px-2 hidden sm:block">
+                Elige al menos una industria o palabra clave para continuar
+              </p>
+            )}
+
             <Button
               onClick={handleNext}
-              disabled={actualizarCliente.isPending}
+              disabled={actualizarCliente.isPending || sinNadaElegido}
+              title={sinNadaElegido ? 'Elige al menos una industria o palabra clave para continuar' : undefined}
             >
               {currentStep === STEPS.length ? (
                 <>
