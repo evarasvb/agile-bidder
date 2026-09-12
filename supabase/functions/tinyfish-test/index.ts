@@ -20,7 +20,7 @@ async function tf(key: string, path: string, payload: unknown) {
     method: "POST",
     headers: { "X-API-Key": key, "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(90_000),
+    signal: AbortSignal.timeout(120_000),
   });
   const text = await r.text();
   let body: unknown = text;
