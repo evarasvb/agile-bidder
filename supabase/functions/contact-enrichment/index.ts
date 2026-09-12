@@ -316,78 +316,87 @@ async function sincronizarProveedoresEstado(supabase: any): Promise<EnrichmentRe
   }
 }
 
-// Sincronizar contactos de webinars (convenios marcos)
+// Sincronizar contactos de webinars (convenios marcos) - con paginación
 async function sincronizarWebinars(supabase: any): Promise<EnrichmentResult> {
   const inicio = Date.now()
   let procesados = 0, nuevos = 0, actualizados = 0, errores = 0
+  let desde = 0
+  const limit = 1000
 
   try {
-    // Obtener inscritos únicos por email desde webinar_inscripciones
-    const { data: webinars, error: fetchError } = await supabase
-      .from('webinar_inscripciones')
-      .select('id, email, nombre, empresa')
-      .not('email', 'is', null)
+    let hasMore = true
+    while (hasMore) {
+      const { data: webinars, error: fetchError } = await supabase
+        .from('webinar_inscripciones')
+        .select('id, email, nombre, empresa')
+        .not('email', 'is', null)
+        .range(desde, desde + limit - 1)
 
-    if (fetchError) {
-      console.error('Error fetching webinar inscriptions:', fetchError)
-      return { procesados, nuevos, actualizados, errores: 1, tiempo_segundos: (Date.now() - inicio) / 1000 }
-    }
-
-    if (!webinars || webinars.length === 0) {
-      console.log('No webinar inscriptions encontradas')
-      return { procesados: 0, nuevos: 0, actualizados: 0, errores: 0, tiempo_segundos: (Date.now() - inicio) / 1000 }
-    }
-
-    // Procesar cada registro
-    for (const registro of webinars) {
-      try {
-        procesados++
-        const email = registro.email?.toLowerCase().trim()
-
-        if (!email || !esEmailValido(email)) {
-          console.log(`Email inválido en webinar: ${email}`)
-          continue
-        }
-
-        // Buscar si ya existe
-        const { data: existente } = await supabase
-          .from('marketing_contactos')
-          .select('id')
-          .eq('email', email)
-          .single()
-          .catch(() => ({ data: null }))
-
-        if (existente) {
-          await supabase
-            .from('marketing_contactos')
-            .update({
-              fuente_primaria: 'webinar',
-              actualizado_en: new Date().toISOString()
-            })
-            .eq('id', existente.id)
-          actualizados++
-        } else {
-          await supabase
-            .from('marketing_contactos')
-            .insert({
-              email,
-              nombre: registro.nombre,
-              empresa: registro.empresa,
-              categoria: 'webinar_inscrito',
-              fuente_datos: 'webinar',
-              fuente_primaria: 'webinar',
-              estado_suscripcion: 'suscrito',
-              email_validado: true,
-              estado_email: 'valido',
-              consentimiento_marketing: true,
-              consentimiento_fecha: new Date().toISOString()
-            })
-          nuevos++
-        }
-      } catch (e) {
-        console.error('Error procesando registro webinar:', e)
+      if (fetchError) {
+        console.error('Error fetching webinar inscriptions:', fetchError)
         errores++
+        break
       }
+
+      if (!webinars || webinars.length === 0) {
+        hasMore = false
+        break
+      }
+
+      // Procesar cada registro
+      for (const registro of webinars) {
+        try {
+          procesados++
+          const email = registro.email?.toLowerCase().trim()
+
+          if (!email || !esEmailValido(email)) {
+            console.log(`Email inválido en webinar: ${email}`)
+            continue
+          }
+
+          // Buscar si ya existe - con await y error check
+          const { data: existente, error: existeError } = await supabase
+            .from('marketing_contactos')
+            .select('id')
+            .eq('email', email)
+            .single()
+
+          if (existente) {
+            await supabase
+              .from('marketing_contactos')
+              .update({
+                fuente_primaria: 'webinar',
+                actualizado_en: new Date().toISOString()
+              })
+              .eq('id', existente.id)
+            actualizados++
+          } else if (!existeError || existeError.code === 'PGRST116') {
+            // PGRST116 = no row found (expected)
+            await supabase
+              .from('marketing_contactos')
+              .insert({
+                email,
+                nombre: registro.nombre,
+                empresa: registro.empresa,
+                categoria: 'webinar_inscrito',
+                fuente_datos: 'webinar',
+                fuente_primaria: 'webinar',
+                estado_suscripcion: 'suscrito',
+                email_validado: true,
+                estado_email: 'valido',
+                consentimiento_marketing: true,
+                consentimiento_fecha: new Date().toISOString()
+              })
+            nuevos++
+          }
+        } catch (e) {
+          console.error('Error procesando registro webinar:', e)
+          errores++
+        }
+      }
+
+      desde += limit
+      hasMore = webinars.length === limit
     }
   } catch (error) {
     console.error('Error sincronizando webinars:', error)
@@ -403,77 +412,86 @@ async function sincronizarWebinars(supabase: any): Promise<EnrichmentResult> {
   }
 }
 
-// Sincronizar suscriptores de YouTube
+// Sincronizar suscriptores de YouTube - con paginación
 async function sincronizarYouTube(supabase: any): Promise<EnrichmentResult> {
   const inicio = Date.now()
   let procesados = 0, nuevos = 0, actualizados = 0, errores = 0
+  let desde = 0
+  const limit = 1000
 
   try {
-    // Obtener suscriptores de YouTube con email
-    const { data: youtubers, error: fetchError } = await supabase
-      .from('youtube_subscribers')
-      .select('id, nombre, email')
-      .not('email', 'is', null)
+    let hasMore = true
+    while (hasMore) {
+      const { data: youtubers, error: fetchError } = await supabase
+        .from('youtube_subscribers')
+        .select('id, nombre, email')
+        .not('email', 'is', null)
+        .range(desde, desde + limit - 1)
 
-    if (fetchError) {
-      console.error('Error fetching YouTube subscribers:', fetchError)
-      return { procesados, nuevos, actualizados, errores: 1, tiempo_segundos: (Date.now() - inicio) / 1000 }
-    }
-
-    if (!youtubers || youtubers.length === 0) {
-      console.log('No YouTube subscribers encontrados')
-      return { procesados: 0, nuevos: 0, actualizados: 0, errores: 0, tiempo_segundos: (Date.now() - inicio) / 1000 }
-    }
-
-    // Procesar cada suscriptor
-    for (const youtuber of youtubers) {
-      try {
-        procesados++
-        const email = youtuber.email?.toLowerCase().trim()
-
-        if (!email || !esEmailValido(email)) {
-          console.log(`Email inválido en YouTube: ${email}`)
-          continue
-        }
-
-        // Buscar si ya existe
-        const { data: existente } = await supabase
-          .from('marketing_contactos')
-          .select('id')
-          .eq('email', email)
-          .single()
-          .catch(() => ({ data: null }))
-
-        if (existente) {
-          await supabase
-            .from('marketing_contactos')
-            .update({
-              fuente_primaria: 'youtube',
-              actualizado_en: new Date().toISOString()
-            })
-            .eq('id', existente.id)
-          actualizados++
-        } else {
-          await supabase
-            .from('marketing_contactos')
-            .insert({
-              email,
-              nombre: youtuber.nombre,
-              categoria: 'youtube_subscriber',
-              fuente_datos: 'youtube',
-              fuente_primaria: 'youtube',
-              estado_suscripcion: 'suscrito',
-              email_validado: true,
-              estado_email: 'valido',
-              consentimiento_marketing: false,
-              consentimiento_fecha: null
-            })
-          nuevos++
-        }
-      } catch (e) {
-        console.error('Error procesando suscriptor YouTube:', e)
+      if (fetchError) {
+        console.error('Error fetching YouTube subscribers:', fetchError)
         errores++
+        break
       }
+
+      if (!youtubers || youtubers.length === 0) {
+        hasMore = false
+        break
+      }
+
+      // Procesar cada suscriptor
+      for (const youtuber of youtubers) {
+        try {
+          procesados++
+          const email = youtuber.email?.toLowerCase().trim()
+
+          if (!email || !esEmailValido(email)) {
+            console.log(`Email inválido en YouTube: ${email}`)
+            continue
+          }
+
+          // Buscar si ya existe - con await y error check
+          const { data: existente, error: existeError } = await supabase
+            .from('marketing_contactos')
+            .select('id')
+            .eq('email', email)
+            .single()
+
+          if (existente) {
+            await supabase
+              .from('marketing_contactos')
+              .update({
+                fuente_primaria: 'youtube',
+                actualizado_en: new Date().toISOString()
+              })
+              .eq('id', existente.id)
+            actualizados++
+          } else if (!existeError || existeError.code === 'PGRST116') {
+            // PGRST116 = no row found (expected)
+            await supabase
+              .from('marketing_contactos')
+              .insert({
+                email,
+                nombre: youtuber.nombre,
+                categoria: 'youtube_subscriber',
+                fuente_datos: 'youtube',
+                fuente_primaria: 'youtube',
+                estado_suscripcion: 'suscrito',
+                email_validado: true,
+                estado_email: 'valido',
+                consentimiento_marketing: false,
+                consentimiento_fecha: null
+              })
+            nuevos++
+          }
+        } catch (e) {
+          console.error('Error procesando suscriptor YouTube:', e)
+          errores++
+        }
+      }
+
+      desde += limit
+      hasMore = youtubers.length === limit
     }
   } catch (error) {
     console.error('Error sincronizando YouTube:', error)
@@ -489,82 +507,92 @@ async function sincronizarYouTube(supabase: any): Promise<EnrichmentResult> {
   }
 }
 
-// Sincronizar clientes existentes
+// Sincronizar clientes existentes - con paginación y columnas correctas
 async function sincronizarClientes(supabase: any): Promise<EnrichmentResult> {
   const inicio = Date.now()
   let procesados = 0, nuevos = 0, actualizados = 0, errores = 0
+  let desde = 0
+  const limit = 1000
 
   try {
-    // Obtener clientes con email de la tabla clientes
-    const { data: clientes, error: fetchError } = await supabase
-      .from('clientes')
-      .select('id, nombre, email, razon_social, rubro')
-      .not('email', 'is', null)
+    let hasMore = true
+    while (hasMore) {
+      // Columnas correctas: nombre_responsable, empresa_nombre, categoria_negocio
+      const { data: clientes, error: fetchError } = await supabase
+        .from('clientes')
+        .select('id, nombre_responsable, email, empresa_nombre, categoria_negocio')
+        .not('email', 'is', null)
+        .range(desde, desde + limit - 1)
 
-    if (fetchError) {
-      console.error('Error fetching clientes:', fetchError)
-      return { procesados, nuevos, actualizados, errores: 1, tiempo_segundos: (Date.now() - inicio) / 1000 }
-    }
-
-    if (!clientes || clientes.length === 0) {
-      console.log('No clientes encontrados')
-      return { procesados: 0, nuevos: 0, actualizados: 0, errores: 0, tiempo_segundos: (Date.now() - inicio) / 1000 }
-    }
-
-    // Procesar cada cliente
-    for (const cliente of clientes) {
-      try {
-        procesados++
-        const email = cliente.email?.toLowerCase().trim()
-
-        if (!email || !esEmailValido(email)) {
-          console.log(`Email inválido para cliente ${cliente.nombre}: ${email}`)
-          continue
-        }
-
-        const rubro = cliente.rubro || clasificarRubro(cliente.razon_social || cliente.nombre)
-
-        // Buscar si ya existe
-        const { data: existente } = await supabase
-          .from('marketing_contactos')
-          .select('id')
-          .eq('email', email)
-          .single()
-          .catch(() => ({ data: null }))
-
-        if (existente) {
-          await supabase
-            .from('marketing_contactos')
-            .update({
-              rubro,
-              fuente_primaria: 'clientes',
-              actualizado_en: new Date().toISOString()
-            })
-            .eq('id', existente.id)
-          actualizados++
-        } else {
-          await supabase
-            .from('marketing_contactos')
-            .insert({
-              email,
-              nombre: cliente.nombre,
-              empresa: cliente.razon_social || cliente.nombre,
-              categoria: 'cliente',
-              fuente_datos: 'clientes',
-              fuente_primaria: 'clientes',
-              rubro,
-              estado_suscripcion: 'suscrito',
-              email_validado: true,
-              estado_email: 'valido',
-              consentimiento_marketing: true,
-              consentimiento_fecha: new Date().toISOString()
-            })
-          nuevos++
-        }
-      } catch (e) {
-        console.error('Error procesando cliente:', e)
+      if (fetchError) {
+        console.error('Error fetching clientes:', fetchError)
         errores++
+        break
       }
+
+      if (!clientes || clientes.length === 0) {
+        hasMore = false
+        break
+      }
+
+      // Procesar cada cliente
+      for (const cliente of clientes) {
+        try {
+          procesados++
+          const email = cliente.email?.toLowerCase().trim()
+
+          if (!email || !esEmailValido(email)) {
+            console.log(`Email inválido para cliente ${cliente.nombre_responsable}: ${email}`)
+            continue
+          }
+
+          const rubro = cliente.categoria_negocio || clasificarRubro(cliente.empresa_nombre || cliente.nombre_responsable)
+
+          // Buscar si ya existe - con await y error check
+          const { data: existente, error: existeError } = await supabase
+            .from('marketing_contactos')
+            .select('id')
+            .eq('email', email)
+            .single()
+
+          if (existente) {
+            await supabase
+              .from('marketing_contactos')
+              .update({
+                rubro,
+                fuente_primaria: 'clientes',
+                actualizado_en: new Date().toISOString()
+              })
+              .eq('id', existente.id)
+            actualizados++
+          } else if (!existeError || existeError.code === 'PGRST116') {
+            // PGRST116 = no row found (expected)
+            await supabase
+              .from('marketing_contactos')
+              .insert({
+                email,
+                nombre: cliente.nombre_responsable,
+                empresa: cliente.empresa_nombre || cliente.nombre_responsable,
+                categoria: 'cliente',
+                fuente_datos: 'clientes',
+                fuente_primaria: 'clientes',
+                rubro,
+                estado_suscripcion: 'suscrito',
+                email_validado: true,
+                estado_email: 'valido',
+                consentimiento_marketing: true,
+                consentimiento_fecha: new Date().toISOString()
+              })
+            nuevos++
+          }
+        } catch (e) {
+          console.error('Error procesando cliente:', e)
+          errores++
+        }
+      }
+
+      desde += limit
+      hasMore = clientes.length === limit
     }
   } catch (error) {
     console.error('Error sincronizando clientes:', error)
