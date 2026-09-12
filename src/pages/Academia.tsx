@@ -80,6 +80,14 @@ const CONTENIDO = {
       { id: "SJ7PZZw1vNM", titulo: "" },
       { id: "kxpU_2H1J_Y", titulo: "" },
     ],
+    // Shorts (videos verticales). Pega el ID de cada Short de YouTube
+    // (la parte después de youtube.com/shorts/ o watch?v= ). Se muestran en una
+    // fila aparte, en formato vertical 9:16. La fila aparece sola cuando hay al
+    // menos uno cargado.
+    shorts: [
+      // { id: "XXXXXXXXXXX", titulo: "Fórmula pyme: 66 puntos" },
+      // { id: "YYYYYYYYYYY", titulo: "El error del 99% de descuento" },
+    ] as { id: string; titulo?: string }[],
   },
 
   // --- Música / canciones ---------------------------------------------------
@@ -303,6 +311,7 @@ export default function Academia() {
   const martes = estadoProximoMartes();
 
   const videosCargados = youtube.videos.filter((v) => v.id.trim() !== "");
+  const shortsCargados = youtube.shorts.filter((s) => s.id.trim() !== "");
   const musicaCargada = musica.filter((m) => m.url.trim() !== "");
   const postsCargados = linkedin.posts.filter(
     (p) => (p.url && p.url.trim() !== "") || p.imagenUrl
@@ -548,6 +557,34 @@ export default function Academia() {
         ) : (
           <PendientePorCargar texto="Aún no hay videos individuales seleccionados. Mientras tanto, entra a mi canal 👇" />
         )}
+        {shortsCargados.length > 0 && (
+          <div className="mt-10">
+            <h3 className="text-lg font-bold text-foreground mb-4">Shorts</h3>
+            <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1">
+              {shortsCargados.map((s, i) => (
+                <div key={i} className="shrink-0 w-[200px]">
+                  <div
+                    className="rounded-xl overflow-hidden border border-border/50 bg-black"
+                    style={{ aspectRatio: "9 / 16" }}
+                  >
+                    <iframe
+                      className="w-full h-full"
+                      src={`https://www.youtube.com/embed/${youtubeId(s.id)}?rel=0`}
+                      title={s.titulo || `Short ${i + 1}`}
+                      loading="lazy"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </div>
+                  {s.titulo && (
+                    <p className="mt-2 text-xs font-medium text-foreground">{s.titulo}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {youtube.canalUrl && (
           <div className="mt-6">
             <Button
