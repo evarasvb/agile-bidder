@@ -13,12 +13,12 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...cors, "Content-Type": "application/json" } });
-const TINYFISH_BASE = "https://api.tinyfish.ai";
+const TINYFISH_BASE = "https://agent.tinyfish.ai";
 
 async function tf(key: string, path: string, payload: unknown) {
   const r = await fetch(`${TINYFISH_BASE}${path}`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    headers: { "X-API-Key": key, "Content-Type": "application/json" },
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(90_000),
   });
@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
 
     if (body.probe) {
       // Llamada mínima solo para confirmar auth + ver la forma real de la respuesta/errores.
-      const r = await tf(key, "/v1/agent/run", { goal: "Responde solo con la palabra OK, sin navegar a ningún sitio." });
+      const r = await tf(key, "/v1/automation/run", { url: "https://example.com", goal: "Dime el título de esta página." });
       return json({ probe: true, resultado: r });
     }
 
@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
         `Lista los nombres de los archivos adjuntos que encuentres. Si hay un archivo PDF cuyo nombre sugiera que son las ` +
         `"Bases" (administrativas, técnicas o de la licitación), descárgalo y devuélveme su contenido como texto o un enlace ` +
         `de descarga. Si la página pide resolver un reCAPTCHA u otro desafío que no puedas pasar, dilo explícitamente.`;
-      const r = await tf(key, "/v1/agent/run", { goal, url });
+      const r = await tf(key, "/v1/automation/run", { goal, url });
       resultados.push({ codigo: c.codigo, url, resultado: r });
     }
     return json({ probados: resultados.length, resultados });
