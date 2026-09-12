@@ -210,7 +210,7 @@ function spotifyEmbed(url: string): string | null {
 
 // Extrae el ID de YouTube de un link completo o devuelve el id tal cual
 function youtubeId(idOrUrl: string): string {
-  const m = idOrUrl.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{6,})/);
+  const m = idOrUrl.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([A-Za-z0-9_-]{6,})/);
   return m ? m[1] : idOrUrl.trim();
 }
 
