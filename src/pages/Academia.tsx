@@ -261,9 +261,28 @@ function fmtTiempo(seg: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-// Días hasta el próximo martes (0 = hoy es martes). El webinar es todos los martes.
-function diasHastaProximoMartes(): number {
-  return (2 - new Date().getDay() + 7) % 7;
+// Estado del próximo webinar (martes 19:00–19:30, hora de Chile). Calcula en la
+// zona horaria America/Santiago para no fallar con visitantes en otros husos, y
+// considera que si ya es martes pasadas las 19:30, el próximo es en 7 días.
+function estadoProximoMartes(): { dias: number; hoy: boolean } {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Santiago",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(now);
+  const wd = parts.find((p) => p.type === "weekday")?.value ?? "";
+  const hour = parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10) % 24;
+  const min = parseInt(parts.find((p) => p.type === "minute")?.value ?? "0", 10);
+  const map: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const dow = map[wd] ?? 0;
+  const finWebinarMin = 19 * 60 + 30; // termina 19:30
+  if (dow === 2 && hour * 60 + min < finWebinarMin) return { dias: 0, hoy: true };
+  let dias = (2 - dow + 7) % 7;
+  if (dias === 0) dias = 7; // es martes pero el webinar ya terminó
+  return { dias, hoy: false };
 }
 
 export default function Academia() {
@@ -273,7 +292,15 @@ export default function Academia() {
   // Salto por capítulos en el video destacado: al elegir un capítulo, recargamos
   // el iframe con ?start= en ese segundo.
   const [inicioSeg, setInicioSeg] = useState<number | null>(null);
-  const diasMartes = diasHastaProximoMartes();
+  // Nonce que cambia en CADA clic de capítulo, para que volver a elegir el mismo
+  // capítulo también recargue el iframe (si solo dependiéramos de inicioSeg, un
+  // segundo clic al mismo capítulo no cambiaría el estado y no re-saltaría).
+  const [saltoNonce, setSaltoNonce] = useState(0);
+  const irACapitulo = (t: number) => {
+    setInicioSeg(t);
+    setSaltoNonce((n) => n + 1);
+  };
+  const martes = estadoProximoMartes();
 
   const videosCargados = youtube.videos.filter((v) => v.id.trim() !== "");
   const musicaCargada = musica.filter((m) => m.url.trim() !== "");
@@ -423,7 +450,7 @@ export default function Academia() {
               <div className="rounded-2xl overflow-hidden shadow-xl border border-border/50 bg-black ring-1 ring-firmavb-blue/10">
                 <div className="aspect-video">
                   <iframe
-                    key={inicioSeg ?? "start"}
+                    key={`${inicioSeg ?? "start"}-${saltoNonce}`}
                     className="w-full h-full"
                     src={`https://www.youtube.com/embed/${youtubeId(videosCargados[0].id)}?rel=0${inicioSeg != null ? `&start=${inicioSeg}&autoplay=1` : ""}`}
                     title={videosCargados[0].titulo || "Video destacado"}
@@ -449,7 +476,7 @@ export default function Academia() {
                       <button
                         key={c.t}
                         type="button"
-                        onClick={() => setInicioSeg(c.t)}
+                        onClick={() => irACapitulo(c.t)}
                         className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-firmavb-blue/5 ${
                           inicioSeg === c.t ? "bg-firmavb-blue/10" : ""
                         }`}
@@ -472,11 +499,11 @@ export default function Academia() {
                   </p>
                   <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-firmavb-blue/10 px-3 py-1 text-xs font-semibold text-firmavb-blue">
                     <CalendarClock className="h-3.5 w-3.5" />
-                    {diasMartes === 0
+                    {martes.hoy
                       ? "¡El próximo es HOY, martes 19:00!"
-                      : diasMartes === 1
+                      : martes.dias === 1
                         ? "Falta 1 día para el próximo martes"
-                        : `Faltan ${diasMartes} días para el próximo martes`}
+                        : `Faltan ${martes.dias} días para el próximo martes`}
                   </p>
                 </div>
                 <Button asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2 shrink-0">
