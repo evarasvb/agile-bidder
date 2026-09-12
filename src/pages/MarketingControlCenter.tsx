@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useCampaigns, useCampaignPiezas, useCampaignMetricas } from '@/hooks/useMarketingCampaigns';
 import { NuevaCampanaRapida } from '@/components/marketing/NuevaCampanaRapida';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AlertCircle, BarChart3, Rocket, Plus, Send } from 'lucide-react';
+import { AlertCircle, BarChart3, Rocket, Plus, Send, Users } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function MarketingControlCenter() {
+  const navigate = useNavigate();
   const { campaigns, isLoading } = useCampaigns();
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [showNewCampaign, setShowNewCampaign] = useState(false);
@@ -44,9 +46,19 @@ export default function MarketingControlCenter() {
 
   return (
     <div className="w-full max-w-7xl mx-auto p-6 space-y-8">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold">Centro de Control de Marketing</h1>
-        <p className="text-muted-foreground">Planifica, ejecuta y monitorea tus campañas automáticamente</p>
+      <div className="flex justify-between items-start">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold">Centro de Control de Marketing</h1>
+          <p className="text-muted-foreground">Planifica, ejecuta y monitorea tus campañas automáticamente</p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => navigate('/marketing/contactos')}
+          className="gap-2"
+        >
+          <Users className="w-4 h-4" />
+          Gestionar Contactos
+        </Button>
       </div>
 
       <Alert>

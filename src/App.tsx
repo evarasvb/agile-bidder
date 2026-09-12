@@ -77,6 +77,7 @@ const AdminSoporte = lazy(() => import("./pages/AdminSoporte"));
 const MisTickets = lazy(() => import("./pages/MisTickets"));
 
 const MarketingControlCenter = lazy(() => import("./pages/MarketingControlCenter"));
+const MarketingContactosAdmin = lazy(() => import("./pages/MarketingContactosAdmin"));
 
 // Defaults de React Query para que la app se sienta más rápida: cachea 1 min,
 // no re-consulta al volver a la pestaña y reintenta solo 1 vez. Antes cada
@@ -225,6 +226,7 @@ const App = () => (
 
             {/* ----- MARKETING ----- */}
             <Route path="/marketing/control" element={<AdminOnlyRoute><MarketingControlCenter /></AdminOnlyRoute>} />
+            <Route path="/marketing/contactos" element={<AdminOnlyRoute><MarketingContactosAdmin /></AdminOnlyRoute>} />
 
             {/* ----- CONFIGURACION ----- */}
             <Route path="/configuracion" element={<ConfiguracionOportunidades />} />
