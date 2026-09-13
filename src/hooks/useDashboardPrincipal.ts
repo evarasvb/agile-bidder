@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { addDays } from 'date-fns';
+import { useAuth } from '@/hooks/useAuth';
 
 // --- Types ---
 
@@ -50,8 +50,9 @@ export interface UltimoMatch {
 // --- KPI Hook ---
 
 export function useDashboardKPIs() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ['dashboard-principal', 'kpis'],
+    queryKey: ['dashboard-principal', user?.id, 'kpis'],
     queryFn: async (): Promise<DashboardKPIs> => {
       // Todo el cálculo se hace en la BD (RPC dashboard_kpis): antes se bajaban
       // TODAS las filas de compras_agiles y licitaciones al navegador cada 30s
@@ -72,6 +73,7 @@ export function useDashboardKPIs() {
         tasaExitoTrend: null,
       };
     },
+    enabled: !!user?.id,
     refetchInterval: 60000,
     staleTime: 30000,
   });
@@ -80,8 +82,9 @@ export function useDashboardKPIs() {
 // --- Pipeline by Stage Hook ---
 
 export function usePipelineByStage() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ['dashboard-principal', 'pipeline-stages'],
+    queryKey: ['dashboard-principal', user?.id, 'pipeline-stages'],
     queryFn: async (): Promise<PipelineStage[]> => {
       // Agregación en la BD (RPC): antes bajaba todas las filas para agrupar en
       // el navegador. La RPC ya devuelve estado (en minúscula), cantidad y monto.
@@ -97,15 +100,17 @@ export function usePipelineByStage() {
       }
 
       // Define pipeline order
-      const stageOrder = ['publicada', 'en_revision', 'postulada', 'enviada', 'adjudicada', 'cerrada', 'desierta'];
+      const stageOrder = ['descubierta', 'seguimiento', 'preparacion', 'postulada', 'evaluacion', 'adjudicada', 'oc_emitida', 'pagada', 'perdida'];
       const stageLabels: Record<string, string> = {
-        publicada: 'Publicada',
-        en_revision: 'En Revisión',
+        descubierta: 'Descubierta',
+        seguimiento: 'Seguimiento',
+        preparacion: 'En preparación',
         postulada: 'Postulada',
-        enviada: 'Enviada',
+        evaluacion: 'En evaluación',
         adjudicada: 'Adjudicada',
-        cerrada: 'Cerrada',
-        desierta: 'Desierta',
+        oc_emitida: 'OC emitida',
+        pagada: 'Pagada',
+        perdida: 'Perdida',
       };
 
       const result: PipelineStage[] = [];
@@ -132,6 +137,7 @@ export function usePipelineByStage() {
 
       return result;
     },
+    enabled: !!user?.id,
     staleTime: 30000,
   });
 }
@@ -139,36 +145,21 @@ export function usePipelineByStage() {
 // --- Oportunidades por Tipo Hook ---
 
 export function useOportunidadesPorTipo() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ['dashboard-principal', 'por-tipo'],
+    queryKey: ['dashboard-principal', user?.id, 'por-tipo'],
     queryFn: async (): Promise<OportunidadPorTipo[]> => {
-      // Solo ABIERTAS (mismo criterio que la Bandeja): antes contaba las
-      // 80.000 compras y 130.000 licitaciones históricas, un número distinto
-      // al que el cliente ve en Oportunidades.
-      const nowIso = new Date().toISOString();
-      const { count: caCount, error: caError } = await supabase
-        .from('compras_agiles')
-        .select('*', { count: 'exact', head: true })
-        .or('estado.ilike.publicada,estado.ilike.activa')
-        .gt('fecha_cierre', nowIso);
-      if (caError) throw caError;
-
-      // licitaciones_bi (fresca, sync oficial), no la antigua `licitaciones`
-      // (congelada) — mismo criterio que useCierresProximos/useUltimosMatches
-      // más abajo. Antes esta tarjeta mostraba un conteo desactualizado
-      // mientras el resto del dashboard ya usaba la tabla correcta.
-      const { count: licCount, error: licError } = await (supabase as any)
-        .from('licitaciones_bi')
-        .select('*', { count: 'exact', head: true })
-        .or('estado.is.null,estado.ilike.publicada,estado.ilike.activa')
-        .gt('fecha_cierre', nowIso);
-      if (licError) throw licError;
-
-      return [
-        { tipo: 'Compras Ágiles', count: caCount || 0 },
-        { tipo: 'Licitaciones', count: licCount || 0 },
-      ];
+      // La RPC agrupa exclusivamente los matches de la empresa autenticada.
+      // Nunca usar match_score de la oportunidad global: ese valor puede haber
+      // sido calculado con el inventario de otra empresa.
+      const { data, error } = await (supabase as any).rpc('dashboard_oportunidades_por_tipo_cliente');
+      if (error) throw error;
+      return ((data || []) as Array<{ tipo: string; cantidad: number }>).map((r) => ({
+        tipo: r.tipo === 'compra_agil' ? 'Compras Ágiles' : 'Licitaciones',
+        count: Number(r.cantidad) || 0,
+      }));
     },
+    enabled: !!user?.id,
     staleTime: 30000,
   });
 }
@@ -176,64 +167,20 @@ export function useOportunidadesPorTipo() {
 // --- Cierres Próximos Hook ---
 
 export function useCierresProximos() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ['dashboard-principal', 'cierres-proximos'],
+    queryKey: ['dashboard-principal', user?.id, 'cierres-proximos'],
     queryFn: async (): Promise<CierreProximo[]> => {
       const now = new Date();
-      const in7Days = addDays(now, 7);
-
-      // Compras Ágiles que cierran pronto. La columna del organismo es
-      // `nombre_organismo` (no `organismo`, que no existe y hacía fallar la query).
-      const { data: caData, error: caError } = await (supabase as any)
-        .from('compras_agiles')
-        .select('codigo, nombre, nombre_organismo, fecha_cierre, match_score, estado')
-        .gte('fecha_cierre', now.toISOString())
-        .lte('fecha_cierre', in7Days.toISOString())
-        .order('fecha_cierre', { ascending: true })
-        .limit(10);
-      if (caError) throw caError;
-
-      // Licitaciones que cierran pronto: desde `licitaciones_bi` (tabla fresca del
-      // sync oficial). La antigua `licitaciones` está congelada (0 activas) y no
-      // tiene `id_licitacion`, por eso la query lanzaba error y el widget de
-      // cierres próximos quedaba vacío. No está en los tipos generados => any.
-      const { data: licData, error: licError } = await (supabase as any)
-        .from('licitaciones_bi')
-        .select('codigo, nombre, institucion_nombre, fecha_cierre, match_score, estado')
-        .gte('fecha_cierre', now.toISOString())
-        .lte('fecha_cierre', in7Days.toISOString())
-        .order('fecha_cierre', { ascending: true })
-        .limit(10);
-      if (licError) throw licError;
-
-      const results: CierreProximo[] = [
-        ...(caData || []).map(ca => ({
-          codigo: ca.codigo,
-          nombre: ca.nombre,
-          institucion: (ca as any).nombre_organismo || 'Sin organismo',
-          fecha_cierre: ca.fecha_cierre || '',
-          diasRestantes: Math.max(0, Math.ceil((new Date(ca.fecha_cierre!).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))),
-          match_score: ca.match_score,
-          etapa: ca.estado || 'Publicada',
-          tipo: 'Compra Ágil',
-        })),
-        ...((licData || []) as any[]).map(l => ({
-          codigo: l.codigo,
-          nombre: l.nombre,
-          institucion: l.institucion_nombre || 'Sin organismo',
-          fecha_cierre: l.fecha_cierre || '',
-          diasRestantes: Math.max(0, Math.ceil((new Date(l.fecha_cierre!).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))),
-          match_score: l.match_score,
-          etapa: l.estado || 'Publicada',
-          tipo: 'Licitación',
-        })),
-      ];
-
-      // Sort by deadline ascending
-      results.sort((a, b) => new Date(a.fecha_cierre).getTime() - new Date(b.fecha_cierre).getTime());
-
-      return results.slice(0, 10);
+      const { data, error } = await (supabase as any).rpc('dashboard_cierres_cliente', { p_limite: 10 });
+      if (error) throw error;
+      return ((data || []) as Array<Omit<CierreProximo, 'diasRestantes'>>).map((r) => ({
+        ...r,
+        match_score: r.match_score == null ? null : Number(r.match_score),
+        diasRestantes: Math.max(0, Math.ceil((new Date(r.fecha_cierre).getTime() - now.getTime()) / 86_400_000)),
+      }));
     },
+    enabled: !!user?.id,
     staleTime: 30000,
   });
 }
@@ -241,53 +188,18 @@ export function useCierresProximos() {
 // --- Últimos Matches Hook ---
 
 export function useUltimosMatches() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ['dashboard-principal', 'ultimos-matches'],
+    queryKey: ['dashboard-principal', user?.id, 'ultimos-matches'],
     queryFn: async (): Promise<UltimoMatch[]> => {
-      // Compras Ágiles con match. Organismo = `nombre_organismo`.
-      const { data: caData, error: caError } = await (supabase as any)
-        .from('compras_agiles')
-        .select('codigo, nombre, nombre_organismo, match_score, created_at')
-        .eq('match_encontrado', true)
-        .gte('match_score', 40)
-        .order('created_at', { ascending: false })
-        .limit(5);
-      if (caError) throw caError;
-
-      // Licitaciones con match desde `licitaciones_bi` (fresca). La antigua
-      // `licitaciones` no tiene `id_licitacion` => la query fallaba. any por tipos.
-      const { data: licData, error: licError } = await (supabase as any)
-        .from('licitaciones_bi')
-        .select('codigo, nombre, institucion_nombre, match_score, created_at')
-        .eq('match_encontrado', true)
-        .gte('match_score', 40)
-        .order('created_at', { ascending: false })
-        .limit(5);
-      if (licError) throw licError;
-
-      const results: UltimoMatch[] = [
-        ...(caData || []).map(ca => ({
-          codigo: ca.codigo,
-          nombre: ca.nombre,
-          institucion: (ca as any).nombre_organismo || 'Sin organismo',
-          match_score: ca.match_score,
-          tipo: 'Compra Ágil',
-          fecha: ca.created_at,
-        })),
-        ...((licData || []) as any[]).map(l => ({
-          codigo: l.codigo,
-          nombre: l.nombre,
-          institucion: l.institucion_nombre || 'Sin organismo',
-          match_score: l.match_score,
-          tipo: 'Licitación',
-          fecha: l.created_at,
-        })),
-      ];
-
-      // Sort by date desc, take 8
-      results.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
-      return results.slice(0, 8);
+      const { data, error } = await (supabase as any).rpc('dashboard_ultimos_matches_cliente', { p_limite: 8 });
+      if (error) throw error;
+      return ((data || []) as UltimoMatch[]).map((r) => ({
+        ...r,
+        match_score: r.match_score == null ? null : Number(r.match_score),
+      }));
     },
+    enabled: !!user?.id,
     staleTime: 30000,
   });
 }
