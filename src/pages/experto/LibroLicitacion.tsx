@@ -79,6 +79,11 @@ export default function LibroLicitacion() {
     enabled: !!cod && !!token,
     queryFn: async () => (await (supabase as any).rpc('experto_libro', { p_codigo: cod })).data,
   });
+  const { data: pruebaPro } = useQuery({
+    queryKey: ['experto_prueba_estado', session?.user?.id],
+    enabled: !!session?.user?.id,
+    queryFn: async () => ((await (supabase as any).rpc('experto_prueba_estado')).data?.[0] ?? null) as { disponible: boolean } | null,
+  });
 
   // Productos solicitados de la licitación con match contra el inventario (para
   // mostrar "Productos Solicitados" y armar la cotización comercial). El libro
@@ -181,6 +186,15 @@ export default function LibroLicitacion() {
     }
   };
 
+  const iniciarPruebaPro = async () => {
+    if (!token) { navigate('/auth?tab=signup'); return; }
+    setOcupado('prueba');
+    const { error } = await (supabase as any).rpc('experto_prueba_iniciar');
+    if (error) { toast.error(error.message.replace(/^.*?: /, '')); setOcupado(null); return; }
+    toast.success('Experto Pro activo por 14 días, sin tarjeta.');
+    window.location.reload();
+  };
+
   const preguntar = async (texto?: string) => {
     const p = (texto ?? pregunta).trim(); if (!p || ocupado) return;
     setPregunta('');
@@ -234,7 +248,7 @@ export default function LibroLicitacion() {
       }
     } catch (e: any) {
       if (e.status === 402) setLimite(e.message);
-      toast.error(e.message, e.status === 402 ? { action: { label: 'Activar Pro', onClick: () => pagarExperto('pro_30') } } : undefined);
+      toast.error(e.message, e.status === 402 ? { action: pruebaPro?.disponible ? { label: 'Probar 14 días', onClick: iniciarPruebaPro } : { label: 'Activar Pro', onClick: () => pagarExperto('pro_30') } } : undefined);
     }
     setOcupado(null);
   };
@@ -740,8 +754,8 @@ export default function LibroLicitacion() {
             {limite && (
               <div className="flex items-center gap-2 flex-wrap text-xs rounded-md border border-yellow-200 bg-yellow-50 text-yellow-900 px-3 py-2">
                 <span className="flex-1 min-w-56">{limite}</span>
-                <Button size="sm" className="h-8" disabled={!!ocupado} onClick={() => pagarExperto('pro_30')}>
-                  {ocupado === 'pago:pro_30' ? <Loader2 className="h-4 w-4 animate-spin" /> : <><CreditCard className="h-3.5 w-3.5 mr-1" />Activar Pro · $50.000</>}
+                <Button size="sm" className="h-8" disabled={!!ocupado} onClick={pruebaPro?.disponible ? iniciarPruebaPro : () => pagarExperto('pro_30')}>
+                  {ocupado === 'prueba' || ocupado === 'pago:pro_30' ? <Loader2 className="h-4 w-4 animate-spin" /> : pruebaPro?.disponible ? <><Sparkles className="h-3.5 w-3.5 mr-1" />Probar Pro · 14 días</> : <><CreditCard className="h-3.5 w-3.5 mr-1" />Activar Pro · $50.000</>}
                 </Button>
                 <Button size="sm" variant="outline" className="h-8" onClick={() => navigate('/cuenta')}>Comparar planes</Button>
               </div>

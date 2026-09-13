@@ -120,7 +120,7 @@ export function ExpertoComodin() {
               {usado && (
                 <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-firmavb-blue/30 bg-firmavb-blue/5 p-4">
                   <p className="flex-1 text-sm">
-                    <b>{estado === "listo" ? "Usaste tu acceso gratis." : "Acceso gratis usado."}</b> Crea tu cuenta para guardar oportunidades. Para seguir usando el Experto, activa Pro con Mercado Pago.
+                    <b>{estado === "listo" ? "Usaste tu acceso gratis." : "Acceso gratis usado."}</b> Crea tu cuenta y activa tu prueba Pro de 14 días, sin tarjeta. Después podrás continuar con Mercado Pago.
                   </p>
                   <Button asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90"><Link to="/auth?tab=signup">Crear cuenta gratis</Link></Button>
                   <Button asChild variant="outline"><Link to="/auth">Ya tengo cuenta</Link></Button>

@@ -134,11 +134,11 @@ export default function Planes() {
         <p className="text-center text-xs text-muted-foreground mt-8">
           Pagos con Mercado Pago. Experto Pro y Plus son pagos únicos por 30 días; el ERP es
           suscripción mensual que puedes cancelar cuando quieras. Sin tarjeta de crédito para el
-          primer uso del Experto.
+          primer uso del Experto ni para la prueba Pro de 14 días.
         </p>
         <p className="text-center text-xs text-muted-foreground mt-2">
-          Elige cómo ocupar tu único resultado gratis: una respuesta, un informe de trabajo o un
-          informe Bajo el Agua. Después: Experto Pro 10 Bajo el Agua al mes, Plus 30 y ERP sin límite.
+          Primero tienes un resultado gratis; al iniciar sesión puedes probar Experto Pro durante
+          14 días. Después: Pro 10 informes Bajo el Agua al mes, Plus 30 y ERP sin límite.
         </p>
       </main>
     </div>

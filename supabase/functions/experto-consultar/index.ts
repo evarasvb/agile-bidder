@@ -197,7 +197,7 @@ Deno.serve(async (req) => {
             return new Response(JSON.stringify({ error: "ritmo", mensaje: "Demasiadas preguntas seguidas desde tu conexión. Espera un rato e intenta de nuevo.", uso: u }), { status: 429, headers: { ...cors, "Content-Type": "application/json", "Retry-After": "900" } });
           }
           if (!userId && ip && (c.ip_anon_24h ?? 0) >= MAX_IP_ANON_24H) {
-            return new Response(JSON.stringify({ error: "comodin_usado", registro: true, mensaje: "El acceso gratis ya se usó desde esta conexión. Crea tu cuenta y activa Experto Pro con Mercado Pago para continuar.", uso: u }), { status: 402, headers: { ...cors, "Content-Type": "application/json" } });
+            return new Response(JSON.stringify({ error: "comodin_usado", registro: true, mensaje: "El acceso gratis ya se usó desde esta conexión. Crea tu cuenta y activa tu prueba Pro de 14 días, sin tarjeta.", uso: u }), { status: 402, headers: { ...cors, "Content-Type": "application/json" } });
           }
           if (c.anon_24h >= MAX_ANON_24H) {
             return new Response(JSON.stringify({ error: "cupo_diario", mensaje: "El cupo gratuito de hoy ya se agotó. Vuelve mañana, o con el plan Pro de FirmaVB no hay límite.", plan: u.plan, uso: u }), { status: 402, headers: { ...cors, "Content-Type": "application/json" } });
@@ -218,8 +218,8 @@ Deno.serve(async (req) => {
       const prueba = pruebaRows?.[0] ?? { plan: "free", usados: 1, maximo: 1 };
       if (Number(prueba.usados) >= 1) {
         const mensaje = userId
-          ? "Ya usaste tu resultado gratis del Experto. Activa Experto Pro con Mercado Pago para seguir preguntando y generar informes sin límite durante 30 días."
-          : "Ya usaste tu resultado gratis. Crea tu cuenta y activa Experto Pro con Mercado Pago para continuar.";
+          ? "Ya usaste tu resultado gratis del Experto. Activa tu prueba Pro de 14 días si aún está disponible; después puedes continuar con Mercado Pago."
+          : "Ya usaste tu resultado gratis. Crea tu cuenta y activa tu prueba Pro de 14 días, sin tarjeta.";
         return new Response(JSON.stringify({ error: "prueba_usada", registro: !userId, mensaje, plan: u.plan, uso: u, prueba, productos: ["pro_30", "plus_30"] }), { status: 402, headers: { ...cors, "Content-Type": "application/json" } });
       }
     }

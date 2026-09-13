@@ -181,7 +181,7 @@ Deno.serve(async (req) => {
     const cuota = cuotaRows?.[0] ?? { plan: "free", usados: 0, maximo: 1, periodo: "total" };
     if (cuota.maximo != null && Number(cuota.usados) >= Number(cuota.maximo)) {
       const mensaje = cuota.plan === "free"
-        ? "Ya usaste tu resultado gratis del Experto. Activa Experto Pro con Mercado Pago: incluye 10 informes Bajo el Agua al mes; Plus incluye 30 y el ERP no tiene límite."
+        ? "Ya usaste tu resultado gratis del Experto. Activa tu prueba Pro de 14 días si está disponible; después, Pro incluye 10 informes Bajo el Agua al mes, Plus 30 y el ERP no tiene límite."
         : `Llegaste al tope de ${cuota.maximo} informes Bajo el Agua de tu plan ${cuota.periodo === "mes" ? "este mes" : ""}. Sube de plan o espera al próximo mes.`;
       return json({ error: cuota.plan === "free" ? "prueba_usada" : "cuota", mensaje, cuota, productos: ["pro_30", "plus_30"] }, 402);
     }

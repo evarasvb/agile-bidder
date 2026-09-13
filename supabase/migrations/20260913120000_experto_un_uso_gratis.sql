@@ -1,7 +1,7 @@
 -- Monetizacion del Experto: un solo resultado gratis de por vida por cuenta.
 -- El uso se consume solo cuando una Edge Function registra una respuesta exitosa.
--- Las pruebas Pro ya iniciadas se respetan hasta su fecha de vencimiento, pero no se
--- pueden iniciar nuevas pruebas de 14 dias.
+-- La prueba Pro de 14 dias al iniciar sesion se mantiene intacta. Esta migracion
+-- solo ordena el uso gratuito anterior a esa prueba y el cobro posterior.
 
 create or replace function public.experto_prueba_un_uso(p_user_id uuid, p_huella text)
 returns table (plan text, usados integer, maximo integer)
@@ -60,26 +60,3 @@ $$;
 
 revoke all on function public.experto_bajo_agua_cuota(uuid) from public, anon, authenticated;
 grant execute on function public.experto_bajo_agua_cuota(uuid) to service_role;
-
--- Se conserva la firma de las RPC que existen en produccion para que clientes
--- antiguos reciban una respuesta explicita, sin dejar una via de activacion gratis.
-create or replace function public.experto_prueba_estado()
-returns table (disponible boolean, usada_en timestamptz, hasta timestamptz)
-language sql stable security definer
-set search_path = public
-as $$
-  select false, null::timestamptz, null::timestamptz;
-$$;
-
-create or replace function public.experto_prueba_iniciar()
-returns timestamptz
-language plpgsql security definer
-set search_path = public
-as $$
-begin
-  raise exception 'El Experto incluye un uso gratis. Para continuar, activa Experto Pro.';
-end;
-$$;
-
-revoke all on function public.experto_prueba_iniciar() from public, anon, authenticated;
-grant execute on function public.experto_prueba_estado() to authenticated;
