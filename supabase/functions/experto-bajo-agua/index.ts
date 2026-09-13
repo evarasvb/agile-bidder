@@ -175,14 +175,15 @@ Deno.serve(async (req) => {
     const huella = String(body.huella ?? "").slice(0, 80);
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-    // Cuota: 1 gratis de por vida como gancho; después según plan (tabla experto_bajo_agua_cuotas).
+    // El plan gratis comparte un unico uso de por vida entre chat, informe y Bajo el Agua.
+    // Los planes pagados mantienen la cuota de Bajo el Agua configurada en la tabla.
     const { data: cuotaRows } = await sb.rpc("experto_bajo_agua_cuota", { p_user_id: userId });
     const cuota = cuotaRows?.[0] ?? { plan: "free", usados: 0, maximo: 1, periodo: "total" };
     if (cuota.maximo != null && Number(cuota.usados) >= Number(cuota.maximo)) {
       const mensaje = cuota.plan === "free"
-        ? "Ya usaste tu informe Bajo el Agua gratis. Con Experto Pro tienes 10 al mes y con Experto Plus 30; el ERP no tiene límite."
+        ? "Ya usaste tu resultado gratis del Experto. Activa Experto Pro con Mercado Pago: incluye 10 informes Bajo el Agua al mes; Plus incluye 30 y el ERP no tiene límite."
         : `Llegaste al tope de ${cuota.maximo} informes Bajo el Agua de tu plan ${cuota.periodo === "mes" ? "este mes" : ""}. Sube de plan o espera al próximo mes.`;
-      return json({ error: cuota.plan === "free" ? "pro" : "cuota", mensaje, cuota }, 402);
+      return json({ error: cuota.plan === "free" ? "prueba_usada" : "cuota", mensaje, cuota, productos: ["pro_30", "plus_30"] }, 402);
     }
 
     const ficha = (await sb.rpc("experto_ficha_licitacion", { p_codigo: codigo })).data;

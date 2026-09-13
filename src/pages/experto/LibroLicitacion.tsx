@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
-import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink, Trash2, Paperclip, Printer, Mail, Map as MapIcon, Image as ImageIcon, Presentation, Waves, Download, Receipt } from 'lucide-react';
+import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink, Trash2, Paperclip, Printer, Mail, Map as MapIcon, Image as ImageIcon, Presentation, Waves, Download, Receipt, CreditCard } from 'lucide-react';
 import { useTraerAdjuntos } from '@/hooks/useAdjuntosLicitacion';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -36,6 +36,7 @@ import { useInventoryActivo } from '@/hooks/useInventory';
 import { useCliente } from '@/hooks/useCliente';
 import { descargarCotizacionPDF, type ItemCotizacion, type DatosCotizacion } from '@/services/pdfGenerator';
 import { evaluarCompletitudExpediente, extraerDecisionLegacy } from '@/lib/expertoDecision';
+import { expertoHuella } from '@/lib/expertoTrial';
 
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string;
 const ANON = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
@@ -121,6 +122,12 @@ export default function LibroLicitacion() {
 
   useEffect(() => { setMsgs([]); setLimite(null); setCompartido(null); }, [cod]);
   useEffect(() => {
+    const pago = sp.get('pago');
+    if (pago === 'ok') { setLimite(null); toast.success('Pago recibido. Mercado Pago está activando tu Experto; puede tardar unos segundos.'); qc.invalidateQueries({ queryKey: ['experto_libro', cod] }); }
+    else if (pago === 'pendiente') toast.info('Tu pago quedó pendiente y el Experto se activará apenas Mercado Pago lo apruebe.');
+    else if (pago === 'error') toast.error('El pago no se completó. No se hizo ningún cargo aprobado.');
+  }, [sp, qc, cod]);
+  useEffect(() => {
     if (!libro) return;
     setMsgs((libro.chat ?? []).flatMap((c: any) => [{ rol: 'yo', texto: c.pregunta }, { rol: 'exp', texto: c.respuesta }]));
     setEntregables({ sala: 'ok', informe: libro.informe?.texto ?? '', matriz: libro.matriz?.texto ?? '', estudio: libro.estudio?.texto ?? '', bajo_agua: libro.bajo_agua?.texto ?? '', anexos: libro.anexos?.texto ?? '', mapa: libro.mapa?.texto ?? '', infografia: libro.ficha ? 'ok' : '' });
@@ -157,6 +164,23 @@ export default function LibroLicitacion() {
     return { texto, meta };
   }
 
+  const pagarExperto = async (producto: 'pro_30' | 'plus_30') => {
+    if (!token) { navigate('/auth?tab=signup'); return; }
+    setOcupado(`pago:${producto}`);
+    try {
+      const r = await fetch(`${SUPA}/functions/v1/crear-pago-experto`, {
+        method: 'POST', headers: auth,
+        body: JSON.stringify({ producto, back_url: window.location.origin + (cod ? `/experto/libro/${cod}` : '/experto') }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.url) throw new Error(j.mensaje || j.error || `Error ${r.status}`);
+      window.location.href = j.url;
+    } catch (e: any) {
+      toast.error(`No pude iniciar el pago: ${e.message}`);
+      setOcupado(null);
+    }
+  };
+
   const preguntar = async (texto?: string) => {
     const p = (texto ?? pregunta).trim(); if (!p || ocupado) return;
     setPregunta('');
@@ -166,7 +190,7 @@ export default function LibroLicitacion() {
     setMsgs((m) => [...m, { rol: 'yo', texto: p }, { rol: 'exp', texto: '' }]);
     setOcupado('chat');
     try {
-      await pedir({ modo: 'chat', pregunta: p, codigo: cod || undefined, historial, huella: 'libro' }, 'experto-consultar', (t, meta) =>
+      await pedir({ modo: 'chat', pregunta: p, codigo: cod || undefined, historial, huella: expertoHuella() }, 'experto-consultar', (t, meta) =>
         setMsgs((m) => { const c = [...m]; c[c.length - 1] = { rol: 'exp', texto: t, fuentes: meta?.fuentes, pedirBases: meta?.pedir_bases }; return c; }));
     } catch (e: any) {
       if (e.status === 402 || e.status === 401) setLimite(e.message);
@@ -204,11 +228,14 @@ export default function LibroLicitacion() {
         if (!r.ok) throw new Error(j.mensaje || j.error || `Error ${r.status}`);
         setEntregables((e) => ({ ...e, anexos: j.contenido })); setFaltantes(j.faltantes ?? []);
       } else {
-        await pedir({ modo: tipo, codigo: cod, pregunta: '', huella: 'libro' }, tipo === 'estudio' ? 'experto-estudio' : tipo === 'bajo_agua' ? 'experto-bajo-agua' : 'experto-consultar', (t) => setEntregables((e) => ({ ...e, [tipo]: t })));
+        await pedir({ modo: tipo, codigo: cod, pregunta: '', huella: expertoHuella() }, tipo === 'estudio' ? 'experto-estudio' : tipo === 'bajo_agua' ? 'experto-bajo-agua' : 'experto-consultar', (t) => setEntregables((e) => ({ ...e, [tipo]: t })));
         // Bajo el Agua gasta cuota: se refresca el libro para mostrar cuántos informes quedan.
         if (tipo === 'bajo_agua') qc.invalidateQueries({ queryKey: ['experto_libro', cod] });
       }
-    } catch (e: any) { toast.error(e.message, e.status === 402 ? { action: { label: 'Ver planes', onClick: () => navigate('/cuenta') } } : undefined); }
+    } catch (e: any) {
+      if (e.status === 402) setLimite(e.message);
+      toast.error(e.message, e.status === 402 ? { action: { label: 'Activar Pro', onClick: () => pagarExperto('pro_30') } } : undefined);
+    }
     setOcupado(null);
   };
 
@@ -474,14 +501,15 @@ export default function LibroLicitacion() {
     noticias: libro?.noticias?.length ? 'completa' : 'pendiente',
   });
   const esPro = libro?.plan && libro.plan !== 'free';
-  // Cuota del modo Bajo el Agua (1 gratis de por vida; después según plan, configurable en la base).
+  // En Free, Bajo el Agua comparte el unico uso gratis con chat e informe.
+  // Los planes pagados conservan su cuota mensual configurable.
   const cuotaBajoAgua = (() => {
     const c = libro?.bajo_agua_cuota as { plan?: string; usados?: number; maximo?: number | null; periodo?: string } | undefined;
-    if (!c) return { etiqueta: '1 gratis para probar', agotada: false, texto: '' };
+    if (!c) return { etiqueta: '1 uso gratis', agotada: false, texto: '' };
     const usados = c.usados ?? 0; const max = c.maximo ?? null;
     if (max == null) return { etiqueta: 'Sin límite', agotada: false, texto: 'Tu plan no tiene límite de informes Bajo el Agua.' };
     const quedan = Math.max(0, max - usados);
-    if (c.plan === 'free') return { etiqueta: quedan > 0 ? '1 gratis para probar' : 'Usado · pasa a Pro', agotada: quedan === 0, texto: quedan > 0 ? 'Tienes 1 informe Bajo el Agua gratis para probar.' : 'Ya usaste tu informe gratis. Con Experto Pro tienes 10 al mes, con Plus 30 y con el ERP sin límite.' };
+    if (c.plan === 'free') return { etiqueta: quedan > 0 ? 'Disponible como uso gratis' : 'Uso gratis agotado', agotada: quedan === 0, texto: quedan > 0 ? 'Puedes ocupar aquí tu único resultado gratis del Experto.' : 'Ya ocupaste tu resultado gratis en una respuesta o informe. Activa Pro para continuar.' };
     return { etiqueta: `${quedan} de ${max} este mes`, agotada: quedan === 0, texto: quedan > 0 ? `Te quedan ${quedan} de ${max} informes Bajo el Agua este mes.` : `Usaste los ${max} informes Bajo el Agua de tu plan este mes.` };
   })();
 
@@ -711,8 +739,11 @@ export default function LibroLicitacion() {
             </div>
             {limite && (
               <div className="flex items-center gap-2 flex-wrap text-xs rounded-md border border-yellow-200 bg-yellow-50 text-yellow-900 px-3 py-2">
-                <span>{limite}</span>
-                <Button size="sm" className="h-7 ml-auto" onClick={() => navigate('/cuenta')}>Ver planes</Button>
+                <span className="flex-1 min-w-56">{limite}</span>
+                <Button size="sm" className="h-8" disabled={!!ocupado} onClick={() => pagarExperto('pro_30')}>
+                  {ocupado === 'pago:pro_30' ? <Loader2 className="h-4 w-4 animate-spin" /> : <><CreditCard className="h-3.5 w-3.5 mr-1" />Activar Pro · $50.000</>}
+                </Button>
+                <Button size="sm" variant="outline" className="h-8" onClick={() => navigate('/cuenta')}>Comparar planes</Button>
               </div>
             )}
             <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); preguntar(); }}>

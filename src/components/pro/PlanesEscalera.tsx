@@ -25,20 +25,6 @@ export function PlanesEscalera() {
     queryFn: async () => (await (supabase as any).from('experto_pro').select('nivel, hasta').eq('user_id', session!.user.id).maybeSingle()).data as { nivel: string; hasta: string } | null,
   });
   const expertoActivo = experto && new Date(experto.hasta) > new Date() ? experto : null;
-  // Prueba gratis de Experto Pro: 14 días, una vez por cuenta, sin tarjeta.
-  const { data: prueba, refetch: refetchPrueba } = useQuery({
-    queryKey: ['experto_prueba_estado', session?.user?.id], enabled: !!session?.user?.id,
-    queryFn: async () => ((await (supabase as any).rpc('experto_prueba_estado')).data?.[0] ?? null) as { disponible: boolean; usada_en: string | null; hasta: string | null } | null,
-  });
-  const iniciarPrueba = async () => {
-    setCargando('prueba');
-    const { error } = await (supabase as any).rpc('experto_prueba_iniciar');
-    setCargando(null);
-    if (error) { toast.error(error.message.replace(/^.*?: /, '')); return; }
-    toast.success('Experto Pro activo por 14 días. Abre una licitación y arma su sala de postulación.');
-    refetchPrueba(); window.location.reload();
-  };
-
   useEffect(() => {
     const p = new URLSearchParams(location.search).get('pago');
     if (p === 'ok') toast.success('Pago recibido. Tu plan del Experto queda activo en segundos.');
@@ -82,16 +68,13 @@ export function PlanesEscalera() {
               {actual(id) ? <Badge variant="outline">Tu plan</Badge>
                 : id === 'free' ? null
                 : id === 'erp' ? <Button size="sm" className="w-full" asChild><Link to="/cuenta/facturacion">Suscribirme al ERP</Link></Button>
-                : <>
-                  {id === 'pro_30' && prueba?.disponible && <Button size="sm" className="w-full mb-1" disabled={!!cargando} onClick={iniciarPrueba}>{cargando === 'prueba' ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Probar 14 días gratis, sin tarjeta'}</Button>}
-                  <Button size="sm" variant="outline" className="w-full" disabled={!!cargando || isPro} onClick={() => pagar(id)}>{cargando === id ? <Loader2 className="h-4 w-4 animate-spin" /> : `Activar ${p.nombre}`}</Button>
-                </>}
+                : <Button size="sm" variant="outline" className="w-full" disabled={!!cargando || isPro} onClick={() => pagar(id)}>{cargando === id ? <Loader2 className="h-4 w-4 animate-spin" /> : `Activar ${p.nombre}`}</Button>}
             </div>
           </div>
           );
         })}
       </div>
-      <p className="text-xs text-muted-foreground">Pagos con Mercado Pago. Experto Pro y Plus son pagos únicos por 30 días; el ERP es suscripción mensual que puedes cancelar cuando quieras e incluye el Experto completo. El ERP es $149.990 netos más IVA ($178.488). La comisión del 3% se calcula sobre el neto de cada orden de compra aceptada de ofertas enviadas desde FirmaVB, se factura mes vencido con IVA y sin tope.</p>
+      <p className="text-xs text-muted-foreground">El primer resultado del Experto es gratis una sola vez. Después, Pro y Plus se activan con un pago único de Mercado Pago por 30 días; el ERP es una suscripción mensual que puedes cancelar cuando quieras e incluye el Experto completo. El ERP es $149.990 netos más IVA ($178.488). La comisión del 3% se calcula sobre el neto de cada orden de compra aceptada de ofertas enviadas desde FirmaVB, se factura mes vencido con IVA y sin tope.</p>
     </div>
   );
 }

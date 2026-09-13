@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PhoneCall } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { expertoHuella } from "@/lib/expertoTrial";
 
 // Misma URL/llave pública que usa el cliente canónico (src/integrations/supabase/client.ts),
 // pero por fetch crudo (no supabase.functions.invoke) porque esta respuesta es streaming (SSE).
@@ -14,15 +15,6 @@ const EJEMPLOS = [
   "¿Pueden exigir ISO 9001 como requisito de admisibilidad?",
   "¿Quién gana las licitaciones de software municipal?",
 ];
-
-// Misma huella que usa /experto.html: el comodín es uno por navegador.
-function huella(): string {
-  try {
-    let h = localStorage.getItem("fvb_huella");
-    if (!h) { h = "h_" + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem("fvb_huella", h); }
-    return h;
-  } catch { return "anon"; }
-}
 
 // Markdown mínimo (mismo que experto.html): títulos, listas, negrita, links.
 function md(t: string): string {
@@ -44,7 +36,7 @@ function md(t: string): string {
 /**
  * "Comodín telefónico": una pregunta gratis al Experto FirmaVB respondida aquí mismo, en la portada.
  * Con sesión se va a /experto (dentro de la app). Sin sesión, el servidor limita a 1 pregunta por
- * navegador y 3 por IP al día; al agotarse invita a crear la cuenta gratis (3 preguntas al mes).
+ * navegador y 3 por IP al día. Ese uso sigue contando si luego crea una cuenta.
  */
 export function ExpertoComodin() {
   const [q, setQ] = useState("");
@@ -66,7 +58,7 @@ export function ExpertoComodin() {
       const r = await fetch(`${SUPA}/functions/v1/experto-consultar`, {
         method: "POST",
         headers: { "Content-Type": "application/json", apikey: ANON, Authorization: `Bearer ${ANON}` },
-        body: JSON.stringify({ modo: "chat", pregunta: p, huella: huella() }),
+        body: JSON.stringify({ modo: "chat", pregunta: p, huella: expertoHuella() }),
       });
       if (!r.ok) {
         const j = await r.json().catch(() => ({}));
@@ -128,7 +120,7 @@ export function ExpertoComodin() {
               {usado && (
                 <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-firmavb-blue/30 bg-firmavb-blue/5 p-4">
                   <p className="flex-1 text-sm">
-                    <b>{estado === "listo" ? "Usaste tu comodín." : "Comodín usado."}</b> Con una cuenta gratis tienes 3 preguntas y 1 informe de licitación al mes, y ves las oportunidades de tu rubro.
+                    <b>{estado === "listo" ? "Usaste tu acceso gratis." : "Acceso gratis usado."}</b> Crea tu cuenta para guardar oportunidades. Para seguir usando el Experto, activa Pro con Mercado Pago.
                   </p>
                   <Button asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90"><Link to="/auth?tab=signup">Crear cuenta gratis</Link></Button>
                   <Button asChild variant="outline"><Link to="/auth">Ya tengo cuenta</Link></Button>
