@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
+    "check:supabase-security": "node scripts/check-supabase-security.mjs",
     "evaristo": "python evaristo/evaristo_manager.py revisar",
     "evaristo:mision": "python evaristo/evaristo_manager.py mision",
     "e2e": "playwright test"
