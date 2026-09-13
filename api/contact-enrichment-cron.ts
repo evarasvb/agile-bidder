@@ -6,6 +6,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Ejecuta en paralelo:
   // 1. Contact enrichment (contactos consolidados)
   // 2. Proveedores e instituciones (bases separadas)
+  // 3. Customer clustering & AI profiling (segmentación)
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -21,8 +22,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       throw new Error('Missing Supabase environment variables')
     }
 
-    // Ejecutar en paralelo: contactos + proveedores/instituciones
-    const [enrichmentResponse, proveedoresResponse] = await Promise.all([
+    // Ejecutar en paralelo: contactos + proveedores/instituciones + clustering
+    const [enrichmentResponse, proveedoresResponse, clusteringResponse] = await Promise.all([
       fetch(`${supabaseUrl}/functions/v1/contact-enrichment`, {
         method: 'POST',
         headers: {
@@ -38,17 +39,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({})
+      }),
+      fetch(`${supabaseUrl}/functions/v1/cluster-customers`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
       })
     ])
 
     const enrichmentData = await enrichmentResponse.json()
     const proveedoresData = await proveedoresResponse.json()
+    const clusteringData = await clusteringResponse.json()
 
     console.log(`[${new Date().toISOString()}] Enriquecimiento completado:`, enrichmentData)
     console.log(`[${new Date().toISOString()}] Proveedores/Instituciones completado:`, proveedoresData)
+    console.log(`[${new Date().toISOString()}] Clustering completado:`, clusteringData)
 
     // Retornar resultado combinado
-    const allSuccess = enrichmentResponse.ok && proveedoresResponse.ok
+    const allSuccess = enrichmentResponse.ok && proveedoresResponse.ok && clusteringResponse.ok
 
     return res.status(allSuccess ? 200 : 500).json({
       success: allSuccess,
@@ -56,7 +67,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       message: 'All sync processes executed',
       results: {
         contact_enrichment: enrichmentData,
-        proveedores_instituciones: proveedoresData
+        proveedores_instituciones: proveedoresData,
+        customer_clustering: clusteringData
       }
     })
   } catch (error) {
