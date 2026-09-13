@@ -70,3 +70,239 @@ verify_jwt = true
 
 [functions.enrichment-scheduler]
 verify_jwt = false
+
+# --- Production function auth baseline (captured 2026-09-13) ---
+# Reconcile intentionally before changing any value.
+[functions.academia-premium]
+verify_jwt = false
+
+[functions.activar-miembro]
+verify_jwt = false
+
+[functions.asistente-lia]
+verify_jwt = true
+
+[functions.ca-detalle-muestra]
+verify_jwt = true
+
+[functions.comisiones-cobrar]
+verify_jwt = true
+
+[functions.cotizacion-pdf]
+verify_jwt = true
+
+[functions.crear-pago-experto]
+verify_jwt = true
+
+[functions.crear-suscripcion-mp]
+verify_jwt = true
+
+[functions.diag-ca-detalle]
+verify_jwt = true
+
+[functions.diag-compra-agil]
+verify_jwt = true
+
+[functions.diag-gemini-modelos]
+verify_jwt = true
+
+[functions.diag-lic-items]
+verify_jwt = true
+
+[functions.diag-mp-compras-agiles]
+verify_jwt = true
+
+[functions.diag-ordenes]
+verify_jwt = true
+
+[functions.enrich-ca-items]
+verify_jwt = true
+
+[functions.enrich-licitaciones-bi]
+verify_jwt = true
+
+[functions.enrich-oc-detalle]
+verify_jwt = true
+
+[functions.enriquecer-inventario]
+verify_jwt = true
+
+[functions.evaristo-soporte]
+verify_jwt = true
+
+[functions.expandir-conceptos]
+verify_jwt = true
+
+[functions.experto]
+verify_jwt = false
+
+[functions.experto-anexo-word]
+verify_jwt = true
+
+[functions.experto-anexos]
+verify_jwt = true
+
+[functions.experto-bajo-agua]
+verify_jwt = true
+
+[functions.experto-bases]
+verify_jwt = true
+
+[functions.experto-buscar]
+verify_jwt = true
+
+[functions.experto-consultar]
+verify_jwt = false
+
+[functions.experto-documentos]
+verify_jwt = true
+
+[functions.experto-estudio]
+verify_jwt = true
+
+[functions.experto-extraer-anexos]
+verify_jwt = true
+
+[functions.experto-indexar]
+verify_jwt = true
+
+[functions.experto-mapa]
+verify_jwt = true
+
+[functions.experto-matriz]
+verify_jwt = true
+
+[functions.experto-pptx]
+verify_jwt = false
+
+[functions.experto-sync-dictamenes]
+verify_jwt = true
+
+[functions.explorar-fuente]
+verify_jwt = true
+
+[functions.extension-adjuntos]
+verify_jwt = false
+
+[functions.fetch-compras-agiles-v2]
+verify_jwt = true
+
+[functions.fetch-compras-agiles-v3]
+verify_jwt = true
+
+[functions.ficha-tecnica-ia]
+verify_jwt = true
+
+[functions.fotos-producto]
+verify_jwt = true
+
+[functions.generar-ofertas-auto]
+verify_jwt = true
+
+[functions.guardian]
+verify_jwt = true
+
+[functions.guardian-ca]
+verify_jwt = true
+
+[functions.importar-odoo]
+verify_jwt = true
+
+[functions.invitar-miembro]
+verify_jwt = true
+
+[functions.licitacion-adjuntos]
+verify_jwt = true
+
+[functions.marketing-ejecutar]
+verify_jwt = true
+
+[functions.marketing-generar-ia]
+verify_jwt = false
+
+[functions.medios-organismo]
+verify_jwt = true
+
+[functions.mp-pago-experto-webhook]
+verify_jwt = false
+
+[functions.mp-probe]
+verify_jwt = true
+
+[functions.mp-suscripcion-webhook]
+verify_jwt = false
+
+[functions.mp-webhook]
+verify_jwt = false
+
+[functions.notificar-ticket-resuelto]
+verify_jwt = false
+
+[functions.pexels-imagen]
+verify_jwt = false
+
+[functions.probe-adjuntos]
+verify_jwt = true
+
+[functions.procesar-oportunidades]
+verify_jwt = true
+
+[functions.publicar-libro-redes]
+verify_jwt = false
+
+[functions.reset-password]
+verify_jwt = false
+
+[functions.send-licitacion-to-odoo]
+verify_jwt = true
+
+[functions.sii-contribuyente]
+verify_jwt = true
+
+[functions.sondear-compras-agiles]
+verify_jwt = true
+
+[functions.soporte-ticket]
+verify_jwt = false
+
+[functions.sugerir-filtros]
+verify_jwt = true
+
+[functions.sync-conducta-pago]
+verify_jwt = true
+
+[functions.sync-licitaciones-bi]
+verify_jwt = false
+
+[functions.sync-mis-oc]
+verify_jwt = true
+
+[functions.sync-noticias]
+verify_jwt = true
+
+[functions.sync-ocds]
+verify_jwt = true
+
+[functions.sync-ordenes-compra-api]
+verify_jwt = true
+
+[functions.sync-reclamos-mp]
+verify_jwt = true
+
+[functions.test-ficha-mp]
+verify_jwt = true
+
+[functions.test-suscripcion-e2e]
+verify_jwt = false
+
+[functions.tinyfish-test]
+verify_jwt = true
+
+[functions.webinar-baja]
+verify_jwt = false
+
+[functions.webinar-confirmar]
+verify_jwt = true
+
+[functions.webinar-invitar]
+verify_jwt = true
