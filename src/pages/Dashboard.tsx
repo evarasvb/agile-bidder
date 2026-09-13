@@ -35,7 +35,6 @@ import {
   useCierresProximos,
   useUltimosMatches,
 } from "@/hooks/useDashboardPrincipal";
-import { useMatchingAI } from "@/hooks/useMatching";
 import {
   BarChart,
   Bar,
