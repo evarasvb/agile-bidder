@@ -36,7 +36,8 @@ function md(t: string): string {
 /**
  * "Comodín telefónico": una pregunta gratis al Experto FirmaVB respondida aquí mismo, en la portada.
  * Con sesión se va a /experto (dentro de la app). Sin sesión, el servidor limita a 1 pregunta por
- * navegador y 3 por IP al día. Ese uso sigue contando si luego crea una cuenta.
+ * navegador y 3 por IP al día. Después puede optar a uno de los 10 accesos
+ * gratuitos de la beta fundadora al crear su cuenta y entrar al Experto.
  */
 export function ExpertoComodin() {
   const [q, setQ] = useState("");
@@ -120,7 +121,7 @@ export function ExpertoComodin() {
               {usado && (
                 <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-firmavb-blue/30 bg-firmavb-blue/5 p-4">
                   <p className="flex-1 text-sm">
-                    <b>{estado === "listo" ? "Usaste tu acceso gratis." : "Acceso gratis usado."}</b> Crea tu cuenta y activa tu prueba Pro de 14 días, sin tarjeta. Después podrás continuar con Mercado Pago.
+                    <b>{estado === "listo" ? "Usaste tu acceso gratis." : "Acceso gratis usado."}</b> Crea tu cuenta y entra a la beta fundadora. Los primeros 10 clientes prueban el Experto completo gratis mientras afinamos el producto.
                   </p>
                   <Button asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90"><Link to="/auth?tab=signup">Crear cuenta gratis</Link></Button>
                   <Button asChild variant="outline"><Link to="/auth">Ya tengo cuenta</Link></Button>

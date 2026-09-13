@@ -34,6 +34,7 @@ import { useProductMatching } from '@/hooks/useProductMatching';
 import { useMatchOverrides } from '@/hooks/useMatchOverrides';
 import { useInventoryActivo } from '@/hooks/useInventory';
 import { useCliente } from '@/hooks/useCliente';
+import { useExpertoLanzamiento } from '@/hooks/useExpertoLanzamiento';
 import { descargarCotizacionPDF, type ItemCotizacion, type DatosCotizacion } from '@/services/pdfGenerator';
 import { evaluarCompletitudExpediente, extraerDecisionLegacy } from '@/lib/expertoDecision';
 import { expertoHuella } from '@/lib/expertoTrial';
@@ -73,15 +74,17 @@ export default function LibroLicitacion() {
   const { session } = useAuth();
   const token = session?.access_token ?? '';
   const auth = { 'Content-Type': 'application/json', apikey: ANON, Authorization: 'Bearer ' + (token || ANON) };
+  const { data: lanzamiento } = useExpertoLanzamiento(true);
+  const enBeta = lanzamiento?.fase !== 'monetizacion';
 
   const { data: libro, isLoading } = useQuery({
-    queryKey: ['experto_libro', cod],
-    enabled: !!cod && !!token,
+    queryKey: ['experto_libro', cod, lanzamiento?.fase, lanzamiento?.posicion],
+    enabled: !!cod && !!token && !!lanzamiento,
     queryFn: async () => (await (supabase as any).rpc('experto_libro', { p_codigo: cod })).data,
   });
   const { data: pruebaPro } = useQuery({
     queryKey: ['experto_prueba_estado', session?.user?.id],
-    enabled: !!session?.user?.id,
+    enabled: !!session?.user?.id && !enBeta,
     queryFn: async () => ((await (supabase as any).rpc('experto_prueba_estado')).data?.[0] ?? null) as { disponible: boolean } | null,
   });
 
@@ -207,7 +210,7 @@ export default function LibroLicitacion() {
       await pedir({ modo: 'chat', pregunta: p, codigo: cod || undefined, historial, huella: expertoHuella() }, 'experto-consultar', (t, meta) =>
         setMsgs((m) => { const c = [...m]; c[c.length - 1] = { rol: 'exp', texto: t, fuentes: meta?.fuentes, pedirBases: meta?.pedir_bases }; return c; }));
     } catch (e: any) {
-      if (e.status === 402 || e.status === 401) setLimite(e.message);
+      if (e.status === 402 || e.status === 403 || e.status === 401) setLimite(e.message);
       setMsgs((m) => { const c = [...m]; c[c.length - 1] = { rol: 'exp', texto: (e.status === 402 ? '' : 'No pude responder: ') + e.message }; return c; });
     }
     setOcupado(null);
@@ -247,8 +250,8 @@ export default function LibroLicitacion() {
         if (tipo === 'bajo_agua') qc.invalidateQueries({ queryKey: ['experto_libro', cod] });
       }
     } catch (e: any) {
-      if (e.status === 402) setLimite(e.message);
-      toast.error(e.message, e.status === 402 ? { action: pruebaPro?.disponible ? { label: 'Probar 14 días', onClick: iniciarPruebaPro } : { label: 'Activar Pro', onClick: () => pagarExperto('pro_30') } } : undefined);
+      if (e.status === 402 || e.status === 403) setLimite(e.message);
+      toast.error(e.message, e.status === 402 && !enBeta ? { action: pruebaPro?.disponible ? { label: 'Probar 14 días', onClick: iniciarPruebaPro } : { label: 'Activar Pro', onClick: () => pagarExperto('pro_30') } } : undefined);
     }
     setOcupado(null);
   };
@@ -542,6 +545,7 @@ export default function LibroLicitacion() {
     <div className="space-y-3">
       <div className="flex items-center gap-3 flex-wrap">
         {cod ? <Button variant="ghost" size="sm" onClick={() => navigate('/experto')}><ArrowLeft className="h-4 w-4 mr-1" />Experto</Button> : <><BookOpen className="h-5 w-5 text-primary" /><h1 className="text-xl font-bold">Experto FirmaVB</h1></>}
+        {enBeta && <Badge className="bg-firmavb-blue">Beta fundadora{lanzamiento?.posicion ? ` #${lanzamiento.posicion}` : ''} · gratis</Badge>}
         {!cod && (
           <form className="flex gap-1" onSubmit={(e) => { e.preventDefault(); abrirLibro(codigoAbrir); }}>
             <Input value={codigoAbrir} onChange={(e) => setCodigoAbrir(e.target.value)} placeholder="Abrir libro por ID, ej. 2699-35-LE26" className="h-8 w-64" />
@@ -754,10 +758,12 @@ export default function LibroLicitacion() {
             {limite && (
               <div className="flex items-center gap-2 flex-wrap text-xs rounded-md border border-yellow-200 bg-yellow-50 text-yellow-900 px-3 py-2">
                 <span className="flex-1 min-w-56">{limite}</span>
-                <Button size="sm" className="h-8" disabled={!!ocupado} onClick={pruebaPro?.disponible ? iniciarPruebaPro : () => pagarExperto('pro_30')}>
-                  {ocupado === 'prueba' || ocupado === 'pago:pro_30' ? <Loader2 className="h-4 w-4 animate-spin" /> : pruebaPro?.disponible ? <><Sparkles className="h-3.5 w-3.5 mr-1" />Probar Pro · 14 días</> : <><CreditCard className="h-3.5 w-3.5 mr-1" />Activar Pro · $50.000</>}
-                </Button>
-                <Button size="sm" variant="outline" className="h-8" onClick={() => navigate('/cuenta')}>Comparar planes</Button>
+                {!enBeta && <>
+                  <Button size="sm" className="h-8" disabled={!!ocupado} onClick={pruebaPro?.disponible ? iniciarPruebaPro : () => pagarExperto('pro_30')}>
+                    {ocupado === 'prueba' || ocupado === 'pago:pro_30' ? <Loader2 className="h-4 w-4 animate-spin" /> : pruebaPro?.disponible ? <><Sparkles className="h-3.5 w-3.5 mr-1" />Probar Pro · 14 días</> : <><CreditCard className="h-3.5 w-3.5 mr-1" />Activar Pro · $50.000</>}
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-8" onClick={() => navigate('/cuenta')}>Comparar planes</Button>
+                </>}
               </div>
             )}
             <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); preguntar(); }}>
@@ -775,8 +781,8 @@ export default function LibroLicitacion() {
               {([
                 ['sala', 'Sala de postulación', '', BookOpen, 'bg-indigo-100 text-indigo-700'],
                 ['informe', 'Informe de trabajo', '', FileText, 'bg-blue-100 text-blue-700'],
-                ['matriz', 'Matriz de postulación', 'Experto Pro', ClipboardList, 'bg-amber-100 text-amber-700'],
-                ['estudio', 'Estudio profundo', 'Experto Pro', Sparkles, 'bg-violet-100 text-violet-700'],
+                ['matriz', 'Matriz de postulación', enBeta ? 'Incluido en beta' : 'Experto Pro', ClipboardList, 'bg-amber-100 text-amber-700'],
+                ['estudio', 'Estudio profundo', enBeta ? 'Incluido en beta' : 'Experto Pro', Sparkles, 'bg-violet-100 text-violet-700'],
                 ['bajo_agua', 'Bajo el Agua', cuotaBajoAgua.etiqueta, Waves, 'bg-sky-100 text-sky-700'],
                 ['mapa', 'Mapa conceptual', '', MapIcon, 'bg-emerald-100 text-emerald-700'],
                 ['infografia', 'Infografía', '', ImageIcon, 'bg-pink-100 text-pink-700'],

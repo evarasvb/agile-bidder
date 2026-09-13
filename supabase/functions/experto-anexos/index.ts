@@ -43,13 +43,16 @@ Deno.serve(async (req) => {
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     // 1. Plan
+    const { data: lanzamiento, error: lanzamientoError } = await sb.rpc("experto_beta_reclamar_usuario", { p_user_id: userId });
+    if (lanzamientoError) return json({ error: "lanzamiento_no_disponible", mensaje: "No pude verificar tu acceso al Experto." }, 503);
+    if (lanzamiento?.[0]?.fase === "beta_10" && !lanzamiento[0].permitido) return json({ error: "beta_completa", mensaje: "Los 10 cupos de la beta inicial ya están ocupados." }, 403);
     const { data: uso } = await sb.rpc("experto_uso_mes", { p_user_id: userId, p_huella: "x" });
     const plan = String(uso?.[0]?.plan ?? "free");
     const { data: cli } = await sb.from("clientes").select("id, empresa_nombre, rut, direccion, telefono, email, region, giros, representante_nombre, representante_rut, plan, activo").eq("user_id", userId).maybeSingle();
     // Plus pagado, o suscripción FirmaVB ERP (incluye todo).
     const conPlus = plan === "plus" || (cli?.activo && ["pro", "business", "enterprise"].includes(String(cli?.plan)));
     if (!conPlus) {
-      return json({ error: "plus", mensaje: "Completar anexos es parte del Experto Plus ($100.000 por 30 días) o del plan FirmaVB ERP.", plan }, 402);
+      return json({ error: "plus", mensaje: "Completar anexos requiere acceso completo al Experto.", plan }, 402);
     }
 
     // 2. Checklist de datos y documentos

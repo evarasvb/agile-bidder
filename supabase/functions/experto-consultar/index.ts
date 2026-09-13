@@ -7,8 +7,9 @@ const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-// Un unico resultado gratis de por vida (pregunta, informe o Bajo el Agua).
-// La huella hace que el uso anonimo siga contando si el usuario luego crea su cuenta.
+// El visitante anonimo recibe un resultado. En fase beta_10, las primeras diez
+// cuentas que usan el Experto acceden al producto completo sin prueba ni cobro.
+// La huella deja preparado el resultado unico para la fase de monetizacion.
 const MAX_IP_ANON_24H = 3;
 // Topes que el cliente no controla (el limite mensual por huella se reinicia en incognito):
 //  - por IP y hora: frena loops
@@ -183,6 +184,20 @@ Deno.serve(async (req) => {
     const ip = ipCliente(req);
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
+    // Una sola configuracion en Postgres gobierna frontend y backend. El reclamo
+    // es atomico y solo usa el userId extraido del JWT verificado por el gateway.
+    const { data: lanzamientoRows, error: lanzamientoError } = userId
+      ? await sb.rpc("experto_beta_reclamar_usuario", { p_user_id: userId })
+      : await sb.rpc("experto_lanzamiento_publico");
+    if (lanzamientoError) {
+      console.error("experto_lanzamiento", lanzamientoError.message);
+      return new Response(JSON.stringify({ error: "lanzamiento_no_disponible", mensaje: "No pude verificar tu acceso al Experto. Intenta nuevamente en unos minutos." }), { status: 503, headers: { ...cors, "Content-Type": "application/json", "Retry-After": "60" } });
+    }
+    const lanzamiento = lanzamientoRows?.[0] ?? { fase: "monetizacion", permitido: false, cupos_usados: 0, cupos_maximos: 10 };
+    if (userId && lanzamiento.fase === "beta_10" && !lanzamiento.permitido) {
+      return new Response(JSON.stringify({ error: "beta_completa", mensaje: "Los 10 cupos de la beta inicial ya están ocupados. Estamos afinando el producto con esas empresas antes de abrir la siguiente etapa.", lanzamiento }), { status: 403, headers: { ...cors, "Content-Type": "application/json" } });
+    }
+
     // Límites
     const { data: uso } = await sb.rpc("experto_uso_mes", { p_user_id: userId, p_huella: huella || "anon" });
     const u = uso?.[0] ?? { consultas: 0, informes: 0, plan: "free" };
@@ -197,10 +212,14 @@ Deno.serve(async (req) => {
             return new Response(JSON.stringify({ error: "ritmo", mensaje: "Demasiadas preguntas seguidas desde tu conexión. Espera un rato e intenta de nuevo.", uso: u }), { status: 429, headers: { ...cors, "Content-Type": "application/json", "Retry-After": "900" } });
           }
           if (!userId && ip && (c.ip_anon_24h ?? 0) >= MAX_IP_ANON_24H) {
-            return new Response(JSON.stringify({ error: "comodin_usado", registro: true, mensaje: "El acceso gratis ya se usó desde esta conexión. Crea tu cuenta y activa tu prueba Pro de 14 días, sin tarjeta.", uso: u }), { status: 402, headers: { ...cors, "Content-Type": "application/json" } });
+            const mensaje = lanzamiento.fase === "beta_10"
+              ? "El acceso gratis ya se usó desde esta conexión. Crea tu cuenta para optar a uno de los 10 accesos de la beta inicial."
+              : "El acceso gratis ya se usó desde esta conexión. Crea tu cuenta y activa tu prueba Pro de 14 días, sin tarjeta.";
+            return new Response(JSON.stringify({ error: "comodin_usado", registro: true, mensaje, uso: u, lanzamiento }), { status: 402, headers: { ...cors, "Content-Type": "application/json" } });
           }
           if (c.anon_24h >= MAX_ANON_24H) {
-            return new Response(JSON.stringify({ error: "cupo_diario", mensaje: "El cupo gratuito de hoy ya se agotó. Vuelve mañana, o con el plan Pro de FirmaVB no hay límite.", plan: u.plan, uso: u }), { status: 402, headers: { ...cors, "Content-Type": "application/json" } });
+            const mensaje = lanzamiento.fase === "beta_10" ? "El cupo gratuito de hoy ya se agotó. Vuelve mañana." : "El cupo gratuito de hoy ya se agotó. Vuelve mañana, o con el plan Pro de FirmaVB no hay límite.";
+            return new Response(JSON.stringify({ error: "cupo_diario", mensaje, plan: u.plan, uso: u, lanzamiento }), { status: 402, headers: { ...cors, "Content-Type": "application/json" } });
           }
         } else if (cqErr) console.error("experto_cuota", cqErr.message);
       } catch (e) { console.error("experto_cuota", String(e)); }
@@ -217,10 +236,12 @@ Deno.serve(async (req) => {
       }
       const prueba = pruebaRows?.[0] ?? { plan: "free", usados: 1, maximo: 1 };
       if (Number(prueba.usados) >= 1) {
-        const mensaje = userId
-          ? "Ya usaste tu resultado gratis del Experto. Activa tu prueba Pro de 14 días si aún está disponible; después puedes continuar con Mercado Pago."
-          : "Ya usaste tu resultado gratis. Crea tu cuenta y activa tu prueba Pro de 14 días, sin tarjeta.";
-        return new Response(JSON.stringify({ error: "prueba_usada", registro: !userId, mensaje, plan: u.plan, uso: u, prueba, productos: ["pro_30", "plus_30"] }), { status: 402, headers: { ...cors, "Content-Type": "application/json" } });
+        const mensaje = lanzamiento.fase === "beta_10"
+          ? "Ya usaste tu resultado gratis. Crea tu cuenta para optar a uno de los 10 accesos de la beta inicial."
+          : userId
+            ? "Ya usaste tu resultado gratis del Experto. Activa tu prueba Pro de 14 días si aún está disponible; después puedes continuar con Mercado Pago."
+            : "Ya usaste tu resultado gratis. Crea tu cuenta y activa tu prueba Pro de 14 días, sin tarjeta.";
+        return new Response(JSON.stringify({ error: "prueba_usada", registro: !userId, mensaje, plan: u.plan, uso: u, prueba, lanzamiento, productos: lanzamiento.fase === "beta_10" ? [] : ["pro_30", "plus_30"] }), { status: 402, headers: { ...cors, "Content-Type": "application/json" } });
       }
     }
 

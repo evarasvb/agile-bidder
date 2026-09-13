@@ -3,11 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Check, Loader2, Sparkles, Crown } from 'lucide-react';
+import { Check, Loader2, Sparkles, Crown, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlan } from '@/hooks/usePlan';
+import { useExpertoLanzamiento } from '@/hooks/useExpertoLanzamiento';
 import { PLANES } from '@/data/planes';
 
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string;
@@ -17,6 +18,8 @@ const ANON = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.V
 export function PlanesEscalera() {
   const { session } = useAuth();
   const { isPro } = usePlan();
+  const { data: lanzamiento } = useExpertoLanzamiento(false);
+  const enBeta = lanzamiento?.fase !== 'monetizacion';
   const location = useLocation();
   const [cargando, setCargando] = useState<string | null>(null);
   const { data: experto } = useQuery({
@@ -27,7 +30,7 @@ export function PlanesEscalera() {
   const expertoActivo = experto && new Date(experto.hasta) > new Date() ? experto : null;
   // Prueba gratis de Experto Pro: 14 dias, una vez por cuenta y sin tarjeta.
   const { data: prueba, refetch: refetchPrueba } = useQuery({
-    queryKey: ['experto_prueba_estado', session?.user?.id], enabled: !!session?.user?.id,
+    queryKey: ['experto_prueba_estado', session?.user?.id], enabled: !!session?.user?.id && !enBeta,
     queryFn: async () => ((await (supabase as any).rpc('experto_prueba_estado')).data?.[0] ?? null) as { disponible: boolean; usada_en: string | null; hasta: string | null } | null,
   });
   const iniciarPrueba = async () => {
@@ -57,6 +60,32 @@ export function PlanesEscalera() {
   };
 
   const actual = (id: string) => (id === 'erp' && isPro) || (id === 'plus_30' && !isPro && expertoActivo?.nivel === 'plus') || (id === 'pro_30' && !isPro && expertoActivo?.nivel === 'pro') || (id === 'free' && !isPro && !expertoActivo);
+
+  if (enBeta) {
+    const usados = lanzamiento?.cupos_usados ?? 0;
+    const maximo = lanzamiento?.cupos_maximos ?? 10;
+    return (
+      <div className="rounded-xl border border-firmavb-blue/30 bg-firmavb-blue/5 p-5">
+        <div className="flex items-start gap-3">
+          <div className="rounded-full bg-firmavb-blue p-2 text-white"><Users className="h-5 w-5" /></div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-semibold">Beta fundadora · 10 empresas</p>
+              <Badge>Gratis durante esta etapa</Badge>
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Estamos trabajando con los primeros 10 clientes para afinar el Experto. No hay prueba de 14 días, plan Pro ni cobro activos ahora.
+            </p>
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-background">
+              <div className="h-full bg-firmavb-blue transition-all" style={{ width: `${Math.min(100, (usados / maximo) * 100)}%` }} />
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">{usados} de {maximo} cupos ocupados</p>
+            <Button size="sm" className="mt-4" asChild><Link to="/experto">Usar el Experto</Link></Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">

@@ -22,6 +22,13 @@ Deno.serve(async (req) => {
     if (!userId) return json({ error: "login", mensaje: "Inicia sesión en FirmaVB para activar el plan Pro." }, 401);
     const clave = String(body.producto ?? "pro_30");
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    if (clave === "pro_30" || clave === "plus_30") {
+      const { data: lanzamiento, error: lanzamientoError } = await sb.rpc("experto_lanzamiento_publico");
+      if (lanzamientoError) return json({ error: "lanzamiento_no_disponible", mensaje: "No pude verificar si el cobro del Experto está habilitado. No se inició ningún pago." }, 503);
+      if (lanzamiento?.[0]?.fase === "beta_10") {
+        return json({ error: "beta_activa", mensaje: "El cobro del Experto todavía no está activo. Primero estamos afinando el producto gratis con 10 clientes." }, 409);
+      }
+    }
     // Pago de una factura mensual (fijo + comisiones) del propio usuario.
     let prod = PRODUCTOS[clave]; let facturaId: string | null = null;
     if (clave === "factura") {

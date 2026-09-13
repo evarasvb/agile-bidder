@@ -2,8 +2,8 @@
 // a quién le compra siempre el organismo y por qué vía (convenio marco, licitación, compra ágil, trato directo),
 // compras ágiles y convenio marco del mismo producto, desiertas y revocadas, quién lleva el proceso y cuántas
 // veces se repite, reclamos, precio real del producto en el Estado, noticias, normativa y dictámenes, bases y
-// matriz de adjudicación, y si ya está adjudicada, por dónde se renueva. Gancho comercial: 1 informe gratis,
-// después cuota por plan (tabla experto_bajo_agua_cuotas). Misma salida SSE que experto-estudio.
+// matriz de adjudicación, y si ya está adjudicada, por dónde se renueva. En beta, los primeros 10 usuarios
+// registrados prueban el flujo completo gratis. Misma salida SSE que experto-estudio.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
@@ -175,15 +175,24 @@ Deno.serve(async (req) => {
     const huella = String(body.huella ?? "").slice(0, 80);
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
+    const { data: lanzamientoRows, error: lanzamientoError } = await sb.rpc("experto_beta_reclamar_usuario", { p_user_id: userId });
+    if (lanzamientoError) return json({ error: "lanzamiento_no_disponible", mensaje: "No pude verificar tu acceso al Experto. Intenta nuevamente en unos minutos." }, 503);
+    const lanzamiento = lanzamientoRows?.[0];
+    if (lanzamiento?.fase === "beta_10" && !lanzamiento.permitido) {
+      return json({ error: "beta_completa", mensaje: "Los 10 cupos de la beta inicial ya están ocupados. Abriremos la siguiente etapa cuando el producto esté afinado.", lanzamiento }, 403);
+    }
+
     // El plan gratis comparte un unico uso de por vida entre chat, informe y Bajo el Agua.
     // Los planes pagados mantienen la cuota de Bajo el Agua configurada en la tabla.
     const { data: cuotaRows } = await sb.rpc("experto_bajo_agua_cuota", { p_user_id: userId });
     const cuota = cuotaRows?.[0] ?? { plan: "free", usados: 0, maximo: 1, periodo: "total" };
     if (cuota.maximo != null && Number(cuota.usados) >= Number(cuota.maximo)) {
       const mensaje = cuota.plan === "free"
-        ? "Ya usaste tu resultado gratis del Experto. Activa tu prueba Pro de 14 días si está disponible; después, Pro incluye 10 informes Bajo el Agua al mes, Plus 30 y el ERP no tiene límite."
+        ? lanzamiento?.fase === "beta_10"
+          ? "Este acceso está reservado para los 10 clientes de la beta inicial."
+          : "Ya usaste tu resultado gratis del Experto. Activa tu prueba Pro de 14 días si está disponible; después, Pro incluye 10 informes Bajo el Agua al mes, Plus 30 y el ERP no tiene límite."
         : `Llegaste al tope de ${cuota.maximo} informes Bajo el Agua de tu plan ${cuota.periodo === "mes" ? "este mes" : ""}. Sube de plan o espera al próximo mes.`;
-      return json({ error: cuota.plan === "free" ? "prueba_usada" : "cuota", mensaje, cuota, productos: ["pro_30", "plus_30"] }, 402);
+      return json({ error: cuota.plan === "free" ? "prueba_usada" : "cuota", mensaje, cuota, lanzamiento, productos: lanzamiento?.fase === "beta_10" ? [] : ["pro_30", "plus_30"] }, 402);
     }
 
     const ficha = (await sb.rpc("experto_ficha_licitacion", { p_codigo: codigo })).data;
