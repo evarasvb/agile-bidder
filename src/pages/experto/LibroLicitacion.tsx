@@ -35,6 +35,7 @@ import { useMatchOverrides } from '@/hooks/useMatchOverrides';
 import { useInventoryActivo } from '@/hooks/useInventory';
 import { useCliente } from '@/hooks/useCliente';
 import { descargarCotizacionPDF, type ItemCotizacion, type DatosCotizacion } from '@/services/pdfGenerator';
+import { evaluarCompletitudExpediente, extraerDecisionLegacy } from '@/lib/expertoDecision';
 
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string;
 const ANON = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
@@ -49,14 +50,8 @@ const conCitas = (html: string, fuentes?: any[]) => html.replace(/\[(\d{1,2})\]/
 });
 // Veredicto del informe (sección 1: ¿vale la pena postular? sí / con reservas / no) como semáforo en el encabezado.
 function veredictoDe(informe?: string): { t: string; c: string } | null {
-  if (!informe) return null;
-  const z = informe.slice(0, 2500).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const v = z.match(/veredicto[^\n]{0,200}/)?.[0] ?? z.match(/vale la pena postular[^\n]{0,200}/)?.[0] ?? '';
-  if (!v) return null;
-  if (/con reservas|con condiciones|si corriges|depende/.test(v)) return { t: 'Postular con reservas', c: 'bg-yellow-100 text-yellow-900 border-yellow-300' };
-  if (/\bno\b(?! hay atajos)/.test(v) && !/\bsi\b/.test(v.slice(0, v.indexOf('no')))) return { t: 'Descartar', c: 'bg-red-100 text-red-900 border-red-300' };
-  if (/\bsi\b|vale la pena/.test(v)) return { t: 'Postular', c: 'bg-green-100 text-green-900 border-green-300' };
-  return { t: 'Evaluar', c: 'bg-muted text-foreground' };
+  const v = extraerDecisionLegacy(informe);
+  return v.decision ? { t: v.etiqueta, c: v.clase } : null;
 }
 const fecha = (d?: string | null) => d ? new Date(d).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }) : 's/i';
 
@@ -408,7 +403,7 @@ export default function LibroLicitacion() {
   };
   // Word / PDF de cualquier texto del Experto (informe, estudio, anexos, respuesta del chat)
   const aWord = (titulo: string, md: string) => descargarWord(titulo, expertoMd(md), `${cod || 'experto'}-${titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}.doc`);
-  const datosPdf = () => ({ subtitulo: f ? `Licitación ${cod} · ${f.nombre ?? ''} · ${nombrePropio(f.institucion)}` : `Licitación ${cod}`, kpis: f ? [{ k: 'Presupuesto', v: presupuestoTexto(f.presupuesto, cod) }, { k: 'Cierre', v: fecha(f.fecha_cierre) }, { k: 'Pago del organismo', v: pagoOrganismo(o).valor, tono: pagoOrganismo(o).tono }] : [], veredicto: (() => { const v = veredictoDe(entregables.informe); return v ? { t: v.t, tono: (/reservas/.test(v.t) ? 'warn' : v.t === 'Descartar' ? 'bad' : v.t === 'Postular' ? 'ok' : 'neutral') as 'ok' | 'warn' | 'bad' | 'neutral' } : null; })() });
+  const datosPdf = () => ({ subtitulo: f ? `Licitación ${cod} · ${f.nombre ?? ''} · ${nombrePropio(f.institucion)}` : `Licitación ${cod}`, kpis: f ? [{ k: 'Presupuesto', v: presupuestoTexto(f.presupuesto, cod) }, { k: 'Cierre', v: fecha(f.fecha_cierre) }, { k: 'Pago del organismo', v: pagoOrganismo(o).valor, tono: pagoOrganismo(o).tono }] : [], veredicto: (() => { const v = veredictoDe(entregables.informe); if (!v) return null; if (!completitud.puedeEmitirVeredictoDefinitivo) return { t: `Análisis preliminar · expediente ${completitud.porcentaje}%`, tono: 'warn' as const }; return { t: v.t, tono: (/reservas/.test(v.t) ? 'warn' : v.t === 'Descartar' ? 'bad' : v.t === 'Postular' ? 'ok' : 'neutral') as 'ok' | 'warn' | 'bad' | 'neutral' }; })() });
   const aPdf = async (titulo: string, md: string) => { const r = await compartirPdfExperto({ titulo, ...datosPdf(), contenido: md, url: `${window.location.origin}/experto/libro/${cod}` }, `${cod || 'experto'}-${titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}.pdf`); if (r === 'descargado') toast.success('PDF descargado'); };
 
   const opinar = async (p: string, util: boolean) => {
@@ -465,6 +460,17 @@ export default function LibroLicitacion() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [libro, cod]);
   const top: any[] = libro?.top_adjudicatarios ?? [];
+  const esCompraAgil = String(f?.tipo ?? '').toLowerCase().includes('gil');
+  const basesResumidas = bases.filter((b) => String(b?.resumen ?? '').trim().length > 40).length;
+  const completitud = evaluarCompletitudExpediente({
+    tipoProceso: esCompraAgil ? 'compra_agil' : 'licitacion',
+    ficha: f ? 'completa' : 'faltante',
+    items: licItems.length > 0 || (f?.items?.length ?? 0) > 0 ? 'completa' : 'faltante',
+    bases: bases.length === 0 ? 'faltante' : basesResumidas === bases.length ? 'completa' : 'parcial',
+    anexos: libro?.anexos?.texto ? (faltantes.length ? 'parcial' : 'completa') : bases.length ? 'parcial' : 'faltante',
+    historial: top.length ? 'completa' : 'pendiente',
+    noticias: libro?.noticias?.length ? 'completa' : 'pendiente',
+  });
   const esPro = libro?.plan && libro.plan !== 'free';
   // Cuota del modo Bajo el Agua (1 gratis de por vida; después según plan, configurable en la base).
   const cuotaBajoAgua = (() => {
@@ -482,7 +488,7 @@ export default function LibroLicitacion() {
   const oportunidadLibro = f ? { codigo: cod, nombre: f.nombre, tipo: f.tipo, organismo: f.institucion, monto: typeof f.presupuesto === 'number' ? f.presupuesto : null, fecha_cierre: f.fecha_cierre, fecha_publicacion: f.fecha_publicacion, link: f.url } : null;
   const extraEmailLibro = (() => {
     const v = veredictoDe(entregables.informe);
-    const partes = [v ? `Veredicto del Experto FirmaVB: ${v.t}` : null, compartido ? `${compartido.titulo}\n${compartido.url}` : null];
+    const partes = [v ? (completitud.puedeEmitirVeredictoDefinitivo ? `Veredicto del Experto FirmaVB: ${v.t}` : `Orientación preliminar del Experto FirmaVB: ${v.t} (expediente ${completitud.porcentaje}%, faltan fuentes críticas)`) : null, compartido ? `${compartido.titulo}\n${compartido.url}` : null];
     return partes.filter(Boolean).join('\n\n') || undefined;
   })();
 
@@ -506,7 +512,10 @@ export default function LibroLicitacion() {
         {f && <span className="text-muted-foreground truncate max-w-[50vw]">{f.nombre} · {nombrePropio(f.institucion)}</span>}
         {f && <Badge variant="outline">cierra {fecha(f.fecha_cierre)}</Badge>}
         {oportunidadLibro && <AccionesCompartir oportunidad={oportunidadLibro} extraEmail={extraEmailLibro} />}
-        {(() => { const v = veredictoDe(entregables.informe); return v ? <Badge variant="outline" className={v.c} title="Veredicto del informe de trabajo">{v.t}</Badge> : null; })()}
+        {cod && <Badge variant="outline" className={completitud.puedeEmitirVeredictoDefinitivo ? 'border-green-300 bg-green-50 text-green-800' : 'border-amber-300 bg-amber-50 text-amber-900'} title={[...completitud.faltantesCriticos, ...completitud.advertencias].join(' · ')}>
+          Expediente {completitud.porcentaje}% · {completitud.nivel}
+        </Badge>}
+        {(() => { const v = veredictoDe(entregables.informe); return v ? <Badge variant="outline" className={completitud.puedeEmitirVeredictoDefinitivo ? v.c : 'bg-amber-50 text-amber-900 border-amber-300'} title={completitud.puedeEmitirVeredictoDefinitivo ? 'Veredicto del informe de trabajo' : 'Orientación preliminar: faltan fuentes críticas'}>{completitud.puedeEmitirVeredictoDefinitivo ? v.t : `Preliminar · ${v.t}`}</Badge> : null; })()}
         {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
       </div>
       {compartido && (
@@ -523,6 +532,11 @@ export default function LibroLicitacion() {
       )}
       {!isLoading && cod && libro && !f && (
         <p className="text-sm text-yellow-800 bg-yellow-50 border border-yellow-200 rounded-md px-3 py-2">No encontré {cod} en la base de Mercado Público. Revisa el ID o sube las bases para trabajar igual.</p>
+      )}
+      {!isLoading && cod && libro && f && !completitud.puedeEmitirVeredictoDefinitivo && (
+        <div className="text-sm text-amber-900 bg-amber-50 border border-amber-300 rounded-md px-3 py-2">
+          <b>Análisis preliminar.</b> El Experto todavía no puede emitir una recomendación definitiva. {completitud.faltantesCriticos.length ? `Falta: ${completitud.faltantesCriticos.join(', ')}.` : 'Hay fuentes críticas pendientes de completar.'}
+        </div>
       )}
 
       {(() => {
@@ -742,7 +756,8 @@ export default function LibroLicitacion() {
             {tab === 'sala' ? (
               <div className="max-h-[70vh] overflow-y-auto pr-1">
                 <SalaPostulacion cod={cod} ficha={f} bases={bases} documentos={documentos} plan={libro?.plan} informe={entregables.informe}
-                  matriz={entregables.matriz ? JSON.parse(entregables.matriz) : null} anexos={entregables.anexos} faltantes={faltantes} veredicto={veredictoDe(entregables.informe)}
+                  matriz={entregables.matriz ? JSON.parse(entregables.matriz) : null} anexos={entregables.anexos} faltantes={faltantes} completitud={completitud}
+                  veredicto={completitud.puedeEmitirVeredictoDefinitivo ? veredictoDe(entregables.informe) : null}
                   onGenerar={(t) => generar(t)} onIr={(t) => setTab(t)} onMatriz={matrizCambio} onPreguntar={(q) => { setPregunta(q); if (!escritorio) setVista('chat'); }}
                   irOportunidad={f ? () => navigate(String(f.tipo ?? '').toLowerCase().includes('gil') ? `/compras-agiles/${cod}` : `/oportunidades/licitacion/${cod}`) : undefined}
                   aprobar={aprobarPostulacion} ocupado={ocupado} />
