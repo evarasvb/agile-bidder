@@ -87,7 +87,7 @@ export function evaluarCompletitudExpediente(input: EntradaCompletitud): Complet
   const puedeEmitirVeredictoDefinitivo = faltantesCriticos.length === 0
     && fuentes.ficha.estado === 'completa'
     && fuentes.items.estado === 'completa'
-    && (!requiereBases || fuentes.bases.estado === 'completa');
+    && (!requiereBases || (fuentes.bases.estado === 'completa' && fuentes.anexos.estado === 'completa'));
 
   let nivel: NivelCompletitud;
   if (!puedeEmitirVeredictoDefinitivo || porcentaje < 45) nivel = 'insuficiente';
