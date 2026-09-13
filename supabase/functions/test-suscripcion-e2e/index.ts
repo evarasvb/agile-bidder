@@ -25,7 +25,25 @@ async function getMpToken(admin: ReturnType<typeof createClient>): Promise<strin
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   try {
-    const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const authHeader = req.headers.get('Authorization') || '';
+    if (!authHeader.startsWith('Bearer ')) return json({ error: 'No autorizado' }, 401);
+
+    const authClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user }, error: authError } = await authClient.auth.getUser(authHeader.slice(7));
+    if (authError || !user) return json({ error: 'Token inválido' }, 401);
+
+    const admin = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const { data: adminRole } = await admin
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .maybeSingle();
+    if (!adminRole) return json({ error: 'Se requiere rol administrador' }, 403);
+
     const packed = await getMpToken(admin);
     if (!packed) return json({ token_encontrado: false });
     const [fuente, token] = [packed.slice(0, packed.indexOf(':')), packed.slice(packed.indexOf(':') + 1)];
