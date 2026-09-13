@@ -16,7 +16,7 @@ export interface SalaProps {
   cod: string; ficha: any; bases: any[]; documentos: any[]; plan?: string;
   informe: string; matriz: Matriz | null; anexos: string; faltantes: string[]; veredicto: { t: string; c: string } | null;
   onGenerar: (tipo: 'informe' | 'matriz' | 'anexos' | 'estudio') => void; onIr: (tab: any) => void; onMatriz: (m: Matriz) => void; onPreguntar: (q: string) => void; irOportunidad?: () => void;
-  aprobar: () => void; ocupado: string | null;
+  aprobar: () => void; ocupado: string | null; onAbrirExpertoModal?: () => void;
 }
 
 export function SalaPostulacion(p: SalaProps) {
@@ -119,7 +119,7 @@ export function SalaPostulacion(p: SalaProps) {
           : <Button size="sm" variant="outline" onClick={p.aprobar} disabled={!m}><ShieldCheck className="h-3.5 w-3.5 mr-1" />Marcar como revisada y aprobada</Button>}
         <div className="flex flex-wrap gap-1">
           {p.irOportunidad && <Button size="sm" onClick={p.irOportunidad}><ExternalLink className="h-3.5 w-3.5 mr-1" />Ir a postular</Button>}
-          <Button size="sm" variant="ghost" onClick={() => p.onPreguntar(`Sobre ${p.cod}: revisa mi postulación completa. ¿Qué me falta o qué riesgo ves antes de enviarla?`)}>Pedir revisión final al Experto</Button>
+          <Button size="sm" variant="ghost" onClick={p.onAbrirExpertoModal || (() => p.onPreguntar(`Sobre ${p.cod}: revisa mi postulación completa. ¿Qué me falta o qué riesgo ves antes de enviarla?`))}>Pedir revisión final al Experto</Button>
         </div>
       </div>
     </div>
