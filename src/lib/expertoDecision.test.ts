@@ -27,6 +27,18 @@ describe('evaluarCompletitudExpediente', () => {
     expect(r.faltantesCriticos).toContain('anexos bloqueados');
   });
 
+  it('mantiene preliminar el análisis si los anexos sólo están parcialmente comprendidos', () => {
+    const r = evaluarCompletitudExpediente({
+      tipoProceso: 'licitacion',
+      ficha: 'completa',
+      items: 'completa',
+      bases: 'completa',
+      anexos: 'parcial',
+    });
+    expect(r.puedeEmitirVeredictoDefinitivo).toBe(false);
+    expect(r.advertencias).toContain('anexos incompletos');
+  });
+
   it('puede verificar un expediente completo', () => {
     const r = evaluarCompletitudExpediente({
       tipoProceso: 'licitacion',
@@ -54,7 +66,7 @@ describe('evaluarCompletitudExpediente', () => {
     });
     expect(r.faltantesCriticos).not.toContain('bases vigentes faltantes');
     expect(r.puedeEmitirVeredictoDefinitivo).toBe(true);
-    expect(r.porcentaje).toBe(100);
+    expect(r.porcentaje).toBe(91);
   });
 });
 
