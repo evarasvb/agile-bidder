@@ -192,9 +192,17 @@ export default function CompraAgilDetalle() {
     });
 
   const filasTotal = [...filasItems, ...filasManuales];
-  const itemsConMatch = filasItems.filter((f) => f.match).length;
+  const itemsConMatch = filasItems.filter((f) => f.match && f.estado !== 'descartado').length;
+  const itemsSinMatch = filasItems.filter((f) => !f.match && f.estado !== 'descartado').length;
+  const totalItems = filasItems.filter((f) => f.estado !== 'descartado').length;
+  const cobertura = totalItems > 0 ? Math.round((itemsConMatch / totalItems) * 100) : 0;
+
+  // Total de oferta: incluir manuales agregados pero mostrar advertencia si faltan items
   const totalOferta = filasTotal.reduce((s, f) => s + (f.match?.subtotal || 0), 0);
   const dentroPresupuesto = compra.monto ? totalOferta <= compra.monto : null;
+
+  // IMPORTANTE: advertencia si hay items sin match (propuesta incompleta)
+  const propuestaIncompleta = itemsSinMatch > 0;
 
   // Ítems en el formato del modal de propuesta, PRECARGADOS con el match para que
   // "Generar propuesta" abra con los productos y precios ya asignados. Los ítems
@@ -349,10 +357,17 @@ export default function CompraAgilDetalle() {
               <h2 className="text-lg font-semibold">Tu match, producto por producto</h2>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              {(compra.items?.length || 0) > 0 && (
-                <Badge variant="outline" className="font-normal">
-                  {itemsConMatch} de {compra.items.length} con match
-                </Badge>
+              {totalItems > 0 && (
+                <>
+                  <Badge variant="outline" className={`font-normal ${cobertura === 100 ? 'bg-firmavb-green/15 text-firmavb-green border-firmavb-green/30' : 'bg-amber-100 text-amber-800 border-amber-200'}`}>
+                    {itemsConMatch} de {totalItems} con match ({cobertura}%)
+                  </Badge>
+                  {propuestaIncompleta && (
+                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 font-normal">
+                      ⚠ {itemsSinMatch} sin match
+                    </Badge>
+                  )}
+                </>
               )}
               <AgregarProductoManual codigo={compra.codigo} />
             </div>
@@ -471,24 +486,39 @@ export default function CompraAgilDetalle() {
               </Table>
               </div>
 
-              {/* Resumen: total de tu oferta vs presupuesto */}
-              <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border bg-muted/30 p-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Tu oferta (ítems con match)</p>
-                  <p className="text-2xl font-bold text-firmavb-blue">{clp(totalOferta)}</p>
-                </div>
-                {compra.monto ? (
-                  <div className="text-sm">
-                    <p className="text-muted-foreground">Presupuesto: <span className="font-medium text-foreground">{clp(compra.monto)}</span></p>
-                    <p className={dentroPresupuesto ? 'text-firmavb-green font-medium' : 'text-firmavb-red font-medium'}>
-                      {dentroPresupuesto ? '✓ Dentro del presupuesto' : '⚠ Excede el presupuesto'}
-                      {' · '}{((totalOferta / compra.monto) * 100).toFixed(0)}%
+              {/* Resumen: total de tu oferta vs presupuesto + advertencia si incompleta */}
+              <div className="mt-4 space-y-3">
+                {propuestaIncompleta && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <p className="text-sm font-medium text-amber-900">⚠ Propuesta incompleta: {itemsSinMatch} {itemsSinMatch === 1 ? 'ítem falta' : 'ítems faltan'}</p>
+                    <p className="text-xs text-amber-800 mt-1">
+                      Tu oferta actual ({clp(totalOferta)}) no incluye {itemsSinMatch} {itemsSinMatch === 1 ? 'producto' : 'productos'} solicitados.
+                      El costo real será mayor una vez que consigas o coticess estos ítems.
                     </p>
                   </div>
-                ) : null}
-                <Button onClick={() => setPropuestaOpen(true)} className="gap-2 shrink-0">
-                  <Sparkles className="h-4 w-4" /> Generar propuesta
-                </Button>
+                )}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border bg-muted/30 p-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      Tu oferta {propuestaIncompleta ? `(${itemsConMatch}/${totalItems} ítems encontrados)` : '(completa)'}
+                    </p>
+                    <p className="text-2xl font-bold text-firmavb-blue">{clp(totalOferta)}</p>
+                  </div>
+                  {compra.monto ? (
+                    <div className="text-sm">
+                      <p className="text-muted-foreground">Presupuesto: <span className="font-medium text-foreground">{clp(compra.monto)}</span></p>
+                      <p className={propuestaIncompleta ? 'text-amber-600 font-medium' : (dentroPresupuesto ? 'text-firmavb-green font-medium' : 'text-firmavb-red font-medium')}>
+                        {propuestaIncompleta
+                          ? '⚠ Presupuesto verificable solo si completan'
+                          : (dentroPresupuesto ? '✓ Dentro del presupuesto' : '⚠ Excede el presupuesto')}
+                        {!propuestaIncompleta && ` · ${((totalOferta / compra.monto) * 100).toFixed(0)}%`}
+                      </p>
+                    </div>
+                  ) : null}
+                  <Button onClick={() => setPropuestaOpen(true)} className="gap-2 shrink-0">
+                    <Sparkles className="h-4 w-4" /> Generar propuesta
+                  </Button>
+                </div>
               </div>
               {itemsConMatch === 0 && (
                 <p className="mt-3 text-sm text-muted-foreground text-center">

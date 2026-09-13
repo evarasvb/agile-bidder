@@ -157,30 +157,97 @@ function extractKeywords(text: string): string[] {
 }
 
 /**
+ * Valida que especificaciones críticas no sean incompatibles
+ * Retorna penalty score (0 = compatible, <0 = incompatible para rechazar)
+ */
+function validateSpecifications(itemRequerido: ItemRequerido, producto: InventoryItem): number {
+  const req = normalizeText(itemRequerido.nombre + ' ' + (itemRequerido.descripcion || ''));
+  const prod = normalizeText(producto.nombre_producto + ' ' + (producto.descripcion || ''));
+
+  // Mapeo de categorías incompatibles (si hay una de cada lado, no matchean)
+  const incompatibilities: Record<string, string[]> = {
+    'electronico|electronic|pendrive|usb|memoria|hard|disk|ssd|monitor|teclado|raton|mouse|adaptador|hdmi|vga|cable':
+      ['papel|papel|cordon|cuerda|adhesivo|pegamento|cinta|scotch'],
+    'papel|papeleria|resma|hoja':
+      ['electronico|pendrive|usb|adaptador|hdmi|monitor'],
+    'tijera|cutter|cortador':
+      ['papel|resma|hoja|pendrive|usb'],
+  };
+
+  for (const [category, incompatibles] of Object.entries(incompatibilities)) {
+    const catWords = category.split('|');
+    const incWords = incompatibles.join('|').split('|');
+
+    const hasCategory = catWords.some(w => req.includes(w));
+    const hasIncompatible = incWords.some(w => prod.includes(w));
+
+    if (hasCategory && hasIncompatible) {
+      return -100; // Rechazar: incompatibles
+    }
+  }
+
+  // Validar especificaciones de unidad/dimensión si las hay
+  // Ej: "15.8 cm" vs "5.5 pulgadas" son diferentes
+  const dimensionPattern = /(\d+(?:\.\d+)?)\s*(cm|mm|m|pulgada|pulg|"|inch)/i;
+  const reqDim = req.match(dimensionPattern);
+  const prodDim = prod.match(dimensionPattern);
+
+  if (reqDim && prodDim) {
+    const reqVal = parseFloat(reqDim[1]);
+    const reqUnit = reqDim[2].toLowerCase();
+    const prodVal = parseFloat(prodDim[1]);
+    const prodUnit = prodDim[2].toLowerCase();
+
+    // Normalizar a mm
+    const toMm = (val: number, unit: string): number => {
+      const u = unit.toLowerCase();
+      if (u.includes('"') || u.includes('pulg') || u.includes('inch')) return val * 25.4; // pulgadas a mm
+      if (u.includes('cm')) return val * 10;
+      return val; // ya en mm
+    };
+
+    const reqMm = toMm(reqVal, reqUnit);
+    const prodMm = toMm(prodVal, prodUnit);
+
+    // Si difieren más de 20%, es sospechoso
+    const diff = Math.abs(reqMm - prodMm) / Math.max(reqMm, prodMm);
+    if (diff > 0.2) {
+      return -50; // Penalidad: dimensión incompatible
+    }
+  }
+
+  return 0; // Compatible
+}
+
+/**
  * Calcula match entre un item requerido y un producto del inventario
- * Versión mejorada con soporte para sinónimos y categorías
+ * Versión mejorada con soporte para sinónimos, categorías Y validación de especificaciones
  */
 function calculateMatch(itemRequerido: ItemRequerido, producto: InventoryItem): ProductMatch | null {
+  // Primero: validar que no haya incompatibilidades obvias
+  const specPenalty = validateSpecifications(itemRequerido, producto);
+  if (specPenalty < -50) return null; // Rechazar si incompatible
+
   const nombreRequerido = normalizeText(itemRequerido.nombre);
   const descripcionRequerida = itemRequerido.descripcion ? normalizeText(itemRequerido.descripcion) : '';
   const textoCompleto = `${nombreRequerido} ${descripcionRequerida}`;
-  
+
   // Expandir con sinónimos
   const textosExpandidos = expandWithSynonyms(textoCompleto);
-  
+
   const nombreProducto = normalizeText(producto.nombre_producto);
   const descripcionProducto = producto.descripcion ? normalizeText(producto.descripcion) : '';
   const categoriaProducto = producto.categoria ? normalizeText(producto.categoria) : '';
   const keywordsProducto = (producto.keywords || []).map(k => normalizeText(k));
   const textoProducto = `${nombreProducto} ${descripcionProducto} ${keywordsProducto.join(' ')}`;
-  
+
   // También expandir el producto
   const productoExpandido = expandWithSynonyms(textoProducto);
-  
+
   let score = 0;
   let matchType: 'exact' | 'partial' | 'keyword' | 'fuzzy' | 'category' = 'fuzzy';
   const matchedTerms: string[] = [];
-  
+
   // 1. Match exacto por nombre (100%)
   if (nombreRequerido === nombreProducto) {
     return {
@@ -190,16 +257,16 @@ function calculateMatch(itemRequerido: ItemRequerido, producto: InventoryItem): 
       matchedTerms: [itemRequerido.nombre]
     };
   }
-  
-  // 2. Similitud de nombre (hasta 80%)
+
+  // 2. Similitud de nombre (hasta 85% - más importancia)
   const nombreSimilarity = stringSimilarity(nombreRequerido, nombreProducto);
-  if (nombreSimilarity > 0.8) {
-    score = Math.max(score, nombreSimilarity * 90);
+  if (nombreSimilarity > 0.75) {
+    score = Math.max(score, nombreSimilarity * 85);
     matchType = 'partial';
     matchedTerms.push(itemRequerido.nombre);
   }
-  
-  // 3. Match por categoría expandida (hasta 70%)
+
+  // 3. Match por categoría expandida - REDUCIDO a máximo 50% (no es suficiente solo)
   let categoryMatches = 0;
   for (const textoExp of textosExpandidos) {
     // Match directo con categoría del producto
@@ -207,7 +274,7 @@ function calculateMatch(itemRequerido: ItemRequerido, producto: InventoryItem): 
       categoryMatches += 2;
       matchedTerms.push(textoExp);
     }
-    
+
     // Match con textos expandidos del producto
     for (const prodExp of productoExpandido) {
       if (prodExp.includes(textoExp) || textoExp.includes(prodExp)) {
@@ -217,19 +284,20 @@ function calculateMatch(itemRequerido: ItemRequerido, producto: InventoryItem): 
       }
     }
   }
-  
+
   if (categoryMatches > 0) {
-    const categoryScore = Math.min(categoryMatches * 15, 70);
+    // CAMBIO CRÍTICO: Máximo 50% solo por categoría, no 70%
+    const categoryScore = Math.min(categoryMatches * 12, 50);
     if (categoryScore > score) {
       score = categoryScore;
       matchType = 'category';
     }
   }
-  
+
   // 4. Match por keywords del producto (hasta 75%)
   const keywordsRequerido = extractKeywords(textoCompleto);
   let keywordMatches = 0;
-  
+
   for (const kw of keywordsRequerido) {
     // Buscar en keywords del producto
     for (const pkw of keywordsProducto) {
@@ -239,14 +307,14 @@ function calculateMatch(itemRequerido: ItemRequerido, producto: InventoryItem): 
         break;
       }
     }
-    
+
     // Buscar en nombre y descripción
     if (textoProducto.includes(kw)) {
       keywordMatches++;
       if (!matchedTerms.includes(kw)) matchedTerms.push(kw);
     }
   }
-  
+
   if (keywordsRequerido.length > 0 && keywordMatches > 0) {
     const keywordScore = (keywordMatches / keywordsRequerido.length) * 75;
     if (keywordScore > score) {
@@ -254,20 +322,25 @@ function calculateMatch(itemRequerido: ItemRequerido, producto: InventoryItem): 
       matchType = 'keyword';
     }
   }
-  
-  // 5. Similitud de texto completo (hasta 60%)
+
+  // 5. Similitud de texto completo (hasta 65%)
   const fullSimilarity = stringSimilarity(textoCompleto, textoProducto);
   if (fullSimilarity > 0.5) {
-    const fuzzyScore = fullSimilarity * 60;
+    const fuzzyScore = fullSimilarity * 65;
     if (fuzzyScore > score) {
       score = fuzzyScore;
       matchType = 'fuzzy';
     }
   }
-  
-  // Umbral mínimo de 25% (reducido para mejor cobertura)
-  if (score < 25) return null;
-  
+
+  // Aplicar penalty de especificación si aplica
+  if (specPenalty < 0) {
+    score = Math.max(0, score + specPenalty);
+  }
+
+  // Umbral mínimo de 35% (subido desde 25% - requiere más especificidad)
+  if (score < 35) return null;
+
   return {
     inventoryItem: producto,
     score: Math.round(score),
