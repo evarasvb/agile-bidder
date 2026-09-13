@@ -207,8 +207,11 @@ export default function OportunidadDetalle() {
 
   // Match producto-por-producto de la licitación (por cliente). item_id ==
   // licitaciones_bi_items.id, que es el mismo id de cada ítem del detalle.
+  // Usar el código RESUELTO de la oportunidad (no el `id` de la ruta): en URLs
+  // legacy el `id` puede ser el UUID de licitaciones_bi, y lic_item_matches se
+  // filtra por licitacion_codigo.
   const { data: licItemMatches = [] } = useLicItemMatches(
-    tipoNormalized === "licitacion" ? id ?? null : null
+    tipoNormalized === "licitacion" ? oportunidad?.codigo ?? null : null
   );
   const matchPorItem = useMemo(() => {
     const m = new Map<string, (typeof licItemMatches)[number]>();

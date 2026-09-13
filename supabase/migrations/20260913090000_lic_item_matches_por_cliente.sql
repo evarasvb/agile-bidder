@@ -72,6 +72,8 @@ begin
   return n;
 end
 $function$;
+-- Batch pesado: solo cron/service role.
+revoke execute on function public.generar_matches_lic_items_cliente(uuid, real) from public, anon, authenticated;
 
 -- Lote: recorre los clientes con inventario, reconcilia (borra lo viejo del
 -- cliente) y regenera. Lo corre el cron; es demasiado pesado para una llamada
@@ -82,6 +84,10 @@ create or replace function public.generar_matches_lic_items_todos()
 returns integer language plpgsql security definer set search_path to 'public' as $function$
 declare r record; total int := 0; k int;
 begin
+  -- Limpiar matches de clientes que ya no tienen inventario (si borraron todo,
+  -- ya no aparecen en el loop de abajo y quedarían pegados).
+  delete from public.lic_item_matches lm
+   where not exists (select 1 from public.cliente_inventario ci where ci.cliente_id = lm.cliente_id);
   for r in select distinct cliente_id from public.cliente_inventario loop
     delete from public.lic_item_matches where cliente_id = r.cliente_id;
     k := public.generar_matches_lic_items_cliente(r.cliente_id);
@@ -90,6 +96,8 @@ begin
   return total;
 end
 $function$;
+-- Batch pesado: solo cron/service role.
+revoke execute on function public.generar_matches_lic_items_todos() from public, anon, authenticated;
 
 -- Cron horario (idempotente).
 select cron.unschedule('match-lic-items-cliente-horario')
