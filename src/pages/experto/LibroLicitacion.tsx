@@ -467,7 +467,9 @@ export default function LibroLicitacion() {
     ficha: f ? 'completa' : 'faltante',
     items: licItems.length > 0 || (f?.items?.length ?? 0) > 0 ? 'completa' : 'faltante',
     bases: bases.length === 0 ? 'faltante' : basesResumidas === bases.length ? 'completa' : 'parcial',
-    anexos: libro?.anexos?.texto ? (faltantes.length ? 'parcial' : 'completa') : bases.length ? 'parcial' : 'faltante',
+    // La comprensión de los anexos pertenece al expediente fuente. No depende de que
+    // el usuario haya comprado/generado el entregable de formularios completados.
+    anexos: bases.length === 0 ? 'faltante' : basesResumidas === bases.length ? 'completa' : 'parcial',
     historial: top.length ? 'completa' : 'pendiente',
     noticias: libro?.noticias?.length ? 'completa' : 'pendiente',
   });
