@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { CheckCircle2, Circle, AlertTriangle, Sparkles, ExternalLink, ShieldCheck } from 'lucide-react';
 import type { Matriz } from '@/components/experto/MatrizPostulacion';
 import { pagoOrganismo, presupuestoTexto } from '@/lib/organismoPago';
+import type { CompletitudExpediente } from '@/lib/expertoDecision';
 
 type Paso = { k: string; t: string; listo: boolean; accion?: () => void; ayuda?: string };
 const pond = (r: any): number => { const n = r.ponderacion_num != null ? Number(r.ponderacion_num) : Number(String(r.ponderacion ?? '').replace(/[^0-9.,]/g, '').replace(',', '.')); if (!Number.isFinite(n) || n === 0) return 0; return n > 1 ? n / 100 : n; };
@@ -14,7 +15,7 @@ const Chip = ({ e }: { e?: string }) => { const [t, c] = ESTADO[e ?? 'pendiente'
 
 export interface SalaProps {
   cod: string; ficha: any; bases: any[]; documentos: any[]; plan?: string;
-  informe: string; matriz: Matriz | null; anexos: string; faltantes: string[]; veredicto: { t: string; c: string } | null;
+  informe: string; matriz: Matriz | null; anexos: string; faltantes: string[]; veredicto: { t: string; c: string } | null; completitud: CompletitudExpediente;
   onGenerar: (tipo: 'informe' | 'matriz' | 'anexos' | 'estudio') => void; onIr: (tab: any) => void; onMatriz: (m: Matriz) => void; onPreguntar: (q: string) => void; irOportunidad?: () => void;
   aprobar: () => void; ocupado: string | null;
 }
@@ -36,7 +37,7 @@ export function SalaPostulacion(p: SalaProps) {
     { k: 'matriz', t: 'Requisitos y puntaje', listo: !!m, accion: () => p.onGenerar('matriz') },
     { k: 'evidencias', t: 'Admisibilidad completa', listo: !!m && adm.length > 0 && noCumple.length === 0 && pend.length === 0, accion: () => p.onIr('matriz') },
     { k: 'anexos', t: 'Anexos completados', listo: !!p.anexos && campos === 0, accion: () => p.anexos ? p.onIr('anexos') : p.onGenerar('anexos') },
-    { k: 'revision', t: 'Revisada y aprobada', listo: !!aprob?.en, accion: p.aprobar },
+    { k: 'revision', t: 'Revisada y aprobada', listo: !!aprob?.en, accion: p.completitud.puedeEmitirVeredictoDefinitivo ? p.aprobar : undefined, ayuda: p.completitud.puedeEmitirVeredictoDefinitivo ? undefined : 'Completa primero las fuentes críticas del expediente' },
   ];
   const listaParaPostular = pasos.every((s) => s.listo);
   const setTarea = (i: number, campo: string, v: string) => { if (!m) return; p.onMatriz({ ...m, tareas: tareas.map((t, j) => j === i ? { ...t, [campo]: v } : t) }); };
@@ -57,6 +58,7 @@ export function SalaPostulacion(p: SalaProps) {
         <div className="flex items-center gap-2 flex-wrap">
           <p className="font-semibold">Resumen ejecutivo</p>
           {p.veredicto ? <span className={`rounded border px-2 py-0.5 text-xs font-medium ${p.veredicto.c}`}>{p.veredicto.t}</span> : <Button size="sm" variant="outline" className="h-7" onClick={() => p.onGenerar('informe')} disabled={!!p.ocupado}><Sparkles className="h-3.5 w-3.5 mr-1" />Pedir veredicto</Button>}
+          {!p.completitud.puedeEmitirVeredictoDefinitivo && <span className="rounded border border-amber-300 bg-amber-50 text-amber-900 px-2 py-0.5 text-xs font-medium">Sólo análisis preliminar</span>}
           {listaParaPostular && <span className="rounded bg-green-600 text-white px-2 py-0.5 text-xs font-medium">Lista para postular</span>}
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-1 text-xs">
@@ -116,7 +118,7 @@ export function SalaPostulacion(p: SalaProps) {
           {pasos.map((s) => <li key={s.k} className="flex items-center gap-1">{s.listo ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600" /> : <Circle className="h-3.5 w-3.5 text-muted-foreground" />}{s.t}</li>)}
         </ul>
         {aprob?.en ? <p className="text-xs text-green-700">Aprobada por {aprob.por ?? 'el usuario'} el {new Date(aprob.en).toLocaleString('es-CL')}.</p>
-          : <Button size="sm" variant="outline" onClick={p.aprobar} disabled={!m}><ShieldCheck className="h-3.5 w-3.5 mr-1" />Marcar como revisada y aprobada</Button>}
+          : <Button size="sm" variant="outline" onClick={p.aprobar} disabled={!m || !p.completitud.puedeEmitirVeredictoDefinitivo} title={!p.completitud.puedeEmitirVeredictoDefinitivo ? `Completa el expediente: ${p.completitud.faltantesCriticos.join(', ')}` : undefined}><ShieldCheck className="h-3.5 w-3.5 mr-1" />Marcar como revisada y aprobada</Button>}
         <div className="flex flex-wrap gap-1">
           {p.irOportunidad && <Button size="sm" onClick={p.irOportunidad}><ExternalLink className="h-3.5 w-3.5 mr-1" />Ir a postular</Button>}
           <Button size="sm" variant="ghost" onClick={() => p.onPreguntar(`Sobre ${p.cod}: revisa mi postulación completa. ¿Qué me falta o qué riesgo ves antes de enviarla?`)}>Pedir revisión final al Experto</Button>
