@@ -306,3 +306,11 @@ verify_jwt = true
 
 [functions.webinar-invitar]
 verify_jwt = true
+
+# extract-proveedores-instituciones is called by cron job (public access)
+[functions.extract-proveedores-instituciones]
+verify_jwt = false
+
+# cluster-customers is called by cron job (public access)
+[functions.cluster-customers]
+verify_jwt = false
