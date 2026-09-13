@@ -37,6 +37,24 @@ const matchBadge = (score: number) =>
   : 'bg-amber-100 text-amber-800 border-amber-200';
 const clp = (n: number) => `$${Math.round(n || 0).toLocaleString('es-CL')}`;
 
+/**
+ * Determina si un match es confiable o solo categoría débil
+ * GARANTÍA: category-only matches (score < 60) se marcan como "por revisar"
+ */
+function evaluarConfianzaMatch(match: any): { confianza: 'alta' | 'media' | 'baja'; tooltip: string } {
+  if (!match) return { confianza: 'baja', tooltip: 'Sin candidato' };
+
+  const score = match.score || 0;
+  if (score >= 75) {
+    return { confianza: 'alta', tooltip: `Coincidencia alta (${score}%)` };
+  }
+  if (score >= 60) {
+    return { confianza: 'media', tooltip: `Coincidencia parcial (${score}%) - revisar especificaciones` };
+  }
+  // score < 60: probablemente solo categoría
+  return { confianza: 'baja', tooltip: `Coincidencia débil (${score}%) - REVISAR, probablemente solo categoría` };
+}
+
 // Chip que muestra si el cliente corrigió el match automático a mano.
 function EstadoBadge({ estado }: { estado: 'auto' | 'confirmado' | 'reasignado' | 'descartado' }) {
   if (estado === 'confirmado') {
@@ -408,7 +426,14 @@ export default function CompraAgilDetalle() {
                     </div>
                     {f.match ? (
                       <div className="mt-1.5 text-sm">
-                        <p className="text-firmavb-blue font-medium">→ {f.match.nombre}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-firmavb-blue font-medium">→ {f.match.nombre}</p>
+                          {evaluarConfianzaMatch(f.match).confianza === 'baja' && (
+                            <span className="text-xs font-semibold px-1.5 py-0.5 bg-red-100 text-red-700 rounded" title="Match débil - revisar especificaciones">
+                              REVISAR
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {f.cantidad} {unidadLabel(f.unidad)} × {clp(f.match.precio || 0)} = <span className="font-semibold text-foreground">{clp(f.match.subtotal)}</span>
                         </p>
@@ -461,9 +486,16 @@ export default function CompraAgilDetalle() {
                       </TableCell>
                       <TableCell className="text-center align-top">
                         {f.match ? (
-                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${matchBadge(f.match.score)}`}>
-                            {f.match.score}%
-                          </span>
+                          <div className="flex flex-col items-center gap-1">
+                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${matchBadge(f.match.score)}`}>
+                              {f.match.score}%
+                            </span>
+                            {evaluarConfianzaMatch(f.match).confianza === 'baja' && (
+                              <span className="text-xs font-semibold px-1.5 py-0.5 bg-red-100 text-red-700 rounded whitespace-nowrap" title={evaluarConfianzaMatch(f.match).tooltip}>
+                                REVISAR
+                              </span>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
