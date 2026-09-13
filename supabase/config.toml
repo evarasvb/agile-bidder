@@ -38,9 +38,9 @@ verify_jwt = true
 [functions.matching-ai]
 verify_jwt = true
 
-# mercadopublico-api is a public proxy for MercadoPublico data
+# Production requires a valid Supabase JWT for mercadopublico-api.
 [functions.mercadopublico-api]
-verify_jwt = false
+verify_jwt = true
 
 [functions.resumir-bases]
 verify_jwt = true
@@ -293,7 +293,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.test-suscripcion-e2e]
-verify_jwt = false
+verify_jwt = true
 
 [functions.tinyfish-test]
 verify_jwt = true
