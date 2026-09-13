@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   ArrowLeft,
   Youtube,
@@ -11,6 +12,9 @@ import {
   ExternalLink,
   Star,
   Sparkles,
+  Clock,
+  CalendarClock,
+  Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -59,11 +63,31 @@ const CONTENIDO = {
     canalUrl: "https://youtube.com/@firmavb", // ← tu canal
     videos: [
       // Pega el ID de cada video (la parte después de watch?v= o youtu.be/ ).
+      {
+        id: "oNsOWfAb6cM",
+        titulo: "Cómo postular al Convenio Marco de SaaS (webinar completo)",
+        // Capítulos: saltan al minuto exacto del video (segundos).
+        capitulos: [
+          { t: 20, label: "El error del 99% de descuento" },
+          { t: 141, label: "Postula a las DOS categorías (SaaS + Proyecto)" },
+          { t: 828, label: "Anexo 3: la firma del hosting (AWS/Azure)" },
+          { t: 988, label: "Anexo 4: acreditar tu experiencia" },
+          { t: 2820, label: "Fórmula pyme: 4 anexos + giro = 66 puntos" },
+        ],
+      },
       { id: "ktBYadx4CD4", titulo: "" },
       { id: "OuTCy3DESxQ", titulo: "" },
       { id: "SJ7PZZw1vNM", titulo: "" },
       { id: "kxpU_2H1J_Y", titulo: "" },
     ],
+    // Shorts (videos verticales). Pega el ID de cada Short de YouTube
+    // (la parte después de youtube.com/shorts/ o watch?v= ). Se muestran en una
+    // fila aparte, en formato vertical 9:16. La fila aparece sola cuando hay al
+    // menos uno cargado.
+    shorts: [
+      // { id: "XXXXXXXXXXX", titulo: "Fórmula pyme: 66 puntos" },
+      // { id: "YYYYYYYYYYY", titulo: "El error del 99% de descuento" },
+    ] as { id: string; titulo?: string }[],
   },
 
   // --- Música / canciones ---------------------------------------------------
@@ -186,7 +210,7 @@ function spotifyEmbed(url: string): string | null {
 
 // Extrae el ID de YouTube de un link completo o devuelve el id tal cual
 function youtubeId(idOrUrl: string): string {
-  const m = idOrUrl.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{6,})/);
+  const m = idOrUrl.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([A-Za-z0-9_-]{6,})/);
   return m ? m[1] : idOrUrl.trim();
 }
 
@@ -238,11 +262,56 @@ function PendientePorCargar({ texto }: { texto: string }) {
   );
 }
 
+// Formatea segundos a m:ss para las etiquetas de capítulos.
+function fmtTiempo(seg: number): string {
+  const m = Math.floor(seg / 60);
+  const s = seg % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+// Estado del próximo webinar (martes 19:00–19:30, hora de Chile). Calcula en la
+// zona horaria America/Santiago para no fallar con visitantes en otros husos, y
+// considera que si ya es martes pasadas las 19:30, el próximo es en 7 días.
+function estadoProximoMartes(): { dias: number; hoy: boolean } {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Santiago",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(now);
+  const wd = parts.find((p) => p.type === "weekday")?.value ?? "";
+  const hour = parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10) % 24;
+  const min = parseInt(parts.find((p) => p.type === "minute")?.value ?? "0", 10);
+  const map: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const dow = map[wd] ?? 0;
+  const finWebinarMin = 19 * 60 + 30; // termina 19:30
+  if (dow === 2 && hour * 60 + min < finWebinarMin) return { dias: 0, hoy: true };
+  let dias = (2 - dow + 7) % 7;
+  if (dias === 0) dias = 7; // es martes pero el webinar ya terminó
+  return { dias, hoy: false };
+}
+
 export default function Academia() {
   const { perfil, banner, youtube, musica, linkedin, libros, cursos, asesoria, asesoriaPago, whatsappGrupo, contacto } =
     CONTENIDO;
 
+  // Salto por capítulos en el video destacado: al elegir un capítulo, recargamos
+  // el iframe con ?start= en ese segundo.
+  const [inicioSeg, setInicioSeg] = useState<number | null>(null);
+  // Nonce que cambia en CADA clic de capítulo, para que volver a elegir el mismo
+  // capítulo también recargue el iframe (si solo dependiéramos de inicioSeg, un
+  // segundo clic al mismo capítulo no cambiaría el estado y no re-saltaría).
+  const [saltoNonce, setSaltoNonce] = useState(0);
+  const irACapitulo = (t: number) => {
+    setInicioSeg(t);
+    setSaltoNonce((n) => n + 1);
+  };
+  const martes = estadoProximoMartes();
+
   const videosCargados = youtube.videos.filter((v) => v.id.trim() !== "");
+  const shortsCargados = youtube.shorts.filter((s) => s.id.trim() !== "");
   const musicaCargada = musica.filter((m) => m.url.trim() !== "");
   const postsCargados = linkedin.posts.filter(
     (p) => (p.url && p.url.trim() !== "") || p.imagenUrl
@@ -376,27 +445,88 @@ export default function Academia() {
       <Seccion
         id="videos"
         icon={Youtube}
-        titulo="Mis videos"
-        subtitulo="Contenido en YouTube sobre compras públicas y cómo venderle al Estado."
+        titulo="Videos y grabaciones"
+        subtitulo="Las grabaciones de los webinars y el mejor contenido sobre cómo venderle al Estado. Míralas cuando quieras."
         alt
       >
         {videosCargados.length > 0 ? (
           <>
             {/* Video destacado */}
-            <div className="rounded-2xl overflow-hidden shadow-lg border border-border/50 bg-black mb-6 max-w-3xl">
-              <div className="aspect-video">
-                <iframe
-                  className="w-full h-full"
-                  src={`https://www.youtube.com/embed/${youtubeId(videosCargados[0].id)}?rel=0`}
-                  title={videosCargados[0].titulo || "Video destacado"}
-                  loading="lazy"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
+            <div className="max-w-4xl mb-8">
+              <Badge className="mb-3 bg-firmavb-red/10 text-firmavb-red border border-firmavb-red/20 hover:bg-firmavb-red/10">
+                🔴 Grabación del webinar
+              </Badge>
+              <div className="rounded-2xl overflow-hidden shadow-xl border border-border/50 bg-black ring-1 ring-firmavb-blue/10">
+                <div className="aspect-video">
+                  <iframe
+                    key={`${inicioSeg ?? "start"}-${saltoNonce}`}
+                    className="w-full h-full"
+                    src={`https://www.youtube.com/embed/${youtubeId(videosCargados[0].id)}?rel=0${inicioSeg != null ? `&start=${inicioSeg}&autoplay=1` : ""}`}
+                    title={videosCargados[0].titulo || "Video destacado"}
+                    loading="lazy"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+              </div>
+              {videosCargados[0].titulo && (
+                <h3 className="mt-4 text-xl md:text-2xl font-bold text-foreground">
+                  {videosCargados[0].titulo}
+                </h3>
+              )}
+              {/* Capítulos: saltan al minuto exacto del video */}
+              {(videosCargados[0] as any).capitulos?.length > 0 && (
+                <div className="mt-4 rounded-xl border border-border/60 bg-card p-3">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                    <Clock className="h-3.5 w-3.5" /> Capítulos · salta al tema que te interesa
+                  </p>
+                  <div className="flex flex-col gap-1">
+                    {((videosCargados[0] as any).capitulos as { t: number; label: string }[]).map((c) => (
+                      <button
+                        key={c.t}
+                        type="button"
+                        onClick={() => irACapitulo(c.t)}
+                        className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-firmavb-blue/5 ${
+                          inicioSeg === c.t ? "bg-firmavb-blue/10" : ""
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5 font-mono text-xs font-medium text-firmavb-blue shrink-0 w-14">
+                          <Play className="h-3 w-3 fill-current" /> {fmtTiempo(c.t)}
+                        </span>
+                        <span className="text-foreground group-hover:text-firmavb-blue">{c.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* CTA: inscríbete al próximo webinar */}
+              <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-firmavb-blue/20 bg-firmavb-blue/5 p-4">
+                <div className="flex-1">
+                  <p className="font-semibold text-foreground">¿Te lo perdiste en vivo?</p>
+                  <p className="text-sm text-muted-foreground">
+                    Hacemos uno nuevo todos los martes, 19:00 a 19:30. Gratis y en vivo.
+                  </p>
+                  <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-firmavb-blue/10 px-3 py-1 text-xs font-semibold text-firmavb-blue">
+                    <CalendarClock className="h-3.5 w-3.5" />
+                    {martes.hoy
+                      ? "¡El próximo es HOY, martes 19:00!"
+                      : martes.dias === 1
+                        ? "Falta 1 día para el próximo martes"
+                        : `Faltan ${martes.dias} días para el próximo martes`}
+                  </p>
+                </div>
+                <Button asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2 shrink-0">
+                  <Link to="/webinar/vendele-al-estado">
+                    Inscríbete al próximo
+                    <ExternalLink className="h-4 w-4" />
+                  </Link>
+                </Button>
               </div>
             </div>
             {/* Resto de videos */}
             {videosCargados.length > 1 && (
+              <>
+              <h3 className="text-lg font-bold text-foreground mb-4">Más videos y grabaciones</h3>
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {videosCargados.slice(1).map((v, i) => (
                   <Card
@@ -421,11 +551,40 @@ export default function Academia() {
                   </Card>
                 ))}
               </div>
+              </>
             )}
           </>
         ) : (
           <PendientePorCargar texto="Aún no hay videos individuales seleccionados. Mientras tanto, entra a mi canal 👇" />
         )}
+        {shortsCargados.length > 0 && (
+          <div className="mt-10">
+            <h3 className="text-lg font-bold text-foreground mb-4">Shorts</h3>
+            <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1">
+              {shortsCargados.map((s, i) => (
+                <div key={i} className="shrink-0 w-[200px]">
+                  <div
+                    className="rounded-xl overflow-hidden border border-border/50 bg-black"
+                    style={{ aspectRatio: "9 / 16" }}
+                  >
+                    <iframe
+                      className="w-full h-full"
+                      src={`https://www.youtube.com/embed/${youtubeId(s.id)}?rel=0`}
+                      title={s.titulo || `Short ${i + 1}`}
+                      loading="lazy"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </div>
+                  {s.titulo && (
+                    <p className="mt-2 text-xs font-medium text-foreground">{s.titulo}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {youtube.canalUrl && (
           <div className="mt-6">
             <Button

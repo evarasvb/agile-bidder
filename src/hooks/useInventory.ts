@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabaseClient as supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/hooks/useAuth';
+import { recalcularMatchInventario } from '@/lib/matchRecalc';
 
 // Resuelve la EMPRESA DUEÑA (clientes.id) del usuario. El inventario vive bajo
 // clientes.id, NO bajo auth.uid(): usar user.id hacía que un usuario real (donde
@@ -406,6 +407,8 @@ export function useCreateInventoryItem() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      // Refrescar el match al cambiar el inventario (no espera al cron horario).
+      void recalcularMatchInventario(queryClient);
     },
   });
 }
@@ -455,6 +458,8 @@ export function useUpdateInventoryItem() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      // Refrescar el match al cambiar el inventario (no espera al cron horario).
+      void recalcularMatchInventario(queryClient);
     },
   });
 }
@@ -486,6 +491,8 @@ export function useDeleteInventoryItem() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      // Refrescar el match al cambiar el inventario (no espera al cron horario).
+      void recalcularMatchInventario(queryClient);
     },
   });
 }
@@ -524,6 +531,8 @@ export function useDeleteInventoryItems() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      // Refrescar el match al cambiar el inventario (no espera al cron horario).
+      void recalcularMatchInventario(queryClient);
     },
   });
 }

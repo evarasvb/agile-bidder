@@ -74,9 +74,14 @@ export default function WebinarVendeleAlEstado() {
       />
       <header className="px-6 py-4 border-b border-border/50 bg-white/90 backdrop-blur-md">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" /> Volver a FirmaVB
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link to="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="h-4 w-4" /> Volver a FirmaVB
+            </Link>
+            <Link to="/academia" className="flex items-center gap-1.5 text-sm font-medium text-firmavb-blue hover:underline">
+              <MonitorPlay className="h-4 w-4" /> Ver grabaciones
+            </Link>
+          </div>
           <img src={logoFirmavbOriginal} alt="FirmaVB" className="h-9 w-auto object-contain" />
         </div>
       </header>

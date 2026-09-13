@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCliente } from './useCliente';
+import { recalcularMatchInventario } from '@/lib/matchRecalc';
 import { toast } from 'sonner';
 
 export interface BulkProductRow {
@@ -146,11 +147,18 @@ export function useClienteInventarioBulk() {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['cliente-inventario'] });
       queryClient.invalidateQueries({ queryKey: ['todo-inventario'] });
-      
+
       if (result.errors.length === 0) {
         toast.success(`✅ ${result.inserted} productos importados, ${result.updated} actualizados`);
       } else {
         toast.warning(`⚠️ ${result.inserted + result.updated} procesados con ${result.errors.length} errores`);
+      }
+
+      // Recalcular el match al tiro para que las oportunidades aparezcan sin
+      // esperar al cron. No bloquea el flujo (fire-and-forget).
+      if (result.inserted + result.updated > 0) {
+        toast.info("Actualizando tus oportunidades con el nuevo inventario…");
+        void recalcularMatchInventario(queryClient);
       }
     },
     onError: (error: Error) => {
