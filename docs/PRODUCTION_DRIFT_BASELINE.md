@@ -7,6 +7,13 @@ Commit base: `344470c27393d15aae2d61e8c7be4e98ccf7895f`
 
 > Esta es una observación de solo lectura. La presencia en una lista no autoriza desplegar ni eliminar una función.
 
+## Endurecimiento incorporado durante la revisión
+
+- `mercadopublico-api` queda con `verify_jwt = true`, igual que producción.
+- `test-suscripcion-e2e` cambia a `verify_jwt = true` y además valida rol `admin` dentro de la función. Producción seguirá mostrando drift hasta que este cambio sea revisado y desplegado expresamente.
+- CI falla si una función de diagnóstico, prueba o probe queda con JWT desactivado, o si aparece un patrón compatible con un secreto literal dentro de Edge Functions.
+- La recuperación del código no equivale a aprobar su despliegue: webhooks y endpoints públicos con `service_role` requieren una revisión de autorización individual.
+
 ## Resumen
 
 | Recurso | GitHub | Producción |
