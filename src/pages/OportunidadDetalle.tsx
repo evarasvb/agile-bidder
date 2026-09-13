@@ -1,5 +1,7 @@
+import { useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { presupuestoTexto } from "@/lib/organismoPago";
+import { useLicItemMatches } from "@/hooks/useLicItemMatches";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -202,6 +204,17 @@ export default function OportunidadDetalle() {
   const descartar = useDescartarOportunidad();
   const registrarSenal = useRegistrarSenal();
   const crearPipeline = useCreatePipelineItem();
+
+  // Match producto-por-producto de la licitación (por cliente). item_id ==
+  // licitaciones_bi_items.id, que es el mismo id de cada ítem del detalle.
+  const { data: licItemMatches = [] } = useLicItemMatches(
+    tipoNormalized === "licitacion" ? id ?? null : null
+  );
+  const matchPorItem = useMemo(() => {
+    const m = new Map<string, (typeof licItemMatches)[number]>();
+    for (const r of licItemMatches) if (r.item_id) m.set(r.item_id, r);
+    return m;
+  }, [licItemMatches]);
 
   if (isLoading) {
     return (
@@ -416,10 +429,14 @@ export default function OportunidadDetalle() {
                         <TableHead className="text-right">Cantidad</TableHead>
                         <TableHead>Unidad</TableHead>
                         <TableHead className="text-right">P. Unitario</TableHead>
+                        {oportunidad.tipo === "licitacion" && <TableHead>Tu producto (match)</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {oportunidad.items.map((item) => (
+                      {oportunidad.items.map((item) => {
+                        const m = matchPorItem.get(item.id);
+                        const tieneMatch = !!m && (m.score ?? 0) >= 40;
+                        return (
                         <TableRow key={item.id}>
                           <TableCell className="font-medium">{item.nombre_producto}</TableCell>
                           <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
@@ -430,8 +447,31 @@ export default function OportunidadDetalle() {
                           <TableCell className="text-right">
                             {item.precio_unitario ? formatCurrency(item.precio_unitario) : "-"}
                           </TableCell>
+                          {oportunidad.tipo === "licitacion" && (
+                            <TableCell>
+                              {tieneMatch ? (
+                                <div className="flex items-center gap-2">
+                                  <Badge
+                                    className={
+                                      (m!.score ?? 0) >= 80
+                                        ? "bg-green-500 text-white"
+                                        : "bg-yellow-500 text-white"
+                                    }
+                                  >
+                                    {Math.round(m!.score ?? 0)}%
+                                  </Badge>
+                                  <span className="text-sm truncate max-w-[200px]" title={m!.nombre_producto || ""}>
+                                    {m!.nombre_producto}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">Sin match</span>
+                              )}
+                            </TableCell>
+                          )}
                         </TableRow>
-                      ))}
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
