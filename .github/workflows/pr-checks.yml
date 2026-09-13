@@ -29,8 +29,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Supabase security gate
+        run: npm run check:supabase-security
+
       - name: Type-check + build
-        run: npm run build
+        run: npm run type-check && npm run build
 
       - name: Unit tests
         run: npm run test

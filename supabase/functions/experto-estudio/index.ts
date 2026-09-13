@@ -68,9 +68,12 @@ Deno.serve(async (req) => {
     const huella = String(body.huella ?? "").slice(0, 80);
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
+    const { data: lanzamiento, error: lanzamientoError } = await sb.rpc("experto_beta_reclamar_usuario", { p_user_id: userId });
+    if (lanzamientoError) return json({ error: "lanzamiento_no_disponible", mensaje: "No pude verificar tu acceso al Experto." }, 503);
+    if (lanzamiento?.[0]?.fase === "beta_10" && !lanzamiento[0].permitido) return json({ error: "beta_completa", mensaje: "Los 10 cupos de la beta inicial ya están ocupados." }, 403);
     const { data: uso } = await sb.rpc("experto_uso_mes", { p_user_id: userId, p_huella: huella || "anon" });
     const u = uso?.[0] ?? { consultas: 0, informes: 0, plan: "free" };
-    if (!u.plan || u.plan === "free") return json({ error: "pro", mensaje: "El estudio profundo es del plan Pro: $50.000 por 30 días, con estudios y preguntas sin límite.", uso: u }, 402);
+    if (!u.plan || u.plan === "free") return json({ error: "pro", mensaje: "El estudio profundo requiere acceso al Experto.", uso: u }, 402);
 
     const ficha = (await sb.rpc("experto_ficha_licitacion", { p_codigo: codigo })).data;
     if (!ficha) return json({ error: "sin_ficha", mensaje: `No encontré la licitación ${codigo} en la base.` }, 404);

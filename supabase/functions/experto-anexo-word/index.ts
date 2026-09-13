@@ -100,11 +100,14 @@ Deno.serve(async (req) => {
     if (!/^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}$/.test(codigo) || !documentoId) return json({ error: "datos", mensaje: "Falta el código de la licitación o el documento." }, 400);
 
     // 1. Plan (Plus o FirmaVB ERP), datos de la empresa y documento
+    const { data: lanzamiento, error: lanzamientoError } = await sb.rpc("experto_beta_reclamar_usuario", { p_user_id: userId });
+    if (lanzamientoError) return json({ error: "lanzamiento_no_disponible", mensaje: "No pude verificar tu acceso al Experto." }, 503);
+    if (lanzamiento?.[0]?.fase === "beta_10" && !lanzamiento[0].permitido) return json({ error: "beta_completa", mensaje: "Los 10 cupos de la beta inicial ya están ocupados." }, 403);
     const { data: uso } = await sb.rpc("experto_uso_mes", { p_user_id: userId, p_huella: "x" });
     const plan = String(uso?.[0]?.plan ?? "free");
     const { data: cli } = await sb.from("clientes").select("id, empresa_nombre, rut, direccion, telefono, email, region, giros, representante_nombre, representante_rut, plan, activo").eq("user_id", userId).maybeSingle();
     const conPlus = plan === "plus" || (cli?.activo && ["pro", "business", "enterprise"].includes(String(cli?.plan)));
-    if (!conPlus) return json({ error: "plus", mensaje: "Completar anexos Word es parte del Experto Plus ($100.000 por 30 días) o del plan FirmaVB ERP.", plan }, 402);
+    if (!conPlus) return json({ error: "plus", mensaje: "Completar anexos Word requiere acceso completo al Experto.", plan }, 402);
     if (!cli?.empresa_nombre || !cli?.rut || !cli?.representante_nombre) return json({ error: "datos", mensaje: "Antes completa en Mi empresa: razón social, RUT y representante legal." }, 428);
     const { data: docs } = await sb.rpc("experto_documento_ruta", { p_user_id: userId, p_id: documentoId });
     const doc = docs?.[0];
