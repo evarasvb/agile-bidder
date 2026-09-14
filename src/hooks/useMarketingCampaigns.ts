@@ -168,13 +168,14 @@ export function useCampaignPiezas(campaignId: string) {
         }
       );
 
-      if (!response.ok) throw new Error('Error executing campaign');
+      if (!response.ok) throw new Error('No se pudo confirmar el envío. Revisa el historial de Ejecución antes de reintentar para evitar duplicados.');
       return await response.json();
     },
     onSuccess: (_data, piezaId) => {
       queryClient.invalidateQueries({ queryKey: ['marketing_piezas', campaignId] });
       queryClient.invalidateQueries({ queryKey: ['marketing_metricas', campaignId] });
       queryClient.invalidateQueries({ queryKey: ['marketing_ejecucion', piezaId] });
+      queryClient.invalidateQueries({ queryKey: ['marketing_ejecucion_recientes'] });
     },
   });
 
@@ -199,9 +200,10 @@ export function useCampaignPiezas(campaignId: string) {
     piezas: piezas || [],
     isLoading,
     createPieza: createPieza.mutate,
-    ejecutarPieza: ejecutarPieza.mutate,
+    ejecutarPieza: ejecutarPieza.mutateAsync,
     ejecutandoPieza: ejecutarPieza.isPending,
     updatePieza: updatePieza.mutate,
+    updatePiezaAsync: updatePieza.mutateAsync,
     actualizandoPieza: updatePieza.isPending,
   };
 }
