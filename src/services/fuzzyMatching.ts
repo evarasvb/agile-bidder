@@ -159,17 +159,14 @@ function extractKeywords(text: string): string[] {
 /**
  * Valida que especificaciones críticas no sean incompatibles
  * Retorna penalty score (0 = compatible, <0 = incompatible para rechazar)
+ * CRÍTICO: Extrae TODAS las dimensiones, no solo la primera
  */
 function validateSpecifications(itemRequerido: ItemRequerido, producto: InventoryItem): number {
   // Extraer dimensiones ANTES de normalizar (porque normalizeText reemplaza puntos por espacios)
   // Soporta: 15.8, 15,8 (decimal comma), excluye mass units (mg/g/kg no matched)
-  const dimensionPattern = /(\d+(?:[.,]\d+)?)\s*(cm|mm|metros|metro|m|pulgadas|pulgada|pulg|"|inch)(?!\w)/i;
 
   const reqFullText = itemRequerido.nombre + ' ' + (itemRequerido.descripcion || '');
   const prodFullText = producto.nombre_producto + ' ' + (producto.descripcion || '');
-
-  const reqDim = reqFullText.match(dimensionPattern);
-  const prodDim = prodFullText.match(dimensionPattern);
 
   // Ahora normalizar para validación de incompatibilidades
   const req = normalizeText(reqFullText);
@@ -178,7 +175,7 @@ function validateSpecifications(itemRequerido: ItemRequerido, producto: Inventor
   // Mapeo de categorías incompatibles (si hay una de cada lado, no matchean)
   const incompatibilities: Record<string, string[]> = {
     'electronico|electronic|pendrive|usb|memoria|hard|disk|ssd|monitor|teclado|raton|mouse|adaptador|hdmi|vga|cable':
-      ['papel|papel|cordon|cuerda|adhesivo|pegamento|cinta|scotch'],
+      ['papel|papel|cordon|cuerda|adhesivo|pegamiento|cinta|scotch'],
     'papel|papeleria|resma|hoja':
       ['electronico|pendrive|usb|adaptador|hdmi|monitor'],
     'tijera|cutter|cortador':
@@ -201,12 +198,17 @@ function validateSpecifications(itemRequerido: ItemRequerido, producto: Inventor
   // CRÍTICO: Solo acepta equivalencia matemática exacta (epsilon), no reglas de negocio
   // Ej: 2m = 2000mm (exacto), 2.0m = 2000.00mm (epsilon ~1e-10)
   // Ej: 15.8cm ≠ 5.5" (139.7mm) → REVISAR, no validado
-  if (reqDim && prodDim) {
-    // Parse valor con soporte para decimal comma y dot
-    const reqVal = parseFloat(reqDim[1].replace(',', '.'));
-    const reqUnit = reqDim[2].toLowerCase();
-    const prodVal = parseFloat(prodDim[1].replace(',', '.'));
-    const prodUnit = prodDim[2].toLowerCase();
+
+  // CRÍTICO: Extraer TODAS las dimensiones (no solo la primera)
+  const dimensionPatternGlobal = /(\d+(?:[.,]\d+)?)\s*(cm|mm|metros|metro|m|pulgadas|pulgada|pulg|"|inch)(?!\w)/g;
+  const reqDims = Array.from(reqFullText.matchAll(dimensionPatternGlobal));
+  const prodDims = Array.from(prodFullText.matchAll(dimensionPatternGlobal));
+
+  if (reqDims.length > 0 && prodDims.length > 0) {
+    // Si hay diferente cantidad de dimensiones → ambiguo, penalizar
+    if (reqDims.length !== prodDims.length) {
+      return -35; // Multidimensional mismatch: diferente cantidad
+    }
 
     // Normalizar a mm (conversión real)
     const toMm = (val: number, unit: string): number => {
@@ -221,22 +223,34 @@ function validateSpecifications(itemRequerido: ItemRequerido, producto: Inventor
       return val;
     };
 
-    const reqMm = toMm(reqVal, reqUnit);
-    const prodMm = toMm(prodVal, prodUnit);
+    // Comparar TODAS las dimensiones
+    let allMatch = true;
+    for (let i = 0; i < reqDims.length; i++) {
+      const reqVal = parseFloat(reqDims[i][1].replace(',', '.'));
+      const reqUnit = reqDims[i][2].toLowerCase();
+      const prodVal = parseFloat(prodDims[i][1].replace(',', '.'));
+      const prodUnit = prodDims[i][2].toLowerCase();
 
-    // Usar epsilon para equivalencia matemática (no reglas de negocio)
-    const epsilon = 1e-10;
-    const diff = Math.abs(reqMm - prodMm);
+      const reqMm = toMm(reqVal, reqUnit);
+      const prodMm = toMm(prodVal, prodUnit);
 
-    // Si difieren < epsilon → equivalentes matemáticamente
-    if (diff < epsilon) {
-      return 0; // Exacto
+      // Usar epsilon para equivalencia matemática
+      const epsilon = 1e-10;
+      const diff = Math.abs(reqMm - prodMm);
+
+      if (diff >= epsilon) {
+        allMatch = false;
+        break;
+      }
     }
 
-    // Si difieren → REVISAR (score <60 pero no rechazado)
-    // No hay "tolerancia de negocio": el usuario debe explícitamente aceptar
-    // Penalidad -15 asegura: score 50 → 35 (límite de visibilidad)
-    return -15; // Penalidad suave: dimensión diferente pero visible
+    if (allMatch) {
+      return 0; // Todas las dimensiones coinciden exactamente
+    }
+
+    // Si alguna dimensión difiere → REVISAR (score <60)
+    // Penalidad -35 asegura: score 85 → 50 (<60), score 75 → 40 (<60)
+    return -35; // Penalidad dimensional: garantiza REVISAR
   }
 
   return 0; // Compatible
@@ -272,13 +286,21 @@ function calculateMatch(itemRequerido: ItemRequerido, producto: InventoryItem): 
   const matchedTerms: string[] = [];
 
   // 1. Match exacto por nombre (100%)
+  // CRÍTICO: Solo retornar 100 si no hay conflicto de dimensiones
+  // Si hay mismatch dimensional (specPenalty = -30), dejar que pase al scoring normal
+  // para que se aplique la penalidad y el score quede <60
   if (nombreRequerido === nombreProducto) {
-    return {
-      inventoryItem: producto,
-      score: 100,
-      matchType: 'exact',
-      matchedTerms: [itemRequerido.nombre]
-    };
+    if (specPenalty === 0) {
+      // Sin dimensiones conflictivas - retornar exact match
+      return {
+        inventoryItem: producto,
+        score: 100,
+        matchType: 'exact',
+        matchedTerms: [itemRequerido.nombre]
+      };
+    }
+    // Si especPenalty = -30 (mismatch dimensional), no retornar aquí
+    // Continuar al scoring normal para aplicar penalidad
   }
 
   // 2. Similitud de nombre (hasta 85% - más importancia)
@@ -375,7 +397,9 @@ function calculateMatch(itemRequerido: ItemRequerido, producto: InventoryItem): 
   }
 
   // Umbral mínimo de 35% (subido desde 25% - requiere más especificidad)
-  if (score < 35) return null;
+  // CRÍTICO: Si hay dimension mismatch, permitir scores más bajos pero visibles (REVISAR)
+  const minThreshold = specPenalty < 0 ? 25 : 35;
+  if (score < minThreshold) return null;
 
   return {
     inventoryItem: producto,
