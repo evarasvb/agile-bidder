@@ -17,6 +17,7 @@
 // El ticket sale de body.ticket o del env MERCADOPUBLICO_API_KEY.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { reconcileStatuses, SCAN_LIMIT, STATUS_BY_CODE, type Candidate } from './reconcile.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -25,18 +26,12 @@ const cors = {
 };
 const MP_BASE = 'https://api.mercadopublico.cl/servicios/v1/publico';
 const CHUNK = 500;
+type SyncRow = { items: Array<Record<string, unknown>>; data: Record<string, unknown> };
 
 // El listado por `estado=activas` trae CodigoEstado pero NO el texto Estado, así
 // que las licitaciones activas quedaban con estado=NULL y el panel (que filtra
 // por estado='Publicada') las ocultaba. Mapeamos el código al texto oficial.
-const ESTADO_POR_CODIGO: Record<number, string> = {
-  5: 'Publicada',
-  6: 'Cerrada',
-  7: 'Desierta',
-  8: 'Adjudicada',
-  18: 'Revocada',
-  19: 'Suspendida',
-};
+const ESTADO_POR_CODIGO = STATUS_BY_CODE;
 
 function parseDate(d?: string) {
   if (!d) return null;
@@ -52,9 +47,14 @@ function formatDate(dt: Date) {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
-  const out = { success: true, synced: 0, items_synced: 0, total: 0, errors: [] as string[] };
+  const out = { success: true, synced: 0, items_synced: 0, total: 0, reconciled: 0, status_checks: 0, errors: [] as string[] };
   try {
-    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!serviceRoleKey || req.headers.get('Authorization') !== `Bearer ${serviceRoleKey}`) {
+      return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }),
+        { status: 401, headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
+    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, serviceRoleKey);
     const body = await req.json().catch(() => ({}));
     const ticket = body.ticket || Deno.env.get('MERCADOPUBLICO_API_KEY');
     if (!ticket) {
@@ -82,11 +82,15 @@ Deno.serve(async (req) => {
         { status: 502, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
     const data = await resp.json();
-    const listado = Array.isArray(data?.Listado) ? data.Listado : [];
+    if (!Array.isArray(data?.Listado)) {
+      return new Response(JSON.stringify({ success: false, error: 'Invalid official listing' }),
+        { status: 502, headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
+    const listado = data.Listado;
     out.total = data?.Cantidad ?? listado.length;
 
     // 1) Mapear cada licitación a su fila + sus ítems (si el detalle los trae).
-    const rows = listado.map((lic: any) => ({
+    const rows: SyncRow[] = listado.map((lic: any) => ({
       items: Array.isArray(lic.Items) ? lic.Items : [],
       data: {
         codigo: lic.CodigoExterno,
@@ -112,7 +116,7 @@ Deno.serve(async (req) => {
         tiempo_evaluacion_dias: lic.UnidadTiempoEvaluacion ?? null,
         raw_data: lic,
       } as Record<string, unknown>,
-    })).filter((r) => r.data.codigo);
+    })).filter((r: SyncRow) => r.data.codigo);
 
     // 2) El listado por `estado`/`fecha` es abreviado (sólo codigo, nombre,
     // estado, fecha_cierre...). Para no pisar con NULL columnas ya pobladas por
@@ -178,6 +182,35 @@ Deno.serve(async (req) => {
       }
     }
 
+    // The active listing cannot refresh processes that disappeared from it.
+    // Use the existing cron, only for an unfiltered active sync with successful writes.
+    if (body.estado === 'activas' && !body.organismo && out.errors.length === 0) {
+      const reconciliation = await reconcileStatuses(new Set<string>(rows.map(r => String(r.data.codigo))), ticket, {
+        load: async () => {
+          const { data: candidates, error } = await supabase.from('licitaciones_bi')
+            .select('id,codigo,estado,codigo_estado,fecha_cierre,updated_at,raw_data')
+            .or('codigo_estado.eq.5,estado.ilike.publicada,estado.ilike.activa,estado.is.null')
+            .order('updated_at', { ascending: true, nullsFirst: true })
+            .order('codigo', { ascending: true })
+            .limit(SCAN_LIMIT);
+          if (error) throw new Error('candidate_read_failed');
+          return (candidates ?? []) as Candidate[];
+        },
+        save: async (row, patch) => {
+          let update = supabase.from('licitaciones_bi').update(patch).eq('id', row.id);
+          update = row.updated_at === null ? update.is('updated_at', null) : update.eq('updated_at', row.updated_at);
+          const { data: saved, error } = await update.select('id');
+          if (error) throw new Error('persistence_failed');
+          return saved?.length === 1;
+        },
+        fetch,
+        sleep: ms => new Promise(resolve => setTimeout(resolve, ms)),
+        now: Date.now,
+      });
+      out.reconciled = reconciliation.changed;
+      out.status_checks = reconciliation.attempted;
+      out.errors.push(...reconciliation.errors);
+    }
     out.success = out.errors.length === 0;
     return new Response(JSON.stringify(out), { headers: { ...cors, 'Content-Type': 'application/json' } });
   } catch (error) {
