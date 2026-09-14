@@ -1,3 +1,4 @@
+import { CampaignHistoryError } from '@/components/marketing/CampaignFeedback';
 import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -13,10 +14,12 @@ import { usePiezaEjecuciones, type MarketingPieza } from '@/hooks/useMarketingCa
 interface PiezaDetalleDialogProps {
   pieza: MarketingPieza | null;
   onOpenChange: (open: boolean) => void;
-  onGuardar: (id: string, updates: Partial<MarketingPieza>) => void;
+  onGuardar: (id: string, updates: Partial<MarketingPieza>) => Promise<unknown>;
   onEjecutar: (id: string) => void;
   guardando: boolean;
   ejecutando: boolean;
+  resultadoEnvio?: string | null;
+  bloqueoEnvio?: string | null;
 }
 
 const ICONOS: Record<string, typeof Mail> = { email: Mail, facebook: Facebook, instagram: Instagram, whatsapp: MessageCircle };
@@ -26,11 +29,11 @@ const ESTADO_LABEL: Record<string, string> = {
   click: 'Con click', fallo: 'Falló', rebote: 'Rebotó',
 };
 
-export function PiezaDetalleDialog({ pieza, onOpenChange, onGuardar, onEjecutar, guardando, ejecutando }: PiezaDetalleDialogProps) {
+export function PiezaDetalleDialog({ pieza, onOpenChange, onGuardar, onEjecutar, guardando, ejecutando, resultadoEnvio, bloqueoEnvio }: PiezaDetalleDialogProps) {
   const [asunto, setAsunto] = useState('');
   const [contenido, setContenido] = useState('');
   const [hashtags, setHashtags] = useState('');
-  const { ejecuciones, isLoading: cargandoEjecuciones } = usePiezaEjecuciones(pieza?.id || '');
+  const { ejecuciones, isLoading: cargandoEjecuciones, isError: errorEjecuciones } = usePiezaEjecuciones(pieza?.id || '');
 
   useEffect(() => {
     if (pieza) {
@@ -46,13 +49,18 @@ export function PiezaDetalleDialog({ pieza, onOpenChange, onGuardar, onEjecutar,
   const esEmail = pieza.canal === 'email';
   const esSocial = pieza.canal === 'facebook' || pieza.canal === 'instagram';
   const puedeEjecutarAutomatico = esEmail; // Facebook/Instagram/WhatsApp aún se publican/mandan a mano.
+  const cambiosSinGuardar = asunto !== (pieza.asunto || '') || contenido !== (pieza.contenido || '');
 
-  const guardarCambios = () => {
+  const guardarCambios = async () => {
     const updates: Partial<MarketingPieza> = { contenido };
     if (esEmail) updates.asunto = asunto;
     if (esSocial) (updates as any).hashtags = hashtags;
-    onGuardar(pieza.id, updates);
-    toast.success('Cambios guardados');
+    try {
+      await onGuardar(pieza.id, updates);
+      toast.success('Cambios guardados');
+    } catch {
+      toast.error('No se pudieron guardar los cambios. Conservamos tu edición; vuelve a intentar guardarla antes de enviar.');
+    }
   };
 
   return (
@@ -64,7 +72,7 @@ export function PiezaDetalleDialog({ pieza, onOpenChange, onGuardar, onEjecutar,
             <Badge variant={pieza.estado === 'ejecutado' ? 'default' : 'outline'} className="capitalize ml-1">{pieza.estado}</Badge>
           </DialogTitle>
           <DialogDescription>
-            {esBorrador ? 'Todavía es borrador — puedes editar el contenido antes de mandarlo.' : 'Ya se ejecutó; el contenido queda como referencia.'}
+            {esBorrador ? 'Todavía es borrador — puedes editar el contenido antes de mandarlo.' : 'La pieza no está en borrador. Revisa su estado y el historial antes de continuar.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -99,14 +107,17 @@ export function PiezaDetalleDialog({ pieza, onOpenChange, onGuardar, onEjecutar,
                 Guardar cambios
               </Button>
               {puedeEjecutarAutomatico && (
-                <Button size="sm" onClick={() => onEjecutar(pieza.id)} disabled={ejecutando} className="gap-1.5">
+                <Button size="sm" onClick={() => onEjecutar(pieza.id)} disabled={!!bloqueoEnvio || ejecutando || guardando || cambiosSinGuardar} className="gap-1.5">
                   {ejecutando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                  Enviar a suscriptores
+                  {ejecutando ? 'Enviando…' : 'Revisar envío a suscriptores'}
                 </Button>
               )}
             </div>
           )}
 
+          {esEmail && cambiosSinGuardar && <p className="text-sm text-muted-foreground">Guarda los cambios antes de revisar el envío.</p>}
+          {bloqueoEnvio && <p role="status" className="text-sm">{bloqueoEnvio}</p>}
+          {resultadoEnvio && <p role="status" aria-live="polite" className="rounded-md border p-3 text-sm">{resultadoEnvio}</p>}
           <div className="pt-2 border-t space-y-2">
             <Label className="text-xs flex items-center gap-1.5"><Users className="w-3.5 h-3.5" />A quién se le envió</Label>
             {!puedeEjecutarAutomatico ? (
@@ -115,7 +126,7 @@ export function PiezaDetalleDialog({ pieza, onOpenChange, onGuardar, onEjecutar,
               </p>
             ) : cargandoEjecuciones ? (
               <p className="text-xs text-muted-foreground">Cargando…</p>
-            ) : ejecuciones.length === 0 ? (
+            ) : errorEjecuciones ? (<CampaignHistoryError />) : ejecuciones.length === 0 ? (
               <p className="text-xs text-muted-foreground">Todavía no se ha enviado a nadie.</p>
             ) : (
               <div className="border rounded-lg overflow-hidden">

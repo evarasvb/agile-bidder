@@ -333,7 +333,7 @@ export function ContactosSaludPanel() {
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              El enriquecimiento se ejecuta automáticamente cada 24 horas. Sincroniza proveedores de Mercado Público, valida emails y elimina duplicados.
+              Consulta la última ejecución registrada para comprobar cuándo se actualizó la base y cuál fue su resultado. La ausencia de registros no confirma que el enriquecimiento esté activo.
             </AlertDescription>
           </Alert>
         </CardContent>

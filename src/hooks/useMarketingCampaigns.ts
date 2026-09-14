@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { requestCampaign } from '@/services/campaignResult';
 
 export interface MarketingCampaign {
   id: string;
@@ -29,7 +30,7 @@ export interface MarketingPieza {
   contenido: string;
   url_tracking?: string;
   programado_para?: string;
-  estado: 'draft' | 'programado' | 'ejecutado' | 'enviado' | 'fallido';
+  estado: 'draft' | 'ejecutando' | 'pendiente' | 'programado' | 'ejecutado' | 'enviado' | 'fallido';
   cantidad_objetivo?: number;
   creado_en: string;
 }
@@ -155,26 +156,17 @@ export function useCampaignPiezas(campaignId: string) {
   });
 
   const ejecutarPieza = useMutation({
-    mutationFn: async (piezaId: string) => {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/marketing-ejecutar`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`,
-          },
-          body: JSON.stringify({ pieza_id: piezaId }),
-        }
-      );
-
-      if (!response.ok) throw new Error('Error executing campaign');
-      return await response.json();
+    mutationFn: async ({ piezaId, contactosIds }: { piezaId: string; contactosIds: string[] }) => {
+      const { data, error } = await supabase.auth.getSession();
+      if (error || !data.session) throw new Error('La sesión no está disponible.');
+      return requestCampaign(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/marketing-ejecutar`, data.session.access_token, piezaId, contactosIds);
     },
-    onSuccess: (_data, piezaId) => {
+    retry: false,
+    onSuccess: (_data, { piezaId }) => {
       queryClient.invalidateQueries({ queryKey: ['marketing_piezas', campaignId] });
       queryClient.invalidateQueries({ queryKey: ['marketing_metricas', campaignId] });
       queryClient.invalidateQueries({ queryKey: ['marketing_ejecucion', piezaId] });
+      queryClient.invalidateQueries({ queryKey: ['marketing_ejecucion_recientes'] });
     },
   });
 
@@ -199,9 +191,10 @@ export function useCampaignPiezas(campaignId: string) {
     piezas: piezas || [],
     isLoading,
     createPieza: createPieza.mutate,
-    ejecutarPieza: ejecutarPieza.mutate,
+    ejecutarPieza: ejecutarPieza.mutateAsync,
     ejecutandoPieza: ejecutarPieza.isPending,
     updatePieza: updatePieza.mutate,
+    updatePiezaAsync: updatePieza.mutateAsync,
     actualizandoPieza: updatePieza.isPending,
   };
 }
@@ -210,7 +203,7 @@ export function useCampaignPiezas(campaignId: string) {
 // para email es real (marketing-ejecutar la llena); whatsapp/redes todavía se
 // mandan a mano, así que para esas piezas no hay filas acá.
 export function usePiezaEjecuciones(piezaId: string) {
-  const { data: ejecuciones, isLoading } = useQuery({
+  const { data: ejecuciones, isLoading, isError } = useQuery({
     queryKey: ['marketing_ejecucion', piezaId],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
@@ -225,12 +218,12 @@ export function usePiezaEjecuciones(piezaId: string) {
     enabled: !!piezaId,
   });
 
-  return { ejecuciones: ejecuciones || [], isLoading };
+  return { ejecuciones: ejecuciones || [], isLoading, isError };
 }
 
 // Historial global de envíos (para la pestaña "Ejecución" del Centro de Control).
 export function useMarketingEjecucionesRecientes(limit: number = 100) {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['marketing_ejecucion_recientes', limit],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
@@ -246,7 +239,7 @@ export function useMarketingEjecucionesRecientes(limit: number = 100) {
     },
   });
 
-  return { ejecuciones: data || [], isLoading };
+  return { ejecuciones: data || [], isLoading, isError };
 }
 
 export function useCampaignMetricas(campaignId: string, days: number = 7) {
