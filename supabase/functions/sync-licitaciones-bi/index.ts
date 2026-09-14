@@ -45,12 +45,22 @@ function formatDate(dt: Date) {
   return `${dd}${mm}${yy}`;
 }
 
+function jwtRole(authorization: string | null): string | null {
+  try {
+    const token = (authorization ?? '').replace(/^Bearer\s+/i, '');
+    const encoded = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(encoded)).role ?? null;
+  } catch { return null; }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   const out = { success: true, synced: 0, items_synced: 0, total: 0, reconciled: 0, status_checks: 0, errors: [] as string[] };
   try {
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    if (!serviceRoleKey || req.headers.get('Authorization') !== `Bearer ${serviceRoleKey}`) {
+    // Supabase verifies the JWT signature at the gateway. The handler additionally
+    // restricts callers to service_role, including the legacy service JWT used by pg_cron.
+    if (!serviceRoleKey || jwtRole(req.headers.get('Authorization')) !== 'service_role') {
       return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }),
         { status: 401, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
