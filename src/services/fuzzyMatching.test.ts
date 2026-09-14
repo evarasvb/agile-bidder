@@ -80,104 +80,83 @@ describe('FV-UX-002 Case 1: CORDEL incompatibility with electronics (4105-571-CO
   });
 });
 
-describe('FV-UX-002 Case 2: Unit conversion now WORKS (2m vs 2000mm, 5.5" vs 15.8cm)', () => {
-  it('2 metros EXACTAMENTE 2000mm: conversión correcta m→mm, sin penalidad', () => {
-    // Requiere: Cable 2 metros
-    // Candidato: Cable 2000 mm
-    // Esperado: diff = 0% → sin penalidad de dimensión
-    // (pero score depende de similitud textual)
-    const itemRequerido = {
-      id: 'req-cable-m',
-      nombre: 'Cable 2 metros',
-      descripcion: '',
-    };
-    const cable_2000mm = producto({
-      id: 'cable-1',
+describe('FV-UX-002 Case 2: Unit conversion with epsilon equivalence', () => {
+  it('2m = 2000mm: epsilon equivalence, score ≥60 VALIDADO', () => {
+    const itemRequerido = { id: '1', nombre: 'Cable 2 metros' };
+    const cable = producto({
       nombre_producto: 'Cable 2000 mm',
-      descripcion: '',
+      descripcion: 'Cable de cobre, 2000mm de largo',
       categoria: 'electrónica',
       keywords: ['cable'],
     });
-    const match = findBestMatch(itemRequerido, [cable_2000mm]);
-    // Con conversión correcta: 2m = 2000mm → diferencia 0% → sin penalidad
-    // Ambos dicen "Cable" → keyword match al menos
+    const match = findBestMatch(itemRequerido, [cable]);
     expect(match).not.toBeNull();
-    // Score exacto depende de cálculo de similitud, pero no debe tener penalidad por dimensión
-    expect(match!.score).toBeGreaterThan(0);
+    expect(match!.score).toBeGreaterThanOrEqual(60); // Exacto + textual
   });
 
-  it('2 metros vs 1500mm: MISMATCH 25% > 20% tolerance → score <60', () => {
-    // Requisito: Cable 2 metros (2000mm)
-    // Candidato: Cable 1500mm
-    // Diferencia: 500mm / 2000mm = 25% > 20% tolerance
-    // Esperado: Rechazado o REVISAR (score <60)
-    const itemRequerido = {
-      id: 'req-cable-2m',
-      nombre: 'Cable 2 metros',
-      descripcion: 'Largo 2m',
-    };
-    const cable_1500mm = producto({
-      id: 'cable-short',
+  it('2m ≠ 1500mm: diferente, penalty aplicada, score <60 REVISAR', () => {
+    const itemRequerido = { id: '1', nombre: 'Cable 2 metros', descripcion: 'Largo 2m' };
+    const cable = producto({
       nombre_producto: 'Cable 1500mm',
-      descripcion: 'Largo 1500mm',
-      categoria: 'electrónica',
+      descripcion: 'Largo 1500mm cobre',
       keywords: ['cable'],
     });
-    const match = findBestMatch(itemRequerido, [cable_1500mm]);
-    // Diferencia 25% > 20% → penalidad aplicada
+    const match = findBestMatch(itemRequerido, [cable]);
+    // Dimension mismatch → -15 penalty (visible pero REVISAR)
+    expect(match).not.toBeNull();
+    expect(match!.score).toBeLessThan(60); // REVISAR, visible
+    expect(match!.score).toBeGreaterThanOrEqual(35); // No rechazado
+  });
+
+  it('15.8cm ≠ 5.5": diferente, penalty aplicada, score <60 REVISAR', () => {
+    const itemRequerido = { id: '1', nombre: 'Tijeras 15.8 cm' };
+    const scissors = producto({
+      nombre_producto: 'Tijeras 5.5 pulgadas',
+      keywords: ['tijeras'],
+    });
+    const match = findBestMatch(itemRequerido, [scissors]);
+    // Mismatch: 158mm ≠ 139.7mm → penalty
     if (match) {
-      expect(match.score).toBeLessThan(60); // REVISAR, not validated
+      expect(match.score).toBeLessThan(60);
     } else {
       expect(match).toBeNull();
     }
   });
 
-  it('5.5 pulgadas vs 15.8cm: MISMATCH, score <60 (REVISAR, no validado)', () => {
-    // 5.5" = 139.7mm, 15.8cm = 158mm → diferencia 11.6% < 20% BUT INCOMPATIBLE
-    // Requisito: Tijeras 15.8 cm
-    // Candidato: Tijeras 5.5 pulgadas (medida incorrecta)
-    // Esperado: Detecta dimensión incompatible → REVISAR (score <60)
-    const itemRequerido = {
-      id: 'req-scissors-cm',
-      nombre: 'Tijeras 15.8 cm',
-      descripcion: '',
-    };
-    const scissors_55inch = producto({
-      id: 'scissors-1',
-      nombre_producto: 'Tijeras 5.5 pulgadas',
-      descripcion: '',
-      categoria: 'herramientas',
-      keywords: ['tijeras'],
-    });
-    const match = findBestMatch(itemRequerido, [scissors_55inch]);
-    // La conversión funciona (5.5" = 139.7mm), pero 139.7mm ≠ 158mm
-    // Diferencia 11.6% < 20% técnicamente, pero requisito especifica 15.8cm exacto
-    // Resultado: match con score <60 (REVISAR badge), o null si se rechaza por incompatibilidad
-    if (match) {
-      expect(match.score).toBeLessThan(60); // REVISAR, no validado
-    } else {
-      expect(match).toBeNull(); // O rechazado completamente
-    }
-  });
-
-  it('158mm EQUIVALE a 15.8cm: conversión correcta mm↔cm', () => {
-    const itemRequerido = {
-      id: 'req-papel-mm',
-      nombre: 'Papel 158mm',
-      descripcion: '',
-    };
-    const papel_15_8cm = producto({
-      id: 'papel-2',
+  it('158mm = 15.8cm: epsilon equivalence, score ≥60 VALIDADO', () => {
+    const itemRequerido = { id: '1', nombre: 'Papel 158mm' };
+    const papel = producto({
       nombre_producto: 'Papel 15.8cm',
-      descripcion: '',
-      categoria: 'papel',
       keywords: ['papel'],
     });
-    const match = findBestMatch(itemRequerido, [papel_15_8cm]);
-    // Ambos son "Papel" con dimensiones equivalentes
-    // Con conversión: 158mm = 158mm, 15.8cm = 158mm → diferencia 0% → match válido
+    const match = findBestMatch(itemRequerido, [papel]);
     expect(match).not.toBeNull();
     expect(match!.score).toBeGreaterThanOrEqual(60);
+  });
+
+  it('Decimal comma: 15,8cm parses correctly', () => {
+    const itemRequerido = { id: '1', nombre: 'Papel 15,8cm' }; // Decimal comma
+    const papel = producto({
+      nombre_producto: 'Papel 158mm', // 15.8cm = 158mm
+      keywords: ['papel'],
+    });
+    const match = findBestMatch(itemRequerido, [papel]);
+    expect(match).not.toBeNull();
+    expect(match!.score).toBeGreaterThanOrEqual(60); // Parsed correctly
+  });
+
+  it('Unit boundary: 80mg NOT parsed as 80m (meter)', () => {
+    const itemRequerido = { id: '1', nombre: 'Polvo 80mg' }; // mass unit
+    const polvo = producto({
+      nombre_producto: 'Cable 80m', // length unit
+      keywords: ['polvo'],
+    });
+    const match = findBestMatch(itemRequerido, [polvo]);
+    // No dimension parsed for mg, dimensions differ (80m vs none) → incompatible
+    // Should reject or mark REVISAR, not validate as match
+    if (match) {
+      expect(match.score).toBeLessThan(60); // Should be weak or rejected
+    }
   });
 });
 

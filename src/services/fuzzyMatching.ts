@@ -162,7 +162,8 @@ function extractKeywords(text: string): string[] {
  */
 function validateSpecifications(itemRequerido: ItemRequerido, producto: InventoryItem): number {
   // Extraer dimensiones ANTES de normalizar (porque normalizeText reemplaza puntos por espacios)
-  const dimensionPattern = /(\d+(?:\.\d+)?)\s*(cm|mm|m(?:etro|etros|)|pulgada|pulgadas|pulg|"|inch)/i;
+  // Soporta: 15.8, 15,8 (decimal comma), excluye mass units (mg/g/kg no matched)
+  const dimensionPattern = /(\d+(?:[.,]\d+)?)\s*(cm|mm|metros|metro|m|pulgadas|pulgada|pulg|"|inch)(?!\w)/i;
 
   const reqFullText = itemRequerido.nombre + ' ' + (itemRequerido.descripcion || '');
   const prodFullText = producto.nombre_producto + ' ' + (producto.descripcion || '');
@@ -197,13 +198,14 @@ function validateSpecifications(itemRequerido: ItemRequerido, producto: Inventor
   }
 
   // Validar especificaciones de unidad/dimensión si las hay
-  // IMPORTANTE: Si ambos tienen dimensiones explícitas pero DIFERENTES, marcar REVISAR
-  // Ej: "15.8 cm" vs "5.5 pulgadas" (139.7mm) = MISMATCH, aunque esté dentro del 20%
-  // Solo equivalencia exacta o muy cercana (<5%) se acepta como VALIDADO
+  // CRÍTICO: Solo acepta equivalencia matemática exacta (epsilon), no reglas de negocio
+  // Ej: 2m = 2000mm (exacto), 2.0m = 2000.00mm (epsilon ~1e-10)
+  // Ej: 15.8cm ≠ 5.5" (139.7mm) → REVISAR, no validado
   if (reqDim && prodDim) {
-    const reqVal = parseFloat(reqDim[1]);
+    // Parse valor con soporte para decimal comma y dot
+    const reqVal = parseFloat(reqDim[1].replace(',', '.'));
     const reqUnit = reqDim[2].toLowerCase();
-    const prodVal = parseFloat(prodDim[1]);
+    const prodVal = parseFloat(prodDim[1].replace(',', '.'));
     const prodUnit = prodDim[2].toLowerCase();
 
     // Normalizar a mm (conversión real)
@@ -222,19 +224,19 @@ function validateSpecifications(itemRequerido: ItemRequerido, producto: Inventor
     const reqMm = toMm(reqVal, reqUnit);
     const prodMm = toMm(prodVal, prodUnit);
 
-    const diff = Math.abs(reqMm - prodMm) / Math.max(reqMm, prodMm);
+    // Usar epsilon para equivalencia matemática (no reglas de negocio)
+    const epsilon = 1e-10;
+    const diff = Math.abs(reqMm - prodMm);
 
-    // Si difieren EXACTAMENTE 0% → compatibles
-    if (diff === 0) {
+    // Si difieren < epsilon → equivalentes matemáticamente
+    if (diff < epsilon) {
       return 0; // Exacto
     }
-    // Si difieren > 5% → REVISAR (no validado automáticamente)
-    // Esto cubre casos como 15.8cm vs 5.5" (11.6% mismatch)
-    if (diff > 0.05) {
-      return -50; // Penalidad: dimensión especificada diferente
-    }
-    // Si difieren <= 5% → compatible (rounding tolerance)
-    return 0;
+
+    // Si difieren → REVISAR (score <60 pero no rechazado)
+    // No hay "tolerancia de negocio": el usuario debe explícitamente aceptar
+    // Penalidad -15 asegura: score 50 → 35 (límite de visibilidad)
+    return -15; // Penalidad suave: dimensión diferente pero visible
   }
 
   return 0; // Compatible
@@ -357,8 +359,18 @@ function calculateMatch(itemRequerido: ItemRequerido, producto: InventoryItem): 
     }
   }
 
-  // Aplicar penalty de especificación si aplica
-  if (specPenalty < 0) {
+  // Aplicar penalty/bonus de especificación
+  if (specPenalty === 0) {
+    // Verificar si hay dimensiones exactas equivalentes
+    const dimensionPattern = /(\d+(?:[.,]\d+)?)\s*(cm|mm|metros|metro|m|pulgadas|pulgada|pulg|"|inch)(?!\w)/i;
+    const reqFullText = itemRequerido.nombre + ' ' + (itemRequerido.descripcion || '');
+    const prodFullText = producto.nombre_producto + ' ' + (producto.descripcion || '');
+    const hasBothDims = dimensionPattern.test(reqFullText) && dimensionPattern.test(prodFullText);
+    if (hasBothDims) {
+      // Bonus por equivalencia matemática exacta de dimensiones
+      score = Math.min(100, score + 25); // +25 para exactitud dimensional
+    }
+  } else if (specPenalty < 0) {
     score = Math.max(0, score + specPenalty);
   }
 
