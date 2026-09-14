@@ -1,9 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  claimEmailPiece,
   executeMarketingCampaign,
+  getMarketingContactsPage,
+  type AtomicClaimQuery,
   type ExecutionError,
   type ExecutionResult,
   type MarketingExecutionStore,
+  type MarketingContactsQuery,
+  type MarketingContactsTable,
   type MarketingPiece,
 } from '../../supabase/functions/marketing-ejecutar/logic';
 
@@ -27,7 +32,10 @@ function createStore(
   return {
     claimPiece: async () => ({ piece }),
     releasePieceClaim: async () => true,
-    getContacts: async () => [{ id: contactId, email: 'test@example.com', nombre: 'Test' }],
+    getContactsPage: async () => ({
+      contacts: [{ id: contactId, email: 'test@example.com', nombre: 'Test' }],
+      total: 1,
+    }),
     persistExecutions: async () => undefined,
     markPieceExecuted: async () => undefined,
     markCampaignExecuting: async () => undefined,
@@ -72,6 +80,113 @@ describe('marketing-ejecutar', () => {
       expect.objectContaining({
         idempotencyKey: `marketing-${pieceId}-${contactId}`,
       }),
+    );
+  });
+
+  it('no reclama ni envía piezas que no sean del canal email', async () => {
+    const socialPiece: MarketingPiece = {
+      ...piece,
+      canal: 'facebook',
+      tipo: 'social',
+      estado: 'draft',
+    };
+    let storedState = socialPiece.estado;
+    let nextState = storedState;
+    const filters = new Map<string, string>();
+    const query: AtomicClaimQuery = {
+      update: vi.fn((values) => {
+        nextState = values.estado;
+        return query;
+      }),
+      eq: vi.fn((column, value) => {
+        filters.set(column, value);
+        return query;
+      }),
+      select: vi.fn(() => ({
+        maybeSingle: async () => {
+          const matches =
+            filters.get('id') === socialPiece.id &&
+            filters.get('estado') === storedState &&
+            filters.get('canal') === socialPiece.canal;
+          if (!matches) return { data: null, error: null };
+
+          storedState = nextState;
+          return { data: { ...socialPiece, estado: storedState }, error: null };
+        },
+      })),
+    };
+    const sendEmail = vi.fn(async () => ({ success: true, statusCode: 200 }));
+    const store = createStore({
+      claimPiece: (id) => claimEmailPiece(query, id),
+    });
+
+    const outcome = await executeMarketingCampaign(
+      { pieza_id: pieceId },
+      { store, sendEmail },
+    );
+
+    expect(outcome.status).toBe(409);
+    expect(filters.get('canal')).toBe('email');
+    expect(filters.get('estado')).toBe('draft');
+    expect(storedState).toBe('draft');
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it('pagina la audiencia con orden estable y usa el total exacto', async () => {
+    const contacts = [
+      { id: contactId, email: 'one@example.com', nombre: 'One' },
+      {
+        id: '44444444-4444-4444-8444-444444444444',
+        email: 'two@example.com',
+        nombre: 'Two',
+      },
+      {
+        id: '55555555-5555-4555-8555-555555555555',
+        email: 'three@example.com',
+        nombre: 'Three',
+      },
+    ];
+    const query: MarketingContactsQuery = {
+      eq: vi.fn(() => query),
+      in: vi.fn(() => query),
+      order: vi.fn(() => query),
+      range: vi.fn(async (from, to) => ({
+        data: contacts.slice(from, to + 1),
+        error: null,
+        count: contacts.length,
+      })),
+    };
+    const table: MarketingContactsTable = {
+      select: vi.fn(() => query),
+    };
+    const getContactsPage = vi.fn((filters) => getMarketingContactsPage(table, filters));
+    const store = createStore({ getContactsPage });
+
+    const outcome = await executeMarketingCampaign(
+      { pieza_id: pieceId },
+      {
+        store,
+        contactPageSize: 2,
+        sendEmail: async () => ({ success: true, statusCode: 200 }),
+      },
+    );
+
+    expect(outcome.status).toBe(200);
+    expect(outcome.body as ExecutionResult).toMatchObject({
+      total_objetivo: 3,
+      total_procesados: 3,
+      total_enviados: 3,
+    });
+    expect(table.select).toHaveBeenCalledWith('id, email, nombre', { count: 'exact' });
+    expect(query.eq).toHaveBeenCalledWith('estado_suscripcion', 'suscrito');
+    expect(query.order).toHaveBeenCalledWith('id', { ascending: true });
+    expect(getContactsPage).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ from: 0, to: 1 }),
+    );
+    expect(getContactsPage).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ from: 2, to: 3 }),
     );
   });
 
@@ -129,7 +244,7 @@ describe('marketing-ejecutar', () => {
       return { success: false, uncertain: true, error: 'sin confirmación' };
     });
     const store = createStore({
-      getContacts: async () => contacts,
+      getContactsPage: async () => ({ contacts, total: contacts.length }),
       persistExecutions,
       markPieceExecuted,
     });

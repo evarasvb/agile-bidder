@@ -74,13 +74,44 @@ export interface ClaimResult {
   failed?: boolean;
 }
 
+export interface AtomicClaimQuery {
+  update(values: { estado: string }): AtomicClaimQuery;
+  eq(column: string, value: string): AtomicClaimQuery;
+  select(columns: string): {
+    maybeSingle(): Promise<{
+      data: MarketingPiece | null;
+      error: { code?: string } | null;
+    }>;
+  };
+}
+
+export interface MarketingContactsQuery {
+  eq(column: string, value: string): MarketingContactsQuery;
+  in(column: string, values: string[]): MarketingContactsQuery;
+  order(column: string, options: { ascending: boolean }): MarketingContactsQuery;
+  range(from: number, to: number): Promise<{
+    data: MarketingContact[] | null;
+    error: { code?: string } | null;
+    count: number | null;
+  }>;
+}
+
+export interface MarketingContactsTable {
+  select(
+    columns: string,
+    options: { count: 'exact' },
+  ): MarketingContactsQuery;
+}
+
 export interface MarketingExecutionStore {
   claimPiece(piezaId: string): Promise<ClaimResult>;
   releasePieceClaim(piezaId: string): Promise<boolean>;
-  getContacts(filters: {
+  getContactsPage(filters: {
     contactIds?: string[];
     category?: string;
-  }): Promise<MarketingContact[]>;
+    from: number;
+    to: number;
+  }): Promise<{ contacts: MarketingContact[]; total: number }>;
   persistExecutions(rows: MarketingExecutionRow[]): Promise<void>;
   markPieceExecuted(piezaId: string): Promise<void>;
   markCampaignExecuting(campaignId: string, updatedAt: string): Promise<void>;
@@ -96,10 +127,53 @@ export interface MarketingExecutionDependencies {
     idempotencyKey: string;
   }): Promise<EmailSendResult>;
   now?: () => Date;
+  contactPageSize?: number;
 }
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export async function claimEmailPiece(
+  query: AtomicClaimQuery,
+  pieceId: string,
+): Promise<ClaimResult> {
+  const { data, error } = await query
+    .update({ estado: 'ejecutando' })
+    .eq('id', pieceId)
+    .eq('estado', 'draft')
+    .eq('canal', 'email')
+    .select('id, campana_id, contenido, asunto, tipo, canal, estado')
+    .maybeSingle();
+
+  return error ? { piece: null, failed: true } : { piece: data };
+}
+
+export async function getMarketingContactsPage(
+  table: MarketingContactsTable,
+  filters: {
+    contactIds?: string[];
+    category?: string;
+    from: number;
+    to: number;
+  },
+): Promise<{ contacts: MarketingContact[]; total: number }> {
+  let query = table
+    .select('id, email, nombre', { count: 'exact' })
+    .eq('estado_suscripcion', 'suscrito');
+
+  if (filters.contactIds && filters.contactIds.length > 0) {
+    query = query.in('id', filters.contactIds);
+  } else if (filters.category) {
+    query = query.eq('categoria', filters.category);
+  }
+
+  const { data, error, count } = await query
+    .order('id', { ascending: true })
+    .range(filters.from, filters.to);
+
+  if (error || count === null) throw new Error('contacts_query_failed');
+  return { contacts: data || [], total: count };
+}
 
 function parseRequest(input: unknown): ExecuteRequest | null {
   if (!input || typeof input !== 'object') return null;
@@ -172,13 +246,41 @@ export async function executeMarketingCampaign(
   }
 
   const piece = claim.piece;
-  let contacts: MarketingContact[];
+  const contacts: MarketingContact[] = [];
 
   try {
-    contacts = await dependencies.store.getContacts({
-      contactIds: request.contactos_ids,
-      category: request.categoria_filtro,
-    });
+    const pageSize = dependencies.contactPageSize ?? 1000;
+    if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 1000) {
+      throw new Error('invalid_contact_page_size');
+    }
+    let expectedTotal: number | null = null;
+    let offset = 0;
+    const seenContactIds = new Set<string>();
+
+    do {
+      const page = await dependencies.store.getContactsPage({
+        contactIds: request.contactos_ids,
+        category: request.categoria_filtro,
+        from: offset,
+        to: offset + pageSize - 1,
+      });
+
+      if (!Number.isSafeInteger(page.total) || page.total < 0) {
+        throw new Error('invalid_contact_count');
+      }
+      if (expectedTotal === null) expectedTotal = page.total;
+      if (page.total !== expectedTotal) throw new Error('contact_count_changed');
+      if (page.contacts.length === 0 && offset < expectedTotal) {
+        throw new Error('contact_page_missing');
+      }
+
+      for (const contact of page.contacts) {
+        if (seenContactIds.has(contact.id)) throw new Error('duplicate_contact_page');
+        seenContactIds.add(contact.id);
+        contacts.push(contact);
+      }
+      offset += page.contacts.length;
+    } while (offset < (expectedTotal ?? 0));
   } catch {
     let released = false;
     try {

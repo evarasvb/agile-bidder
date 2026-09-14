@@ -1,11 +1,13 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
 import {
+  claimEmailPiece,
   executeMarketingCampaign,
+  getMarketingContactsPage,
+  type AtomicClaimQuery,
   type EmailSendResult,
-  type MarketingContact,
+  type MarketingContactsTable,
   type MarketingExecutionRow,
-  type MarketingPiece,
 } from "./logic.ts";
 
 const corsHeaders = {
@@ -119,21 +121,9 @@ serve(async (req) => {
 
     const outcome = await executeMarketingCampaign(body, {
       store: {
-        claimPiece: async (pieceId) => {
-          const { data, error } = await sb
-            .from('marketing_piezas')
-            .update({ estado: 'ejecutando' })
-            .eq('id', pieceId)
-            .eq('estado', 'draft')
-            .select('id, campana_id, contenido, asunto, tipo, canal, estado')
-            .maybeSingle();
-
-          if (error) {
-            console.error('No se pudo reclamar la pieza:', error.code);
-            return { piece: null, failed: true };
-          }
-
-          return { piece: data as MarketingPiece | null };
+        claimPiece: (pieceId) => {
+          const query = sb.from('marketing_piezas') as unknown as AtomicClaimQuery;
+          return claimEmailPiece(query, pieceId);
         },
         releasePieceClaim: async (pieceId) => {
           const { data, error } = await sb
@@ -147,25 +137,9 @@ serve(async (req) => {
           if (error) console.error('No se pudo liberar la pieza:', error.code);
           return !error && Boolean(data);
         },
-        getContacts: async ({ contactIds, category }) => {
-          let query = sb
-            .from('marketing_contactos')
-            .select('id, email, nombre')
-            .eq('estado_suscripcion', 'suscrito');
-
-          if (contactIds && contactIds.length > 0) {
-            query = query.in('id', contactIds);
-          } else if (category) {
-            query = query.eq('categoria', category);
-          }
-
-          const { data, error } = await query;
-          if (error) {
-            console.error('No se pudieron obtener contactos:', error.code);
-            throw new Error('contacts_query_failed');
-          }
-
-          return (data || []) as MarketingContact[];
+        getContactsPage: (filters) => {
+          const table = sb.from('marketing_contactos') as unknown as MarketingContactsTable;
+          return getMarketingContactsPage(table, filters);
         },
         persistExecutions: async (rows: MarketingExecutionRow[]) => {
           const { error } = await sb.from('marketing_ejecucion').insert(rows);
