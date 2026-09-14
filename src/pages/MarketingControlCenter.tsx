@@ -1,4 +1,6 @@
+import { CampaignFeedback, CampaignHistoryError } from '@/components/marketing/CampaignFeedback';
 import { useState, useEffect, useRef } from 'react';
+import { campaignAudience } from '@/services/campaignResult';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCampaigns, useCampaignPiezas, useCampaignMetricas, useMarketingEjecucionesRecientes, type MarketingPieza } from '@/hooks/useMarketingCampaigns';
@@ -48,7 +50,9 @@ export default function MarketingControlCenter() {
   });
   const queryClient = useQueryClient();
   const envioEnCurso = useRef(false);
-  const [resultadoEnvio, setResultadoEnvio] = useState<string | null>(null);
+  const [resultadosEnvio, setResultadosEnvio] = useState<Record<string, string>>({});
+  const [bloqueados, setBloqueados] = useState<Record<string, boolean>>({});
+  const [audienciaConfiable, setAudienciaConfiable] = useState(false);
 
   useEffect(() => {
     cargarContactos();
@@ -56,16 +60,18 @@ export default function MarketingControlCenter() {
 
   const cargarContactos = async () => {
     setCargandoContactos(true);
+    setAudienciaConfiable(false);
     setErrorContactos(null);
     try {
-      const { data, error } = await supabase
+      const { data, error, count } = await supabase
         .from('marketing_contactos')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('creado_en', { ascending: false });
 
       if (error) throw error;
 
       setContactos((data || []) as MarketingContacto[]);
+      setAudienciaConfiable(count !== null && count === (data || []).length);
 
       const stats = {
         total: data?.length || 0,
@@ -104,24 +110,28 @@ export default function MarketingControlCenter() {
   const selectedCampaign = campaigns.find(c => c.id === selectedCampaignId);
   const { piezas, updatePiezaAsync, actualizandoPieza, ejecutarPieza, ejecutandoPieza } = useCampaignPiezas(selectedCampaignId || '');
   const { metricas, totalEnviados, totalConversiones, promTasaApertura } = useCampaignMetricas(selectedCampaignId || '');
-  const { ejecuciones: ejecucionesRecientes, isLoading: cargandoEjecuciones } = useMarketingEjecucionesRecientes();
+  const { ejecuciones: ejecucionesRecientes, isLoading: cargandoEjecuciones, isError: errorEjecuciones } = useMarketingEjecucionesRecientes();
 
+  const audiencia = campaignAudience(contactosFiltrados, audienciaConfiable && !cargandoContactos && !errorContactos);
+  const piezaActual = piezaAbierta ? piezas.find(p => p.id === piezaAbierta.id) || null : null;
+  const resultadoEnvio = piezaActual ? resultadosEnvio[piezaActual.id] : null;
   const handleExecutePieza = async (piezaId: string) => {
-    if (envioEnCurso.current) return;
+    if (envioEnCurso.current || bloqueados[piezaId]) return;
     const pieza = piezas.find(p => p.id === piezaId);
     if (!pieza || pieza.canal !== 'email' || pieza.estado !== 'draft') return;
-    if (!window.confirm(`¿Enviar el correo «${pieza.nombre}» a todos los contactos suscritos? Se usará el contenido guardado. Esta acción enviará correos reales y no se puede deshacer.`)) return;
+    const showResult = (message: string) => setResultadosEnvio(current => ({ ...current, [piezaId]: message }));
+    if (audiencia.error) { showResult(audiencia.error); return; }
+    const ids = [...audiencia.ids];
+    if (!window.confirm('¿Enviar «' + pieza.nombre + '» a los ' + ids.length + ' contactos suscritos del segmento de Gestión de Contactos? Se usará el contenido guardado. Esta acción enviará correos reales y no se puede deshacer.')) return;
     envioEnCurso.current = true;
-    setResultadoEnvio('Enviando correos… Espera el resultado antes de intentar otro envío.');
+    showResult('Enviando correos… Espera el resultado antes de intentar otro envío.');
     try {
-      const result = await ejecutarPieza(piezaId);
-      const counts = [result?.total_enviados, result?.total_exitosos, result?.total_errores];
-      if (!counts.every(n => Number.isInteger(n) && n >= 0) || result.total_exitosos + result.total_errores !== result.total_enviados) {
-        throw new Error('No se recibió un resultado completo. Revisa Ejecución antes de reintentar.');
-      }
-      setResultadoEnvio(`«${pieza.nombre}»: ${result.total_enviados} destinatarios procesados, ${result.total_exitosos} envíos aceptados y ${result.total_errores} fallidos. ${result.total_enviados === 0 ? 'No se envió ningún correo.' : 'Revisa el historial de Ejecución para consultar los detalles; aceptado no significa entregado.'}`);
-    } catch (error) {
-      setResultadoEnvio(error instanceof Error ? `${error.message} Consulta Ejecución antes de volver a enviar.` : 'No se pudo confirmar el resultado. Consulta Ejecución antes de volver a enviar.');
+      const result = await ejecutarPieza({ piezaId, contactosIds: ids });
+      showResult(result.message);
+      if (result.manualReview || result.status === 200) setBloqueados(current => ({ ...current, [piezaId]: true }));
+    } catch {
+      showResult('No se pudo confirmar el resultado. Revisa la sesión y el historial antes de volver a enviar.');
+      setBloqueados(current => ({ ...current, [piezaId]: true }));
     } finally {
       envioEnCurso.current = false;
       queryClient.invalidateQueries({ queryKey: ['marketing_ejecucion_recientes'] });
@@ -156,6 +166,7 @@ export default function MarketingControlCenter() {
 
         {/* CAMPAIGNS TAB */}
         <TabsContent value="campaigns" className="space-y-4">
+          <p role="status" className="text-sm">{audiencia.error || `Audiencia seleccionada: ${audiencia.ids.length} contactos suscritos. Ajusta los filtros en Gestión de Contactos.`}</p>
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
             <h2 className="text-xl sm:text-2xl font-bold">Tus campañas</h2>
             <Button onClick={() => setShowNewCampaign(true)}>
@@ -226,11 +237,12 @@ export default function MarketingControlCenter() {
                         <div>
                           <p className="font-medium">{pieza.nombre}</p>
                           <p className="text-sm text-muted-foreground">{pieza.tipo} • {pieza.canal}</p>
+                          <CampaignFeedback pieceId={pieza.id} results={resultadosEnvio} />
                         </div>
                         <Button
                           size="sm"
                           onClick={(e) => { e.stopPropagation(); handleExecutePieza(pieza.id); }}
-                          disabled={ejecutandoPieza || pieza.estado !== 'draft' || pieza.canal !== 'email'}
+                          disabled={!!audiencia.error || !!bloqueados[pieza.id] || ejecutandoPieza || pieza.estado !== 'draft' || pieza.canal !== 'email'}
                         >
                           <Send className="w-3 h-3 mr-1" />
                           {ejecutandoPieza ? 'Enviando…' : pieza.estado === 'ejecutado' ? 'Ejecutado' : pieza.canal !== 'email' ? 'Manual' : 'Revisar envío'}
@@ -344,7 +356,7 @@ export default function MarketingControlCenter() {
                 </select>
                 <Button variant="outline" onClick={() => { setBusqueda(''); setFiltroFuente(null); setFiltroRubro(''); setFiltroCategoria(''); setFiltroSuscripcion(''); }}>Limpiar filtros</Button>
               </div>
-              <p className="text-sm text-muted-foreground">Combina filtros para revisar segmentos. Estos filtros no cambian los destinatarios de las campañas.</p>
+              <p className="text-sm text-muted-foreground">Combina filtros para revisar segmentos. Los envíos usan únicamente los contactos suscritos de este segmento.</p>
               <p className="text-sm text-muted-foreground">
                 Mostrando {contactosFiltrados.length} de {contactos.length} contactos
               </p>
@@ -526,7 +538,7 @@ export default function MarketingControlCenter() {
 
           {cargandoEjecuciones ? (
             <div className="text-center py-8 text-muted-foreground">Cargando…</div>
-          ) : ejecucionesRecientes.length === 0 ? (
+          ) : errorEjecuciones ? (<CampaignHistoryError />) : ejecucionesRecientes.length === 0 ? (
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>Todavía no se ha ejecutado ningún envío.</AlertDescription>
@@ -577,7 +589,7 @@ export default function MarketingControlCenter() {
       />
 
       <PiezaDetalleDialog
-        pieza={piezaAbierta}
+        pieza={piezaActual}
         onOpenChange={(open) => !open && setPiezaAbierta(null)}
         onGuardar={async (id, updates) => {
           const saved = await updatePiezaAsync({ id, ...updates });
@@ -586,6 +598,7 @@ export default function MarketingControlCenter() {
         }}
         onEjecutar={handleExecutePieza}
         resultadoEnvio={resultadoEnvio}
+        bloqueoEnvio={audiencia.error || (piezaActual && bloqueados[piezaActual.id] ? "Este envío ya fue procesado o requiere revisión manual; no se repetirá." : null)}
         guardando={actualizandoPieza}
         ejecutando={ejecutandoPieza}
       />
