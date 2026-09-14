@@ -161,8 +161,18 @@ function extractKeywords(text: string): string[] {
  * Retorna penalty score (0 = compatible, <0 = incompatible para rechazar)
  */
 function validateSpecifications(itemRequerido: ItemRequerido, producto: InventoryItem): number {
-  const req = normalizeText(itemRequerido.nombre + ' ' + (itemRequerido.descripcion || ''));
-  const prod = normalizeText(producto.nombre_producto + ' ' + (producto.descripcion || ''));
+  // Extraer dimensiones ANTES de normalizar (porque normalizeText reemplaza puntos por espacios)
+  const dimensionPattern = /(\d+(?:\.\d+)?)\s*(cm|mm|m(?:etro|etros|)|pulgada|pulgadas|pulg|"|inch)/i;
+
+  const reqFullText = itemRequerido.nombre + ' ' + (itemRequerido.descripcion || '');
+  const prodFullText = producto.nombre_producto + ' ' + (producto.descripcion || '');
+
+  const reqDim = reqFullText.match(dimensionPattern);
+  const prodDim = prodFullText.match(dimensionPattern);
+
+  // Ahora normalizar para validación de incompatibilidades
+  const req = normalizeText(reqFullText);
+  const prod = normalizeText(prodFullText);
 
   // Mapeo de categorías incompatibles (si hay una de cada lado, no matchean)
   const incompatibilities: Record<string, string[]> = {
@@ -187,29 +197,31 @@ function validateSpecifications(itemRequerido: ItemRequerido, producto: Inventor
   }
 
   // Validar especificaciones de unidad/dimensión si las hay
-  // Ej: "15.8 cm" vs "5.5 pulgadas" son diferentes
-  const dimensionPattern = /(\d+(?:\.\d+)?)\s*(cm|mm|m|pulgada|pulg|"|inch)/i;
-  const reqDim = req.match(dimensionPattern);
-  const prodDim = prod.match(dimensionPattern);
-
+  // Ej: "15.8 cm" vs "5.5 pulgadas" deben convertirse correctamente
+  // Ej: "2 metros" vs "2000 mm" deben detectarse como equivalentes
   if (reqDim && prodDim) {
     const reqVal = parseFloat(reqDim[1]);
     const reqUnit = reqDim[2].toLowerCase();
     const prodVal = parseFloat(prodDim[1]);
     const prodUnit = prodDim[2].toLowerCase();
 
-    // Normalizar a mm
+    // Normalizar a mm (conversión real)
     const toMm = (val: number, unit: string): number => {
       const u = unit.toLowerCase();
-      if (u.includes('"') || u.includes('pulg') || u.includes('inch')) return val * 25.4; // pulgadas a mm
+      // Metros: 1m = 1000mm
+      if (u === 'm' || u.includes('metro')) return val * 1000;
+      // Centímetros: 1cm = 10mm
       if (u.includes('cm')) return val * 10;
-      return val; // ya en mm
+      // Pulgadas: 1" = 25.4mm
+      if (u.includes('"') || u.includes('pulg') || u.includes('inch')) return val * 25.4;
+      // Si no se reconoce, asumir mm
+      return val;
     };
 
     const reqMm = toMm(reqVal, reqUnit);
     const prodMm = toMm(prodVal, prodUnit);
 
-    // Si difieren más de 20%, es sospechoso
+    // Si difieren más de 20%, rechazar
     const diff = Math.abs(reqMm - prodMm) / Math.max(reqMm, prodMm);
     if (diff > 0.2) {
       return -50; // Penalidad: dimensión incompatible
@@ -379,11 +391,58 @@ export function findMatches(
  * Encuentra el mejor match para un item
  */
 export function findBestMatch(
-  itemRequerido: ItemRequerido, 
+  itemRequerido: ItemRequerido,
   inventario: InventoryItem[]
 ): ProductMatch | null {
   const matches = findMatches(itemRequerido, inventario, 1);
   return matches.length > 0 ? matches[0] : null;
+}
+
+/**
+ * Interfaz para una fila de item en propuesta
+ */
+export interface PropuestaItemRow {
+  id: string;
+  match: ProductMatch | null;
+  estado: 'auto' | 'confirmado' | 'descartado';
+}
+
+/**
+ * Calcula métricas de cobertura de propuesta
+ * CRÍTICO FV-UX-002: solo score >= 60 cuenta como VALIDADO
+ * score < 60 (REVISAR) NO cuenta; items descartados NO cuentan
+ */
+export function calculateCoverageMetrics(rows: PropuestaItemRow[]): {
+  itemsConMatchValidado: number;
+  itemsConMatchDebil: number;
+  itemsSinMatch: number;
+  totalItems: number;
+  cobertura: number;
+  propuestaIncompleta: boolean;
+} {
+  const itemsConMatchValidado = rows.filter((f) => {
+    if (!f.match || f.estado === 'descartado') return false;
+    return f.match.score >= 60; // Solo high/medium confidence
+  }).length;
+
+  const itemsConMatchDebil = rows.filter((f) => {
+    if (!f.match || f.estado === 'descartado') return false;
+    return f.match.score < 60; // Low confidence (REVISAR)
+  }).length;
+
+  const itemsSinMatch = rows.filter((f) => !f.match && f.estado !== 'descartado').length;
+  const totalItems = rows.filter((f) => f.estado !== 'descartado').length;
+  const cobertura = totalItems > 0 ? Math.round((itemsConMatchValidado / totalItems) * 100) : 0;
+  const propuestaIncompleta = (itemsSinMatch + itemsConMatchDebil) > 0;
+
+  return {
+    itemsConMatchValidado,
+    itemsConMatchDebil,
+    itemsSinMatch,
+    totalItems,
+    cobertura,
+    propuestaIncompleta
+  };
 }
 
 /**
