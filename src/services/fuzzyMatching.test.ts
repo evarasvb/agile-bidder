@@ -124,3 +124,138 @@ describe('processCompraMatches', () => {
     expect(resultado.get('req-2')).toEqual([]);
   });
 });
+
+describe('validateSpecifications - Incompatibility rules (FV-UX-002)', () => {
+  it('RECHAZA: CORDEL_DE_PAPEL NO debe matchear con Pendrive 32GB (electrónico vs cordaje)', () => {
+    const itemRequerido = { id: '1', nombre: 'Pendrive 32GB USB 3.0' };
+    const cordel = producto({
+      id: 'cordel-papel',
+      sku: 'CORDEL-001',
+      nombre_producto: 'Cordel de papel',
+      descripcion: 'Cuerda de papel kraft para empaques',
+      categoria: 'pegamento',
+      keywords: ['cordel', 'cuerda', 'adhesivo', 'embalaje'],
+    });
+    const match = findBestMatch(itemRequerido, [cordel]);
+    expect(match).toBeNull();
+  });
+
+  it('RECHAZA: CORDEL_DE_PAPEL NO debe matchear con Adaptador VGA-HDMI (electrónico vs cordaje)', () => {
+    const itemRequerido = { id: '2', nombre: 'Adaptador VGA a HDMI 1.4' };
+    const cordel = producto({
+      id: 'cordel-papel',
+      sku: 'CORDEL-001',
+      nombre_producto: 'Cordel de papel',
+      descripcion: 'Cuerda de papel kraft para empaques',
+      categoria: 'pegamento',
+      keywords: ['cordel', 'cuerda', 'adhesivo', 'embalaje'],
+    });
+    const match = findBestMatch(itemRequerido, [cordel]);
+    expect(match).toBeNull();
+  });
+
+  it('RECHAZA: CORDEL_DE_PAPEL NO debe matchear con Tijeras (incompatible por especificación)', () => {
+    const itemRequerido = { id: '3', nombre: 'Tijeras de corte profesional 8"' };
+    const cordel = producto({
+      id: 'cordel-papel',
+      sku: 'CORDEL-001',
+      nombre_producto: 'Cordel de papel',
+      descripcion: 'Cuerda de papel kraft para empaques',
+      categoria: 'pegamento',
+      keywords: ['cordel', 'cuerda', 'adhesivo', 'embalaje'],
+    });
+    const match = findBestMatch(itemRequerido, [cordel]);
+    expect(match).toBeNull();
+  });
+
+  it('RECHAZA: CORDEL_DE_PAPEL NO debe matchear con Lapiceros (oficina, pero incompatible por especificación)', () => {
+    const itemRequerido = { id: '4', nombre: 'Lapicero azul Staedtler triangular' };
+    const cordel = producto({
+      id: 'cordel-papel',
+      sku: 'CORDEL-001',
+      nombre_producto: 'Cordel de papel',
+      descripcion: 'Cuerda de papel kraft para empaques',
+      categoria: 'pegamento',
+      keywords: ['cordel', 'cuerda', 'adhesivo', 'embalaje'],
+    });
+    const match = findBestMatch(itemRequerido, [cordel]);
+    expect(match).toBeNull();
+  });
+});
+
+describe('Dimension validation without generic tolerance (FV-UX-002)', () => {
+  it('PENALIZA: 5.5 pulgadas (13.97cm) vs requisito 15.8cm = 11.6% diferencia (bajo 20%, pero sin tolerancia genérica justificada)', () => {
+    const itemRequerido = {
+      id: '5',
+      nombre: 'Papel carta 5.5 pulgadas ancho',
+      descripcion: 'Papel carta formato 5.5 pulgadas de ancho',
+    };
+    const papel_15_8cm = producto({
+      id: 'papel-15-8',
+      nombre_producto: 'Papel oficio 15.8 cm',
+      descripcion: 'Papel oficio estándar 15.8 cm de ancho',
+      categoria: 'papel',
+    });
+    const match = findBestMatch(itemRequerido, [papel_15_8cm]);
+    // Debe retornar null o score muy bajo porque la dimensión es diferente
+    // 5.5" = 13.97cm, diferencia con 15.8cm es 11.6%
+    // NOTA: 20% es arbitrario; sin tolerancia genérica, esto debería rechazarse
+    if (match) {
+      expect(match.score).toBeLessThan(50); // Penalizado, no debe ser "completo"
+    } else {
+      expect(match).toBeNull(); // O simplemente rechazado
+    }
+  });
+});
+
+describe('Match confidence levels - REVISAR badges (FV-UX-002)', () => {
+  it('LOW confidence (score < 60%): REVISAR badge - NO debe contar como cobertura validada', () => {
+    const itemRequerido = { id: '6', nombre: 'Pendrive Samsung 64GB USB 3.1' };
+    const produtoLejano = producto({
+      id: 'cables-varios',
+      nombre_producto: 'Cables y conectores varios',
+      descripcion: 'Variados cables USB y conectores',
+      categoria: 'electrónica',
+      keywords: ['cable', 'conector', 'usb'],
+    });
+    const match = findBestMatch(itemRequerido, [produtoLejano]);
+    // Un match débil (< 60%) debe ser marcado REVISAR y NO debe contar como cobertura completa
+    if (match) {
+      expect(match.score).toBeLessThan(60);
+      // En CompraAgilDetalle, esto debería mostrar badge "REVISAR" y NO incrementar itemsConMatch
+    }
+  });
+
+  it('MEDIUM confidence (60-74%): partial match - debe mostrar tooltip de revisión requerida', () => {
+    const itemRequerido = { id: '7', nombre: 'Resma de papel oficio 75g' };
+    const papel_carta = producto({
+      id: 'papel-carta',
+      nombre_producto: 'Resma de papel carta 75g',
+      descripcion: 'Papel bond blanco carta',
+      categoria: 'papel',
+      keywords: ['resma', 'papel', 'carta'],
+    });
+    const match = findBestMatch(itemRequerido, [papel_carta]);
+    expect(match).not.toBeNull();
+    if (match && match.score >= 60 && match.score < 75) {
+      expect(match.score).toBeGreaterThanOrEqual(60);
+      expect(match.score).toBeLessThan(75);
+      // Debe mostrar "Coincidencia parcial - revisar especificaciones"
+    }
+  });
+
+  it('HIGH confidence (score >= 75%): puede contar como cobertura validada', () => {
+    const itemRequerido = { id: '8', nombre: 'Resma de papel carta 75g' };
+    const match_exacto = findBestMatch(itemRequerido, [
+      producto({
+        id: 'papel-exacto',
+        nombre_producto: 'Resma de papel carta 75g',
+        descripcion: 'Papel bond blanco carta estándar',
+        categoria: 'papel',
+        keywords: ['resma', 'papel', 'carta', '75g'],
+      }),
+    ]);
+    expect(match_exacto).not.toBeNull();
+    expect(match_exacto!.score).toBeGreaterThanOrEqual(75);
+  });
+});

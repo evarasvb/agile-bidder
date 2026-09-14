@@ -210,17 +210,32 @@ export default function CompraAgilDetalle() {
     });
 
   const filasTotal = [...filasItems, ...filasManuales];
-  const itemsConMatch = filasItems.filter((f) => f.match && f.estado !== 'descartado').length;
+
+  // CRÍTICO FV-UX-002: itemsConMatch solo cuenta matches de ALTA/MEDIA confianza (score >= 60)
+  // REVISAR badges (score < 60) NO cuentan como cobertura validada
+  const itemsConMatchValidado = filasItems.filter((f) => {
+    if (!f.match || f.estado === 'descartado') return false;
+    const score = f.match.score || 0;
+    return score >= 60; // Solo high/medium confidence
+  }).length;
+
+  const itemsConMatchDebil = filasItems.filter((f) => {
+    if (!f.match || f.estado === 'descartado') return false;
+    const score = f.match.score || 0;
+    return score < 60; // Low confidence (REVISAR)
+  }).length;
+
   const itemsSinMatch = filasItems.filter((f) => !f.match && f.estado !== 'descartado').length;
   const totalItems = filasItems.filter((f) => f.estado !== 'descartado').length;
-  const cobertura = totalItems > 0 ? Math.round((itemsConMatch / totalItems) * 100) : 0;
+  const cobertura = totalItems > 0 ? Math.round((itemsConMatchValidado / totalItems) * 100) : 0;
 
   // Total de oferta: incluir manuales agregados pero mostrar advertencia si faltan items
   const totalOferta = filasTotal.reduce((s, f) => s + (f.match?.subtotal || 0), 0);
   const dentroPresupuesto = compra.monto ? totalOferta <= compra.monto : null;
 
-  // IMPORTANTE: advertencia si hay items sin match (propuesta incompleta)
-  const propuestaIncompleta = itemsSinMatch > 0;
+  // IMPORTANTE: advertencia si hay items sin match validado (propuesta incompleta)
+  // Incluye items SIN match + items con REVISAR badge (low confidence)
+  const propuestaIncompleta = (itemsSinMatch + itemsConMatchDebil) > 0;
 
   // Ítems en el formato del modal de propuesta, PRECARGADOS con el match para que
   // "Generar propuesta" abra con los productos y precios ya asignados. Los ítems
@@ -378,11 +393,11 @@ export default function CompraAgilDetalle() {
               {totalItems > 0 && (
                 <>
                   <Badge variant="outline" className={`font-normal ${cobertura === 100 ? 'bg-firmavb-green/15 text-firmavb-green border-firmavb-green/30' : 'bg-amber-100 text-amber-800 border-amber-200'}`}>
-                    {itemsConMatch} de {totalItems} con match ({cobertura}%)
+                    {itemsConMatchValidado} de {totalItems} validados ({cobertura}%)
                   </Badge>
                   {propuestaIncompleta && (
                     <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 font-normal">
-                      ⚠ {itemsSinMatch} sin match
+                      ⚠ {itemsSinMatch + itemsConMatchDebil} incompletos
                     </Badge>
                   )}
                 </>
@@ -522,17 +537,18 @@ export default function CompraAgilDetalle() {
               <div className="mt-4 space-y-3">
                 {propuestaIncompleta && (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                    <p className="text-sm font-medium text-amber-900">⚠ Propuesta incompleta: {itemsSinMatch} {itemsSinMatch === 1 ? 'ítem falta' : 'ítems faltan'}</p>
+                    <p className="text-sm font-medium text-amber-900">⚠ Propuesta incompleta: {itemsSinMatch + itemsConMatchDebil} {itemsSinMatch + itemsConMatchDebil === 1 ? 'ítem falta' : 'ítems faltan'}</p>
                     <p className="text-xs text-amber-800 mt-1">
-                      Tu oferta actual ({clp(totalOferta)}) no incluye {itemsSinMatch} {itemsSinMatch === 1 ? 'producto' : 'productos'} solicitados.
-                      El costo real será mayor una vez que consigas o coticess estos ítems.
+                      {itemsSinMatch > 0 && <>{itemsSinMatch} sin match en inventario. </>}
+                      {itemsConMatchDebil > 0 && <>{itemsConMatchDebil} con coincidencia débil (REVISAR). </>}
+                      Tu oferta actual ({clp(totalOferta)}) requiere validación o búsqueda de alternativas. El costo real será mayor.
                     </p>
                   </div>
                 )}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border bg-muted/30 p-4">
                   <div>
                     <p className="text-sm text-muted-foreground">
-                      Tu oferta {propuestaIncompleta ? `(${itemsConMatch}/${totalItems} ítems encontrados)` : '(completa)'}
+                      Tu oferta {propuestaIncompleta ? `(${itemsConMatchValidado}/${totalItems} validados)` : '(completa)'}
                     </p>
                     <p className="text-2xl font-bold text-firmavb-blue">{clp(totalOferta)}</p>
                   </div>
@@ -552,9 +568,9 @@ export default function CompraAgilDetalle() {
                   </Button>
                 </div>
               </div>
-              {itemsConMatch === 0 && (
+              {itemsConMatchValidado === 0 && itemsConMatchDebil === 0 && (
                 <p className="mt-3 text-sm text-muted-foreground text-center">
-                  Aún no hay match para estos ítems. Si acabas de cargar inventario, el match se actualiza en unos minutos; o ajusta tus productos/palabras clave, o agrega un producto manual arriba.
+                  Aún no hay match validado para estos ítems. Si acabas de cargar inventario, el match se actualiza en unos minutos; o ajusta tus productos/palabras clave, o agrega un producto manual arriba.
                 </p>
               )}
             </div>
