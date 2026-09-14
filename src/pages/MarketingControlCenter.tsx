@@ -76,9 +76,9 @@ export default function MarketingControlCenter() {
 
   const contactosFiltrados = contactos.filter(c => {
     const coincideBusqueda = !busqueda ||
-      c.email.toLowerCase().includes(busqueda.toLowerCase()) ||
-      c.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      c.empresa.toLowerCase().includes(busqueda.toLowerCase());
+      (c.email || '').toLowerCase().includes(busqueda.toLowerCase()) ||
+      (c.nombre || '').toLowerCase().includes(busqueda.toLowerCase()) ||
+      (c.empresa || '').toLowerCase().includes(busqueda.toLowerCase());
 
     const coincideFuente = !filtroFuente || c.fuente_datos === filtroFuente;
 
@@ -114,21 +114,21 @@ export default function MarketingControlCenter() {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-6 space-y-8">
+    <div className="w-full min-w-0 max-w-7xl mx-auto px-4 py-6 pb-24 sm:px-6 space-y-6">
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold">Centro de Control de Marketing</h1>
-        <p className="text-muted-foreground">Planifica, ejecuta y monitorea tus campañas automáticamente</p>
+        <h1 className="text-2xl sm:text-3xl font-bold">Centro de Control de Marketing</h1>
+        <p className="text-muted-foreground">Organiza tus campañas, contactos y resultados en un solo lugar</p>
       </div>
 
       <Alert>
         <Rocket className="h-4 w-4" />
         <AlertDescription>
-          Sistema completamente automatizado: plan → execute → monitor → improve. Aquí es donde controlas todas tus campañas de marketing.
+          Consulta los envíos de correo en Ejecución. Las publicaciones en Facebook, Instagram y WhatsApp todavía se gestionan manualmente.
         </AlertDescription>
       </Alert>
 
       <Tabs defaultValue="campaigns" className="w-full">
-        <TabsList>
+        <TabsList aria-label="Secciones de marketing" className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-5 [&>button]:min-h-11 [&>button]:whitespace-normal">
           <TabsTrigger value="campaigns">Mis Campañas</TabsTrigger>
           <TabsTrigger value="contactos">Gestión de Contactos</TabsTrigger>
           <TabsTrigger value="salud">Salud de Base</TabsTrigger>
@@ -138,8 +138,8 @@ export default function MarketingControlCenter() {
 
         {/* CAMPAIGNS TAB */}
         <TabsContent value="campaigns" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold">Campañas Activas</h2>
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
+            <h2 className="text-xl sm:text-2xl font-bold">Tus campañas</h2>
             <Button onClick={() => setShowNewCampaign(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Nueva Campaña
@@ -163,16 +163,16 @@ export default function MarketingControlCenter() {
               {campaigns.map(campaign => (
                 <Card
                   key={campaign.id}
-                  className={`cursor-pointer transition-colors ${selectedCampaignId === campaign.id ? 'border-blue-500 bg-blue-50' : ''}`}
-                  onClick={() => setSelectedCampaignId(campaign.id)}
+                  className={`min-w-0 transition-colors focus-within:ring-2 focus-within:ring-ring ${selectedCampaignId === campaign.id ? 'border-primary bg-primary/5' : ''}`}
+
                 >
                   <CardHeader>
-                    <CardTitle className="text-lg">{campaign.nombre}</CardTitle>
+                    <CardTitle className="text-lg break-words"><button type="button" className="min-h-11 w-full text-left rounded-sm hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-pressed={selectedCampaignId === campaign.id} onClick={() => setSelectedCampaignId(campaign.id)}>{campaign.nombre}</button></CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
                     <div>
                       <p className="text-sm text-muted-foreground">Estado</p>
-                      <p className="font-semibold capitalize">{campaign.estado}</p>
+                      <p className="font-semibold capitalize">{campaign.estado === 'draft' ? 'Borrador' : campaign.estado}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Objetivo</p>
@@ -228,7 +228,7 @@ export default function MarketingControlCenter() {
 
         {/* CONTACTS TAB */}
         <TabsContent value="contactos" className="space-y-4">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
             <h2 className="text-2xl font-bold">Gestión de Contactos</h2>
             <Button onClick={cargarContactos} disabled={cargandoContactos} variant="outline">
               <Download className="w-4 h-4 mr-2" />
@@ -296,13 +296,13 @@ export default function MarketingControlCenter() {
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="flex-1">
                   <Input
-                    placeholder="Buscar por email, nombre o empresa..."
+                    aria-label="Buscar contactos" placeholder="Buscar por correo, nombre o empresa…"
                     value={busqueda}
                     onChange={(e) => setBusqueda(e.target.value)}
                   />
                 </div>
                 <select
-                  value={filtroFuente || ''}
+                  aria-label="Filtrar contactos por origen" value={filtroFuente || ''}
                   onChange={(e) => setFiltroFuente(e.target.value || null)}
                   className="px-3 py-2 border rounded-md text-sm"
                 >
@@ -456,7 +456,7 @@ export default function MarketingControlCenter() {
                   {metricas.map(metrica => (
                     <div key={metrica.fecha} className="p-3 border rounded-lg">
                       <p className="font-medium">{new Date(metrica.fecha).toLocaleDateString('es-CL')}</p>
-                      <div className="grid grid-cols-4 gap-2 mt-2 text-sm">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2 text-sm">
                         <div>
                           <p className="text-muted-foreground">Enviados</p>
                           <p className="font-semibold">{metrica.total_enviados}</p>
