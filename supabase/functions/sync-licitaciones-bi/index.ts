@@ -26,6 +26,7 @@ const cors = {
 };
 const MP_BASE = 'https://api.mercadopublico.cl/servicios/v1/publico';
 const CHUNK = 500;
+type SyncRow = { items: Array<Record<string, unknown>>; data: Record<string, unknown> };
 
 // El listado por `estado=activas` trae CodigoEstado pero NO el texto Estado, así
 // que las licitaciones activas quedaban con estado=NULL y el panel (que filtra
@@ -48,7 +49,12 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   const out = { success: true, synced: 0, items_synced: 0, total: 0, reconciled: 0, status_checks: 0, errors: [] as string[] };
   try {
-    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!serviceRoleKey || req.headers.get('Authorization') !== `Bearer ${serviceRoleKey}`) {
+      return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }),
+        { status: 401, headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
+    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, serviceRoleKey);
     const body = await req.json().catch(() => ({}));
     const ticket = body.ticket || Deno.env.get('MERCADOPUBLICO_API_KEY');
     if (!ticket) {
@@ -84,7 +90,7 @@ Deno.serve(async (req) => {
     out.total = data?.Cantidad ?? listado.length;
 
     // 1) Mapear cada licitación a su fila + sus ítems (si el detalle los trae).
-    const rows = listado.map((lic: any) => ({
+    const rows: SyncRow[] = listado.map((lic: any) => ({
       items: Array.isArray(lic.Items) ? lic.Items : [],
       data: {
         codigo: lic.CodigoExterno,
@@ -110,7 +116,7 @@ Deno.serve(async (req) => {
         tiempo_evaluacion_dias: lic.UnidadTiempoEvaluacion ?? null,
         raw_data: lic,
       } as Record<string, unknown>,
-    })).filter((r) => r.data.codigo);
+    })).filter((r: SyncRow) => r.data.codigo);
 
     // 2) El listado por `estado`/`fecha` es abreviado (sólo codigo, nombre,
     // estado, fecha_cierre...). Para no pisar con NULL columnas ya pobladas por

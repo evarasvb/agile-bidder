@@ -83,7 +83,7 @@ export async function reconcileStatuses(activeCodes: ReadonlySet<string>, ticket
             typeof detail.CodigoEstado === 'string' && /^\d+$/.test(detail.CodigoEstado) ? Number(detail.CodigoEstado) : NaN;
           const state = STATUS_BY_CODE[code];
           const stated = typeof detail.Estado === 'string' ? detail.Estado.trim() : '';
-          if (!state || (stated && stated.toLowerCase() !== state.toLowerCase())) failure = 'invalid_status';
+          if (!state || !stated || stated.toLowerCase() !== state.toLowerCase()) failure = 'invalid_status';
           else official = { estado: state, codigo_estado: code };
         }
       }

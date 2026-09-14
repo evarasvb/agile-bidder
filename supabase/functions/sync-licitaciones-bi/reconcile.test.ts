@@ -66,6 +66,7 @@ describe('bounded official status reconciliation', () => {
     ['invalid JSON', () => new Response('{bad'), 'transport_or_json_failed'],
     ['empty', () => new Response(JSON.stringify({ Listado: [] })), 'invalid_detail'],
     ['wrong code', () => detail('999-1-LE26'), 'invalid_detail'],
+    ['missing status', () => new Response(JSON.stringify({ Listado: [{ CodigoExterno: CODE, CodigoEstado: 18 }] })), 'invalid_status'],
     ['contradictory status', () => new Response(JSON.stringify({ Listado: [{ CodigoExterno: CODE, CodigoEstado: 18, Estado: 'Publicada' }] })), 'invalid_status'],
   ] as const)('%s preserves state and reports only a safe failure', async (_label, response, error) => {
     const { ports, records } = fixture();
@@ -174,7 +175,12 @@ describe('existing sync handler, isolated from all network and production', () =
       Deno: { serve: (fn: typeof handler) => { handler = fn; }, env: { get: () => 'fake' } },
       fetch: fakeFetch, Request, Response, URLSearchParams, setTimeout,
     });
-    const response = await handler(new Request('https://local.test', { method: 'POST', body: JSON.stringify({ estado: 'activas' }) }));
+    const unauthorized = await handler(new Request('https://local.test', { method: 'POST', body: JSON.stringify({ estado: 'activas' }) }));
+    expect(unauthorized.status).toBe(401);
+    expect(fakeFetch).not.toHaveBeenCalled();
+    const response = await handler(new Request('https://local.test', {
+      method: 'POST', headers: { Authorization: 'Bearer fake' }, body: JSON.stringify({ estado: 'activas' }),
+    }));
     expect(await response.json()).toMatchObject({ success: mode !== '429', synced: 1, items_synced: 1, status_checks: mode === 'none' ? 0 : 1 });
     expect(upsert.mock.calls[0][0][0]).toMatchObject({ codigo: '2700-1-LE26', estado: 'Publicada', codigo_estado: 5 });
     expect(insert).toHaveBeenCalledTimes(1);
