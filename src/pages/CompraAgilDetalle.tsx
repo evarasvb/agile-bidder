@@ -28,6 +28,7 @@ import { MatchItemActions } from '@/components/compras-agiles/MatchItemActions';
 import { AgregarProductoManual } from '@/components/compras-agiles/AgregarProductoManual';
 import { AccionesCompartir } from '@/components/oportunidades/AccionesCompartir';
 import { DetalleCompraAgil } from '@/components/compras-agiles/DetalleCompraAgil';
+import { calculateCoverageMetrics, type PropuestaItemRow } from '@/services/fuzzyMatching';
 import { unidadLabel } from '@/utils/unidades';
 
 // Color del badge de match según el %.
@@ -211,31 +212,24 @@ export default function CompraAgilDetalle() {
 
   const filasTotal = [...filasItems, ...filasManuales];
 
-  // CRÍTICO FV-UX-002: itemsConMatch solo cuenta matches de ALTA/MEDIA confianza (score >= 60)
-  // REVISAR badges (score < 60) NO cuentan como cobertura validada
-  const itemsConMatchValidado = filasItems.filter((f) => {
-    if (!f.match || f.estado === 'descartado') return false;
-    const score = f.match.score || 0;
-    return score >= 60; // Solo high/medium confidence
-  }).length;
-
-  const itemsConMatchDebil = filasItems.filter((f) => {
-    if (!f.match || f.estado === 'descartado') return false;
-    const score = f.match.score || 0;
-    return score < 60; // Low confidence (REVISAR)
-  }).length;
-
-  const itemsSinMatch = filasItems.filter((f) => !f.match && f.estado !== 'descartado').length;
-  const totalItems = filasItems.filter((f) => f.estado !== 'descartado').length;
-  const cobertura = totalItems > 0 ? Math.round((itemsConMatchValidado / totalItems) * 100) : 0;
+  // CRÍTICO FV-UX-002: Usar helper extractado (calculateCoverageMetrics)
+  // Este helper asegura que score >= 60 cuenta como VALIDADO
+  // score < 60 (REVISAR) NO cuenta; descartados NO cuentan
+  const coverageMetrics = calculateCoverageMetrics(
+    filasItems as PropuestaItemRow[]
+  );
+  const {
+    itemsConMatchValidado,
+    itemsConMatchDebil,
+    itemsSinMatch,
+    totalItems,
+    cobertura,
+    propuestaIncompleta
+  } = coverageMetrics;
 
   // Total de oferta: incluir manuales agregados pero mostrar advertencia si faltan items
   const totalOferta = filasTotal.reduce((s, f) => s + (f.match?.subtotal || 0), 0);
   const dentroPresupuesto = compra.monto ? totalOferta <= compra.monto : null;
-
-  // IMPORTANTE: advertencia si hay items sin match validado (propuesta incompleta)
-  // Incluye items SIN match + items con REVISAR badge (low confidence)
-  const propuestaIncompleta = (itemsSinMatch + itemsConMatchDebil) > 0;
 
   // Ítems en el formato del modal de propuesta, PRECARGADOS con el match para que
   // "Generar propuesta" abra con los productos y precios ya asignados. Los ítems

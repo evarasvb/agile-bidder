@@ -197,8 +197,9 @@ function validateSpecifications(itemRequerido: ItemRequerido, producto: Inventor
   }
 
   // Validar especificaciones de unidad/dimensión si las hay
-  // Ej: "15.8 cm" vs "5.5 pulgadas" deben convertirse correctamente
-  // Ej: "2 metros" vs "2000 mm" deben detectarse como equivalentes
+  // IMPORTANTE: Si ambos tienen dimensiones explícitas pero DIFERENTES, marcar REVISAR
+  // Ej: "15.8 cm" vs "5.5 pulgadas" (139.7mm) = MISMATCH, aunque esté dentro del 20%
+  // Solo equivalencia exacta o muy cercana (<5%) se acepta como VALIDADO
   if (reqDim && prodDim) {
     const reqVal = parseFloat(reqDim[1]);
     const reqUnit = reqDim[2].toLowerCase();
@@ -221,11 +222,19 @@ function validateSpecifications(itemRequerido: ItemRequerido, producto: Inventor
     const reqMm = toMm(reqVal, reqUnit);
     const prodMm = toMm(prodVal, prodUnit);
 
-    // Si difieren más de 20%, rechazar
     const diff = Math.abs(reqMm - prodMm) / Math.max(reqMm, prodMm);
-    if (diff > 0.2) {
-      return -50; // Penalidad: dimensión incompatible
+
+    // Si difieren EXACTAMENTE 0% → compatibles
+    if (diff === 0) {
+      return 0; // Exacto
     }
+    // Si difieren > 5% → REVISAR (no validado automáticamente)
+    // Esto cubre casos como 15.8cm vs 5.5" (11.6% mismatch)
+    if (diff > 0.05) {
+      return -50; // Penalidad: dimensión especificada diferente
+    }
+    // Si difieren <= 5% → compatible (rounding tolerance)
+    return 0;
   }
 
   return 0; // Compatible
@@ -311,17 +320,20 @@ function calculateMatch(itemRequerido: ItemRequerido, producto: InventoryItem): 
   let keywordMatches = 0;
 
   for (const kw of keywordsRequerido) {
+    let found = false;
+
     // Buscar en keywords del producto
     for (const pkw of keywordsProducto) {
       if (pkw.includes(kw) || kw.includes(pkw) || stringSimilarity(kw, pkw) > 0.8) {
         keywordMatches++;
         matchedTerms.push(kw);
+        found = true;
         break;
       }
     }
 
-    // Buscar en nombre y descripción
-    if (textoProducto.includes(kw)) {
+    // Buscar en nombre y descripción SOLO si no encontró en keywords
+    if (!found && textoProducto.includes(kw)) {
       keywordMatches++;
       if (!matchedTerms.includes(kw)) matchedTerms.push(kw);
     }
