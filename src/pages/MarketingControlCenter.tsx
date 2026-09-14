@@ -176,7 +176,7 @@ export default function MarketingControlCenter() {
           </div>
 
           {isLoading ? (
-            <div className="text-center py-8">Cargando campañas...</div>
+            <div className="text-center py-8">Cargando campañas…</div>
           ) : campaigns.length === 0 ? (
             <Card>
               <CardContent className="pt-8 text-center">
@@ -231,12 +231,17 @@ export default function MarketingControlCenter() {
                     {piezas.map(pieza => (
                       <div
                         key={pieza.id}
-                        className="flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:border-primary/40 transition-colors"
-                        onClick={() => setPiezaAbierta(pieza)}
+                        className="flex items-center justify-between gap-3 p-3 border rounded-lg hover:border-primary/40 transition-colors"
                       >
-                        <div>
-                          <p className="font-medium">{pieza.nombre}</p>
-                          <p className="text-sm text-muted-foreground">{pieza.tipo} • {pieza.canal}</p>
+                        <div className="min-w-0">
+                          <button
+                            type="button"
+                            className="min-h-11 rounded-sm text-left hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            onClick={() => setPiezaAbierta(pieza)}
+                          >
+                            <span className="block font-medium break-words">{pieza.nombre}</span>
+                            <span className="block text-sm text-muted-foreground">{pieza.tipo} • {pieza.canal}</span>
+                          </button>
                           <CampaignFeedback pieceId={pieza.id} results={resultadosEnvio} />
                         </div>
                         <Button
@@ -366,7 +371,7 @@ export default function MarketingControlCenter() {
           {/* CONTACTS TABLE */}
           {errorContactos && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{errorContactos}<Button variant="outline" className="ml-2" disabled={cargandoContactos} onClick={cargarContactos}>Reintentar</Button></AlertDescription></Alert>}
           {cargandoContactos ? (
-            <div className="text-center py-8 text-muted-foreground">Cargando contactos...</div>
+            <div className="text-center py-8 text-muted-foreground">Cargando contactos…</div>
           ) : errorContactos && contactos.length === 0 ? null : contactosFiltrados.length === 0 ? (
             <Alert>
               <AlertCircle className="h-4 w-4" />

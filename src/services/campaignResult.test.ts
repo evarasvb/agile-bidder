@@ -17,7 +17,7 @@ describe('campaign result contract', () => {
   });
   it('409 is not retried', async () => {
     const mock = vi.fn<typeof fetch>().mockResolvedValue(new Response('{}', {status:409}));
-    const r = await requestCampaign('/mock','test',id,[id],mock);
+    const r = await requestCampaign('/mock','test','public',id,[id],mock);
     expect(r.message).toContain('reclamada');
     expect(mock).toHaveBeenCalledTimes(1);
   });
@@ -32,12 +32,12 @@ describe('campaign result contract', () => {
   });
   it.each(['network','timeout'])('treats %s as uncertain without retry', async name => {
     const mock=vi.fn<typeof fetch>().mockRejectedValue(new Error(name));
-    expect((await requestCampaign('/mock','test',id,[id],mock)).manualReview).toBe(true);
+    expect((await requestCampaign('/mock','test','public',id,[id],mock)).manualReview).toBe(true);
     expect(mock).toHaveBeenCalledTimes(1);
   });
   it('invalid JSON preserves HTTP status and uncertainty', async () => {
     const mock=vi.fn<typeof fetch>().mockResolvedValue(new Response('invalid',{status:202}));
-    expect(await requestCampaign('/mock','test',id,[id],mock)).toMatchObject({status:202,manualReview:true});
+    expect(await requestCampaign('/mock','test','public',id,[id],mock)).toMatchObject({status:202,manualReview:true});
   });
   it.each([{total_enviados:-1},{total_exitosos:3},{total_procesados:9},{total_objetivo:1},{total_inciertos:0.5}])('rejects invalid counts %o', overrides => {
     expect(normalize(200,{...counts(),...overrides})).toMatchObject({manualReview:true});
@@ -47,14 +47,20 @@ describe('campaign result contract', () => {
     const audience=campaignAudience([{id,estado_suscripcion:'suscrito'},{id:'other',estado_suscripcion:'baja'}],true);
     expect(audience.ids).toEqual([id]);
     const mock=vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify(counts(1)),{status:200}));
-    await requestCampaign('/mock','test',id,audience.ids,mock);
+    await requestCampaign('/mock','test','public',id,audience.ids,mock);
     expect(JSON.parse(String(mock.mock.calls[0][1]?.body))).toEqual({pieza_id:id,contactos_ids:[id]});
+    expect(mock.mock.calls[0][1]?.headers).toMatchObject({ Authorization: 'Bearer test', apikey: 'public' });
   });
   it('empty or unreliable audience is blocked', async () => {
     expect(campaignAudience([],true).error).toBeTruthy();
     expect(campaignAudience([{id,estado_suscripcion:'suscrito'}],false).ids).toEqual([]);
     const mock=vi.fn<typeof fetch>();
-    await requestCampaign('/mock','test',id,[],mock);
+    await requestCampaign('/mock','test','public',id,[],mock);
+    expect(mock).not.toHaveBeenCalled();
+  });
+  it('missing public API key is blocked before fetch', async () => {
+    const mock=vi.fn<typeof fetch>();
+    await requestCampaign('/mock','test','',id,[id],mock);
     expect(mock).not.toHaveBeenCalled();
   });
 });

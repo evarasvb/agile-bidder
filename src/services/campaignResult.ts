@@ -35,10 +35,10 @@ export function normalizeCampaignResult(status: number, body: unknown): Campaign
   return { status, counts, manualReview, message: `Objetivo: ${counts.total_objetivo}. Procesados: ${counts.total_procesados}. Confirmados por el proveedor: ${counts.total_enviados}. Fallidos: ${counts.total_errores}. Inciertos: ${counts.total_inciertos}. ${manualReview ? 'Requiere conciliación y revisión manual; no vuelvas a enviar.' : zero ? 'No se envió ningún correo.' : 'Aceptado por el proveedor no significa entregado.'}${warning}` };
 }
 
-export async function requestCampaign(url: string, token: string, piezaId: string, ids: string[], fetcher: typeof fetch = fetch): Promise<CampaignOutcome> {
-  if (!token || ids.length === 0 || ids.length > 1000) return { status: null, manualReview: false, message: 'Envío bloqueado: revisa la sesión y selecciona entre 1 y 1.000 contactos suscritos.' };
+export async function requestCampaign(url: string, token: string, apiKey: string, piezaId: string, ids: string[], fetcher: typeof fetch = fetch): Promise<CampaignOutcome> {
+  if (!token || !apiKey || ids.length === 0 || ids.length > 1000) return { status: null, manualReview: false, message: 'Envío bloqueado: revisa la sesión y selecciona entre 1 y 1.000 contactos suscritos.' };
   try {
-    const response = await fetcher(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ pieza_id: piezaId, contactos_ids: ids }), signal: AbortSignal.timeout(60000) });
+    const response = await fetcher(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, apikey: apiKey }, body: JSON.stringify({ pieza_id: piezaId, contactos_ids: ids }), signal: AbortSignal.timeout(60000) });
     try { return normalizeCampaignResult(response.status, await response.json()); }
     catch { return uncertain(response.status); }
   } catch { return uncertain(null); }

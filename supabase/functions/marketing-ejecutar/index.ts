@@ -114,7 +114,11 @@ serve(async (req) => {
 
     let body: unknown;
     try {
-      body = await req.json();
+      const rawBody = await req.text();
+      if (new TextEncoder().encode(rawBody).byteLength > 100_000) {
+        return jsonResponse({ error: 'Solicitud demasiado grande' }, 413);
+      }
+      body = JSON.parse(rawBody);
     } catch {
       return jsonResponse({ error: 'JSON inválido' }, 400);
     }

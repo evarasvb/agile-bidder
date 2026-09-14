@@ -1,7 +1,6 @@
 export interface ExecuteRequest {
   pieza_id: string;
-  contactos_ids?: string[];
-  categoria_filtro?: string;
+  contactos_ids: string[];
 }
 
 export interface MarketingPiece {
@@ -107,8 +106,7 @@ export interface MarketingExecutionStore {
   claimPiece(piezaId: string): Promise<ClaimResult>;
   releasePieceClaim(piezaId: string): Promise<boolean>;
   getContactsPage(filters: {
-    contactIds?: string[];
-    category?: string;
+    contactIds: string[];
     from: number;
     to: number;
   }): Promise<{ contacts: MarketingContact[]; total: number }>;
@@ -151,8 +149,7 @@ export async function claimEmailPiece(
 export async function getMarketingContactsPage(
   table: MarketingContactsTable,
   filters: {
-    contactIds?: string[];
-    category?: string;
+    contactIds: string[];
     from: number;
     to: number;
   },
@@ -161,11 +158,7 @@ export async function getMarketingContactsPage(
     .select('id, email, nombre', { count: 'exact' })
     .eq('estado_suscripcion', 'suscrito');
 
-  if (filters.contactIds && filters.contactIds.length > 0) {
-    query = query.in('id', filters.contactIds);
-  } else if (filters.category) {
-    query = query.eq('categoria', filters.category);
-  }
+  query = query.in('id', filters.contactIds);
 
   const { data, error, count } = await query
     .order('id', { ascending: true })
@@ -179,33 +172,26 @@ function parseRequest(input: unknown): ExecuteRequest | null {
   if (!input || typeof input !== 'object') return null;
 
   const candidate = input as Record<string, unknown>;
+  const allowedKeys = new Set(['pieza_id', 'contactos_ids']);
+  if (Object.keys(candidate).some((key) => !allowedKeys.has(key))) return null;
+
   if (typeof candidate.pieza_id !== 'string' || !UUID_PATTERN.test(candidate.pieza_id)) {
     return null;
   }
 
   if (
-    candidate.contactos_ids !== undefined &&
-    (!Array.isArray(candidate.contactos_ids) ||
+    !Array.isArray(candidate.contactos_ids) ||
       candidate.contactos_ids.length === 0 ||
       candidate.contactos_ids.length > 1000 ||
-      candidate.contactos_ids.some((id) => typeof id !== 'string' || !UUID_PATTERN.test(id)))
-  ) {
-    return null;
-  }
-
-  if (
-    candidate.categoria_filtro !== undefined &&
-    (typeof candidate.categoria_filtro !== 'string' ||
-      candidate.categoria_filtro.length === 0 ||
-      candidate.categoria_filtro.length > 80)
+      candidate.contactos_ids.some((id) => typeof id !== 'string' || !UUID_PATTERN.test(id)) ||
+      new Set(candidate.contactos_ids).size !== candidate.contactos_ids.length
   ) {
     return null;
   }
 
   return {
     pieza_id: candidate.pieza_id,
-    contactos_ids: candidate.contactos_ids as string[] | undefined,
-    categoria_filtro: candidate.categoria_filtro as string | undefined,
+    contactos_ids: candidate.contactos_ids as string[],
   };
 }
 
@@ -249,38 +235,44 @@ export async function executeMarketingCampaign(
   const contacts: MarketingContact[] = [];
 
   try {
-    const pageSize = dependencies.contactPageSize ?? 1000;
+    const pageSize = dependencies.contactPageSize ?? 100;
     if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 1000) {
       throw new Error('invalid_contact_page_size');
     }
-    let expectedTotal: number | null = null;
-    let offset = 0;
     const seenContactIds = new Set<string>();
 
-    do {
+    for (let offset = 0; offset < request.contactos_ids.length; offset += pageSize) {
+      const requestedPageIds = request.contactos_ids.slice(offset, offset + pageSize);
+      const requestedPageSet = new Set(requestedPageIds);
       const page = await dependencies.store.getContactsPage({
-        contactIds: request.contactos_ids,
-        category: request.categoria_filtro,
-        from: offset,
-        to: offset + pageSize - 1,
+        contactIds: requestedPageIds,
+        from: 0,
+        to: requestedPageIds.length - 1,
       });
 
-      if (!Number.isSafeInteger(page.total) || page.total < 0) {
+      if (
+        !Number.isSafeInteger(page.total) ||
+        page.total !== requestedPageIds.length ||
+        page.contacts.length !== requestedPageIds.length
+      ) {
         throw new Error('invalid_contact_count');
-      }
-      if (expectedTotal === null) expectedTotal = page.total;
-      if (page.total !== expectedTotal) throw new Error('contact_count_changed');
-      if (page.contacts.length === 0 && offset < expectedTotal) {
-        throw new Error('contact_page_missing');
       }
 
       for (const contact of page.contacts) {
-        if (seenContactIds.has(contact.id)) throw new Error('duplicate_contact_page');
+        if (!requestedPageSet.has(contact.id) || seenContactIds.has(contact.id)) {
+          throw new Error('explicit_audience_mismatch');
+        }
         seenContactIds.add(contact.id);
         contacts.push(contact);
       }
-      offset += page.contacts.length;
-    } while (offset < (expectedTotal ?? 0));
+    }
+
+    if (contacts.length !== request.contactos_ids.length) {
+      throw new Error('explicit_audience_changed');
+    }
+    for (const contactId of request.contactos_ids) {
+      if (!seenContactIds.has(contactId)) throw new Error('explicit_audience_mismatch');
+    }
   } catch {
     let released = false;
     try {

@@ -159,7 +159,8 @@ export function useCampaignPiezas(campaignId: string) {
     mutationFn: async ({ piezaId, contactosIds }: { piezaId: string; contactosIds: string[] }) => {
       const { data, error } = await supabase.auth.getSession();
       if (error || !data.session) throw new Error('La sesión no está disponible.');
-      return requestCampaign(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/marketing-ejecutar`, data.session.access_token, piezaId, contactosIds);
+      const publicApiKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
+      return requestCampaign(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/marketing-ejecutar`, data.session.access_token, publicApiKey, piezaId, contactosIds);
     },
     retry: false,
     onSuccess: (_data, { piezaId }) => {

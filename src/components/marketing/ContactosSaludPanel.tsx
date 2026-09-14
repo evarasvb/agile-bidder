@@ -34,6 +34,24 @@ const ESTADO_LABEL: Record<string, string> = {
   procesando: 'En proceso',
 };
 
+async function cargarRubrosPaginados() {
+  const pageSize = 1000;
+  const rows: Array<{ id: string; rubro: string | null }> = [];
+
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from('marketing_contactos')
+      .select('id, rubro')
+      .not('rubro', 'is', null)
+      .order('id', { ascending: true })
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+    rows.push(...(data || []));
+    if ((data || []).length < pageSize) return rows;
+  }
+}
+
 export function ContactosSaludPanel() {
   const [salud, setSalud] = useState<SaludContactos | null>(null);
   const [cargando, setCargando] = useState(false);
@@ -58,10 +76,7 @@ export function ContactosSaludPanel() {
           .from('marketing_contactos')
           .select('id', { count: 'exact', head: true })
           .eq('estado_email', 'invalido'),
-        supabase
-          .from('marketing_contactos')
-          .select('rubro')
-          .not('rubro', 'is', null),
+        cargarRubrosPaginados(),
         supabase
           .from('contact_enrichment_logs')
           .select('id, proceso, fecha_inicio, fecha_fin, estado, registros_procesados, registros_nuevos, registros_actualizados, errores, mensaje_error')
@@ -72,11 +87,10 @@ export function ContactosSaludPanel() {
       const queryError = totalResult.error
         || validosResult.error
         || invalidosResult.error
-        || rubrosResult.error
         || logsResult.error;
       if (queryError) throw queryError;
 
-      const rubroCount = (rubrosResult.data || []).reduce<Record<string, number>>((acumulado, fila) => {
+      const rubroCount = rubrosResult.reduce<Record<string, number>>((acumulado, fila) => {
         if (fila.rubro) acumulado[fila.rubro] = (acumulado[fila.rubro] || 0) + 1;
         return acumulado;
       }, {});
@@ -119,6 +133,7 @@ export function ContactosSaludPanel() {
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.session.access_token}`,
+            'apikey': (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string,
           },
         }
       );

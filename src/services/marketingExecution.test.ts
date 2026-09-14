@@ -58,6 +58,38 @@ describe('marketing-ejecutar', () => {
     expect(sendEmail).not.toHaveBeenCalled();
   });
 
+  it('exige una audiencia explícita, válida y sin IDs duplicados', async () => {
+    const sendEmail = vi.fn(async () => ({ success: true, statusCode: 200 }));
+    const store = createStore();
+
+    const missing = await executeMarketingCampaign({ pieza_id: pieceId }, { store, sendEmail });
+    const duplicated = await executeMarketingCampaign(
+      { pieza_id: pieceId, contactos_ids: [contactId, contactId] },
+      { store, sendEmail },
+    );
+
+    expect(missing.status).toBe(400);
+    expect(duplicated.status).toBe(400);
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it('rechaza audiencias superiores a 1.000 contactos', async () => {
+    const sendEmail = vi.fn(async () => ({ success: true, statusCode: 200 }));
+    const store = createStore();
+    const tooManyIds = Array.from(
+      { length: 1001 },
+      (_, index) => `33333333-3333-4333-8333-${index.toString(16).padStart(12, '0')}`,
+    );
+
+    const outcome = await executeMarketingCampaign(
+      { pieza_id: pieceId, contactos_ids: tooManyIds },
+      { store, sendEmail },
+    );
+
+    expect(outcome.status).toBe(400);
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
   it('permite que solo una ejecución concurrente reclame y envíe la pieza', async () => {
     let state: 'draft' | 'ejecutando' = 'draft';
     const sendEmail = vi.fn(async () => ({ success: true, statusCode: 200 }));
@@ -70,8 +102,8 @@ describe('marketing-ejecutar', () => {
     });
 
     const outcomes = await Promise.all([
-      executeMarketingCampaign({ pieza_id: pieceId }, { store, sendEmail }),
-      executeMarketingCampaign({ pieza_id: pieceId }, { store, sendEmail }),
+      executeMarketingCampaign({ pieza_id: pieceId, contactos_ids: [contactId] }, { store, sendEmail }),
+      executeMarketingCampaign({ pieza_id: pieceId, contactos_ids: [contactId] }, { store, sendEmail }),
     ]);
 
     expect(outcomes.map(({ status }) => status).sort()).toEqual([200, 409]);
@@ -121,7 +153,7 @@ describe('marketing-ejecutar', () => {
     });
 
     const outcome = await executeMarketingCampaign(
-      { pieza_id: pieceId },
+      { pieza_id: pieceId, contactos_ids: [contactId] },
       { store, sendEmail },
     );
 
@@ -146,14 +178,18 @@ describe('marketing-ejecutar', () => {
         nombre: 'Three',
       },
     ];
+    let selectedIds = contacts.map(({ id }) => id);
     const query: MarketingContactsQuery = {
       eq: vi.fn(() => query),
-      in: vi.fn(() => query),
+      in: vi.fn((_column, values) => {
+        selectedIds = values;
+        return query;
+      }),
       order: vi.fn(() => query),
       range: vi.fn(async (from, to) => ({
-        data: contacts.slice(from, to + 1),
+        data: contacts.filter(({ id }) => selectedIds.includes(id)).slice(from, to + 1),
         error: null,
-        count: contacts.length,
+        count: contacts.filter(({ id }) => selectedIds.includes(id)).length,
       })),
     };
     const table: MarketingContactsTable = {
@@ -163,7 +199,7 @@ describe('marketing-ejecutar', () => {
     const store = createStore({ getContactsPage });
 
     const outcome = await executeMarketingCampaign(
-      { pieza_id: pieceId },
+      { pieza_id: pieceId, contactos_ids: contacts.map(({ id }) => id) },
       {
         store,
         contactPageSize: 2,
@@ -179,15 +215,33 @@ describe('marketing-ejecutar', () => {
     });
     expect(table.select).toHaveBeenCalledWith('id, email, nombre', { count: 'exact' });
     expect(query.eq).toHaveBeenCalledWith('estado_suscripcion', 'suscrito');
+    expect(query.in).toHaveBeenNthCalledWith(1, 'id', contacts.slice(0, 2).map(({ id }) => id));
+    expect(query.in).toHaveBeenNthCalledWith(2, 'id', [contacts[2].id]);
     expect(query.order).toHaveBeenCalledWith('id', { ascending: true });
     expect(getContactsPage).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ from: 0, to: 1 }),
+      expect.objectContaining({ contactIds: contacts.slice(0, 2).map(({ id }) => id), from: 0, to: 1 }),
     );
     expect(getContactsPage).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ from: 2, to: 3 }),
+      expect.objectContaining({ contactIds: [contacts[2].id], from: 0, to: 0 }),
     );
+  });
+
+  it('bloquea antes de enviar si la audiencia suscrita ya no coincide exactamente', async () => {
+    const secondContactId = '44444444-4444-4444-8444-444444444444';
+    const releasePieceClaim = vi.fn(async () => true);
+    const sendEmail = vi.fn(async () => ({ success: true, statusCode: 200 }));
+    const store = createStore({ releasePieceClaim });
+
+    const outcome = await executeMarketingCampaign(
+      { pieza_id: pieceId, contactos_ids: [contactId, secondContactId] },
+      { store, sendEmail },
+    );
+
+    expect(outcome).toMatchObject({ status: 500, body: { codigo: 'contacts_failed' } });
+    expect(releasePieceClaim).toHaveBeenCalledWith(pieceId);
+    expect(sendEmail).not.toHaveBeenCalled();
   });
 
   it('no declara éxito ni cierra la pieza cuando falla la persistencia', async () => {
@@ -200,7 +254,7 @@ describe('marketing-ejecutar', () => {
     });
 
     const outcome = await executeMarketingCampaign(
-      { pieza_id: pieceId },
+      { pieza_id: pieceId, contactos_ids: [contactId] },
       {
         store,
         sendEmail: async () => ({ success: true, statusCode: 200 }),
@@ -250,7 +304,7 @@ describe('marketing-ejecutar', () => {
     });
 
     const outcome = await executeMarketingCampaign(
-      { pieza_id: pieceId },
+      { pieza_id: pieceId, contactos_ids: contacts.map(({ id }) => id) },
       { store, sendEmail },
     );
 
