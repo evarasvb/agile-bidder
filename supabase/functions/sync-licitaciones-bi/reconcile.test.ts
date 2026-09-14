@@ -145,6 +145,11 @@ describe('bounded official status reconciliation', () => {
 });
 
 describe('existing sync handler, isolated from all network and production', () => {
+  it('keeps gateway JWT verification enabled for the sync function', () => {
+    const config = readFileSync(new URL('../../config.toml', import.meta.url), 'utf8');
+    expect(config).toMatch(/\[functions\.sync-licitaciones-bi\]\s+verify_jwt = true/);
+  });
+
   it.each(['none', 'revoked', '429'])('normal sync and guarded reconciliation: %s', async mode => {
     let handler!: (req: Request) => Promise<Response>;
     const upsert = vi.fn((rows: Array<{ codigo: string }>) => ({ select: async () => ({ data: rows.map(r => ({ id: r.codigo, codigo: r.codigo })), error: null }) }));
@@ -173,13 +178,18 @@ describe('existing sync handler, isolated from all network and production', () =
         throw new Error('Unexpected import');
       },
       Deno: { serve: (fn: typeof handler) => { handler = fn; }, env: { get: () => 'fake' } },
-      fetch: fakeFetch, Request, Response, URLSearchParams, setTimeout,
+      fetch: fakeFetch, Request, Response, URLSearchParams, setTimeout, atob,
     });
     const unauthorized = await handler(new Request('https://local.test', { method: 'POST', body: JSON.stringify({ estado: 'activas' }) }));
     expect(unauthorized.status).toBe(401);
-    expect(fakeFetch).not.toHaveBeenCalled();
-    const response = await handler(new Request('https://local.test', {
+    const mismatchedLegacyKey = await handler(new Request('https://local.test', {
       method: 'POST', headers: { Authorization: 'Bearer fake' }, body: JSON.stringify({ estado: 'activas' }),
+    }));
+    expect(mismatchedLegacyKey.status).toBe(401);
+    expect(fakeFetch).not.toHaveBeenCalled();
+    const serviceJwt = `header.${btoa(JSON.stringify({ role: 'service_role' }))}.signature`;
+    const response = await handler(new Request('https://local.test', {
+      method: 'POST', headers: { Authorization: `Bearer ${serviceJwt}` }, body: JSON.stringify({ estado: 'activas' }),
     }));
     expect(await response.json()).toMatchObject({ success: mode !== '429', synced: 1, items_synced: 1, status_checks: mode === 'none' ? 0 : 1 });
     expect(upsert.mock.calls[0][0][0]).toMatchObject({ codigo: '2700-1-LE26', estado: 'Publicada', codigo_estado: 5 });
