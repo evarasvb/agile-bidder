@@ -2,6 +2,7 @@
 // Busca en Postgres (normativa, jurisprudencia, datos de Mercado Público) y
 // responde con Gemini en streaming (SSE). Límites por plan.
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { evidenceGateLicitacion, crearEstadoDocumentacionLicitacion } from "../_shared/evidenceGateHelper.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -322,6 +323,22 @@ Deno.serve(async (req) => {
     if (res.topadj?.length) partes.push("QUIÉN LE GANA A ESTE ORGANISMO (API OCDS, 12 meses):\n" + res.topadj.map((t: any) => `${t.adjudicatario} (${t.rut ?? "s/i"}): ${t.licitaciones} licitaciones ganadas por ${fmt(t.monto)}, participó en ${t.participaciones}`).join("\n"));
     if (res.org) partes.push("FICHA ORGANISMO (Datos Mercado Público vía FirmaVB):\n" + textoOrganismo(res.org));
     const contexto = partes.join("\n\n") || "(sin fuentes ni datos para esta pregunta)";
+
+    // Evidence Gate: valida que la documentación esté completa para postular
+    if (codigo) {
+      const estadoDoc = crearEstadoDocumentacionLicitacion(res.ficha, bases, anexos);
+      const gate = evidenceGateLicitacion(estadoDoc);
+      if (!gate.permiteBadgeVerde) {
+        return new Response(JSON.stringify({
+          error: "documentacion_incompleta",
+          veredicto: gate.veredicto,
+          razon: gate.razon,
+          faltantes: gate.faltantes,
+          permiteBadgeVerde: false,
+          mensaje: `No se puede recomendar postular: ${gate.razon}. Faltantes: ${gate.faltantes.join("; ")}.`
+        }), { status: 202, headers: { ...cors, "Content-Type": "application/json" } });
+      }
+    }
 
     const userMsg = modo === "chat" ? `${contexto}\n\nPREGUNTA: ${pregunta}` : `${contexto}\n\nGenera el informe de trabajo para la licitación ${codigo}.${pregunta ? " Contexto del proveedor: " + pregunta : ""}`;
     const messages = [
