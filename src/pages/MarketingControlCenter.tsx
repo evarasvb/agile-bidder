@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import { CampaignFeedback, CampaignHistoryError } from '@/components/marketing/CampaignFeedback';
+import { useState, useEffect, useRef } from 'react';
+import { campaignAudience } from '@/services/campaignResult';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCampaigns, useCampaignPiezas, useCampaignMetricas, useMarketingEjecucionesRecientes, type MarketingPieza } from '@/hooks/useMarketingCampaigns';
@@ -20,6 +22,7 @@ interface MarketingContacto {
   nombre: string;
   empresa: string;
   categoria: string;
+  rubro: string | null;
   fuente_datos: string;
   estado_suscripcion: string;
   creado_en: string;
@@ -34,6 +37,10 @@ export default function MarketingControlCenter() {
   const [cargandoContactos, setCargandoContactos] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   const [filtroFuente, setFiltroFuente] = useState<string | null>(null);
+  const [filtroRubro, setFiltroRubro] = useState('');
+  const [filtroCategoria, setFiltroCategoria] = useState('');
+  const [filtroSuscripcion, setFiltroSuscripcion] = useState('');
+  const [errorContactos, setErrorContactos] = useState<string | null>(null);
   const [estadisticasContactos, setEstadisticasContactos] = useState({
     total: 0,
     prospects: 0,
@@ -42,6 +49,10 @@ export default function MarketingControlCenter() {
     youtube: 0,
   });
   const queryClient = useQueryClient();
+  const envioEnCurso = useRef(false);
+  const [resultadosEnvio, setResultadosEnvio] = useState<Record<string, string>>({});
+  const [bloqueados, setBloqueados] = useState<Record<string, boolean>>({});
+  const [audienciaConfiable, setAudienciaConfiable] = useState(false);
 
   useEffect(() => {
     cargarContactos();
@@ -49,15 +60,18 @@ export default function MarketingControlCenter() {
 
   const cargarContactos = async () => {
     setCargandoContactos(true);
+    setAudienciaConfiable(false);
+    setErrorContactos(null);
     try {
-      const { data, error } = await supabase
+      const { data, error, count } = await supabase
         .from('marketing_contactos')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('creado_en', { ascending: false });
 
       if (error) throw error;
 
-      setContactos(data as MarketingContacto[]);
+      setContactos((data || []) as MarketingContacto[]);
+      setAudienciaConfiable(count !== null && count === (data || []).length);
 
       const stats = {
         total: data?.length || 0,
@@ -69,6 +83,7 @@ export default function MarketingControlCenter() {
       setEstadisticasContactos(stats);
     } catch (error) {
       console.error('Error cargando contactos:', error);
+      setErrorContactos('No se pudieron actualizar los contactos. Los datos anteriores, si existen, se conservan.');
     } finally {
       setCargandoContactos(false);
     }
@@ -76,70 +91,84 @@ export default function MarketingControlCenter() {
 
   const contactosFiltrados = contactos.filter(c => {
     const coincideBusqueda = !busqueda ||
-      c.email.toLowerCase().includes(busqueda.toLowerCase()) ||
-      c.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      c.empresa.toLowerCase().includes(busqueda.toLowerCase());
+      (c.email || '').toLowerCase().includes(busqueda.toLowerCase()) ||
+      (c.nombre || '').toLowerCase().includes(busqueda.toLowerCase()) ||
+      (c.empresa || '').toLowerCase().includes(busqueda.toLowerCase());
 
     const coincideFuente = !filtroFuente || c.fuente_datos === filtroFuente;
 
-    return coincideBusqueda && coincideFuente;
+    return coincideBusqueda && coincideFuente &&
+      (!filtroRubro || c.rubro === filtroRubro) &&
+      (!filtroCategoria || c.categoria === filtroCategoria) &&
+      (!filtroSuscripcion || c.estado_suscripcion === filtroSuscripcion);
   });
 
+  const rubros = [...new Set(contactos.map(c => c.rubro).filter((v): v is string => Boolean(v)))].sort();
+  const categorias = [...new Set(contactos.map(c => c.categoria).filter(Boolean))].sort();
+  const suscripciones = [...new Set(contactos.map(c => c.estado_suscripcion).filter(Boolean))].sort();
+
   const selectedCampaign = campaigns.find(c => c.id === selectedCampaignId);
-  const { piezas, updatePieza, actualizandoPieza, ejecutarPieza, ejecutandoPieza } = useCampaignPiezas(selectedCampaignId || '');
+  const { piezas, updatePiezaAsync, actualizandoPieza, ejecutarPieza, ejecutandoPieza } = useCampaignPiezas(selectedCampaignId || '');
   const { metricas, totalEnviados, totalConversiones, promTasaApertura } = useCampaignMetricas(selectedCampaignId || '');
-  const { ejecuciones: ejecucionesRecientes, isLoading: cargandoEjecuciones } = useMarketingEjecucionesRecientes();
+  const { ejecuciones: ejecucionesRecientes, isLoading: cargandoEjecuciones, isError: errorEjecuciones } = useMarketingEjecucionesRecientes();
 
+  const audiencia = campaignAudience(contactosFiltrados, audienciaConfiable && !cargandoContactos && !errorContactos);
+  const piezaActual = piezaAbierta ? piezas.find(p => p.id === piezaAbierta.id) || null : null;
+  const resultadoEnvio = piezaActual ? resultadosEnvio[piezaActual.id] : null;
   const handleExecutePieza = async (piezaId: string) => {
+    if (envioEnCurso.current || bloqueados[piezaId]) return;
+    const pieza = piezas.find(p => p.id === piezaId);
+    if (!pieza || pieza.canal !== 'email' || pieza.estado !== 'draft') return;
+    const showResult = (message: string) => setResultadosEnvio(current => ({ ...current, [piezaId]: message }));
+    if (audiencia.error) { showResult(audiencia.error); return; }
+    const ids = [...audiencia.ids];
+    if (!window.confirm('¿Enviar «' + pieza.nombre + '» a los ' + ids.length + ' contactos suscritos del segmento de Gestión de Contactos? Se usará el contenido guardado. Esta acción enviará correos reales y no se puede deshacer.')) return;
+    envioEnCurso.current = true;
+    showResult('Enviando correos… Espera el resultado antes de intentar otro envío.');
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/marketing-ejecutar`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`,
-          },
-          body: JSON.stringify({ pieza_id: piezaId }),
-        }
-      );
-
-      if (!response.ok) throw new Error('Error al ejecutar');
-
+      const result = await ejecutarPieza({ piezaId, contactosIds: ids });
+      showResult(result.message);
+      if (result.manualReview || result.status === 200) setBloqueados(current => ({ ...current, [piezaId]: true }));
+    } catch {
+      showResult('No se pudo confirmar el resultado. Revisa la sesión y el historial antes de volver a enviar.');
+      setBloqueados(current => ({ ...current, [piezaId]: true }));
+    } finally {
+      envioEnCurso.current = false;
+      queryClient.invalidateQueries({ queryKey: ['marketing_ejecucion_recientes'] });
+      queryClient.invalidateQueries({ queryKey: ['marketing_ejecucion', piezaId] });
       queryClient.invalidateQueries({ queryKey: ['marketing_piezas', selectedCampaignId] });
-      queryClient.invalidateQueries({ queryKey: ['marketing_metricas', selectedCampaignId] });
-    } catch (error) {
-      console.error('Error:', error);
     }
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-6 space-y-8">
+    <div className="w-full min-w-0 max-w-7xl mx-auto px-4 py-6 pb-24 sm:px-6 space-y-6">
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold">Centro de Control de Marketing</h1>
-        <p className="text-muted-foreground">Planifica, ejecuta y monitorea tus campañas automáticamente</p>
+        <h1 className="text-2xl sm:text-3xl font-bold">Centro de Control de Marketing</h1>
+        <p className="text-muted-foreground">Organiza tus campañas, contactos y resultados en un solo lugar</p>
       </div>
 
       <Alert>
         <Rocket className="h-4 w-4" />
         <AlertDescription>
-          Sistema completamente automatizado: plan → execute → monitor → improve. Aquí es donde controlas todas tus campañas de marketing.
+          Consulta los envíos de correo en Ejecución. Las publicaciones en Facebook, Instagram y WhatsApp todavía se gestionan manualmente.
         </AlertDescription>
       </Alert>
 
       <Tabs defaultValue="campaigns" className="w-full">
-        <TabsList>
+        <TabsList aria-label="Secciones de marketing" className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-5 [&>button]:min-h-11 [&>button]:whitespace-normal">
           <TabsTrigger value="campaigns">Mis Campañas</TabsTrigger>
           <TabsTrigger value="contactos">Gestión de Contactos</TabsTrigger>
           <TabsTrigger value="salud">Salud de Base</TabsTrigger>
           <TabsTrigger value="metricas">Métricas</TabsTrigger>
           <TabsTrigger value="ejecucion">Ejecución</TabsTrigger>
         </TabsList>
+        {resultadoEnvio && <Alert className="mt-4" role="status" aria-live="polite"><AlertDescription>{resultadoEnvio}</AlertDescription></Alert>}
 
         {/* CAMPAIGNS TAB */}
         <TabsContent value="campaigns" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold">Campañas Activas</h2>
+          <p role="status" className="text-sm">{audiencia.error || `Audiencia seleccionada: ${audiencia.ids.length} contactos suscritos. Ajusta los filtros en Gestión de Contactos.`}</p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
+            <h2 className="text-xl sm:text-2xl font-bold">Tus campañas</h2>
             <Button onClick={() => setShowNewCampaign(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Nueva Campaña
@@ -147,7 +176,7 @@ export default function MarketingControlCenter() {
           </div>
 
           {isLoading ? (
-            <div className="text-center py-8">Cargando campañas...</div>
+            <div className="text-center py-8">Cargando campañas…</div>
           ) : campaigns.length === 0 ? (
             <Card>
               <CardContent className="pt-8 text-center">
@@ -163,16 +192,16 @@ export default function MarketingControlCenter() {
               {campaigns.map(campaign => (
                 <Card
                   key={campaign.id}
-                  className={`cursor-pointer transition-colors ${selectedCampaignId === campaign.id ? 'border-blue-500 bg-blue-50' : ''}`}
-                  onClick={() => setSelectedCampaignId(campaign.id)}
+                  className={`min-w-0 transition-colors focus-within:ring-2 focus-within:ring-ring ${selectedCampaignId === campaign.id ? 'border-primary bg-primary/5' : ''}`}
+
                 >
                   <CardHeader>
-                    <CardTitle className="text-lg">{campaign.nombre}</CardTitle>
+                    <CardTitle className="text-lg break-words"><button type="button" className="min-h-11 w-full text-left rounded-sm hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-pressed={selectedCampaignId === campaign.id} onClick={() => setSelectedCampaignId(campaign.id)}>{campaign.nombre}</button></CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
                     <div>
                       <p className="text-sm text-muted-foreground">Estado</p>
-                      <p className="font-semibold capitalize">{campaign.estado}</p>
+                      <p className="font-semibold capitalize">{campaign.estado === 'draft' ? 'Borrador' : campaign.estado}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Objetivo</p>
@@ -202,20 +231,26 @@ export default function MarketingControlCenter() {
                     {piezas.map(pieza => (
                       <div
                         key={pieza.id}
-                        className="flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:border-primary/40 transition-colors"
-                        onClick={() => setPiezaAbierta(pieza)}
+                        className="flex items-center justify-between gap-3 p-3 border rounded-lg hover:border-primary/40 transition-colors"
                       >
-                        <div>
-                          <p className="font-medium">{pieza.nombre}</p>
-                          <p className="text-sm text-muted-foreground">{pieza.tipo} • {pieza.canal}</p>
+                        <div className="min-w-0">
+                          <button
+                            type="button"
+                            className="min-h-11 rounded-sm text-left hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            onClick={() => setPiezaAbierta(pieza)}
+                          >
+                            <span className="block font-medium break-words">{pieza.nombre}</span>
+                            <span className="block text-sm text-muted-foreground">{pieza.tipo} • {pieza.canal}</span>
+                          </button>
+                          <CampaignFeedback pieceId={pieza.id} results={resultadosEnvio} />
                         </div>
                         <Button
                           size="sm"
                           onClick={(e) => { e.stopPropagation(); handleExecutePieza(pieza.id); }}
-                          disabled={pieza.estado === 'ejecutado' || pieza.canal !== 'email'}
+                          disabled={!!audiencia.error || !!bloqueados[pieza.id] || ejecutandoPieza || pieza.estado !== 'draft' || pieza.canal !== 'email'}
                         >
                           <Send className="w-3 h-3 mr-1" />
-                          {pieza.estado === 'ejecutado' ? 'Ejecutado' : pieza.canal !== 'email' ? 'Manual' : 'Ejecutar'}
+                          {ejecutandoPieza ? 'Enviando…' : pieza.estado === 'ejecutado' ? 'Ejecutado' : pieza.canal !== 'email' ? 'Manual' : 'Revisar envío'}
                         </Button>
                       </div>
                     ))}
@@ -228,7 +263,7 @@ export default function MarketingControlCenter() {
 
         {/* CONTACTS TAB */}
         <TabsContent value="contactos" className="space-y-4">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
             <h2 className="text-2xl font-bold">Gestión de Contactos</h2>
             <Button onClick={cargarContactos} disabled={cargandoContactos} variant="outline">
               <Download className="w-4 h-4 mr-2" />
@@ -293,16 +328,16 @@ export default function MarketingControlCenter() {
               <CardTitle>Filtrar Contactos</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-col md:flex-row gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="flex-1">
                   <Input
-                    placeholder="Buscar por email, nombre o empresa..."
+                    aria-label="Buscar contactos" placeholder="Buscar por correo, nombre o empresa…"
                     value={busqueda}
                     onChange={(e) => setBusqueda(e.target.value)}
                   />
                 </div>
                 <select
-                  value={filtroFuente || ''}
+                  aria-label="Filtrar contactos por origen" value={filtroFuente || ''}
                   onChange={(e) => setFiltroFuente(e.target.value || null)}
                   className="px-3 py-2 border rounded-md text-sm"
                 >
@@ -312,7 +347,21 @@ export default function MarketingControlCenter() {
                   <option value="webinar">Webinar</option>
                   <option value="youtube">YouTube</option>
                 </select>
+                <select aria-label="Filtrar contactos por rubro" value={filtroRubro} onChange={e => setFiltroRubro(e.target.value)} className="min-h-11 min-w-0 px-3 py-2 border rounded-md text-sm bg-background">
+                  <option value="">Todos los rubros</option>
+                  {rubros.map(rubro => <option key={rubro} value={rubro}>{rubro}</option>)}
+                </select>
+                <select aria-label="Filtrar contactos por categoría" value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value)} className="min-h-11 min-w-0 px-3 py-2 border rounded-md text-sm bg-background">
+                  <option value="">Todas las categorías</option>
+                  {categorias.map(categoria => <option key={categoria} value={categoria}>{categoria}</option>)}
+                </select>
+                <select aria-label="Filtrar contactos por suscripción" value={filtroSuscripcion} onChange={e => setFiltroSuscripcion(e.target.value)} className="min-h-11 min-w-0 px-3 py-2 border rounded-md text-sm bg-background">
+                  <option value="">Todos los estados de suscripción</option>
+                  {suscripciones.map(estado => <option key={estado} value={estado}>{estado}</option>)}
+                </select>
+                <Button variant="outline" onClick={() => { setBusqueda(''); setFiltroFuente(null); setFiltroRubro(''); setFiltroCategoria(''); setFiltroSuscripcion(''); }}>Limpiar filtros</Button>
               </div>
+              <p className="text-sm text-muted-foreground">Combina filtros para revisar segmentos. Los envíos usan únicamente los contactos suscritos de este segmento.</p>
               <p className="text-sm text-muted-foreground">
                 Mostrando {contactosFiltrados.length} de {contactos.length} contactos
               </p>
@@ -320,9 +369,10 @@ export default function MarketingControlCenter() {
           </Card>
 
           {/* CONTACTS TABLE */}
+          {errorContactos && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{errorContactos}<Button variant="outline" className="ml-2" disabled={cargandoContactos} onClick={cargarContactos}>Reintentar</Button></AlertDescription></Alert>}
           {cargandoContactos ? (
-            <div className="text-center py-8 text-muted-foreground">Cargando contactos...</div>
-          ) : contactosFiltrados.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">Cargando contactos…</div>
+          ) : errorContactos && contactos.length === 0 ? null : contactosFiltrados.length === 0 ? (
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
@@ -343,6 +393,7 @@ export default function MarketingControlCenter() {
                         <TableHead>Nombre</TableHead>
                         <TableHead>Empresa</TableHead>
                         <TableHead>Categoría</TableHead>
+                        <TableHead>Rubro</TableHead>
                         <TableHead>Fuente</TableHead>
                         <TableHead>Estado</TableHead>
                         <TableHead>Fecha</TableHead>
@@ -355,6 +406,7 @@ export default function MarketingControlCenter() {
                           <TableCell className="text-sm">{contacto.nombre || '—'}</TableCell>
                           <TableCell className="text-sm">{contacto.empresa || '—'}</TableCell>
                           <TableCell className="text-sm">{contacto.categoria || '—'}</TableCell>
+                          <TableCell className="text-sm">{contacto.rubro || 'Sin información'}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className="text-xs">
                               {contacto.fuente_datos}
@@ -456,7 +508,7 @@ export default function MarketingControlCenter() {
                   {metricas.map(metrica => (
                     <div key={metrica.fecha} className="p-3 border rounded-lg">
                       <p className="font-medium">{new Date(metrica.fecha).toLocaleDateString('es-CL')}</p>
-                      <div className="grid grid-cols-4 gap-2 mt-2 text-sm">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2 text-sm">
                         <div>
                           <p className="text-muted-foreground">Enviados</p>
                           <p className="font-semibold">{metrica.total_enviados}</p>
@@ -491,7 +543,7 @@ export default function MarketingControlCenter() {
 
           {cargandoEjecuciones ? (
             <div className="text-center py-8 text-muted-foreground">Cargando…</div>
-          ) : ejecucionesRecientes.length === 0 ? (
+          ) : errorEjecuciones ? (<CampaignHistoryError />) : ejecucionesRecientes.length === 0 ? (
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>Todavía no se ha ejecutado ningún envío.</AlertDescription>
@@ -542,10 +594,16 @@ export default function MarketingControlCenter() {
       />
 
       <PiezaDetalleDialog
-        pieza={piezaAbierta}
+        pieza={piezaActual}
         onOpenChange={(open) => !open && setPiezaAbierta(null)}
-        onGuardar={(id, updates) => updatePieza({ id, ...updates })}
-        onEjecutar={(id) => { ejecutarPieza(id); setPiezaAbierta(null); }}
+        onGuardar={async (id, updates) => {
+          const saved = await updatePiezaAsync({ id, ...updates });
+          setPiezaAbierta(current => current?.id === id ? { ...current, ...saved } : current);
+          return saved;
+        }}
+        onEjecutar={handleExecutePieza}
+        resultadoEnvio={resultadoEnvio}
+        bloqueoEnvio={audiencia.error || (piezaActual && bloqueados[piezaActual.id] ? "Este envío ya fue procesado o requiere revisión manual; no se repetirá." : null)}
         guardando={actualizandoPieza}
         ejecutando={ejecutandoPieza}
       />

@@ -49,7 +49,6 @@ export function NuevaCampanaRapida({ open, onOpenChange, onCampaignCreated }: Nu
     instagram: { ...CANAL_VACIO },
     whatsapp: { ...CANAL_VACIO },
   });
-  const [ejecutarAhora, setEjecutarAhora] = useState(true);
 
   const toggleCanal = (c: CanalTipo) => {
     setCanales((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
@@ -66,7 +65,6 @@ export function NuevaCampanaRapida({ open, onOpenChange, onCampaignCreated }: Nu
     setNombre('');
     setObjetivo('');
     setPorCanal({ email: { ...CANAL_VACIO }, facebook: { ...CANAL_VACIO }, instagram: { ...CANAL_VACIO }, whatsapp: { ...CANAL_VACIO } });
-    setEjecutarAhora(true);
   };
 
   // La IA arma nombre, objetivo y el contenido de cada canal elegido a partir
@@ -107,6 +105,7 @@ export function NuevaCampanaRapida({ open, onOpenChange, onCampaignCreated }: Nu
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     if (canales.length === 0) { toast.error('Elige al menos un canal'); return; }
     setLoading(true);
 
@@ -138,19 +137,7 @@ export function NuevaCampanaRapida({ open, onOpenChange, onCampaignCreated }: Nu
         const { data: pieza, error: piezaError } = await (supabase as any).from('marketing_piezas').insert([piezaData]).select().single();
         if (piezaError) throw piezaError;
 
-        if (canal === 'email' && ejecutarAhora) {
-          const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/marketing-ejecutar`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`,
-            },
-            body: JSON.stringify({ pieza_id: pieza.id }),
-          });
-          if (!response.ok) throw new Error('Error al ejecutar la pieza de email');
-          const result = await response.json();
-          avisos.push(`Email enviado: ${result.total_exitosos}/${result.total_enviados} exitosos`);
-        } else if (canal === 'email') {
+        if (canal === 'email') {
           avisos.push('Email guardado como borrador (sin enviar).');
         } else if (canal === 'facebook' || canal === 'instagram') {
           avisos.push(`${canal === 'facebook' ? 'Facebook' : 'Instagram'} guardado — la publicación automática todavía no está conectada, publícalo tú por ahora.`);
@@ -254,10 +241,7 @@ export function NuevaCampanaRapida({ open, onOpenChange, onCampaignCreated }: Nu
                       <Label className="text-xs">Contenido (HTML)</Label>
                       <Textarea value={d.contenido} onChange={(e) => actualizarCanal('email', 'contenido', e.target.value)} rows={6} required className="font-mono text-xs" />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" id="ejecutarAhora" checked={ejecutarAhora} onChange={(e) => setEjecutarAhora(e.target.checked)} />
-                      <Label htmlFor="ejecutarAhora" className="cursor-pointer text-xs font-normal">Enviar de inmediato a todos los suscriptores</Label>
-                    </div>
+                    <p className="text-sm text-muted-foreground">Se guardará como borrador. Podrás revisar el correo y confirmar el envío por separado.</p>
                   </>
                 )}
 
@@ -298,7 +282,7 @@ export function NuevaCampanaRapida({ open, onOpenChange, onCampaignCreated }: Nu
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
             <Button disabled={loading || canales.length === 0}>
               {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {loading ? 'Creando…' : 'Crear campaña'}
+              {loading ? 'Guardando…' : 'Guardar campaña como borrador'}
             </Button>
           </div>
         </form>
