@@ -29,6 +29,8 @@ interface Contacto {
   rubro: string | null;
   email_validado: boolean | null;
   estado_email: string | null;
+  esCliente: boolean;
+  campanasEnviadas: number;
 }
 
 const COLUMNAS_CONTACTOS: DataTableColumn<Contacto>[] = [
@@ -62,6 +64,25 @@ const COLUMNAS_CONTACTOS: DataTableColumn<Contacto>[] = [
     ),
     sortValue: (c) => c.estado_suscripcion,
   },
+  {
+    id: 'es_cliente',
+    header: '¿Ya es cliente?',
+    cell: (c) =>
+      c.esCliente ? (
+        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800">Cliente</span>
+      ) : (
+        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">Prospecto</span>
+      ),
+    sortValue: (c) => (c.esCliente ? 1 : 0),
+    exportValue: (c) => (c.esCliente ? 'cliente' : 'prospecto'),
+  },
+  {
+    id: 'campanas_enviadas',
+    header: 'Campañas',
+    align: 'right',
+    cell: (c) => c.campanasEnviadas,
+    sortValue: (c) => c.campanasEnviadas,
+  },
 ];
 
 export default function MarketingContactosAdmin() {
@@ -78,6 +99,7 @@ export default function MarketingContactosAdmin() {
   const [filtroRubro, setFiltroRubro] = useState<string>('');
   const [filtroEstadoEmail, setFiltroEstadoEmail] = useState<string>('');
   const [filtroSuscripcion, setFiltroSuscripcion] = useState<string>('');
+  const [filtroTipo, setFiltroTipo] = useState<string>('');
 
   // Estados únicos para dropdowns
   const [fuentes, setFuentes] = useState<string[]>([]);
@@ -90,7 +112,7 @@ export default function MarketingContactosAdmin() {
 
   useEffect(() => {
     aplicarFiltros();
-  }, [contactos, filtroCategoria, filtroFuente, filtroRubro, filtroEstadoEmail, filtroSuscripcion]);
+  }, [contactos, filtroCategoria, filtroFuente, filtroRubro, filtroEstadoEmail, filtroSuscripcion, filtroTipo]);
 
   const cargarDatos = async () => {
     setLoading(true);
@@ -130,7 +152,19 @@ export default function MarketingContactosAdmin() {
         .limit(5000);
 
       if (!contactosError && contactosData) {
-        setContactos(contactosData);
+        // Cruce con clientes (¿ya se registró en la plataforma?) y con las
+        // campañas que se le han enviado. RLS de "clientes" solo deja ver la
+        // propia fila, así que el cruce lo hace una RPC de admin aparte.
+        const { data: cruceData } = await supabase.rpc('admin_marketing_contactos_cruce');
+        const cruceMap = new Map((cruceData ?? []).map(c => [c.contacto_id, c]));
+
+        const contactosConCruce: Contacto[] = contactosData.map(c => ({
+          ...c,
+          esCliente: cruceMap.get(c.id)?.es_cliente ?? false,
+          campanasEnviadas: cruceMap.get(c.id)?.campanas_enviadas ?? 0,
+        }));
+
+        setContactos(contactosConCruce);
 
         // Extraer valores únicos para filtros
         const uniqueFuentes = [...new Set(contactosData.map(c => c.fuente_datos).filter(Boolean))].sort();
@@ -158,6 +192,8 @@ export default function MarketingContactosAdmin() {
     if (filtroRubro) filtered = filtered.filter(c => c.rubro === filtroRubro);
     if (filtroEstadoEmail) filtered = filtered.filter(c => c.estado_email === filtroEstadoEmail);
     if (filtroSuscripcion) filtered = filtered.filter(c => c.estado_suscripcion === filtroSuscripcion);
+    if (filtroTipo === 'cliente') filtered = filtered.filter(c => c.esCliente);
+    if (filtroTipo === 'prospecto') filtered = filtered.filter(c => !c.esCliente);
     setContactosFiltrados(filtered);
   };
 
@@ -477,6 +513,38 @@ export default function MarketingContactosAdmin() {
               </Card>
             </div>
           )}
+
+          {!loading && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="border-blue-200 bg-blue-50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-blue-900">Ya son clientes</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold text-blue-600">{contactos.filter(c => c.esCliente).length}</p>
+                  <p className="text-xs text-blue-700 mt-2">Se registraron en FirmaVB</p>
+                </CardContent>
+              </Card>
+              <Card className="border-amber-200 bg-amber-50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-amber-900">Solo prospectos</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold text-amber-600">{contactos.filter(c => !c.esCliente).length}</p>
+                  <p className="text-xs text-amber-700 mt-2">Reciben campañas pero no se han registrado</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Con campañas enviadas</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold">{contactos.filter(c => c.campanasEnviadas > 0).length}</p>
+                  <p className="text-xs text-muted-foreground mt-2">Al menos un envío registrado</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </TabsContent>
 
         {/* CONTACTOS TAB */}
@@ -552,7 +620,19 @@ export default function MarketingContactosAdmin() {
                 <option value="no_suscrito">No suscrito</option>
               </select>
             </div>
-            {(filtroCategoria || filtroFuente || filtroRubro || filtroEstadoEmail || filtroSuscripcion) && (
+            <div>
+              <Label className="text-xs">¿Ya es cliente?</Label>
+              <select
+                value={filtroTipo}
+                onChange={(e) => setFiltroTipo(e.target.value)}
+                className="w-full px-2 py-1 text-sm border rounded"
+              >
+                <option value="">Todos</option>
+                <option value="cliente">Solo clientes</option>
+                <option value="prospecto">Solo prospectos</option>
+              </select>
+            </div>
+            {(filtroCategoria || filtroFuente || filtroRubro || filtroEstadoEmail || filtroSuscripcion || filtroTipo) && (
               <div className="flex items-end">
                 <Button
                   size="sm"
@@ -563,6 +643,7 @@ export default function MarketingContactosAdmin() {
                     setFiltroRubro('');
                     setFiltroEstadoEmail('');
                     setFiltroSuscripcion('');
+                    setFiltroTipo('');
                   }}
                 >
                   <X className="w-4 h-4 mr-1" />

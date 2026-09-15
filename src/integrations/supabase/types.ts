@@ -8799,6 +8799,14 @@ export type Database = {
           plan: string
         }[]
       }
+      admin_marketing_contactos_cruce: {
+        Args: never
+        Returns: {
+          campanas_enviadas: number
+          contacto_id: string
+          es_cliente: boolean
+        }[]
+      }
       admin_traccion_resumen: { Args: never; Returns: Json }
       alerta_ingesta_ca: { Args: never; Returns: string }
       alerta_ingesta_compras_agiles: { Args: never; Returns: string }
