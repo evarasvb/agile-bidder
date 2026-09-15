@@ -152,6 +152,16 @@ export default function CompraAgilDetalle() {
       ? { inventarioId: m.inventario_id, nombre: m.nombre_producto, sku: m.sku, precio: m.precio_unitario, score: Math.round(Number(m.score) || 0) }
       : null;
     const { match, estado, override } = resolverMatch(String(it.id), matchAuto);
+    const subtotal = (match?.precio || 0) * cantidad;
+    const score = match?.score ?? 0;
+    // Sugerencia automática que el cliente aún no confirmó y que tiene poca
+    // confianza (<60%) o confianza media (<80%) pero cuyo solo ítem ya supera
+    // TODO el presupuesto de la compra (señal clara de producto equivocado):
+    // se muestra marcada como dudosa y NO se suma al total ni va precargada a
+    // la propuesta. Caso real: "opalina" → "cordel de papel" al 77% entraba
+    // solo y la oferta salía 7x sobre el presupuesto.
+    const superaPresupuesto = !!compra.monto && subtotal > compra.monto;
+    const dudoso = estado === 'auto' && !!match && (score < 60 || (score < 80 && superaPresupuesto));
     return {
       idx,
       id: it.id,
@@ -163,12 +173,8 @@ export default function CompraAgilDetalle() {
       estado,
       override,
       manual: false,
-      match: match ? { ...match, subtotal: (match.precio || 0) * cantidad } : null,
-      // Sugerencia automática con poca confianza (<60%) que el cliente aún no
-      // confirmó: se muestra marcada como dudosa y NO se suma al total ni va
-      // precargada a la propuesta (antes "opalina" → "cordel de papel" al 77%
-      // entraba solo y la oferta salía 7x sobre el presupuesto).
-      dudoso: estado === 'auto' && !!match && (match.score ?? 0) < 60,
+      match: match ? { ...match, subtotal } : null,
+      dudoso,
     };
   });
 
@@ -499,7 +505,7 @@ export default function CompraAgilDetalle() {
                   <p className="text-2xl font-bold text-firmavb-blue">{clp(totalOferta)}</p>
                   {itemsDudosos > 0 && (
                     <p className="text-xs text-amber-700 mt-1">
-                      {itemsDudosos} coincidencia{itemsDudosos === 1 ? '' : 's'} dudosa{itemsDudosos === 1 ? '' : 's'} (menos de 60%) no se suma{itemsDudosos === 1 ? '' : 'n'} hasta que la{itemsDudosos === 1 ? '' : 's'} confirmes.
+                      {itemsDudosos} coincidencia{itemsDudosos === 1 ? '' : 's'} dudosa{itemsDudosos === 1 ? '' : 's'} (poca confianza o precio fuera del presupuesto) no se suma{itemsDudosos === 1 ? '' : 'n'} hasta que la{itemsDudosos === 1 ? '' : 's'} confirmes.
                     </p>
                   )}
                 </div>
