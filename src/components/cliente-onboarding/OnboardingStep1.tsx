@@ -124,7 +124,7 @@ export default function OnboardingStep1({ cliente }: OnboardingStep1Props) {
                   }`}
                 >
                   <div className={`p-2 rounded-lg ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                    <Icon className="w-5 h-5" />
+                    <Icon className="w-5 h-5" aria-hidden="true" />
                   </div>
                   <span className="font-medium text-sm">{cat.label}</span>
                   {isSelected && (

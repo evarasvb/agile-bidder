@@ -93,7 +93,7 @@ export function MatrizPostulacion({ m, onChange, empresa, url }: { m: Matriz; on
           <p className="font-semibold mb-2">{s.titulo}</p>
           <div className="overflow-x-auto rounded border">
             <table className="w-full text-sm">
-              <thead className="bg-muted/60"><tr>{s.cols.map((c) => <th key={c[0]} className="text-left px-3 py-2 font-semibold whitespace-nowrap text-xs">{c[1]}</th>)}</tr></thead>
+              <thead className="bg-muted/60"><tr>{s.cols.map((c) => <th key={c[0]} scope="col" className="text-left px-3 py-2 font-semibold whitespace-nowrap text-xs">{c[1]}</th>)}</tr></thead>
               <tbody>{fFiltrado.map((r, i) => (
                 <tr key={i} className="border-t align-top">{s.cols.map((c) => (
                   <td key={c[0]} className="px-3 py-2">

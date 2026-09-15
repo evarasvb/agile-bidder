@@ -14,6 +14,9 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-0 focus:left-0 focus:z-50 focus:p-4 focus:bg-primary focus:text-primary-foreground focus:rounded-b-md">
+        Saltar al contenido principal
+      </a>
       <AppSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* En escritorio deja espacio para el sidebar fijo; en móvil ocupa todo */}

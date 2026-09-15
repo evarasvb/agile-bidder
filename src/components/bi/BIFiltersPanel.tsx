@@ -101,7 +101,7 @@ export function BIFiltersPanel({ filters, onFiltersChange }: BIFiltersPanelProps
           {/* Fecha Desde */}
           <div className="space-y-2">
             <Label className="flex items-center gap-1">
-              <CalendarIcon className="h-3 w-3" />
+              <CalendarIcon className="h-3 w-3" aria-hidden="true" />
               Desde
             </Label>
             <Popover>
@@ -134,7 +134,7 @@ export function BIFiltersPanel({ filters, onFiltersChange }: BIFiltersPanelProps
           {/* Fecha Hasta */}
           <div className="space-y-2">
             <Label className="flex items-center gap-1">
-              <CalendarIcon className="h-3 w-3" />
+              <CalendarIcon className="h-3 w-3" aria-hidden="true" />
               Hasta
             </Label>
             <Popover>
