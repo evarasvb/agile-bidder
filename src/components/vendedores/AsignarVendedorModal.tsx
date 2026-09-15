@@ -150,7 +150,7 @@ export function AsignarVendedorModal({ open, onOpenChange, licitacion }: Asignar
               </div>
             ) : (
               <Select value={selectedVendedor} onValueChange={setSelectedVendedor}>
-                <SelectTrigger autoFocus>
+                <SelectTrigger>
                   <SelectValue placeholder="Selecciona un vendedor" />
                 </SelectTrigger>
                 <SelectContent>
