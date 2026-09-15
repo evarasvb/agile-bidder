@@ -171,7 +171,7 @@ export function PipelineDetailModal({
               {currentConfig.label}
             </Badge>
             <Select value={item.etapa} onValueChange={handleStageChange}>
-              <SelectTrigger className="w-[180px] h-8 text-xs">
+              <SelectTrigger className="w-[180px] h-8 text-xs" aria-label="Cambiar etapa de la oportunidad">
                 <SelectValue placeholder="Mover a..." />
               </SelectTrigger>
               <SelectContent>
@@ -220,8 +220,8 @@ export function PipelineDetailModal({
           {mpUrl && prePostulacion && (
             <div className="flex flex-wrap gap-2">
               <Button asChild size="sm" className="gap-1.5">
-                <a href={mpUrl} target="_blank" rel="noreferrer">
-                  <ExternalLink className="h-3.5 w-3.5" />
+                <a href={mpUrl} target="_blank" rel="noreferrer" aria-label="Postular en Mercado Público (abre en nueva pestaña)">
+                  <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
                   Postular en Mercado Público
                 </a>
               </Button>
@@ -236,8 +236,9 @@ export function PipelineDetailModal({
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+              aria-label="Ver en Mercado Público (abre en nueva pestaña)"
             >
-              <ExternalLink className="h-3.5 w-3.5" />
+              <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
               Ver en Mercado Público
             </a>
           )}

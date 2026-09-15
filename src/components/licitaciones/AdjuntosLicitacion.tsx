@@ -100,7 +100,7 @@ export function AdjuntosLicitacion({ codigo }: { codigo: string }) {
                       <FileText className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
                       <div className="min-w-0 flex-1">
                         {b.url ? (
-                          <a href={b.url} target="_blank" rel="noopener noreferrer" className="font-medium underline break-all">{b.archivo}</a>
+                          <a href={b.url} target="_blank" rel="noopener noreferrer" className="font-medium underline break-all" aria-label={`Descargar ${b.archivo} (abre en nueva pestaña)`}>{b.archivo}</a>
                         ) : (
                           <span className="font-medium break-all" title="Inicia sesión para descargar">{b.archivo}</span>
                         )}
@@ -130,7 +130,7 @@ export function AdjuntosLicitacion({ codigo }: { codigo: string }) {
                       <FileText className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
                       <div className="min-w-0 flex-1">
                         {a.url ? (
-                          <a href={a.url} target="_blank" rel="noopener noreferrer" className="font-medium underline break-all">{a.nombre}</a>
+                          <a href={a.url} target="_blank" rel="noopener noreferrer" className="font-medium underline break-all" aria-label={`Descargar ${a.nombre} (abre en nueva pestaña)`}>{a.nombre}</a>
                         ) : (
                           <span className="font-medium break-all" title="Inicia sesión para descargar">{a.nombre}</span>
                         )}

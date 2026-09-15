@@ -102,7 +102,7 @@ function Datos({ datos }: { datos: Dato[] }) {
           <dt className="text-xs text-muted-foreground">{d.etiqueta}</dt>
           <dd className="font-medium break-words">
             {d.href ? (
-              <a href={d.href} target="_blank" rel="noopener noreferrer" className="underline">{d.valor}</a>
+              <a href={d.href} target="_blank" rel="noopener noreferrer" className="underline" aria-label={`${d.valor} (abre en nueva pestaña)`}>{d.valor}</a>
             ) : d.valor}
           </dd>
         </div>
@@ -199,7 +199,7 @@ export function FichaMercadoPublico({ codigo, raw }: { codigo: string; raw: unkn
         )}
         <p className="text-xs text-muted-foreground">
           Datos oficiales de la API de Mercado Público.{' '}
-          <a href={fichaUrl} target="_blank" rel="noopener noreferrer" className="underline">Ver ficha oficial</a>.
+          <a href={fichaUrl} target="_blank" rel="noopener noreferrer" className="underline" aria-label="Ver ficha oficial en Mercado Público (abre en nueva pestaña)">Ver ficha oficial</a>.
         </p>
       </CardContent>
     </Card>

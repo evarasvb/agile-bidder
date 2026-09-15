@@ -57,7 +57,7 @@ export default function Compartidos() {
             <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="outline" className="text-xs"><Eye className="h-3 w-3 mr-1" />{f.vistas} vista{f.vistas === 1 ? '' : 's'}</Badge>
               <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(url(f.token)); toast.success('Link copiado'); }} title="Copiar link"><Copy className="h-4 w-4" /></Button>
-              <Button size="sm" variant="ghost" asChild><Link to={`/experto/c/${f.token}`} target="_blank" title="Abrir en pestaña nueva"><ExternalLink className="h-4 w-4" /></Link></Button>
+              <Button size="sm" variant="ghost" asChild><Link to={`/experto/c/${f.token}`} target="_blank" aria-label="Abrir en pestaña nueva"><ExternalLink className="h-4 w-4" aria-hidden="true" /></Link></Button>
             </div>
           </div>
         ))}

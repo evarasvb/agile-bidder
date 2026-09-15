@@ -95,7 +95,7 @@ export function PipelineToolbar({
                 onFiltersChange({ ...filters, oportunidad_tipo: v === 'todos' ? undefined : v })
               }
             >
-              <SelectTrigger className="h-8 text-xs">
+              <SelectTrigger className="h-8 text-xs" aria-label="Filtrar por tipo de oportunidad">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
