@@ -385,10 +385,10 @@ export default function Oportunidades() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Oportunidades</h1>
-          <OrigenMatch />
           <p className="text-muted-foreground">
-            Oportunidades de licitaciones y compras ágiles con match a tu inventario
+            Licitaciones y compras ágiles que calzan con tu inventario.
           </p>
+          <OrigenMatch />
         </div>
         <Button variant="outline" onClick={() => refetch()} className="gap-2">
           <RefreshCw className="h-4 w-4" />
