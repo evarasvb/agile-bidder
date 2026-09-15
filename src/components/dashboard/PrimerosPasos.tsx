@@ -87,6 +87,13 @@ export function PrimerosPasos() {
       aviso: "Vamos a armar tu perfil 🏷️",
     },
     {
+      id: "extension", done: isConnected, opcional: true, icon: Plug,
+      titulo: "Conecta la extensión (opcional, pero te ahorra harto)",
+      desc: "Autocompleta tus cotizaciones en Mercado Público y manda solas las bases y anexos de una licitación al Experto — sin descargar ni subir nada a mano.",
+      to: "/configuracion/extension",
+      aviso: "Te muestro cómo conectar la extensión 🔌",
+    },
+    {
       id: "inventario", done: tieneInventario, icon: Package,
       titulo: "Carga tu inventario",
       desc: "Es lo que firmavb usa para encontrar las oportunidades que puedes ganar. Sin esto, no hay match.",
@@ -108,13 +115,6 @@ export function PrimerosPasos() {
       desc: "Elige una oportunidad y crea la oferta con tus precios, o abre su libro con el Experto.",
       to: "/oportunidades?tipo=compra_agil",
       aviso: "Elige una compra ágil y arma tu oferta 📝",
-    },
-    {
-      id: "extension", done: isConnected, opcional: true, icon: Plug,
-      titulo: "Conecta la extensión (opcional)",
-      desc: "Para que autocomplete tus cotizaciones mientras postulas en Mercado Público.",
-      to: "/configuracion/extension",
-      aviso: "Te muestro cómo conectar la extensión 🔌",
     },
   ];
 
