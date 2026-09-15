@@ -111,7 +111,7 @@ export function EquipoMemberList() {
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Opciones del miembro">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Opciones de ${member.nombre}`}>
                       <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                     </Button>
                   </DropdownMenuTrigger>
