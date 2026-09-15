@@ -85,3 +85,6 @@ verify_jwt = false
 # cluster-customers is called by cron job (public access)
 [functions.cluster-customers]
 verify_jwt = false
+
+[functions.sii-contribuyente]
+verify_jwt = true

@@ -47,6 +47,9 @@ export function DatosEmpresaCard() {
   const [rutTocado, setRutTocado] = useState(false);
   const [buscandoRut, setBuscandoRut] = useState(false);
   const [rutFuente, setRutFuente] = useState<string | null>(null);
+  // Valores que puso la última búsqueda por RUT, para poder reemplazarlos si
+  // el usuario cambia el RUT (sin tocar lo que escribió a mano).
+  const autoRellenado = useRef<Partial<Record<'nombre' | 'direccion' | 'telefono' | 'email' | 'giros', string>>>({});
 
   useEffect(() => {
     if (cliente) {
@@ -138,19 +141,43 @@ export function DatosEmpresaCard() {
       const emp = await buscarEmpresaPorRut(rut);
       setBuscandoRut(false);
       if (cancelado) return;
+      // Un campo se puede pisar si está vacío o si su valor actual es el que
+      // puso una búsqueda anterior (el usuario no lo tocó). Lo que escribió a
+      // mano nunca se reemplaza. Así, corregir el RUT de la empresa A a la B
+      // no deja los datos de A pegados al RUT de B.
+      const auto = autoRellenado.current;
+      const nombreDefecto = (cliente?.email || '').split('@')[0];
+      const aplicar = (setter: (f: (v: string) => string) => void, clave: keyof typeof auto, nuevo: string | null | undefined, extraVacio = '') => {
+        setter((v) => {
+          const pisable = !v.trim() || v === auto[clave] || (extraVacio && v.trim() === extraVacio);
+          if (!pisable) return v;
+          if (!nuevo) {
+            const previo = auto[clave];
+            delete auto[clave];
+            return v === previo ? '' : v;
+          }
+          auto[clave] = nuevo;
+          return nuevo;
+        });
+      };
       if (!emp) {
+        // Sin datos para el nuevo RUT: se limpia lo que puso la búsqueda anterior.
+        (Object.keys(auto) as (keyof typeof auto)[]).forEach((k) => {
+          const setter = { nombre: setEmpresaNombre, direccion: setDireccion, telefono: setTelefono, email: setEmail, giros: setGiros }[k];
+          setter((v) => (v === auto[k] ? '' : v));
+          delete auto[k];
+        });
         setRutFuente('');
         return;
       }
       // El nombre por defecto al crear la cuenta es el prefijo del correo: se
       // considera "vacío" para reemplazarlo por la razón social real.
-      const nombreDefecto = (cliente?.email || '').split('@')[0];
-      setEmpresaNombre((v) => (!v.trim() || v.trim() === nombreDefecto ? emp.razon_social : v));
+      aplicar(setEmpresaNombre, 'nombre', emp.razon_social, nombreDefecto);
       const dir = [emp.direccion, emp.comuna, emp.region].filter((x) => x && String(x).trim()).join(', ');
-      if (dir) setDireccion((v) => (v.trim() ? v : dir));
-      if (emp.telefono) setTelefono((v) => (v.trim() ? v : String(emp.telefono)));
-      if (emp.email && EMAIL_RE.test(emp.email)) setEmail((v) => (v.trim() ? v : String(emp.email)));
-      if (emp.giros) setGiros((v) => (v.trim() ? v : String(emp.giros)));
+      aplicar(setDireccion, 'direccion', dir);
+      aplicar(setTelefono, 'telefono', emp.telefono ? String(emp.telefono) : null);
+      aplicar(setEmail, 'email', emp.email && EMAIL_RE.test(emp.email) ? String(emp.email) : null);
+      aplicar(setGiros, 'giros', emp.giros ? String(emp.giros) : null);
       setRutFuente(emp.fuente === 'sii' ? 'SII' : 'Mercado Público');
       toast.success(`Encontramos ${emp.razon_social}. Completamos los campos vacíos; revísalos y guarda.`);
     }, 700);
