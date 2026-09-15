@@ -570,8 +570,8 @@ export default function LibroLicitacion() {
         <Button size="sm" variant="ghost" className="h-8" onClick={() => navigate('/experto/compartidos')}>Mis compartidos</Button>
         {cod && <Button size="sm" variant="ghost" className="h-8 text-muted-foreground" onClick={() => archivarLibro(cod, true).then(() => navigate('/experto'))}>Archivar libro</Button>}
         {f && <Button variant="outline" size="sm" onClick={() => navigate(String(f.tipo ?? '').toLowerCase().includes('gil') ? `/compras-agiles/${cod}` : `/oportunidades/licitacion/${cod}`)}>Ver la oportunidad</Button>}
-        <BookOpen className="h-5 w-5 text-primary" />
-        <h1 className="text-xl font-bold">{cod}</h1>
+        {cod && <BookOpen className="h-5 w-5 text-primary" />}
+        {cod && <h1 className="text-xl font-bold">{cod}</h1>}
         {f && <span className="text-muted-foreground truncate max-w-[50vw]">{f.nombre} · {nombrePropio(f.institucion)}</span>}
         {f && <Badge variant="outline">cierra {fecha(f.fecha_cierre)}</Badge>}
         {oportunidadLibro && <AccionesCompartir oportunidad={oportunidadLibro} extraEmail={extraEmailLibro} />}

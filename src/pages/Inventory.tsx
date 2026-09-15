@@ -636,16 +636,25 @@ export default function Inventory() {
                   </TooltipContent>
                 </Tooltip>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => setOportunidadesProducto(item)}
-                  aria-label={`Ver oportunidades de ${item.nombre_producto}`}
-                >
-                  <Badge variant="success" className="cursor-pointer gap-1">
-                    <Gavel className="h-3 w-3" />
-                    {matchesByProductId[item.id].length}
-                  </Badge>
-                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => setOportunidadesProducto(item)}
+                      aria-label={`Ver oportunidades de ${item.nombre_producto}`}
+                    >
+                      <Badge variant="success" className="cursor-pointer gap-1">
+                        <Gavel className="h-3 w-3" />
+                        {matchesByProductId[item.id].length}
+                      </Badge>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">
+                      {matchesByProductId[item.id].length} compra(s) ágil(es) activa(s) hacen match con este producto. Clic para verlas.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
               ),
           },
           { id: 'estado', header: 'Estado', cell: (item) => getStatusBadge(item.stock_disponible, item.activo) },
