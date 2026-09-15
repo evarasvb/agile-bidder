@@ -8799,6 +8799,15 @@ export type Database = {
           plan: string
         }[]
       }
+      admin_clientes_para_importar: {
+        Args: never
+        Returns: {
+          email: string
+          empresa_nombre: string
+          nombre_responsable: string
+          rut: string
+        }[]
+      }
       admin_marketing_contactos_cruce: {
         Args: never
         Returns: {
