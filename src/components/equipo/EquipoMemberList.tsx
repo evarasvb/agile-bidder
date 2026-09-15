@@ -202,23 +202,26 @@ export function EquipoMemberList() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Nombre</Label>
+              <Label htmlFor="edit-nombre">Nombre</Label>
               <Input
+                id="edit-nombre"
                 value={editForm.nombre}
                 onChange={(e) => setEditForm({ ...editForm, nombre: e.target.value })}
               />
             </div>
             <div className="space-y-2">
-              <Label>Email</Label>
+              <Label htmlFor="edit-email">Email</Label>
               <Input
+                id="edit-email"
                 type="email"
                 value={editForm.email}
                 onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
               />
             </div>
             <div className="space-y-2">
-              <Label>Teléfono</Label>
+              <Label htmlFor="edit-telefono">Teléfono</Label>
               <Input
+                id="edit-telefono"
                 type="tel"
                 value={editForm.telefono}
                 onChange={(e) => setEditForm({ ...editForm, telefono: e.target.value })}
@@ -226,9 +229,9 @@ export function EquipoMemberList() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Rol</Label>
+              <Label htmlFor="edit-rol">Rol</Label>
               <Select value={editForm.rol} onValueChange={(v) => setEditForm({ ...editForm, rol: v })}>
-                <SelectTrigger>
+                <SelectTrigger id="edit-rol">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

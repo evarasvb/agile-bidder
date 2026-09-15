@@ -68,22 +68,22 @@ export function InvitarMiembroDialog({ open, onOpenChange }: InvitarMiembroDialo
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Nombre completo</Label>
-                <Input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Juan Pérez" />
+                <Label htmlFor="invitar-nombre">Nombre completo</Label>
+                <Input id="invitar-nombre" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Juan Pérez" />
               </div>
               <div className="space-y-2">
-                <Label>Email</Label>
-                <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="juan@empresa.cl" />
+                <Label htmlFor="invitar-email">Email</Label>
+                <Input id="invitar-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="juan@empresa.cl" />
                 <p className="text-xs text-muted-foreground">Le llegará un correo para activar su cuenta.</p>
               </div>
               <div className="space-y-2">
-                <Label>Teléfono (opcional)</Label>
-                <Input type="tel" value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} placeholder="+56 9 1234 5678" />
+                <Label htmlFor="invitar-telefono">Teléfono (opcional)</Label>
+                <Input id="invitar-telefono" type="tel" value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} placeholder="+56 9 1234 5678" />
               </div>
               <div className="space-y-2">
-                <Label>Rol</Label>
+                <Label htmlFor="invitar-rol">Rol</Label>
                 <Select value={form.rol} onValueChange={(v) => setForm({ ...form, rol: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="invitar-rol"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="admin">Admin — Acceso completo</SelectItem>
                     <SelectItem value="vendedor">Vendedor — Pipeline y asignaciones</SelectItem>
