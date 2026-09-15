@@ -88,14 +88,22 @@ function guardarPreferencia(key: string | undefined, campo: string, valor: unkno
   }
 }
 
+const esVacio = (v: unknown) => v === null || v === undefined || v === '';
+
+/** Compara dos valores no vacíos (número o texto en español, orden natural). */
 function compararValores(a: unknown, b: unknown): number {
-  const aNulo = a === null || a === undefined || a === '';
-  const bNulo = b === null || b === undefined || b === '';
-  if (aNulo && bNulo) return 0;
-  if (aNulo) return 1; // los vacíos siempre al final
-  if (bNulo) return -1;
   if (typeof a === 'number' && typeof b === 'number') return a - b;
   return String(a).localeCompare(String(b), 'es', { numeric: true, sensitivity: 'base' });
+}
+
+/** Orden con dirección; los vacíos van SIEMPRE al final, suba o baje. */
+function compararConDireccion(a: unknown, b: unknown, dir: 'asc' | 'desc'): number {
+  const aNulo = esVacio(a);
+  const bNulo = esVacio(b);
+  if (aNulo && bNulo) return 0;
+  if (aNulo) return 1;
+  if (bNulo) return -1;
+  return compararValores(a, b) * (dir === 'asc' ? 1 : -1);
 }
 
 function exportarCSV<T>(columns: DataTableColumn<T>[], rows: T[], fileName: string) {
@@ -103,7 +111,11 @@ function exportarCSV<T>(columns: DataTableColumn<T>[], rows: T[], fileName: stri
   // (las de acciones, sin encabezado, quedan fuera).
   const cols = columns.filter((c) => c.exportValue || c.sortValue || (typeof c.header === 'string' && c.header.trim() !== ''));
   const escapar = (v: unknown) => {
-    const s = v === null || v === undefined ? '' : String(v);
+    let s = v === null || v === undefined ? '' : String(v);
+    // Anti "CSV injection": una celda que empieza con = + - @ (o tab/retorno)
+    // la planilla la ejecutaría como fórmula; se antepone un apóstrofo para
+    // que Excel/Sheets la traten como texto.
+    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
     return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const cabecera = cols.map((c) => escapar(c.exportHeader ?? (typeof c.header === 'string' ? c.header : c.id)));
@@ -155,8 +167,7 @@ export function DataTable<T>({
     const col = columns.find((c) => c.id === sort.id);
     if (!col?.sortValue) return filtradas;
     const sv = col.sortValue;
-    const dir = sort.dir === 'asc' ? 1 : -1;
-    return [...filtradas].sort((a, b) => compararValores(sv(a), sv(b)) * dir);
+    return [...filtradas].sort((a, b) => compararConDireccion(sv(a), sv(b), sort.dir));
   }, [filtradas, sort, columns]);
 
   const total = ordenadas.length;
