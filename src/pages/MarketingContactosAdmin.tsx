@@ -275,13 +275,14 @@ export default function MarketingContactosAdmin() {
     try {
       setLoading(true);
 
+      // clientes solo deja ver la propia fila por RLS (cada usuario, la suya);
+      // para traer la lista completa se usa una RPC de admin, mismo patrón que
+      // el cruce "¿ya es cliente?" de la pestaña Contactos.
       const { data: clientes, error: clientesError } = await supabase
-        .from('clientes')
-        .select('email, empresa_nombre, nombre_responsable, rut')
-        .limit(1000);
+        .rpc('admin_clientes_para_importar');
 
       if (clientesError) {
-        toast.error('No se encontró tabla de clientes o error al acceder');
+        toast.error('Error al acceder a los clientes');
         return;
       }
 
