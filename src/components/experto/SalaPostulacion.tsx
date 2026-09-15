@@ -5,12 +5,12 @@ import { Button } from '@/components/ui/button';
 import { CheckCircle2, Circle, AlertTriangle, Sparkles, ExternalLink, ShieldCheck } from 'lucide-react';
 import type { Matriz } from '@/components/experto/MatrizPostulacion';
 import { pagoOrganismo, presupuestoTexto } from '@/lib/organismoPago';
+import { colorEstadoRequisito, labelEstadoRequisito } from '@/lib/estadoRequisito';
 
 type Paso = { k: string; t: string; listo: boolean; accion?: () => void; ayuda?: string };
 const pond = (r: any): number => { const n = r.ponderacion_num != null ? Number(r.ponderacion_num) : Number(String(r.ponderacion ?? '').replace(/[^0-9.,]/g, '').replace(',', '.')); if (!Number.isFinite(n) || n === 0) return 0; return n > 1 ? n / 100 : n; };
 const num = (v: any): number | null => { const n = Number(String(v ?? '').replace(/[^0-9.,-]/g, '').replace(/\.(?=\d{3})/g, '').replace(',', '.')); return v == null || v === '' || !Number.isFinite(n) ? null : n; };
-const ESTADO: Record<string, [string, string]> = { cumple: ['Cumple', 'bg-green-100 text-green-800'], ok: ['OK', 'bg-green-100 text-green-800'], verificar: ['Verificar', 'bg-yellow-100 text-yellow-800'], no_aplica: ['No aplica', 'bg-muted text-muted-foreground'], solo_si_adjudica: ['Solo si adjudica', 'bg-blue-100 text-blue-800'], no_cumple: ['No cumple', 'bg-red-100 text-red-800'], revisar: ['Revisar', 'bg-yellow-100 text-yellow-800'], pendiente: ['Pendiente', 'bg-muted text-muted-foreground'] };
-const Chip = ({ e }: { e?: string }) => { const [t, c] = ESTADO[e ?? 'pendiente'] ?? ESTADO.pendiente; return <span className={`rounded px-1.5 py-0.5 text-[11px] ${c}`}>{t}</span>; };
+const Chip = ({ e }: { e?: string }) => <span className={`rounded px-1.5 py-0.5 text-[11px] ${colorEstadoRequisito(e)}`}>{labelEstadoRequisito(e)}</span>;
 
 export interface SalaProps {
   cod: string; ficha: any; bases: any[]; documentos: any[]; plan?: string;
@@ -56,7 +56,7 @@ export function SalaPostulacion(p: SalaProps) {
       <div className="rounded-lg border p-3 space-y-2">
         <div className="flex items-center gap-2 flex-wrap">
           <p className="font-semibold">Resumen ejecutivo</p>
-          {p.veredicto ? <span className={`rounded border px-2 py-0.5 text-xs font-medium ${p.veredicto.c}`}>{p.veredicto.t}</span> : <Button size="sm" variant="outline" className="h-7" onClick={() => p.onGenerar('informe')} disabled={!!p.ocupado}><Sparkles className="h-3.5 w-3.5 mr-1" />Pedir veredicto</Button>}
+          {p.veredicto ? <span className={`rounded border px-2 py-0.5 text-xs font-medium ${p.veredicto.c}`}>{p.veredicto.t}</span> : <Button size="sm" variant="outline" className="h-8" onClick={() => p.onGenerar('informe')} disabled={!!p.ocupado}><Sparkles className="h-3.5 w-3.5 mr-1" />Pedir veredicto</Button>}
           {listaParaPostular && <span className="rounded bg-green-600 text-white px-2 py-0.5 text-xs font-medium">Lista para postular</span>}
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-1 text-xs">
@@ -70,7 +70,7 @@ export function SalaPostulacion(p: SalaProps) {
 
       {/* 2. Admisibilidad */}
       <div className="rounded-lg border p-3 space-y-1">
-        <div className="flex items-center gap-2"><p className="font-semibold">Admisibilidad</p>{m && <span className="text-xs text-muted-foreground">{cumple.length}/{adm.length} cumplidos</span>}<Button size="sm" variant="ghost" className="h-7 ml-auto" onClick={() => m ? p.onIr('matriz') : p.onGenerar('matriz')}>{m ? 'Editar' : 'Generar'}</Button></div>
+        <div className="flex items-center gap-2"><p className="font-semibold">Admisibilidad</p>{m && <span className="text-xs text-muted-foreground">{cumple.length}/{adm.length} cumplidos</span>}<Button size="sm" variant="ghost" className="h-8 ml-auto" onClick={() => m ? p.onIr('matriz') : p.onGenerar('matriz')}>{m ? 'Editar' : 'Generar'}</Button></div>
         {!m && <p className="text-xs text-muted-foreground">Genera la matriz: el Experto convierte las bases en requisitos con su fuente y cómo se chequea cada uno.</p>}
         {noCumple.map((r, i) => <p key={'n' + i} className="text-xs flex items-start gap-1"><AlertTriangle className="h-3.5 w-3.5 text-red-600 mt-0.5" /><span><b>{r.requisito}</b>: {r.nota || r.regla} <span className="text-muted-foreground">({r.fuente})</span></span></p>)}
         {pend.slice(0, 6).map((r, i) => <p key={'p' + i} className="text-xs flex items-center gap-1"><Chip e={r.estado} /><span>{r.requisito}</span><span className="text-muted-foreground truncate">· {r.fuente}</span></p>)}
