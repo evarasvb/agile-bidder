@@ -61,7 +61,7 @@ export function useBINegociosPorInstitucion(limit: number = 20) {
   return useQuery({
     queryKey: ['bi-negocios-institucion', limit],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('bi_oc_negocios_por_institucion')
         .select('*')
         .limit(limit);
@@ -77,7 +77,7 @@ export function useBINegociosPorProveedor(limit: number = 20) {
   return useQuery({
     queryKey: ['bi-negocios-proveedor', limit],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('bi_oc_negocios_por_proveedor')
         .select('*')
         .limit(limit);
@@ -93,7 +93,7 @@ export function useBIProductos(limit: number = 50) {
   return useQuery({
     queryKey: ['bi-productos', limit],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('bi_oc_productos')
         .select('*')
         .limit(limit);
@@ -109,7 +109,7 @@ export function useBIPreciosProductoProveedor(productoNombre?: string, limit: nu
   return useQuery({
     queryKey: ['bi-precios-producto-proveedor', productoNombre, limit],
     queryFn: async () => {
-      let query = (supabase as any)
+      let query = supabase
         .from('bi_oc_precios_producto_proveedor')
         .select('*')
         .limit(limit);
@@ -130,7 +130,7 @@ export function useDashboardEstado() {
   return useQuery({
     queryKey: ['dashboard-estado'],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('dashboard_estado')
         .select('*')
         .single();
@@ -146,7 +146,7 @@ export function useLicitacionesConMatch(limit: number = 50) {
   return useQuery({
     queryKey: ['licitaciones-con-match', limit],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('licitaciones_con_match')
         .select('*')
         .limit(limit);
@@ -162,7 +162,7 @@ export function useLicitacionesUrgentes() {
   return useQuery({
     queryKey: ['licitaciones-urgentes'],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('licitaciones_urgentes')
         .select('*');
       
@@ -177,7 +177,7 @@ export function useTendenciaVentasMensual() {
   return useQuery({
     queryKey: ['tendencia-ventas-mensual'],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('ordenes_compra')
         .select('fecha_creacion, total')
         .order('fecha_creacion', { ascending: true });
@@ -210,7 +210,7 @@ export function useTopCategorias(limit: number = 10) {
   return useQuery({
     queryKey: ['top-categorias', limit],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('ordenes_compra_items')
         .select('categoria');
       
@@ -236,7 +236,7 @@ export function useComparativaPrecios(productoNombre: string) {
   return useQuery({
     queryKey: ['comparativa-precios', productoNombre],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('bi_oc_precios_producto_proveedor')
         .select('*')
         .ilike('nombre_producto', `%${productoNombre}%`)

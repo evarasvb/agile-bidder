@@ -46,7 +46,7 @@ export function useDocumentosLicitacion(licitacionId: string | null) {
     queryFn: async (): Promise<DocumentoLicitacion[]> => {
       if (!licitacionId) return [];
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('documentos_licitacion')
         .select('id, licitacion_id, filename, storage_path, file_size, total_pages, status, error_message, resumen_automatico, processed_at, created_at')
         .eq('licitacion_id', licitacionId)
@@ -92,7 +92,7 @@ export function useUploadDocument(licitacionId: string) {
       if (uploadError) throw uploadError;
 
       // 2. Create document record
-      const { data: doc, error: insertError } = await (supabase as any)
+      const { data: doc, error: insertError } = await supabase
         .from('documentos_licitacion')
         .insert({
           licitacion_id: licitacionId,
@@ -155,7 +155,7 @@ export function useDeleteDocument(licitacionId: string) {
       await supabase.storage.from('bases-licitacion').remove([storagePath]);
 
       // Delete from DB
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('documentos_licitacion')
         .delete()
         .eq('id', documentId);
@@ -182,7 +182,7 @@ export function useChatLicitacion(licitacionId: string | null) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('chat_licitacion')
         .select('*')
         .eq('licitacion_id', licitacionId)
@@ -246,7 +246,7 @@ export function useClearChat(licitacionId: string) {
 
   return useMutation({
     mutationFn: async (chatId: string) => {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('chat_licitacion')
         .delete()
         .eq('id', chatId);

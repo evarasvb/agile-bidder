@@ -101,7 +101,7 @@ export function useVendedorPipelineItems(vendedorId: string | undefined) {
     queryKey: [EQUIPO_KEY, 'pipeline-items', vendedorId],
     queryFn: async () => {
       if (!vendedorId) return [];
-      const { data: asignaciones, error } = await (supabase as any)
+      const { data: asignaciones, error } = await supabase
         .from('vendedor_asignaciones')
         .select('id, licitacion_id, fecha_asignacion, notas')
         .eq('vendedor_id', vendedorId)
@@ -111,7 +111,7 @@ export function useVendedorPipelineItems(vendedorId: string | undefined) {
       if (!asignaciones?.length) return [];
 
       const oportunidadIds = asignaciones.map((a: any) => a.licitacion_id);
-      const { data: pipelineRows, error: pipelineError } = await (supabase as any)
+      const { data: pipelineRows, error: pipelineError } = await supabase
         .from('pipeline')
         .select('id, oportunidad_id, titulo, institucion, monto_estimado, fecha_cierre, etapa, match_score, oportunidad_tipo, created_at, updated_at')
         .in('oportunidad_id', oportunidadIds);
@@ -132,7 +132,7 @@ export function usePipelineAsignaciones() {
   return useQuery({
     queryKey: [ASIGNACIONES_KEY],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('vendedor_asignaciones')
         .select(`
           id,
@@ -176,7 +176,7 @@ export function useAsignarPipeline() {
       if (!user?.id) throw new Error('No autenticado');
 
       // Upsert: si ya existe una asignación para esta oportunidad, se actualiza.
-      const { data: existing } = await (supabase as any)
+      const { data: existing } = await supabase
         .from('vendedor_asignaciones')
         .select('id')
         .eq('licitacion_id', oportunidadId)
@@ -184,7 +184,7 @@ export function useAsignarPipeline() {
 
       let data;
       if (existing) {
-        const res = await (supabase as any)
+        const res = await supabase
           .from('vendedor_asignaciones')
           .update({
             vendedor_id: vendedorId,
@@ -197,7 +197,7 @@ export function useAsignarPipeline() {
         if (res.error) throw res.error;
         data = res.data;
       } else {
-        const res = await (supabase as any)
+        const res = await supabase
           .from('vendedor_asignaciones')
           .insert({
             licitacion_id: oportunidadId,

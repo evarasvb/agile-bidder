@@ -13,7 +13,7 @@ const TIPO: Record<string, string> = { informe: 'Informe', estudio: 'Estudio pro
 export default function Compartidos() {
   const { data: filas = [], isLoading } = useQuery({
     queryKey: ['experto_compartidos_mios'],
-    queryFn: async () => ((await (supabase as any).from('experto_compartidos').select('id, token, codigo, tipo, titulo, vistas, creado_en').order('creado_en', { ascending: false }).limit(100)).data ?? []) as any[],
+    queryFn: async () => ((await supabase.from('experto_compartidos').select('id, token, codigo, tipo, titulo, vistas, creado_en').order('creado_en', { ascending: false }).limit(100)).data ?? []) as any[],
   });
   const url = (t: string) => `${window.location.origin}/experto/c/${t}`;
   return (

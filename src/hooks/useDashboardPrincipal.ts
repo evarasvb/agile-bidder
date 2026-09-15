@@ -56,7 +56,7 @@ export function useDashboardKPIs() {
       // Todo el cálculo se hace en la BD (RPC dashboard_kpis): antes se bajaban
       // TODAS las filas de compras_agiles y licitaciones al navegador cada 30s
       // sólo para contar/sumar. Ahora es una sola llamada sin transferir filas.
-      const { data, error } = await (supabase as any).rpc('dashboard_kpis');
+      const { data, error } = await supabase.rpc('dashboard_kpis');
       if (error) throw error;
       const row = Array.isArray(data) ? data[0] : data;
 
@@ -85,7 +85,7 @@ export function usePipelineByStage() {
     queryFn: async (): Promise<PipelineStage[]> => {
       // Agregación en la BD (RPC): antes bajaba todas las filas para agrupar en
       // el navegador. La RPC ya devuelve estado (en minúscula), cantidad y monto.
-      const { data, error } = await (supabase as any).rpc('dashboard_pipeline_por_estado');
+      const { data, error } = await supabase.rpc('dashboard_pipeline_por_estado');
       if (error) throw error;
 
       const stageMap: Record<string, { count: number; monto: number }> = {};
@@ -157,7 +157,7 @@ export function useOportunidadesPorTipo() {
       // (congelada) — mismo criterio que useCierresProximos/useUltimosMatches
       // más abajo. Antes esta tarjeta mostraba un conteo desactualizado
       // mientras el resto del dashboard ya usaba la tabla correcta.
-      const { count: licCount, error: licError } = await (supabase as any)
+      const { count: licCount, error: licError } = await supabase
         .from('licitaciones_bi')
         .select('*', { count: 'exact', head: true })
         .or('estado.is.null,estado.ilike.publicada,estado.ilike.activa')
@@ -184,7 +184,7 @@ export function useCierresProximos() {
 
       // Compras Ágiles que cierran pronto. La columna del organismo es
       // `nombre_organismo` (no `organismo`, que no existe y hacía fallar la query).
-      const { data: caData, error: caError } = await (supabase as any)
+      const { data: caData, error: caError } = await supabase
         .from('compras_agiles')
         .select('codigo, nombre, nombre_organismo, fecha_cierre, match_score, estado')
         .gte('fecha_cierre', now.toISOString())
@@ -196,8 +196,8 @@ export function useCierresProximos() {
       // Licitaciones que cierran pronto: desde `licitaciones_bi` (tabla fresca del
       // sync oficial). La antigua `licitaciones` está congelada (0 activas) y no
       // tiene `id_licitacion`, por eso la query lanzaba error y el widget de
-      // cierres próximos quedaba vacío. No está en los tipos generados => any.
-      const { data: licData, error: licError } = await (supabase as any)
+      // cierres próximos quedaba vacío.
+      const { data: licData, error: licError } = await supabase
         .from('licitaciones_bi')
         .select('codigo, nombre, institucion_nombre, fecha_cierre, match_score, estado')
         .gte('fecha_cierre', now.toISOString())
@@ -245,7 +245,7 @@ export function useUltimosMatches() {
     queryKey: ['dashboard-principal', 'ultimos-matches'],
     queryFn: async (): Promise<UltimoMatch[]> => {
       // Compras Ágiles con match. Organismo = `nombre_organismo`.
-      const { data: caData, error: caError } = await (supabase as any)
+      const { data: caData, error: caError } = await supabase
         .from('compras_agiles')
         .select('codigo, nombre, nombre_organismo, match_score, created_at')
         .eq('match_encontrado', true)
@@ -256,7 +256,7 @@ export function useUltimosMatches() {
 
       // Licitaciones con match desde `licitaciones_bi` (fresca). La antigua
       // `licitaciones` no tiene `id_licitacion` => la query fallaba. any por tipos.
-      const { data: licData, error: licError } = await (supabase as any)
+      const { data: licData, error: licError } = await supabase
         .from('licitaciones_bi')
         .select('codigo, nombre, institucion_nombre, match_score, created_at')
         .eq('match_encontrado', true)

@@ -151,7 +151,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       let codigosCA: string[] | null = null;
       let codigosLic: string[] | null = null;
       if (textoBusqueda.length >= 2) {
-        const { data: hits, error: errBusqueda } = await (supabase as any).rpc('buscar_oportunidades', {
+        const { data: hits, error: errBusqueda } = await supabase.rpc('buscar_oportunidades', {
           p_texto: textoBusqueda,
           p_incluir_cerradas: incluirCerradas,
           p_limite: 200,
@@ -203,14 +203,13 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       // el sync oficial de Mercado Público). La antigua tabla `licitaciones`
       // quedó congelada en 2026-04 (0 activas) — por eso el panel no mostraba
       // ninguna licitación abierta. `licitaciones_bi` tiene ~2.000 activas al día.
-      // No está en los tipos generados de Supabase => usamos any.
       // Columnas explícitas (NO `raw_data`, que es un jsonb enorme por fila) para
       // no descargar megas al navegador.
       const LIC_COLS =
         'id, codigo, nombre, descripcion, estado, fecha_cierre, fecha_publicacion, ' +
         'institucion_nombre, unidad_compra_region, presupuesto_estimado, created_at, ' +
         'match_score, match_encontrado';
-      let licitacionesQuery = (supabase as any)
+      let licitacionesQuery = supabase
         .from('licitaciones_bi')
         .select(LIC_COLS)
         .order('fecha_publicacion', { ascending: false, nullsFirst: false });
@@ -231,7 +230,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
 
       // Filtros del cliente (onboarding + IA): se piden en paralelo. RLS restringe
       // la fila al propio cliente, así que un maybeSingle basta.
-      const filtrosRes = await (supabase as any)
+      const filtrosRes = await supabase
         .from('cliente_filtros_oportunidades')
         .select('palabras_incluir, palabras_incluir_ia, palabras_ia_descartadas, palabras_excluir, regiones_activas, monto_min, monto_max')
         .maybeSingle();
@@ -250,7 +249,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         if (palabras.length) {
           const res = await Promise.all(
             palabras.map((pal) =>
-              (supabase as any)
+              supabase
                 .rpc('buscar_oportunidades', { p_texto: pal, p_incluir_cerradas: incluirCerradas, p_limite: 100 })
                 .then((r: any) => ({ pal, hits: (r?.data || []) as any[] }))
                 .catch(() => ({ pal, hits: [] as any[] })),
@@ -286,11 +285,11 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
 
       // Afinidad aprendida del comportamiento (lo que cotiza sube, lo que
       // descarta baja). Resuelve el cliente por auth.uid() dentro de la función.
-      const afinidadQuery = (supabase as any).rpc('cliente_afinidad');
+      const afinidadQuery = supabase.rpc('cliente_afinidad');
 
       // Conteo real de activas (head:true = sin traer filas). Se pide junto al
       // resto: no depende de nada.
-      const licCountQuery = (supabase as any)
+      const licCountQuery = supabase
         .from('licitaciones_bi')
         .select('codigo', { count: 'exact', head: true })
         .or('estado.is.null,estado.ilike.publicada,estado.ilike.activa')
@@ -305,7 +304,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       // sentía lento): compras, licitaciones, filtros, afinidad, empresa dueña y
       // los conteos no dependen entre sí.
       const rubroLicQuery = porLotes(codigosRubroLic, (lote) =>
-        (supabase as any).from('licitaciones_bi').select(LIC_COLS).in('codigo', lote),
+        supabase.from('licitaciones_bi').select(LIC_COLS).in('codigo', lote),
       );
 
       const [comprasRes, licitacionesRes, rubroCA, rubroLic, afinidadRes, ownerRes, licCountRes, caCountRes] = await Promise.all([
@@ -314,7 +313,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         rubroCAQuery,
         rubroLicQuery,
         afinidadQuery,
-        (supabase as any).rpc('cliente_owner_id').then((r: any) => r).catch(() => ({ data: null })),
+        supabase.rpc('cliente_owner_id').then((r: any) => r).catch(() => ({ data: null })),
         incluirCerradas ? Promise.resolve(null) : licCountQuery,
         incluirCerradas ? Promise.resolve(null) : caCountQuery,
       ]);
@@ -367,11 +366,11 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         // Si el RPC de empresa dueña no resolvió (p. ej. caché de esquema o un
         // usuario sin fila en clientes), NO dejamos el panel sin matches: caemos
         // al comportamiento anterior (matches por código, mejor score).
-        let matchQuery = (supabase as any)
+        let matchQuery = supabase
           .from('ca_matches')
           .select('compra_agil_codigo, score, nombre_producto')
           .gte('fecha_cierre', nowIso);
-        let itemQuery = (supabase as any)
+        let itemQuery = supabase
           .from('ca_item_matches')
           .select('compra_agil_codigo')
           .gte('fecha_cierre', nowIso);
@@ -720,14 +719,14 @@ export function useOportunidadDetalle(id: string | null, tipo: 'compra_agil' | '
       // por `id` (uuid) por si llega un id antiguo.
       let licRow: any = null;
       {
-        const { data: byCodigo } = await (supabase as any)
+        const { data: byCodigo } = await supabase
           .from('licitaciones_bi')
           .select('*, licitaciones_bi_items(*)')
           .eq('codigo', id)
           .maybeSingle();
         licRow = byCodigo;
         if (!licRow && /^[0-9a-f-]{36}$/i.test(id)) {
-          const { data: byId } = await (supabase as any)
+          const { data: byId } = await supabase
             .from('licitaciones_bi')
             .select('*, licitaciones_bi_items(*)')
             .eq('id', id)
@@ -832,7 +831,7 @@ export function useDescartarOportunidad() {
           .eq('codigo', codigo);
         if (error) throw error;
       } else {
-        const { error } = await (supabase as any)
+        const { error } = await supabase
           .from('licitaciones_bi')
           .update({ match_encontrado: false, match_score: 0 })
           .eq('codigo', codigo);

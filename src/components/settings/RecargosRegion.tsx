@@ -52,7 +52,7 @@ export function RecargosRegion() {
   const fetchRecargos = async () => {
     try {
       const { data, error } = await supabase
-        .from('recargos_region' as any)
+        .from('recargos_region')
         .select('*')
         .eq('cliente_id', user?.id);
 
@@ -92,7 +92,7 @@ export function RecargosRegion() {
       for (const recargo of recargos) {
         if (recargo.id) {
           await supabase
-            .from('recargos_region' as any)
+            .from('recargos_region')
             .update({
               recargo_porcentaje: recargo.recargo_porcentaje,
               recargo_fijo: recargo.recargo_fijo,
@@ -101,7 +101,7 @@ export function RecargosRegion() {
             .eq('id', recargo.id);
         } else {
           await supabase
-            .from('recargos_region' as any)
+            .from('recargos_region')
             .insert({
               cliente_id: user.id,
               region_codigo: recargo.region_codigo,

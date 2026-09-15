@@ -46,9 +46,9 @@ export function useOportunidades(options: UseOportunidadesOptions = {}) {
     queryKey: ['oportunidades', filters, page, pageSize, orderBy, orderAsc],
     queryFn: async () => {
       // Query oportunidades_all view
-      const { data, error, count } = await (supabase
-        .from('oportunidades_all' as any)
-        .select('*', { count: 'exact' }) as any)
+      const { data, error, count } = await supabase
+        .from('oportunidades_all')
+        .select('*', { count: 'exact' })
         .order(orderBy, { ascending: orderAsc })
         .range((page - 1) * pageSize, page * pageSize - 1);
 

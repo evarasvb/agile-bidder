@@ -26,7 +26,7 @@ export function useProductosCatalogo(filters?: ProductosCatalogoFilters) {
   return useQuery({
     queryKey: ['productos-catalogo', filters],
     queryFn: async () => {
-      let query = (supabaseClient as any)
+      let query = supabaseClient
         .from('productos')
         .select('*')
         .eq('activo', true)
@@ -65,7 +65,7 @@ export function useProductosSearch(searchTerm: string, enabled: boolean = true) 
     queryFn: async () => {
       if (!searchTerm || searchTerm.length < 2) return [];
 
-      const { data, error } = await (supabaseClient as any)
+      const { data, error } = await supabaseClient
         .from('productos')
         .select('*')
         .or(`nombre.ilike.%${searchTerm}%,descripcion.ilike.%${searchTerm}%`)

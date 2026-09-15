@@ -104,7 +104,7 @@ export function useClienteFiltros() {
       const clienteId = await resolverClienteId(user.id);
       if (!clienteId) return null;
 
-      const { data, error } = await (supabaseClient as any)
+      const { data, error } = await supabaseClient
         .from('cliente_filtros_oportunidades')
         .select('*')
         .eq('cliente_id', clienteId)
@@ -132,7 +132,7 @@ export function useClienteFiltros() {
         ...filtros,
         updated_at: new Date().toISOString(),
       };
-      const { data, error } = await (supabaseClient as any)
+      const { data, error } = await supabaseClient
         .from('cliente_filtros_oportunidades')
         .upsert(payload, { onConflict: 'cliente_id' })
         .select()
