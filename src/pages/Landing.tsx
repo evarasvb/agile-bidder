@@ -278,9 +278,9 @@ export default function Landing() {
 <Shield className="h-3 w-3 mr-1" />
 Convenio Marco CM 2239-2-LR26
 </Badge>
-<h3 className="text-xl md:text-2xl font-bold text-foreground mb-2">
+<h2 className="text-xl md:text-2xl font-bold text-foreground mb-2">
 Puedes postular al Convenio Marco de Software y Servicios TI?
-</h3>
+</h2>
 <p className="text-muted-foreground">
 Valida en 2 minutos si tu empresa cumple los requisitos de admisibilidad y que puntaje tecnico podrias alcanzar.
 </p>

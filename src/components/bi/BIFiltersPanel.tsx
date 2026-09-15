@@ -338,13 +338,13 @@ export function BIFiltersPanel({ filters, onFiltersChange }: BIFiltersPanelProps
             {filters.fechaDesde && (
               <Badge variant="outline" className="flex items-center gap-1">
                 Desde: {format(new Date(filters.fechaDesde), "dd/MM/yyyy")}
-                <X className="h-3 w-3 cursor-pointer" onClick={() => onFiltersChange({ ...filters, fechaDesde: undefined })} />
+                <button onClick={() => onFiltersChange({ ...filters, fechaDesde: undefined })} aria-label="Limpiar filtro de fecha desde" className="hover:opacity-70 transition-opacity"><X className="h-3 w-3" /></button>
               </Badge>
             )}
             {filters.fechaHasta && (
               <Badge variant="outline" className="flex items-center gap-1">
                 Hasta: {format(new Date(filters.fechaHasta), "dd/MM/yyyy")}
-                <X className="h-3 w-3 cursor-pointer" onClick={() => onFiltersChange({ ...filters, fechaHasta: undefined })} />
+                <button onClick={() => onFiltersChange({ ...filters, fechaHasta: undefined })} aria-label="Limpiar filtro de fecha hasta" className="hover:opacity-70 transition-opacity"><X className="h-3 w-3" /></button>
               </Badge>
             )}
             {filters.proveedorNombre && (
