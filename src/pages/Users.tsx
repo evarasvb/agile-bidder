@@ -280,7 +280,7 @@ export default function Users() {
       }
       const errorMessage = error?.message || 'Error al eliminar usuario';
       toast.error(errorMessage, {
-        description: 'Intenta de nuevo; si persiste, escríbenos por el chat de Evaristo.',
+        description: 'Intenta de nuevo; si persiste, escríbenos por el chat de Don Evaristo.',
       });
     },
   });

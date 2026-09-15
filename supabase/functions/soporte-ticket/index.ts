@@ -36,7 +36,7 @@ function transcriptHtml(conv: Msg[]) {
     .filter((m) => m && m.content)
     .map((m) => {
       const esCliente = m.role === 'user';
-      const quien = esCliente ? 'Cliente' : 'Evaristo';
+      const quien = esCliente ? 'Cliente' : 'Don Evaristo';
       const bg = esCliente ? '#eff6ff' : '#f1f5f9';
       const col = esCliente ? '#1E40AF' : '#334155';
       return `<div style="margin:0 0 8px">

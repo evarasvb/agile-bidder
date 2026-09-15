@@ -93,7 +93,7 @@ export default function AdminSoporte() {
         <div className="p-2.5 rounded-xl bg-firmavb-blue/10 text-firmavb-blue"><LifeBuoy className="h-6 w-6" /></div>
         <div>
           <h1 className="text-xl font-bold leading-tight">Tickets de soporte</h1>
-          <p className="text-sm text-muted-foreground">Casos que Evaristo canalizó al equipo. Responde al correo del cliente y marca el estado.</p>
+          <p className="text-sm text-muted-foreground">Casos que Don Evaristo canalizó al equipo. Responde al correo del cliente y marca el estado.</p>
         </div>
       </div>
 
