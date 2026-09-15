@@ -150,7 +150,7 @@ export function AsignarVendedorModal({ open, onOpenChange, licitacion }: Asignar
               </div>
             ) : (
               <Select value={selectedVendedor} onValueChange={setSelectedVendedor}>
-                <SelectTrigger>
+                <SelectTrigger autoFocus>
                   <SelectValue placeholder="Selecciona un vendedor" />
                 </SelectTrigger>
                 <SelectContent>
@@ -193,6 +193,7 @@ export function AsignarVendedorModal({ open, onOpenChange, licitacion }: Asignar
                   value={newVendedor.nombre}
                   onChange={(e) => setNewVendedor({ ...newVendedor, nombre: e.target.value })}
                   placeholder="Nombre completo"
+                  autoFocus
                 />
               </div>
               <div className="space-y-2">

@@ -207,6 +207,7 @@ export function EquipoMemberList() {
                 id="edit-nombre"
                 value={editForm.nombre}
                 onChange={(e) => setEditForm({ ...editForm, nombre: e.target.value })}
+                autoFocus
               />
             </div>
             <div className="space-y-2">

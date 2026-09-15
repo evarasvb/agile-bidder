@@ -139,6 +139,7 @@ export function EditProductDialog({
                     value={formData.sku}
                     onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                     required
+                    autoFocus
                   />
                 </div>
                 <div className="space-y-2">

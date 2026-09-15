@@ -69,7 +69,7 @@ export function InvitarMiembroDialog({ open, onOpenChange }: InvitarMiembroDialo
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="invitar-nombre">Nombre completo</Label>
-                <Input id="invitar-nombre" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Juan Pérez" />
+                <Input id="invitar-nombre" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Juan Pérez" autoFocus />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="invitar-email">Email</Label>
