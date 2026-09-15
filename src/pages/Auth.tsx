@@ -306,7 +306,8 @@ export default function Auth() {
                     <div className="space-y-2">
                       <Label htmlFor="new-password">Nueva contraseña</Label>
                       <Input id="new-password" type="password" placeholder="Mínimo 6 caracteres"
-                        value={newPassword} onChange={(e) => setNewPassword(e.target.value)} disabled={loading} />
+                        value={newPassword} onChange={(e) => setNewPassword(e.target.value)} disabled={loading} aria-describedby="pwd-help" />
+                      <p id="pwd-help" className="text-xs text-muted-foreground">Mínimo 6 caracteres</p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="new-password-2">Repite la contraseña</Label>
@@ -370,8 +371,9 @@ export default function Auth() {
                             setSuccess(null);
                           }}
                           className="text-xs text-[hsl(var(--firmavb-blue))] hover:underline flex items-center gap-1"
+                          aria-label="Recuperar contraseña olvidada"
                         >
-                          <HelpCircle className="h-3 w-3" />
+                          <HelpCircle className="h-3 w-3" aria-hidden="true" />
                           ¿Olvidaste tu contraseña?
                         </button>
                       </div>
@@ -447,9 +449,15 @@ export default function Auth() {
 
                   {/* Forgot Password Form */}
                   {showForgotPassword && (
-                    <div className="mt-4 p-4 rounded-lg border border-border bg-muted/30">
+                    <div className="mt-4 p-4 rounded-lg border border-border bg-muted/30" role="dialog" aria-labelledby="forgot-password-title" onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setShowForgotPassword(false);
+                        setResetEmail('');
+                        setError(null);
+                      }
+                    }}>
                       <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-sm font-semibold">Recuperar Contraseña</h3>
+                        <h3 id="forgot-password-title" className="text-sm font-semibold">Recuperar Contraseña</h3>
                         <button
                           type="button"
                           onClick={() => {
@@ -458,6 +466,7 @@ export default function Auth() {
                             setError(null);
                           }}
                           className="text-xs text-muted-foreground hover:text-foreground"
+                          aria-label="Cerrar diálogo de recuperación de contraseña"
                         >
                           Cancelar
                         </button>

@@ -46,8 +46,8 @@ export function SalaPostulacion(p: SalaProps) {
       {/* Proceso */}
       <div className="flex flex-wrap gap-1">
         {pasos.map((s, i) => (
-          <button key={s.k} onClick={s.accion} title={s.ayuda} className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${s.listo ? 'border-green-300 bg-green-50 text-green-800' : 'hover:border-primary'}`}>
-            {s.listo ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5 text-muted-foreground" />}{i + 1}. {s.t}
+          <button key={s.k} onClick={s.accion} title={s.ayuda} aria-label={`Paso ${i + 1}: ${s.t}${s.listo ? ' (completado)' : ''}`} className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${s.listo ? 'border-green-300 bg-green-50 text-green-800' : 'hover:border-primary'}`}>
+            {s.listo ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> : <Circle className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />}{i + 1}. {s.t}
           </button>
         ))}
       </div>

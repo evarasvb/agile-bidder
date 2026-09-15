@@ -646,10 +646,15 @@ export default function Academia() {
               asChild
               className="bg-firmavb-red hover:bg-firmavb-red/90 gap-2"
             >
-              <a href={youtube.canalUrl} target="_blank" rel="noopener noreferrer">
-                <Youtube className="h-4 w-4" />
+              <a
+                href={youtube.canalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Ver canal de YouTube (abre en nueva pestaña)"
+              >
+                <Youtube className="h-4 w-4" aria-hidden="true" />
                 Ver mi canal en YouTube
-                <ExternalLink className="h-3 w-3" />
+                <ExternalLink className="h-3 w-3" aria-hidden="true" />
               </a>
             </Button>
           </div>

@@ -553,8 +553,13 @@ export default function OportunidadDetalle() {
             </Button>
             {oportunidad.link_oficial && (
               <Button variant="outline" className="gap-2" asChild>
-                <a href={oportunidad.link_oficial} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-4 w-4" />
+                <a
+                  href={oportunidad.link_oficial}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Ver oportunidad en Mercado Público (abre en nueva pestaña)"
+                >
+                  <ExternalLink className="h-4 w-4" aria-hidden="true" />
                   Ver en MercadoPúblico
                 </a>
               </Button>

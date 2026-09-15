@@ -541,11 +541,11 @@ export default function LibroLicitacion() {
       {compartido && (
         <div className="flex items-center gap-1 flex-wrap text-xs rounded-md border border-primary/30 bg-primary/5 px-2 py-1">
           <span className="font-medium truncate max-w-[30vw]" title={compartido.titulo}>Link listo</span>
-          <Button size="sm" className="h-8 bg-[#25D366] hover:bg-[#1ebe5d] text-white" asChild><a href={waUrl(compartido)} target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4 mr-1" />WhatsApp (link)</a></Button>
+          <Button size="sm" className="h-8 bg-[#25D366] hover:bg-[#1ebe5d] text-white" asChild><a href={waUrl(compartido)} target="_blank" rel="noreferrer" aria-label="Enviar por WhatsApp (abre en nueva pestaña)"><MessageCircle className="h-4 w-4 mr-1" aria-hidden="true" />WhatsApp (link)</a></Button>
           {compartido.tipo !== 'mapa' && compartido.tipo !== 'infografia' && <Button size="sm" variant="outline" className="h-8" onClick={pdfCompartido} disabled={ocupado === 'pdf'}>{ocupado === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <FileText className="h-4 w-4 mr-1" />}PDF para WhatsApp</Button>}
           <Button size="sm" variant="outline" className="h-8" onClick={() => { navigator.clipboard.writeText(compartido.url); toast.success('Copiado'); }}><Copy className="h-4 w-4 mr-1" />Copiar link</Button>
           <Button size="sm" variant="outline" className="h-8" asChild><a href={oportunidadLibro ? mailtoOportunidad(oportunidadLibro, `${compartido.titulo}\n${compartido.url}`) : `mailto:?subject=${encodeURIComponent(compartido.titulo)}&body=${encodeURIComponent(compartido.titulo + '\n' + compartido.url)}`}><Mail className="h-4 w-4 mr-1" />Email (link)</a></Button>
-          <Button size="sm" variant="outline" className="h-8" asChild><a href={compartido.url} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4 mr-1" />Ver página</a></Button>
+          <Button size="sm" variant="outline" className="h-8" asChild><a href={compartido.url} target="_blank" rel="noreferrer" aria-label="Ver página del análisis (abre en nueva pestaña)"><ExternalLink className="h-4 w-4 mr-1" aria-hidden="true" />Ver página</a></Button>
           {typeof navigator !== 'undefined' && 'share' in navigator && <Button size="sm" variant="ghost" className="h-8" onClick={() => navigator.share({ title: compartido.titulo, url: compartido.url }).catch(() => {})}><Share2 className="h-4 w-4 mr-1" />Más…</Button>}
           <Button size="icon" variant="ghost" className="ml-auto h-8 w-8 text-muted-foreground" onClick={() => setCompartido(null)}><X className="h-4 w-4" /></Button>
         </div>

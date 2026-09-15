@@ -256,14 +256,25 @@ export default function CompraAgilDetalle() {
             (daba 404). */}
         {compra.link_oficial ? (
           <Button asChild variant="outline" className="gap-2 shrink-0">
-            <a href={compra.link_oficial} target="_blank" rel="noreferrer">
-              <ExternalLink className="h-4 w-4" />
+            <a
+              href={compra.link_oficial}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Postular en Mercado Público (abre en nueva pestaña)"
+            >
+              <ExternalLink className="h-4 w-4" aria-hidden="true" />
               Postular en Mercado Público
             </a>
           </Button>
         ) : (
-          <Button variant="outline" className="gap-2 shrink-0" disabled title="Aún no tenemos el enlace oficial de esta compra">
-            <ExternalLink className="h-4 w-4" />
+          <Button
+            variant="outline"
+            className="gap-2 shrink-0"
+            disabled
+            title="Aún no tenemos el enlace oficial de esta compra"
+            aria-label="Postular en Mercado Público - enlace no disponible"
+          >
+            <ExternalLink className="h-4 w-4" aria-hidden="true" />
             Postular en Mercado Público
           </Button>
         )}
