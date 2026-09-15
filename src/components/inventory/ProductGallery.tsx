@@ -156,7 +156,7 @@ export function ProductGallery({
             
             <img
               src={selectedImage.image_url}
-              alt=""
+              alt={`Galería de imágenes - ${productName}`}
               className="max-h-[85vh] max-w-[85vw] object-contain"
               onClick={(e) => e.stopPropagation()}
             />
@@ -206,9 +206,9 @@ export function ProductGalleryInline({
     >
       {principalImage ? (
         <>
-          <img 
-            src={principalImage.image_url} 
-            alt=""
+          <img
+            src={principalImage.image_url}
+            alt={`Galería de ${productName}`}
             className="w-full h-full object-cover"
           />
           {imageCount > 1 && (
