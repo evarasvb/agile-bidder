@@ -4081,7 +4081,11 @@ export type Database = {
       marketing_contactos: {
         Row: {
           actualizado_en: string
+          campos_adicionales: Json | null
           categoria: string | null
+          ciudad: string | null
+          consentimiento_fecha: string | null
+          consentimiento_marketing: boolean | null
           creado_en: string
           datos_enriquecimiento: Json | null
           email: string
@@ -4091,19 +4095,28 @@ export type Database = {
           estado_email: string | null
           estado_suscripcion: string | null
           etiquetas: string[] | null
+          frecuencia_contacto: string | null
           fuente_datos: string | null
           fuente_primaria: string | null
           id: string
           intentos_validacion: number | null
           nombre: string | null
           origen: string | null
+          pais: string | null
+          puntuacion_relevancia: number | null
           rubro: string | null
           telefono: string | null
+          telefono_pais: string | null
           ultima_validacion: string | null
+          ultimo_contacto_en: string | null
         }
         Insert: {
           actualizado_en?: string
+          campos_adicionales?: Json | null
           categoria?: string | null
+          ciudad?: string | null
+          consentimiento_fecha?: string | null
+          consentimiento_marketing?: boolean | null
           creado_en?: string
           datos_enriquecimiento?: Json | null
           email: string
@@ -4113,19 +4126,28 @@ export type Database = {
           estado_email?: string | null
           estado_suscripcion?: string | null
           etiquetas?: string[] | null
+          frecuencia_contacto?: string | null
           fuente_datos?: string | null
           fuente_primaria?: string | null
           id?: string
           intentos_validacion?: number | null
           nombre?: string | null
           origen?: string | null
+          pais?: string | null
+          puntuacion_relevancia?: number | null
           rubro?: string | null
           telefono?: string | null
+          telefono_pais?: string | null
           ultima_validacion?: string | null
+          ultimo_contacto_en?: string | null
         }
         Update: {
           actualizado_en?: string
+          campos_adicionales?: Json | null
           categoria?: string | null
+          ciudad?: string | null
+          consentimiento_fecha?: string | null
+          consentimiento_marketing?: boolean | null
           creado_en?: string
           datos_enriquecimiento?: Json | null
           email?: string
@@ -4135,15 +4157,50 @@ export type Database = {
           estado_email?: string | null
           estado_suscripcion?: string | null
           etiquetas?: string[] | null
+          frecuencia_contacto?: string | null
           fuente_datos?: string | null
           fuente_primaria?: string | null
           id?: string
           intentos_validacion?: number | null
           nombre?: string | null
           origen?: string | null
+          pais?: string | null
+          puntuacion_relevancia?: number | null
           rubro?: string | null
           telefono?: string | null
+          telefono_pais?: string | null
           ultima_validacion?: string | null
+          ultimo_contacto_en?: string | null
+        }
+        Relationships: []
+      }
+      marketing_contactos_auditoria: {
+        Row: {
+          accion: string
+          cantidad_afectada: number | null
+          detalles: Json | null
+          fuente: string | null
+          id: string
+          realizado_en: string | null
+          realizado_por: string | null
+        }
+        Insert: {
+          accion: string
+          cantidad_afectada?: number | null
+          detalles?: Json | null
+          fuente?: string | null
+          id?: string
+          realizado_en?: string | null
+          realizado_por?: string | null
+        }
+        Update: {
+          accion?: string
+          cantidad_afectada?: number | null
+          detalles?: Json | null
+          fuente?: string | null
+          id?: string
+          realizado_en?: string | null
+          realizado_por?: string | null
         }
         Relationships: []
       }
@@ -4202,6 +4259,13 @@ export type Database = {
             columns: ["contacto_id"]
             isOneToOne: false
             referencedRelation: "marketing_contactos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_ejecucion_contacto_id_fkey"
+            columns: ["contacto_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_contactos_segmentados"
             referencedColumns: ["id"]
           },
           {
@@ -7426,6 +7490,13 @@ export type Database = {
             referencedRelation: "marketing_contactos"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "youtube_subscribers_contacto_id_fkey"
+            columns: ["contacto_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_contactos_segmentados"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
@@ -8167,6 +8238,26 @@ export type Database = {
           margen_comercial?: string | null
           precio_venta_neto?: string | null
           unidad?: string | null
+        }
+        Relationships: []
+      }
+      marketing_contactos_segmentados: {
+        Row: {
+          categoria: string | null
+          consentimiento_marketing: boolean | null
+          email: string | null
+          empresa: string | null
+          estado_contacto: string | null
+          estado_suscripcion: string | null
+          etiquetas: string[] | null
+          fuente_datos: string | null
+          id: string | null
+          nombre: string | null
+          origen: string | null
+          puntuacion_relevancia: number | null
+          telefono: string | null
+          total_registros: number | null
+          ultimo_contacto_en: string | null
         }
         Relationships: []
       }
@@ -9893,9 +9984,21 @@ export type Database = {
         }[]
       }
       marcar_intento_pago: { Args: { p_rut: string }; Returns: undefined }
+      marketing_actualizar_ultimo_contacto: {
+        Args: { p_contacto_id: string }
+        Returns: undefined
+      }
       marketing_calcular_metricas: {
         Args: { campana_id_in: string; fecha_in: string }
         Returns: undefined
+      }
+      marketing_importar_contactos: {
+        Args: { p_cantidad?: number; p_fuente: string; p_tabla_origen: string }
+        Returns: {
+          duplicados: number
+          errores: number
+          importados: number
+        }[]
       }
       marketing_importar_webinars: {
         Args: never
@@ -9904,6 +10007,15 @@ export type Database = {
           errores: number
           importados: number
         }[]
+      }
+      marketing_registrar_auditoria: {
+        Args: {
+          p_accion: string
+          p_cantidad: number
+          p_detalles?: Json
+          p_fuente: string
+        }
+        Returns: string
       }
       match_compra_items: {
         Args: { p_titulo: string }
