@@ -171,6 +171,7 @@ export function ImagePreview({
           <button
             onClick={onSetPrincipal}
             disabled={isLoading}
+            title="Establecer como imagen principal"
             className="p-1.5 rounded-full bg-white/20 hover:bg-white/40 text-white text-xs"
             aria-label="Establecer como imagen principal"
           >
