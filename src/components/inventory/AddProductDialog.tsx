@@ -51,10 +51,20 @@ const UNITS = [
   { value: 'caja', label: 'Caja' },
   { value: 'pack', label: 'Pack' },
   { value: 'kit', label: 'Kit' },
-  { value: 'resma', label: 'Resma' },
+  { value: 'juego', label: 'Juego / Set' },
+  { value: 'par', label: 'Par' },
+  { value: 'docena', label: 'Docena' },
+  { value: 'metro', label: 'Metro' },
+  { value: 'metro2', label: 'Metro cuadrado' },
+  { value: 'rollo', label: 'Rollo' },
+  { value: 'plancha', label: 'Plancha' },
   { value: 'saco', label: 'Saco' },
+  { value: 'bolsa', label: 'Bolsa' },
+  { value: 'balde', label: 'Balde' },
+  { value: 'galon', label: 'Galón' },
   { value: 'litro', label: 'Litro' },
   { value: 'kg', label: 'Kilogramo' },
+  { value: 'resma', label: 'Resma' },
 ];
 
 export function AddProductDialog({
@@ -66,6 +76,7 @@ export function AddProductDialog({
   const [formData, setFormData] = useState<InventoryInput>({
     sku: '',
     nombre_producto: '',
+    marca: '',
     descripcion: '',
     categoria: '',
     keywords: [],
@@ -212,15 +223,26 @@ export function AddProductDialog({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="nombre">Nombre del Producto *</Label>
-            <Input
-              id="nombre"
-              placeholder="Resma Papel Carta"
-              value={formData.nombre_producto}
-              onChange={(e) => setFormData({ ...formData, nombre_producto: e.target.value })}
-              required
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="nombre">Nombre del Producto *</Label>
+              <Input
+                id="nombre"
+                placeholder="Taladro percutor 1/2 pulg. 750W"
+                value={formData.nombre_producto}
+                onChange={(e) => setFormData({ ...formData, nombre_producto: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="marca">Marca</Label>
+              <Input
+                id="marca"
+                placeholder="Bosch, Stanley, Genérico…"
+                value={formData.marca || ''}
+                onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
+              />
+            </div>
           </div>
 
           <div className="space-y-2">
