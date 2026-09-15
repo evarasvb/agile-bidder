@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink, Trash2, Paperclip, Printer, Mail, Map as MapIcon, Image as ImageIcon, Presentation, Waves, Download, Receipt, X } from 'lucide-react';
-import { useTraerAdjuntos } from '@/hooks/useAdjuntosLicitacion';
+import { useTraerAdjuntos, useAdjuntosLicitacion } from '@/hooks/useAdjuntosLicitacion';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -26,6 +26,7 @@ import { compartirPdfExperto } from '@/services/expertoPdf';
 import { MatrizPostulacion, type Matriz } from '@/components/experto/MatrizPostulacion';
 import { descargarWord } from '@/services/exportar';
 import { SalaPostulacion } from '@/components/experto/SalaPostulacion';
+import { ExpertoLibroModal } from '@/components/experto/ExpertoLibroModal';
 import { pagoOrganismo, presupuestoTexto, nombrePropio } from '@/lib/organismoPago';
 import { AccionesCompartir } from '@/components/oportunidades/AccionesCompartir';
 import { mailtoOportunidad } from '@/lib/compartir';
@@ -130,6 +131,7 @@ export default function LibroLicitacion() {
   const ENTREGABLES: Entregable[] = ['sala', 'informe', 'matriz', 'estudio', 'bajo_agua', 'anexos', 'mapa', 'infografia'];
   const generandoEntregable = ENTREGABLES.some((k) => ocupados.has(k));
   const algunWord = [...ocupados].some((k) => k.startsWith('word:'));
+  const [modalLibroAbierto, setModalLibroAbierto] = useState(false);
   const [tab, setTab] = useState<Entregable>('sala');
   const [entregables, setEntregables] = useState<Record<Entregable, string>>({ sala: 'ok', informe: '', matriz: '', estudio: '', bajo_agua: '', anexos: '', mapa: '', infografia: '' });
   const [faltantes, setFaltantes] = useState<string[]>([]);
@@ -199,6 +201,35 @@ export default function LibroLicitacion() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  // Análisis desde el modal: pincelada rápida, profundo o power analysis
+  const handleLibroAnalisis = async (tipo: 'pincelada' | 'profundo' | 'power') => {
+    // Manda al mismo hilo de chat (msgs), así que comparte candado con "chat":
+    // no tiene sentido dejar mandar una pregunta normal mientras esto corre, ni
+    // al revés.
+    if (ocupado('chat')) return;
+    setModalLibroAbierto(false);
+    if (!escritorio) setVista('chat');
+
+    const prompts: Record<string, string> = {
+      pincelada: `Sobre ${cod}: dame un resumen ejecutivo rápido (2-3 párrafos). ¿Qué piden? ¿Cuántas evaluaciones? ¿Plazos y riesgos obvios? Quiero decidir rápido si postular.`,
+      profundo: `Sobre ${cod}: análisis detallado completo. Requisitos específicos, matriz de evaluación, oportunidades, riesgos legales y administrativos. Todo lo que debo saber.`,
+      power: `Sobre ${cod}: estrategia para GANAR esta licitación. ¿Cómo maximizar puntaje? ¿Qué requisitos son críticos? ¿Dónde invertir recursos? ¿Cómo diferenciarnos?`
+    };
+
+    setMsgs((m) => [...m, { rol: 'yo', texto: prompts[tipo] }]);
+    empezar('chat'); empezar(`experto-${tipo}`);
+
+    try {
+      const historial = msgs.slice(-10).map((m) => ({ rol: m.rol, texto: m.texto }));
+      await pedir({ modo: 'chat', pregunta: prompts[tipo], codigo: cod || undefined, historial, huella: 'libro' }, 'experto-consultar', (t, meta) =>
+        setMsgs((m) => { const c = [...m]; c[c.length - 1] = { rol: 'exp', texto: t, fuentes: meta?.fuentes, pedirBases: meta?.pedir_bases }; return c; }));
+    } catch (e: any) {
+      if (e.status === 402 || e.status === 401) setLimite(e.message);
+      setMsgs((m) => { const c = [...m]; c[c.length - 1] = { rol: 'exp', texto: (e.status === 402 ? '' : 'No pude responder: ') + e.message }; return c; });
+    }
+    terminar('chat'); terminar(`experto-${tipo}`);
+  };
+
   const generar = async (tipo: Entregable) => {
     if (generandoEntregable) return;
     setTab(tipo); empezar(tipo);
@@ -234,6 +265,10 @@ export default function LibroLicitacion() {
   // imágenes o texto (privados, cuentan para el cupo del plan). Varios archivos a la vez, uno tras otro.
   // Bases y anexos directo desde la ficha de Mercado Público (robot licitacion-adjuntos).
   const traerAdjuntos = useTraerAdjuntos(cod);
+  // La sección "Adjuntos" de Mercado Público exige captcha: no se baja sola, pero si sabemos su URL
+  // se la ponemos a un clic de distancia en vez de que el usuario tenga que ir a buscarla.
+  const { data: adjuntosInfo } = useAdjuntosLicitacion(cod);
+  const urlAdjuntosMp = adjuntosInfo?.estado?.url_adjuntos_mp || null;
   const traerBasesMP = () =>
     traerAdjuntos.mutate(undefined, {
       onSuccess: (r) => {
@@ -572,8 +607,15 @@ export default function LibroLicitacion() {
               </div>
               <div>
                 <p className="font-medium flex items-center gap-1"><Upload className="h-4 w-4" />Fuentes subidas · bases (PDF)</p>
-                {bases.length ? bases.map((b) => <p key={b.id} className="text-muted-foreground truncate">{b.archivo} · {b.paginas} pág.</p>) : traerAdjuntos.isPending ? <p className="text-muted-foreground flex items-center gap-1"><Loader2 className="h-3.5 w-3.5 animate-spin" />Buscando las bases en Mercado Público…</p> : <p className="text-muted-foreground">Mercado Público no las tiene publicadas todavía (o el robot no las encontró). Tráelas de nuevo o súbelas tú abajo.</p>}
+                {bases.length ? bases.map((b) => <p key={b.id} className="text-muted-foreground truncate">{b.archivo} · {b.paginas} pág.</p>) : traerAdjuntos.isPending ? <p className="text-muted-foreground flex items-center gap-1"><Loader2 className="h-3.5 w-3.5 animate-spin" />Buscando las bases en Mercado Público…</p> : urlAdjuntosMp ? <p className="text-muted-foreground">Mercado Público las protege con captcha, así que no se bajan solas: ábrelas, descarga el PDF y súbelo abajo.</p> : <p className="text-muted-foreground">Mercado Público no las tiene publicadas todavía (o el robot no las encontró). Tráelas de nuevo o súbelas tú abajo.</p>}
                 <input ref={fileRef} type="file" multiple accept=".pdf,.xlsx,.xls,.xlsm,.csv,.docx,.txt,.md,.png,.jpg,.jpeg,.gif,.webp" className="hidden" onChange={(e) => { if (e.target.files?.length) subirFuentes(e.target.files); e.target.value = ''; }} />
+                {urlAdjuntosMp && (
+                  <Button size="sm" variant="outline" className="mt-1 mr-2" asChild title="Abre la sección Adjuntos de la ficha en Mercado Público (pide resolver un captcha)">
+                    <a href={urlAdjuntosMp} target="_blank" rel="noreferrer">
+                      <ExternalLink className="h-4 w-4 mr-1" />Abrir Adjuntos en Mercado Público
+                    </a>
+                  </Button>
+                )}
                 <Button size="sm" variant="outline" className="mt-1 mr-2" onClick={traerBasesMP} disabled={ocupado('fuentes') || traerAdjuntos.isPending} title="Baja las bases y anexos publicados en la ficha de Mercado Público y el Experto los lee">
                   {traerAdjuntos.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Download className="h-4 w-4 mr-1" />}Traer bases desde Mercado Público
                 </Button>
@@ -677,11 +719,23 @@ export default function LibroLicitacion() {
                   }} /> : <span className="text-muted-foreground">Buscando en las fuentes…</span>}
                   {m.pedirBases && (
                     <div className="mt-2 rounded-md border border-firmavb-blue/30 bg-firmavb-blue/5 px-2 py-2 text-xs space-y-1.5">
-                      <p>Para esto necesito las bases en PDF y todavía no las tengo — Mercado Público puede no haberlas publicado, o el robot aún no las encontró. Mientras tanto te respondo con lo que sé.</p>
+                      <p>
+                        {urlAdjuntosMp
+                          ? 'Para esto necesito las bases en PDF. Mercado Público protege esa sección con captcha, así que no la puedo abrir sola: ábrela tú, descarga el PDF de las Bases y súbelo aquí — queda guardado para todos los que consulten esta licitación.'
+                          : 'Para esto necesito las bases en PDF y todavía no las tengo — Mercado Público puede no haberlas publicado, o el robot aún no las encontró. Mientras tanto te respondo con lo que sé.'}
+                      </p>
                       <div className="flex flex-wrap gap-1">
-                        <Button size="sm" variant="outline" className="h-8" disabled={traerAdjuntos.isPending} onClick={traerBasesMP}>
-                          {traerAdjuntos.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Download className="h-3.5 w-3.5 mr-1" />}Reintentar desde Mercado Público
-                        </Button>
+                        {urlAdjuntosMp ? (
+                          <Button size="sm" variant="outline" className="h-8" asChild>
+                            <a href={urlAdjuntosMp} target="_blank" rel="noreferrer">
+                              <ExternalLink className="h-3.5 w-3.5 mr-1" />Abrir en Mercado Público
+                            </a>
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="outline" className="h-8" disabled={traerAdjuntos.isPending} onClick={traerBasesMP}>
+                            {traerAdjuntos.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Download className="h-3.5 w-3.5 mr-1" />}Reintentar desde Mercado Público
+                          </Button>
+                        )}
                         <Button size="sm" className="h-8" onClick={() => { if (!escritorio) { setVista('fuentes'); setTimeout(() => fileRef.current?.click(), 150); } else fileRef.current?.click(); }}>
                           <Upload className="h-3.5 w-3.5 mr-1" />Subir bases (PDF)
                         </Button>
@@ -758,7 +812,7 @@ export default function LibroLicitacion() {
                   matriz={entregables.matriz ? JSON.parse(entregables.matriz) : null} anexos={entregables.anexos} faltantes={faltantes} veredicto={veredictoDe(entregables.informe)}
                   onGenerar={(t) => generar(t)} onIr={(t) => setTab(t)} onMatriz={matrizCambio} onPreguntar={(q) => { setPregunta(q); if (!escritorio) setVista('chat'); }}
                   irOportunidad={f ? () => navigate(String(f.tipo ?? '').toLowerCase().includes('gil') ? `/compras-agiles/${cod}` : `/oportunidades/licitacion/${cod}`) : undefined}
-                  aprobar={aprobarPostulacion} ocupado={generandoEntregable ? 'generando' : null} />
+                  aprobar={aprobarPostulacion} ocupado={generandoEntregable ? 'generando' : null} onAbrirExpertoModal={() => setModalLibroAbierto(true)} />
               </div>
             ) : entregables[tab] ? (
               <div>
@@ -816,12 +870,15 @@ export default function LibroLicitacion() {
         </div>
       );
       return (
-        <ResizablePanelGroup orientation="horizontal" className="min-h-[calc(100vh-11rem)]">
-          <ResizablePanel defaultSize={cod ? 22 : 26} minSize={14} collapsible collapsedSize={0}>{panelFuentes}</ResizablePanel>
-          <ResizableHandle withHandle className="mx-1" />
-          <ResizablePanel defaultSize={cod ? 46 : 74} minSize={30}>{panelChat}</ResizablePanel>
-          {panelEntregables && <><ResizableHandle withHandle className="mx-1" /><ResizablePanel defaultSize={32} minSize={22} collapsible collapsedSize={0}>{panelEntregables}</ResizablePanel></>}
-        </ResizablePanelGroup>
+        <>
+          <ResizablePanelGroup orientation="horizontal" className="min-h-[calc(100vh-11rem)]">
+            <ResizablePanel defaultSize={cod ? 22 : 26} minSize={14} collapsible collapsedSize={0}>{panelFuentes}</ResizablePanel>
+            <ResizableHandle withHandle className="mx-1" />
+            <ResizablePanel defaultSize={cod ? 46 : 74} minSize={30}>{panelChat}</ResizablePanel>
+            {panelEntregables && <><ResizableHandle withHandle className="mx-1" /><ResizablePanel defaultSize={32} minSize={22} collapsible collapsedSize={0}>{panelEntregables}</ResizablePanel></>}
+          </ResizablePanelGroup>
+          <ExpertoLibroModal open={modalLibroAbierto} onClose={() => setModalLibroAbierto(false)} onAnalizar={handleLibroAnalisis} bases={bases} codigo={cod} ocupado={(['experto-pincelada', 'experto-profundo', 'experto-power'] as const).find((k) => ocupado(k)) ?? null} />
+        </>
       );
       })()}
     </div>
