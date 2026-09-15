@@ -15,3 +15,7 @@ Al empezar CUALQUIER tarea, cargar primero la skill `ahorro-tokens`. Después, s
 - Bajar la cuenta de Vercel o acelerar el sitio: `vercel-optimize`.
 
 Las skills viven en `.claude/skills/`. Las públicas se actualizan con `npx skills update`; las propias (`ahorro-tokens`, `marketing-viral`, `ventas-experto`, `ux-conversion`, `programador-experto`) se editan directo en su `SKILL.md`.
+
+# Pull requests
+
+Toda PR (aunque CI esté verde y sin conflictos) espera la aprobación de Evaristo antes de mergear. Nunca hacer merge por cuenta propia: dejar la PR lista (fuera de draft si corresponde) y avisar que queda pendiente de su aprobación.
