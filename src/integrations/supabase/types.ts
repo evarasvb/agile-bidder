@@ -1194,6 +1194,7 @@ export type Database = {
           sku: string
           stock_disponible: number
           tiempo_entrega: number
+          unidad_medida: string | null
           updated_at: string
         }
         Insert: {
@@ -1217,6 +1218,7 @@ export type Database = {
           sku: string
           stock_disponible?: number
           tiempo_entrega?: number
+          unidad_medida?: string | null
           updated_at?: string
         }
         Update: {
@@ -1240,6 +1242,7 @@ export type Database = {
           sku?: string
           stock_disponible?: number
           tiempo_entrega?: number
+          unidad_medida?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1800,6 +1803,90 @@ export type Database = {
           raw_json?: Json | null
           rut_institucion?: string | null
           unidad_compra?: string | null
+        }
+        Relationships: []
+      }
+      contact_data_sources: {
+        Row: {
+          actualizado_en: string
+          configuracion: Json | null
+          creado_en: string
+          descripcion: string | null
+          estado: string | null
+          id: string
+          nombre: string
+          proxima_sincronizacion: string | null
+          registros_obtenidos: number | null
+          tipo_fuente: string | null
+          ultima_sincronizacion: string | null
+        }
+        Insert: {
+          actualizado_en?: string
+          configuracion?: Json | null
+          creado_en?: string
+          descripcion?: string | null
+          estado?: string | null
+          id?: string
+          nombre: string
+          proxima_sincronizacion?: string | null
+          registros_obtenidos?: number | null
+          tipo_fuente?: string | null
+          ultima_sincronizacion?: string | null
+        }
+        Update: {
+          actualizado_en?: string
+          configuracion?: Json | null
+          creado_en?: string
+          descripcion?: string | null
+          estado?: string | null
+          id?: string
+          nombre?: string
+          proxima_sincronizacion?: string | null
+          registros_obtenidos?: number | null
+          tipo_fuente?: string | null
+          ultima_sincronizacion?: string | null
+        }
+        Relationships: []
+      }
+      contact_enrichment_logs: {
+        Row: {
+          errores: number | null
+          estado: string | null
+          fecha_fin: string | null
+          fecha_inicio: string
+          id: string
+          mensaje_error: string | null
+          metadata: Json | null
+          proceso: string
+          registros_actualizados: number | null
+          registros_nuevos: number | null
+          registros_procesados: number | null
+        }
+        Insert: {
+          errores?: number | null
+          estado?: string | null
+          fecha_fin?: string | null
+          fecha_inicio?: string
+          id?: string
+          mensaje_error?: string | null
+          metadata?: Json | null
+          proceso: string
+          registros_actualizados?: number | null
+          registros_nuevos?: number | null
+          registros_procesados?: number | null
+        }
+        Update: {
+          errores?: number | null
+          estado?: string | null
+          fecha_fin?: string | null
+          fecha_inicio?: string
+          id?: string
+          mensaje_error?: string | null
+          metadata?: Json | null
+          proceso?: string
+          registros_actualizados?: number | null
+          registros_nuevos?: number | null
+          registros_procesados?: number | null
         }
         Relationships: []
       }
@@ -9983,6 +10070,13 @@ export type Database = {
           id: string
         }[]
       }
+      limpiar_duplicados_contactos: {
+        Args: never
+        Returns: {
+          eliminados: number
+          procesados: number
+        }[]
+      }
       marcar_intento_pago: { Args: { p_rut: string }; Returns: undefined }
       marketing_actualizar_ultimo_contacto: {
         Args: { p_contacto_id: string }
@@ -10180,6 +10274,18 @@ export type Database = {
         }
         Returns: undefined
       }
+      registrar_enriquecimiento_log: {
+        Args: {
+          p_errores?: number
+          p_mensaje_error?: string
+          p_metadata?: Json
+          p_proceso: string
+          p_registros_actualizados: number
+          p_registros_nuevos: number
+          p_registros_procesados: number
+        }
+        Returns: string
+      }
       revisar_datos_prueba_licitaciones: {
         Args: never
         Returns: {
@@ -10215,6 +10321,7 @@ export type Database = {
         Args: { _section_key: string; _user_id: string }
         Returns: boolean
       }
+      validar_email_basico: { Args: { p_email: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "user" | "super_admin" | "vendedor" | "visor"
