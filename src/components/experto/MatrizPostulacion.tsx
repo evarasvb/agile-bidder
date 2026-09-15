@@ -84,7 +84,8 @@ export function MatrizPostulacion({ m, onChange, empresa, url }: { m: Matriz; on
         {total > 0 && <span className="ml-auto text-xs text-muted-foreground">Admisibilidad: {ok}/{total} cumplidos</span>}
       </div>
       <div className="flex gap-2">
-        <input type="text" placeholder="Buscar por requisito, criterio o anexo…" value={filtro} onChange={(e) => setFiltro(e.target.value.toLowerCase())} className="flex-1 rounded border px-3 py-1 text-sm" />
+        <label htmlFor="matriz-search" className="sr-only">Buscar por requisito, criterio o anexo</label>
+        <input id="matriz-search" type="text" placeholder="Buscar por requisito, criterio o anexo…" value={filtro} onChange={(e) => setFiltro(e.target.value.toLowerCase())} className="flex-1 rounded border px-3 py-1 text-sm focus:ring-2 focus:ring-primary focus:outline-none" />
       </div>
       {m.resumen && <p className="text-muted-foreground">{m.resumen}</p>}
       {SECCIONES.map((s) => { const f = filas(m, s.clave); const fFiltrado = filtro ? f.filter((r) => s.cols.some((c) => String(r[c[0]] ?? '').toLowerCase().includes(filtro))) : f; if (!f.length) return null; if (filtro && !fFiltrado.length) return null; return (
@@ -103,7 +104,7 @@ export function MatrizPostulacion({ m, onChange, empresa, url }: { m: Matriz; on
                     : c[0] === 'entrada' ? (editable
                       ? (r.chequeo?.tipo === 'si_no' || !r.chequeo?.tipo
                         ? <select value={txt(r.entrada)} onChange={(e) => set(s.clave, i, 'entrada', e.target.value)} className="rounded border bg-yellow-50 px-2 py-1 text-sm" aria-label={`Entrada para ${r.requisito}`}><option value="">—</option><option value="SÍ">SÍ</option><option value="NO">NO</option></select>
-                        : <input value={txt(r.entrada)} onChange={(e) => set(s.clave, i, 'entrada', e.target.value)} className="min-w-[100px] rounded border bg-yellow-50 px-2 py-1 text-sm" placeholder={r.chequeo?.unidad ?? 'valor'} title={r.chequeo?.umbral != null ? `Regla: ${r.chequeo.tipo} ${r.chequeo.umbral}${r.chequeo.umbral2 != null ? ' a ' + r.chequeo.umbral2 : ''} ${r.chequeo.unidad ?? ''}` : ''} aria-label={`Entrada ${r.chequeo?.unidad ?? 'valor'} para ${r.requisito}`} />)
+                        : <><input value={txt(r.entrada)} onChange={(e) => set(s.clave, i, 'entrada', e.target.value)} className="min-w-[100px] rounded border bg-yellow-50 px-2 py-1 text-sm" placeholder={r.chequeo?.unidad ?? 'valor'} aria-label={`Entrada ${r.chequeo?.unidad ?? 'valor'} para ${r.requisito}`} aria-describedby={r.chequeo?.umbral != null ? `regla-${s.clave}-${i}` : undefined} />{r.chequeo?.umbral != null && <span id={`regla-${s.clave}-${i}`} className="sr-only">Regla de validación: ${r.chequeo.tipo} ${r.chequeo.umbral}${r.chequeo.umbral2 != null ? ' a ' + r.chequeo.umbral2 : ''} ${r.chequeo.unidad ?? ''}</span>}</>)
                       : <span>{txt(r.entrada)}</span>)
                     : <span className={c[0] === 'fuente' || c[0] === 'plazo' ? 'text-muted-foreground' : ''}>{txt(r[c[0]])}</span>}
                   </td>))}</tr>))}</tbody>

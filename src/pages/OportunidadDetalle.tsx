@@ -442,7 +442,7 @@ export default function OportunidadDetalle() {
                         return (
                         <TableRow key={item.id}>
                           <TableCell className="font-medium">{item.nombre_producto}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
+                          <TableCell className="text-sm text-muted-foreground max-w-xs truncate" title={item.descripcion || ""}>
                             {item.descripcion || "-"}
                           </TableCell>
                           <TableCell className="text-right">{item.cantidad || "-"}</TableCell>
@@ -553,8 +553,13 @@ export default function OportunidadDetalle() {
             </Button>
             {oportunidad.link_oficial && (
               <Button variant="outline" className="gap-2" asChild>
-                <a href={oportunidad.link_oficial} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-4 w-4" />
+                <a
+                  href={oportunidad.link_oficial}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Ver oportunidad en Mercado Público (abre en nueva pestaña)"
+                >
+                  <ExternalLink className="h-4 w-4" aria-hidden="true" />
                   Ver en MercadoPúblico
                 </a>
               </Button>

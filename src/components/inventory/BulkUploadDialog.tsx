@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2, X, FileUp, ImageIcon, Download, ImageOff } from 'lucide-react';
-import { useInventoryBulk, BulkProductRow, ImportProgress, generateInventoryTemplateData, generateInventoryInstructions } from '@/hooks/useInventoryBulk';
+import { useInventoryBulk, esSkuFecha, BulkProductRow, ImportProgress, generateInventoryTemplateData, generateInventoryInstructions } from '@/hooks/useInventoryBulk';
 import { useCreateImportHistory } from '@/hooks/useImportHistory';
 import { validateImageUrl } from '@/hooks/useProductImageUpload';
 import * as XLSX from 'xlsx';
@@ -154,7 +154,8 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
         const descCol = String(row['Descripción'] || row['Descripcion'] || row['descripcion'] || '').trim();
         const detalleCol = String(row['Detalle'] || row['detalle'] || '').trim();
         return {
-        sku: row['Código'] || row['Codigo'] || row['SKU'] || row['sku'] || row['Sku'] || '',
+        // String(): si Excel entregó un número o una fecha, no explota el .trim().
+        sku: String(row['Código'] ?? row['Codigo'] ?? row['SKU'] ?? row['sku'] ?? row['Sku'] ?? '').trim(),
         nombre: nombreCol || descCol,
         descripcion: detalleCol || (nombreCol ? descCol : ''),
         categoria: row['Categoría'] || row['Categoria'] || row['categoria'] || '',
@@ -180,6 +181,8 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
         // Required: Código
         if (!row.sku || row.sku.trim() === '') {
           errors.push(`Fila ${rowNum}: Código es obligatorio`);
+        } else if (esSkuFecha(row.sku)) {
+          errors.push(`Fila ${rowNum}: el código "${row.sku}" parece una fecha. En Excel pon la columna Código en formato Texto y vuelve a cargar`);
         } else if (skuSet.has(row.sku.toLowerCase())) {
           errors.push(`Fila ${rowNum}: Código "${row.sku}" duplicado en el archivo`);
         } else {
@@ -370,14 +373,23 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onClick={handleFileInputClick}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleFileInputClick();
+                  }
+                }}
+                aria-label="Arrastra archivo Excel o CSV aquí, o haz clic para seleccionar"
                 className={cn(
                   "border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer",
-                  isDragging 
-                    ? "border-primary bg-primary/5" 
+                  isDragging
+                    ? "border-primary bg-primary/5"
                     : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50"
                 )}
               >
-                <FileUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <FileUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground" aria-hidden="true" />
                 <p className="text-lg font-medium mb-2">
                   Arrastra tu archivo aquí
                 </p>
@@ -392,7 +404,7 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
                   className="hidden"
                 />
                 <Button variant="outline" className="pointer-events-none">
-                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  <FileSpreadsheet className="h-4 w-4 mr-2" aria-hidden="true" />
                   Seleccionar Archivo
                 </Button>
                 <p className="text-xs text-muted-foreground mt-4">
@@ -405,12 +417,12 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
               
               {/* Download Template Button */}
               <div className="flex justify-center">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="gap-2"
                   onClick={handleDownloadTemplate}
                 >
-                  <Download className="h-4 w-4" />
+                  <Download className="h-4 w-4" aria-hidden="true" />
                   Descargar Plantilla de Ejemplo
                 </Button>
               </div>

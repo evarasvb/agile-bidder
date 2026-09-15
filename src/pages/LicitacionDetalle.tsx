@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { format, differenceInDays, differenceInHours } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -361,15 +362,26 @@ export default function LicitacionDetalle() {
               </Badge>
             )}
           </Button>
-          <Button
-            size="sm"
-            className="bg-firmavb-blue hover:bg-firmavb-blue/90"
-            onClick={handleCrearOferta}
-            disabled={!estaAbierta}
-          >
-            <FileText className="h-4 w-4 mr-2" />
-            Crear Nueva Oferta
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  className="bg-firmavb-blue hover:bg-firmavb-blue/90"
+                  onClick={handleCrearOferta}
+                  disabled={!estaAbierta}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Crear Nueva Oferta
+                </Button>
+              </TooltipTrigger>
+              {!estaAbierta && (
+                <TooltipContent side="top">
+                  Esta licitación ya cerró. No puedes crear nuevas ofertas.
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </div>
 

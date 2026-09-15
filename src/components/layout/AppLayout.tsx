@@ -35,7 +35,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         </div>
 
         <StatusBar />
-        <main className="p-4 sm:p-6">{children}</main>
+        <main id="main-content" className="p-4 sm:p-6">{children}</main>
       </div>
 
       {/* Asistente de soporte con IA, disponible en toda la app */}

@@ -38,6 +38,15 @@ export interface ImportProgress {
   message: string;
 }
 
+// Excel convierte códigos como "01-09" a fecha y llegan como
+// "Tue Sep 01 8471 00:00:00 GMT-0400" (o un Date): quedaban guardados como
+// SKU corrupto e imposibles de buscar. Se rechaza la fila con aviso claro.
+export function esSkuFecha(sku: unknown): boolean {
+  if (sku instanceof Date) return true;
+  const s = String(sku ?? '').trim();
+  return /GMT|UTC|^[A-Z][a-z]{2} [A-Z][a-z]{2} \d{1,2} \d{4}|^\d{4}-\d{2}-\d{2}T\d{2}:/i.test(s);
+}
+
 export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void) {
   const queryClient = useQueryClient();
 
@@ -102,8 +111,13 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
         const row = products[i];
         const rowNum = i + 2;
 
-        if (!row.sku || row.sku.trim() === '') {
+        if (!row.sku || String(row.sku).trim() === '') {
           errors.push({ row: rowNum, field: 'Código', message: 'Código es obligatorio' });
+          continue;
+        }
+
+        if (esSkuFecha(row.sku)) {
+          errors.push({ row: rowNum, field: 'Código', message: 'El código parece una fecha: en Excel pon la columna en formato Texto y vuelve a cargar' });
           continue;
         }
 

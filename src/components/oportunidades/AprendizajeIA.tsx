@@ -39,7 +39,7 @@ export default function AprendizajeIA({
         <CardDescription>
           {total === 0
             ? "Aún estoy aprendiendo de ti. A medida que descartes o cotices oportunidades en el panel, aquí verás sugerencias para afinar tus filtros."
-            : `Analicé ${total} acción${total === 1 ? "" : "es"} tuya${total === 1 ? "" : "s"} en el panel.`}
+            : `Analicé ${total} acción${total === 1 ? "" : "es"} tuya${total === 1 ? "" : "s"} en el panel. Mientras más descartes y cotices, más precisas serán las sugerencias.`}
         </CardDescription>
       </CardHeader>
       {(isLoading || haySugerencias) && (

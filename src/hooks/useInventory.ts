@@ -162,6 +162,11 @@ export function useInventarioResumen() {
     },
     enabled: !!clienteId && !authLoading,
     staleTime: 60 * 1000,
+    // Los KPIs quedaban en 0·0·0·0 al entrar directo a /inventario hasta que
+    // algo forzaba un refetch (p.ej. escribir en el buscador). Forzar la
+    // consulta al montar y reintentar si la RPC falla al primer intento.
+    refetchOnMount: 'always',
+    retry: 2,
   });
 }
 

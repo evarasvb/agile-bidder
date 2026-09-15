@@ -19,20 +19,20 @@ interface RecargoRegion {
 
 const REGIONES_CHILE = [
   { codigo: 'XV', nombre: 'Arica y Parinacota' },
-  { codigo: 'I', nombre: 'Tarapaca' },
+  { codigo: 'I', nombre: 'Tarapacá' },
   { codigo: 'II', nombre: 'Antofagasta' },
   { codigo: 'III', nombre: 'Atacama' },
   { codigo: 'IV', nombre: 'Coquimbo' },
-  { codigo: 'V', nombre: 'Valparaiso' },
+  { codigo: 'V', nombre: 'Valparaíso' },
   { codigo: 'RM', nombre: 'Metropolitana' },
-  { codigo: 'VI', nombre: 'OHiggins' },
+  { codigo: 'VI', nombre: "O'Higgins" },
   { codigo: 'VII', nombre: 'Maule' },
-  { codigo: 'XVI', nombre: 'Nuble' },
-  { codigo: 'VIII', nombre: 'Biobio' },
-  { codigo: 'IX', nombre: 'La Araucania' },
-  { codigo: 'XIV', nombre: 'Los Rios' },
+  { codigo: 'XVI', nombre: 'Ñuble' },
+  { codigo: 'VIII', nombre: 'Biobío' },
+  { codigo: 'IX', nombre: 'La Araucanía' },
+  { codigo: 'XIV', nombre: 'Los Ríos' },
   { codigo: 'X', nombre: 'Los Lagos' },
-  { codigo: 'XI', nombre: 'Aysen' },
+  { codigo: 'XI', nombre: 'Aysén' },
   { codigo: 'XII', nombre: 'Magallanes' },
 ];
 
