@@ -442,7 +442,7 @@ export default function OportunidadDetalle() {
                         return (
                         <TableRow key={item.id}>
                           <TableCell className="font-medium">{item.nombre_producto}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
+                          <TableCell className="text-sm text-muted-foreground max-w-xs truncate" title={item.descripcion || ""}>
                             {item.descripcion || "-"}
                           </TableCell>
                           <TableCell className="text-right">{item.cantidad || "-"}</TableCell>
