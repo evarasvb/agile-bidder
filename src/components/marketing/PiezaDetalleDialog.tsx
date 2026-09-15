@@ -80,7 +80,7 @@ export function PiezaDetalleDialog({ pieza, onOpenChange, onGuardar, onEjecutar,
           {esEmail && (
             <div>
               <Label className="text-xs">Asunto</Label>
-              <Input value={asunto} onChange={(e) => setAsunto(e.target.value)} disabled={!esBorrador} />
+              <Input value={asunto} onChange={(e) => setAsunto(e.target.value)} disabled={ejecutando} />
             </div>
           )}
           <div>
@@ -88,7 +88,7 @@ export function PiezaDetalleDialog({ pieza, onOpenChange, onGuardar, onEjecutar,
             <Textarea
               value={contenido}
               onChange={(e) => setContenido(e.target.value)}
-              disabled={!esBorrador}
+              disabled={ejecutando}
               rows={esEmail ? 7 : 4}
               className={esEmail ? 'font-mono text-xs' : ''}
             />
@@ -96,7 +96,7 @@ export function PiezaDetalleDialog({ pieza, onOpenChange, onGuardar, onEjecutar,
           {esSocial && (
             <div>
               <Label className="text-xs">Hashtags</Label>
-              <Input value={hashtags} onChange={(e) => setHashtags(e.target.value)} disabled={!esBorrador} />
+              <Input value={hashtags} onChange={(e) => setHashtags(e.target.value)} disabled={ejecutando} />
             </div>
           )}
 
