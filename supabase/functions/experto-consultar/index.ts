@@ -231,6 +231,8 @@ Deno.serve(async (req) => {
     if (codigo) tareas.ficha = sb.rpc("experto_ficha_licitacion", { p_codigo: codigo }).then((r) => r.data);
     if (codigo) tareas.bases = sb.rpc("experto_bases_texto", { p_codigo: codigo }).then((r) => r.data ?? []);
     if (codigo) tareas.anexos = sb.rpc("experto_anexos_texto", { p_codigo: codigo }).then((r) => r.data ?? []);
+    if (codigo) tareas.fragmentacion = sb.rpc("experto_fragmentacion_organismo", { p_codigo_licitacion: codigo, p_dias_ventana: 90 }).then((r) => r.data ?? []);
+    if (codigo) tareas.patrones = sb.rpc("experto_patrones_licitacion", { p_codigo_licitacion: codigo, p_anos_atras: 3 }).then((r) => r.data ?? []);
     if (codigo && userId) tareas.docs = sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: codigo, p_max: 8000 }).then((r) => r.data ?? []);
     if (modo === "chat") {
       if (kws.length) {
@@ -322,6 +324,8 @@ Deno.serve(async (req) => {
     if (res.adj?.length) partes.push("LICITACIONES PARECIDAS YA ADJUDICADAS (API OCDS de Mercado Público, 12 meses; quién ganó y con cuánto):\n" + res.adj.map((a: any) => `${a.codigo} | ${a.titulo} | ${a.comprador} | adjudicada ${fecha(a.fecha_adjudicacion)} a ${a.adjudicatario ?? "s/i"} por ${fmt(a.monto_adjudicado)} (presupuesto ${fmt(a.monto_estimado)}) | ${a.num_oferentes ?? "s/i"} oferentes: ${a.oferentes ?? "s/i"}`).join("\n"));
     if (res.topadj?.length) partes.push("QUIÉN LE GANA A ESTE ORGANISMO (API OCDS, 12 meses):\n" + res.topadj.map((t: any) => `${t.adjudicatario} (${t.rut ?? "s/i"}): ${t.licitaciones} licitaciones ganadas por ${fmt(t.monto)}, participó en ${t.participaciones}`).join("\n"));
     if (res.org) partes.push("FICHA ORGANISMO (Datos Mercado Público vía FirmaVB):\n" + textoOrganismo(res.org));
+    if (res.fragmentacion?.length) partes.push("ANÁLISIS: FRAGMENTACIÓN DETECTADA\nEste organismo está licitando múltiples compras del mismo rubro en corto plazo. Señales:\n" + res.fragmentacion.map((f: any) => `- ${f.codigo} (${f.estado}, ${fecha(f.fecha_publicacion)}): ${fmt(f.presupuesto_estimado)} ${f.moneda} — ${f.señal}`).join("\n") + "\n💡 Oportunidad: Negocia volumen directo o espera consolidación; competencia fragmentada = precios altos.");
+    if (res.patrones?.length) partes.push("ANÁLISIS: PATRÓN RECURRENTE\nEste organismo licita esto cada cierto tiempo (compra estructural predecible):\n" + res.patrones.map((p: any) => `- ${p.codigo} (${p.estado}, ${fecha(p.fecha_publicacion)}): ${fmt(p.presupuesto_estimado)} ${p.moneda} — ${p.señal}`).join("\n") + "\n💡 Estrategia: Prepara proceso estándar, optimiza el precio de entrada, revisa cambios en criterios de adjudicación.");
     const contexto = partes.join("\n\n") || "(sin fuentes ni datos para esta pregunta)";
 
     // Evidence Gate: valida que la documentación esté completa para postular
