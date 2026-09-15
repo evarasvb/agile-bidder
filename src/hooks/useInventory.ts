@@ -29,7 +29,8 @@ export interface InventoryItem {
   margen_minimo: number | null;
   margen_objetivo: number | null; // UI field, stored as margen_minimo in DB
   stock_disponible: number | null;
-  unidad_medida: string | null; // UI field, not in cliente_inventario
+  unidad_medida: string | null;
+  marca: string | null;
   tiempo_entrega_dias: number | null;
   proveedor: string | null; // UI field, not in cliente_inventario
   activo: boolean | null;
@@ -49,7 +50,8 @@ export interface InventoryInput {
   margen_minimo?: number | null;
   margen_objetivo?: number | null; // UI field
   stock_disponible?: number | null;
-  unidad_medida?: string | null; // UI field
+  unidad_medida?: string | null;
+  marca?: string | null;
   tiempo_entrega_dias?: number | null;
   proveedor?: string | null; // UI field
   activo?: boolean | null;
@@ -69,7 +71,8 @@ function mapRowToInventoryItem(row: any): InventoryItem {
     margen_minimo: row.margen_minimo,
     margen_objetivo: row.margen_minimo, // Use same value as fallback
     stock_disponible: row.stock_disponible,
-    unidad_medida: 'unidad', // Default since not in table
+    unidad_medida: row.unidad_medida ?? 'unidad',
+    marca: row.marca ?? null,
     tiempo_entrega_dias: row.tiempo_entrega,
     proveedor: null, // Not in table
     activo: true, /* no existe columna activo en cliente_inventario */
@@ -389,6 +392,8 @@ export function useCreateInventoryItem() {
         precio_unitario: item.precio_unitario,
         margen_minimo: item.margen_minimo ?? item.margen_objetivo ?? 15,
         stock_disponible: item.stock_disponible ?? 0,
+        unidad_medida: item.unidad_medida ?? null,
+        marca: item.marca?.trim() || null,
         tiempo_entrega: item.tiempo_entrega_dias ?? 5,
                 imagen_url: item.imagen_url,
       };
@@ -451,6 +456,8 @@ export function useUpdateInventoryItem() {
       if (updates.precio_unitario !== undefined) updateData.precio_unitario = updates.precio_unitario;
       if (updates.margen_minimo !== undefined) updateData.margen_minimo = updates.margen_minimo;
       if (updates.stock_disponible !== undefined) updateData.stock_disponible = updates.stock_disponible;
+      if (updates.unidad_medida !== undefined) updateData.unidad_medida = updates.unidad_medida;
+      if (updates.marca !== undefined) updateData.marca = (updates.marca?.trim() || null);
       if (updates.tiempo_entrega_dias !== undefined) updateData.tiempo_entrega = updates.tiempo_entrega_dias;
             if (updates.imagen_url !== undefined) updateData.imagen_url = updates.imagen_url;
       if (updates.sku !== undefined) updateData.sku = updates.sku;

@@ -94,6 +94,7 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
       wsProducts['!cols'] = [
         { wch: 15 },  // Código
         { wch: 40 },  // Descripción
+        { wch: 15 },  // Marca
         { wch: 12 },  // Precio de Venta
         { wch: 10 },  // Unidad
         { wch: 20 },  // Categoría
@@ -161,6 +162,7 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
         categoria: row['Categoría'] || row['Categoria'] || row['categoria'] || '',
         precio_unitario: Number(row['Precio de Venta'] || row['Precio Neto'] || row['Precio'] || row['Precio Unitario'] || row['precio'] || row['precio_unitario'] || 0),
         unidad_medida: row['Unidad'] || row['Unidad de Medida'] || row['unidad'] || row['unidad_medida'] || '',
+        marca: String(row['Marca'] || row['marca'] || row['MARCA'] || '').trim(),
         stock: Number(row['Stock'] || row['stock'] || row['Stock Disponible'] || 0),
         margen_minimo: Number(row['Margen Mínimo (%)'] || row['Margen Minimo'] || row['margen_minimo'] || 10),
         margen_objetivo: Number(row['Margen Objetivo (%)'] || row['Margen Objetivo'] || row['margen_objetivo'] || 15),
@@ -525,6 +527,7 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
                       <TableHead className="w-10">Img</TableHead>
                       <TableHead>Código</TableHead>
                       <TableHead>Descripción</TableHead>
+                      <TableHead>Marca</TableHead>
                       <TableHead className="text-right">Precio</TableHead>
                       <TableHead>Unidad</TableHead>
                       <TableHead>Categoría</TableHead>
@@ -552,6 +555,7 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
                         </TableCell>
                         <TableCell className="font-mono text-sm">{row.sku || '-'}</TableCell>
                         <TableCell className="max-w-[200px] truncate">{row.nombre || '-'}</TableCell>
+                        <TableCell className="max-w-[120px] truncate">{row.marca || '-'}</TableCell>
                         <TableCell className="text-right font-mono">
                           {row.precio_unitario ? `$${row.precio_unitario.toLocaleString()}` : '-'}
                         </TableCell>

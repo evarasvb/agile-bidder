@@ -233,6 +233,7 @@ export default function Inventory() {
       'SKU': item.sku,
       'Producto': item.nombre_producto,
       'Descripción': item.descripcion || '',
+      'Marca': item.marca || '',
       'Categoría': item.categoria,
       'Proveedor': item.proveedor || '',
       'Precio Unitario': item.precio_unitario,
@@ -263,6 +264,7 @@ export default function Inventory() {
       { wch: 15 }, // SKU
       { wch: 30 }, // Producto
       { wch: 40 }, // Descripción
+      { wch: 15 }, // Marca
       { wch: 15 }, // Categoría
       { wch: 20 }, // Proveedor
       { wch: 12 }, // Precio
@@ -601,6 +603,7 @@ export default function Inventory() {
             ),
           },
           { id: 'proveedor', header: 'Proveedor', cell: (item) => <span className="text-muted-foreground">{item.proveedor || '-'}</span> },
+          { id: 'marca', header: 'Marca', cell: (item) => <span className="text-muted-foreground">{item.marca || '-'}</span>, sortValue: (item) => item.marca ?? '' },
           { id: 'categoria', header: 'Categoría', cell: (item) => <span className="text-muted-foreground">{item.categoria || '-'}</span>, sortValue: (item) => item.categoria },
           { id: 'precio_unitario', header: 'Precio', align: 'right', cell: (item) => <span className="font-mono">${item.precio_unitario.toLocaleString("es-CL")}</span>, sortValue: (item) => item.precio_unitario },
           { id: 'margen_minimo', header: 'Margen', align: 'right', cell: (item) => <span className="font-mono">{item.margen_minimo || 10}%</span>, sortValue: (item) => item.margen_minimo ?? 10 },
