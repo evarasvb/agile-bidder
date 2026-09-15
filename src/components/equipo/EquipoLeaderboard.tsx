@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import {
   BarChart,
   Bar,
@@ -15,7 +15,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
-import { useEquipoDashboard } from '@/hooks/useEquipo';
+import { useEquipoDashboard, type VendedorDashboard } from '@/hooks/useEquipo';
 
 const COLORS = ['#1e40af', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe'];
 
@@ -27,6 +27,76 @@ function formatCLP(value: number): string {
     maximumFractionDigits: 1,
   }).format(value);
 }
+
+/** Fila del ranking: el vendedor más su posición por ingresos (fija, aunque se reordene la tabla). */
+type FilaRanking = VendedorDashboard & { posicion: number };
+
+const MEDALLAS = ['🥇', '🥈', '🥉'];
+
+const COLUMNAS_RANKING: DataTableColumn<FilaRanking>[] = [
+  {
+    id: 'posicion',
+    header: '#',
+    headerClassName: 'w-12',
+    sortValue: (m) => m.posicion,
+    cell: (m) =>
+      m.posicion <= 3 ? (
+        <span className="text-lg">{MEDALLAS[m.posicion - 1]}</span>
+      ) : (
+        <span className="text-sm text-muted-foreground font-mono">{m.posicion}</span>
+      ),
+  },
+  {
+    id: 'vendedor',
+    header: 'Vendedor',
+    sortValue: (m) => m.nombre,
+    exportValue: (m) => `${m.nombre} <${m.email}>`,
+    cell: (m) => (
+      <div className="flex items-center gap-3">
+        <Avatar className="h-8 w-8">
+          <AvatarFallback className="bg-primary/10 text-primary text-xs">
+            {m.nombre.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+          </AvatarFallback>
+        </Avatar>
+        <div>
+          <div className="font-medium">{m.nombre}</div>
+          <div className="text-xs text-muted-foreground">{m.email}</div>
+        </div>
+      </div>
+    ),
+  },
+  { id: 'asignadas', header: 'Asignadas', align: 'center', sortValue: (m) => m.total_asignadas, cell: (m) => <Badge variant="outline">{m.total_asignadas}</Badge> },
+  { id: 'postuladas', header: 'Postuladas', align: 'center', sortValue: (m) => m.postuladas, cell: (m) => <Badge variant="secondary">{m.postuladas}</Badge> },
+  {
+    id: 'adjudicadas',
+    header: 'Adjudicadas',
+    align: 'center',
+    sortValue: (m) => m.adjudicadas,
+    cell: (m) => <Badge className="bg-green-500/10 text-green-600 border-green-500/30">{m.adjudicadas}</Badge>,
+  },
+  {
+    id: 'tasa',
+    header: 'Win Rate',
+    align: 'center',
+    sortValue: (m) => m.tasa_exito,
+    exportValue: (m) => `${m.tasa_exito}%`,
+    cell: (m) => (
+      <div className="flex flex-col items-center gap-1">
+        <span className="font-mono text-sm font-medium">{m.tasa_exito}%</span>
+        <Progress value={m.tasa_exito} className="h-1.5 w-16" />
+      </div>
+    ),
+  },
+  {
+    id: 'ingresos',
+    header: 'Ingresos',
+    align: 'right',
+    sortValue: (m) => m.ingresos_generados,
+    exportValue: (m) => m.ingresos_generados,
+    className: 'font-mono font-medium',
+    cell: (m) => formatCLP(m.ingresos_generados),
+  },
+];
 
 export function EquipoLeaderboard() {
   const navigate = useNavigate();
@@ -64,8 +134,10 @@ export function EquipoLeaderboard() {
     adjudicadas: m.adjudicadas,
   }));
 
-  // Leaderboard sorted by ingresos
-  const leaderboard = [...members].sort((a, b) => b.ingresos_generados - a.ingresos_generados);
+  // Ranking por ingresos: la posición queda fija en la fila aunque el usuario reordene la tabla
+  const leaderboard: FilaRanking[] = [...members]
+    .sort((a, b) => b.ingresos_generados - a.ingresos_generados)
+    .map((m, idx) => ({ ...m, posicion: idx + 1 }));
 
   return (
     <div className="space-y-6">
@@ -163,84 +235,19 @@ export function EquipoLeaderboard() {
           <CardDescription>Ranking por ingresos generados</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">#</TableHead>
-                <TableHead>Vendedor</TableHead>
-                <TableHead className="text-center">Asignadas</TableHead>
-                <TableHead className="text-center">Postuladas</TableHead>
-                <TableHead className="text-center">Adjudicadas</TableHead>
-                <TableHead className="text-center">Win Rate</TableHead>
-                <TableHead className="text-right">Ingresos</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {leaderboard.map((member, idx) => (
-                <TableRow
-                  key={member.vendedor_id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => navigate(`/equipo/${member.vendedor_id}`)}
-                >
-                  <TableCell>
-                    {idx === 0 ? (
-                      <span className="text-lg">🥇</span>
-                    ) : idx === 1 ? (
-                      <span className="text-lg">🥈</span>
-                    ) : idx === 2 ? (
-                      <span className="text-lg">🥉</span>
-                    ) : (
-                      <span className="text-sm text-muted-foreground font-mono">{idx + 1}</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                          {member.nombre
-                            .split(' ')
-                            .map((n) => n[0])
-                            .join('')
-                            .slice(0, 2)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="font-medium">{member.nombre}</div>
-                        <div className="text-xs text-muted-foreground">{member.email}</div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge variant="outline">{member.total_asignadas}</Badge>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge variant="secondary">{member.postuladas}</Badge>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge className="bg-green-500/10 text-green-600 border-green-500/30">
-                      {member.adjudicadas}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <div className="flex flex-col items-center gap-1">
-                      <span className="font-mono text-sm font-medium">{member.tasa_exito}%</span>
-                      <Progress value={member.tasa_exito} className="h-1.5 w-16" />
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right font-mono font-medium">
-                    {formatCLP(member.ingresos_generados)}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {leaderboard.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    No hay datos de rendimiento aún
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          <DataTable<FilaRanking>
+            storageKey="equipo-leaderboard"
+            rows={leaderboard}
+            rowKey={(m) => m.vendedor_id}
+            columns={COLUMNAS_RANKING}
+            itemLabel="vendedores"
+            searchText={(m) => `${m.nombre} ${m.email}`}
+            searchPlaceholder="Buscar vendedor…"
+            defaultSort={{ id: 'ingresos', dir: 'desc' }}
+            exportFileName="leaderboard-equipo"
+            emptyMessage="No hay datos de rendimiento aún"
+            onRowClick={(m) => navigate(`/equipo/${m.vendedor_id}`)}
+          />
         </CardContent>
       </Card>
     </div>

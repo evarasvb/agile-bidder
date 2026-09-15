@@ -1,34 +1,77 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { Input } from "@/components/ui/input";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
-  Users, Download, Search, Package, Building2, DollarSign, FileText,
+  Users, Package, Building2, DollarSign, FileText,
   Trophy, Crown,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { ReportHero } from "@/components/reportes/ReportHero";
-import { formatCurrency, formatCompact, formatNumber, exportToCSV } from "@/hooks/useReportes";
+import { formatCompact, formatNumber } from "@/hooks/useReportes";
 import { useBIStats, useTopProveedores, useProveedorDetalle, rangoDePreset, type BIProveedor, type PeriodoPreset } from "@/hooks/useBI";
 import { PeriodoSelector } from "@/components/reportes/PeriodoSelector";
 
+/** Fila del ranking: el proveedor más su posición por monto (fija aunque se reordene la tabla). */
+type FilaProveedor = BIProveedor & { posicion: number };
+
+const COLUMNAS_PROVEEDORES: DataTableColumn<FilaProveedor>[] = [
+  {
+    id: "posicion",
+    header: "#",
+    headerClassName: "w-8",
+    className: "text-muted-foreground",
+    sortValue: (p) => p.posicion,
+    cell: (p) => (p.posicion === 1 ? <Crown className="h-4 w-4 text-amber-500" /> : p.posicion),
+  },
+  {
+    id: "proveedor",
+    header: "Proveedor",
+    className: "font-medium max-w-[220px] truncate",
+    sortValue: (p) => p.proveedor,
+    cell: (p) => p.proveedor,
+  },
+  { id: "ordenes", header: "Órdenes", align: "right", sortValue: (p) => p.ordenes, cell: (p) => formatNumber(p.ordenes) },
+  { id: "compradores", header: "Compradores", align: "right", sortValue: (p) => p.compradores, cell: (p) => formatNumber(p.compradores) },
+  {
+    id: "monto",
+    header: "Monto",
+    align: "right",
+    className: "font-mono text-sm",
+    sortValue: (p) => p.monto_total,
+    exportValue: (p) => Math.round(p.monto_total),
+    cell: (p) => formatCompact(p.monto_total),
+  },
+  {
+    id: "share",
+    header: "Mercado",
+    headerClassName: "w-[130px]",
+    sortValue: (p) => p.share,
+    exportValue: (p) => (p.share == null ? "" : `${p.share.toFixed(1)}%`),
+    cell: (p) => (
+      <div className="flex items-center gap-2">
+        <Progress value={Math.min(100, p.share ?? 0)} className="h-1.5 w-16" />
+        <span className="text-xs text-muted-foreground w-10">{(p.share ?? 0).toFixed(1)}%</span>
+      </div>
+    ),
+  },
+];
+
 export default function ReporteProveedores() {
-  const [search, setSearch] = useState("");
   const [sel, setSel] = useState<BIProveedor | null>(null);
   const [preset, setPreset] = useState<PeriodoPreset>("total");
   const periodo = rangoDePreset(preset);
 
+  // La búsqueda va al servidor (busca en TODOS los proveedores antes del top
+  // 200); la tabla solo ordena/pagina lo que llega.
+  const [q, setQ] = useState("");
+  const termino = useDebouncedValue(q.trim(), 400);
   const { data: stats } = useBIStats(periodo);
-  const { data, isLoading } = useTopProveedores(search, 80, periodo);
-  const items = data?.items ?? [];
+  const { data, isLoading } = useTopProveedores(termino, 200, periodo);
+  const filas = useMemo<FilaProveedor[]>(() => (data?.items ?? []).map((p, i) => ({ ...p, posicion: i + 1 })), [data]);
   const { data: detalle, isLoading: detalleLoading } = useProveedorDetalle(sel?.proveedor ?? null);
-
-  const handleExport = () => exportToCSV(items.map((p) => ({
-    Proveedor: p.proveedor, Órdenes: p.ordenes, Compradores: p.compradores,
-    "Monto total": p.monto_total, "Participación %": p.share ?? "",
-  })), "reporte_proveedores");
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -45,16 +88,6 @@ export default function ReporteProveedores() {
         right={<PeriodoSelector value={preset} onChange={setPreset} />}
       />
 
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="relative max-w-md w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar proveedor…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-10" />
-        </div>
-        <Button variant="outline" size="sm" onClick={handleExport} disabled={!items.length}>
-          <Download className="h-4 w-4 mr-2" /> CSV
-        </Button>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Ranking */}
         <Card className="lg:col-span-3 border-border/50 shadow-sm">
@@ -63,43 +96,29 @@ export default function ReporteProveedores() {
             <CardDescription>Por monto adjudicado y participación de mercado. Haz clic para ver el detalle.</CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
-              <div className="space-y-2">{[...Array(8)].map((_, i) => <Skeleton key={i} className="h-11 w-full" />)}</div>
-            ) : items.length === 0 ? (
-              <p className="py-8 text-center text-muted-foreground text-sm">{search ? `Sin proveedores para “${search}”.` : "Aún no hay datos para mostrar."}</p>
-            ) : (
-              <div className="rounded-lg border overflow-auto max-h-[68vh]">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-muted/60 backdrop-blur">
-                    <TableRow>
-                      <TableHead className="w-8">#</TableHead>
-                      <TableHead>Proveedor</TableHead>
-                      <TableHead className="text-right">Monto</TableHead>
-                      <TableHead className="w-[130px]">Mercado</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {items.map((p, i) => {
-                      const active = sel?.proveedor === p.proveedor;
-                      return (
-                        <TableRow key={p.proveedor} onClick={() => setSel(p)}
-                          className={`cursor-pointer ${active ? "bg-primary/5" : ""}`}>
-                          <TableCell className="text-muted-foreground">{i === 0 ? <Crown className="h-4 w-4 text-amber-500" /> : i + 1}</TableCell>
-                          <TableCell className="font-medium max-w-[220px] truncate">{p.proveedor}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{formatCompact(p.monto_total)}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Progress value={Math.min(100, p.share ?? 0)} className="h-1.5 w-16" />
-                              <span className="text-xs text-muted-foreground w-10">{(p.share ?? 0).toFixed(1)}%</span>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+            <DataTable<FilaProveedor>
+              storageKey="reporte-proveedores"
+              rows={filas}
+              rowKey={(p) => p.proveedor}
+              columns={COLUMNAS_PROVEEDORES}
+              loading={isLoading}
+              itemLabel="proveedores"
+              toolbar={
+                <Input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Buscar proveedor en todo el mercado…"
+                  aria-label="Buscar proveedor"
+                  className="h-10 w-full sm:w-72"
+                />
+              }
+              defaultSort={{ id: "monto", dir: "desc" }}
+              exportFileName="reporte_proveedores"
+              emptyMessage={termino ? `Ningún proveedor coincide con “${termino}”.` : "Aún no hay datos para mostrar."}
+              maxHeight="68vh"
+              onRowClick={(p) => setSel(p)}
+              rowClassName={(p) => (sel?.proveedor === p.proveedor ? "bg-primary/5" : undefined)}
+            />
           </CardContent>
         </Card>
 
