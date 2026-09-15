@@ -46,11 +46,11 @@ function Rico({ text, onInternal }: { text: string; onInternal: (path: string) =
                   </button>
                 );
               }
-              return <a key={j} href={href} target="_blank" rel="noreferrer" className="underline text-firmavb-blue break-all">{txt}</a>;
+              return <a key={j} href={href} target="_blank" rel="noreferrer" className="underline text-firmavb-blue break-all" aria-label={`${txt} (abre en nueva pestaña)`}>{txt}</a>;
             }
             if (frag.startsWith("**") && frag.endsWith("**")) return <strong key={j}>{frag.slice(2, -2)}</strong>;
             if (/^https?:\/\//.test(frag)) return (
-              <a key={j} href={frag} target="_blank" rel="noreferrer" className="underline text-firmavb-blue break-all">{frag}</a>
+              <a key={j} href={frag} target="_blank" rel="noreferrer" className="underline text-firmavb-blue break-all" aria-label={`${frag} (abre en nueva pestaña)`}>{frag}</a>
             );
             return <span key={j}>{frag}</span>;
           })}
