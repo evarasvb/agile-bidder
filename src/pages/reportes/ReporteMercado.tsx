@@ -264,17 +264,13 @@ export default function ReporteMercado() {
                       tickLine={false}
                     />
                     <RechartsTooltip
-                      formatter={(value: number, name: string) => {
-                        if (name === "monto") return [formatCurrency(value), "Monto"];
-                        return [value, "Cantidad"];
-                      }}
+                      formatter={(value: number) => [value, "Cantidad"]}
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
                         border: "1px solid hsl(var(--border))",
                         borderRadius: "8px",
                       }}
                     />
-                    <Legend />
                     <Bar dataKey="count" name="Cantidad" fill="hsl(var(--firmavb-blue))" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>

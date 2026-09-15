@@ -337,6 +337,10 @@ export default function Academia() {
   const { perfil, banner, youtube, musica, linkedin, libros, asesoria, asesoriaPago, whatsappGrupo, contacto } =
     CONTENIDO;
 
+  // Si la foto de perfil no carga (archivo aún no subido), caemos a las iniciales
+  // en vez de mostrar el ícono de imagen rota.
+  const [fotoPerfilRota, setFotoPerfilRota] = useState(false);
+
   // Salto por capítulos en el video destacado: al elegir un capítulo, recargamos
   // el iframe con ?start= en ese segundo.
   const [inicioSeg, setInicioSeg] = useState<number | null>(null);
@@ -416,10 +420,11 @@ export default function Academia() {
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col md:flex-row items-center gap-8">
             <div className="shrink-0">
-              {perfil.fotoUrl ? (
+              {perfil.fotoUrl && !fotoPerfilRota ? (
                 <img
                   src={perfil.fotoUrl}
                   alt={perfil.nombre}
+                  onError={() => setFotoPerfilRota(true)}
                   className="h-32 w-32 md:h-40 md:w-40 rounded-full object-cover shadow-lg border-4 border-white"
                 />
               ) : (
@@ -472,6 +477,7 @@ export default function Academia() {
                 <img
                   src={banner.imagenUrl}
                   alt={banner.alt}
+                  onError={(e) => { e.currentTarget.style.display = "none"; }}
                   className="w-full rounded-2xl shadow-lg border border-border/50 transition-transform group-hover:scale-[1.01]"
                 />
               </a>
@@ -479,6 +485,7 @@ export default function Academia() {
               <img
                 src={banner.imagenUrl}
                 alt={banner.alt}
+                onError={(e) => { e.currentTarget.style.display = "none"; }}
                 className="w-full rounded-2xl shadow-lg border border-border/50"
               />
             )}
@@ -723,6 +730,7 @@ export default function Academia() {
                         src={p.imagenUrl}
                         alt={p.titulo}
                         loading="lazy"
+                        onError={(e) => { e.currentTarget.style.display = "none"; }}
                         className="w-full aspect-square object-cover hover:opacity-95 transition-opacity"
                       />
                     </a>
@@ -787,7 +795,7 @@ export default function Academia() {
               <Card key={i} className="border-border/50 overflow-hidden flex flex-col">
                 <div className="aspect-[3/4] bg-muted/50 flex items-center justify-center">
                   {l.portadaUrl ? (
-                    <img src={l.portadaUrl} alt={l.titulo} className="w-full h-full object-cover" />
+                    <img src={l.portadaUrl} alt={l.titulo} onError={(e) => { e.currentTarget.style.display = "none"; }} className="w-full h-full object-cover" />
                   ) : (
                     <BookOpen className="h-12 w-12 text-muted-foreground/40" />
                   )}
