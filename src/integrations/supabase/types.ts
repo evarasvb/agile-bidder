@@ -4087,8 +4087,10 @@ export type Database = {
           email: string
           email_validado: boolean | null
           empresa: string | null
+          estado_contacto: string
           estado_email: string | null
           estado_suscripcion: string | null
+          etiquetas: string[] | null
           fuente_datos: string | null
           fuente_primaria: string | null
           id: string
@@ -4107,8 +4109,10 @@ export type Database = {
           email: string
           email_validado?: boolean | null
           empresa?: string | null
+          estado_contacto?: string
           estado_email?: string | null
           estado_suscripcion?: string | null
+          etiquetas?: string[] | null
           fuente_datos?: string | null
           fuente_primaria?: string | null
           id?: string
@@ -4127,8 +4131,10 @@ export type Database = {
           email?: string
           email_validado?: boolean | null
           empresa?: string | null
+          estado_contacto?: string
           estado_email?: string | null
           estado_suscripcion?: string | null
+          etiquetas?: string[] | null
           fuente_datos?: string | null
           fuente_primaria?: string | null
           id?: string
@@ -9369,6 +9375,19 @@ export type Database = {
         Returns: undefined
       }
       experto_ficha_licitacion: { Args: { p_codigo: string }; Returns: Json }
+      experto_fragmentacion_organismo: {
+        Args: { p_codigo_licitacion: string; p_dias_ventana?: number }
+        Returns: {
+          codigo: string
+          dias_desde: number
+          estado: string
+          fecha_publicacion: string
+          moneda: string
+          nombre: string
+          presupuesto_estimado: number
+          señal: string
+        }[]
+      }
       experto_insertar: { Args: { filas: Json }; Returns: number }
       experto_libro: { Args: { p_codigo: string }; Returns: Json }
       experto_libro_archivar: {
@@ -9475,6 +9494,20 @@ export type Database = {
           presupuesto_total: number
           top_instituciones: Json
           top_regiones: Json
+        }[]
+      }
+      experto_patrones_licitacion: {
+        Args: { p_anos_atras?: number; p_codigo_licitacion: string }
+        Returns: {
+          codigo: string
+          dias_desde: number
+          estado: string
+          fecha_publicacion: string
+          moneda: string
+          nombre: string
+          presupuesto_estimado: number
+          señal: string
+          veces_licitado: number
         }[]
       }
       experto_plus_checklist: {

@@ -3,57 +3,52 @@ import { supabase } from '@/integrations/supabase/client';
 
 // Types
 export interface BINegocioInstitucion {
-  institucion_nombre: string;
-  institucion_rut?: string;
-  total_ordenes: number;
+  demandante: string;
+  cantidad_ordenes: number;
+  cantidad_proveedores: number;
   monto_total: number;
-  promedio_orden: number;
-  ultima_orden?: string;
-  proveedores_distintos: number;
+  tipo_origen: string;
 }
 
 export interface BINegocioProveedor {
-  proveedor_nombre: string;
-  proveedor_rut?: string;
-  total_ordenes: number;
+  proveedor: string;
+  cantidad_ordenes: number;
+  cantidad_instituciones: number;
   monto_total: number;
-  promedio_orden: number;
-  ultima_orden?: string;
-  instituciones_distintas: number;
+  tipo_origen: string;
 }
 
 export interface BIProducto {
-  nombre_producto: string;
-  categoria?: string;
-  total_ventas: number;
-  cantidad_total: number;
+  producto: string;
+  codigo_producto: string;
+  instituciones: number;
+  lineas: number;
+  proveedores: number;
+  precio_unitario_min: number;
+  precio_unitario_max: number;
+  precio_unitario_prom: number;
   monto_total: number;
-  precio_promedio: number;
-  precio_minimo: number;
-  precio_maximo: number;
+  tipo_origen: string;
 }
 
 export interface BIPrecioProductoProveedor {
-  nombre_producto: string;
-  proveedor_nombre: string;
-  proveedor_rut?: string;
-  veces_vendido: number;
-  precio_promedio: number;
-  precio_minimo: number;
-  precio_maximo: number;
-  ultima_venta?: string;
+  producto: string;
+  proveedor: string;
+  codigo_producto: string;
+  muestras: number;
+  precio_min: number;
+  precio_max: number;
+  precio_prom: number;
+  tipo_origen: string;
 }
 
 export interface DashboardEstado {
   total_licitaciones: number;
   con_match: number;
-  urgentes: number;
-  total_ofertas: number;
+  monto_con_match: number;
+  monto_total_oportunidades: number;
   ofertas_enviadas: number;
-  ofertas_ganadas: number;
-  monto_ganado: number;
-  total_ordenes: number;
-  monto_ordenes: number;
+  procesadas: number;
 }
 
 // Hook: Negocios por institución
@@ -115,7 +110,7 @@ export function useBIPreciosProductoProveedor(productoNombre?: string, limit: nu
         .limit(limit);
 
       if (productoNombre) {
-        query = query.ilike('nombre_producto', `%${productoNombre}%`);
+        query = query.ilike('producto', `%${productoNombre}%`);
       }
 
       const { data, error } = await query;
@@ -239,8 +234,8 @@ export function useComparativaPrecios(productoNombre: string) {
       const { data, error } = await supabase
         .from('bi_oc_precios_producto_proveedor')
         .select('*')
-        .ilike('nombre_producto', `%${productoNombre}%`)
-        .order('precio_promedio', { ascending: true });
+        .ilike('producto', `%${productoNombre}%`)
+        .order('precio_prom', { ascending: true });
       
       if (error) throw error;
       return data as BIPrecioProductoProveedor[];
