@@ -118,7 +118,7 @@ export default function Planes() {
                   <Button
                     size="sm"
                     className="w-full"
-                    variant={p.id === "erp" ? "default" : "outline"}
+                    variant="default"
                     asChild
                   >
                     <Link to="/auth?tab=signup">

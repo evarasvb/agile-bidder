@@ -34,7 +34,7 @@ export function useListaPreciosFirmaVB(filters?: ListaPreciosFilters) {
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
 
-      const query = (supabase as any)
+      const query = supabase
         .from('lista_precios_firmavb')
         .select('*', { count: 'exact' })
         .range(from, to)
@@ -88,7 +88,7 @@ export function useListaPreciosFilterOptions() {
   return useQuery({
     queryKey: ['lista-precios-filter-options'],
     queryFn: async () => {
-      const { data: catData } = await (supabase as any)
+      const { data: catData } = await supabase
         .from('lista_precios_firmavb')
         .select('*');
 
@@ -106,15 +106,15 @@ export function useListaPreciosStats() {
   return useQuery({
     queryKey: ['lista-precios-stats'],
     queryFn: async () => {
-      const { count: total } = await (supabase as any)
+      const { count: total } = await supabase
         .from('lista_precios_firmavb')
         .select('*', { count: 'exact', head: true });
 
-      const { data: categorias } = await (supabase as any)
+      const { data: categorias } = await supabase
         .from('lista_precios_firmavb')
         .select('*');
 
-      const { data: valorData } = await (supabase as any)
+      const { data: valorData } = await supabase
         .from('lista_precios_firmavb')
         .select('*')
         .limit(1000);
@@ -144,7 +144,7 @@ export function useBuscarProductosFirmaVB(searchTerm: string, enabled: boolean =
       if (!searchTerm || searchTerm.length < 2) return [];
 
       // Fetch all and filter client-side due to column name issues
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('lista_precios_firmavb')
         .select('*')
         .limit(500);
@@ -195,7 +195,7 @@ export function useMatchProductosFirmaVB(nombreBuscado: string | null) {
 
       if (palabras.length === 0) return [];
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('lista_precios_firmavb')
         .select('*')
         .limit(200);

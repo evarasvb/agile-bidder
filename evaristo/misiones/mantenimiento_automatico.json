@@ -51,7 +51,7 @@
     {
       "nombre": "Optimizar rendimiento general",
       "tipo": "revisar",
-      "archivo": "src/hooks/useMatching.ts",
+      "archivo": "src/hooks/useComprasAgilesMatch.ts",
       "instruccion": "Revisa este hook. Optimiza las queries, reduce re-renders innecesarios, mejora el caching, y asegúrate de que las invalidaciones de queries sean eficientes."
     },
     {

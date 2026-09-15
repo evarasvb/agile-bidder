@@ -11,7 +11,7 @@ export function PrecioMercadoHint({ nombre, onUsar, disabled }: Props) {
     queryKey: ['precio_mercado', texto],
     enabled: texto.length > 3,
     staleTime: 10 * 60 * 1000,
-    queryFn: async () => ((await (supabase as any).rpc('precio_mercado', { p_texto: texto })).data?.[0] ?? null) as { proveedores: number; ordenes: number; precio_min: number; precio_mediano: number; precio_max: number; lider: string | null; lider_precio: number | null } | null,
+    queryFn: async () => ((await supabase.rpc('precio_mercado', { p_texto: texto })).data?.[0] ?? null) as { proveedores: number; ordenes: number; precio_min: number; precio_mediano: number; precio_max: number; lider: string | null; lider_precio: number | null } | null,
   });
   if (!data || !data.proveedores) return null;
   const objetivo = Math.round(Number(data.precio_mediano) * 0.97);

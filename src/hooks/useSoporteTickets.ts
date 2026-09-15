@@ -7,7 +7,6 @@ import { toast } from 'sonner';
 // Tickets de soporte (casos que Evaristo canaliza al equipo).
 // - El cliente ve SOLO los suyos (RLS: user_id = auth.uid()).
 // - El admin ve TODOS y puede cambiar el estado (RLS: is_admin o correo fundador).
-// La tabla es nueva y no está en los tipos generados => casteamos a any.
 // =============================================================================
 
 export type EstadoTicket = 'abierto' | 'en_proceso' | 'resuelto';
@@ -51,7 +50,7 @@ export function useMisTickets() {
     queryKey: ['mis-tickets', user?.id],
     enabled: !!user?.id,
     queryFn: async (): Promise<SoporteTicket[]> => {
-      const { data, error } = await (supabaseClient as any)
+      const { data, error } = await supabaseClient
         .from('soporte_tickets')
         .select('*')
         .eq('user_id', user!.id)
@@ -67,7 +66,7 @@ export function useTicketsAdmin(estado?: EstadoTicket | 'todos') {
   return useQuery({
     queryKey: ['tickets-admin', estado ?? 'todos'],
     queryFn: async (): Promise<SoporteTicket[]> => {
-      let q = (supabaseClient as any)
+      let q = supabaseClient
         .from('soporte_tickets')
         .select('*')
         .order('created_at', { ascending: false });
@@ -85,7 +84,7 @@ export function useActualizarEstadoTicket() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, estado }: { id: string; estado: EstadoTicket }) => {
-      const { error } = await (supabaseClient as any)
+      const { error } = await supabaseClient
         .from('soporte_tickets')
         .update({ estado, updated_at: new Date().toISOString() })
         .eq('id', id);

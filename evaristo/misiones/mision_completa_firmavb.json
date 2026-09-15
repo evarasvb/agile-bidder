@@ -23,10 +23,10 @@
       "instruccion": "Revisa y optimiza el motor de matching para que funcione correctamente con compras ágiles. Asegúrate de que calcule correctamente el match_score, considere el margen objetivo, y actualice correctamente match_encontrado y match_score en la tabla compras_agiles. Incorpora lógica para considerar si el organismo es buen pagador (agregar campo buen_pagador si no existe)."
     },
     {
-      "nombre": "Verificar hook useMatchingAI para compras ágiles",
+      "nombre": "Verificar hook useComprasAgilesMatch para compras ágiles",
       "tipo": "revisar",
-      "archivo": "src/hooks/useMatching.ts",
-      "instruccion": "Revisa que useMatchingAI cargue correctamente compras ágiles no procesadas, ejecute el matching, y actualice correctamente la tabla compras_agiles. Asegúrate de que invalide las queries correctas después de actualizar. Verifica que maneje errores apropiadamente."
+      "archivo": "src/hooks/useComprasAgilesMatch.ts",
+      "instruccion": "Revisa que useComprasAgilesMatch lea el motor vivo (ca_item_matches) y devuelva el match por compra consistente con el panel y el detalle. Asegúrate de que respete el piso de match y que la forma de datos siga sirviendo a la página de Inventario y su modal."
     },
     {
       "nombre": "Mejorar componente GenerarCotizacionModal para envío a MercadoPúblico",

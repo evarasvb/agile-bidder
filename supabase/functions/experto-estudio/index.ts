@@ -3,6 +3,7 @@
 // compitieron, quién es el incumbente, cómo paga, y (si están) las bases. Misma salida SSE que
 // experto-consultar para reutilizar la interfaz.
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { evidenceGateLicitacion, crearEstadoDocumentacionLicitacion } from "../_shared/evidenceGateHelper.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
@@ -97,10 +98,24 @@ Deno.serve(async (req) => {
     const res: Record<string, any> = {};
     await Promise.all(Object.entries(t).map(async ([k, p]) => { try { res[k] = await p; } catch { res[k] = null; } }));
 
+    // Evidence Gate: valida que la documentación esté completa para postular
+    const bases: any[] = res.bases ?? [];
+    const estadoDoc = crearEstadoDocumentacionLicitacion(ficha, bases, []);
+    const gate = evidenceGateLicitacion(estadoDoc);
+    if (!gate.permiteBadgeVerde) {
+      return json({
+        error: "documentacion_incompleta",
+        veredicto: gate.veredicto,
+        razon: gate.razon,
+        faltantes: gate.faltantes,
+        permiteBadgeVerde: false,
+        mensaje: `No se puede recomendar postular: ${gate.razon}. Faltantes: ${gate.faltantes.join("; ")}.`
+      }, 202);
+    }
+
     // Fuentes normativas [1..n], luego bases
     const vistos = new Set<number>();
     const frag: any[] = [...(res.n1 ?? []), ...(res.n2 ?? []), ...(res.n3 ?? [])].filter((f) => !vistos.has(f.id) && vistos.add(f.id));
-    const bases: any[] = res.bases ?? [];
     const partes: string[] = [];
     if (frag.length) partes.push("FUENTES:\n" + frag.map((f, i) => `[${i + 1}] ${f.fuente}${f.seccion ? " — " + f.seccion : ""}\n${String(f.texto).slice(0, 1200)}`).join("\n\n"));
     const o = ficha.organismo ?? {};

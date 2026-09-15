@@ -34,20 +34,20 @@ export interface CampanasResumen {
 export function useTraccionResumen() {
   return useQuery({
     queryKey: ['admin_traccion_resumen'],
-    queryFn: async () => (await (supabase.rpc as any)('admin_traccion_resumen')).data as TraccionResumen | null,
+    queryFn: async () => (await supabase.rpc('admin_traccion_resumen')).data as TraccionResumen | null,
   });
 }
 
 export function useClientesNuevos(dias = 30) {
   return useQuery({
     queryKey: ['admin_clientes_nuevos', dias],
-    queryFn: async () => ((await (supabase.rpc as any)('admin_clientes_nuevos', { dias, lim: 200 })).data ?? []) as ClienteNuevo[],
+    queryFn: async () => ((await supabase.rpc('admin_clientes_nuevos', { dias, lim: 200 })).data ?? []) as ClienteNuevo[],
   });
 }
 
 export function useCampanasResumen() {
   return useQuery({
     queryKey: ['admin_campanas_resumen'],
-    queryFn: async () => (await (supabase.rpc as any)('admin_campanas_resumen')).data as CampanasResumen | null,
+    queryFn: async () => (await supabase.rpc('admin_campanas_resumen')).data as CampanasResumen | null,
   });
 }

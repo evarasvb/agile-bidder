@@ -182,11 +182,10 @@ export function useMovePipelineItem() {
       const { data, error } = await supabase
         .from('pipeline')
         .update({
-          // cast: los tipos generados aún no incluyen la etapa 'perdida'
           etapa: nuevaEtapa,
           etapa_historial: nuevoHistorial,
           updated_at: now,
-        } as any)
+        })
         .eq('id', id)
         .select()
         .single();

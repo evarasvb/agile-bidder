@@ -249,10 +249,10 @@ export default function Landing() {
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
               </Button>
-              <Button 
-                size="lg" 
-                variant="outline" 
-                className="text-base h-12 px-8 gap-2 border-2 hover:bg-muted/50 transition-all hover:scale-105 active:scale-95"
+              <Button
+                size="lg"
+                variant="ghost"
+                className="text-base h-12 px-8 gap-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all"
                 onClick={() => setDemoOpen(true)}
               >
                 <Play className="h-4 w-4" />

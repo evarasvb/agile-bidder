@@ -32,12 +32,12 @@ export function DocumentosEmpresaCard() {
   const { data: docs = [] } = useQuery({
     queryKey: ['cliente_documentos', cliente?.id],
     enabled: !!cliente?.id,
-    queryFn: async () => ((await (supabase as any).from('cliente_documentos').select('id, tipo, nombre, archivo_url, created_at').eq('cliente_id', cliente!.id).order('created_at', { ascending: false })).data ?? []) as Doc[],
+    queryFn: async () => ((await supabase.from('cliente_documentos').select('id, tipo, nombre, archivo_url, created_at').eq('cliente_id', cliente!.id).order('created_at', { ascending: false })).data ?? []) as Doc[],
   });
   const { data: checklist = [] } = useQuery({
     queryKey: ['experto_plus_checklist', cliente?.id, docs.length],
     enabled: !!cliente?.id,
-    queryFn: async () => ((await (supabase as any).rpc('experto_plus_checklist')).data ?? []) as ChecklistItem[],
+    queryFn: async () => ((await supabase.rpc('experto_plus_checklist')).data ?? []) as ChecklistItem[],
   });
   const obligatorios = checklist.filter((c) => c.obligatorio);
   const listos = obligatorios.filter((c) => c.listo).length;
@@ -54,9 +54,9 @@ export function DocumentosEmpresaCard() {
     const anterior = docs.find((d) => d.tipo === tipo);
     if (anterior) {
       await supabase.storage.from('documentos-empresa').remove([anterior.archivo_url]);
-      await (supabase as any).from('cliente_documentos').delete().eq('id', anterior.id);
+      await supabase.from('cliente_documentos').delete().eq('id', anterior.id);
     }
-    const ins = await (supabase as any).from('cliente_documentos').insert({ cliente_id: cliente.id, tipo, nombre: file.name, archivo_url: path, descripcion: TIPOS.find((t) => t.tipo === tipo)?.nombre ?? tipo });
+    const ins = await supabase.from('cliente_documentos').insert({ cliente_id: cliente.id, tipo, nombre: file.name, archivo_url: path, descripcion: TIPOS.find((t) => t.tipo === tipo)?.nombre ?? tipo });
     setSubiendo(null);
     if (ins.error) { toast.error('No se pudo registrar: ' + ins.error.message); return; }
     toast.success('Documento guardado');
@@ -65,7 +65,7 @@ export function DocumentosEmpresaCard() {
 
   const borrar = async (d: Doc) => {
     await supabase.storage.from('documentos-empresa').remove([d.archivo_url]);
-    await (supabase as any).from('cliente_documentos').delete().eq('id', d.id);
+    await supabase.from('cliente_documentos').delete().eq('id', d.id);
     qc.invalidateQueries({ queryKey: ['cliente_documentos'] });
   };
 

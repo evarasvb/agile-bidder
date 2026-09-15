@@ -62,6 +62,10 @@ verify_jwt = false
 [functions.sync-health]
 verify_jwt = false
 
+# Scheduled syncs use the legacy service_role JWT in Authorization.
+[functions.sync-licitaciones-bi]
+verify_jwt = true
+
 [functions.youtube-sync]
 verify_jwt = true
 
@@ -70,6 +74,9 @@ verify_jwt = true
 
 [functions.enrichment-scheduler]
 verify_jwt = false
+
+[functions.marketing-ejecutar]
+verify_jwt = true
 
 # extract-proveedores-instituciones is called by cron job (public access)
 [functions.extract-proveedores-instituciones]

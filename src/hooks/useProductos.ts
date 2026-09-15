@@ -39,7 +39,7 @@ export function useBuscarProductos(search: string, limit: number = 20) {
     queryFn: async () => {
       if (!search || search.length < 2) return [];
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('productos')
         .select('*')
         .eq('activo', true)
@@ -58,7 +58,7 @@ export function useProductosPorCategoria(categoria: string) {
   return useQuery({
     queryKey: ['productos-categoria', categoria],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('productos')
         .select('*')
         .eq('categoria', categoria)
@@ -77,7 +77,7 @@ export function useCategoriasProductos() {
   return useQuery({
     queryKey: ['productos-categorias'],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('productos')
         .select('categoria')
         .eq('activo', true);
@@ -96,16 +96,16 @@ export function useProductosStats() {
   return useQuery({
     queryKey: ['productos-stats'],
     queryFn: async () => {
-      const { count: total } = await (supabase as any)
+      const { count: total } = await supabase
         .from('productos')
         .select('*', { count: 'exact', head: true });
 
-      const { count: activos } = await (supabase as any)
+      const { count: activos } = await supabase
         .from('productos')
         .select('*', { count: 'exact', head: true })
         .eq('activo', true);
 
-      const { data: categorias } = await (supabase as any)
+      const { data: categorias } = await supabase
         .from('productos')
         .select('categoria')
         .eq('activo', true);
@@ -128,7 +128,7 @@ export function useCompraAgilItems(compraAgilId: string | null) {
     queryFn: async () => {
       if (!compraAgilId) return [];
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('compras_agiles_items')
         .select('*')
         .eq('compra_agil_id', compraAgilId)
@@ -148,7 +148,7 @@ export function useCompraAgilItemsByCodigo(codigo: string | undefined) {
     queryFn: async () => {
       if (!codigo) return [];
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('compras_agiles_items')
         .select('*')
         .eq('codigo_compra', codigo)
@@ -171,7 +171,7 @@ export function useMatchingProductos(nombreBuscado: string) {
       // Buscar productos similares
       const palabras = nombreBuscado.toLowerCase().split(' ').filter(p => p.length > 2);
       
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('productos')
         .select('*')
         .eq('activo', true)

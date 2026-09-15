@@ -19,7 +19,7 @@ export function usePlan() {
   // riesgo de pago del organismo, competencia y match completo.
   const { data: planExperto } = useQuery({
     queryKey: ['experto_mi_plan'],
-    queryFn: async () => (await (supabase as any).rpc('experto_mi_plan')).data as string | null,
+    queryFn: async () => (await supabase.rpc('experto_mi_plan')).data as string | null,
     enabled: !isPro,
     staleTime: 5 * 60 * 1000,
   });
