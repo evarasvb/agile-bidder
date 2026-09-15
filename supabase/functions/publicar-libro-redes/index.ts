@@ -41,6 +41,22 @@ async function publicarFacebook(pageId: string, token: string, texto: string) {
   return data;
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function esperarContenedorListo(containerId: string, token: string) {
+  for (let intento = 0; intento < 12; intento++) {
+    const resp = await fetch(`${GRAPH}/${containerId}?fields=status_code&access_token=${token}`);
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(`Instagram (status): ${JSON.stringify(data)}`);
+    if (data.status_code === 'FINISHED') return;
+    if (data.status_code === 'ERROR') throw new Error(`Instagram (media): contenedor con status ERROR`);
+    await sleep(2000);
+  }
+  throw new Error('Instagram (media): el contenedor no quedó listo (status_code) tras esperar');
+}
+
 async function publicarInstagram(igId: string, token: string, texto: string, imagenUrl: string) {
   if (!imagenUrl) throw new Error('Falta imagen_url para el post de Instagram');
   const contenedor = await fetch(`${GRAPH}/${igId}/media`, {
@@ -50,6 +66,8 @@ async function publicarInstagram(igId: string, token: string, texto: string, ima
   });
   const contenedorData = await contenedor.json();
   if (!contenedor.ok) throw new Error(`Instagram (media): ${JSON.stringify(contenedorData)}`);
+
+  await esperarContenedorListo(contenedorData.id, token);
 
   const publicacion = await fetch(`${GRAPH}/${igId}/media_publish`, {
     method: 'POST',
