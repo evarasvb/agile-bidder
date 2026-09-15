@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink, Trash2, Paperclip, Printer, Mail, Map as MapIcon, Image as ImageIcon, Presentation, Waves, Download, Receipt, X } from 'lucide-react';
-import { useTraerAdjuntos } from '@/hooks/useAdjuntosLicitacion';
+import { useTraerAdjuntos, useAdjuntosLicitacion } from '@/hooks/useAdjuntosLicitacion';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -37,6 +37,7 @@ import { useMatchOverrides } from '@/hooks/useMatchOverrides';
 import { useInventoryActivo } from '@/hooks/useInventory';
 import { useCliente } from '@/hooks/useCliente';
 import { descargarCotizacionPDF, type ItemCotizacion, type DatosCotizacion } from '@/services/pdfGenerator';
+import { useExtensionStatus } from '@/hooks/useExtensionStatus';
 
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string;
 const ANON = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
@@ -118,7 +119,19 @@ export default function LibroLicitacion() {
   const [compartido, setCompartido] = useState<{ url: string; titulo: string; token: string; tipo: string } | null>(null);
   const autoRef = useRef(false);
   const [pregunta, setPregunta] = useState('');
-  const [ocupado, setOcupado] = useState<string | null>(null);
+  // Candado por acción, no global: antes un solo "ocupado" bloqueaba TODO (no
+  // podías subir una fuente ni mandar una pregunta mientras se generaba la
+  // matriz). Ahora cada acción tiene su propia llave y solo se bloquea a sí
+  // misma o a lo que de verdad comparte con ella.
+  const [ocupados, setOcupados] = useState<Set<string>>(new Set());
+  const ocupado = (k: string) => ocupados.has(k);
+  const empezar = (k: string) => setOcupados((prev) => new Set(prev).add(k));
+  const terminar = (k: string) => setOcupados((prev) => { const n = new Set(prev); n.delete(k); return n; });
+  // Los 8 entregables comparten un solo cupo de generación (misma sesión/cuota
+  // del Experto): solo uno se genera a la vez, igual que antes.
+  const ENTREGABLES: Entregable[] = ['sala', 'informe', 'matriz', 'estudio', 'bajo_agua', 'anexos', 'mapa', 'infografia'];
+  const generandoEntregable = ENTREGABLES.some((k) => ocupados.has(k));
+  const algunWord = [...ocupados].some((k) => k.startsWith('word:'));
   const [modalLibroAbierto, setModalLibroAbierto] = useState(false);
   const [tab, setTab] = useState<Entregable>('sala');
   const [entregables, setEntregables] = useState<Record<Entregable, string>>({ sala: 'ok', informe: '', matriz: '', estudio: '', bajo_agua: '', anexos: '', mapa: '', infografia: '' });
@@ -166,13 +179,13 @@ export default function LibroLicitacion() {
   }
 
   const preguntar = async (texto?: string) => {
-    const p = (texto ?? pregunta).trim(); if (!p || ocupado) return;
+    const p = (texto ?? pregunta).trim(); if (!p || ocupado('chat')) return;
     setPregunta('');
     // Sin libro abierto, un ID de licitación solo abre su libro.
     if (!cod && RE_ID.test(p.toUpperCase()) && p.length < 20) { navigate(`/experto/libro/${idEn(p)}`); return; }
     const historial = msgs.slice(-6).map((m) => ({ role: m.rol === 'yo' ? 'user' : 'assistant', content: m.texto }));
     setMsgs((m) => [...m, { rol: 'yo', texto: p }, { rol: 'exp', texto: '' }]);
-    setOcupado('chat');
+    empezar('chat');
     try {
       await pedir({ modo: 'chat', pregunta: p, codigo: cod || undefined, historial, huella: 'libro' }, 'experto-consultar', (t, meta) =>
         setMsgs((m) => { const c = [...m]; c[c.length - 1] = { rol: 'exp', texto: t, fuentes: meta?.fuentes, pedirBases: meta?.pedir_bases }; return c; }));
@@ -180,7 +193,7 @@ export default function LibroLicitacion() {
       if (e.status === 402 || e.status === 401) setLimite(e.message);
       setMsgs((m) => { const c = [...m]; c[c.length - 1] = { rol: 'exp', texto: (e.status === 402 ? '' : 'No pude responder: ') + e.message }; return c; });
     }
-    setOcupado(null);
+    terminar('chat');
   };
   // Pregunta que llega por la URL (landing, tarjeta de riesgo del organismo): se envía sola una vez.
   useEffect(() => {
@@ -191,7 +204,10 @@ export default function LibroLicitacion() {
 
   // Análisis desde el modal: pincelada rápida, profundo o power analysis
   const handleLibroAnalisis = async (tipo: 'pincelada' | 'profundo' | 'power') => {
-    if (ocupado) return;
+    // Manda al mismo hilo de chat (msgs), así que comparte candado con "chat":
+    // no tiene sentido dejar mandar una pregunta normal mientras esto corre, ni
+    // al revés.
+    if (ocupado('chat')) return;
     setModalLibroAbierto(false);
     if (!escritorio) setVista('chat');
 
@@ -202,7 +218,7 @@ export default function LibroLicitacion() {
     };
 
     setMsgs((m) => [...m, { rol: 'yo', texto: prompts[tipo] }]);
-    setOcupado(`experto-${tipo}`);
+    empezar('chat'); empezar(`experto-${tipo}`);
 
     try {
       const historial = msgs.slice(-10).map((m) => ({ rol: m.rol, texto: m.texto }));
@@ -212,12 +228,12 @@ export default function LibroLicitacion() {
       if (e.status === 402 || e.status === 401) setLimite(e.message);
       setMsgs((m) => { const c = [...m]; c[c.length - 1] = { rol: 'exp', texto: (e.status === 402 ? '' : 'No pude responder: ') + e.message }; return c; });
     }
-    setOcupado(null);
+    terminar('chat'); terminar(`experto-${tipo}`);
   };
 
   const generar = async (tipo: Entregable) => {
-    if (ocupado) return;
-    setTab(tipo); setOcupado(tipo);
+    if (generandoEntregable) return;
+    setTab(tipo); empezar(tipo);
     try {
       if (tipo === 'mapa') {
         const r = await fetch(`${SUPA}/functions/v1/experto-mapa`, { method: 'POST', headers: auth, body: JSON.stringify({ codigo: cod }) });
@@ -243,13 +259,20 @@ export default function LibroLicitacion() {
         if (tipo === 'bajo_agua') qc.invalidateQueries({ queryKey: ['experto_libro', cod] });
       }
     } catch (e: any) { toast.error(e.message, e.status === 402 ? { action: { label: 'Ver planes', onClick: () => navigate('/cuenta') } } : undefined); }
-    setOcupado(null);
+    terminar(tipo);
   };
 
   // Fuentes subidas (una sola entrada): PDF de bases (se reconocen solos y quedan para todos), Excel, Word,
   // imágenes o texto (privados, cuentan para el cupo del plan). Varios archivos a la vez, uno tras otro.
   // Bases y anexos directo desde la ficha de Mercado Público (robot licitacion-adjuntos).
   const traerAdjuntos = useTraerAdjuntos(cod);
+  // La sección "Adjuntos" de Mercado Público exige captcha: no se baja sola, pero si sabemos su URL
+  // se la ponemos a un clic de distancia en vez de que el usuario tenga que ir a buscarla.
+  const { data: adjuntosInfo } = useAdjuntosLicitacion(cod);
+  const urlAdjuntosMp = adjuntosInfo?.estado?.url_adjuntos_mp || null;
+  // La extensión de Chrome de FirmaVB manda esos adjuntos sola en cuanto el usuario (ya con el
+  // captcha resuelto) abre esa misma página — evita el paso manual de bajar y volver a subir.
+  const { isConnected: extensionConectada } = useExtensionStatus();
   const traerBasesMP = () =>
     traerAdjuntos.mutate(undefined, {
       onSuccess: (r) => {
@@ -263,7 +286,7 @@ export default function LibroLicitacion() {
 
   const subirFuentes = async (files: FileList | File[]) => {
     const lista = Array.from(files); if (!lista.length) return;
-    setOcupado('fuentes');
+    empezar('fuentes');
     let bases = 0, docs = 0;
     for (const file of lista) {
       try {
@@ -276,7 +299,7 @@ export default function LibroLicitacion() {
       } catch (e: any) { toast.error(`${file.name}: ${e.message}`); }
     }
     if (bases || docs) qc.invalidateQueries({ queryKey: ['experto_libro', cod] });
-    setOcupado(null);
+    terminar('fuentes');
   };
   // Anexos Word oficiales completados por el Experto (conservan el formato; amarillo = validar).
   const { data: anexosWord = [] } = useQuery({
@@ -297,8 +320,8 @@ export default function LibroLicitacion() {
     return true;
   };
   const completarWord = async (d: any) => {
-    setOcupado('word:' + d.id);
-    try { await completarUno(d); } catch (e: any) { toast.error(e.message); } finally { setOcupado(null); }
+    empezar('word:' + d.id);
+    try { await completarUno(d); } catch (e: any) { toast.error(e.message); } finally { terminar('word:' + d.id); }
   };
   // Todos los Word de la licitación, uno tras otro. Si hay varias copias del mismo anexo
   // ("Anexo_N_3 (6)", "(7)", "(8)") se usa la última subida.
@@ -313,7 +336,7 @@ export default function LibroLicitacion() {
   // (Plus/ERP) y entrega cada uno como un .docx aparte en "Mis documentos de trabajo" — quedan
   // con el botón "Completar" disponible por si se quieren volver a rellenar.
   const extraerAnexos = async () => {
-    setOcupado('extraer-anexos');
+    empezar('extraer-anexos');
     try {
       const r = await fetch(`${SUPA}/functions/v1/experto-extraer-anexos`, { method: 'POST', headers: auth, body: JSON.stringify({ codigo: cod }) });
       const j = await r.json().catch(() => ({}));
@@ -324,13 +347,13 @@ export default function LibroLicitacion() {
       toast.success(`${j.anexos.length} anexo(s) extraído(s) a "Mis documentos de trabajo"${j.omitidos_por_cupo ? `, ${j.omitidos_por_cupo} sin espacio en tu plan` : ''}.`, { duration: 8000 });
       qc.invalidateQueries({ queryKey: ['experto_libro', cod] });
       qc.invalidateQueries({ queryKey: ['experto_anexos_word', cod] });
-    } catch (e: any) { toast.error(e.message); } finally { setOcupado(null); }
+    } catch (e: any) { toast.error(e.message); } finally { terminar('extraer-anexos'); }
   };
   // PowerPoint de la matriz de postulación (plan Pro): portada, resumen, admisibilidad,
   // evaluación, tareas por fase, garantías y pendientes. Reutiliza experto-matriz, así que
   // pide la misma sesión Pro; queda como .pptx en "Mis documentos de trabajo".
   const generarPptx = async () => {
-    setOcupado('pptx');
+    empezar('pptx');
     try {
       const r = await fetch(`${SUPA}/functions/v1/experto-pptx`, { method: 'POST', headers: auth, body: JSON.stringify({ codigo: cod }) });
       const j = await r.json().catch(() => ({}));
@@ -338,7 +361,7 @@ export default function LibroLicitacion() {
       if (!r.ok) { toast.error(j.mensaje || j.error || 'No pude generar el PowerPoint'); return; }
       toast.success(`PowerPoint listo en "Mis documentos de trabajo" (${j.slides} láminas).`, { duration: 7000 });
       qc.invalidateQueries({ queryKey: ['experto_libro', cod] });
-    } catch (e: any) { toast.error(e.message); } finally { setOcupado(null); }
+    } catch (e: any) { toast.error(e.message); } finally { terminar('pptx'); }
   };
   // Ítems de la licitación con match confirmado o sugerido contra el inventario
   // (mismo criterio que la sección "Productos Solicitados" de más arriba): se
@@ -382,7 +405,7 @@ export default function LibroLicitacion() {
   const generarCotizacion = async () => {
     const items = itemsParaCotizar();
     if (!items.length) { toast.error('No hay productos con match para cotizar. Revisa "Productos Solicitados" más arriba y corrige el match si hace falta.', { duration: 7000 }); return; }
-    setOcupado('cotizacion');
+    empezar('cotizacion');
     try {
       const datosPDF: DatosCotizacion = {
         numero: `COT-${Date.now().toString().slice(-8)}`,
@@ -401,21 +424,21 @@ export default function LibroLicitacion() {
       };
       await descargarCotizacionPDF(datosPDF);
       toast.success('Cotización descargada');
-    } catch (e: any) { toast.error(e.message || 'No pude generar la cotización'); } finally { setOcupado(null); }
+    } catch (e: any) { toast.error(e.message || 'No pude generar la cotización'); } finally { terminar('cotizacion'); }
   };
   const completarTodos = async () => {
     const lista = wordsUnicos(); if (!lista.length) return;
-    setOcupado('word:todos');
-    try { for (const d of lista) { if (!(await completarUno(d))) break; } } catch (e: any) { toast.error(e.message); } finally { setOcupado(null); }
+    empezar('word:todos');
+    try { for (const d of lista) { if (!(await completarUno(d))) break; } } catch (e: any) { toast.error(e.message); } finally { terminar('word:todos'); }
   };
   const descargarDocumento = async (id: string) => {
-    setOcupado('descargar:' + id);
+    empezar('descargar:' + id);
     try {
       const r = await fetch(`${SUPA}/functions/v1/experto-documentos?id=${id}`, { headers: auth });
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.url) { toast.error(j.mensaje || 'No pude preparar la descarga'); return; }
       window.open(j.url, '_blank');
-    } catch (e: any) { toast.error(e.message); } finally { setOcupado(null); }
+    } catch (e: any) { toast.error(e.message); } finally { terminar('descargar:' + id); }
   };
   const borrarAnexoWord = async (id: string) => {
     await fetch(`${SUPA}/functions/v1/experto-anexo-word?id=${id}`, { method: 'DELETE', headers: auth });
@@ -458,14 +481,14 @@ export default function LibroLicitacion() {
   // PDF con marca para adjuntar en WhatsApp (celular: se comparte directo; escritorio: se descarga).
   const pdfCompartido = async () => {
     if (!compartido) return;
-    setOcupado('pdf');
+    empezar('pdf');
     try {
       const fila = (await supabase.rpc('experto_compartido', { p_token: compartido.token })).data?.[0];
       if (!fila) throw new Error('No encontré el análisis');
       const r = await compartirPdfExperto({ titulo: fila.titulo ?? compartido.titulo, ...datosPdf(), empresa: fila.empresa, contenido: fila.contenido, url: compartido.url, fecha: fila.creado_en }, `${cod || 'experto'}-${compartido.tipo}.pdf`);
       if (r === 'descargado') toast.success('PDF descargado: adjúntalo en WhatsApp o correo');
     } catch (e: any) { toast.error(e.message); }
-    setOcupado(null);
+    terminar('pdf');
   };
   const datosInfografia = (): InfografiaDatos => ({
     codigo: cod, nombre: f?.nombre, institucion: f?.institucion, tipo: f?.tipo, presupuesto: f?.presupuesto, cierre: f?.fecha_cierre, publicada: f?.fecha_publicacion, region: f?.region,
@@ -541,11 +564,11 @@ export default function LibroLicitacion() {
       {compartido && (
         <div className="flex items-center gap-1 flex-wrap text-xs rounded-md border border-primary/30 bg-primary/5 px-2 py-1">
           <span className="font-medium truncate max-w-[30vw]" title={compartido.titulo}>Link listo</span>
-          <Button size="sm" className="h-8 bg-[#25D366] hover:bg-[#1ebe5d] text-white" asChild><a href={waUrl(compartido)} target="_blank" rel="noreferrer" aria-label="Enviar por WhatsApp (abre en nueva pestaña)"><MessageCircle className="h-4 w-4 mr-1" aria-hidden="true" />WhatsApp (link)</a></Button>
-          {compartido.tipo !== 'mapa' && compartido.tipo !== 'infografia' && <Button size="sm" variant="outline" className="h-8" onClick={pdfCompartido} disabled={ocupado === 'pdf'}>{ocupado === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <FileText className="h-4 w-4 mr-1" />}PDF para WhatsApp</Button>}
+          <Button size="sm" className="h-8 bg-[#25D366] hover:bg-[#1ebe5d] text-white" asChild><a href={waUrl(compartido)} target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4 mr-1" />WhatsApp (link)</a></Button>
+          {compartido.tipo !== 'mapa' && compartido.tipo !== 'infografia' && <Button size="sm" variant="outline" className="h-8" onClick={pdfCompartido} disabled={ocupado('pdf')}>{ocupado('pdf') ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <FileText className="h-4 w-4 mr-1" />}PDF para WhatsApp</Button>}
           <Button size="sm" variant="outline" className="h-8" onClick={() => { navigator.clipboard.writeText(compartido.url); toast.success('Copiado'); }}><Copy className="h-4 w-4 mr-1" />Copiar link</Button>
           <Button size="sm" variant="outline" className="h-8" asChild><a href={oportunidadLibro ? mailtoOportunidad(oportunidadLibro, `${compartido.titulo}\n${compartido.url}`) : `mailto:?subject=${encodeURIComponent(compartido.titulo)}&body=${encodeURIComponent(compartido.titulo + '\n' + compartido.url)}`}><Mail className="h-4 w-4 mr-1" />Email (link)</a></Button>
-          <Button size="sm" variant="outline" className="h-8" asChild><a href={compartido.url} target="_blank" rel="noreferrer" aria-label="Ver página del análisis (abre en nueva pestaña)"><ExternalLink className="h-4 w-4 mr-1" aria-hidden="true" />Ver página</a></Button>
+          <Button size="sm" variant="outline" className="h-8" asChild><a href={compartido.url} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4 mr-1" />Ver página</a></Button>
           {typeof navigator !== 'undefined' && 'share' in navigator && <Button size="sm" variant="ghost" className="h-8" onClick={() => navigator.share({ title: compartido.titulo, url: compartido.url }).catch(() => {})}><Share2 className="h-4 w-4 mr-1" />Más…</Button>}
           <Button size="icon" variant="ghost" className="ml-auto h-8 w-8 text-muted-foreground" onClick={() => setCompartido(null)}><X className="h-4 w-4" /></Button>
         </div>
@@ -584,52 +607,66 @@ export default function LibroLicitacion() {
               <div>
                 <p className="font-medium flex items-center gap-1"><FileText className="h-4 w-4" />Ficha Mercado Público</p>
                 {f ? <p className="text-muted-foreground">{f.tipo ?? ''} · {fmt(f.presupuesto)} · {f.estado}</p> : <p className="text-muted-foreground">sin ficha</p>}
-                {f?.url && <a className="text-primary underline text-xs" href={f.url} target="_blank" rel="noreferrer" aria-label="Ver oportunidad en Mercado Público (abre en nueva pestaña)">ver en Mercado Público</a>}
+                {f?.url && <a className="text-primary underline text-xs" href={f.url} target="_blank" rel="noreferrer">ver en Mercado Público</a>}
               </div>
               <div>
                 <p className="font-medium flex items-center gap-1"><Upload className="h-4 w-4" />Fuentes subidas · bases (PDF)</p>
-                {bases.length ? bases.map((b) => <p key={b.id} className="text-muted-foreground truncate">{b.archivo} · {b.paginas} pág.</p>) : traerAdjuntos.isPending ? <p className="text-muted-foreground flex items-center gap-1"><Loader2 className="h-3.5 w-3.5 animate-spin" />Buscando las bases en Mercado Público…</p> : <p className="text-muted-foreground">Mercado Público no las tiene publicadas todavía (o el robot no las encontró). Tráelas de nuevo o súbelas tú abajo.</p>}
+                {bases.length ? bases.map((b) => <p key={b.id} className="text-muted-foreground truncate">{b.archivo} · {b.paginas} pág.</p>) : traerAdjuntos.isPending ? <p className="text-muted-foreground flex items-center gap-1"><Loader2 className="h-3.5 w-3.5 animate-spin" />Buscando las bases en Mercado Público…</p> : urlAdjuntosMp ? <p className="text-muted-foreground">Mercado Público las protege con captcha, así que no se bajan solas: ábrelas, descarga el PDF y súbelo abajo.</p> : <p className="text-muted-foreground">Mercado Público no las tiene publicadas todavía (o el robot no las encontró). Tráelas de nuevo o súbelas tú abajo.</p>}
                 <input ref={fileRef} type="file" multiple accept=".pdf,.xlsx,.xls,.xlsm,.csv,.docx,.txt,.md,.png,.jpg,.jpeg,.gif,.webp" className="hidden" onChange={(e) => { if (e.target.files?.length) subirFuentes(e.target.files); e.target.value = ''; }} />
-                <Button size="sm" variant="outline" className="mt-1 mr-2" onClick={traerBasesMP} disabled={!!ocupado || traerAdjuntos.isPending} title="Baja las bases y anexos publicados en la ficha de Mercado Público y el Experto los lee">
+                {urlAdjuntosMp && (
+                  <Button size="sm" variant="outline" className="mt-1 mr-2" asChild title="Abre la sección Adjuntos de la ficha en Mercado Público (pide resolver un captcha)">
+                    <a href={urlAdjuntosMp} target="_blank" rel="noreferrer">
+                      <ExternalLink className="h-4 w-4 mr-1" />Abrir Adjuntos en Mercado Público
+                    </a>
+                  </Button>
+                )}
+                <Button size="sm" variant="outline" className="mt-1 mr-2" onClick={traerBasesMP} disabled={ocupado('fuentes') || traerAdjuntos.isPending} title="Baja las bases y anexos publicados en la ficha de Mercado Público y el Experto los lee">
                   {traerAdjuntos.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Download className="h-4 w-4 mr-1" />}Traer bases desde Mercado Público
                 </Button>
-                <Button size="sm" variant="outline" className="mt-1" onClick={() => fileRef.current?.click()} disabled={ocupado === 'fuentes'}>
-                  {ocupado === 'fuentes' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}Subir fuentes (PDF, Excel, Word, imágenes)
+                <Button size="sm" variant="outline" className="mt-1" onClick={() => fileRef.current?.click()} disabled={ocupado('fuentes')}>
+                  {ocupado('fuentes') ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}Subir fuentes (PDF, Excel, Word, imágenes)
                 </Button>
                 <p className="text-[11px] text-muted-foreground mt-1">Puedes elegir varios a la vez. Los PDF de bases se reconocen solos y quedan para todos; el resto es tuyo. {esPro ? 'Tu plan permite hasta 10 archivos por licitación (Plus y ERP: 50).' : 'Plan gratis: 2 archivos de hasta 5 MB por licitación.'}</p>
+                {urlAdjuntosMp && (
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    {extensionConectada
+                      ? 'Tienes la extensión de Chrome conectada: al abrir Adjuntos se mandan solos, sin subirlos aquí.'
+                      : <>O instala la <a className="underline" href="/configuracion/extension" target="_blank" rel="noreferrer">extensión de Chrome de FirmaVB</a> y se mandan solos cada vez que abras esa página.</>}
+                  </p>
+                )}
                 {bases.length > 0 && (
-                  <Button size="sm" variant="outline" className="mt-2 w-full sm:w-auto" onClick={extraerAnexos} disabled={!!ocupado} title="Cuando los anexos vienen dentro del PDF de bases (no como Word aparte), los separa en documentos individuales">
-                    {ocupado === 'extraer-anexos' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}Extraer anexos de las bases
+                  <Button size="sm" variant="outline" className="mt-2 w-full sm:w-auto" onClick={extraerAnexos} disabled={ocupado('extraer-anexos')} title="Cuando los anexos vienen dentro del PDF de bases (no como Word aparte), los separa en documentos individuales">
+                    {ocupado('extraer-anexos') ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}Extraer anexos de las bases
                   </Button>
                 )}
               </div>
               <div>
                 <p className="font-medium flex items-center gap-1"><Paperclip className="h-4 w-4" />Mis documentos de trabajo</p>
                 <p className="text-xs text-muted-foreground">Excel, Word, PDF o imágenes (tu matriz, checklist, anexos a medio llenar). El Experto los lee para anotar qué te falta y ayudarte a completarlos.{documentos.length === 0 ? ' Sube con el botón de arriba.' : ''}</p>
-                <Button size="sm" variant="outline" className="mt-1 mb-1 mr-2 w-full sm:w-auto" onClick={generarPptx} disabled={!!ocupado} title="Portada, resumen, admisibilidad, evaluación, tareas por fase, garantías y pendientes en un PowerPoint">
-                  {ocupado === 'pptx' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Presentation className="h-4 w-4 mr-1" />}Generar PowerPoint de la matriz
+                <Button size="sm" variant="outline" className="mt-1 mb-1 mr-2 w-full sm:w-auto" onClick={generarPptx} disabled={ocupado('pptx')} title="Portada, resumen, admisibilidad, evaluación, tareas por fase, garantías y pendientes en un PowerPoint">
+                  {ocupado('pptx') ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Presentation className="h-4 w-4 mr-1" />}Generar PowerPoint de la matriz
                 </Button>
-                <Button size="sm" variant="outline" className="mt-1 mb-1 w-full sm:w-auto" onClick={generarCotizacion} disabled={!!ocupado} title="Cotización en PDF con los productos de tu inventario que hacen match, lista para subir como oferta comercial">
-                  {ocupado === 'cotizacion' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Receipt className="h-4 w-4 mr-1" />}Generar cotización comercial
+                <Button size="sm" variant="outline" className="mt-1 mb-1 w-full sm:w-auto" onClick={generarCotizacion} disabled={ocupado('cotizacion')} title="Cotización en PDF con los productos de tu inventario que hacen match, lista para subir como oferta comercial">
+                  {ocupado('cotizacion') ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Receipt className="h-4 w-4 mr-1" />}Generar cotización comercial
                 </Button>
                 {documentos.map((d: any) => (
                   <div key={d.id} className="flex items-center gap-1 text-muted-foreground">
                     <span className="truncate flex-1" title={d.nombre}>{d.nombre} <span className="text-[10px] uppercase">{d.tipo}</span></span>
                     {d.tipo === 'docx' && (
                       // Anexo oficial en Word: el Experto lo completa en el mismo archivo (formato intacto).
-                      <Button variant="outline" onClick={() => completarWord(d)} disabled={!!ocupado} title="Completar este Word con los datos de tu empresa, conservando el formato" className="h-auto gap-0.5 rounded border px-1.5 py-0.5 text-[11px] text-firmavb-blue hover:bg-muted">
-                        {ocupado === 'word:' + d.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}<span className="hidden sm:inline">Completar</span>
+                      <Button variant="outline" onClick={() => completarWord(d)} disabled={ocupado('word:' + d.id) || ocupado('word:todos')} title="Completar este Word con los datos de tu empresa, conservando el formato" className="h-auto gap-0.5 rounded border px-1.5 py-0.5 text-[11px] text-firmavb-blue hover:bg-muted">
+                        {ocupado('word:' + d.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}<span className="hidden sm:inline">Completar</span>
                       </Button>
                     )}
-                    <Button variant="outline" onClick={() => descargarDocumento(d.id)} disabled={!!ocupado} title="Descargar" className="h-auto gap-0.5 rounded border px-1.5 py-0.5 text-[11px] text-firmavb-blue hover:bg-muted">
-                      {ocupado === 'descargar:' + d.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}<span className="hidden sm:inline">Descargar</span>
+                    <Button variant="outline" onClick={() => descargarDocumento(d.id)} disabled={ocupado('descargar:' + d.id)} title="Descargar" className="h-auto gap-0.5 rounded border px-1.5 py-0.5 text-[11px] text-firmavb-blue hover:bg-muted">
+                      {ocupado('descargar:' + d.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}<span className="hidden sm:inline">Descargar</span>
                     </Button>
                     <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground" onClick={() => borrarDocumento(d.id)} title="Quitar"><Trash2 className="h-3.5 w-3.5" /></Button>
                   </div>
                 ))}
                 {documentos.filter((x: any) => x.tipo === 'docx').length > 1 && (
-                  <Button size="sm" variant="outline" className="mt-1 w-full sm:w-auto" onClick={completarTodos} disabled={!!ocupado}>
-                    {ocupado === 'word:todos' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}Completar todos los anexos Word
+                  <Button size="sm" variant="outline" className="mt-1 w-full sm:w-auto" onClick={completarTodos} disabled={algunWord}>
+                    {ocupado('word:todos') ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}Completar todos los anexos Word
                   </Button>
                 )}
                 {anexosWord.length > 0 && (
@@ -640,7 +677,7 @@ export default function LibroLicitacion() {
                       <div key={a.id} className="flex flex-wrap items-center gap-1 text-xs">
                         <span className="truncate flex-1 min-w-[140px]" title={a.campos?.[0]?.resumen ?? a.nombre}>{a.nombre}{a.campos?.[0]?.tipo ? <span className="ml-1 text-[10px] uppercase text-muted-foreground">{String(a.campos[0].tipo).replace(/_/g, ' ')}</span> : null}</span>
                         <span className={`rounded px-1.5 py-0.5 text-[10px] ${a.campos_validar ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>{a.campos_validar ? `${a.campos_validar} por validar` : 'sin pendientes'}</span>
-                        {a.url && <Button variant="outline" asChild className="h-auto gap-0.5 rounded border px-1.5 py-0.5 text-firmavb-blue hover:bg-muted"><a href={a.url} target="_blank" rel="noreferrer" aria-label={`Descargar ${a.nombre} (abre en nueva pestaña)`}><FileText className="h-3.5 w-3.5" aria-hidden="true" />Descargar</a></Button>}
+                        {a.url && <Button variant="outline" asChild className="h-auto gap-0.5 rounded border px-1.5 py-0.5 text-firmavb-blue hover:bg-muted"><a href={a.url} target="_blank" rel="noreferrer"><FileText className="h-3.5 w-3.5" />Descargar</a></Button>}
                         <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground" onClick={() => borrarAnexoWord(a.id)} title="Quitar"><Trash2 className="h-3.5 w-3.5" /></Button>
                       </div>
                     ))}
@@ -693,24 +730,43 @@ export default function LibroLicitacion() {
                   }} /> : <span className="text-muted-foreground">Buscando en las fuentes…</span>}
                   {m.pedirBases && (
                     <div className="mt-2 rounded-md border border-firmavb-blue/30 bg-firmavb-blue/5 px-2 py-2 text-xs space-y-1.5">
-                      <p>Para esto necesito las bases en PDF y todavía no las tengo — Mercado Público puede no haberlas publicado, o el robot aún no las encontró. Mientras tanto te respondo con lo que sé.</p>
+                      <p>
+                        {urlAdjuntosMp
+                          ? 'Para esto necesito las bases en PDF. Mercado Público protege esa sección con captcha, así que no la puedo abrir sola: ábrela tú, descarga el PDF de las Bases y súbelo aquí — queda guardado para todos los que consulten esta licitación.'
+                          : 'Para esto necesito las bases en PDF y todavía no las tengo — Mercado Público puede no haberlas publicado, o el robot aún no las encontró. Mientras tanto te respondo con lo que sé.'}
+                      </p>
                       <div className="flex flex-wrap gap-1">
-                        <Button size="sm" variant="outline" className="h-8" disabled={traerAdjuntos.isPending} onClick={traerBasesMP}>
-                          {traerAdjuntos.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Download className="h-3.5 w-3.5 mr-1" />}Reintentar desde Mercado Público
-                        </Button>
+                        {urlAdjuntosMp ? (
+                          <Button size="sm" variant="outline" className="h-8" asChild>
+                            <a href={urlAdjuntosMp} target="_blank" rel="noreferrer">
+                              <ExternalLink className="h-3.5 w-3.5 mr-1" />Abrir en Mercado Público
+                            </a>
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="outline" className="h-8" disabled={traerAdjuntos.isPending} onClick={traerBasesMP}>
+                            {traerAdjuntos.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Download className="h-3.5 w-3.5 mr-1" />}Reintentar desde Mercado Público
+                          </Button>
+                        )}
                         <Button size="sm" className="h-8" onClick={() => { if (!escritorio) { setVista('fuentes'); setTimeout(() => fileRef.current?.click(), 150); } else fileRef.current?.click(); }}>
                           <Upload className="h-3.5 w-3.5 mr-1" />Subir bases (PDF)
                         </Button>
                       </div>
+                      {urlAdjuntosMp && (
+                        <p className="text-[11px] text-muted-foreground">
+                          {extensionConectada
+                            ? 'Tienes la extensión de Chrome conectada: al abrir esa página se manda sola, sin que tengas que subir nada.'
+                            : <>También puedes instalar la <a className="underline" href="/configuracion/extension" target="_blank" rel="noreferrer">extensión de Chrome de FirmaVB</a>: cuando abras esa página se mandan solos, sin descargar ni subir a mano.</>}
+                        </p>
+                      )}
                     </div>
                   )}
                   {!cod && m.texto && idEn(msgs[i - 1]?.texto ?? '') && <Button size="sm" variant="outline" className="mt-2" onClick={() => navigate(`/experto/libro/${idEn(msgs[i - 1].texto)}`)}><BookOpen className="h-3.5 w-3.5 mr-1" />Abrir el libro de {idEn(msgs[i - 1].texto)}</Button>}
                   {m.texto && m.fuentes && m.fuentes.length > 0 && (
                     <details id={`fuentes-${i}`} className="mt-2 text-xs text-muted-foreground"><summary className="cursor-pointer">Fuentes ({m.fuentes.length}) · haz clic en un [n] del texto para ver de dónde salió</summary>
-                      {m.fuentes.map((s: any) => <div key={s.n} id={`fuente-${i}-${s.n}`} className="rounded px-1 transition-colors">[{s.n}] {s.url ? <a className="underline" href={s.url} target="_blank" rel="noreferrer" aria-label={`${s.fuente} (abre en nueva pestaña)`}>{s.fuente}</a> : s.fuente}</div>)}
+                      {m.fuentes.map((s: any) => <div key={s.n} id={`fuente-${i}-${s.n}`} className="rounded px-1 transition-colors">[{s.n}] {s.url ? <a className="underline" href={s.url} target="_blank" rel="noreferrer">{s.fuente}</a> : s.fuente}</div>)}
                     </details>
                   )}
-                  {m.texto && !ocupado && (
+                  {m.texto && !ocupado('chat') && (
                     <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                       {i === msgs.length - 1 && <>¿Te sirvió?
                         <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => opinar(msgs[i - 1]?.texto ?? '', true)}><ThumbsUp className="h-3.5 w-3.5" /></Button>
@@ -729,8 +785,8 @@ export default function LibroLicitacion() {
               </div>
             )}
             <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); preguntar(); }}>
-              <Input value={pregunta} onChange={(e) => setPregunta(e.target.value)} placeholder={cod ? `Pregunta sobre ${cod}…` : 'Pregúntale al Experto o escribe un ID de licitación…'} disabled={!!ocupado} />
-              <Button type="submit" disabled={!!ocupado || !pregunta.trim()}>{ocupado === 'chat' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}</Button>
+              <Input value={pregunta} onChange={(e) => setPregunta(e.target.value)} placeholder={cod ? `Pregunta sobre ${cod}…` : 'Pregúntale al Experto o escribe un ID de licitación…'} disabled={ocupado('chat')} />
+              <Button type="submit" disabled={ocupado('chat') || !pregunta.trim()}>{ocupado('chat') ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}</Button>
             </form>
           </CardContent>
         </Card>);
@@ -753,11 +809,11 @@ export default function LibroLicitacion() {
                 <button
                   key={k}
                   onClick={() => entregables[k] ? setTab(k) : generar(k)}
-                  disabled={!!ocupado && ocupado !== k}
+                  disabled={generandoEntregable && !ocupados.has(k)}
                   className={`flex items-center gap-2 rounded-xl border p-2.5 text-left transition-colors disabled:opacity-50 ${tab === k ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/60'}`}
                 >
                   <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${color}`}>
-                    {ocupado === k ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icono className="h-4 w-4" />}
+                    {ocupados.has(k) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icono className="h-4 w-4" />}
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate text-xs font-medium leading-tight">{n}</span>
@@ -774,7 +830,7 @@ export default function LibroLicitacion() {
                   matriz={entregables.matriz ? JSON.parse(entregables.matriz) : null} anexos={entregables.anexos} faltantes={faltantes} veredicto={veredictoDe(entregables.informe)}
                   onGenerar={(t) => generar(t)} onIr={(t) => setTab(t)} onMatriz={matrizCambio} onPreguntar={(q) => { setPregunta(q); if (!escritorio) setVista('chat'); }}
                   irOportunidad={f ? () => navigate(String(f.tipo ?? '').toLowerCase().includes('gil') ? `/compras-agiles/${cod}` : `/oportunidades/licitacion/${cod}`) : undefined}
-                  aprobar={aprobarPostulacion} ocupado={ocupado} onAbrirExpertoModal={() => setModalLibroAbierto(true)} />
+                  aprobar={aprobarPostulacion} ocupado={generandoEntregable ? 'generando' : null} onAbrirExpertoModal={() => setModalLibroAbierto(true)} />
               </div>
             ) : entregables[tab] ? (
               <div>
@@ -784,7 +840,7 @@ export default function LibroLicitacion() {
                     <Button size="sm" variant="ghost" onClick={() => aWord(nombresEntregable[tab], entregables[tab])}><FileText className="h-3.5 w-3.5 mr-1" />Word</Button>
                     <Button size="sm" variant="ghost" onClick={() => aPdf(nombresEntregable[tab], entregables[tab])}><Printer className="h-3.5 w-3.5 mr-1" />PDF</Button>
                     <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(entregables[tab]); toast.success('Copiado'); }}><Copy className="h-3.5 w-3.5 mr-1" />Copiar</Button></>}
-                  <Button size="sm" variant="ghost" onClick={() => generar(tab)} disabled={!!ocupado}>Volver a generar</Button>
+                  <Button size="sm" variant="ghost" onClick={() => generar(tab)} disabled={generandoEntregable}>Volver a generar</Button>
                 </div>
                 {tab === 'anexos' && faltantes.length > 0 && <p className="text-xs text-yellow-800 bg-yellow-50 border border-yellow-200 rounded px-2 py-1 mb-2">Completa a mano: {faltantes.join(', ')}</p>}
                 {tab === 'mapa' ? (
@@ -816,7 +872,7 @@ export default function LibroLicitacion() {
                    {tab === 'bajo_agua' && `Bajo el Agua: lo que no se ve en la ficha. A quién le compra siempre este organismo y por qué vía, consultas al mercado (RFI) previas, compras ágiles y convenio marco del mismo producto, desiertas, quién lleva el proceso y sus audiencias de lobby, reclamos, precio real del producto en el Estado, noticias y dictámenes, matriz de adjudicación con simulación y, si ya está adjudicada, por dónde se renueva. ${cuotaBajoAgua.texto}`}
                    {tab === 'anexos' && 'Anexos completados (Plus): los formularios de las bases con los datos de tu empresa, listos para revisar y firmar.'}</p>
                 {!esPro && tab !== 'informe' && tab !== 'bajo_agua' && <p className="text-xs">Requiere Experto {tab === 'anexos' ? 'Plus' : 'Pro'} o FirmaVB ERP.</p>}
-                <Button size="sm" onClick={() => generar(tab)} disabled={!!ocupado}><Sparkles className="h-4 w-4 mr-1" />Generar</Button>
+                <Button size="sm" onClick={() => generar(tab)} disabled={generandoEntregable}><Sparkles className="h-4 w-4 mr-1" />Generar</Button>
               </div>
             )}
           </CardContent>
@@ -839,7 +895,7 @@ export default function LibroLicitacion() {
             <ResizablePanel defaultSize={cod ? 46 : 74} minSize={30}>{panelChat}</ResizablePanel>
             {panelEntregables && <><ResizableHandle withHandle className="mx-1" /><ResizablePanel defaultSize={32} minSize={22} collapsible collapsedSize={0}>{panelEntregables}</ResizablePanel></>}
           </ResizablePanelGroup>
-          <ExpertoLibroModal open={modalLibroAbierto} onClose={() => setModalLibroAbierto(false)} onAnalizar={handleLibroAnalisis} bases={bases} codigo={cod} ocupado={ocupado} />
+          <ExpertoLibroModal open={modalLibroAbierto} onClose={() => setModalLibroAbierto(false)} onAnalizar={handleLibroAnalisis} bases={bases} codigo={cod} ocupado={(['experto-pincelada', 'experto-profundo', 'experto-power'] as const).find((k) => ocupado(k)) ?? null} />
         </>
       );
       })()}
