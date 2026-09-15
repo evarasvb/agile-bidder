@@ -485,7 +485,7 @@ Validar Admisibilidad Gratis
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2"
-                aria-label="Contactar por WhatsApp (abre en nueva ventana)"
+                aria-label="+56 9 9425 9157 por WhatsApp (abre en nueva ventana)"
               >
                 💬 +56 9 9425 9157
               </a>
