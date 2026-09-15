@@ -148,12 +148,23 @@ export function OpportunityCard({ licitacion, onGenerarOferta }: OpportunityCard
               {formatCurrency(licitacion.presupuesto)}
             </div>
             <div className="flex gap-2">
-              <Button onClick={() => setShowAsignarModal(true)} size="sm" variant="outline" className="gap-1">
-                <UserPlus className="h-4 w-4" />
+              <Button
+                onClick={() => setShowAsignarModal(true)}
+                size="sm"
+                variant="outline"
+                className="gap-1"
+                aria-label={`${asignacion ? 'Reasignar vendedor para' : 'Asignar vendedor a'} ${licitacion.titulo}`}
+              >
+                <UserPlus className="h-4 w-4" aria-hidden="true" />
                 {asignacion ? 'Reasignar' : 'Asignar'}
               </Button>
-              <Button onClick={handleGenerarOferta} size="sm" className="gap-2">
-                <FileText className="h-4 w-4" />
+              <Button
+                onClick={handleGenerarOferta}
+                size="sm"
+                className="gap-2"
+                aria-label={`Generar oferta para ${licitacion.titulo}`}
+              >
+                <FileText className="h-4 w-4" aria-hidden="true" />
                 Generar Oferta
               </Button>
             </div>

@@ -105,7 +105,18 @@ function OpportunityCard({
   const deadline = getDeadlineText(op.fecha_cierre);
 
   return (
-    <Card className="hover:shadow-md transition-shadow cursor-pointer group" onClick={onViewDetail}>
+    <Card
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onViewDetail();
+        }
+      }}
+      className="hover:shadow-md transition-shadow cursor-pointer group focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary rounded-lg outline-none"
+      onClick={onViewDetail}
+    >
       <CardContent className="p-4 space-y-3">
         {/* Top row: Score + Type + Deadline */}
         <div className="flex items-start justify-between gap-2">

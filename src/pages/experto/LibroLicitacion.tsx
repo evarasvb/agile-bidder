@@ -584,7 +584,7 @@ export default function LibroLicitacion() {
               <div>
                 <p className="font-medium flex items-center gap-1"><FileText className="h-4 w-4" />Ficha Mercado Público</p>
                 {f ? <p className="text-muted-foreground">{f.tipo ?? ''} · {fmt(f.presupuesto)} · {f.estado}</p> : <p className="text-muted-foreground">sin ficha</p>}
-                {f?.url && <a className="text-primary underline text-xs" href={f.url} target="_blank" rel="noreferrer">ver en Mercado Público</a>}
+                {f?.url && <a className="text-primary underline text-xs" href={f.url} target="_blank" rel="noreferrer" aria-label="Ver oportunidad en Mercado Público (abre en nueva pestaña)">ver en Mercado Público</a>}
               </div>
               <div>
                 <p className="font-medium flex items-center gap-1"><Upload className="h-4 w-4" />Fuentes subidas · bases (PDF)</p>
@@ -640,7 +640,7 @@ export default function LibroLicitacion() {
                       <div key={a.id} className="flex flex-wrap items-center gap-1 text-xs">
                         <span className="truncate flex-1 min-w-[140px]" title={a.campos?.[0]?.resumen ?? a.nombre}>{a.nombre}{a.campos?.[0]?.tipo ? <span className="ml-1 text-[10px] uppercase text-muted-foreground">{String(a.campos[0].tipo).replace(/_/g, ' ')}</span> : null}</span>
                         <span className={`rounded px-1.5 py-0.5 text-[10px] ${a.campos_validar ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>{a.campos_validar ? `${a.campos_validar} por validar` : 'sin pendientes'}</span>
-                        {a.url && <Button variant="outline" asChild className="h-auto gap-0.5 rounded border px-1.5 py-0.5 text-firmavb-blue hover:bg-muted"><a href={a.url} target="_blank" rel="noreferrer"><FileText className="h-3.5 w-3.5" />Descargar</a></Button>}
+                        {a.url && <Button variant="outline" asChild className="h-auto gap-0.5 rounded border px-1.5 py-0.5 text-firmavb-blue hover:bg-muted"><a href={a.url} target="_blank" rel="noreferrer" aria-label={`Descargar ${a.nombre} (abre en nueva pestaña)`}><FileText className="h-3.5 w-3.5" aria-hidden="true" />Descargar</a></Button>}
                         <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground" onClick={() => borrarAnexoWord(a.id)} title="Quitar"><Trash2 className="h-3.5 w-3.5" /></Button>
                       </div>
                     ))}
@@ -707,7 +707,7 @@ export default function LibroLicitacion() {
                   {!cod && m.texto && idEn(msgs[i - 1]?.texto ?? '') && <Button size="sm" variant="outline" className="mt-2" onClick={() => navigate(`/experto/libro/${idEn(msgs[i - 1].texto)}`)}><BookOpen className="h-3.5 w-3.5 mr-1" />Abrir el libro de {idEn(msgs[i - 1].texto)}</Button>}
                   {m.texto && m.fuentes && m.fuentes.length > 0 && (
                     <details id={`fuentes-${i}`} className="mt-2 text-xs text-muted-foreground"><summary className="cursor-pointer">Fuentes ({m.fuentes.length}) · haz clic en un [n] del texto para ver de dónde salió</summary>
-                      {m.fuentes.map((s: any) => <div key={s.n} id={`fuente-${i}-${s.n}`} className="rounded px-1 transition-colors">[{s.n}] {s.url ? <a className="underline" href={s.url} target="_blank" rel="noreferrer">{s.fuente}</a> : s.fuente}</div>)}
+                      {m.fuentes.map((s: any) => <div key={s.n} id={`fuente-${i}-${s.n}`} className="rounded px-1 transition-colors">[{s.n}] {s.url ? <a className="underline" href={s.url} target="_blank" rel="noreferrer" aria-label={`${s.fuente} (abre en nueva pestaña)`}>{s.fuente}</a> : s.fuente}</div>)}
                     </details>
                   )}
                   {m.texto && !ocupado && (

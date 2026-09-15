@@ -27,6 +27,8 @@ function TicketCard({ t }: { t: SoporteTicket }) {
     <div className="rounded-xl border border-border bg-card">
       <button
         onClick={() => setAbierto((v) => !v)}
+        aria-expanded={abierto}
+        aria-controls={`ticket-content-${t.id}`}
         className="w-full flex items-start gap-3 p-4 text-left"
       >
         <div className="flex-1 min-w-0">
@@ -44,7 +46,7 @@ function TicketCard({ t }: { t: SoporteTicket }) {
       </button>
 
       {abierto && conv.length > 0 && (
-        <div className="border-t border-border/60 px-4 py-3 space-y-2 bg-muted/20">
+        <div id={`ticket-content-${t.id}`} className="border-t border-border/60 px-4 py-3 space-y-2 bg-muted/20">
           <p className="text-xs font-semibold text-muted-foreground">Conversación</p>
           {conv.filter((m) => m.content).map((m, i) => (
             <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
