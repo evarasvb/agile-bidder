@@ -42,7 +42,7 @@ export function SalaPostulacion(p: SalaProps) {
   const setTarea = (i: number, campo: string, v: string) => { if (!m) return; p.onMatriz({ ...m, tareas: tareas.map((t, j) => j === i ? { ...t, [campo]: v } : t) }); };
 
   return (
-    <div className="space-y-4 text-sm">
+    <div className="space-y-4 text-sm leading-relaxed">
       {/* Proceso */}
       <div className="flex flex-wrap gap-1">
         {pasos.map((s, i) => (
@@ -59,9 +59,9 @@ export function SalaPostulacion(p: SalaProps) {
           {p.veredicto ? <span className={`rounded border px-2 py-0.5 text-xs font-medium ${p.veredicto.c}`}>{p.veredicto.t}</span> : <Button size="sm" variant="outline" className="h-8" onClick={() => p.onGenerar('informe')} disabled={!!p.ocupado}><Sparkles className="h-3.5 w-3.5 mr-1" />Pedir veredicto</Button>}
           {listaParaPostular && <span className="rounded bg-green-600 text-white px-2 py-0.5 text-xs font-medium">Lista para postular</span>}
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-1 text-xs">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
           {[['Presupuesto', presupuestoTexto(f.presupuesto, f.codigo), ''], ['Cierre', dias == null ? 's/i' : dias < 0 ? 'cerrada' : `en ${dias} días`, ''], ['Pago del organismo', pagoOrganismo(o).valor, pagoOrganismo(o).detalle], ['Puntaje estimado', m && ev.length ? `${total.toFixed(1)}${umbral != null ? ` / umbral ${umbral}` : ''}` : 's/i', '']].map(([k, v, d]) => (
-            <div key={k} className="rounded-md border bg-muted/30 px-2 py-1" title={d}><p className="text-[10px] uppercase tracking-wide text-muted-foreground">{k}</p><p className="font-semibold truncate">{v}</p>{d && <p className="text-[10px] text-muted-foreground truncate">{d}</p>}</div>
+            <div key={k} className="rounded-md border bg-muted/30 px-3 py-2" title={`${k}: ${v}${d ? ' (' + d + ')' : ''}`}><p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium">{k}</p><p className="font-semibold text-sm break-words">{v}</p>{d && <p className="text-[10px] text-muted-foreground mt-0.5">{d}</p>}</div>
           ))}
         </div>
         {m && ev.length > 0 && umbral != null && <p className={`text-xs ${total >= umbral ? 'text-green-700' : 'text-red-700'}`}>{total >= umbral ? 'Con tu puntaje estimado superas el umbral de adjudicación.' : `Te faltan ${(umbral - total).toFixed(1)} puntos para el umbral: revisa qué criterios puedes subir en Requisitos y puntaje.`}</p>}
@@ -69,24 +69,25 @@ export function SalaPostulacion(p: SalaProps) {
       </div>
 
       {/* 2. Admisibilidad */}
-      <div className="rounded-lg border p-3 space-y-1">
-        <div className="flex items-center gap-2"><p className="font-semibold">Admisibilidad</p>{m && <span className="text-xs text-muted-foreground">{cumple.length}/{adm.length} cumplidos</span>}<Button size="sm" variant="ghost" className="h-8 ml-auto" onClick={() => m ? p.onIr('matriz') : p.onGenerar('matriz')}>{m ? 'Editar' : 'Generar'}</Button></div>
+      <div className="rounded-lg border p-3 space-y-2">
+        <div className="flex items-center gap-2 flex-wrap"><p className="font-semibold">Admisibilidad</p>{m && <span className="text-xs text-muted-foreground">{cumple.length}/{adm.length} cumplidos</span>}<Button size="sm" variant="ghost" className="h-8 ml-auto" onClick={() => m ? p.onIr('matriz') : p.onGenerar('matriz')}>{m ? 'Editar' : 'Generar'}</Button></div>
         {!m && <p className="text-xs text-muted-foreground">Genera la matriz: el Experto convierte las bases en requisitos con su fuente y cómo se chequea cada uno.</p>}
-        {noCumple.map((r, i) => <p key={'n' + i} className="text-xs flex items-start gap-1"><AlertTriangle className="h-3.5 w-3.5 text-red-600 mt-0.5" /><span><b>{r.requisito}</b>: {r.nota || r.regla} <span className="text-muted-foreground">({r.fuente})</span></span></p>)}
-        {pend.slice(0, 6).map((r, i) => <p key={'p' + i} className="text-xs flex items-center gap-1"><Chip e={r.estado} /><span>{r.requisito}</span><span className="text-muted-foreground truncate">· {r.fuente}</span></p>)}
-        {m && noCumple.length === 0 && pend.length === 0 && <p className="text-xs text-green-700 flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5" />Todos los requisitos de admisibilidad están cumplidos.</p>}
+        {noCumple.map((r, i) => <p key={'n' + i} className="text-sm flex items-start gap-2"><AlertTriangle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" /><span><b>{r.requisito}</b>: {r.nota || r.regla} {r.fuente && <span className="text-muted-foreground text-xs" title={r.fuente}>({r.fuente})</span>}</span></p>)}
+        {pend.slice(0, 8).map((r, i) => <p key={'p' + i} className="text-xs flex items-center gap-2"><Chip e={r.estado} /><span className="flex-1 min-w-0"><span title={`${r.requisito} · ${r.fuente}`}>{r.requisito}</span></span></p>)}
+        {pend.length > 8 && <p className="text-xs text-muted-foreground">+{pend.length - 8} más por revisar. Abre la matriz para detalles.</p>}
+        {m && noCumple.length === 0 && pend.length === 0 && <p className="text-xs text-green-700 flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5" />Todos los requisitos de admisibilidad están cumplidos.</p>}
       </div>
 
       {/* 3. Equipo y tareas */}
-      <div className="rounded-lg border p-3 space-y-1">
+      <div className="rounded-lg border p-3 space-y-2">
         <p className="font-semibold">Equipo y tareas</p>
         {!tareas.length && <p className="text-xs text-muted-foreground">Las tareas salen de la matriz. Asigna responsable y plazo aquí; se guardan solos.</p>}
         {tareas.map((t, i) => (
-          <div key={i} className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-1 text-xs border-b last:border-0 py-1">
-            <button onClick={() => setTarea(i, 'estado', t.estado === 'ok' ? 'pendiente' : 'ok')} title="Marcar">{t.estado === 'ok' ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <Circle className="h-4 w-4 text-muted-foreground" />}</button>
-            <span className={t.estado === 'ok' ? 'line-through text-muted-foreground' : ''}>{t.accion}</span>
-            <input value={t.responsable ?? ''} onChange={(e) => setTarea(i, 'responsable', e.target.value)} placeholder="responsable" className="w-28 bg-transparent border-b border-dashed border-muted-foreground/40 focus:outline-none" />
-            <input value={t.plazo ?? ''} onChange={(e) => setTarea(i, 'plazo', e.target.value)} placeholder="plazo" className="w-24 bg-transparent border-b border-dashed border-muted-foreground/40 focus:outline-none" />
+          <div key={i} className="grid grid-cols-1 sm:grid-cols-[auto_1fr_auto_auto] items-start sm:items-center gap-2 text-xs border-b last:border-0 py-2">
+            <button onClick={() => setTarea(i, 'estado', t.estado === 'ok' ? 'pendiente' : 'ok')} title="Marcar" className="shrink-0">{t.estado === 'ok' ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <Circle className="h-4 w-4 text-muted-foreground" />}</button>
+            <span className={`break-words ${t.estado === 'ok' ? 'line-through text-muted-foreground' : ''}`}>{t.accion}</span>
+            <input value={t.responsable ?? ''} onChange={(e) => setTarea(i, 'responsable', e.target.value)} placeholder="responsable" className="min-w-[120px] bg-transparent border-b border-dashed border-muted-foreground/40 focus:outline-none text-sm" aria-label={`Responsable de ${t.accion}`} />
+            <input value={t.plazo ?? ''} onChange={(e) => setTarea(i, 'plazo', e.target.value)} placeholder="plazo (ej: 30 dic)" className="min-w-[100px] bg-transparent border-b border-dashed border-muted-foreground/40 focus:outline-none text-sm" aria-label={`Plazo de ${t.accion}`} />
           </div>
         ))}
       </div>
