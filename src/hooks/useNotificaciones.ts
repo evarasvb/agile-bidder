@@ -217,7 +217,7 @@ export function useNotificaciones(clienteId: string | null) {
     // Get licitaciones with high match that haven't been notified
     const { data: licitaciones, error } = await supabase
       .from('licitaciones')
-      .select('id_licitacion, titulo, organismo, presupuesto, fecha_cierre, match_score')
+      .select('codigo, titulo, organismo, presupuesto_estimado, fecha_cierre, match_score')
       .eq('match_encontrado', true)
       .gte('match_score', scoreMinimo)
       .order('created_at', { ascending: false })
@@ -231,20 +231,20 @@ export function useNotificaciones(clienteId: string | null) {
       .select('licitacion_id')
       .eq('cliente_id', clienteId)
       .eq('tipo', 'nuevo_match')
-      .in('licitacion_id', licitaciones.map(l => l.id_licitacion));
+      .in('licitacion_id', licitaciones.map(l => l.codigo));
     
     const notificadosIds = new Set(notificados?.map(n => n.licitacion_id) || []);
     
     return licitaciones
-      .filter(l => !notificadosIds.has(l.id_licitacion))
+      .filter(l => !notificadosIds.has(l.codigo))
       .map(l => ({
         tipo: 'nuevo_match' as const,
-        licitacion_id: l.id_licitacion,
+        licitacion_id: l.codigo,
         datos: {
           licitacion_titulo: l.titulo,
           match_score: l.match_score || 0,
           organismo: l.organismo,
-          presupuesto: l.presupuesto || 0,
+          presupuesto: l.presupuesto_estimado || 0,
           fecha_cierre: l.fecha_cierre || undefined
         }
       }));
@@ -260,7 +260,7 @@ export function useNotificaciones(clienteId: string | null) {
     
     const { data: licitaciones, error } = await supabase
       .from('licitaciones')
-      .select('id_licitacion, titulo, organismo, presupuesto, fecha_cierre, match_score')
+      .select('codigo, titulo, organismo, presupuesto_estimado, fecha_cierre, match_score')
       .eq('match_encontrado', true)
       .lte('fecha_cierre', fechaLimite.toISOString())
       .gte('fecha_cierre', new Date().toISOString())
@@ -274,24 +274,24 @@ export function useNotificaciones(clienteId: string | null) {
       .select('licitacion_id')
       .eq('cliente_id', clienteId)
       .eq('tipo', 'cierre_proximo')
-      .in('licitacion_id', licitaciones.map(l => l.id_licitacion));
+      .in('licitacion_id', licitaciones.map(l => l.codigo));
     
     const notificadosIds = new Set(notificados?.map(n => n.licitacion_id) || []);
     
     return licitaciones
-      .filter(l => !notificadosIds.has(l.id_licitacion))
+      .filter(l => !notificadosIds.has(l.codigo))
       .map(l => {
         const horasRestantes = Math.ceil(
           (new Date(l.fecha_cierre!).getTime() - Date.now()) / (1000 * 60 * 60)
         );
         return {
           tipo: 'cierre_proximo' as const,
-          licitacion_id: l.id_licitacion,
+          licitacion_id: l.codigo,
           datos: {
             licitacion_titulo: l.titulo,
             match_score: l.match_score || 0,
             organismo: l.organismo,
-            presupuesto: l.presupuesto || 0,
+            presupuesto: l.presupuesto_estimado || 0,
             fecha_cierre: l.fecha_cierre || undefined,
             horas_restantes: horasRestantes
           }

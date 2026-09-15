@@ -99,7 +99,7 @@ export default function MarketingContactosAdmin() {
       const { data: contactosData, error: contactosError } = await supabase
         .from('marketing_contactos')
         .select('*')
-        .order('created_at', { ascending: false })
+        .order('creado_en', { ascending: false })
         .limit(5000);
 
       if (!contactosError && contactosData) {
@@ -236,7 +236,7 @@ export default function MarketingContactosAdmin() {
       await supabase.rpc('marketing_registrar_auditoria', {
         p_accion: 'importacion',
         p_fuente: 'prospects',
-        p_cantidad: insertedData?.length || prospects.length,
+        p_cantidad: (insertedData ?? []).length || prospects.length,
       });
 
       toast.success(`Importados ${prospects.length} contactos de prospects`);

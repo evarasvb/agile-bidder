@@ -157,7 +157,8 @@ export function useInventarioResumen() {
         console.error('[useInventarioResumen]', error);
         throw error;
       }
-      return { ...vacio, ...(data || {}), categorias: (data?.categorias as string[]) || [] };
+      const resumen = (data || {}) as Partial<InventarioResumen>;
+      return { ...vacio, ...resumen, categorias: (resumen.categorias as string[]) || [] };
     },
     enabled: !!clienteId && !authLoading,
     staleTime: 60 * 1000,

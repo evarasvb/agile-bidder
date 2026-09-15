@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { evidenceGateLicitacion, crearEstadoDocumentacionLicitacion } from '@/services/evidenceGate';
 
 // Escritorio: tres paneles ajustables (arrastra el separador). Celular/tablet: pestañas Fuentes · Chat · Entregables.
 function useEscritorio() {
@@ -65,6 +64,22 @@ const fecha = (d?: string | null) => d ? new Date(d).toLocaleDateString('es-CL',
 
 interface Msg { rol: 'yo' | 'exp'; texto: string; fuentes?: any[]; pedirBases?: string | null }
 type Entregable = 'sala' | 'informe' | 'matriz' | 'estudio' | 'bajo_agua' | 'anexos' | 'mapa' | 'infografia';
+// Forma del jsonb que devuelve la RPC experto_libro (un blob con todo el libro).
+interface LibroExperto {
+  chat?: { pregunta: string; respuesta: string }[];
+  informe?: { texto: string } | null;
+  matriz?: { texto: string } | null;
+  estudio?: { texto: string } | null;
+  bajo_agua?: { texto: string } | null;
+  anexos?: { texto: string; faltantes?: string[] } | null;
+  mapa?: { texto: string } | null;
+  ficha?: any;
+  bases?: any[];
+  documentos?: any[];
+  top_adjudicatarios?: any[];
+  plan?: string;
+  bajo_agua_cuota?: { plan?: string; usados?: number; maximo?: number | null; periodo?: string };
+}
 
 /**
  * Libro de trabajo de una licitación: Fuentes (ficha, bases, organismo, quién gana) · Chat con el
@@ -84,7 +99,9 @@ export default function LibroLicitacion() {
   const { data: libro, isLoading } = useQuery({
     queryKey: ['experto_libro', cod],
     enabled: !!cod && !!token,
-    queryFn: async () => (await supabase.rpc('experto_libro', { p_codigo: cod })).data,
+    // La RPC devuelve un jsonb con todo el libro; tipamos acá el único punto
+    // de entrada en vez de castear cada lectura de libro.* más abajo.
+    queryFn: async () => (await supabase.rpc('experto_libro', { p_codigo: cod })).data as LibroExperto | null,
   });
 
   // Productos solicitados de la licitación con match contra el inventario (para
@@ -451,7 +468,7 @@ export default function LibroLicitacion() {
   const matrizCambio = (m: Matriz) => {
     setEntregables((e) => ({ ...e, matriz: JSON.stringify(m) }));
     if (guardarRef.current) clearTimeout(guardarRef.current);
-    guardarRef.current = setTimeout(async () => { const { error } = await supabase.rpc('experto_matriz_guardar', { p_codigo: cod, p_matriz: m }); if (error) toast.error('No pude guardar la matriz'); }, 1200);
+    guardarRef.current = setTimeout(async () => { const { error } = await supabase.rpc('experto_matriz_guardar', { p_codigo: cod, p_matriz: m as any }); if (error) toast.error('No pude guardar la matriz'); }, 1200);
   };
   const aprobarPostulacion = () => {
     if (!entregables.matriz) { toast.error('Genera primero la matriz de postulación'); return; }
