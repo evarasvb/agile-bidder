@@ -163,15 +163,6 @@ const CONTENIDO = {
     },
   ],
 
-  // --- Cursos que imparto ---------------------------------------------------
-  cursos: [
-    {
-      titulo: "Nombre del curso",
-      descripcion: "Qué aprenderás y para quién es.",
-      accesoUrl: "", // link de acceso / inscripción
-    },
-  ],
-
   // --- Asesoría gratuita (Google Form) --------------------------------------
   asesoria: {
     descripcion:
@@ -343,7 +334,7 @@ function estadoProximoMartes(): { dias: number; hoy: boolean } {
 }
 
 export default function Academia() {
-  const { perfil, banner, youtube, musica, linkedin, libros, cursos, asesoria, asesoriaPago, whatsappGrupo, contacto } =
+  const { perfil, banner, youtube, musica, linkedin, libros, asesoria, asesoriaPago, whatsappGrupo, contacto } =
     CONTENIDO;
 
   // Salto por capítulos en el video destacado: al elegir un capítulo, recargamos
@@ -366,7 +357,6 @@ export default function Academia() {
     (p) => (p.url && p.url.trim() !== "") || p.imagenUrl
   );
   const librosCargados = libros.filter((l) => l.titulo.trim() !== "" && l.titulo !== "Título del libro");
-  const cursosCargados = cursos.filter((c) => c.titulo.trim() !== "" && c.titulo !== "Nombre del curso");
 
   // Jerarquía de la Academia: gratis (punto de partida) → exprés (paga rápida,
   // fuera de la saga) → saga (las 7 partes secuenciales del programa completo).
