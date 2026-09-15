@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink, Trash2, Paperclip, Printer, Mail, Map as MapIcon, Image as ImageIcon, Presentation, Waves, Download, Receipt, X } from 'lucide-react';
-import { useTraerAdjuntos } from '@/hooks/useAdjuntosLicitacion';
+import { useTraerAdjuntos, useAdjuntosLicitacion } from '@/hooks/useAdjuntosLicitacion';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -250,6 +250,10 @@ export default function LibroLicitacion() {
   // imágenes o texto (privados, cuentan para el cupo del plan). Varios archivos a la vez, uno tras otro.
   // Bases y anexos directo desde la ficha de Mercado Público (robot licitacion-adjuntos).
   const traerAdjuntos = useTraerAdjuntos(cod);
+  // La sección "Adjuntos" de Mercado Público exige captcha: no se baja sola, pero si sabemos su URL
+  // se la ponemos a un clic de distancia en vez de que el usuario tenga que ir a buscarla.
+  const { data: adjuntosInfo } = useAdjuntosLicitacion(cod);
+  const urlAdjuntosMp = adjuntosInfo?.estado?.url_adjuntos_mp || null;
   const traerBasesMP = () =>
     traerAdjuntos.mutate(undefined, {
       onSuccess: (r) => {
@@ -588,8 +592,15 @@ export default function LibroLicitacion() {
               </div>
               <div>
                 <p className="font-medium flex items-center gap-1"><Upload className="h-4 w-4" />Fuentes subidas · bases (PDF)</p>
-                {bases.length ? bases.map((b) => <p key={b.id} className="text-muted-foreground truncate">{b.archivo} · {b.paginas} pág.</p>) : traerAdjuntos.isPending ? <p className="text-muted-foreground flex items-center gap-1"><Loader2 className="h-3.5 w-3.5 animate-spin" />Buscando las bases en Mercado Público…</p> : <p className="text-muted-foreground">Mercado Público no las tiene publicadas todavía (o el robot no las encontró). Tráelas de nuevo o súbelas tú abajo.</p>}
+                {bases.length ? bases.map((b) => <p key={b.id} className="text-muted-foreground truncate">{b.archivo} · {b.paginas} pág.</p>) : traerAdjuntos.isPending ? <p className="text-muted-foreground flex items-center gap-1"><Loader2 className="h-3.5 w-3.5 animate-spin" />Buscando las bases en Mercado Público…</p> : urlAdjuntosMp ? <p className="text-muted-foreground">Mercado Público las protege con captcha, así que no se bajan solas: ábrelas, descarga el PDF y súbelo abajo.</p> : <p className="text-muted-foreground">Mercado Público no las tiene publicadas todavía (o el robot no las encontró). Tráelas de nuevo o súbelas tú abajo.</p>}
                 <input ref={fileRef} type="file" multiple accept=".pdf,.xlsx,.xls,.xlsm,.csv,.docx,.txt,.md,.png,.jpg,.jpeg,.gif,.webp" className="hidden" onChange={(e) => { if (e.target.files?.length) subirFuentes(e.target.files); e.target.value = ''; }} />
+                {urlAdjuntosMp && (
+                  <Button size="sm" variant="outline" className="mt-1 mr-2" asChild title="Abre la sección Adjuntos de la ficha en Mercado Público (pide resolver un captcha)">
+                    <a href={urlAdjuntosMp} target="_blank" rel="noreferrer">
+                      <ExternalLink className="h-4 w-4 mr-1" />Abrir Adjuntos en Mercado Público
+                    </a>
+                  </Button>
+                )}
                 <Button size="sm" variant="outline" className="mt-1 mr-2" onClick={traerBasesMP} disabled={!!ocupado || traerAdjuntos.isPending} title="Baja las bases y anexos publicados en la ficha de Mercado Público y el Experto los lee">
                   {traerAdjuntos.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Download className="h-4 w-4 mr-1" />}Traer bases desde Mercado Público
                 </Button>
@@ -693,11 +704,23 @@ export default function LibroLicitacion() {
                   }} /> : <span className="text-muted-foreground">Buscando en las fuentes…</span>}
                   {m.pedirBases && (
                     <div className="mt-2 rounded-md border border-firmavb-blue/30 bg-firmavb-blue/5 px-2 py-2 text-xs space-y-1.5">
-                      <p>Para esto necesito las bases en PDF y todavía no las tengo — Mercado Público puede no haberlas publicado, o el robot aún no las encontró. Mientras tanto te respondo con lo que sé.</p>
+                      <p>
+                        {urlAdjuntosMp
+                          ? 'Para esto necesito las bases en PDF. Mercado Público protege esa sección con captcha, así que no la puedo abrir sola: ábrela tú, descarga el PDF de las Bases y súbelo aquí — queda guardado para todos los que consulten esta licitación.'
+                          : 'Para esto necesito las bases en PDF y todavía no las tengo — Mercado Público puede no haberlas publicado, o el robot aún no las encontró. Mientras tanto te respondo con lo que sé.'}
+                      </p>
                       <div className="flex flex-wrap gap-1">
-                        <Button size="sm" variant="outline" className="h-8" disabled={traerAdjuntos.isPending} onClick={traerBasesMP}>
-                          {traerAdjuntos.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Download className="h-3.5 w-3.5 mr-1" />}Reintentar desde Mercado Público
-                        </Button>
+                        {urlAdjuntosMp ? (
+                          <Button size="sm" variant="outline" className="h-8" asChild>
+                            <a href={urlAdjuntosMp} target="_blank" rel="noreferrer">
+                              <ExternalLink className="h-3.5 w-3.5 mr-1" />Abrir en Mercado Público
+                            </a>
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="outline" className="h-8" disabled={traerAdjuntos.isPending} onClick={traerBasesMP}>
+                            {traerAdjuntos.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Download className="h-3.5 w-3.5 mr-1" />}Reintentar desde Mercado Público
+                          </Button>
+                        )}
                         <Button size="sm" className="h-8" onClick={() => { if (!escritorio) { setVista('fuentes'); setTimeout(() => fileRef.current?.click(), 150); } else fileRef.current?.click(); }}>
                           <Upload className="h-3.5 w-3.5 mr-1" />Subir bases (PDF)
                         </Button>
