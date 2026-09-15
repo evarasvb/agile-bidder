@@ -3,6 +3,7 @@
 // (ruta AdminOnlyRoute + RPC security-definer). No trae correos (Mercado Público no
 // los expone); sirve para saber a quién conviene contactar y priorizar.
 import { useMemo, useState } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useProveedoresEstado, useProveedorEstadoDetalle, useRubrosEstado, type ProveedorEstado } from "@/hooks/useProveedoresEstado";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,7 +16,9 @@ import { Building2, Store, Tags, TrendingUp, X } from "lucide-react";
 
 // Cuántos proveedores trae el RPC (ordenados por monto 2026). La búsqueda por
 // nombre/RUT, el orden y la paginación se hacen en la tabla sobre este set.
-const LIMITE_PROVEEDORES = 500;
+// El RPC proveedores_estado corta en 200; la búsqueda por nombre/RUT (q) se
+// hace en el servidor sobre TODOS los proveedores antes de ese corte.
+const LIMITE_PROVEEDORES = 200;
 
 function clp(n: number | null | undefined): string {
   const v = Number(n || 0);
@@ -85,12 +88,14 @@ function DetalleProveedor({ rut }: { rut: string }) {
 }
 
 export default function ProveedoresEstado() {
+  const [q, setQ] = useState("");
   const [rubro, setRubro] = useState("");
   const [institucion, setInstitucion] = useState("");
+  const qServidor = useDebouncedValue(q.trim(), 400);
   const { data: rubros = [] } = useRubrosEstado();
-  const { data: proveedores = [], isLoading } = useProveedoresEstado("", rubro, institucion, LIMITE_PROVEEDORES);
+  const { data: proveedores = [], isLoading } = useProveedoresEstado(qServidor, rubro, institucion, LIMITE_PROVEEDORES);
   const [abierto, setAbierto] = useState<ProveedorEstado | null>(null);
-  const hayFiltro = !!(rubro || institucion.trim());
+  const hayFiltro = !!(rubro || institucion.trim() || q.trim());
 
   const totales = useMemo(() => {
     const monto = proveedores.reduce((s, p) => s + Number(p.monto_2026 || 0), 0);
@@ -109,7 +114,13 @@ export default function ProveedoresEstado() {
 
       <Card>
         <CardContent className="pt-6 space-y-3">
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-3">
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Proveedor por nombre o RUT (busca en todos)…"
+              aria-label="Buscar proveedor"
+            />
             <Select value={rubro || "__all__"} onValueChange={(v) => setRubro(v === "__all__" ? "" : v)}>
               <SelectTrigger><SelectValue placeholder="Todos los rubros" /></SelectTrigger>
               <SelectContent>
@@ -125,8 +136,8 @@ export default function ProveedoresEstado() {
           </div>
           <div className="flex items-center gap-3">
             {hayFiltro
-              ? <Button variant="ghost" size="sm" onClick={() => { setRubro(""); setInstitucion(""); }}>Limpiar filtros</Button>
-              : <p className="text-xs text-muted-foreground">Mostrando el top {num(LIMITE_PROVEEDORES)} por monto 2026. Filtra por rubro o institución y busca por nombre o RUT en la tabla.</p>}
+              ? <Button variant="ghost" size="sm" onClick={() => { setQ(""); setRubro(""); setInstitucion(""); }}>Limpiar filtros</Button>
+              : <p className="text-xs text-muted-foreground">Mostrando el top {num(LIMITE_PROVEEDORES)} por monto 2026. Busca por nombre o RUT, o filtra por rubro o institución.</p>}
           </div>
         </CardContent>
       </Card>
@@ -147,11 +158,9 @@ export default function ProveedoresEstado() {
             loading={isLoading}
             itemLabel="proveedores"
             columns={COLUMNAS_PROVEEDORES}
-            searchText={(p) => `${p.proveedor_nombre ?? ""} ${p.rut_proveedor}`}
-            searchPlaceholder="Proveedor por nombre o RUT…"
             defaultSort={{ id: "monto_2026", dir: "desc" }}
             exportFileName="proveedores-estado"
-            emptyMessage="Sin resultados. Prueba otro rubro o institución."
+            emptyMessage="Sin resultados. Prueba otro nombre, rubro o institución."
             onRowClick={(p) => setAbierto((prev) => (prev?.rut_proveedor === p.rut_proveedor ? null : p))}
             rowClassName={(p) => (abierto?.rut_proveedor === p.rut_proveedor ? "bg-firmavb-blue/5" : "hover:bg-firmavb-blue/5")}
           />

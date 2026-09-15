@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { Input } from "@/components/ui/input";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { Building2, Package, Users, DollarSign, FileText, Crown, Landmark } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -59,8 +61,12 @@ export default function ReporteCompradores() {
   const [preset, setPreset] = useState<PeriodoPreset>("total");
   const periodo = rangoDePreset(preset);
 
+  // La búsqueda va al servidor (busca en TODAS las instituciones antes del
+  // top 200); la tabla solo ordena/pagina lo que llega.
+  const [q, setQ] = useState("");
+  const termino = useDebouncedValue(q.trim(), 400);
   const { data: stats } = useBIStats(periodo);
-  const { data, isLoading } = useTopCompradores("", 200, periodo);
+  const { data, isLoading } = useTopCompradores(termino, 200, periodo);
   const filas = useMemo<FilaComprador[]>(() => (data?.items ?? []).map((c, i) => ({ ...c, posicion: i + 1 })), [data]);
   const { data: detalle, isLoading: detalleLoading } = useCompradorDetalle(sel?.comprador ?? null);
 
@@ -94,11 +100,18 @@ export default function ReporteCompradores() {
               columns={COLUMNAS_COMPRADORES}
               loading={isLoading}
               itemLabel="instituciones"
-              searchText={(c) => c.comprador}
-              searchPlaceholder="Buscar institución…"
+              toolbar={
+                <Input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Buscar institución en todo el mercado…"
+                  aria-label="Buscar institución"
+                  className="h-10 w-full sm:w-72"
+                />
+              }
               defaultSort={{ id: "monto", dir: "desc" }}
               exportFileName="reporte_compradores"
-              emptyMessage="Aún no hay datos para mostrar."
+              emptyMessage={termino ? `Ninguna institución coincide con “${termino}”.` : "Aún no hay datos para mostrar."}
               maxHeight="68vh"
               onRowClick={(c) => setSel(c)}
               rowClassName={(c) => (sel?.comprador === c.comprador ? "bg-primary/5" : undefined)}

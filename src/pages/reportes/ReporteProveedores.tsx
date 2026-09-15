@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { Input } from "@/components/ui/input";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
   Users, Package, Building2, DollarSign, FileText,
   Trophy, Crown,
@@ -62,8 +64,12 @@ export default function ReporteProveedores() {
   const [preset, setPreset] = useState<PeriodoPreset>("total");
   const periodo = rangoDePreset(preset);
 
+  // La búsqueda va al servidor (busca en TODOS los proveedores antes del top
+  // 200); la tabla solo ordena/pagina lo que llega.
+  const [q, setQ] = useState("");
+  const termino = useDebouncedValue(q.trim(), 400);
   const { data: stats } = useBIStats(periodo);
-  const { data, isLoading } = useTopProveedores("", 200, periodo);
+  const { data, isLoading } = useTopProveedores(termino, 200, periodo);
   const filas = useMemo<FilaProveedor[]>(() => (data?.items ?? []).map((p, i) => ({ ...p, posicion: i + 1 })), [data]);
   const { data: detalle, isLoading: detalleLoading } = useProveedorDetalle(sel?.proveedor ?? null);
 
@@ -97,11 +103,18 @@ export default function ReporteProveedores() {
               columns={COLUMNAS_PROVEEDORES}
               loading={isLoading}
               itemLabel="proveedores"
-              searchText={(p) => p.proveedor}
-              searchPlaceholder="Buscar proveedor…"
+              toolbar={
+                <Input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Buscar proveedor en todo el mercado…"
+                  aria-label="Buscar proveedor"
+                  className="h-10 w-full sm:w-72"
+                />
+              }
               defaultSort={{ id: "monto", dir: "desc" }}
               exportFileName="reporte_proveedores"
-              emptyMessage="Aún no hay datos para mostrar."
+              emptyMessage={termino ? `Ningún proveedor coincide con “${termino}”.` : "Aún no hay datos para mostrar."}
               maxHeight="68vh"
               onRowClick={(p) => setSel(p)}
               rowClassName={(p) => (sel?.proveedor === p.proveedor ? "bg-primary/5" : undefined)}
