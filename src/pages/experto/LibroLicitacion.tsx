@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { evidenceGateLicitacion, crearEstadoDocumentacionLicitacion } from '@/services/evidenceGate';
 
 // Escritorio: tres paneles ajustables (arrastra el separador). Celular/tablet: pestañas Fuentes · Chat · Entregables.
 function useEscritorio() {
