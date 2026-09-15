@@ -239,6 +239,9 @@ export default function Dashboard() {
                 <BarChart3 className="h-4 w-4 text-firmavb-blue" />
                 Pipeline por Etapa
               </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Cuántas oportunidades tienes en cada estado del proceso.
+              </p>
             </CardHeader>
             <CardContent>
               {!pipelineData?.length ? (
@@ -247,48 +250,55 @@ export default function Dashboard() {
                   <p className="text-sm">Sin datos de pipeline</p>
                 </div>
               ) : (
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={pipelineData} barCategoryGap="20%">
+                <ResponsiveContainer
+                  width="100%"
+                  height={Math.max(280, pipelineData.length * 34)}
+                >
+                  {/* Barras horizontales: con muchas etapas, los nombres se leen
+                      completos a la izquierda en vez de encimarse abajo. */}
+                  <BarChart
+                    data={pipelineData}
+                    layout="vertical"
+                    margin={{ left: 8, right: 16, top: 4, bottom: 4 }}
+                    barCategoryGap="25%"
+                  >
                     <CartesianGrid
                       strokeDasharray="3 3"
                       className="stroke-muted"
-                      vertical={false}
+                      horizontal={false}
                     />
                     <XAxis
-                      dataKey="etapa"
-                      tick={{ fontSize: 11 }}
-                      className="text-muted-foreground"
-                      axisLine={false}
-                      tickLine={false}
-                      interval={0}
-                      angle={-20}
-                      textAnchor="end"
-                      height={50}
-                    />
-                    <YAxis
+                      type="number"
                       tick={{ fontSize: 12 }}
                       className="text-muted-foreground"
                       axisLine={false}
                       tickLine={false}
+                      allowDecimals={false}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="etapa"
+                      tick={{ fontSize: 12 }}
+                      className="text-muted-foreground"
+                      axisLine={false}
+                      tickLine={false}
+                      width={130}
+                      interval={0}
                     />
                     <RechartsTooltip
+                      cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }}
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
                         border: "1px solid hsl(var(--border))",
                         borderRadius: "8px",
                       }}
-                      formatter={(value: number, name: string) => {
-                        if (name === "monto")
-                          return [formatCompact(value), "Monto"];
-                        return [value, "Cantidad"];
-                      }}
+                      formatter={(value: number) => [value, "Oportunidades"]}
                     />
-                    <Legend />
                     <Bar
                       dataKey="count"
-                      name="Cantidad"
+                      name="Oportunidades"
                       fill="hsl(var(--firmavb-blue))"
-                      radius={[4, 4, 0, 0]}
+                      radius={[0, 4, 4, 0]}
                     />
                   </BarChart>
                 </ResponsiveContainer>
@@ -316,6 +326,9 @@ export default function Dashboard() {
                 <Target className="h-4 w-4 text-firmavb-green" />
                 Oportunidades abiertas por tipo
               </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Reparto entre Compras Ágiles y Licitaciones.
+              </p>
             </CardHeader>
             <CardContent>
               {!porTipoData?.length ||
@@ -336,8 +349,6 @@ export default function Dashboard() {
                       paddingAngle={4}
                       dataKey="count"
                       nameKey="tipo"
-                      label={({ tipo, count }) => `${tipo}: ${count}`}
-                      labelLine={false}
                     >
                       {porTipoData.map((_, index) => (
                         <Cell
@@ -353,7 +364,11 @@ export default function Dashboard() {
                         borderRadius: "8px",
                       }}
                     />
-                    <Legend />
+                    <Legend
+                      formatter={(value: string, entry: any) =>
+                        `${value} (${entry?.payload?.count ?? 0})`
+                      }
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               )}
@@ -371,6 +386,9 @@ export default function Dashboard() {
               <Clock className="h-4 w-4 text-firmavb-amber" />
               Cierres Próximos (7 días)
             </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Oportunidades que cierran esta semana. Postula antes de que venza el plazo.
+            </p>
           </CardHeader>
           <CardContent>
             {cierresLoading ? (
@@ -493,6 +511,9 @@ export default function Dashboard() {
               <Zap className="h-4 w-4 text-firmavb-green" />
               Últimos Matches
             </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Compras del Estado que calzan con tu inventario. A mayor %, mejor encaje.
+            </p>
           </CardHeader>
           <CardContent>
             {matchesLoading ? (
