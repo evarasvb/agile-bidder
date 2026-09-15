@@ -313,8 +313,8 @@ export default function OportunidadDetalle() {
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex items-start gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/oportunidades")}>
-          <ArrowLeft className="h-5 w-5" />
+        <Button variant="ghost" size="icon" onClick={() => navigate("/oportunidades")} aria-label="Volver a oportunidades">
+          <ArrowLeft className="h-5 w-5" aria-hidden="true" />
         </Button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">

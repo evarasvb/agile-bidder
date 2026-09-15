@@ -265,8 +265,8 @@ export default function LicitacionDetalle() {
       {/* Header */}
       <div className="flex flex-col gap-4">
         <div className="flex items-start gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-5 w-5" />
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} aria-label="Volver">
+            <ArrowLeft className="h-5 w-5" aria-hidden="true" />
           </Button>
           <div className="flex-1 space-y-3">
             {/* Badges Row */}
