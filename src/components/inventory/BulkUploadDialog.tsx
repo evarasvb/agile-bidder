@@ -370,14 +370,23 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onClick={handleFileInputClick}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleFileInputClick();
+                  }
+                }}
+                aria-label="Arrastra archivo Excel o CSV aquí, o haz clic para seleccionar"
                 className={cn(
                   "border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer",
-                  isDragging 
-                    ? "border-primary bg-primary/5" 
+                  isDragging
+                    ? "border-primary bg-primary/5"
                     : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50"
                 )}
               >
-                <FileUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <FileUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground" aria-hidden="true" />
                 <p className="text-lg font-medium mb-2">
                   Arrastra tu archivo aquí
                 </p>
@@ -392,7 +401,7 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
                   className="hidden"
                 />
                 <Button variant="outline" className="pointer-events-none">
-                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  <FileSpreadsheet className="h-4 w-4 mr-2" aria-hidden="true" />
                   Seleccionar Archivo
                 </Button>
                 <p className="text-xs text-muted-foreground mt-4">
@@ -405,12 +414,12 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
               
               {/* Download Template Button */}
               <div className="flex justify-center">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="gap-2"
                   onClick={handleDownloadTemplate}
                 >
-                  <Download className="h-4 w-4" />
+                  <Download className="h-4 w-4" aria-hidden="true" />
                   Descargar Plantilla de Ejemplo
                 </Button>
               </div>

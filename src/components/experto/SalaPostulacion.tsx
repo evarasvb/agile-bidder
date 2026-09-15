@@ -46,8 +46,8 @@ export function SalaPostulacion(p: SalaProps) {
       {/* Proceso */}
       <div className="flex flex-wrap gap-1">
         {pasos.map((s, i) => (
-          <button key={s.k} onClick={s.accion} title={s.ayuda} className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${s.listo ? 'border-green-300 bg-green-50 text-green-800' : 'hover:border-primary'}`}>
-            {s.listo ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5 text-muted-foreground" />}{i + 1}. {s.t}
+          <button key={s.k} onClick={s.accion} title={s.ayuda} aria-label={`Paso ${i + 1}: ${s.t}${s.listo ? ' (completado)' : ''}`} className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${s.listo ? 'border-green-300 bg-green-50 text-green-800' : 'hover:border-primary'}`}>
+            {s.listo ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> : <Circle className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />}{i + 1}. {s.t}
           </button>
         ))}
       </div>
@@ -84,7 +84,7 @@ export function SalaPostulacion(p: SalaProps) {
         {!tareas.length && <p className="text-xs text-muted-foreground">Las tareas salen de la matriz. Asigna responsable y plazo aquí; se guardan solos.</p>}
         {tareas.map((t, i) => (
           <div key={i} className="grid grid-cols-1 sm:grid-cols-[auto_1fr_auto_auto] items-start sm:items-center gap-2 text-xs border-b last:border-0 py-2">
-            <button onClick={() => setTarea(i, 'estado', t.estado === 'ok' ? 'pendiente' : 'ok')} title="Marcar" className="shrink-0">{t.estado === 'ok' ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <Circle className="h-4 w-4 text-muted-foreground" />}</button>
+            <button onClick={() => setTarea(i, 'estado', t.estado === 'ok' ? 'pendiente' : 'ok')} aria-expanded={t.estado === 'ok'} aria-label={`${t.accion}: ${t.estado === 'ok' ? 'completada' : 'pendiente'}`} className="shrink-0">{t.estado === 'ok' ? <CheckCircle2 className="h-4 w-4 text-green-600" aria-hidden="true" /> : <Circle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />}</button>
             <span className={`break-words ${t.estado === 'ok' ? 'line-through text-muted-foreground' : ''}`}>{t.accion}</span>
             <input value={t.responsable ?? ''} onChange={(e) => setTarea(i, 'responsable', e.target.value)} placeholder="responsable" className="min-w-[120px] bg-transparent border-b border-dashed border-muted-foreground/40 focus:outline-none text-sm" aria-label={`Responsable de ${t.accion}`} />
             <input value={t.plazo ?? ''} onChange={(e) => setTarea(i, 'plazo', e.target.value)} placeholder="plazo (ej: 30 dic)" className="min-w-[100px] bg-transparent border-b border-dashed border-muted-foreground/40 focus:outline-none text-sm" aria-label={`Plazo de ${t.accion}`} />

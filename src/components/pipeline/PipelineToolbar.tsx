@@ -54,6 +54,7 @@ export function PipelineToolbar({
           value={filters.search || ''}
           onChange={(e) => onFiltersChange({ ...filters, search: e.target.value })}
           className="pl-9 h-9"
+          aria-label="Buscar oportunidades en el pipeline"
         />
       </div>
 

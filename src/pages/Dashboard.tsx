@@ -20,6 +20,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Table,
   TableBody,
@@ -409,14 +410,32 @@ export default function Dashboard() {
                     {cierresData.map((item) => (
                       <TableRow key={item.codigo} className="data-row">
                         <TableCell>
-                          <p className="font-medium text-sm line-clamp-1 max-w-[200px]">
-                            {item.nombre}
-                          </p>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <p className="font-medium text-sm line-clamp-1 max-w-[200px] cursor-help">
+                                  {item.nombre}
+                                </p>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs">
+                                {item.nombre}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </TableCell>
                         <TableCell>
-                          <p className="text-sm text-muted-foreground line-clamp-1 max-w-[150px]">
-                            {item.institucion}
-                          </p>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <p className="text-sm text-muted-foreground line-clamp-1 max-w-[150px] cursor-help">
+                                  {item.institucion}
+                                </p>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs">
+                                {item.institucion}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </TableCell>
                         <TableCell>
                           <Badge

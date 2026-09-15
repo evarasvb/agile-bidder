@@ -354,14 +354,14 @@ export function EvaristoChat() {
                 onClick={abrirEscalar}
                 className="w-full flex items-center justify-center gap-1.5 border-t border-border py-2 text-xs font-medium text-firmavb-blue hover:bg-firmavb-blue/5 transition-colors"
               >
-                <LifeBuoy className="h-3.5 w-3.5" /> ¿Prefieres que te contacte el equipo?
+                <LifeBuoy className="h-3.5 w-3.5" aria-hidden="true" /> ¿Prefieres que te contacte el equipo?
               </button>
 
               {/* Input */}
               <div className="border-t border-border p-2.5 flex items-end gap-2 bg-card">
                 <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickImg} />
                 <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => fileRef.current?.click()} aria-label="Adjuntar captura">
-                  <ImagePlus className="h-5 w-5" />
+                  <ImagePlus className="h-5 w-5" aria-hidden="true" />
                 </Button>
                 <textarea
                   value={input}
@@ -373,7 +373,7 @@ export function EvaristoChat() {
                   className="flex-1 resize-none max-h-24 rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-firmavb-blue/30"
                 />
                 <Button size="icon" className="h-9 w-9 shrink-0 bg-firmavb-blue hover:bg-firmavb-blue/90" onClick={enviar} disabled={loading || (!input.trim() && !img)} aria-label="Enviar">
-                  <Send className="h-4 w-4" />
+                  <Send className="h-4 w-4" aria-hidden="true" />
                 </Button>
               </div>
             </>

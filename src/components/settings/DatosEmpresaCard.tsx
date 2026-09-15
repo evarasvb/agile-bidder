@@ -136,7 +136,7 @@ export function DatosEmpresaCard() {
         <div className="flex items-center gap-4">
           <div className="h-20 w-20 rounded-lg border bg-muted/40 flex items-center justify-center overflow-hidden shrink-0">
             {logoUrl ? (
-              <img src={logoUrl} alt="Logo" className="h-full w-full object-contain" />
+              <img src={logoUrl} alt="Logo de la empresa" className="h-full w-full object-contain" />
             ) : (
               <ImageIcon className="h-7 w-7 text-muted-foreground" />
             )}
@@ -149,7 +149,12 @@ export function DatosEmpresaCard() {
               className="hidden"
               onChange={handleLogo}
             />
-            <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={subiendo}>
+            <Button
+              variant="outline"
+              onClick={() => fileRef.current?.click()}
+              disabled={subiendo}
+              aria-label={logoUrl ? "Cambiar logo de la empresa" : "Subir logo de la empresa"}
+            >
               {subiendo ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
               {logoUrl ? 'Cambiar logo' : 'Subir logo'}
             </Button>

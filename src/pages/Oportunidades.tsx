@@ -8,7 +8,7 @@ function OrigenMatch() {
   const n = inv?.total ?? 0;
   return n > 0
     ? <p className="text-xs text-muted-foreground">Match calculado con tu inventario ({n.toLocaleString("es-CL")} productos) contra los ítems de cada compra.</p>
-    : <p className="text-xs text-amber-700">Sin inventario cargado: el % de match usa tus palabras clave y los ítems publicados. Carga tu inventario para un match por producto.</p>;
+    : <p className="text-xs text-amber-900 font-medium">Sin inventario cargado: el % de match usa tus palabras clave y los ítems publicados. Carga tu inventario para un match por producto.</p>;
 }
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +18,7 @@ import { useRequirePro } from "@/components/pro/UpgradeProProvider";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Select,
   SelectContent,
@@ -104,7 +105,18 @@ function OpportunityCard({
   const deadline = getDeadlineText(op.fecha_cierre);
 
   return (
-    <Card className="hover:shadow-md transition-shadow cursor-pointer group" onClick={onViewDetail}>
+    <Card
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onViewDetail();
+        }
+      }}
+      className="hover:shadow-md transition-shadow cursor-pointer group focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary rounded-lg outline-none"
+      onClick={onViewDetail}
+    >
       <CardContent className="p-4 space-y-3">
         {/* Top row: Score + Type + Deadline */}
         <div className="flex items-start justify-between gap-2">
@@ -144,17 +156,37 @@ function OpportunityCard({
         {/* Buyer info */}
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Building2 className="h-3 w-3 shrink-0" />
-          <span className="truncate">{op.organismo}</span>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="truncate cursor-help">{op.organismo}</span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs">
+                {op.organismo}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
         {op.tipo === "compra_agil" && op.items_detalle && op.items_detalle.length > 0 ? (
           // Lo que realmente piden, ítem por ítem (cantidad · descripción de la ficha).
           // El título de la compra suele ser genérico ("Materiales de reparación").
           <ul className="text-xs text-foreground/80 space-y-0.5">
             {op.items_detalle.slice(0, 3).map((t, i) => (
-              <li key={i} className="truncate" title={t}>· {t}</li>
+              <li key={i} className="truncate flex items-center gap-1">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="truncate cursor-help">· {t}</span>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-xs">
+                      {t}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </li>
             ))}
             {op.items_detalle.length > 3 ? (
-              <li className="text-muted-foreground">+{op.items_detalle.length - 3} ítems más</li>
+              <li className="text-muted-foreground text-[11px]">+{op.items_detalle.length - 3} ítems más (abre para ver todos)</li>
             ) : null}
           </ul>
         ) : null}
@@ -437,9 +469,10 @@ export default function Oportunidades() {
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Buscar producto, título, código u organismo (también dentro de los ítems)..."
+              placeholder="Buscar producto, título, código u organismo..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
+              aria-label="Buscar oportunidades por producto, título, código u organismo"
               className="pl-9"
             />
           </div>
@@ -544,15 +577,15 @@ export default function Oportunidades() {
         </div>
       ) : paginatedOps.length === 0 ? (
         <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-            <Package className="h-12 w-12 text-muted-foreground/50 mb-4" />
+          <CardContent className="flex flex-col items-center justify-center py-16 px-4 text-center space-y-4">
+            <Package className="h-16 w-16 text-muted-foreground/40 mb-2" />
             {stats.totalActivas > 0 || hasActiveFilters || tieneFiltrosRubro ? (
               // Hay oportunidades activas en el mercado (o filtros aplicados),
               // pero la vista actual quedó vacía. NO es que no haya nada: son los
               // filtros (de vista o de rubro) los que están ocultando todo.
               <>
-                <h3 className="text-lg font-medium">Ninguna coincide con tus filtros ahora</h3>
-                <p className="text-sm text-muted-foreground max-w-md">
+                <h3 className="text-xl font-semibold text-foreground">Ninguna coincide con tus filtros ahora</h3>
+                <p className="text-base text-muted-foreground max-w-md">
                   {stats.totalActivas > 0 && (
                     <>Hay <strong>{stats.totalActivas}</strong> oportunidades activas en el mercado, pero ninguna pasa tus filtros{soloComprasAgiles ? " de Compras Ágiles" : ""} en este momento.{" "}</>
                   )}

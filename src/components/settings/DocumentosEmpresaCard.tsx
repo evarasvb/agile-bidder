@@ -105,7 +105,7 @@ export function DocumentosEmpresaCard() {
           const d = docs.find((x) => x.tipo === t.tipo);
           return (
             <div key={t.tipo} className="flex items-center gap-3 p-2 rounded-md bg-muted/40 text-sm">
-              {d ? <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" /> : <Circle className="h-4 w-4 text-muted-foreground shrink-0" />}
+              {d ? <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" aria-hidden="true" /> : <Circle className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden="true" />}
               <div className="flex-1 min-w-0">
                 <p className="font-medium">{t.nombre}{!t.obligatorio && <span className="text-xs text-muted-foreground"> · opcional</span>}</p>
                 <p className="text-xs text-muted-foreground truncate">{d ? `${d.nombre} · ${new Date(d.created_at).toLocaleDateString('es-CL')}` : t.ayuda}</p>
@@ -113,11 +113,17 @@ export function DocumentosEmpresaCard() {
               <input type="file" accept="application/pdf,image/jpeg,image/png" className="hidden" ref={(el) => { inputs.current[t.tipo] = el; }}
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) subir(t.tipo, f); e.target.value = ''; }} />
               {d && <Button variant="ghost" size="sm" onClick={() => abrir(d)}>Ver</Button>}
-              <Button variant={d ? 'ghost' : 'outline'} size="sm" disabled={subiendo === t.tipo} onClick={() => inputs.current[t.tipo]?.click()}>
-                {subiendo === t.tipo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              <Button
+                variant={d ? 'ghost' : 'outline'}
+                size="sm"
+                disabled={subiendo === t.tipo}
+                onClick={() => inputs.current[t.tipo]?.click()}
+                aria-label={d ? `Reemplazar ${t.nombre}` : `Subir ${t.nombre}`}
+              >
+                {subiendo === t.tipo ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Upload className="h-4 w-4" aria-hidden="true" />}
                 <span className="ml-1">{d ? 'Reemplazar' : 'Subir'}</span>
               </Button>
-              {d && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => borrar(d)}><Trash2 className="h-4 w-4" /></Button>}
+              {d && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => borrar(d)} aria-label={`Eliminar ${t.nombre}`}><Trash2 className="h-4 w-4" aria-hidden="true" /></Button>}
             </div>
           );
         })}

@@ -6,16 +6,20 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  DollarSign, 
-  Percent, 
-  FileText, 
-  CreditCard, 
-  Download, 
+import {
+  DollarSign,
+  Percent,
+  FileText,
+  CreditCard,
+  Download,
   Search,
   Calendar,
   Plus,
-  Receipt
+  Receipt,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  FileCheck
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -108,17 +112,17 @@ export default function Billing() {
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
       case "preforma":
-        return <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-200">Preforma en validación</Badge>;
+        return <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-200 flex items-center gap-1 w-fit"><FileText className="h-3 w-3" /> Preforma en validación</Badge>;
       case "por_facturar":
-        return <Badge variant="outline" className="bg-accent text-accent-foreground">Por facturar</Badge>;
+        return <Badge variant="outline" className="bg-accent text-accent-foreground flex items-center gap-1 w-fit"><Clock className="h-3 w-3" /> Por facturar</Badge>;
       case "facturada":
-        return <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200">Emitida · por pagar</Badge>;
+        return <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 flex items-center gap-1 w-fit"><FileCheck className="h-3 w-3" /> Emitida · por pagar</Badge>;
       case "pagada":
-        return <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">Pagada</Badge>;
+        return <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 flex items-center gap-1 w-fit"><CheckCircle2 className="h-3 w-3" /> Pagada</Badge>;
       case "pendiente":
-        return <Badge variant="outline" className="bg-accent text-accent-foreground">Pendiente</Badge>;
+        return <Badge variant="outline" className="bg-accent text-accent-foreground flex items-center gap-1 w-fit"><Clock className="h-3 w-3" /> Pendiente</Badge>;
       case "vencida":
-        return <Badge variant="destructive">Vencida</Badge>;
+        return <Badge variant="destructive" className="flex items-center gap-1 w-fit"><AlertCircle className="h-3 w-3" /> Vencida</Badge>;
       default:
         return <Badge variant="outline">{estado}</Badge>;
     }
@@ -222,6 +226,7 @@ export default function Billing() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-9 w-64"
+                  aria-label="Buscar órdenes de compra por código o nombre del comprador"
                 />
               </div>
             </div>
