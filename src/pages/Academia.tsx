@@ -15,7 +15,9 @@ import {
   Clock,
   CalendarClock,
   Play,
+  ArrowRight,
 } from "lucide-react";
+import type { Curso } from "@/data/academiaCursos";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -262,6 +264,53 @@ function PendientePorCargar({ texto }: { texto: string }) {
   );
 }
 
+// Tarjeta de un curso individual (gratis o exprés de pago). destacar agrega un
+// anillo y una etiqueta "Empieza aquí" para marcar el punto de partida.
+function CursoCard({ c, destacar = false }: { c: Curso; destacar?: boolean }) {
+  return (
+    <Card
+      className={`border-border/50 hover:shadow-md transition-shadow flex flex-col overflow-hidden ${
+        destacar ? "ring-2 ring-firmavb-blue" : ""
+      }`}
+    >
+      <div className={`relative ${ACENTO[c.acento].portada} h-24 flex items-center justify-center`}>
+        <span className="text-5xl drop-shadow-md">{c.emoji}</span>
+        {destacar ? (
+          <span className="absolute top-2 right-2 bg-firmavb-blue text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
+            👉 Empieza aquí
+          </span>
+        ) : c.premium ? (
+          <span className="absolute top-2 right-2 bg-white/90 text-firmavb-blue text-xs font-bold px-2 py-0.5 rounded-full shadow">
+            💎 Premium
+          </span>
+        ) : (
+          <span className="absolute top-2 right-2 bg-white/90 text-[hsl(var(--success))] text-xs font-bold px-2 py-0.5 rounded-full shadow">
+            Gratis
+          </span>
+        )}
+      </div>
+      <CardContent className="py-6 flex flex-col flex-1">
+        <h3 className="font-semibold text-foreground mb-1">{c.titulo}</h3>
+        <p className="text-sm text-muted-foreground mb-4 flex-1">{c.descripcion}</p>
+        <div className="flex flex-wrap gap-2 mb-4">
+          <Badge variant="outline" className="text-xs">{c.nivel}</Badge>
+          <Badge variant="outline" className="text-xs">{c.duracion}</Badge>
+          {c.premium && c.precio && (
+            <Badge className="text-xs bg-firmavb-blue/10 text-firmavb-blue border-firmavb-blue/20">
+              {c.precio}
+            </Badge>
+          )}
+        </div>
+        <Button asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2 w-full">
+          <Link to={`/academia/curso/${c.slug}`}>
+            {c.premium ? "Ver programa" : "Ver curso gratis"}
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 // Formatea segundos a m:ss para las etiquetas de capítulos.
 function fmtTiempo(seg: number): string {
   const m = Math.floor(seg / 60);
@@ -318,6 +367,12 @@ export default function Academia() {
   );
   const librosCargados = libros.filter((l) => l.titulo.trim() !== "" && l.titulo !== "Título del libro");
   const cursosCargados = cursos.filter((c) => c.titulo.trim() !== "" && c.titulo !== "Nombre del curso");
+
+  // Jerarquía de la Academia: gratis (punto de partida) → exprés (paga rápida,
+  // fuera de la saga) → saga (las 7 partes secuenciales del programa completo).
+  const cursosGratis = CURSOS.filter((c) => !c.premium);
+  const cursosSaga = CURSOS.filter((c) => c.premium && c.slug.startsWith("saga-"));
+  const cursosExpres = CURSOS.filter((c) => c.premium && !c.slug.startsWith("saga-"));
 
   const nav = [
     { href: "#videos", label: "Videos", icon: Youtube },
@@ -774,80 +829,100 @@ export default function Academia() {
         id="cursos"
         icon={GraduationCap}
         titulo="Mis cursos"
-        subtitulo="Cursos gratuitos paso a paso, y un programa premium para llevarte al siguiente nivel."
+        subtitulo="Tres formas de avanzar: parte gratis, resuelve rápido con un curso exprés, o haz el camino completo con la Saga."
         alt
       >
-        {SAGA_BUNDLE.activo && (
-          <Card className="mb-6 overflow-hidden border-0 bg-gradient-to-br from-firmavb-blue to-header-dark text-white shadow-xl">
-            <CardContent className="py-6 md:flex items-center justify-between gap-6">
-              <div>
-                <Badge className="mb-2 bg-white/20 text-white border-white/30 hover:bg-white/30">
-                  🎁 Pack con descuento
-                </Badge>
-                <h3 className="text-xl md:text-2xl font-bold">{SAGA_BUNDLE.titulo}</h3>
-                <p className="text-white/90 max-w-xl">{SAGA_BUNDLE.descripcion}</p>
-              </div>
-              <div className="mt-4 md:mt-0 text-center shrink-0">
-                <p className="text-3xl font-bold mb-2">{SAGA_BUNDLE.precio}</p>
-                {SAGA_BUNDLE.pagoUrl ? (
-                  <Button
-                    asChild
-                    size="lg"
-                    className="bg-white text-firmavb-blue hover:bg-white/90 font-semibold gap-2"
-                  >
-                    <a href={SAGA_BUNDLE.pagoUrl} target="_blank" rel="noopener noreferrer">
-                      Comprar la saga completa
-                    </a>
-                  </Button>
-                ) : (
-                  <Button size="lg" disabled>
-                    Muy pronto
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+        {/* 1. Punto de partida: los 3 cursos gratis, con el primero destacado */}
+        <div className="mb-12">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">
+            1. Empieza gratis
+          </h3>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {cursosGratis.map((c, i) => (
+              <CursoCard key={c.slug} c={c} destacar={i === 0} />
+            ))}
+          </div>
+        </div>
+
+        {/* 2. Cursos exprés: alternativa paga y rápida, sin comprometerse a la saga */}
+        {cursosExpres.length > 0 && (
+          <div className="mb-12">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">
+              2. ¿Con prisa? Cursos exprés
+            </h3>
+            <div className="grid sm:grid-cols-2 gap-6">
+              {cursosExpres.map((c) => (
+                <CursoCard key={c.slug} c={c} />
+              ))}
+            </div>
+          </div>
         )}
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {CURSOS.map((c) => (
-            <Card
-              key={c.slug}
-              className="border-border/50 hover:shadow-md transition-shadow flex flex-col overflow-hidden"
-            >
-              <div className={`relative ${ACENTO[c.acento].portada} h-24 flex items-center justify-center`}>
-                <span className="text-5xl drop-shadow-md">{c.emoji}</span>
-                {c.premium ? (
-                  <span className="absolute top-2 right-2 bg-white/90 text-firmavb-blue text-xs font-bold px-2 py-0.5 rounded-full shadow">
-                    💎 Premium
-                  </span>
-                ) : (
-                  <span className="absolute top-2 right-2 bg-white/90 text-[hsl(var(--success))] text-xs font-bold px-2 py-0.5 rounded-full shadow">
-                    Gratis
-                  </span>
-                )}
-              </div>
-              <CardContent className="py-6 flex flex-col flex-1">
-                <h3 className="font-semibold text-foreground mb-1">{c.titulo}</h3>
-                <p className="text-sm text-muted-foreground mb-4 flex-1">{c.descripcion}</p>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  <Badge variant="outline" className="text-xs">{c.nivel}</Badge>
-                  <Badge variant="outline" className="text-xs">{c.duracion}</Badge>
-                  {c.premium && c.precio && (
-                    <Badge className="text-xs bg-firmavb-blue/10 text-firmavb-blue border-firmavb-blue/20">
-                      {c.precio}
+        {/* 3. La Saga completa: 7 partes secuenciales, en formato lista (no 7 tarjetas
+            repetidas) para que se lea como un programa y no como 7 cursos sueltos. */}
+        {cursosSaga.length > 0 && (
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">
+              3. El camino completo: Saga Véndele al Estado
+            </h3>
+            {SAGA_BUNDLE.activo && (
+              <Card className="mb-4 overflow-hidden border-0 bg-gradient-to-br from-firmavb-blue to-header-dark text-white shadow-xl">
+                <CardContent className="py-6 md:flex items-center justify-between gap-6">
+                  <div>
+                    <Badge className="mb-2 bg-white/20 text-white border-white/30 hover:bg-white/30">
+                      🎁 Pack con descuento
                     </Badge>
+                    <h3 className="text-xl md:text-2xl font-bold">{SAGA_BUNDLE.titulo}</h3>
+                    <p className="text-white/90 max-w-xl">{SAGA_BUNDLE.descripcion}</p>
+                  </div>
+                  <div className="mt-4 md:mt-0 text-center shrink-0">
+                    <p className="text-3xl font-bold mb-2">{SAGA_BUNDLE.precio}</p>
+                    {SAGA_BUNDLE.pagoUrl ? (
+                      <Button
+                        asChild
+                        size="lg"
+                        className="bg-white text-firmavb-blue hover:bg-white/90 font-semibold gap-2"
+                      >
+                        <a href={SAGA_BUNDLE.pagoUrl} target="_blank" rel="noopener noreferrer">
+                          Comprar la saga completa
+                        </a>
+                      </Button>
+                    ) : (
+                      <Button size="lg" disabled>
+                        Muy pronto
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            <div className="rounded-xl border border-border/50 bg-card divide-y divide-border/50 overflow-hidden">
+              {cursosSaga.map((c, i) => (
+                <Link
+                  key={c.slug}
+                  to={`/academia/curso/${c.slug}`}
+                  className="flex items-center gap-4 px-4 py-3 hover:bg-muted/50 transition-colors"
+                >
+                  <span
+                    className={`shrink-0 h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold ${ACENTO[c.acento].chip}`}
+                  >
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-foreground truncate">{c.titulo}</p>
+                    <p className="text-xs text-muted-foreground truncate">{c.descripcion}</p>
+                  </div>
+                  {c.precio && (
+                    <span className="hidden sm:inline text-sm font-semibold text-firmavb-blue shrink-0">
+                      {c.precio}
+                    </span>
                   )}
-                </div>
-                <Button asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2 w-full">
-                  <Link to={`/academia/curso/${c.slug}`}>
-                    {c.premium ? "Ver programa" : "Ver curso gratis"}
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </Seccion>
 
       {/* Asesoría gratuita */}
