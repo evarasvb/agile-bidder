@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Building2, Upload, Loader2, Save, Image as ImageIcon, CheckCircle2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCliente, useActualizarCliente, validarRUT, formatearRUT } from '@/hooks/useCliente';
+import { buscarEmpresaPorRut } from '@/hooks/useEmpresaPorRut';
 import { uploadCompanyLogo, isValidImageFile } from '@/hooks/useProductImageUpload';
 import { cn } from '@/lib/utils';
 
@@ -40,6 +41,12 @@ export function DatosEmpresaCard() {
   const [repRut, setRepRut] = useState('');
   const [giros, setGiros] = useState('');
   const [subiendo, setSubiendo] = useState(false);
+  // Autocompletado por RUT: el cliente escribe el RUT y buscamos sus datos
+  // públicos (base de proveedores de Mercado Público o SII) para rellenar solo
+  // los campos que estén vacíos. `rutTocado` evita buscar al cargar el perfil.
+  const [rutTocado, setRutTocado] = useState(false);
+  const [buscandoRut, setBuscandoRut] = useState(false);
+  const [rutFuente, setRutFuente] = useState<string | null>(null);
 
   useEffect(() => {
     if (cliente) {
@@ -119,7 +126,40 @@ export function DatosEmpresaCard() {
 
   const handleRutChange = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setter(formatearRUT(e.target.value));
+    if (setter === setRut) setRutTocado(true);
   };
+
+  useEffect(() => {
+    if (!rutTocado || !rutValido || rut.replace(/[^0-9kK]/g, '').length < 8) return;
+    let cancelado = false;
+    setRutFuente(null);
+    const t = setTimeout(async () => {
+      setBuscandoRut(true);
+      const emp = await buscarEmpresaPorRut(rut);
+      setBuscandoRut(false);
+      if (cancelado) return;
+      if (!emp) {
+        setRutFuente('');
+        return;
+      }
+      // El nombre por defecto al crear la cuenta es el prefijo del correo: se
+      // considera "vacío" para reemplazarlo por la razón social real.
+      const nombreDefecto = (cliente?.email || '').split('@')[0];
+      setEmpresaNombre((v) => (!v.trim() || v.trim() === nombreDefecto ? emp.razon_social : v));
+      const dir = [emp.direccion, emp.comuna, emp.region].filter((x) => x && String(x).trim()).join(', ');
+      if (dir) setDireccion((v) => (v.trim() ? v : dir));
+      if (emp.telefono) setTelefono((v) => (v.trim() ? v : String(emp.telefono)));
+      if (emp.email && EMAIL_RE.test(emp.email)) setEmail((v) => (v.trim() ? v : String(emp.email)));
+      if (emp.giros) setGiros((v) => (v.trim() ? v : String(emp.giros)));
+      setRutFuente(emp.fuente === 'sii' ? 'SII' : 'Mercado Público');
+      toast.success(`Encontramos ${emp.razon_social}. Completamos los campos vacíos; revísalos y guarda.`);
+    }, 700);
+    return () => {
+      cancelado = true;
+      clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rut, rutTocado, rutValido]);
 
   return (
     <Card>
@@ -178,9 +218,20 @@ export function DatosEmpresaCard() {
                 maxLength={12}
                 className={cn('pr-9', !rutValido && 'border-destructive focus-visible:ring-destructive')}
               />
-              <CampoEstado tocado={rut.trim().length > 0} valido={rutValido} />
+              {buscandoRut ? (
+                <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+              ) : (
+                <CampoEstado tocado={rut.trim().length > 0} valido={rutValido} />
+              )}
             </div>
             {!rutValido && <p className="text-xs text-destructive">RUT inválido — revisa el dígito verificador.</p>}
+            {rutValido && buscandoRut && <p className="text-xs text-muted-foreground">Buscando los datos de la empresa…</p>}
+            {rutValido && !buscandoRut && rutFuente && (
+              <p className="text-xs text-firmavb-green">Datos completados desde {rutFuente}. Revísalos antes de guardar.</p>
+            )}
+            {rutValido && !buscandoRut && rutFuente === '' && (
+              <p className="text-xs text-muted-foreground">No encontramos datos públicos para este RUT; complétalos a mano.</p>
+            )}
           </div>
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="empresa-direccion">Dirección</Label>
