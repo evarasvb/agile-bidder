@@ -5259,45 +5259,6 @@ export type Database = {
         }
         Relationships: []
       }
-      productos: {
-        Row: {
-          created_at: string
-          descripcion: string | null
-          id: number
-          iva: number | null
-          marca: string | null
-          precio_iva: number | null
-          precio_neto: number | null
-          proveedor: string | null
-          sku: string | null
-          unidad: string | null
-        }
-        Insert: {
-          created_at?: string
-          descripcion?: string | null
-          id?: number
-          iva?: number | null
-          marca?: string | null
-          precio_iva?: number | null
-          precio_neto?: number | null
-          proveedor?: string | null
-          sku?: string | null
-          unidad?: string | null
-        }
-        Update: {
-          created_at?: string
-          descripcion?: string | null
-          id?: number
-          iva?: number | null
-          marca?: string | null
-          precio_iva?: number | null
-          precio_neto?: number | null
-          proveedor?: string | null
-          sku?: string | null
-          unidad?: string | null
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -10282,3 +10243,4 @@ export const Constants = {
     },
   },
 } as const
+
