@@ -99,7 +99,7 @@ export function DetalleCompraAgil({ datos }: { datos: DetalleCompraAgilDatos }) 
                         {d.nombre}
                       </a>
                     ) : (
-                      <a href={fichaUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-primary" aria-label={`Descargar ${d.nombre} de Mercado Público (abre en nueva pestaña)`}>
+                      <a href={fichaUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-primary" aria-label={`Ver ${d.nombre} en ficha oficial de Mercado Público (requiere sesión iniciada, abre en nueva pestaña)`}>
                         {d.nombre}
                       </a>
                     )}
