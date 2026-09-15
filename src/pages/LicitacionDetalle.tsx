@@ -60,7 +60,7 @@ function useLicitacionDetalle(id: string | undefined) {
       if (!id) return null;
 
       // Try compras_agiles first
-      const { data: compraAgil, error: caError } = await (supabaseClient as any)
+      const { data: compraAgil, error: caError } = await supabaseClient
         .from('compras_agiles')
         .select('*')
         .or(/^[0-9a-f-]{36}$/i.test(id) ? `codigo.eq.${id},id.eq.${id}` : `codigo.eq.${id}`)
@@ -89,7 +89,7 @@ function useLicitacionDetalle(id: string | undefined) {
       }
 
       // Try licitaciones table
-      const { data: licitacion, error: licError } = await (supabaseClient as any)
+      const { data: licitacion, error: licError } = await supabaseClient
         .from('licitaciones')
         .select('*')
         .or(`id_licitacion.eq.${id}`)
@@ -117,7 +117,7 @@ function useLicitacionDetalle(id: string | undefined) {
       }
 
       // Try licitaciones_bi
-      const { data: licitacionBI, error: biError } = await (supabaseClient as any)
+      const { data: licitacionBI, error: biError } = await supabaseClient
         .from('licitaciones_bi')
         .select('*')
         .or(/^[0-9a-f-]{36}$/i.test(id) ? `codigo.eq.${id},id.eq.${id}` : `codigo.eq.${id}`)
@@ -156,7 +156,7 @@ function useLicitacionBIItems(licitacionId: string | null, tipo: string | undefi
     queryFn: async () => {
       if (!licitacionId || tipo !== 'licitacion_bi') return [];
 
-      const { data, error } = await (supabaseClient as any)
+      const { data, error } = await supabaseClient
         .from('licitaciones_bi_items')
         .select('*')
         .eq('licitacion_id', licitacionId)

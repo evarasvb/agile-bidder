@@ -54,7 +54,7 @@ export function useLicitacionItems(identifier: string | number | null) {
       console.log('[useLicitacionItems] Fetching items for licitacionId:', licitacionId);
 
       // Fetch items from licitacion_items using licitacion_id
-      const itemsResult = await (supabase as any)
+      const itemsResult = await supabase
         .from('licitacion_items')
         .select('*')
         .eq('licitacion_id', licitacionId) as any;

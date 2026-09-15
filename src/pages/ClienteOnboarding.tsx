@@ -52,7 +52,7 @@ export default function ClienteOnboarding() {
       // Disparar el primer match para que el cliente vea sus PRIMERAS
       // oportunidades de inmediato (además del cron horario). Best-effort.
       try {
-        await (supabase as any).rpc('generar_matches_ca_para_mi');
+        await supabase.rpc('generar_matches_ca_para_mi');
       } catch {
         // el cron horario lo generará igual
       }

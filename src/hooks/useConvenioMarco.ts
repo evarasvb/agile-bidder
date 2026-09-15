@@ -59,7 +59,7 @@ export function useCMStats(tipo: TipoOrigenCM = 'convenio_marco') {
   return useQuery({
     queryKey: ['cm-stats', tipo],
     queryFn: async () => {
-      const { data, error } = await (supabase.rpc as any)('cm_stats', { p_tipo: tipo });
+      const { data, error } = await supabase.rpc('cm_stats', { p_tipo: tipo });
       if (error) throw error;
       return (data ?? { productos: 0, monto_total: 0, proveedores: 0, compradores: 0 }) as CMStats;
     },
@@ -72,7 +72,7 @@ export function useCMProductos(termino: string, tipo: TipoOrigenCM = 'convenio_m
   return useQuery({
     queryKey: ['cm-productos', termino, tipo],
     queryFn: async () => {
-      const { data, error } = await (supabase.rpc as any)('cm_buscar_productos', {
+      const { data, error } = await supabase.rpc('cm_buscar_productos', {
         termino: termino ?? '',
         p_tipo: tipo,
         limite: 60,
@@ -91,7 +91,7 @@ export function useCMProductoDetalle(productoKey: string | null, tipo: TipoOrige
     queryKey: ['cm-detalle', productoKey, tipo],
     enabled: !!productoKey,
     queryFn: async () => {
-      const { data, error } = await (supabase.rpc as any)('cm_producto_detalle', {
+      const { data, error } = await supabase.rpc('cm_producto_detalle', {
         p_producto_key: productoKey,
         p_tipo: tipo,
       });
@@ -121,7 +121,7 @@ export function useMiCompetitividad(tipo: TipoOrigenCM = 'convenio_marco', enabl
     queryKey: ['cm-mi-competitividad', tipo],
     enabled,
     queryFn: async () => {
-      const { data, error } = await (supabase.rpc as any)('cm_mi_competitividad', { p_tipo: tipo, umbral: 0.6 });
+      const { data, error } = await supabase.rpc('cm_mi_competitividad', { p_tipo: tipo, umbral: 0.6 });
       if (error) throw error;
       return (data ?? []) as CMCompetitividad[];
     },
@@ -135,7 +135,7 @@ export function useCMProductoTendencia(productoKey: string | null, tipo: TipoOri
     queryKey: ['cm-tendencia', productoKey, tipo],
     enabled: !!productoKey,
     queryFn: async () => {
-      const { data, error } = await (supabase.rpc as any)('cm_producto_tendencia', {
+      const { data, error } = await supabase.rpc('cm_producto_tendencia', {
         p_producto_key: productoKey,
         p_tipo: tipo,
       });

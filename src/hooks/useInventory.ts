@@ -9,7 +9,7 @@ import { recalcularMatchInventario } from '@/lib/matchRecalc';
 // escritura exige clientes.id y el match une por clientes.id). Ver función SQL
 // cliente_owner_id(). Devuelve null si aún no hay empresa.
 async function resolverClienteOwnerId(): Promise<string | null> {
-  const { data, error } = await (supabase as any).rpc('cliente_owner_id');
+  const { data, error } = await supabase.rpc('cliente_owner_id');
   if (error) {
     console.error('[inventory] cliente_owner_id error:', error);
     return null;
@@ -152,7 +152,7 @@ export function useInventarioResumen() {
     queryFn: async (): Promise<InventarioResumen> => {
       const vacio: InventarioResumen = { total: 0, activos: 0, sin_stock: 0, stock_bajo: 0, incompletos: 0, valor: 0, categorias: [] };
       if (!clienteId) return vacio;
-      const { data, error } = await (supabase as any).rpc('cliente_inventario_resumen');
+      const { data, error } = await supabase.rpc('cliente_inventario_resumen');
       if (error) {
         console.error('[useInventarioResumen]', error);
         throw error;

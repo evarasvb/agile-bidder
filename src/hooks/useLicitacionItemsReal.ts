@@ -31,7 +31,7 @@ export function useLicitacionItemsReal(licitacionId: string | undefined) {
       if (!licitacionId) return [];
 
       // Try licitacion_items first
-      const { data: itemsData, error: itemsError } = await (supabaseClient as any)
+      const { data: itemsData, error: itemsError } = await supabaseClient
         .from('licitacion_items')
         .select('*')
         .eq('licitacion_id', licitacionId)
@@ -51,7 +51,7 @@ export function useLicitacionItemsReal(licitacionId: string | undefined) {
       }
 
       // Try licitaciones_bi_items
-      const { data: biItemsData, error: biItemsError } = await (supabaseClient as any)
+      const { data: biItemsData, error: biItemsError } = await supabaseClient
         .from('licitaciones_bi_items')
         .select('*')
         .eq('licitacion_id', licitacionId)
@@ -83,7 +83,7 @@ export function useCompraAgilItems(compraAgilId: string | undefined) {
     queryFn: async () => {
       if (!compraAgilId) return [];
 
-      const { data, error } = await (supabaseClient as any)
+      const { data, error } = await supabaseClient
         .from('compras_agiles_items')
         .select('*')
         .eq('compra_agil_id', compraAgilId)

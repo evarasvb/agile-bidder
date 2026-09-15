@@ -72,7 +72,7 @@ export default function LicitacionesSimilares({ licitacionId, titulo, organismo 
     queryKey: ['licitaciones_similares', licitacionId, titulo],
     queryFn: async () => {
       // First, try to find adjudicated licitaciones from licitaciones_adjudicaciones
-      const { data: adjudicaciones } = await (supabase as any)
+      const { data: adjudicaciones } = await supabase
         .from('licitaciones_adjudicaciones')
         .select(`
           *,

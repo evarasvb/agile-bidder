@@ -111,7 +111,7 @@ export function NuevaCampanaRapida({ open, onOpenChange, onCampaignCreated }: Nu
 
     try {
       // 1. Una campaña para todos los canales elegidos.
-      const { data: campana, error: campanaError } = await (supabase as any)
+      const { data: campana, error: campanaError } = await supabase
         .from('marketing_campanas')
         .insert([{ nombre, objetivo, estado: 'draft', creado_por: 'evaras@firmavb.cl', canal_primario: canales[0] }])
         .select()
@@ -134,7 +134,7 @@ export function NuevaCampanaRapida({ open, onOpenChange, onCampaignCreated }: Nu
           ...(canal === 'whatsapp' && { contenido: d.mensaje }),
         };
 
-        const { data: pieza, error: piezaError } = await (supabase as any).from('marketing_piezas').insert([piezaData]).select().single();
+        const { data: pieza, error: piezaError } = await supabase.from('marketing_piezas').insert([piezaData]).select().single();
         if (piezaError) throw piezaError;
 
         if (canal === 'email') {

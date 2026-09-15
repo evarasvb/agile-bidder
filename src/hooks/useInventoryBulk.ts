@@ -57,7 +57,7 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
 
       // El inventario vive bajo clientes.id (no auth.uid()). Antes se usaba
       // user.id → los inserts se rechazaban por RLS y nada quedaba cargado.
-      const { data: ownerId } = await (supabase as any).rpc('cliente_owner_id');
+      const { data: ownerId } = await supabase.rpc('cliente_owner_id');
       if (!ownerId) {
         throw new Error('No se encontró tu empresa. Completa tu perfil e intenta de nuevo.');
       }

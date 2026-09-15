@@ -26,7 +26,7 @@ export function usePlanes() {
   return useQuery({
     queryKey: ['planes'],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('planes')
         .select('*')
         .eq('activo', true)
@@ -50,7 +50,7 @@ export function usePlan(id: string | null) {
     queryFn: async () => {
       if (!id) return null;
       
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('planes')
         .select('*')
         .eq('id', id)
@@ -71,7 +71,7 @@ export function usePlanByNombre(nombre: string) {
   return useQuery({
     queryKey: ['plan-nombre', nombre],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('planes')
         .select('*')
         .eq('nombre', nombre)
@@ -93,7 +93,7 @@ export function useCompararPlanes() {
   return useQuery({
     queryKey: ['comparar-planes'],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('planes')
         .select('*')
         .eq('activo', true)
@@ -151,12 +151,12 @@ export function useVerificarLimitesPlan(planNombre: string) {
       inicioMes.setDate(1);
       inicioMes.setHours(0, 0, 0, 0);
 
-      const { count: licitacionesCount } = await (supabase as any)
+      const { count: licitacionesCount } = await supabase
         .from('licitaciones')
         .select('*', { count: 'exact', head: true })
         .gte('created_at', inicioMes.toISOString());
 
-      const { count: ofertasCount } = await (supabase as any)
+      const { count: ofertasCount } = await supabase
         .from('ofertas')
         .select('*', { count: 'exact', head: true })
         .gte('created_at', inicioMes.toISOString());

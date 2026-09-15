@@ -52,7 +52,7 @@ export function PrimerosPasos() {
   const { data: cliente, isLoading: cargandoCliente } = useCliente();
   // Eventos reales: libros del Experto (licitaciones analizadas) también cuentan como avance.
   const { session } = useAuth();
-  const { data: libros, isLoading: cargandoLib } = useQuery({ queryKey: ["experto_mis_libros"], enabled: !!session, queryFn: async () => ((await (supabase as any).rpc("experto_mis_libros")).data ?? []) as any[] });
+  const { data: libros, isLoading: cargandoLib } = useQuery({ queryKey: ["experto_mis_libros"], enabled: !!session, queryFn: async () => ((await supabase.rpc("experto_mis_libros")).data ?? []) as any[] });
   const cargando = cargandoInv || cargandoOf || cargandoLib || cargandoCliente;
 
   const perfilListo = cliente?.onboarding_completado === true;

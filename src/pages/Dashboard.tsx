@@ -116,7 +116,7 @@ export default function Dashboard() {
   const handleBuscarParaMi = async () => {
     setIsMatching(true);
     try {
-      await (supabase as any).rpc("generar_matches_ca_para_mi");
+      await supabase.rpc("generar_matches_ca_para_mi");
       toast({
         title: "¡Listo!",
         description: "Buscamos coincidencias nuevas con tu inventario.",

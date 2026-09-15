@@ -173,7 +173,7 @@ export function useCampaignPiezas(campaignId: string) {
 
   const updatePieza = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<MarketingPieza> & { id: string }) => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('marketing_piezas')
         .update(updates)
         .eq('id', id)
@@ -207,7 +207,7 @@ export function usePiezaEjecuciones(piezaId: string) {
   const { data: ejecuciones, isLoading, isError } = useQuery({
     queryKey: ['marketing_ejecucion', piezaId],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('marketing_ejecucion')
         .select('id, pieza_id, contacto_id, email, estado, respuesta_codigo, respuesta_mensaje, abierto, clicks, fecha_envio, creado_en')
         .eq('pieza_id', piezaId)
@@ -227,7 +227,7 @@ export function useMarketingEjecucionesRecientes(limit: number = 100) {
   const { data, isLoading, isError } = useQuery({
     queryKey: ['marketing_ejecucion_recientes', limit],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('marketing_ejecucion')
         .select('id, email, estado, abierto, clicks, fecha_envio, creado_en, marketing_piezas(nombre, canal, campana_id, marketing_campanas(nombre))')
         .order('creado_en', { ascending: false })

@@ -21,7 +21,7 @@ export default function Compartido() {
   const { data, isLoading } = useQuery({
     queryKey: ['experto_compartido', token],
     enabled: !!token,
-    queryFn: async () => ((await (supabase as any).rpc('experto_compartido', { p_token: token })).data?.[0] ?? null) as { codigo: string | null; tipo: string; titulo: string | null; empresa: string | null; contenido: string; creado_en: string } | null,
+    queryFn: async () => ((await supabase.rpc('experto_compartido', { p_token: token })).data?.[0] ?? null) as { codigo: string | null; tipo: string; titulo: string | null; empresa: string | null; contenido: string; creado_en: string } | null,
   });
   useEffect(() => { document.title = data?.titulo ? `${data.titulo} · Experto FirmaVB` : 'Experto FirmaVB'; }, [data]);
 

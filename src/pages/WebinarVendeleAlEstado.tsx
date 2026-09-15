@@ -44,7 +44,7 @@ export default function WebinarVendeleAlEstado() {
       return;
     }
     setEnviando(true);
-    const { error } = await (supabase as any).from("webinar_inscripciones").insert({
+    const { error } = await supabase.from("webinar_inscripciones").insert({
       evento_slug: EVENTO_SLUG,
       nombre: form.nombre.trim(),
       email: form.email.trim().toLowerCase(),

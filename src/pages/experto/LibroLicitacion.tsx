@@ -81,7 +81,7 @@ export default function LibroLicitacion() {
   const { data: libro, isLoading } = useQuery({
     queryKey: ['experto_libro', cod],
     enabled: !!cod && !!token,
-    queryFn: async () => (await (supabase as any).rpc('experto_libro', { p_codigo: cod })).data,
+    queryFn: async () => (await supabase.rpc('experto_libro', { p_codigo: cod })).data,
   });
 
   // Productos solicitados de la licitación con match contra el inventario (para
@@ -90,7 +90,7 @@ export default function LibroLicitacion() {
   const { data: licRow } = useQuery({
     queryKey: ['licitacion_bi_id', cod],
     enabled: !!cod,
-    queryFn: async () => (await (supabase as any).from('licitaciones_bi').select('id').eq('codigo', cod).maybeSingle()).data,
+    queryFn: async () => (await supabase.from('licitaciones_bi').select('id').eq('codigo', cod).maybeSingle()).data,
   });
   const { data: licItems = [] } = useLicitacionItemsReal(licRow?.id);
   const { procesarCompra } = useProductMatching();
@@ -100,9 +100,9 @@ export default function LibroLicitacion() {
 
   const [buscarLibro, setBuscarLibro] = useState('');
   const [verArchivados, setVerArchivados] = useState(false);
-  const { data: libros = [] } = useQuery({ queryKey: ['experto_mis_libros', verArchivados, buscarLibro], enabled: !!token, queryFn: async () => ((await (supabase as any).rpc('experto_mis_libros', { p_archivados: verArchivados, p_buscar: buscarLibro || null })).data ?? []) as any[] });
+  const { data: libros = [] } = useQuery({ queryKey: ['experto_mis_libros', verArchivados, buscarLibro], enabled: !!token, queryFn: async () => ((await supabase.rpc('experto_mis_libros', { p_archivados: verArchivados, p_buscar: buscarLibro || null })).data ?? []) as any[] });
   const archivarLibro = async (c: string, archivado: boolean) => {
-    const { error } = await (supabase as any).rpc('experto_libro_archivar', { p_codigo: c, p_archivado: archivado });
+    const { error } = await supabase.rpc('experto_libro_archivar', { p_codigo: c, p_archivado: archivado });
     if (error) { toast.error('No pude archivar'); return; }
     toast.success(archivado ? 'Libro archivado (sigue guardado, lo ves en Archivados)' : 'Libro reactivado');
     qc.invalidateQueries({ queryKey: ['experto_mis_libros'] });
@@ -399,7 +399,7 @@ export default function LibroLicitacion() {
   const matrizCambio = (m: Matriz) => {
     setEntregables((e) => ({ ...e, matriz: JSON.stringify(m) }));
     if (guardarRef.current) clearTimeout(guardarRef.current);
-    guardarRef.current = setTimeout(async () => { const { error } = await (supabase as any).rpc('experto_matriz_guardar', { p_codigo: cod, p_matriz: m }); if (error) toast.error('No pude guardar la matriz'); }, 1200);
+    guardarRef.current = setTimeout(async () => { const { error } = await supabase.rpc('experto_matriz_guardar', { p_codigo: cod, p_matriz: m }); if (error) toast.error('No pude guardar la matriz'); }, 1200);
   };
   const aprobarPostulacion = () => {
     if (!entregables.matriz) { toast.error('Genera primero la matriz de postulación'); return; }
@@ -413,12 +413,12 @@ export default function LibroLicitacion() {
 
   const opinar = async (p: string, util: boolean) => {
     const comentario = util ? null : window.prompt('¿Qué faltó? (queda guardado y el Experto lo tendrá en cuenta)') ?? '';
-    await (supabase as any).rpc('experto_feedback', { p_huella: 'libro', p_pregunta: p, p_util: util, p_comentario: comentario });
+    await supabase.rpc('experto_feedback', { p_huella: 'libro', p_pregunta: p, p_util: util, p_comentario: comentario });
     toast.success(util ? 'Gracias' : 'Anotado');
   };
 
   const compartirTexto = async (tipo: string, titulo: string, contenido: string) => {
-    const { data, error } = await (supabase as any).rpc('experto_compartir', { p_codigo: cod || null, p_tipo: tipo, p_titulo: titulo, p_contenido: contenido });
+    const { data, error } = await supabase.rpc('experto_compartir', { p_codigo: cod || null, p_tipo: tipo, p_titulo: titulo, p_contenido: contenido });
     if (error || !data) { toast.error('No pude crear el link'); return; }
     const url = `${window.location.origin}/experto/c/${data}`;
     try { await navigator.clipboard.writeText(url); } catch { /* sin permiso */ }
@@ -431,7 +431,7 @@ export default function LibroLicitacion() {
     if (!compartido) return;
     setOcupado('pdf');
     try {
-      const fila = (await (supabase as any).rpc('experto_compartido', { p_token: compartido.token })).data?.[0];
+      const fila = (await supabase.rpc('experto_compartido', { p_token: compartido.token })).data?.[0];
       if (!fila) throw new Error('No encontré el análisis');
       const r = await compartirPdfExperto({ titulo: fila.titulo ?? compartido.titulo, ...datosPdf(), empresa: fila.empresa, contenido: fila.contenido, url: compartido.url, fecha: fila.creado_en }, `${cod || 'experto'}-${compartido.tipo}.pdf`);
       if (r === 'descargado') toast.success('PDF descargado: adjúntalo en WhatsApp o correo');
