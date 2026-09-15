@@ -204,13 +204,14 @@ export function BIFiltersPanel({ filters, onFiltersChange }: BIFiltersPanelProps
 
           {/* Proveedor */}
           <div className="space-y-2 relative">
-            <Label className="flex items-center gap-1">
+            <Label htmlFor="proveedor-search" className="flex items-center gap-1">
               <User className="h-3 w-3" />
               Proveedor
             </Label>
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
+                id="proveedor-search"
                 placeholder="Buscar por nombre o RUT"
                 value={proveedorSearch}
                 onChange={(e) => {
@@ -255,13 +256,14 @@ export function BIFiltersPanel({ filters, onFiltersChange }: BIFiltersPanelProps
 
           {/* Institución */}
           <div className="space-y-2 relative">
-            <Label className="flex items-center gap-1">
+            <Label htmlFor="institucion-search" className="flex items-center gap-1">
               <Building2 className="h-3 w-3" />
               Institución
             </Label>
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
+                id="institucion-search"
                 placeholder="Buscar por nombre o RUT"
                 value={institucionSearch}
                 onChange={(e) => {
@@ -306,13 +308,14 @@ export function BIFiltersPanel({ filters, onFiltersChange }: BIFiltersPanelProps
 
           {/* Producto */}
           <div className="space-y-2 lg:col-span-2">
-            <Label className="flex items-center gap-1">
+            <Label htmlFor="producto-search" className="flex items-center gap-1">
               <Package className="h-3 w-3" />
               Producto
             </Label>
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
+                id="producto-search"
                 placeholder="Buscar producto por nombre"
                 value={filters.producto || ''}
                 onChange={(e) => onFiltersChange({ ...filters, producto: e.target.value || undefined })}

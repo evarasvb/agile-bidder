@@ -59,6 +59,7 @@ export function PriceSuggestionCard({ filters }: PriceSuggestionCardProps) {
                 onChange={(e) => setProductoSearch(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleBuscar()}
                 className="pl-9"
+                aria-label="Nombre del producto para analizar sugerencia de precio"
               />
             </div>
             <Button onClick={handleBuscar} disabled={!productoSearch.trim() || isLoadingSugerencia}>
