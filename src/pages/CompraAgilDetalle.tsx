@@ -28,6 +28,7 @@ import { MatchItemActions } from '@/components/compras-agiles/MatchItemActions';
 import { AgregarProductoManual } from '@/components/compras-agiles/AgregarProductoManual';
 import { AccionesCompartir } from '@/components/oportunidades/AccionesCompartir';
 import { DetalleCompraAgil } from '@/components/compras-agiles/DetalleCompraAgil';
+import { calculateCoverageMetrics, type PropuestaItemRow } from '@/services/fuzzyMatching';
 import { unidadLabel } from '@/utils/unidades';
 
 // Color del badge de match según el %.
@@ -36,6 +37,24 @@ const matchBadge = (score: number) =>
   : score >= 50 ? 'bg-firmavb-blue/15 text-firmavb-blue border-firmavb-blue/30'
   : 'bg-amber-100 text-amber-800 border-amber-200';
 const clp = (n: number) => `$${Math.round(n || 0).toLocaleString('es-CL')}`;
+
+/**
+ * Determina si un match es confiable o solo categoría débil
+ * GARANTÍA: category-only matches (score < 60) se marcan como "por revisar"
+ */
+function evaluarConfianzaMatch(match: any): { confianza: 'alta' | 'media' | 'baja'; tooltip: string } {
+  if (!match) return { confianza: 'baja', tooltip: 'Sin candidato' };
+
+  const score = match.score || 0;
+  if (score >= 75) {
+    return { confianza: 'alta', tooltip: `Coincidencia alta (${score}%)` };
+  }
+  if (score >= 60) {
+    return { confianza: 'media', tooltip: `Coincidencia parcial (${score}%) - revisar especificaciones` };
+  }
+  // score < 60: probablemente solo categoría
+  return { confianza: 'baja', tooltip: `Coincidencia débil (${score}%) - REVISAR, probablemente solo categoría` };
+}
 
 // Chip que muestra si el cliente corrigió el match automático a mano.
 function EstadoBadge({ estado }: { estado: 'auto' | 'confirmado' | 'reasignado' | 'descartado' }) {
@@ -192,7 +211,23 @@ export default function CompraAgilDetalle() {
     });
 
   const filasTotal = [...filasItems, ...filasManuales];
-  const itemsConMatch = filasItems.filter((f) => f.match).length;
+
+  // CRÍTICO FV-UX-002: Usar helper extractado (calculateCoverageMetrics)
+  // Este helper asegura que score >= 60 cuenta como VALIDADO
+  // score < 60 (REVISAR) NO cuenta; descartados NO cuentan
+  const coverageMetrics = calculateCoverageMetrics(
+    filasItems as PropuestaItemRow[]
+  );
+  const {
+    itemsConMatchValidado,
+    itemsConMatchDebil,
+    itemsSinMatch,
+    totalItems,
+    cobertura,
+    propuestaIncompleta
+  } = coverageMetrics;
+
+  // Total de oferta: incluir manuales agregados pero mostrar advertencia si faltan items
   const totalOferta = filasTotal.reduce((s, f) => s + (f.match?.subtotal || 0), 0);
   const dentroPresupuesto = compra.monto ? totalOferta <= compra.monto : null;
 
@@ -360,10 +395,17 @@ export default function CompraAgilDetalle() {
               <h2 className="text-lg font-semibold">Tu match, producto por producto</h2>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              {(compra.items?.length || 0) > 0 && (
-                <Badge variant="outline" className="font-normal">
-                  {itemsConMatch} de {compra.items.length} con match
-                </Badge>
+              {totalItems > 0 && (
+                <>
+                  <Badge variant="outline" className={`font-normal ${cobertura === 100 ? 'bg-firmavb-green/15 text-firmavb-green border-firmavb-green/30' : 'bg-amber-100 text-amber-800 border-amber-200'}`}>
+                    {itemsConMatchValidado} de {totalItems} validados ({cobertura}%)
+                  </Badge>
+                  {propuestaIncompleta && (
+                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 font-normal">
+                      ⚠ {itemsSinMatch + itemsConMatchDebil} incompletos
+                    </Badge>
+                  )}
+                </>
               )}
               <AgregarProductoManual codigo={compra.codigo} />
             </div>
@@ -404,7 +446,14 @@ export default function CompraAgilDetalle() {
                     </div>
                     {f.match ? (
                       <div className="mt-1.5 text-sm">
-                        <p className="text-firmavb-blue font-medium">→ {f.match.nombre}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-firmavb-blue font-medium">→ {f.match.nombre}</p>
+                          {evaluarConfianzaMatch(f.match).confianza === 'baja' && (
+                            <span className="text-xs font-semibold px-1.5 py-0.5 bg-red-100 text-red-700 rounded" title="Match débil - revisar especificaciones">
+                              REVISAR
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {f.cantidad} {unidadLabel(f.unidad)} × {clp(f.match.precio || 0)} = <span className="font-semibold text-foreground">{clp(f.match.subtotal)}</span>
                         </p>
@@ -457,9 +506,16 @@ export default function CompraAgilDetalle() {
                       </TableCell>
                       <TableCell className="text-center align-top">
                         {f.match ? (
-                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${matchBadge(f.match.score)}`}>
-                            {f.match.score}%
-                          </span>
+                          <div className="flex flex-col items-center gap-1">
+                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${matchBadge(f.match.score)}`}>
+                              {f.match.score}%
+                            </span>
+                            {evaluarConfianzaMatch(f.match).confianza === 'baja' && (
+                              <span className="text-xs font-semibold px-1.5 py-0.5 bg-red-100 text-red-700 rounded whitespace-nowrap" title={evaluarConfianzaMatch(f.match).tooltip}>
+                                REVISAR
+                              </span>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
@@ -482,28 +538,44 @@ export default function CompraAgilDetalle() {
               </Table>
               </div>
 
-              {/* Resumen: total de tu oferta vs presupuesto */}
-              <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border bg-muted/30 p-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Tu oferta (ítems con match)</p>
-                  <p className="text-2xl font-bold text-firmavb-blue">{clp(totalOferta)}</p>
-                </div>
-                {compra.monto ? (
-                  <div className="text-sm">
-                    <p className="text-muted-foreground">Presupuesto: <span className="font-medium text-foreground">{clp(compra.monto)}</span></p>
-                    <p className={dentroPresupuesto ? 'text-firmavb-green font-medium' : 'text-firmavb-red font-medium'}>
-                      {dentroPresupuesto ? '✓ Dentro del presupuesto' : '⚠ Excede el presupuesto'}
-                      {' · '}{((totalOferta / compra.monto) * 100).toFixed(0)}%
+              {/* Resumen: total de tu oferta vs presupuesto + advertencia si incompleta */}
+              <div className="mt-4 space-y-3">
+                {propuestaIncompleta && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <p className="text-sm font-medium text-amber-900">⚠ Propuesta incompleta: {itemsSinMatch + itemsConMatchDebil} {itemsSinMatch + itemsConMatchDebil === 1 ? 'ítem falta' : 'ítems faltan'}</p>
+                    <p className="text-xs text-amber-800 mt-1">
+                      {itemsSinMatch > 0 && <>{itemsSinMatch} sin match en inventario. </>}
+                      {itemsConMatchDebil > 0 && <>{itemsConMatchDebil} con coincidencia débil (REVISAR). </>}
+                      Tu oferta actual ({clp(totalOferta)}) requiere validación o búsqueda de alternativas. El costo real será mayor.
                     </p>
                   </div>
-                ) : null}
-                <Button onClick={() => setPropuestaOpen(true)} className="gap-2 shrink-0">
-                  <Sparkles className="h-4 w-4" /> Generar propuesta
-                </Button>
+                )}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border bg-muted/30 p-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      Tu oferta {propuestaIncompleta ? `(${itemsConMatchValidado}/${totalItems} validados)` : '(completa)'}
+                    </p>
+                    <p className="text-2xl font-bold text-firmavb-blue">{clp(totalOferta)}</p>
+                  </div>
+                  {compra.monto ? (
+                    <div className="text-sm">
+                      <p className="text-muted-foreground">Presupuesto: <span className="font-medium text-foreground">{clp(compra.monto)}</span></p>
+                      <p className={propuestaIncompleta ? 'text-amber-600 font-medium' : (dentroPresupuesto ? 'text-firmavb-green font-medium' : 'text-firmavb-red font-medium')}>
+                        {propuestaIncompleta
+                          ? '⚠ Presupuesto verificable solo si completan'
+                          : (dentroPresupuesto ? '✓ Dentro del presupuesto' : '⚠ Excede el presupuesto')}
+                        {!propuestaIncompleta && ` · ${((totalOferta / compra.monto) * 100).toFixed(0)}%`}
+                      </p>
+                    </div>
+                  ) : null}
+                  <Button onClick={() => setPropuestaOpen(true)} className="gap-2 shrink-0">
+                    <Sparkles className="h-4 w-4" /> Generar propuesta
+                  </Button>
+                </div>
               </div>
-              {itemsConMatch === 0 && (
+              {itemsConMatchValidado === 0 && itemsConMatchDebil === 0 && (
                 <p className="mt-3 text-sm text-muted-foreground text-center">
-                  Aún no hay match para estos ítems. Si acabas de cargar inventario, el match se actualiza en unos minutos; o ajusta tus productos/palabras clave, o agrega un producto manual arriba.
+                  Aún no hay match validado para estos ítems. Si acabas de cargar inventario, el match se actualiza en unos minutos; o ajusta tus productos/palabras clave, o agrega un producto manual arriba.
                 </p>
               )}
             </div>
