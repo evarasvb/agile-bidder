@@ -101,7 +101,7 @@ export default function Planes() {
               <div className="mt-6">
                 {isAuthenticated ? (
                   <Button
-                    size="md"
+                    size="default"
                     className="w-full h-11 font-medium"
                     variant={p.id === "erp" ? "default" : "outline"}
                     asChild
