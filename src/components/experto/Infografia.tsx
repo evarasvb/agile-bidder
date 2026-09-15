@@ -35,11 +35,11 @@ export function Infografia({ d }: { d: InfografiaDatos }) {
         </div>
         {(d.ganadores?.length ?? 0) > 0 && (
           <div><p className="text-xs font-semibold uppercase text-slate-500 mb-1">Quién le gana a este organismo (12 meses)</p>
-            <ul className="text-sm space-y-0.5">{d.ganadores!.slice(0, 4).map((g) => <li key={g.nombre} className="flex justify-between gap-2"><span className="truncate">{g.nombre}</span><span className="text-slate-500 shrink-0">{g.n} lic. · {clp(g.monto)}</span></li>)}</ul></div>
+            <ul className="text-sm space-y-0.5">{d.ganadores!.slice(0, 4).map((g) => <li key={g.nombre} className="flex justify-between gap-2"><span className="truncate" title={g.nombre}>{g.nombre}</span><span className="text-slate-500 shrink-0">{g.n} lic. · {clp(g.monto)}</span></li>)}</ul></div>
         )}
         {(d.competencia?.length ?? 0) > 0 && (
           <div><p className="text-xs font-semibold uppercase text-slate-500 mb-1">Quién vende esto al Estado y a qué precio</p>
-            <ul className="text-sm space-y-0.5">{d.competencia!.slice(0, 4).map((c) => <li key={c.proveedor} className="flex justify-between gap-2"><span className="truncate">{c.proveedor}</span><span className="text-slate-500 shrink-0">{c.ordenes} OC{c.precio ? ` · unit. ${clp(c.precio)}` : ''}</span></li>)}</ul></div>
+            <ul className="text-sm space-y-0.5">{d.competencia!.slice(0, 4).map((c) => <li key={c.proveedor} className="flex justify-between gap-2"><span className="truncate" title={c.proveedor}>{c.proveedor}</span><span className="text-slate-500 shrink-0">{c.ordenes} OC{c.precio ? ` · unit. ${clp(c.precio)}` : ''}</span></li>)}</ul></div>
         )}
         {(d.items?.length ?? 0) > 0 && <p className="text-xs text-slate-600"><b>Compran:</b> {d.items!.slice(0, 6).join(' · ')}</p>}
       </div>

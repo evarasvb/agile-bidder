@@ -26,6 +26,7 @@ import { compartirPdfExperto } from '@/services/expertoPdf';
 import { MatrizPostulacion, type Matriz } from '@/components/experto/MatrizPostulacion';
 import { descargarWord } from '@/services/exportar';
 import { SalaPostulacion } from '@/components/experto/SalaPostulacion';
+import { ExpertoLibroModal } from '@/components/experto/ExpertoLibroModal';
 import { pagoOrganismo, presupuestoTexto, nombrePropio } from '@/lib/organismoPago';
 import { AccionesCompartir } from '@/components/oportunidades/AccionesCompartir';
 import { mailtoOportunidad } from '@/lib/compartir';
@@ -118,6 +119,7 @@ export default function LibroLicitacion() {
   const autoRef = useRef(false);
   const [pregunta, setPregunta] = useState('');
   const [ocupado, setOcupado] = useState<string | null>(null);
+  const [modalLibroAbierto, setModalLibroAbierto] = useState(false);
   const [tab, setTab] = useState<Entregable>('sala');
   const [entregables, setEntregables] = useState<Record<Entregable, string>>({ sala: 'ok', informe: '', matriz: '', estudio: '', bajo_agua: '', anexos: '', mapa: '', infografia: '' });
   const [faltantes, setFaltantes] = useState<string[]>([]);
@@ -186,6 +188,32 @@ export default function LibroLicitacion() {
     if (q && token && !autoRef.current) { autoRef.current = true; preguntar(q); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  // Análisis desde el modal: pincelada rápida, profundo o power analysis
+  const handleLibroAnalisis = async (tipo: 'pincelada' | 'profundo' | 'power') => {
+    if (ocupado) return;
+    setModalLibroAbierto(false);
+    if (!escritorio) setVista('chat');
+
+    const prompts: Record<string, string> = {
+      pincelada: `Sobre ${cod}: dame un resumen ejecutivo rápido (2-3 párrafos). ¿Qué piden? ¿Cuántas evaluaciones? ¿Plazos y riesgos obvios? Quiero decidir rápido si postular.`,
+      profundo: `Sobre ${cod}: análisis detallado completo. Requisitos específicos, matriz de evaluación, oportunidades, riesgos legales y administrativos. Todo lo que debo saber.`,
+      power: `Sobre ${cod}: estrategia para GANAR esta licitación. ¿Cómo maximizar puntaje? ¿Qué requisitos son críticos? ¿Dónde invertir recursos? ¿Cómo diferenciarnos?`
+    };
+
+    setMsgs((m) => [...m, { rol: 'yo', texto: prompts[tipo] }]);
+    setOcupado(`experto-${tipo}`);
+
+    try {
+      const historial = msgs.slice(-10).map((m) => ({ rol: m.rol, texto: m.texto }));
+      await pedir({ modo: 'chat', pregunta: prompts[tipo], codigo: cod || undefined, historial, huella: 'libro' }, 'experto-consultar', (t, meta) =>
+        setMsgs((m) => { const c = [...m]; c[c.length - 1] = { rol: 'exp', texto: t, fuentes: meta?.fuentes, pedirBases: meta?.pedir_bases }; return c; }));
+    } catch (e: any) {
+      if (e.status === 402 || e.status === 401) setLimite(e.message);
+      setMsgs((m) => { const c = [...m]; c[c.length - 1] = { rol: 'exp', texto: (e.status === 402 ? '' : 'No pude responder: ') + e.message }; return c; });
+    }
+    setOcupado(null);
+  };
 
   const generar = async (tipo: Entregable) => {
     if (ocupado) return;
@@ -746,7 +774,7 @@ export default function LibroLicitacion() {
                   matriz={entregables.matriz ? JSON.parse(entregables.matriz) : null} anexos={entregables.anexos} faltantes={faltantes} veredicto={veredictoDe(entregables.informe)}
                   onGenerar={(t) => generar(t)} onIr={(t) => setTab(t)} onMatriz={matrizCambio} onPreguntar={(q) => { setPregunta(q); if (!escritorio) setVista('chat'); }}
                   irOportunidad={f ? () => navigate(String(f.tipo ?? '').toLowerCase().includes('gil') ? `/compras-agiles/${cod}` : `/oportunidades/licitacion/${cod}`) : undefined}
-                  aprobar={aprobarPostulacion} ocupado={ocupado} />
+                  aprobar={aprobarPostulacion} ocupado={ocupado} onAbrirExpertoModal={() => setModalLibroAbierto(true)} />
               </div>
             ) : entregables[tab] ? (
               <div>
@@ -804,12 +832,15 @@ export default function LibroLicitacion() {
         </div>
       );
       return (
-        <ResizablePanelGroup orientation="horizontal" className="min-h-[calc(100vh-11rem)]">
-          <ResizablePanel defaultSize={cod ? 22 : 26} minSize={14} collapsible collapsedSize={0}>{panelFuentes}</ResizablePanel>
-          <ResizableHandle withHandle className="mx-1" />
-          <ResizablePanel defaultSize={cod ? 46 : 74} minSize={30}>{panelChat}</ResizablePanel>
-          {panelEntregables && <><ResizableHandle withHandle className="mx-1" /><ResizablePanel defaultSize={32} minSize={22} collapsible collapsedSize={0}>{panelEntregables}</ResizablePanel></>}
-        </ResizablePanelGroup>
+        <>
+          <ResizablePanelGroup orientation="horizontal" className="min-h-[calc(100vh-11rem)]">
+            <ResizablePanel defaultSize={cod ? 22 : 26} minSize={14} collapsible collapsedSize={0}>{panelFuentes}</ResizablePanel>
+            <ResizableHandle withHandle className="mx-1" />
+            <ResizablePanel defaultSize={cod ? 46 : 74} minSize={30}>{panelChat}</ResizablePanel>
+            {panelEntregables && <><ResizableHandle withHandle className="mx-1" /><ResizablePanel defaultSize={32} minSize={22} collapsible collapsedSize={0}>{panelEntregables}</ResizablePanel></>}
+          </ResizablePanelGroup>
+          <ExpertoLibroModal open={modalLibroAbierto} onClose={() => setModalLibroAbierto(false)} onAnalizar={handleLibroAnalisis} bases={bases} codigo={cod} ocupado={ocupado} />
+        </>
       );
       })()}
     </div>
