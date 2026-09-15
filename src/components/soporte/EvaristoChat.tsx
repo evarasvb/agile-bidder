@@ -242,7 +242,7 @@ export function EvaristoChat() {
             <Sparkles className="h-5 w-5" />
             <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-firmavb-green ring-2 ring-firmavb-blue" />
           </span>
-          <span className="text-sm font-semibold hidden sm:block">¿Te ayudo?</span>
+          <span className="text-sm font-semibold hidden sm:block">Evaristo · ¿Te ayudo?</span>
         </button>
       )}
 

@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2, X, FileUp, ImageIcon, Download, ImageOff } from 'lucide-react';
-import { useInventoryBulk, BulkProductRow, ImportProgress, generateInventoryTemplateData, generateInventoryInstructions } from '@/hooks/useInventoryBulk';
+import { useInventoryBulk, esSkuFecha, BulkProductRow, ImportProgress, generateInventoryTemplateData, generateInventoryInstructions } from '@/hooks/useInventoryBulk';
 import { useCreateImportHistory } from '@/hooks/useImportHistory';
 import { validateImageUrl } from '@/hooks/useProductImageUpload';
 import * as XLSX from 'xlsx';
@@ -154,7 +154,8 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
         const descCol = String(row['Descripción'] || row['Descripcion'] || row['descripcion'] || '').trim();
         const detalleCol = String(row['Detalle'] || row['detalle'] || '').trim();
         return {
-        sku: row['Código'] || row['Codigo'] || row['SKU'] || row['sku'] || row['Sku'] || '',
+        // String(): si Excel entregó un número o una fecha, no explota el .trim().
+        sku: String(row['Código'] ?? row['Codigo'] ?? row['SKU'] ?? row['sku'] ?? row['Sku'] ?? '').trim(),
         nombre: nombreCol || descCol,
         descripcion: detalleCol || (nombreCol ? descCol : ''),
         categoria: row['Categoría'] || row['Categoria'] || row['categoria'] || '',
@@ -180,6 +181,8 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
         // Required: Código
         if (!row.sku || row.sku.trim() === '') {
           errors.push(`Fila ${rowNum}: Código es obligatorio`);
+        } else if (esSkuFecha(row.sku)) {
+          errors.push(`Fila ${rowNum}: el código "${row.sku}" parece una fecha. En Excel pon la columna Código en formato Texto y vuelve a cargar`);
         } else if (skuSet.has(row.sku.toLowerCase())) {
           errors.push(`Fila ${rowNum}: Código "${row.sku}" duplicado en el archivo`);
         } else {
