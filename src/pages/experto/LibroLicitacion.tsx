@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
-import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink, Trash2, Paperclip, Printer, Mail, Map as MapIcon, Image as ImageIcon, Presentation, Waves, Download, Receipt } from 'lucide-react';
+import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink, Trash2, Paperclip, Printer, Mail, Map as MapIcon, Image as ImageIcon, Presentation, Waves, Download, Receipt, X } from 'lucide-react';
 import { useTraerAdjuntos } from '@/hooks/useAdjuntosLicitacion';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -512,13 +512,13 @@ export default function LibroLicitacion() {
       {compartido && (
         <div className="flex items-center gap-1 flex-wrap text-xs rounded-md border border-primary/30 bg-primary/5 px-2 py-1">
           <span className="font-medium truncate max-w-[30vw]" title={compartido.titulo}>Link listo</span>
-          <Button size="sm" className="h-7 bg-[#25D366] hover:bg-[#1ebe5d] text-white" asChild><a href={waUrl(compartido)} target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4 mr-1" />WhatsApp (link)</a></Button>
+          <Button size="sm" className="h-8 bg-[#25D366] hover:bg-[#1ebe5d] text-white" asChild><a href={waUrl(compartido)} target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4 mr-1" />WhatsApp (link)</a></Button>
           {compartido.tipo !== 'mapa' && compartido.tipo !== 'infografia' && <Button size="sm" variant="outline" className="h-8" onClick={pdfCompartido} disabled={ocupado === 'pdf'}>{ocupado === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <FileText className="h-4 w-4 mr-1" />}PDF para WhatsApp</Button>}
           <Button size="sm" variant="outline" className="h-8" onClick={() => { navigator.clipboard.writeText(compartido.url); toast.success('Copiado'); }}><Copy className="h-4 w-4 mr-1" />Copiar link</Button>
           <Button size="sm" variant="outline" className="h-8" asChild><a href={oportunidadLibro ? mailtoOportunidad(oportunidadLibro, `${compartido.titulo}\n${compartido.url}`) : `mailto:?subject=${encodeURIComponent(compartido.titulo)}&body=${encodeURIComponent(compartido.titulo + '\n' + compartido.url)}`}><Mail className="h-4 w-4 mr-1" />Email (link)</a></Button>
           <Button size="sm" variant="outline" className="h-8" asChild><a href={compartido.url} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4 mr-1" />Ver página</a></Button>
           {typeof navigator !== 'undefined' && 'share' in navigator && <Button size="sm" variant="ghost" className="h-8" onClick={() => navigator.share({ title: compartido.titulo, url: compartido.url }).catch(() => {})}><Share2 className="h-4 w-4 mr-1" />Más…</Button>}
-          <button className="ml-auto text-muted-foreground" onClick={() => setCompartido(null)}>✕</button>
+          <Button size="icon" variant="ghost" className="ml-auto h-8 w-8 text-muted-foreground" onClick={() => setCompartido(null)}><X className="h-4 w-4" /></Button>
         </div>
       )}
       {!isLoading && cod && libro && !f && (
@@ -588,14 +588,14 @@ export default function LibroLicitacion() {
                     <span className="truncate flex-1" title={d.nombre}>{d.nombre} <span className="text-[10px] uppercase">{d.tipo}</span></span>
                     {d.tipo === 'docx' && (
                       // Anexo oficial en Word: el Experto lo completa en el mismo archivo (formato intacto).
-                      <button onClick={() => completarWord(d)} disabled={!!ocupado} title="Completar este Word con los datos de tu empresa, conservando el formato" className="flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[11px] text-firmavb-blue hover:bg-muted disabled:opacity-50">
+                      <Button variant="outline" onClick={() => completarWord(d)} disabled={!!ocupado} title="Completar este Word con los datos de tu empresa, conservando el formato" className="h-auto gap-0.5 rounded border px-1.5 py-0.5 text-[11px] text-firmavb-blue hover:bg-muted">
                         {ocupado === 'word:' + d.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}<span className="hidden sm:inline">Completar</span>
-                      </button>
+                      </Button>
                     )}
-                    <button onClick={() => descargarDocumento(d.id)} disabled={!!ocupado} title="Descargar" className="flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[11px] text-firmavb-blue hover:bg-muted disabled:opacity-50">
+                    <Button variant="outline" onClick={() => descargarDocumento(d.id)} disabled={!!ocupado} title="Descargar" className="h-auto gap-0.5 rounded border px-1.5 py-0.5 text-[11px] text-firmavb-blue hover:bg-muted">
                       {ocupado === 'descargar:' + d.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}<span className="hidden sm:inline">Descargar</span>
-                    </button>
-                    <button onClick={() => borrarDocumento(d.id)} title="Quitar"><Trash2 className="h-3.5 w-3.5" /></button>
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground" onClick={() => borrarDocumento(d.id)} title="Quitar"><Trash2 className="h-3.5 w-3.5" /></Button>
                   </div>
                 ))}
                 {documentos.filter((x: any) => x.tipo === 'docx').length > 1 && (
@@ -611,8 +611,8 @@ export default function LibroLicitacion() {
                       <div key={a.id} className="flex flex-wrap items-center gap-1 text-xs">
                         <span className="truncate flex-1 min-w-[140px]" title={a.campos?.[0]?.resumen ?? a.nombre}>{a.nombre}{a.campos?.[0]?.tipo ? <span className="ml-1 text-[10px] uppercase text-muted-foreground">{String(a.campos[0].tipo).replace(/_/g, ' ')}</span> : null}</span>
                         <span className={`rounded px-1.5 py-0.5 text-[10px] ${a.campos_validar ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>{a.campos_validar ? `${a.campos_validar} por validar` : 'sin pendientes'}</span>
-                        {a.url && <a href={a.url} target="_blank" rel="noreferrer" className="flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-firmavb-blue hover:bg-muted"><FileText className="h-3.5 w-3.5" />Descargar</a>}
-                        <button onClick={() => borrarAnexoWord(a.id)} title="Quitar"><Trash2 className="h-3.5 w-3.5 text-muted-foreground" /></button>
+                        {a.url && <Button variant="outline" asChild className="h-auto gap-0.5 rounded border px-1.5 py-0.5 text-firmavb-blue hover:bg-muted"><a href={a.url} target="_blank" rel="noreferrer"><FileText className="h-3.5 w-3.5" />Descargar</a></Button>}
+                        <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground" onClick={() => borrarAnexoWord(a.id)} title="Quitar"><Trash2 className="h-3.5 w-3.5" /></Button>
                       </div>
                     ))}
                   </div>
@@ -654,9 +654,9 @@ export default function LibroLicitacion() {
                 </div>
               )}
               {msgs.map((m, i) => m.rol === 'yo' ? (
-                <div key={i} className="ml-auto max-w-[85%] rounded-2xl bg-firmavb-blue text-white px-4 py-2 text-sm">{m.texto}</div>
+                <div key={i} className="ml-auto max-w-[75%] rounded-2xl bg-firmavb-blue text-white px-4 py-2 text-sm">{m.texto}</div>
               ) : (
-                <div key={i} className="max-w-[95%] rounded-2xl bg-muted/50 px-4 py-3 text-sm">
+                <div key={i} className="max-w-full rounded-2xl bg-muted/50 px-4 py-3 text-sm">
                   {m.texto ? <div dangerouslySetInnerHTML={{ __html: conCitas(expertoMd(m.texto), m.fuentes) }} onClick={(e) => {
                     const a = (e.target as HTMLElement).closest('a.cita') as HTMLAnchorElement | null; if (!a || a.getAttribute('href') !== '#') return;
                     e.preventDefault(); const d = document.getElementById(`fuentes-${i}`) as HTMLDetailsElement | null; if (d) d.open = true;
@@ -666,10 +666,10 @@ export default function LibroLicitacion() {
                     <div className="mt-2 rounded-md border border-firmavb-blue/30 bg-firmavb-blue/5 px-2 py-2 text-xs space-y-1.5">
                       <p>Para esto necesito las bases en PDF y todavía no las tengo — Mercado Público puede no haberlas publicado, o el robot aún no las encontró. Mientras tanto te respondo con lo que sé.</p>
                       <div className="flex flex-wrap gap-1">
-                        <Button size="sm" variant="outline" className="h-7" disabled={traerAdjuntos.isPending} onClick={traerBasesMP}>
+                        <Button size="sm" variant="outline" className="h-8" disabled={traerAdjuntos.isPending} onClick={traerBasesMP}>
                           {traerAdjuntos.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Download className="h-3.5 w-3.5 mr-1" />}Reintentar desde Mercado Público
                         </Button>
-                        <Button size="sm" className="h-7" onClick={() => { if (!escritorio) { setVista('fuentes'); setTimeout(() => fileRef.current?.click(), 150); } else fileRef.current?.click(); }}>
+                        <Button size="sm" className="h-8" onClick={() => { if (!escritorio) { setVista('fuentes'); setTimeout(() => fileRef.current?.click(), 150); } else fileRef.current?.click(); }}>
                           <Upload className="h-3.5 w-3.5 mr-1" />Subir bases (PDF)
                         </Button>
                       </div>
@@ -684,10 +684,10 @@ export default function LibroLicitacion() {
                   {m.texto && !ocupado && (
                     <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                       {i === msgs.length - 1 && <>¿Te sirvió?
-                        <button onClick={() => opinar(msgs[i - 1]?.texto ?? '', true)}><ThumbsUp className="h-3.5 w-3.5" /></button>
-                        <button onClick={() => opinar(msgs[i - 1]?.texto ?? '', false)}><ThumbsDown className="h-3.5 w-3.5" /></button></>}
-                      <button className="ml-auto flex items-center gap-1 underline" onClick={() => aPdf('Respuesta del Experto', `**Pregunta:** ${msgs[i - 1]?.texto ?? ''}\n\n${m.texto}`)}><Printer className="h-3.5 w-3.5" />PDF</button>
-                      <button className="flex items-center gap-1 underline" onClick={() => compartirTexto('chat', (msgs[i - 1]?.texto ?? `Respuesta del Experto · ${cod}`).slice(0, 120), `**Pregunta:** ${msgs[i - 1]?.texto ?? ''}\n\n${m.texto}`)}><Share2 className="h-3.5 w-3.5" />Compartir</button>
+                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => opinar(msgs[i - 1]?.texto ?? '', true)}><ThumbsUp className="h-3.5 w-3.5" /></Button>
+                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => opinar(msgs[i - 1]?.texto ?? '', false)}><ThumbsDown className="h-3.5 w-3.5" /></Button></>}
+                      <Button size="sm" variant="ghost" className="ml-auto h-6 px-2 gap-1" onClick={() => aPdf('Respuesta del Experto', `**Pregunta:** ${msgs[i - 1]?.texto ?? ''}\n\n${m.texto}`)}><Printer className="h-3.5 w-3.5" />PDF</Button>
+                      <Button size="sm" variant="ghost" className="h-6 px-2 gap-1" onClick={() => compartirTexto('chat', (msgs[i - 1]?.texto ?? `Respuesta del Experto · ${cod}`).slice(0, 120), `**Pregunta:** ${msgs[i - 1]?.texto ?? ''}\n\n${m.texto}`)}><Share2 className="h-3.5 w-3.5" />Compartir</Button>
                     </div>
                   )}
                 </div>
@@ -696,7 +696,7 @@ export default function LibroLicitacion() {
             {limite && (
               <div className="flex items-center gap-2 flex-wrap text-xs rounded-md border border-yellow-200 bg-yellow-50 text-yellow-900 px-3 py-2">
                 <span>{limite}</span>
-                <Button size="sm" className="h-7 ml-auto" onClick={() => navigate('/cuenta')}>Ver planes</Button>
+                <Button size="sm" className="h-8 ml-auto" onClick={() => navigate('/cuenta')}>Ver planes</Button>
               </div>
             )}
             <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); preguntar(); }}>
