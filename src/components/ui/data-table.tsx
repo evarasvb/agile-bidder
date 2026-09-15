@@ -41,8 +41,24 @@ export interface DataTableSelection {
   onToggleMany: (ids: string[], seleccionar: boolean) => void;
 }
 
+/**
+ * Modo servidor: la página trae solo una página ya ordenada y filtrada (p. ej.
+ * inventarios de miles de filas). La tabla no ordena ni pagina localmente:
+ * muestra `rows` tal cual y delega orden/página/tamaño a estos callbacks.
+ */
+export interface DataTableManual {
+  total: number;
+  page: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (n: number) => void;
+  sort: DataTableSort | null;
+  onSortChange: (sort: DataTableSort | null) => void;
+}
+
 export interface DataTableProps<T> {
   columns: DataTableColumn<T>[];
+  manual?: DataTableManual;
   rows: T[];
   rowKey: (row: T) => string;
   /** Texto por fila para la búsqueda. Si se entrega, aparece el buscador. */
@@ -132,6 +148,7 @@ function exportarCSV<T>(columns: DataTableColumn<T>[], rows: T[], fileName: stri
 
 export function DataTable<T>({
   columns,
+  manual,
   rows,
   rowKey,
   searchText,
@@ -152,49 +169,65 @@ export function DataTable<T>({
   className,
 }: DataTableProps<T>) {
   const [busqueda, setBusqueda] = useState('');
-  const [sort, setSort] = useState<DataTableSort | null>(() => leerPreferencia(storageKey, 'sort', defaultSort ?? null));
-  const [pageSize, setPageSize] = useState<number>(() => leerPreferencia(storageKey, 'pageSize', defaultPageSize));
-  const [page, setPage] = useState(1);
+  const [sortLocal, setSortLocal] = useState<DataTableSort | null>(() => leerPreferencia(storageKey, 'sort', defaultSort ?? null));
+  const [pageSizeLocal, setPageSizeLocal] = useState<number>(() => leerPreferencia(storageKey, 'pageSize', defaultPageSize));
+  const [pageLocal, setPageLocal] = useState(1);
+
+  // En modo servidor el orden, la página y el tamaño vienen de la página.
+  const sort = manual ? manual.sort : sortLocal;
+  const pageSize = manual ? manual.pageSize : pageSizeLocal;
 
   const filtradas = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
-    if (!q || !searchText) return rows;
+    if (manual || !q || !searchText) return rows;
     return rows.filter((r) => searchText(r).toLowerCase().includes(q));
-  }, [rows, busqueda, searchText]);
+  }, [rows, busqueda, searchText, manual]);
 
   const ordenadas = useMemo(() => {
-    if (!sort) return filtradas;
+    if (manual || !sort) return filtradas;
     const col = columns.find((c) => c.id === sort.id);
     if (!col?.sortValue) return filtradas;
     const sv = col.sortValue;
     return [...filtradas].sort((a, b) => compararConDireccion(sv(a), sv(b), sort.dir));
-  }, [filtradas, sort, columns]);
+  }, [filtradas, sort, columns, manual]);
 
-  const total = ordenadas.length;
+  const total = manual ? manual.total : ordenadas.length;
   const totalPaginas = Math.max(1, Math.ceil(total / pageSize));
-  const paginaActual = Math.min(page, totalPaginas);
+  const paginaActual = Math.min(manual ? manual.page : pageLocal, totalPaginas);
   const inicio = (paginaActual - 1) * pageSize;
-  const visibles = ordenadas.slice(inicio, inicio + pageSize);
+  const visibles = manual ? ordenadas : ordenadas.slice(inicio, inicio + pageSize);
 
   // Al cambiar búsqueda, orden, tamaño o cantidad de filas se vuelve a la
   // primera página (por cantidad y no por identidad: las páginas suelen
-  // recalcular el arreglo en cada render).
+  // recalcular el arreglo en cada render). En modo servidor lo decide la página.
   useEffect(() => {
-    setPage(1);
-  }, [busqueda, sort, pageSize, rows.length]);
+    if (!manual) setPageLocal(1);
+  }, [busqueda, sort, pageSize, rows.length, manual]);
+
+  const irA = (n: number) => {
+    const destino = Math.min(Math.max(1, n), totalPaginas);
+    if (manual) manual.onPageChange(destino);
+    else setPageLocal(destino);
+  };
 
   const cambiarOrden = (col: DataTableColumn<T>) => {
     if (!col.sortValue) return;
-    setSort((prev) => {
-      const siguiente: DataTableSort | null =
-        prev?.id !== col.id ? { id: col.id, dir: 'asc' } : prev.dir === 'asc' ? { id: col.id, dir: 'desc' } : null;
-      guardarPreferencia(storageKey, 'sort', siguiente);
-      return siguiente;
-    });
+    const siguiente: DataTableSort | null =
+      sort?.id !== col.id ? { id: col.id, dir: 'asc' } : sort.dir === 'asc' ? { id: col.id, dir: 'desc' } : null;
+    if (manual) {
+      manual.onSortChange(siguiente);
+      return;
+    }
+    guardarPreferencia(storageKey, 'sort', siguiente);
+    setSortLocal(siguiente);
   };
 
   const cambiarPageSize = (n: number) => {
-    setPageSize(n);
+    if (manual) {
+      manual.onPageSizeChange(n);
+      return;
+    }
+    setPageSizeLocal(n);
     guardarPreferencia(storageKey, 'pageSize', n);
   };
 
@@ -380,19 +413,19 @@ export function DataTable<T>({
           </label>
           {totalPaginas > 1 && (
             <nav className="flex items-center gap-1" aria-label="Paginación">
-              <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setPage(1)} disabled={paginaActual === 1} aria-label="Primera página">
+              <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => irA(1)} disabled={paginaActual === 1} aria-label="Primera página">
                 <ChevronsLeft className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={paginaActual === 1} aria-label="Página anterior">
+              <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => irA(paginaActual - 1)} disabled={paginaActual === 1} aria-label="Página anterior">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <span className="px-2 text-muted-foreground">
                 Página <span className="font-medium text-foreground">{paginaActual}</span> de {totalPaginas}
               </span>
-              <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setPage((p) => Math.min(totalPaginas, p + 1))} disabled={paginaActual === totalPaginas} aria-label="Página siguiente">
+              <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => irA(paginaActual + 1)} disabled={paginaActual === totalPaginas} aria-label="Página siguiente">
                 <ChevronRight className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setPage(totalPaginas)} disabled={paginaActual === totalPaginas} aria-label="Última página">
+              <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => irA(totalPaginas)} disabled={paginaActual === totalPaginas} aria-label="Última página">
                 <ChevronsRight className="h-4 w-4" />
               </Button>
             </nav>

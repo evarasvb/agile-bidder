@@ -84,11 +84,16 @@ function mapRowToInventoryItem(row: any): InventoryItem {
 // Inventario PAGINADO en el servidor (pantalla Inventario). Antes la pantalla
 // bajaba las 16.000 filas al navegador en tandas de 1.000 y filtraba ahí.
 // -----------------------------------------------------------------------------
+/** Columnas reales de cliente_inventario por las que se puede ordenar en el servidor. */
+export type InventarioOrdenColumna = 'sku' | 'nombre_producto' | 'categoria' | 'precio_unitario' | 'margen_minimo' | 'stock_disponible' | 'created_at';
+
 export interface InventarioPaginaOpts {
   page: number;
   pageSize: number;
   q?: string;
   soloIncompletos?: boolean;
+  /** Orden en el servidor (por defecto created_at desc). */
+  orderBy?: { column: InventarioOrdenColumna; asc: boolean };
 }
 
 const escapaIlike = (s: string) => s.replace(/[%_,()]/g, ' ').trim();
@@ -99,7 +104,7 @@ export function useInventarioPagina(opts: InventarioPaginaOpts) {
   const q = (opts.q || '').trim();
 
   return useQuery({
-    queryKey: ['inventory', 'pagina', clienteId, opts.page, opts.pageSize, q, !!opts.soloIncompletos],
+    queryKey: ['inventory', 'pagina', clienteId, opts.page, opts.pageSize, q, !!opts.soloIncompletos, opts.orderBy?.column ?? 'created_at', opts.orderBy?.asc ?? false],
     queryFn: async (): Promise<{ items: InventoryItem[]; total: number }> => {
       if (!clienteId) return { items: [], total: 0 };
       const ownerId = await resolverClienteOwnerId();
@@ -118,8 +123,12 @@ export function useInventarioPagina(opts: InventarioPaginaOpts) {
         // Sin descripción o sin imagen (lo que resta calidad al match y al PDF).
         query = query.or('descripcion.is.null,descripcion.eq.,imagen_url.is.null,imagen_url.eq.');
       }
+      // Orden pedido por la tabla + id como desempate para que las páginas no
+      // repitan ni salten filas; los vacíos siempre al final.
+      const orden = opts.orderBy ?? { column: 'created_at' as const, asc: false };
       const { data, error, count } = await query
-        .order('created_at', { ascending: false })
+        .order(orden.column, { ascending: orden.asc, nullsFirst: false })
+        .order('id', { ascending: true })
         .range(from, from + opts.pageSize - 1);
       if (error) {
         console.error('[useInventarioPagina]', error);
