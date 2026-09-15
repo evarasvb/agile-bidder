@@ -37,6 +37,7 @@ import { useMatchOverrides } from '@/hooks/useMatchOverrides';
 import { useInventoryActivo } from '@/hooks/useInventory';
 import { useCliente } from '@/hooks/useCliente';
 import { descargarCotizacionPDF, type ItemCotizacion, type DatosCotizacion } from '@/services/pdfGenerator';
+import { useExtensionStatus } from '@/hooks/useExtensionStatus';
 
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string;
 const ANON = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
@@ -254,6 +255,9 @@ export default function LibroLicitacion() {
   // se la ponemos a un clic de distancia en vez de que el usuario tenga que ir a buscarla.
   const { data: adjuntosInfo } = useAdjuntosLicitacion(cod);
   const urlAdjuntosMp = adjuntosInfo?.estado?.url_adjuntos_mp || null;
+  // La extensión de Chrome de FirmaVB manda esos adjuntos sola en cuanto el usuario (ya con el
+  // captcha resuelto) abre esa misma página — evita el paso manual de bajar y volver a subir.
+  const { isConnected: extensionConectada } = useExtensionStatus();
   const traerBasesMP = () =>
     traerAdjuntos.mutate(undefined, {
       onSuccess: (r) => {
@@ -608,6 +612,13 @@ export default function LibroLicitacion() {
                   {ocupado === 'fuentes' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}Subir fuentes (PDF, Excel, Word, imágenes)
                 </Button>
                 <p className="text-[11px] text-muted-foreground mt-1">Puedes elegir varios a la vez. Los PDF de bases se reconocen solos y quedan para todos; el resto es tuyo. {esPro ? 'Tu plan permite hasta 10 archivos por licitación (Plus y ERP: 50).' : 'Plan gratis: 2 archivos de hasta 5 MB por licitación.'}</p>
+                {urlAdjuntosMp && (
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    {extensionConectada
+                      ? 'Tienes la extensión de Chrome conectada: al abrir Adjuntos se mandan solos, sin subirlos aquí.'
+                      : <>O instala la <a className="underline" href="/configuracion/extension" target="_blank" rel="noreferrer">extensión de Chrome de FirmaVB</a> y se mandan solos cada vez que abras esa página.</>}
+                  </p>
+                )}
                 {bases.length > 0 && (
                   <Button size="sm" variant="outline" className="mt-2 w-full sm:w-auto" onClick={extraerAnexos} disabled={!!ocupado} title="Cuando los anexos vienen dentro del PDF de bases (no como Word aparte), los separa en documentos individuales">
                     {ocupado === 'extraer-anexos' ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}Extraer anexos de las bases
@@ -725,6 +736,13 @@ export default function LibroLicitacion() {
                           <Upload className="h-3.5 w-3.5 mr-1" />Subir bases (PDF)
                         </Button>
                       </div>
+                      {urlAdjuntosMp && (
+                        <p className="text-[11px] text-muted-foreground">
+                          {extensionConectada
+                            ? 'Tienes la extensión de Chrome conectada: al abrir esa página se manda sola, sin que tengas que subir nada.'
+                            : <>También puedes instalar la <a className="underline" href="/configuracion/extension" target="_blank" rel="noreferrer">extensión de Chrome de FirmaVB</a>: cuando abras esa página se mandan solos, sin descargar ni subir a mano.</>}
+                        </p>
+                      )}
                     </div>
                   )}
                   {!cod && m.texto && idEn(msgs[i - 1]?.texto ?? '') && <Button size="sm" variant="outline" className="mt-2" onClick={() => navigate(`/experto/libro/${idEn(msgs[i - 1].texto)}`)}><BookOpen className="h-3.5 w-3.5 mr-1" />Abrir el libro de {idEn(msgs[i - 1].texto)}</Button>}
