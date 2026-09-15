@@ -192,6 +192,8 @@ const App = () => (
             {/* Legacy: la lista vieja duplicaba Compras Ágiles (y hasta se titulaba así) */}
             <Route path="/licitaciones" element={<Navigate to="/oportunidades?tipo=licitacion" replace />} />
             <Route path="/licitaciones-nuevas" element={<Navigate to="/oportunidades" replace />} />
+            {/* "/inicio" es lo que escribe la gente para volver al panel: no debe dar 404 */}
+            <Route path="/inicio" element={<Navigate to="/dashboard" replace />} />
 
             {/* ----- OPORTUNIDADES PANEL ----- */}
             <Route path="/oportunidades" element={<OportunidadesPanel />} />

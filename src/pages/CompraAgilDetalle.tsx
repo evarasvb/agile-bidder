@@ -164,6 +164,11 @@ export default function CompraAgilDetalle() {
       override,
       manual: false,
       match: match ? { ...match, subtotal: (match.precio || 0) * cantidad } : null,
+      // Sugerencia automática con poca confianza (<60%) que el cliente aún no
+      // confirmó: se muestra marcada como dudosa y NO se suma al total ni va
+      // precargada a la propuesta (antes "opalina" → "cordel de papel" al 77%
+      // entraba solo y la oferta salía 7x sobre el presupuesto).
+      dudoso: estado === 'auto' && !!match && (match.score ?? 0) < 60,
     };
   });
 
@@ -185,6 +190,7 @@ export default function CompraAgilDetalle() {
         estado: (descartado ? 'descartado' : 'reasignado') as const,
         override: ov,
         manual: true,
+        dudoso: false,
         match: prod
           ? { inventarioId: prod.id, nombre: prod.nombre_producto, sku: prod.sku, precio: prod.precio_unitario, score: 100, subtotal: prod.precio_unitario }
           : null,
@@ -193,7 +199,8 @@ export default function CompraAgilDetalle() {
 
   const filasTotal = [...filasItems, ...filasManuales];
   const itemsConMatch = filasItems.filter((f) => f.match).length;
-  const totalOferta = filasTotal.reduce((s, f) => s + (f.match?.subtotal || 0), 0);
+  const itemsDudosos = filasItems.filter((f) => f.dudoso).length;
+  const totalOferta = filasTotal.reduce((s, f) => s + (!f.dudoso && f.match ? f.match.subtotal || 0 : 0), 0);
   const dentroPresupuesto = compra.monto ? totalOferta <= compra.monto : null;
 
   // Ítems en el formato del modal de propuesta, PRECARGADOS con el match para que
@@ -210,7 +217,7 @@ export default function CompraAgilDetalle() {
         descripcion: f.descripcion,
         cantidadSolicitada: f.cantidad,
         unidadMedida: f.unidad,
-        match: f.match
+        match: f.match && !f.dudoso
           ? { id: f.match.inventarioId, sku: f.match.sku, nombre: f.match.nombre, precio_unitario: f.match.precio || 0, stock: null, matchScore: f.match.score, margen_estimado: 0 }
           : null,
       })),
@@ -389,8 +396,8 @@ export default function CompraAgilDetalle() {
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         {f.match && (
-                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${matchBadge(f.match.score)}`}>
-                            {f.match.score}%
+                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${f.dudoso ? 'bg-amber-100 text-amber-800 border-amber-300' : matchBadge(f.match.score)}`}>
+                            {f.match.score}%{f.dudoso ? ' · dudoso' : ''}
                           </span>
                         )}
                         <MatchItemActions
@@ -457,8 +464,11 @@ export default function CompraAgilDetalle() {
                       </TableCell>
                       <TableCell className="text-center align-top">
                         {f.match ? (
-                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${matchBadge(f.match.score)}`}>
-                            {f.match.score}%
+                          <span
+                            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${f.dudoso ? 'bg-amber-100 text-amber-800 border-amber-300' : matchBadge(f.match.score)}`}
+                            title={f.dudoso ? 'Coincidencia con poca confianza: confírmala o cámbiala. No se suma al total hasta que la confirmes.' : undefined}
+                          >
+                            {f.match.score}%{f.dudoso ? ' · dudoso' : ''}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">—</span>
@@ -487,6 +497,11 @@ export default function CompraAgilDetalle() {
                 <div>
                   <p className="text-sm text-muted-foreground">Tu oferta (ítems con match)</p>
                   <p className="text-2xl font-bold text-firmavb-blue">{clp(totalOferta)}</p>
+                  {itemsDudosos > 0 && (
+                    <p className="text-xs text-amber-700 mt-1">
+                      {itemsDudosos} coincidencia{itemsDudosos === 1 ? '' : 's'} dudosa{itemsDudosos === 1 ? '' : 's'} (menos de 60%) no se suma{itemsDudosos === 1 ? '' : 'n'} hasta que la{itemsDudosos === 1 ? '' : 's'} confirmes.
+                    </p>
+                  )}
                 </div>
                 {compra.monto ? (
                   <div className="text-sm">

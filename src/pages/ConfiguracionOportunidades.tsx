@@ -412,7 +412,7 @@ export default function ConfiguracionOportunidades() {
               Regiones Activas
             </CardTitle>
             <CardDescription>
-              Solo verás oportunidades de las regiones seleccionadas
+              Marca las regiones donde puedes despachar. Si no marcas ninguna, verás oportunidades de todas las regiones.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -424,7 +424,7 @@ export default function ConfiguracionOportunidades() {
                 Limpiar
               </Button>
               <Badge variant="secondary" className="ml-auto">
-                {regionesActivas.length} seleccionadas
+                {regionesActivas.length === 0 ? "Todas (sin filtro)" : `${regionesActivas.length} seleccionadas`}
               </Badge>
             </div>
             <div className="grid grid-cols-2 gap-2 max-h-[250px] overflow-y-auto p-2 border rounded-md">

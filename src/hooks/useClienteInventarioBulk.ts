@@ -67,6 +67,14 @@ export function useClienteInventarioBulk() {
           continue;
         }
 
+        // Excel convierte SKUs como "01-09" a fecha y llegan como
+        // "Tue Sep 01 8471 00:00:00 GMT-0400": quedaban guardados como SKU
+        // corrupto e imposibles de buscar. Se rechaza la fila con aviso claro.
+        if (/GMT|UTC|^[A-Z][a-z]{2} [A-Z][a-z]{2} \d{1,2} \d{4}|^\d{4}-\d{2}-\d{2}T\d{2}:/i.test(row.sku.trim())) {
+          errors.push({ row: rowNum, field: 'SKU', message: 'El SKU parece una fecha: en Excel pon la columna SKU en formato Texto y vuelve a cargar' });
+          continue;
+        }
+
         // Parse keywords
         const palabras_clave = row.keywords 
           ? row.keywords.split(',').map(k => k.trim()).filter(k => k.length > 0)

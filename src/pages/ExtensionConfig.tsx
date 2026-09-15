@@ -279,8 +279,19 @@ export default function ExtensionConfig() {
           <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-              <p className="text-sm font-semibold text-amber-800">Aún no está conectada</p>
-              <p className="text-xs text-amber-700">Sigue la guía y quedará lista en ~3 minutos.</p>
+              {extUltimaActividad ? (
+                <>
+                  <p className="text-sm font-semibold text-amber-800">Instalada, sin actividad reciente</p>
+                  <p className="text-xs text-amber-700">
+                    Última actividad {formatDistanceToNow(extUltimaActividad, { addSuffix: true, locale: es })}. Abre Mercado Público en Chrome y se reactiva sola.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold text-amber-800">Aún no está conectada</p>
+                  <p className="text-xs text-amber-700">Sigue la guía y quedará lista en ~3 minutos.</p>
+                </>
+              )}
             </div>
             <a href="#guia-instalacion" className="text-sm font-semibold text-amber-800 underline underline-offset-2">
               Ir a la guía paso a paso ↓
