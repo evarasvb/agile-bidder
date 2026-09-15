@@ -45,9 +45,9 @@ function ImageThumbnail({ url }: { url: string }) {
           <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
         </div>
       )}
-      <img 
-        src={url} 
-        alt="" 
+      <img
+        src={url}
+        alt="Miniatura de imagen del producto"
         className={cn("w-full h-full object-cover transition-opacity", loaded ? "opacity-100" : "opacity-0")}
         onLoad={() => setLoaded(true)}
         onError={() => setError(true)}

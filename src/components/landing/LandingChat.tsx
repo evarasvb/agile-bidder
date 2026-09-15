@@ -235,6 +235,7 @@ export function LandingChat({ open, onClose }: LandingChatProps) {
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-foreground transition-colors"
+            aria-label="Contactar por WhatsApp (abre en nueva ventana)"
           >
             💬 +56 9 9425 9157
           </a>

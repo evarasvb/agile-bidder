@@ -46,11 +46,11 @@ function Rico({ text, onInternal }: { text: string; onInternal: (path: string) =
                   </button>
                 );
               }
-              return <a key={j} href={href} target="_blank" rel="noreferrer" className="underline text-firmavb-blue break-all">{txt}</a>;
+              return <a key={j} href={href} target="_blank" rel="noreferrer" className="underline text-firmavb-blue break-all" aria-label={`${txt} (abre en nueva pestaña)`}>{txt}</a>;
             }
             if (frag.startsWith("**") && frag.endsWith("**")) return <strong key={j}>{frag.slice(2, -2)}</strong>;
             if (/^https?:\/\//.test(frag)) return (
-              <a key={j} href={frag} target="_blank" rel="noreferrer" className="underline text-firmavb-blue break-all">{frag}</a>
+              <a key={j} href={frag} target="_blank" rel="noreferrer" className="underline text-firmavb-blue break-all" aria-label={`${frag} (abre en nueva pestaña)`}>{frag}</a>
             );
             return <span key={j}>{frag}</span>;
           })}
@@ -265,10 +265,10 @@ export function EvaristoChat() {
                 href="https://wa.me/56994259157"
                 target="_blank"
                 rel="noreferrer"
-                title="Hablar con un humano por WhatsApp"
+                aria-label="Hablar con un humano por WhatsApp (abre en nueva ventana)"
                 className="flex items-center gap-1 rounded-full bg-white/15 hover:bg-white/25 text-white text-xs font-medium px-2.5 h-7 transition-colors"
               >
-                <MessageCircle className="h-3.5 w-3.5" /> Humano
+                <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" /> Humano
               </a>
               <Button variant="ghost" size="sm" onClick={limpiar} className="text-white/80 hover:text-white hover:bg-white/10 h-7 px-2 text-xs">Reiniciar</Button>
               <Button variant="ghost" size="icon" onClick={() => setOpen(false)} className="text-white hover:bg-white/10 h-7 w-7"><X className="h-4 w-4" /></Button>

@@ -199,10 +199,10 @@ export default function AcademiaLeads() {
                               href={waLink(l.whatsapp)!}
                               target="_blank"
                               rel="noopener noreferrer"
-                              title={l.whatsapp || ""}
+                              aria-label="Contactar por WhatsApp (abre en nueva ventana)"
                               className="text-[hsl(var(--success))] hover:opacity-70"
                             >
-                              <MessageCircle className="h-4 w-4" />
+                              <MessageCircle className="h-4 w-4" aria-hidden="true" />
                             </a>
                           )}
                           {l.email && (

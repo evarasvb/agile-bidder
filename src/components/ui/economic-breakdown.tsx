@@ -44,10 +44,10 @@ export function EconomicBreakdown({
         <table className="w-full text-sm">
           <thead className="bg-muted/50">
             <tr>
-              <th className="px-4 py-2 text-left font-medium">Producto</th>
-              <th className="px-4 py-2 text-right font-medium">Cant.</th>
-              <th className="px-4 py-2 text-right font-medium">P. Unit.</th>
-              <th className="px-4 py-2 text-right font-medium">Subtotal</th>
+              <th scope="col" className="px-4 py-2 text-left font-medium">Producto</th>
+              <th scope="col" className="px-4 py-2 text-right font-medium">Cant.</th>
+              <th scope="col" className="px-4 py-2 text-right font-medium">P. Unit.</th>
+              <th scope="col" className="px-4 py-2 text-right font-medium">Subtotal</th>
             </tr>
           </thead>
           <tbody>

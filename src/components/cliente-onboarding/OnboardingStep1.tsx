@@ -124,7 +124,7 @@ export default function OnboardingStep1({ cliente }: OnboardingStep1Props) {
                   }`}
                 >
                   <div className={`p-2 rounded-lg ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                    <Icon className="w-5 h-5" />
+                    <Icon className="w-5 h-5" aria-hidden="true" />
                   </div>
                   <span className="font-medium text-sm">{cat.label}</span>
                   {isSelected && (
@@ -168,6 +168,7 @@ export default function OnboardingStep1({ cliente }: OnboardingStep1Props) {
               onBlur={() => input.trim() && addPalabra(input)}
               placeholder={palabras.length ? 'Agrega otra…' : 'Escribe y presiona Enter'}
               className="flex-1 min-w-[140px] border-0 shadow-none focus-visible:ring-0 px-1 h-8"
+              aria-label="Agregar palabra clave"
             />
           </div>
 

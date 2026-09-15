@@ -667,42 +667,47 @@ export default function MarketingContactosAdmin() {
                   <table className="w-full text-sm">
                     <thead className="border-b bg-gray-50">
                       <tr>
-                        <th className="text-left py-2 px-2 w-8">
+                        <th scope="col" className="text-left py-2 px-2 w-8">
                           <input
                             type="checkbox"
                             checked={selectedIds.size === contactosFiltrados.length && contactosFiltrados.length > 0}
                             onChange={toggleSelectAll}
                             className="rounded"
+                            aria-label="Seleccionar todos los contactos"
                           />
                         </th>
                         <th
+                          scope="col"
                           className="text-left py-2 px-2 cursor-pointer hover:bg-gray-100"
                           onClick={() => toggleSort('email')}
                         >
                           Email {sortConfig.key === 'email' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                         </th>
                         <th
+                          scope="col"
                           className="text-left py-2 px-2 cursor-pointer hover:bg-gray-100"
                           onClick={() => toggleSort('nombre')}
                         >
                           Nombre {sortConfig.key === 'nombre' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                         </th>
                         <th
+                          scope="col"
                           className="text-left py-2 px-2 cursor-pointer hover:bg-gray-100"
                           onClick={() => toggleSort('empresa')}
                         >
                           Empresa {sortConfig.key === 'empresa' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                         </th>
-                        <th className="text-left py-2 px-2">Rubro</th>
-                        <th className="text-left py-2 px-2">Fuente</th>
-                        <th className="text-left py-2 px-2">Email</th>
+                        <th scope="col" className="text-left py-2 px-2">Rubro</th>
+                        <th scope="col" className="text-left py-2 px-2">Fuente</th>
+                        <th scope="col" className="text-left py-2 px-2">Email</th>
                         <th
+                          scope="col"
                           className="text-left py-2 px-2 cursor-pointer hover:bg-gray-100"
                           onClick={() => toggleSort('estado_suscripcion')}
                         >
                           Estado {sortConfig.key === 'estado_suscripcion' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                         </th>
-                        <th className="py-2 px-2 w-16"></th>
+                        <th scope="col" className="py-2 px-2 w-16"></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -971,7 +976,7 @@ export default function MarketingContactosAdmin() {
                 <div>
                   <Label className="text-sm font-medium">Pasos para conectar:</Label>
                   <ol className="text-sm text-muted-foreground mt-2 space-y-1 ml-4 list-decimal">
-                    <li>Ve a <a href="https://console.cloud.google.com" target="_blank" rel="noopener" className="text-blue-600 hover:underline">Google Cloud Console</a></li>
+                    <li>Ve a <a href="https://console.cloud.google.com" target="_blank" rel="noopener" className="text-blue-600 hover:underline" aria-label="Google Cloud Console (abre en nueva pestaña)">Google Cloud Console</a></li>
                     <li>Crea un nuevo proyecto (o selecciona uno existente)</li>
                     <li>Habilita la YouTube Data API v3</li>
                     <li>Crea credenciales OAuth 2.0 (tipo: Aplicación Web)</li>

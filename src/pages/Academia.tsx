@@ -680,9 +680,9 @@ export default function Academia() {
                         <span className="font-medium text-foreground">{m.titulo}</span>
                       </div>
                       <Button size="sm" variant="outline" asChild className="gap-2">
-                        <a href={m.url} target="_blank" rel="noopener noreferrer">
+                        <a href={m.url} target="_blank" rel="noopener noreferrer" aria-label="Escuchar podcast (abre en nueva pestaña)">
                           Escuchar
-                          <ExternalLink className="h-3 w-3" />
+                          <ExternalLink className="h-3 w-3" aria-hidden="true" />
                         </a>
                       </Button>
                     </CardContent>
@@ -718,6 +718,7 @@ export default function Academia() {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="block bg-muted"
+                      aria-label={`${p.titulo} (abre en nueva pestaña)`}
                     >
                       <img
                         src={p.imagenUrl}
@@ -736,9 +737,9 @@ export default function Academia() {
                     <p className="text-sm text-muted-foreground mb-4 flex-1">{p.resumen}</p>
                     {p.url && (
                       <Button size="sm" variant="outline" asChild className="gap-2 self-start">
-                        <a href={p.url} target="_blank" rel="noopener noreferrer">
+                        <a href={p.url} target="_blank" rel="noopener noreferrer" aria-label="Ver publicación (abre en nueva pestaña)">
                           Ver publicación
-                          <ExternalLink className="h-3 w-3" />
+                          <ExternalLink className="h-3 w-3" aria-hidden="true" />
                         </a>
                       </Button>
                     )}
@@ -749,10 +750,10 @@ export default function Academia() {
             {linkedin.perfilUrl && (
               <div className="mt-6">
                 <Button variant="outline" asChild className="gap-2">
-                  <a href={linkedin.perfilUrl} target="_blank" rel="noopener noreferrer">
-                    <Linkedin className="h-4 w-4" />
+                  <a href={linkedin.perfilUrl} target="_blank" rel="noopener noreferrer" aria-label="Ver perfil de LinkedIn (abre en nueva pestaña)">
+                    <Linkedin className="h-4 w-4" aria-hidden="true" />
                     Ver mi perfil de LinkedIn
-                    <ExternalLink className="h-3 w-3" />
+                    <ExternalLink className="h-3 w-3" aria-hidden="true" />
                   </a>
                 </Button>
               </div>
@@ -763,10 +764,10 @@ export default function Academia() {
             <PendientePorCargar texto="Aún no hay posts cargados. Pega los links de tus publicaciones de LinkedIn en el bloque CONTENIDO." />
             {linkedin.perfilUrl && (
               <Button variant="outline" asChild className="gap-2">
-                <a href={linkedin.perfilUrl} target="_blank" rel="noopener noreferrer">
-                  <Linkedin className="h-4 w-4" />
+                <a href={linkedin.perfilUrl} target="_blank" rel="noopener noreferrer" aria-label="Ver perfil de LinkedIn (abre en nueva pestaña)">
+                  <Linkedin className="h-4 w-4" aria-hidden="true" />
                   Ver mi perfil de LinkedIn
-                  <ExternalLink className="h-3 w-3" />
+                  <ExternalLink className="h-3 w-3" aria-hidden="true" />
                 </a>
               </Button>
             )}
@@ -803,9 +804,9 @@ export default function Academia() {
                     )}
                     {l.comprarUrl && (
                       <Button size="sm" asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2">
-                        <a href={l.comprarUrl} target="_blank" rel="noopener noreferrer">
+                        <a href={l.comprarUrl} target="_blank" rel="noopener noreferrer" aria-label="Comprar en Amazon (abre en nueva pestaña)">
                           Comprar en Amazon
-                          <ExternalLink className="h-3 w-3" />
+                          <ExternalLink className="h-3 w-3" aria-hidden="true" />
                         </a>
                       </Button>
                     )}
@@ -878,7 +879,7 @@ export default function Academia() {
                         size="lg"
                         className="bg-white text-firmavb-blue hover:bg-white/90 font-semibold gap-2"
                       >
-                        <a href={SAGA_BUNDLE.pagoUrl} target="_blank" rel="noopener noreferrer">
+                        <a href={SAGA_BUNDLE.pagoUrl} target="_blank" rel="noopener noreferrer" aria-label="Comprar la saga completa (abre en nueva pestaña)">
                           Comprar la saga completa
                         </a>
                       </Button>
@@ -946,7 +947,7 @@ export default function Academia() {
                   )}
                   {asesoriaPago.pagoUrl ? (
                     <Button asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2">
-                      <a href={asesoriaPago.pagoUrl} target="_blank" rel="noopener noreferrer">
+                      <a href={asesoriaPago.pagoUrl} target="_blank" rel="noopener noreferrer" aria-label="Agendar asesoría con pago (abre en nueva pestaña)">
                         Agendar (con pago)
                       </a>
                     </Button>
@@ -1005,8 +1006,8 @@ export default function Academia() {
                   asChild
                   className="bg-[hsl(var(--success))] hover:bg-[hsl(var(--success))]/90 gap-2"
                 >
-                  <a href={whatsappGrupo.invitacionUrl} target="_blank" rel="noopener noreferrer">
-                    <MessageCircle className="h-4 w-4" />
+                  <a href={whatsappGrupo.invitacionUrl} target="_blank" rel="noopener noreferrer" aria-label="Unirse al grupo de WhatsApp (abre en nueva ventana)">
+                    <MessageCircle className="h-4 w-4" aria-hidden="true" />
                     Unirme al grupo
                   </a>
                 </Button>
@@ -1027,8 +1028,8 @@ export default function Academia() {
               </p>
               <div className="flex flex-wrap gap-3">
                 <Button asChild variant="outline" className="gap-2">
-                  <a href={contacto.whatsapp} target="_blank" rel="noopener noreferrer">
-                    <MessageCircle className="h-4 w-4" />
+                  <a href={contacto.whatsapp} target="_blank" rel="noopener noreferrer" aria-label="Contactar por WhatsApp (abre en nueva ventana)">
+                    <MessageCircle className="h-4 w-4" aria-hidden="true" />
                     WhatsApp
                   </a>
                 </Button>

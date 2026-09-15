@@ -172,7 +172,7 @@ export function ImagePreview({
             onClick={onSetPrincipal}
             disabled={isLoading}
             className="p-1.5 rounded-full bg-white/20 hover:bg-white/40 text-white text-xs"
-            title="Establecer como principal"
+            aria-label="Establecer como imagen principal"
           >
             ★
           </button>
@@ -182,9 +182,9 @@ export function ImagePreview({
             onClick={onRemove}
             disabled={isLoading}
             className="p-1.5 rounded-full bg-white/20 hover:bg-destructive text-white"
-            title="Eliminar"
+            aria-label="Eliminar imagen"
           >
-            <X className="h-3 w-3" />
+            <X className="h-3 w-3" aria-hidden="true" />
           </button>
         )}
       </div>
