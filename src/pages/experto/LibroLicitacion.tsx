@@ -712,7 +712,7 @@ export default function LibroLicitacion() {
                 <p className="font-medium">Quién le gana a este organismo (12 m)</p>
                 {top.length ? top.slice(0, 5).map((t: any) => <p key={t.adjudicatario} className="text-muted-foreground truncate">{t.adjudicatario}: {t.licitaciones} · {fmt(t.monto)}</p>) : <p className="text-muted-foreground">sin adjudicaciones registradas aún</p>}
               </div>
-              {libro.licitaciones_similares && libro.licitaciones_similares.length > 0 && (
+              {libro?.licitaciones_similares && libro.licitaciones_similares.length > 0 && (
                 <div>
                   <p className="font-medium">Licitaciones similares de este organismo (últimas)</p>
                   {libro.licitaciones_similares.map((l: any) => (
