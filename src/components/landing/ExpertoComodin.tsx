@@ -28,7 +28,7 @@ function huella(): string {
 function md(t: string): string {
   const esc = (x: string) => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   const escAttr = (x: string) => x.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const inline = (x: string) => esc(x).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, (m, label) => `<a href="$2" target="_blank" rel="noopener noreferrer" class="underline" aria-label="${escAttr(label)} (abre en nueva pestaña)">${esc(label)}</a>`);
+  const inline = (x: string) => esc(x).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, (m, label, url) => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="underline" aria-label="${escAttr(label)} (abre en nueva pestaña)">${esc(label)}</a>`);
   let out = "", lista: string | null = null;
   const cierra = () => { if (lista) { out += `</${lista}>`; lista = null; } };
   for (const ln of t.split("\n")) {
