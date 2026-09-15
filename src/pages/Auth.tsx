@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { Loader2, Mail, Lock, AlertCircle, ArrowLeft, Sparkles, HelpCircle } from 'lucide-react';
+import logoFirmavbOriginal from '@/assets/logo-firmavb-original.png';
 
 // Validation schemas
 const emailSchema = z.string().email('Email inválido');
@@ -266,9 +267,7 @@ export default function Auth() {
           {/* Logo */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-3 mb-4">
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-[hsl(var(--firmavb-blue))] to-[hsl(var(--header-dark))] flex items-center justify-center shadow-lg shadow-[hsl(var(--firmavb-blue))]/20">
-                <span className="text-white font-bold text-lg">FV</span>
-              </div>
+              <img src={logoFirmavbOriginal} alt="FirmaVB" className="h-12 w-auto object-contain" />
               <div className="text-left">
                 <span className="font-bold text-foreground text-xl">FirmaVB</span>
                 <p className="text-xs text-muted-foreground">Inteligencia para Ganar Más</p>

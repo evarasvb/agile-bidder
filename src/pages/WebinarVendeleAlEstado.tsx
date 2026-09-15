@@ -4,7 +4,7 @@
 // confirmación con el evento RECURRENTE para el calendario (mismo flujo que el otro webinar).
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, CalendarDays, CheckCircle2, Clock, Loader2, MonitorPlay, Send, Sparkles, Repeat } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock, Loader2, MonitorPlay, Send, Sparkles, Repeat } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -111,10 +111,6 @@ export default function WebinarVendeleAlEstado() {
               <div className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2">
                 <Clock className="h-4 w-4 text-firmavb-blue" />
                 <span>19:00 – 19:30 hrs (Chile) · Online</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2">
-                <CalendarDays className="h-4 w-4 text-firmavb-blue" />
-                <span>Empieza el martes 15 de septiembre</span>
               </div>
             </div>
 
