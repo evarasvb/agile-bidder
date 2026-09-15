@@ -680,7 +680,7 @@ export default function Academia() {
                         <span className="font-medium text-foreground">{m.titulo}</span>
                       </div>
                       <Button size="sm" variant="outline" asChild className="gap-2">
-                        <a href={m.url} target="_blank" rel="noopener noreferrer" aria-label="Escuchar podcast (abre en nueva pestaña)">
+                        <a href={m.url} target="_blank" rel="noopener noreferrer" aria-label={`Escuchar ${m.titulo} (canción, abre en nueva pestaña)`}>
                           Escuchar
                           <ExternalLink className="h-3 w-3" aria-hidden="true" />
                         </a>

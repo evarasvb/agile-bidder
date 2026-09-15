@@ -33,7 +33,7 @@ export function ExpertoLibroModal({ open, onClose, onAnalizar, bases, codigo, oc
 
             <div className="grid grid-cols-1 gap-3">
               {/* Pincelada */}
-              <Card role="button" tabIndex={0} className="cursor-pointer hover:border-primary transition-colors" onClick={() => !ocupado && (onAnalizar('pincelada'), onClose())} onKeyDown={(e) => e.key === 'Enter' && !ocupado && (onAnalizar('pincelada'), onClose())}>
+              <Card role="button" tabIndex={0} className="cursor-pointer hover:border-primary transition-colors" onClick={() => !ocupado && (onAnalizar('pincelada'), onClose())} onKeyDown={(e) => {if ((e.key === 'Enter' || e.key === ' ') && !ocupado) {e.preventDefault(); onAnalizar('pincelada'); onClose();}}}>
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-2">
@@ -52,7 +52,7 @@ export function ExpertoLibroModal({ open, onClose, onAnalizar, bases, codigo, oc
               </Card>
 
               {/* Análisis profundo */}
-              <Card role="button" tabIndex={0} className="cursor-pointer hover:border-primary transition-colors" onClick={() => !ocupado && (onAnalizar('profundo'), onClose())} onKeyDown={(e) => e.key === 'Enter' && !ocupado && (onAnalizar('profundo'), onClose())}>
+              <Card role="button" tabIndex={0} className="cursor-pointer hover:border-primary transition-colors" onClick={() => !ocupado && (onAnalizar('profundo'), onClose())} onKeyDown={(e) => {if ((e.key === 'Enter' || e.key === ' ') && !ocupado) {e.preventDefault(); onAnalizar('profundo'); onClose();}}}>
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-2">
@@ -71,7 +71,7 @@ export function ExpertoLibroModal({ open, onClose, onAnalizar, bases, codigo, oc
               </Card>
 
               {/* Power Analysis */}
-              <Card role="button" tabIndex={0} className="cursor-pointer hover:border-primary transition-colors" onClick={() => !ocupado && (onAnalizar('power'), onClose())} onKeyDown={(e) => e.key === 'Enter' && !ocupado && (onAnalizar('power'), onClose())}>
+              <Card role="button" tabIndex={0} className="cursor-pointer hover:border-primary transition-colors" onClick={() => !ocupado && (onAnalizar('power'), onClose())} onKeyDown={(e) => {if ((e.key === 'Enter' || e.key === ' ') && !ocupado) {e.preventDefault(); onAnalizar('power'); onClose();}}}>
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-2">
