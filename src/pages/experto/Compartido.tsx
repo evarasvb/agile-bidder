@@ -23,11 +23,11 @@ export default function Compartido() {
     enabled: !!token,
     queryFn: async () => ((await supabase.rpc('experto_compartido', { p_token: token })).data?.[0] ?? null) as { codigo: string | null; tipo: string; titulo: string | null; empresa: string | null; contenido: string; creado_en: string } | null,
   });
-  useEffect(() => { document.title = data?.titulo ? `${data.titulo} · Experto FirmaVB` : 'Experto FirmaVB'; }, [data]);
+  useEffect(() => { document.title = data?.titulo ? `${data.titulo} · Don Evaristo` : 'Don Evaristo'; }, [data]);
 
   const compartir = async () => {
     const url = window.location.href;
-    if (navigator.share) { try { await navigator.share({ title: data?.titulo ?? 'Análisis del Experto FirmaVB', url }); return; } catch { /* cancelado */ } }
+    if (navigator.share) { try { await navigator.share({ title: data?.titulo ?? 'Análisis de Don Evaristo', url }); return; } catch { /* cancelado */ } }
     await navigator.clipboard.writeText(url); toast.success('Link copiado');
   };
 
@@ -38,7 +38,7 @@ export default function Compartido() {
         <div className="max-w-3xl mx-auto px-6 py-5 flex items-center justify-between gap-4">
           <img src={logo} alt="FirmaVB" className="h-9" />
           <div className="text-right text-sm">
-            <p className="font-semibold">Experto FirmaVB</p>
+            <p className="font-semibold">Don Evaristo</p>
             <p className="opacity-80">Ley 19.886 · dictámenes CGR · datos vivos de Mercado Público</p>
           </div>
         </div>
@@ -51,13 +51,13 @@ export default function Compartido() {
             <p className="text-xs uppercase tracking-wide text-muted-foreground">{TIPO[data.tipo] ?? data.tipo}{data.codigo ? ` · Licitación ${data.codigo}` : ''}</p>
             <h1 className="text-2xl font-bold mt-1">{data.titulo ?? `Análisis ${data.codigo ?? ''}`}</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Hecho por <b>{data.empresa ?? 'un proveedor'}</b> con el Experto FirmaVB · {new Date(data.creado_en).toLocaleDateString('es-CL')}
+              Hecho por <b>{data.empresa ?? 'un proveedor'}</b> con Don Evaristo · {new Date(data.creado_en).toLocaleDateString('es-CL')}
             </p>
             <div className="no-print flex flex-wrap gap-2 mt-4">
               {data.tipo === 'mapa' || data.tipo === 'infografia'
                 ? <Button size="sm" variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4 mr-1" />Guardar PDF</Button>
                 : <Button size="sm" variant="outline" onClick={async () => { const r = await compartirPdfExperto({ titulo: data.titulo ?? `Análisis ${data.codigo ?? ''}`, empresa: data.empresa, contenido: data.contenido, url: window.location.href, fecha: data.creado_en }, `${data.codigo ?? 'experto'}-${data.tipo}.pdf`); if (r === 'descargado') toast.success('PDF descargado'); }}><Printer className="h-4 w-4 mr-1" />Descargar PDF</Button>}
-              <Button size="sm" className="bg-[#25D366] hover:bg-[#1ebe5d] text-white" asChild><a href={`https://wa.me/?text=${encodeURIComponent(`${data.titulo ?? 'Análisis del Experto FirmaVB'}\n${window.location.href}`)}`} target="_blank" rel="noreferrer">WhatsApp</a></Button>
+              <Button size="sm" className="bg-[#25D366] hover:bg-[#1ebe5d] text-white" asChild><a href={`https://wa.me/?text=${encodeURIComponent(`${data.titulo ?? 'Análisis de Don Evaristo'}\n${window.location.href}`)}`} target="_blank" rel="noreferrer">WhatsApp</a></Button>
               <Button size="sm" variant="outline" onClick={compartir}><Share2 className="h-4 w-4 mr-1" />Compartir</Button>
             </div>
             {data.tipo === 'infografia' && parse(data.contenido) ? <div className="mt-6"><Infografia d={{ ...parse(data.contenido), empresa: data.empresa }} /></div>
@@ -68,7 +68,7 @@ export default function Compartido() {
         )}
         <section className="mt-10 rounded-xl border bg-muted/30 p-6">
           <p className="font-semibold flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" />¿Tienes una licitación entre manos?</p>
-          <p className="text-sm text-muted-foreground mt-1">Pregúntale al Experto FirmaVB: 17 años vendiéndole al Estado, la ley, 3.148 dictámenes y los datos reales de quién gana y cómo paga cada organismo. Tu primera pregunta es gratis, sin registrarte.</p>
+          <p className="text-sm text-muted-foreground mt-1">Pregúntale a Don Evaristo: 17 años vendiéndole al Estado, la ley, 3.148 dictámenes y los datos reales de quién gana y cómo paga cada organismo. Tu primera pregunta es gratis, sin registrarte.</p>
           <div className="no-print mt-3 flex gap-2 flex-wrap">
             <Button asChild><a href="/">Usar mi comodín gratis</a></Button>
             <Button variant="outline" asChild><Link to="/auth?tab=signup">Crear cuenta</Link></Button>

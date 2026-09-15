@@ -551,7 +551,7 @@ export default function LibroLicitacion() {
   const oportunidadLibro = f ? { codigo: cod, nombre: f.nombre, tipo: f.tipo, organismo: f.institucion, monto: typeof f.presupuesto === 'number' ? f.presupuesto : null, fecha_cierre: f.fecha_cierre, fecha_publicacion: f.fecha_publicacion, link: f.url } : null;
   const extraEmailLibro = (() => {
     const v = veredictoDe(entregables.informe);
-    const partes = [v ? `Veredicto del Experto FirmaVB: ${v.t}` : null, compartido ? `${compartido.titulo}\n${compartido.url}` : null];
+    const partes = [v ? `Veredicto de Don Evaristo: ${v.t}` : null, compartido ? `${compartido.titulo}\n${compartido.url}` : null];
     return partes.filter(Boolean).join('\n\n') || undefined;
   })();
 
@@ -560,7 +560,7 @@ export default function LibroLicitacion() {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3 flex-wrap">
-        {cod ? <Button variant="ghost" size="sm" onClick={() => navigate('/experto')}><ArrowLeft className="h-4 w-4 mr-1" />Experto</Button> : <><BookOpen className="h-5 w-5 text-primary" /><h1 className="text-xl font-bold">Experto FirmaVB</h1></>}
+        {cod ? <Button variant="ghost" size="sm" onClick={() => navigate('/experto')}><ArrowLeft className="h-4 w-4 mr-1" />Experto</Button> : <><BookOpen className="h-5 w-5 text-primary" /><h1 className="text-xl font-bold">Don Evaristo</h1></>}
         {!cod && (
           <form className="flex gap-1" onSubmit={(e) => { e.preventDefault(); abrirLibro(codigoAbrir); }}>
             <Input value={codigoAbrir} onChange={(e) => setCodigoAbrir(e.target.value)} placeholder="Abrir libro por ID, ej. 2699-35-LE26" className="h-8 w-64" />

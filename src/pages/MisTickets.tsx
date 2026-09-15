@@ -74,7 +74,7 @@ export default function MisTickets() {
   const [abierto, setAbierto] = useState(false);
   const [mensaje, setMensaje] = useState("");
   const [enviando, setEnviando] = useState(false);
-  // Nueva consulta directa (mismo canal que el asistente Evaristo): queda como caso con seguimiento.
+  // Nueva consulta directa (mismo canal que el asistente Don Evaristo): queda como caso con seguimiento.
   const enviar = async () => {
     if (mensaje.trim().length < 10) { toast.error("Cuéntanos un poco más (mínimo 10 caracteres)"); return; }
     setEnviando(true);
@@ -121,7 +121,7 @@ export default function MisTickets() {
           <MessageCircle className="h-8 w-8 mx-auto text-muted-foreground/60" />
           <p className="mt-3 text-sm font-medium">Aún no has dejado ninguna consulta</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Usa el botón <span className="font-medium text-firmavb-blue">Nueva consulta</span> o el asistente Evaristo (abajo a la derecha). Aquí verás el estado de cada caso.
+            Usa el botón <span className="font-medium text-firmavb-blue">Nueva consulta</span> o el asistente Don Evaristo (abajo a la derecha). Aquí verás el estado de cada caso.
           </p>
         </div>
       ) : (
