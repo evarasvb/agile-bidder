@@ -52,7 +52,7 @@ function useLinkOficialOportunidad(tipo: string | undefined, codigo: string | un
         return data?.url_ficha ?? null;
       }
       if (tipo === 'licitacion') {
-        const { data } = await supabase.from('licitaciones').select('link_detalle').eq('id_licitacion', codigo).maybeSingle();
+        const { data } = await supabase.from('licitaciones').select('link_detalle').eq('codigo', codigo).maybeSingle();
         return data?.link_detalle ?? null;
       }
       return null;

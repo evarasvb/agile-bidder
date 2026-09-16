@@ -64,7 +64,11 @@ export default function ExtensionConfig() {
   const { data: cliente } = useCliente();
   // Estado REAL de conexión: antes esta pantalla no decía si la extensión
   // estaba conectada (el indicador vivía en una barra oculta en móvil).
-  const { isConnected: extConectada, isLoading: extVerificando, lastActivity: extUltimaActividad } = useExtensionStatus();
+  const { isConnected: extConectada, isLoading: extVerificando, lastActivity: extUltimaActividad, activeKeysCount: extClavesActivas } = useExtensionStatus();
+  // "Instalada, sin actividad" solo si además tiene una clave activa: si borró
+  // o desactivó su última clave, la extensión ya no puede autenticarse y no se
+  // va a reactivar sola por abrir Mercado Público.
+  const extInactiva = !!extUltimaActividad && (extClavesActivas ?? 0) > 0;
   const clienteId = cliente?.id || null;
   
   const { data: apiKeys, isLoading } = useExtensionApiKeys(clienteId);
@@ -279,8 +283,19 @@ export default function ExtensionConfig() {
           <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-              <p className="text-sm font-semibold text-amber-800">Aún no está conectada</p>
-              <p className="text-xs text-amber-700">Sigue la guía y quedará lista en ~3 minutos.</p>
+              {extInactiva ? (
+                <>
+                  <p className="text-sm font-semibold text-amber-800">Instalada, sin actividad reciente</p>
+                  <p className="text-xs text-amber-700">
+                    Última actividad {formatDistanceToNow(extUltimaActividad, { addSuffix: true, locale: es })}. Abre Mercado Público en Chrome y se reactiva sola.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold text-amber-800">Aún no está conectada</p>
+                  <p className="text-xs text-amber-700">Sigue la guía y quedará lista en ~3 minutos.</p>
+                </>
+              )}
             </div>
             <a href="#guia-instalacion" className="text-sm font-semibold text-amber-800 underline underline-offset-2">
               Ir a la guía paso a paso ↓

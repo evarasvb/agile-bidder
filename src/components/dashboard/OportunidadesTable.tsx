@@ -69,7 +69,7 @@ export function OportunidadesTable() {
 
       // Apply search
       if (searchTerm) {
-        query = query.or(`titulo.ilike.%${searchTerm}%,organismo.ilike.%${searchTerm}%,id_licitacion.ilike.%${searchTerm}%`);
+        query = query.or(`titulo.ilike.%${searchTerm}%,organismo.ilike.%${searchTerm}%,codigo.ilike.%${searchTerm}%`);
       }
 
       // Apply estado filter
@@ -91,16 +91,16 @@ export function OportunidadesTable() {
 
       // Transform to Oportunidad format
       const oportunidades: Oportunidad[] = (data || []).map(l => ({
-        codigo: l.id_licitacion,
+        codigo: l.codigo,
         nombre: l.titulo,
         institucion_nombre: l.organismo,
         estado: l.estado,
         fecha_publicacion: l.created_at,
         fecha_cierre: l.fecha_cierre,
-        presupuesto_estimado: l.presupuesto,
+        presupuesto_estimado: l.presupuesto_estimado,
         match_score: l.match_score,
         tipo_proceso: 'compra_agil',
-        link_oficial: l.link_oficial,
+        link_oficial: l.link_detalle,
       }));
 
       return {

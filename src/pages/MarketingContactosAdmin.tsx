@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AlertCircle, Upload, Users, Filter, Trash2, Download, Youtube, Settings, X, Check, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 
 interface ContactoStats {
   fuente: string;
@@ -28,12 +29,61 @@ interface Contacto {
   rubro: string | null;
   email_validado: boolean | null;
   estado_email: string | null;
+  esCliente: boolean;
+  campanasEnviadas: number;
 }
 
-interface SortConfig {
-  key: keyof Contacto | null;
-  direction: 'asc' | 'desc';
-}
+const COLUMNAS_CONTACTOS: DataTableColumn<Contacto>[] = [
+  { id: 'email', header: 'Email', cell: (c) => <span className="font-mono text-xs">{c.email}</span>, sortValue: (c) => c.email },
+  { id: 'nombre', header: 'Nombre', cell: (c) => c.nombre || '—', sortValue: (c) => c.nombre },
+  { id: 'empresa', header: 'Empresa', cell: (c) => c.empresa || '—', sortValue: (c) => c.empresa },
+  { id: 'categoria', header: 'Categoría', cell: (c) => c.categoria || '—', sortValue: (c) => c.categoria },
+  { id: 'rubro', header: 'Rubro', cell: (c) => <span className="capitalize">{c.rubro || '—'}</span>, sortValue: (c) => c.rubro },
+  { id: 'fuente', header: 'Fuente', cell: (c) => <span className="capitalize">{c.fuente_datos || '—'}</span>, sortValue: (c) => c.fuente_datos },
+  {
+    id: 'estado_email',
+    header: 'Email válido',
+    cell: (c) =>
+      c.email_validado ? (
+        <span className="inline-flex items-center gap-1 rounded bg-green-100 px-2 py-0.5 text-xs text-green-800">
+          <Check className="h-3 w-3" /> {c.estado_email}
+        </span>
+      ) : (
+        <span className="text-xs text-muted-foreground">No validado</span>
+      ),
+    sortValue: (c) => (c.email_validado ? `1-${c.estado_email ?? ''}` : '0'),
+    exportValue: (c) => (c.email_validado ? c.estado_email ?? 'validado' : 'no validado'),
+  },
+  {
+    id: 'estado',
+    header: 'Suscripción',
+    cell: (c) => (
+      <span className={`rounded-full px-2 py-0.5 text-xs ${c.estado_suscripcion === 'suscrito' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+        {c.estado_suscripcion}
+      </span>
+    ),
+    sortValue: (c) => c.estado_suscripcion,
+  },
+  {
+    id: 'es_cliente',
+    header: '¿Ya es cliente?',
+    cell: (c) =>
+      c.esCliente ? (
+        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800">Cliente</span>
+      ) : (
+        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">Prospecto</span>
+      ),
+    sortValue: (c) => (c.esCliente ? 1 : 0),
+    exportValue: (c) => (c.esCliente ? 'cliente' : 'prospecto'),
+  },
+  {
+    id: 'campanas_enviadas',
+    header: 'Campañas',
+    align: 'right',
+    cell: (c) => c.campanasEnviadas,
+    sortValue: (c) => c.campanasEnviadas,
+  },
+];
 
 export default function MarketingContactosAdmin() {
   const [stats, setStats] = useState<ContactoStats[]>([]);
@@ -42,15 +92,14 @@ export default function MarketingContactosAdmin() {
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [editingContacto, setEditingContacto] = useState<Contacto | null>(null);
-  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: null, direction: 'asc' });
 
   // Filtros
-  const [searchText, setSearchText] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState<string>('');
   const [filtroFuente, setFiltroFuente] = useState<string>('');
   const [filtroRubro, setFiltroRubro] = useState<string>('');
   const [filtroEstadoEmail, setFiltroEstadoEmail] = useState<string>('');
   const [filtroSuscripcion, setFiltroSuscripcion] = useState<string>('');
+  const [filtroTipo, setFiltroTipo] = useState<string>('');
 
   // Estados únicos para dropdowns
   const [fuentes, setFuentes] = useState<string[]>([]);
@@ -62,8 +111,8 @@ export default function MarketingContactosAdmin() {
   }, []);
 
   useEffect(() => {
-    aplicarFiltrosYOrdenamiento();
-  }, [contactos, searchText, filtroCategoria, filtroFuente, filtroRubro, filtroEstadoEmail, filtroSuscripcion, sortConfig]);
+    aplicarFiltros();
+  }, [contactos, filtroCategoria, filtroFuente, filtroRubro, filtroEstadoEmail, filtroSuscripcion, filtroTipo]);
 
   const cargarDatos = async () => {
     setLoading(true);
@@ -99,11 +148,23 @@ export default function MarketingContactosAdmin() {
       const { data: contactosData, error: contactosError } = await supabase
         .from('marketing_contactos')
         .select('*')
-        .order('created_at', { ascending: false })
+        .order('creado_en', { ascending: false })
         .limit(5000);
 
       if (!contactosError && contactosData) {
-        setContactos(contactosData);
+        // Cruce con clientes (¿ya se registró en la plataforma?) y con las
+        // campañas que se le han enviado. RLS de "clientes" solo deja ver la
+        // propia fila, así que el cruce lo hace una RPC de admin aparte.
+        const { data: cruceData } = await supabase.rpc('admin_marketing_contactos_cruce');
+        const cruceMap = new Map((cruceData ?? []).map(c => [c.contacto_id, c]));
+
+        const contactosConCruce: Contacto[] = contactosData.map(c => ({
+          ...c,
+          esCliente: cruceMap.get(c.id)?.es_cliente ?? false,
+          campanasEnviadas: cruceMap.get(c.id)?.campanas_enviadas ?? 0,
+        }));
+
+        setContactos(contactosConCruce);
 
         // Extraer valores únicos para filtros
         const uniqueFuentes = [...new Set(contactosData.map(c => c.fuente_datos).filter(Boolean))].sort();
@@ -122,65 +183,26 @@ export default function MarketingContactosAdmin() {
     }
   };
 
-  const aplicarFiltrosYOrdenamiento = () => {
+  // Búsqueda, orden y paginación los hace la DataTable; aquí solo los filtros
+  // por campo, que además definen el segmento para acciones en lote.
+  const aplicarFiltros = () => {
     let filtered = contactos;
-
-    // Buscar texto en email, nombre, empresa
-    if (searchText) {
-      const search = searchText.toLowerCase();
-      filtered = filtered.filter(c =>
-        (c.email?.toLowerCase().includes(search)) ||
-        (c.nombre?.toLowerCase().includes(search)) ||
-        (c.empresa?.toLowerCase().includes(search))
-      );
-    }
-
-    // Filtrar por campos específicos
     if (filtroCategoria) filtered = filtered.filter(c => c.categoria === filtroCategoria);
     if (filtroFuente) filtered = filtered.filter(c => c.fuente_datos === filtroFuente);
     if (filtroRubro) filtered = filtered.filter(c => c.rubro === filtroRubro);
     if (filtroEstadoEmail) filtered = filtered.filter(c => c.estado_email === filtroEstadoEmail);
     if (filtroSuscripcion) filtered = filtered.filter(c => c.estado_suscripcion === filtroSuscripcion);
-
-    // Ordenamiento
-    if (sortConfig.key) {
-      filtered.sort((a, b) => {
-        const aVal = a[sortConfig.key!];
-        const bVal = b[sortConfig.key!];
-
-        if (aVal === null || aVal === undefined) return sortConfig.direction === 'asc' ? 1 : -1;
-        if (bVal === null || bVal === undefined) return sortConfig.direction === 'asc' ? -1 : 1;
-
-        if (typeof aVal === 'string') {
-          return sortConfig.direction === 'asc'
-            ? aVal.localeCompare(bVal as string)
-            : (bVal as string).localeCompare(aVal);
-        }
-
-        return sortConfig.direction === 'asc' ? (aVal as any) - (bVal as any) : (bVal as any) - (aVal as any);
-      });
-    }
-
+    if (filtroTipo === 'cliente') filtered = filtered.filter(c => c.esCliente);
+    if (filtroTipo === 'prospecto') filtered = filtered.filter(c => !c.esCliente);
     setContactosFiltrados(filtered);
   };
 
-  const toggleSort = (key: keyof Contacto) => {
-    if (sortConfig.key === key) {
-      setSortConfig({
-        key,
-        direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'
-      });
-    } else {
-      setSortConfig({ key, direction: 'asc' });
-    }
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedIds.size === contactosFiltrados.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(contactosFiltrados.map(c => c.id)));
-    }
+  const toggleSelectMany = (ids: string[], seleccionar: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      ids.forEach(id => (seleccionar ? next.add(id) : next.delete(id)));
+      return next;
+    });
   };
 
   const toggleSelectContacto = (id: string) => {
@@ -236,7 +258,7 @@ export default function MarketingContactosAdmin() {
       await supabase.rpc('marketing_registrar_auditoria', {
         p_accion: 'importacion',
         p_fuente: 'prospects',
-        p_cantidad: insertedData?.length || prospects.length,
+        p_cantidad: (insertedData ?? []).length || prospects.length,
       });
 
       toast.success(`Importados ${prospects.length} contactos de prospects`);
@@ -253,13 +275,14 @@ export default function MarketingContactosAdmin() {
     try {
       setLoading(true);
 
+      // clientes solo deja ver la propia fila por RLS (cada usuario, la suya);
+      // para traer la lista completa se usa una RPC de admin, mismo patrón que
+      // el cruce "¿ya es cliente?" de la pestaña Contactos.
       const { data: clientes, error: clientesError } = await supabase
-        .from('clientes')
-        .select('email, empresa_nombre, nombre_responsable, rut')
-        .limit(1000);
+        .rpc('admin_clientes_para_importar');
 
       if (clientesError) {
-        toast.error('No se encontró tabla de clientes o error al acceder');
+        toast.error('Error al acceder a los clientes');
         return;
       }
 
@@ -491,29 +514,44 @@ export default function MarketingContactosAdmin() {
               </Card>
             </div>
           )}
+
+          {!loading && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="border-blue-200 bg-blue-50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-blue-900">Ya son clientes</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold text-blue-600">{contactos.filter(c => c.esCliente).length}</p>
+                  <p className="text-xs text-blue-700 mt-2">Se registraron en FirmaVB</p>
+                </CardContent>
+              </Card>
+              <Card className="border-amber-200 bg-amber-50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-amber-900">Solo prospectos</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold text-amber-600">{contactos.filter(c => !c.esCliente).length}</p>
+                  <p className="text-xs text-amber-700 mt-2">Reciben campañas pero no se han registrado</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Con campañas enviadas</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold">{contactos.filter(c => c.campanasEnviadas > 0).length}</p>
+                  <p className="text-xs text-muted-foreground mt-2">Al menos un envío registrado</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </TabsContent>
 
         {/* CONTACTOS TAB */}
         <TabsContent value="contactos" className="space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold">Base de Datos de Contactos ({contactosFiltrados.length})</h2>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm">
-                <Download className="w-4 h-4 mr-2" />
-                Exportar
-              </Button>
-            </div>
-          </div>
-
-          {/* Búsqueda global */}
-          <div>
-            <Label className="text-sm">Buscar (email, nombre, empresa)</Label>
-            <Input
-              placeholder="Escribe para buscar..."
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              className="w-full"
-            />
           </div>
 
           {/* Filtros avanzados */}
@@ -583,18 +621,30 @@ export default function MarketingContactosAdmin() {
                 <option value="no_suscrito">No suscrito</option>
               </select>
             </div>
-            {(searchText || filtroCategoria || filtroFuente || filtroRubro || filtroEstadoEmail || filtroSuscripcion) && (
+            <div>
+              <Label className="text-xs">¿Ya es cliente?</Label>
+              <select
+                value={filtroTipo}
+                onChange={(e) => setFiltroTipo(e.target.value)}
+                className="w-full px-2 py-1 text-sm border rounded"
+              >
+                <option value="">Todos</option>
+                <option value="cliente">Solo clientes</option>
+                <option value="prospecto">Solo prospectos</option>
+              </select>
+            </div>
+            {(filtroCategoria || filtroFuente || filtroRubro || filtroEstadoEmail || filtroSuscripcion || filtroTipo) && (
               <div className="flex items-end">
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => {
-                    setSearchText('');
                     setFiltroCategoria('');
                     setFiltroFuente('');
                     setFiltroRubro('');
                     setFiltroEstadoEmail('');
                     setFiltroSuscripcion('');
+                    setFiltroTipo('');
                   }}
                 >
                   <X className="w-4 h-4 mr-1" />
@@ -651,123 +701,47 @@ export default function MarketingContactosAdmin() {
             </Card>
           )}
 
-          {loading ? (
-            <div className="text-center py-8">Cargando contactos...</div>
-          ) : contactosFiltrados.length === 0 ? (
-            <Card>
-              <CardContent className="pt-8 text-center">
-                <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4 opacity-50" />
-                <p className="text-muted-foreground mb-4">No hay contactos con esos filtros</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="border-b bg-gray-50">
-                      <tr>
-                        <th scope="col" className="text-left py-2 px-2 w-8">
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.size === contactosFiltrados.length && contactosFiltrados.length > 0}
-                            onChange={toggleSelectAll}
-                            className="rounded"
-                            aria-label="Seleccionar todos los contactos"
-                          />
-                        </th>
-                        <th
-                          scope="col"
-                          className="text-left py-2 px-2 cursor-pointer hover:bg-gray-100"
-                          onClick={() => toggleSort('email')}
-                        >
-                          Email {sortConfig.key === 'email' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                        </th>
-                        <th
-                          scope="col"
-                          className="text-left py-2 px-2 cursor-pointer hover:bg-gray-100"
-                          onClick={() => toggleSort('nombre')}
-                        >
-                          Nombre {sortConfig.key === 'nombre' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                        </th>
-                        <th
-                          scope="col"
-                          className="text-left py-2 px-2 cursor-pointer hover:bg-gray-100"
-                          onClick={() => toggleSort('empresa')}
-                        >
-                          Empresa {sortConfig.key === 'empresa' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                        </th>
-                        <th scope="col" className="text-left py-2 px-2">Rubro</th>
-                        <th scope="col" className="text-left py-2 px-2">Fuente</th>
-                        <th scope="col" className="text-left py-2 px-2">Email</th>
-                        <th
-                          scope="col"
-                          className="text-left py-2 px-2 cursor-pointer hover:bg-gray-100"
-                          onClick={() => toggleSort('estado_suscripcion')}
-                        >
-                          Estado {sortConfig.key === 'estado_suscripcion' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                        </th>
-                        <th scope="col" className="py-2 px-2 w-16"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {contactosFiltrados.map((contacto) => (
-                        <tr key={contacto.id} className="border-b hover:bg-gray-50">
-                          <td className="py-2 px-2">
-                            <input
-                              type="checkbox"
-                              checked={selectedIds.has(contacto.id)}
-                              onChange={() => toggleSelectContacto(contacto.id)}
-                              className="rounded"
-                            />
-                          </td>
-                          <td className="py-2 px-2 text-xs font-mono">{contacto.email}</td>
-                          <td className="py-2 px-2 text-sm">{contacto.nombre || '-'}</td>
-                          <td className="py-2 px-2 text-sm">{contacto.empresa || '-'}</td>
-                          <td className="py-2 px-2 text-xs capitalize">{contacto.rubro || '-'}</td>
-                          <td className="py-2 px-2 text-xs capitalize">{contacto.fuente_datos || '-'}</td>
-                          <td className="py-2 px-2 text-xs">
-                            {contacto.email_validado ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-green-100 text-green-800">
-                                <Check className="w-3 h-3" /> {contacto.estado_email}
-                              </span>
-                            ) : (
-                              <span className="text-gray-500">No validado</span>
-                            )}
-                          </td>
-                          <td className="py-2 px-2">
-                            <span className={`px-2 py-1 rounded-full text-xs ${
-                              contacto.estado_suscripcion === 'suscrito'
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-gray-100 text-gray-800'
-                            }`}>
-                              {contacto.estado_suscripcion}
-                            </span>
-                          </td>
-                          <td className="py-2 px-2 text-right flex gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setEditingContacto(contacto)}
-                            >
-                              Editar
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEliminarContacto(contacto.id)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          <Card>
+            <CardContent className="pt-6">
+              <DataTable<Contacto>
+                storageKey="marketing-contactos"
+                rows={contactosFiltrados}
+                rowKey={(c) => c.id}
+                loading={loading}
+                itemLabel="contactos"
+                searchText={(c) => `${c.email} ${c.nombre ?? ''} ${c.empresa ?? ''}`}
+                searchPlaceholder="Buscar por correo, nombre o empresa…"
+                exportFileName="contactos-marketing"
+                defaultSort={{ id: 'email', dir: 'asc' }}
+                emptyMessage={
+                  <span className="inline-flex flex-col items-center gap-2">
+                    <Users className="h-10 w-10 opacity-40" />
+                    No hay contactos con esos filtros.
+                  </span>
+                }
+                selection={{ selected: selectedIds, onToggle: toggleSelectContacto, onToggleMany: toggleSelectMany }}
+                columns={[
+                  ...COLUMNAS_CONTACTOS,
+                  {
+                    id: 'acciones',
+                    header: '',
+                    align: 'right',
+                    className: 'whitespace-nowrap',
+                    cell: (contacto) => (
+                      <span className="inline-flex gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => setEditingContacto(contacto)}>
+                          Editar
+                        </Button>
+                        <Button variant="ghost" size="sm" aria-label="Eliminar contacto" onClick={() => handleEliminarContacto(contacto.id)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </span>
+                    ),
+                  },
+                ]}
+              />
+            </CardContent>
+          </Card>
 
           {/* Modal de edición */}
           {editingContacto && (

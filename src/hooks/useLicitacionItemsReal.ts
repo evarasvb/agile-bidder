@@ -34,14 +34,14 @@ export function useLicitacionItemsReal(licitacionId: string | undefined) {
       const { data: itemsData, error: itemsError } = await supabaseClient
         .from('licitacion_items')
         .select('*')
-        .eq('licitacion_id', licitacionId)
+        .eq('licitacion_codigo', licitacionId)
         .order('id', { ascending: true });
 
       if (!itemsError && itemsData && itemsData.length > 0) {
         return itemsData.map((item: any) => ({
           id: item.id,
-          licitacion_id: item.licitacion_id,
-          nombre_producto: item.nombre_producto,
+          licitacion_id: item.licitacion_codigo,
+          nombre_producto: item.nombre,
           descripcion: item.descripcion,
           cantidad: item.cantidad,
           unidad: item.unidad,
@@ -86,7 +86,7 @@ export function useCompraAgilItems(compraAgilId: string | undefined) {
       const { data, error } = await supabaseClient
         .from('compras_agiles_items')
         .select('*')
-        .eq('compra_agil_id', compraAgilId)
+        .eq('compra_agil_id', Number(compraAgilId))
         .order('id', { ascending: true });
 
       if (error) {

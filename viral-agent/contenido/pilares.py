@@ -30,6 +30,22 @@ PILARES = [
                 "3 errores que le cuestan contratos a proveedores del Estado (y cómo los "
                 "resolví escribiendo '{titulo}') 🧵"
             ),
+            (
+                "Mito: \"si ofrezco el precio más bajo, gano\". Falso. La ficha de "
+                "evaluación pondera precio, plazo, experiencia y cumplimiento de "
+                "requisitos técnicos — y ahí es donde se pierden más puntos de los que "
+                "crees. Te muestro cómo leerla en '{titulo}'."
+            ),
+            (
+                "¿Cuánto te ha costado una licitación descartada por un anexo mal llenado? "
+                "A la mayoría de las PYMES les pasa al menos una vez. En '{titulo}' te "
+                "dejo el checklist que uso para que no te vuelva a pasar a ti."
+            ),
+            (
+                "Mito: \"el Estado paga cuando quiere\". Hay datos públicos de conducta de "
+                "pago por organismo — y no todos son iguales. En '{titulo}' te explico "
+                "dónde mirarlos antes de postular, no después de ganar."
+            ),
         ],
     },
     {
@@ -49,6 +65,18 @@ PILARES = [
                 "responde EXACTAMENTE lo que piden las bases? La mayoría de las ofertas se "
                 "caen por esto, no por precio. Todo el proceso paso a paso en '{titulo}'."
             ),
+            (
+                "3 cosas que reviso ANTES de calcular el precio de una oferta:\n"
+                "1. Fecha y hora exacta de cierre (con huso horario)\n"
+                "2. Garantía de seriedad: monto, plazo y forma de entrega\n"
+                "3. Criterios de evaluación y su ponderación\n"
+                "El resto del método, en '{titulo}'."
+            ),
+            (
+                "¿Sabes calcular tu margen real en una licitación? No es precio menos "
+                "costo — hay que sumar la garantía, el plazo de pago del organismo y el "
+                "riesgo de multas. Te lo dejo con ejemplos en '{titulo}'."
+            ),
         ],
     },
     {
@@ -67,6 +95,17 @@ PILARES = [
                 "no se olvida. Estas son las historias reales detrás de '{titulo}' — "
                 "el libro que me hubiera gustado tener antes de empezar."
             ),
+            (
+                "Un cliente perdió una licitación adjudicable por subir el anexo en el "
+                "formato equivocado. Nada de precio, nada de calidad técnica — un PDF. "
+                "Por eso el capítulo de admisibilidad de '{titulo}' es el que más "
+                "recomiendo releer."
+            ),
+            (
+                "La primera vez que gané una licitación pública no fue por tener el mejor "
+                "precio, fue por ser el único que cumplió TODOS los requisitos formales. "
+                "Esa fue la lección que armó buena parte de '{titulo}'."
+            ),
         ],
     },
     {
@@ -84,6 +123,17 @@ PILARES = [
                 "ayudando a postular a licitaciones públicas en Chile. '{titulo}' ya está "
                 "disponible, link en bio."
             ),
+            (
+                "Me preguntan seguido por qué me metí a escribir sobre Mercado Público en "
+                "vez de solo seguir asesorando en privado: porque el mismo error se repite "
+                "en cientos de PYMES que nunca se conocen entre sí. '{titulo}' junta esos "
+                "errores en un solo lugar."
+            ),
+            (
+                "Detrás de cada capítulo de '{titulo}' hay una pregunta real que me hizo "
+                "algún cliente antes de postular por primera vez. Si tienes una duda que no "
+                "está en el libro, cuéntamela en los comentarios."
+            ),
         ],
     },
     {
@@ -94,6 +144,14 @@ PILARES = [
             (
                 "\"{cita_lector}\" — gracias por leer '{titulo}' 🙌 Si tú también lo leíste, "
                 "cuéntame qué capítulo te sirvió más."
+            ),
+            (
+                "Lo que más me repiten los lectores de '{titulo}': \"{cita_lector}\". "
+                "Si postulas a licitaciones y aún no lo lees, este es tu momento 📖"
+            ),
+            (
+                "Cada semana llega un mensaje como este sobre '{titulo}': \"{cita_lector}\". "
+                "Gracias por leerlo y compartirlo con tu equipo."
             ),
         ],
     },
@@ -111,6 +169,20 @@ PILARES = [
                 "¿Tu empresa está inscrita en Mercado Público pero no ha ganado ninguna "
                 "licitación todavía? Empieza por '{titulo}'. Todo el proceso explicado sin "
                 "vueltas, de PYME a PYME."
+            ),
+            (
+                "Si vendes al Estado hace años a puro instinto, '{titulo}' te ordena el "
+                "proceso de punta a punta: bases, evaluación, garantías y contrato. "
+                "Disponible en Amazon, link en bio."
+            ),
+            (
+                "Última llamada para quienes postulan seguido y siguen perdiendo por temas "
+                "administrativos: '{titulo}' resuelve justo eso. Link en bio."
+            ),
+            (
+                "¿Primera vez postulando a una licitación pública? Empieza con el pie "
+                "derecho: '{titulo}' te lleva de la mano por bases, anexos, garantías y "
+                "evaluación. Disponible en Amazon, link en bio."
             ),
         ],
     },

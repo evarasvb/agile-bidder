@@ -1194,6 +1194,7 @@ export type Database = {
           sku: string
           stock_disponible: number
           tiempo_entrega: number
+          unidad_medida: string | null
           updated_at: string
         }
         Insert: {
@@ -1217,6 +1218,7 @@ export type Database = {
           sku: string
           stock_disponible?: number
           tiempo_entrega?: number
+          unidad_medida?: string | null
           updated_at?: string
         }
         Update: {
@@ -1240,6 +1242,7 @@ export type Database = {
           sku?: string
           stock_disponible?: number
           tiempo_entrega?: number
+          unidad_medida?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1587,6 +1590,93 @@ export type Database = {
         }
         Relationships: []
       }
+      cluster_metadata: {
+        Row: {
+          avg_purchase_value: number | null
+          cluster_description: string | null
+          cluster_id: number
+          cluster_name: string
+          created_at: string | null
+          customer_count: number | null
+          fecha_creacion: string | null
+          id: string
+          key_characteristics: string | null
+          recommended_messaging: string | null
+          regions: Json | null
+          sectors: Json | null
+          total_purchases: number | null
+          ultima_actualizacion: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          avg_purchase_value?: number | null
+          cluster_description?: string | null
+          cluster_id: number
+          cluster_name: string
+          created_at?: string | null
+          customer_count?: number | null
+          fecha_creacion?: string | null
+          id?: string
+          key_characteristics?: string | null
+          recommended_messaging?: string | null
+          regions?: Json | null
+          sectors?: Json | null
+          total_purchases?: number | null
+          ultima_actualizacion?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          avg_purchase_value?: number | null
+          cluster_description?: string | null
+          cluster_id?: number
+          cluster_name?: string
+          created_at?: string | null
+          customer_count?: number | null
+          fecha_creacion?: string | null
+          id?: string
+          key_characteristics?: string | null
+          recommended_messaging?: string | null
+          regions?: Json | null
+          sectors?: Json | null
+          total_purchases?: number | null
+          ultima_actualizacion?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      clustering_log: {
+        Row: {
+          clientes_procesados: number | null
+          clusters_generados: number | null
+          created_at: string | null
+          detalles: Json | null
+          fecha_clustering: string | null
+          id: string
+          status: string | null
+          tiempo_segundos: number | null
+        }
+        Insert: {
+          clientes_procesados?: number | null
+          clusters_generados?: number | null
+          created_at?: string | null
+          detalles?: Json | null
+          fecha_clustering?: string | null
+          id?: string
+          status?: string | null
+          tiempo_segundos?: number | null
+        }
+        Update: {
+          clientes_procesados?: number | null
+          clusters_generados?: number | null
+          created_at?: string | null
+          detalles?: Json | null
+          fecha_clustering?: string | null
+          id?: string
+          status?: string | null
+          tiempo_segundos?: number | null
+        }
+        Relationships: []
+      }
       compras_agiles: {
         Row: {
           asignado_a: string | null
@@ -1800,6 +1890,141 @@ export type Database = {
           raw_json?: Json | null
           rut_institucion?: string | null
           unidad_compra?: string | null
+        }
+        Relationships: []
+      }
+      contact_data_sources: {
+        Row: {
+          actualizado_en: string
+          configuracion: Json | null
+          creado_en: string
+          descripcion: string | null
+          estado: string | null
+          id: string
+          nombre: string
+          proxima_sincronizacion: string | null
+          registros_obtenidos: number | null
+          tipo_fuente: string | null
+          ultima_sincronizacion: string | null
+        }
+        Insert: {
+          actualizado_en?: string
+          configuracion?: Json | null
+          creado_en?: string
+          descripcion?: string | null
+          estado?: string | null
+          id?: string
+          nombre: string
+          proxima_sincronizacion?: string | null
+          registros_obtenidos?: number | null
+          tipo_fuente?: string | null
+          ultima_sincronizacion?: string | null
+        }
+        Update: {
+          actualizado_en?: string
+          configuracion?: Json | null
+          creado_en?: string
+          descripcion?: string | null
+          estado?: string | null
+          id?: string
+          nombre?: string
+          proxima_sincronizacion?: string | null
+          registros_obtenidos?: number | null
+          tipo_fuente?: string | null
+          ultima_sincronizacion?: string | null
+        }
+        Relationships: []
+      }
+      contact_enrichment_logs: {
+        Row: {
+          errores: number | null
+          estado: string | null
+          fecha_fin: string | null
+          fecha_inicio: string
+          id: string
+          mensaje_error: string | null
+          metadata: Json | null
+          proceso: string
+          registros_actualizados: number | null
+          registros_nuevos: number | null
+          registros_procesados: number | null
+        }
+        Insert: {
+          errores?: number | null
+          estado?: string | null
+          fecha_fin?: string | null
+          fecha_inicio?: string
+          id?: string
+          mensaje_error?: string | null
+          metadata?: Json | null
+          proceso: string
+          registros_actualizados?: number | null
+          registros_nuevos?: number | null
+          registros_procesados?: number | null
+        }
+        Update: {
+          errores?: number | null
+          estado?: string | null
+          fecha_fin?: string | null
+          fecha_inicio?: string
+          id?: string
+          mensaje_error?: string | null
+          metadata?: Json | null
+          proceso?: string
+          registros_actualizados?: number | null
+          registros_nuevos?: number | null
+          registros_procesados?: number | null
+        }
+        Relationships: []
+      }
+      customer_clusters: {
+        Row: {
+          ai_profile: string | null
+          characteristics: Json | null
+          cluster_description: string | null
+          cluster_id: number
+          cluster_name: string
+          created_at: string | null
+          customer_name: string | null
+          customer_rut: string
+          customer_type: string | null
+          fecha_clustering: string | null
+          id: string
+          purchase_history: Json | null
+          ultima_actualizacion: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ai_profile?: string | null
+          characteristics?: Json | null
+          cluster_description?: string | null
+          cluster_id: number
+          cluster_name: string
+          created_at?: string | null
+          customer_name?: string | null
+          customer_rut: string
+          customer_type?: string | null
+          fecha_clustering?: string | null
+          id?: string
+          purchase_history?: Json | null
+          ultima_actualizacion?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ai_profile?: string | null
+          characteristics?: Json | null
+          cluster_description?: string | null
+          cluster_id?: number
+          cluster_name?: string
+          created_at?: string | null
+          customer_name?: string | null
+          customer_rut?: string
+          customer_type?: string | null
+          fecha_clustering?: string | null
+          id?: string
+          purchase_history?: Json | null
+          ultima_actualizacion?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -4022,6 +4247,7 @@ export type Database = {
         Row: {
           actualizado_en: string
           audiencia_estimada: number | null
+          audiencia_estimada_final: number | null
           canal_primario: string | null
           creado_en: string
           creado_por: string | null
@@ -4037,10 +4263,12 @@ export type Database = {
           notas: string | null
           objetivo: string
           presupuesto: number | null
+          segmentos_seleccionados: string[] | null
         }
         Insert: {
           actualizado_en?: string
           audiencia_estimada?: number | null
+          audiencia_estimada_final?: number | null
           canal_primario?: string | null
           creado_en?: string
           creado_por?: string | null
@@ -4056,10 +4284,12 @@ export type Database = {
           notas?: string | null
           objetivo: string
           presupuesto?: number | null
+          segmentos_seleccionados?: string[] | null
         }
         Update: {
           actualizado_en?: string
           audiencia_estimada?: number | null
+          audiencia_estimada_final?: number | null
           canal_primario?: string | null
           creado_en?: string
           creado_por?: string | null
@@ -4075,69 +4305,133 @@ export type Database = {
           notas?: string | null
           objetivo?: string
           presupuesto?: number | null
+          segmentos_seleccionados?: string[] | null
         }
         Relationships: []
       }
       marketing_contactos: {
         Row: {
           actualizado_en: string
+          campos_adicionales: Json | null
           categoria: string | null
+          ciudad: string | null
+          consentimiento_fecha: string | null
+          consentimiento_marketing: boolean | null
           creado_en: string
           datos_enriquecimiento: Json | null
           email: string
           email_validado: boolean | null
           empresa: string | null
+          estado_contacto: string
           estado_email: string | null
           estado_suscripcion: string | null
+          etiquetas: string[] | null
+          frecuencia_contacto: string | null
           fuente_datos: string | null
           fuente_primaria: string | null
           id: string
           intentos_validacion: number | null
           nombre: string | null
           origen: string | null
+          pais: string | null
+          puntuacion_relevancia: number | null
           rubro: string | null
           telefono: string | null
+          telefono_pais: string | null
           ultima_validacion: string | null
+          ultimo_contacto_en: string | null
         }
         Insert: {
           actualizado_en?: string
+          campos_adicionales?: Json | null
           categoria?: string | null
+          ciudad?: string | null
+          consentimiento_fecha?: string | null
+          consentimiento_marketing?: boolean | null
           creado_en?: string
           datos_enriquecimiento?: Json | null
           email: string
           email_validado?: boolean | null
           empresa?: string | null
+          estado_contacto?: string
           estado_email?: string | null
           estado_suscripcion?: string | null
+          etiquetas?: string[] | null
+          frecuencia_contacto?: string | null
           fuente_datos?: string | null
           fuente_primaria?: string | null
           id?: string
           intentos_validacion?: number | null
           nombre?: string | null
           origen?: string | null
+          pais?: string | null
+          puntuacion_relevancia?: number | null
           rubro?: string | null
           telefono?: string | null
+          telefono_pais?: string | null
           ultima_validacion?: string | null
+          ultimo_contacto_en?: string | null
         }
         Update: {
           actualizado_en?: string
+          campos_adicionales?: Json | null
           categoria?: string | null
+          ciudad?: string | null
+          consentimiento_fecha?: string | null
+          consentimiento_marketing?: boolean | null
           creado_en?: string
           datos_enriquecimiento?: Json | null
           email?: string
           email_validado?: boolean | null
           empresa?: string | null
+          estado_contacto?: string
           estado_email?: string | null
           estado_suscripcion?: string | null
+          etiquetas?: string[] | null
+          frecuencia_contacto?: string | null
           fuente_datos?: string | null
           fuente_primaria?: string | null
           id?: string
           intentos_validacion?: number | null
           nombre?: string | null
           origen?: string | null
+          pais?: string | null
+          puntuacion_relevancia?: number | null
           rubro?: string | null
           telefono?: string | null
+          telefono_pais?: string | null
           ultima_validacion?: string | null
+          ultimo_contacto_en?: string | null
+        }
+        Relationships: []
+      }
+      marketing_contactos_auditoria: {
+        Row: {
+          accion: string
+          cantidad_afectada: number | null
+          detalles: Json | null
+          fuente: string | null
+          id: string
+          realizado_en: string | null
+          realizado_por: string | null
+        }
+        Insert: {
+          accion: string
+          cantidad_afectada?: number | null
+          detalles?: Json | null
+          fuente?: string | null
+          id?: string
+          realizado_en?: string | null
+          realizado_por?: string | null
+        }
+        Update: {
+          accion?: string
+          cantidad_afectada?: number | null
+          detalles?: Json | null
+          fuente?: string | null
+          id?: string
+          realizado_en?: string | null
+          realizado_por?: string | null
         }
         Relationships: []
       }
@@ -4196,6 +4490,13 @@ export type Database = {
             columns: ["contacto_id"]
             isOneToOne: false
             referencedRelation: "marketing_contactos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_ejecucion_contacto_id_fkey"
+            columns: ["contacto_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_contactos_segmentados"
             referencedColumns: ["id"]
           },
           {
@@ -5250,45 +5551,6 @@ export type Database = {
           product_id?: string
           product_type?: string
           storage_path?: string | null
-        }
-        Relationships: []
-      }
-      productos: {
-        Row: {
-          created_at: string
-          descripcion: string | null
-          id: number
-          iva: number | null
-          marca: string | null
-          precio_iva: number | null
-          precio_neto: number | null
-          proveedor: string | null
-          sku: string | null
-          unidad: string | null
-        }
-        Insert: {
-          created_at?: string
-          descripcion?: string | null
-          id?: number
-          iva?: number | null
-          marca?: string | null
-          precio_iva?: number | null
-          precio_neto?: number | null
-          proveedor?: string | null
-          sku?: string | null
-          unidad?: string | null
-        }
-        Update: {
-          created_at?: string
-          descripcion?: string | null
-          id?: number
-          iva?: number | null
-          marca?: string | null
-          precio_iva?: number | null
-          precio_neto?: number | null
-          proveedor?: string | null
-          sku?: string | null
-          unidad?: string | null
         }
         Relationships: []
       }
@@ -6347,8 +6609,10 @@ export type Database = {
           mensaje: string | null
           nombre: string | null
           numero: number
+          origen: string
           pantalla: string | null
           telefono: string | null
+          tipo: string
           updated_at: string
           user_id: string | null
         }
@@ -6365,8 +6629,10 @@ export type Database = {
           mensaje?: string | null
           nombre?: string | null
           numero?: number
+          origen?: string
           pantalla?: string | null
           telefono?: string | null
+          tipo?: string
           updated_at?: string
           user_id?: string | null
         }
@@ -6383,8 +6649,10 @@ export type Database = {
           mensaje?: string | null
           nombre?: string | null
           numero?: number
+          origen?: string
           pantalla?: string | null
           telefono?: string | null
+          tipo?: string
           updated_at?: string
           user_id?: string | null
         }
@@ -7459,6 +7727,13 @@ export type Database = {
             referencedRelation: "marketing_contactos"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "youtube_subscribers_contacto_id_fkey"
+            columns: ["contacto_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_contactos_segmentados"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
@@ -8203,6 +8478,26 @@ export type Database = {
         }
         Relationships: []
       }
+      marketing_contactos_segmentados: {
+        Row: {
+          categoria: string | null
+          consentimiento_marketing: boolean | null
+          email: string | null
+          empresa: string | null
+          estado_contacto: string | null
+          estado_suscripcion: string | null
+          etiquetas: string[] | null
+          fuente_datos: string | null
+          id: string | null
+          nombre: string | null
+          origen: string | null
+          puntuacion_relevancia: number | null
+          telefono: string | null
+          total_registros: number | null
+          ultimo_contacto_en: string | null
+        }
+        Relationships: []
+      }
       mv_bi_comprador: {
         Row: {
           comprador: string | null
@@ -8832,6 +9127,23 @@ export type Database = {
           plan: string
         }[]
       }
+      admin_clientes_para_importar: {
+        Args: never
+        Returns: {
+          email: string
+          empresa_nombre: string
+          nombre_responsable: string
+          rut: string
+        }[]
+      }
+      admin_marketing_contactos_cruce: {
+        Args: never
+        Returns: {
+          campanas_enviadas: number
+          contacto_id: string
+          es_cliente: boolean
+        }[]
+      }
       admin_traccion_resumen: { Args: never; Returns: Json }
       alerta_ingesta_ca: { Args: never; Returns: string }
       alerta_ingesta_compras_agiles: { Args: never; Returns: string }
@@ -9369,6 +9681,19 @@ export type Database = {
         Returns: undefined
       }
       experto_ficha_licitacion: { Args: { p_codigo: string }; Returns: Json }
+      experto_fragmentacion_organismo: {
+        Args: { p_codigo_licitacion: string; p_dias_ventana?: number }
+        Returns: {
+          codigo: string
+          dias_desde: number
+          estado: string
+          fecha_publicacion: string
+          moneda: string
+          nombre: string
+          presupuesto_estimado: number
+          señal: string
+        }[]
+      }
       experto_insertar: { Args: { filas: Json }; Returns: number }
       experto_libro: { Args: { p_codigo: string }; Returns: Json }
       experto_libro_archivar: {
@@ -9396,6 +9721,20 @@ export type Database = {
           region: string
           tipo: string
           url: string
+        }[]
+      }
+      experto_licitaciones_similares: {
+        Args: { p_cantidad?: number; p_codigo: string; p_meses?: number }
+        Returns: {
+          adjudicatario_nombre: string
+          adjudicatario_rut: string
+          codigo: string
+          fecha_cierre: string
+          institucion: string
+          monto_adjudicado: number
+          monto_estimado: number
+          tipo_producto: string
+          titulo: string
         }[]
       }
       experto_matriz_guardar: {
@@ -9475,6 +9814,20 @@ export type Database = {
           presupuesto_total: number
           top_instituciones: Json
           top_regiones: Json
+        }[]
+      }
+      experto_patrones_licitacion: {
+        Args: { p_anos_atras?: number; p_codigo_licitacion: string }
+        Returns: {
+          codigo: string
+          dias_desde: number
+          estado: string
+          fecha_publicacion: string
+          moneda: string
+          nombre: string
+          presupuesto_estimado: number
+          señal: string
+          veces_licitado: number
         }[]
       }
       experto_plus_checklist: {
@@ -9881,10 +10234,29 @@ export type Database = {
           id: string
         }[]
       }
+      limpiar_duplicados_contactos: {
+        Args: never
+        Returns: {
+          eliminados: number
+          procesados: number
+        }[]
+      }
       marcar_intento_pago: { Args: { p_rut: string }; Returns: undefined }
+      marketing_actualizar_ultimo_contacto: {
+        Args: { p_contacto_id: string }
+        Returns: undefined
+      }
       marketing_calcular_metricas: {
         Args: { campana_id_in: string; fecha_in: string }
         Returns: undefined
+      }
+      marketing_importar_contactos: {
+        Args: { p_cantidad?: number; p_fuente: string; p_tabla_origen: string }
+        Returns: {
+          duplicados: number
+          errores: number
+          importados: number
+        }[]
       }
       marketing_importar_webinars: {
         Args: never
@@ -9893,6 +10265,15 @@ export type Database = {
           errores: number
           importados: number
         }[]
+      }
+      marketing_registrar_auditoria: {
+        Args: {
+          p_accion: string
+          p_cantidad: number
+          p_detalles?: Json
+          p_fuente: string
+        }
+        Returns: string
       }
       match_compra_items: {
         Args: { p_titulo: string }
@@ -10057,6 +10438,18 @@ export type Database = {
         }
         Returns: undefined
       }
+      registrar_enriquecimiento_log: {
+        Args: {
+          p_errores?: number
+          p_mensaje_error?: string
+          p_metadata?: Json
+          p_proceso: string
+          p_registros_actualizados: number
+          p_registros_nuevos: number
+          p_registros_procesados: number
+        }
+        Returns: string
+      }
       revisar_datos_prueba_licitaciones: {
         Args: never
         Returns: {
@@ -10091,6 +10484,15 @@ export type Database = {
       user_can_access_section: {
         Args: { _section_key: string; _user_id: string }
         Returns: boolean
+      }
+      validar_email_basico: { Args: { p_email: string }; Returns: string }
+      youtube_sincronizar_suscriptores: {
+        Args: { p_canal_id: string }
+        Returns: {
+          duplicados: number
+          errores: number
+          sincronizados: number
+        }[]
       }
     }
     Enums: {
@@ -10249,3 +10651,4 @@ export const Constants = {
     },
   },
 } as const
+

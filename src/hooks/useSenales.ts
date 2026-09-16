@@ -36,7 +36,7 @@ export function useRegistrarSenal() {
           oportunidad_tipo: s.oportunidad_tipo ?? null,
           codigo: s.codigo ?? null,
           titulo: s.titulo ?? null,
-          meta: s.meta ?? null,
+          meta: s.meta as any,
         })
         .then(
           () => {},

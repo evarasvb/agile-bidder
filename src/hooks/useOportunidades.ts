@@ -57,8 +57,23 @@ export function useOportunidades(options: UseOportunidadesOptions = {}) {
         throw error;
       }
 
-      // Apply client-side filtering for type-safety
-      let filtered = (data || []) as Oportunidad[];
+      // La vista oportunidades_all no tiene nombre/institucion_nombre/link_oficial/
+      // match_encontrado tal cual (son titulo/organismo/link_detalle, y match_encontrado
+      // se deriva de si hay match_score): se mapea acá en vez de castear directo.
+      let filtered: Oportunidad[] = (data || []).map((o: any) => ({
+        codigo: o.codigo,
+        nombre: o.titulo,
+        institucion_nombre: o.organismo,
+        estado: o.estado,
+        fecha_publicacion: o.fecha_publicacion,
+        fecha_cierre: o.fecha_cierre,
+        presupuesto_estimado: o.presupuesto_estimado,
+        match_score: o.match_score,
+        match_encontrado: o.match_score != null,
+        tipo_proceso: o.tipo_proceso,
+        link_oficial: o.link_detalle,
+        procesada: o.match_score != null,
+      }));
 
       if (filters.tipo_proceso && filters.tipo_proceso !== 'all') {
         filtered = filtered.filter(o => o.tipo_proceso === filters.tipo_proceso);
@@ -94,14 +109,14 @@ export function useOportunidadesStats() {
       // Get stats from compras_agiles table
       const { data: comprasAgiles, error: caError } = await supabase
         .from('compras_agiles')
-        .select('codigo, estado, match_encontrado, monto, fecha_cierre');
+        .select('codigo, estado, match_encontrado, monto_estimado, fecha_cierre');
 
       if (caError) throw caError;
 
       // Get stats from licitaciones table (legacy)
       const { data: licitaciones, error: licError } = await supabase
         .from('licitaciones')
-        .select('id_licitacion, estado, match_encontrado, presupuesto, fecha_cierre');
+        .select('codigo, estado, match_encontrado, presupuesto_estimado, fecha_cierre');
 
       if (licError) throw licError;
 
@@ -122,12 +137,12 @@ export function useOportunidadesStats() {
         ...(comprasAgiles || []).map(ca => ({
           fecha_cierre: ca.fecha_cierre,
           match_encontrado: ca.match_encontrado,
-          monto: ca.monto,
+          monto: ca.monto_estimado,
         })),
         ...(licitaciones || []).map(l => ({
           fecha_cierre: l.fecha_cierre,
           match_encontrado: l.match_encontrado,
-          monto: l.presupuesto,
+          monto: l.presupuesto_estimado,
         })),
       ];
       

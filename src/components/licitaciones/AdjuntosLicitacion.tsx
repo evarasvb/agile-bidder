@@ -90,8 +90,9 @@ export function AdjuntosLicitacion({ codigo }: { codigo: string }) {
               {bases.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   Mercado Público protege con captcha la sección donde publica las bases, así que el robot no puede bajarlas solo.
-                  Ábrela con &quot;Adjuntos en Mercado Público&quot;, descarga el PDF y súbelo con &quot;Subir bases (PDF)&quot;: queda
-                  guardado para todos y el Experto lo lee de inmediato.
+                  Ábrela con &quot;Adjuntos en Mercado Público&quot;: si tienes la extensión de firmavb instalada, las bases se suben solas
+                  al abrir esa ventana; si no, descarga el PDF y súbelo con &quot;Subir bases (PDF)&quot;. Quedan guardadas para todos y
+                  Don Evaristo las lee de inmediato.
                 </p>
               ) : (
                 <ul className="space-y-2">

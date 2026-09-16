@@ -20,7 +20,7 @@ export function Infografia({ d }: { d: InfografiaDatos }) {
     <div className="rounded-2xl overflow-hidden border shadow-sm bg-white text-[#1b2a4a] max-w-2xl mx-auto" style={{ fontFamily: 'system-ui, sans-serif' }}>
       <div className="bg-[#1b2a4a] text-white px-6 py-4 flex items-center justify-between">
         <img src={logo} alt="FirmaVB" className="h-8" />
-        <span className="text-xs opacity-80">Experto FirmaVB · Datos Mercado Público</span>
+        <span className="text-xs opacity-80">Don Evaristo · Datos Mercado Público</span>
       </div>
       <div className="px-6 py-5 space-y-4">
         <div>
@@ -44,7 +44,7 @@ export function Infografia({ d }: { d: InfografiaDatos }) {
         {(d.items?.length ?? 0) > 0 && <p className="text-xs text-slate-600"><b>Compran:</b> {d.items!.slice(0, 6).join(' · ')}</p>}
       </div>
       <div className="bg-slate-50 px-6 py-3 text-[11px] text-slate-600 flex items-center justify-between">
-        <span>{d.empresa ? `Análisis de ${d.empresa} con el Experto FirmaVB` : 'Hecho con el Experto FirmaVB'}</span>
+        <span>{d.empresa ? `Análisis de ${d.empresa} con Don Evaristo` : 'Hecho con Don Evaristo'}</span>
         <span>firmavb.cl/experto · primera pregunta gratis</span>
       </div>
     </div>

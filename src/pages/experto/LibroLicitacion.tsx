@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { evidenceGateLicitacion, crearEstadoDocumentacionLicitacion } from '@/services/evidenceGate';
 
 // Escritorio: tres paneles ajustables (arrastra el separador). Celular/tablet: pestañas Fuentes · Chat · Entregables.
 function useEscritorio() {
@@ -65,6 +64,22 @@ const fecha = (d?: string | null) => d ? new Date(d).toLocaleDateString('es-CL',
 
 interface Msg { rol: 'yo' | 'exp'; texto: string; fuentes?: any[]; pedirBases?: string | null }
 type Entregable = 'sala' | 'informe' | 'matriz' | 'estudio' | 'bajo_agua' | 'anexos' | 'mapa' | 'infografia';
+// Forma del jsonb que devuelve la RPC experto_libro (un blob con todo el libro).
+interface LibroExperto {
+  chat?: { pregunta: string; respuesta: string }[];
+  informe?: { texto: string } | null;
+  matriz?: { texto: string } | null;
+  estudio?: { texto: string } | null;
+  bajo_agua?: { texto: string } | null;
+  anexos?: { texto: string; faltantes?: string[] } | null;
+  mapa?: { texto: string } | null;
+  ficha?: any;
+  bases?: any[];
+  documentos?: any[];
+  top_adjudicatarios?: any[];
+  plan?: string;
+  bajo_agua_cuota?: { plan?: string; usados?: number; maximo?: number | null; periodo?: string };
+}
 
 /**
  * Libro de trabajo de una licitación: Fuentes (ficha, bases, organismo, quién gana) · Chat con el
@@ -84,7 +99,9 @@ export default function LibroLicitacion() {
   const { data: libro, isLoading } = useQuery({
     queryKey: ['experto_libro', cod],
     enabled: !!cod && !!token,
-    queryFn: async () => (await supabase.rpc('experto_libro', { p_codigo: cod })).data,
+    // La RPC devuelve un jsonb con todo el libro; tipamos acá el único punto
+    // de entrada en vez de castear cada lectura de libro.* más abajo.
+    queryFn: async () => (await supabase.rpc('experto_libro', { p_codigo: cod })).data as LibroExperto | null,
   });
 
   // Productos solicitados de la licitación con match contra el inventario (para
@@ -451,7 +468,7 @@ export default function LibroLicitacion() {
   const matrizCambio = (m: Matriz) => {
     setEntregables((e) => ({ ...e, matriz: JSON.stringify(m) }));
     if (guardarRef.current) clearTimeout(guardarRef.current);
-    guardarRef.current = setTimeout(async () => { const { error } = await supabase.rpc('experto_matriz_guardar', { p_codigo: cod, p_matriz: m }); if (error) toast.error('No pude guardar la matriz'); }, 1200);
+    guardarRef.current = setTimeout(async () => { const { error } = await supabase.rpc('experto_matriz_guardar', { p_codigo: cod, p_matriz: m as any }); if (error) toast.error('No pude guardar la matriz'); }, 1200);
   };
   const aprobarPostulacion = () => {
     if (!entregables.matriz) { toast.error('Genera primero la matriz de postulación'); return; }
@@ -534,7 +551,7 @@ export default function LibroLicitacion() {
   const oportunidadLibro = f ? { codigo: cod, nombre: f.nombre, tipo: f.tipo, organismo: f.institucion, monto: typeof f.presupuesto === 'number' ? f.presupuesto : null, fecha_cierre: f.fecha_cierre, fecha_publicacion: f.fecha_publicacion, link: f.url } : null;
   const extraEmailLibro = (() => {
     const v = veredictoDe(entregables.informe);
-    const partes = [v ? `Veredicto del Experto FirmaVB: ${v.t}` : null, compartido ? `${compartido.titulo}\n${compartido.url}` : null];
+    const partes = [v ? `Veredicto de Don Evaristo: ${v.t}` : null, compartido ? `${compartido.titulo}\n${compartido.url}` : null];
     return partes.filter(Boolean).join('\n\n') || undefined;
   })();
 
@@ -543,7 +560,7 @@ export default function LibroLicitacion() {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3 flex-wrap">
-        {cod ? <Button variant="ghost" size="sm" onClick={() => navigate('/experto')}><ArrowLeft className="h-4 w-4 mr-1" />Experto</Button> : <><BookOpen className="h-5 w-5 text-primary" /><h1 className="text-xl font-bold">Experto FirmaVB</h1></>}
+        {cod ? <Button variant="ghost" size="sm" onClick={() => navigate('/experto')}><ArrowLeft className="h-4 w-4 mr-1" />Experto</Button> : <><BookOpen className="h-5 w-5 text-primary" /><h1 className="text-xl font-bold">Don Evaristo</h1></>}
         {!cod && (
           <form className="flex gap-1" onSubmit={(e) => { e.preventDefault(); abrirLibro(codigoAbrir); }}>
             <Input value={codigoAbrir} onChange={(e) => setCodigoAbrir(e.target.value)} placeholder="Abrir libro por ID, ej. 2699-35-LE26" className="h-8 w-64" />
@@ -553,8 +570,8 @@ export default function LibroLicitacion() {
         <Button size="sm" variant="ghost" className="h-8" onClick={() => navigate('/experto/compartidos')}>Mis compartidos</Button>
         {cod && <Button size="sm" variant="ghost" className="h-8 text-muted-foreground" onClick={() => archivarLibro(cod, true).then(() => navigate('/experto'))}>Archivar libro</Button>}
         {f && <Button variant="outline" size="sm" onClick={() => navigate(String(f.tipo ?? '').toLowerCase().includes('gil') ? `/compras-agiles/${cod}` : `/oportunidades/licitacion/${cod}`)}>Ver la oportunidad</Button>}
-        <BookOpen className="h-5 w-5 text-primary" />
-        <h1 className="text-xl font-bold">{cod}</h1>
+        {cod && <BookOpen className="h-5 w-5 text-primary" />}
+        {cod && <h1 className="text-xl font-bold">{cod}</h1>}
         {f && <span className="text-muted-foreground truncate max-w-[50vw]">{f.nombre} · {nombrePropio(f.institucion)}</span>}
         {f && <Badge variant="outline">cierra {fecha(f.fecha_cierre)}</Badge>}
         {oportunidadLibro && <AccionesCompartir oportunidad={oportunidadLibro} extraEmail={extraEmailLibro} />}
@@ -695,6 +712,18 @@ export default function LibroLicitacion() {
                 <p className="font-medium">Quién le gana a este organismo (12 m)</p>
                 {top.length ? top.slice(0, 5).map((t: any) => <p key={t.adjudicatario} className="text-muted-foreground truncate">{t.adjudicatario}: {t.licitaciones} · {fmt(t.monto)}</p>) : <p className="text-muted-foreground">sin adjudicaciones registradas aún</p>}
               </div>
+              {libro?.licitaciones_similares && libro.licitaciones_similares.length > 0 && (
+                <div>
+                  <p className="font-medium">Licitaciones similares de este organismo (últimas)</p>
+                  {libro.licitaciones_similares.map((l: any) => (
+                    <div key={l.codigo} className="text-muted-foreground text-sm space-y-0.5">
+                      <p className="font-semibold text-foreground">{l.codigo}</p>
+                      <p className="truncate">{l.titulo}</p>
+                      <p className="text-xs">Ganó: <strong>{l.adjudicatario}</strong> por {fmt(l.monto_adjudicado)} (presupuesto: {fmt(l.monto_estimado)})</p>
+                    </div>
+                  ))}
+                </div>
+              )}
               {(f?.competencia ?? []).length > 0 && (
                 <div>
                   <p className="font-medium">Quién vende esto al Estado</p>

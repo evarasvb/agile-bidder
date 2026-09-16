@@ -41,10 +41,11 @@ export interface ClienteInventario {
   categoria?: string;
   precio_unitario: number;
   margen_minimo: number;
-  stock: number;
-  tiempo_entrega_dias: number;
+  // Columnas reales de cliente_inventario: no hay "activo" (todos los
+  // productos del inventario se tratan como activos).
+  stock_disponible: number;
+  tiempo_entrega: number;
   palabras_clave?: string[];
-  activo: boolean;
   imagen_url?: string;
   created_at: string;
   updated_at: string;
@@ -63,7 +64,7 @@ export interface ClienteNotificaciones {
   email_instantaneo: boolean;
   resumen_diario: boolean;
   resumen_semanal: boolean;
-  push_notifications: boolean;
+  push_notificaciones: boolean;
   webhook_url?: string;
   presupuesto_minimo: number;
   created_at: string;

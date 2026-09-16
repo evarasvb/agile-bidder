@@ -133,7 +133,7 @@ export function useCalendarioIntegrado() {
       // 2. Compras Ágiles deadlines
       const { data: compras } = await supabase
         .from('compras_agiles')
-        .select('id, codigo, nombre, fecha_cierre, organismo, monto')
+        .select('id, codigo, nombre, fecha_cierre, nombre_organismo, monto_estimado')
         .not('fecha_cierre', 'is', null);
 
       if (compras) {
@@ -149,10 +149,12 @@ export function useCalendarioIntegrado() {
             allDay: true,
             type,
             sourceType: 'compra_agil',
-            sourceId: c.id,
+            // La ficha /compras-agiles/:codigo busca por CÓDIGO (ej. 2307-437-COT26),
+            // no por el id interno: mandar el código o "Ver Oportunidad" abre vacío.
+            sourceId: c.codigo,
             tipoBadge: 'Cierre Compra Ágil',
-            monto: c.monto,
-            institucion: c.organismo,
+            monto: c.monto_estimado,
+            institucion: c.nombre_organismo,
             descripcion: c.nombre,
             asignado: null,
             ...colors,
