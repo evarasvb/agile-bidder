@@ -4,6 +4,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { FolderCheck, Upload, Trash2, CheckCircle2, Circle, Loader2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useCliente } from '@/hooks/useCliente';
@@ -64,14 +75,17 @@ export function DocumentosEmpresaCard() {
   };
 
   const borrar = async (d: Doc) => {
-    await supabase.storage.from('documentos-empresa').remove([d.archivo_url]);
-    await supabase.from('cliente_documentos').delete().eq('id', d.id);
+    const { error: eStorage } = await supabase.storage.from('documentos-empresa').remove([d.archivo_url]);
+    const { error: eDb } = await supabase.from('cliente_documentos').delete().eq('id', d.id);
+    if (eStorage || eDb) { toast.error('No se pudo eliminar el documento. Reintenta.'); return; }
+    toast.success('Documento eliminado');
     qc.invalidateQueries({ queryKey: ['cliente_documentos'] });
   };
 
   const abrir = async (d: Doc) => {
-    const { data } = await supabase.storage.from('documentos-empresa').createSignedUrl(d.archivo_url, 300);
-    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+    const { data, error } = await supabase.storage.from('documentos-empresa').createSignedUrl(d.archivo_url, 300);
+    if (error || !data?.signedUrl) { toast.error('No se pudo abrir el documento. Reintenta.'); return; }
+    window.open(data.signedUrl, '_blank');
   };
 
   return (
@@ -123,7 +137,25 @@ export function DocumentosEmpresaCard() {
                 {subiendo === t.tipo ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Upload className="h-4 w-4" aria-hidden="true" />}
                 <span className="ml-1">{d ? 'Reemplazar' : 'Subir'}</span>
               </Button>
-              {d && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => borrar(d)} aria-label={`Eliminar ${t.nombre}`}><Trash2 className="h-4 w-4" aria-hidden="true" /></Button>}
+              {d && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Eliminar ${t.nombre}`}><Trash2 className="h-4 w-4" aria-hidden="true" /></Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>¿Eliminar este documento?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Se borrará «{t.nombre}» del repositorio de tu empresa. Esta acción no se puede deshacer.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => borrar(d)}>Eliminar</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </div>
           );
         })}

@@ -22,7 +22,7 @@ const AGENDA = [
   "Los errores de anexos y precio que dejan fuera a la mayoría",
   "Convenio Marco: cómo entrar y cómo dejar tus precios competitivos",
   "Preguntas en vivo: trae tu caso y lo revisamos juntos",
-  "Cómo el Experto FirmaVB te arma la matriz y completa los anexos por ti",
+  "Cómo Don Evaristo te arma la matriz y completa los anexos por ti",
 ];
 
 interface FormState { nombre: string; email: string; whatsapp: string; empresa: string }
@@ -192,12 +192,12 @@ export default function WebinarVendeleAlEstado() {
               <div className="flex items-center gap-3">
                 <Sparkles className="h-6 w-6 shrink-0" />
                 <p className="text-sm sm:text-base">
-                  <b>¿No quieres esperar al martes?</b> El Experto FirmaVB lee las bases, arma tu matriz de
+                  <b>¿No quieres esperar al martes?</b> Don Evaristo lee las bases, arma tu matriz de
                   postulación y completa tus anexos con los datos de tu empresa.
                 </p>
               </div>
               <Button asChild variant="secondary" className="shrink-0">
-                <Link to="/auth">Probar el Experto FirmaVB</Link>
+                <Link to="/auth">Probar a Don Evaristo</Link>
               </Button>
             </CardContent>
           </Card>

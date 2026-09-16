@@ -31,7 +31,7 @@ function useLicitacionesFeed() {
       
       // Transform licitaciones into feed items
       return (data || []).map((lic): FeedItem => ({
-        id: lic.id_licitacion,
+        id: lic.codigo,
         timestamp: new Date(lic.created_at),
         action: lic.match_encontrado ? "matching" : lic.procesada ? "scanning" : "scanning",
         result: lic.match_encontrado ? "success" : lic.procesada ? "no_match" : "pending",

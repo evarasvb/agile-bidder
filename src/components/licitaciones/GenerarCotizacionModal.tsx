@@ -34,6 +34,7 @@ import {
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useInventory } from '@/hooks/useInventory';
+import { useCliente } from '@/hooks/useCliente';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Licitacion } from '@/hooks/useLicitaciones';
@@ -69,6 +70,7 @@ export function GenerarCotizacionModal({
   licitacion 
 }: GenerarCotizacionModalProps) {
   const { data: inventario, isLoading: inventarioLoading } = useInventory();
+  const { data: cliente } = useCliente();
   const [productosOfertados, setProductosOfertados] = useState<ProductoOfertado[]>([]);
   const [observaciones, setObservaciones] = useState('');
   const [plazoEntrega, setPlazoEntrega] = useState(5);
@@ -148,24 +150,27 @@ export function GenerarCotizacionModal({
       return;
     }
 
+    if (!cliente) {
+      toast.error('No se pudo identificar tu cuenta. Vuelve a intentar en unos segundos.');
+      return;
+    }
+
     setIsGenerating(true);
     try {
       // Create offer record in database
-      const { data: { user } } = await supabase.auth.getUser();
-      
       const ofertaData = {
+        cliente_id: cliente.id,
         licitacion_id: licitacion.id_licitacion,
         productos_ofertados: JSON.parse(JSON.stringify(productosOfertados)),
-        valor_total_oferta: totalOferta,
+        valor_total: totalOferta,
         margen_total: margenPromedio,
         match_score: licitacion.match_score,
         estado: 'borrador',
-        notas_internas: observaciones,
-        created_by: user?.id,
+        notas: observaciones,
       };
 
       const { data: oferta, error } = await supabase
-        .from('ofertas')
+        .from('cliente_ofertas')
         .insert(ofertaData)
         .select()
         .single();
@@ -211,24 +216,27 @@ export function GenerarCotizacionModal({
       return;
     }
 
+    if (!cliente) {
+      toast.error('No se pudo identificar tu cuenta. Vuelve a intentar en unos segundos.');
+      return;
+    }
+
     setIsSending(true);
     try {
       // First generate the offer if not already done
-      const { data: { user } } = await supabase.auth.getUser();
-      
       const ofertaData = {
+        cliente_id: cliente.id,
         licitacion_id: licitacion.id_licitacion,
         productos_ofertados: JSON.parse(JSON.stringify(productosOfertados)),
-        valor_total_oferta: totalOferta,
+        valor_total: totalOferta,
         margen_total: margenPromedio,
         match_score: licitacion.match_score,
-        estado: 'lista_envio',
-        notas_internas: observaciones,
-        created_by: user?.id,
+        estado: 'revision',
+        notas: observaciones,
       };
 
       const { data: oferta, error } = await supabase
-        .from('ofertas')
+        .from('cliente_ofertas')
         .insert(ofertaData)
         .select()
         .single();

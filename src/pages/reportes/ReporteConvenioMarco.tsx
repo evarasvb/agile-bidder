@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Download, Search, Package, Building2, Trophy, Users,
@@ -9,9 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -23,8 +21,113 @@ import { formatCurrency, formatCompact, formatNumber, exportToCSV } from "@/hook
 import { ReportHero } from "@/components/reportes/ReportHero";
 import {
   useCMProductos, useCMProductoDetalle, useCMProductoTendencia, useMiCompetitividad, useCMStats,
-  type TipoOrigenCM, type CMProducto,
+  type TipoOrigenCM, type CMProducto, type CMProveedor, type CMComprador, type CMCompetitividad,
 } from "@/hooks/useConvenioMarco";
+
+/** Semáforo de "Mi competitividad": ganas (≤0%), competitivo (≤8%) o caro. */
+function estadoCompetitividad(diff: number | null): { t: string; c: string; tono: string } {
+  if (diff == null) return { t: "—", c: "", tono: "" };
+  if (diff <= 0) return { t: "Ganas", c: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20", tono: "text-emerald-600" };
+  if (diff <= 8) return { t: "Competitivo", c: "bg-amber-500/10 text-amber-600 border-amber-500/20", tono: "" };
+  return { t: "Caro", c: "bg-destructive/10 text-destructive border-destructive/20", tono: "text-destructive" };
+}
+
+type FilaCompetitividad = CMCompetitividad & { fila_id: string };
+
+const COLUMNAS_MI_COMPETITIVIDAD: DataTableColumn<FilaCompetitividad>[] = [
+  {
+    id: "mi_producto",
+    header: "Mi producto",
+    className: "font-medium max-w-[200px] truncate",
+    sortValue: (r) => r.mi_producto,
+    cell: (r) => r.mi_producto,
+  },
+  {
+    id: "producto_cm",
+    header: "Producto en el mercado",
+    className: "max-w-[240px]",
+    sortValue: (r) => r.producto_cm,
+    exportValue: (r) => `${r.producto_cm} (${Math.round(r.similitud * 100)}% coincidencia)`,
+    cell: (r) => (
+      <>
+        <span className="line-clamp-1 text-sm">{r.producto_cm}</span>
+        <span className="text-[11px] text-muted-foreground">{Math.round(r.similitud * 100)}% coincidencia</span>
+      </>
+    ),
+  },
+  {
+    id: "mi_precio",
+    header: "Mi precio",
+    align: "right",
+    className: "font-mono",
+    sortValue: (r) => Math.round(r.mi_precio),
+    cell: (r) => formatCurrency(Math.round(r.mi_precio)),
+  },
+  {
+    id: "precio_ganador",
+    header: "Mejor del mercado",
+    align: "right",
+    className: "font-mono",
+    sortValue: (r) => (r.precio_ganador != null ? Math.round(r.precio_ganador) : null),
+    cell: (r) => (r.precio_ganador != null ? formatCurrency(Math.round(r.precio_ganador)) : "—"),
+  },
+  {
+    id: "diff",
+    header: "Dif.",
+    align: "right",
+    className: "font-mono",
+    sortValue: (r) => r.diff_pct,
+    exportValue: (r) => (r.diff_pct == null ? "" : `${r.diff_pct > 0 ? "+" : ""}${r.diff_pct}%`),
+    cell: (r) => (
+      <span className={estadoCompetitividad(r.diff_pct).tono}>
+        {r.diff_pct == null ? "—" : `${r.diff_pct > 0 ? "+" : ""}${r.diff_pct}%`}
+      </span>
+    ),
+  },
+  {
+    id: "estado",
+    header: "Estado",
+    sortValue: (r) => estadoCompetitividad(r.diff_pct).t,
+    cell: (r) => {
+      const badge = estadoCompetitividad(r.diff_pct);
+      return <Badge variant="outline" className={badge.c}>{badge.t}</Badge>;
+    },
+  },
+];
+
+const COLUMNAS_COMPRADORES_CM: DataTableColumn<CMComprador>[] = [
+  { id: "comprador", header: "Institución", className: "font-medium max-w-[220px] truncate", sortValue: (c) => c.comprador, cell: (c) => c.comprador },
+  { id: "ordenes", header: "Órdenes", align: "right", sortValue: (c) => c.lineas, cell: (c) => c.lineas },
+  {
+    id: "precio_prom",
+    header: "Precio prom.",
+    align: "right",
+    className: "font-mono",
+    sortValue: (c) => (c.precio_prom ? Math.round(c.precio_prom) : null),
+    cell: (c) => (c.precio_prom ? formatCurrency(Math.round(c.precio_prom)) : "—"),
+  },
+  { id: "monto", header: "Monto", align: "right", className: "font-mono text-sm", sortValue: (c) => c.monto_total, cell: (c) => formatCompact(c.monto_total) },
+];
+
+/** Fila de la comparativa lado a lado: una métrica con el valor de cada producto. */
+interface FilaComparativa {
+  label: string;
+  a: number | null;
+  b: number | null;
+  esPrecio: boolean;
+}
+
+const METRICAS_COMPARATIVA: [string, (p: CMProducto) => number | null, boolean][] = [
+  ["Precio promedio", (p) => p.precio_prom, true],
+  ["Precio mínimo", (p) => p.precio_min, true],
+  ["Precio máximo", (p) => p.precio_max, true],
+  ["Competidores", (p) => p.proveedores, false],
+  ["Compradores", (p) => p.compradores, false],
+  ["Monto transado", (p) => p.monto_total, false],
+];
+
+const fmtComparativa = (v: number | null, esPrecio: boolean) =>
+  v == null ? "—" : esPrecio ? formatCurrency(Math.round(v)) : formatNumber(v);
 
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 function labelMes(mes: string): string {
@@ -89,12 +192,83 @@ export default function ReporteConvenioMarco() {
   const compareOpciones = (compareData?.items ?? []).filter((p) => p.producto_key !== selected?.producto_key).slice(0, 6);
 
   const { data: miComp = [], isLoading: miCompLoading } = useMiCompetitividad(tipo, modo === "mia");
+  const filasMiComp = useMemo<FilaCompetitividad[]>(
+    () => miComp.map((r, i) => ({ ...r, fila_id: `${i}-${r.producto_key}` })),
+    [miComp],
+  );
   const { data: stats } = useCMStats(tipo);
 
   // El proveedor con menor precio promedio = el precio a vencer.
   const mejorPrecio = detalle?.proveedores?.length
     ? Math.min(...detalle.proveedores.map((p) => p.precio_prom ?? Infinity))
     : null;
+
+  // Columnas de competidores: dependen de `mejorPrecio` para marcar con corona al más barato.
+  const columnasProveedoresCM = useMemo<DataTableColumn<CMProveedor>[]>(() => {
+    const esMejor = (pr: CMProveedor) => pr.precio_prom != null && pr.precio_prom === mejorPrecio;
+    return [
+      {
+        id: "proveedor",
+        header: "Proveedor",
+        className: "font-medium max-w-[220px] truncate",
+        sortValue: (pr) => pr.proveedor,
+        cell: (pr) => (
+          <span className="flex items-center gap-1">
+            {esMejor(pr) && <Crown className="h-3.5 w-3.5 text-amber-500 shrink-0" />}
+            {pr.proveedor}
+          </span>
+        ),
+      },
+      { id: "ordenes", header: "Órdenes", align: "right", sortValue: (pr) => pr.lineas, cell: (pr) => pr.lineas },
+      {
+        id: "precio_prom",
+        header: "Precio prom.",
+        align: "right",
+        sortValue: (pr) => (pr.precio_prom ? Math.round(pr.precio_prom) : null),
+        cell: (pr) => (
+          <span className={`font-mono ${esMejor(pr) ? "text-emerald-600 font-semibold" : ""}`}>
+            {pr.precio_prom ? formatCurrency(Math.round(pr.precio_prom)) : "—"}
+          </span>
+        ),
+      },
+      { id: "monto", header: "Monto", align: "right", className: "font-mono text-sm", sortValue: (pr) => pr.monto_total, cell: (pr) => formatCompact(pr.monto_total) },
+    ];
+  }, [mejorPrecio]);
+
+  // Comparativa lado a lado: filas = métricas, columnas = los dos productos.
+  const filasComparativa = useMemo<FilaComparativa[]>(
+    () => (selected && compareSel
+      ? METRICAS_COMPARATIVA.map(([label, get, esPrecio]) => ({ label, a: get(selected), b: get(compareSel), esPrecio }))
+      : []),
+    [selected, compareSel],
+  );
+  const columnasComparativa = useMemo<DataTableColumn<FilaComparativa>[]>(() => [
+    { id: "metrica", header: "Métrica", className: "text-muted-foreground", cell: (f) => f.label },
+    {
+      id: "a",
+      header: selected?.producto ?? "",
+      headerClassName: "max-w-[160px] truncate",
+      align: "right",
+      sortValue: (f) => f.a,
+      cell: (f) => (
+        <span className={`font-mono ${f.esPrecio && f.a != null && f.b != null && f.a < f.b ? "text-emerald-600 font-semibold" : ""}`}>
+          {fmtComparativa(f.a, f.esPrecio)}
+        </span>
+      ),
+    },
+    {
+      id: "b",
+      header: compareSel?.producto ?? "",
+      headerClassName: "max-w-[160px] truncate",
+      align: "right",
+      sortValue: (f) => f.b,
+      cell: (f) => (
+        <span className={`font-mono ${f.esPrecio && f.a != null && f.b != null && f.b < f.a ? "text-emerald-600 font-semibold" : ""}`}>
+          {fmtComparativa(f.b, f.esPrecio)}
+        </span>
+      ),
+    },
+  ], [selected?.producto, compareSel?.producto]);
   // Precio "ganador" de referencia: el más bajo entre competidores (o el mínimo histórico).
   const precioGanador =
     mejorPrecio != null && isFinite(mejorPrecio) ? mejorPrecio : (selected?.precio_min ?? null);
@@ -177,46 +351,18 @@ export default function ReporteConvenioMarco() {
                 <Button asChild variant="outline" size="sm" className="mt-3"><Link to="/inventario">Ir a mi inventario</Link></Button>
               </div>
             ) : (
-              <div className="rounded-lg border overflow-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead>Mi producto</TableHead>
-                      <TableHead>Producto en el mercado</TableHead>
-                      <TableHead className="text-right">Mi precio</TableHead>
-                      <TableHead className="text-right">Mejor del mercado</TableHead>
-                      <TableHead className="text-right">Dif.</TableHead>
-                      <TableHead>Estado</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {miComp.map((r, i) => {
-                      const gana = r.diff_pct != null && r.diff_pct <= 0;
-                      const cerca = r.diff_pct != null && r.diff_pct > 0 && r.diff_pct <= 8;
-                      const caro = r.diff_pct != null && r.diff_pct > 8;
-                      const badge = gana ? { t: "Ganas", c: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" }
-                        : cerca ? { t: "Competitivo", c: "bg-amber-500/10 text-amber-600 border-amber-500/20" }
-                        : caro ? { t: "Caro", c: "bg-destructive/10 text-destructive border-destructive/20" }
-                        : { t: "—", c: "" };
-                      return (
-                        <TableRow key={i}>
-                          <TableCell className="font-medium max-w-[200px] truncate">{r.mi_producto}</TableCell>
-                          <TableCell className="max-w-[240px]">
-                            <span className="line-clamp-1 text-sm">{r.producto_cm}</span>
-                            <span className="text-[11px] text-muted-foreground">{Math.round(r.similitud * 100)}% coincidencia</span>
-                          </TableCell>
-                          <TableCell className="text-right font-mono">{formatCurrency(Math.round(r.mi_precio))}</TableCell>
-                          <TableCell className="text-right font-mono">{r.precio_ganador != null ? formatCurrency(Math.round(r.precio_ganador)) : "—"}</TableCell>
-                          <TableCell className={`text-right font-mono ${gana ? "text-emerald-600" : caro ? "text-destructive" : ""}`}>
-                            {r.diff_pct == null ? "—" : `${r.diff_pct > 0 ? "+" : ""}${r.diff_pct}%`}
-                          </TableCell>
-                          <TableCell><Badge variant="outline" className={badge.c}>{badge.t}</Badge></TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
+              <DataTable<FilaCompetitividad>
+                storageKey="cm-mi-competitividad"
+                rows={filasMiComp}
+                rowKey={(r) => r.fila_id}
+                columns={COLUMNAS_MI_COMPETITIVIDAD}
+                itemLabel="productos"
+                searchText={(r) => `${r.mi_producto} ${r.producto_cm} ${estadoCompetitividad(r.diff_pct).t}`}
+                searchPlaceholder="Buscar producto…"
+                defaultSort={{ id: "diff", dir: "asc" }}
+                exportFileName="mi_competitividad_convenio_marco"
+                emptyMessage="Sin coincidencias todavía"
+              />
             )}
           </CardContent>
         </Card>
@@ -425,38 +571,15 @@ export default function ReporteConvenioMarco() {
                   {detalleLoading ? (
                     <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
                   ) : detalle?.proveedores?.length ? (
-                    <div className="rounded-lg border overflow-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-muted/50">
-                            <TableHead>Proveedor</TableHead>
-                            <TableHead className="text-right">Órdenes</TableHead>
-                            <TableHead className="text-right">Precio prom.</TableHead>
-                            <TableHead className="text-right">Monto</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {detalle.proveedores.map((pr, i) => {
-                            const esMejor = pr.precio_prom != null && pr.precio_prom === mejorPrecio;
-                            return (
-                              <TableRow key={i}>
-                                <TableCell className="font-medium max-w-[220px] truncate">
-                                  <span className="flex items-center gap-1">
-                                    {esMejor && <Crown className="h-3.5 w-3.5 text-amber-500 shrink-0" />}
-                                    {pr.proveedor}
-                                  </span>
-                                </TableCell>
-                                <TableCell className="text-right">{pr.lineas}</TableCell>
-                                <TableCell className={`text-right font-mono ${esMejor ? "text-emerald-600 font-semibold" : ""}`}>
-                                  {pr.precio_prom ? formatCurrency(Math.round(pr.precio_prom)) : "—"}
-                                </TableCell>
-                                <TableCell className="text-right font-mono text-sm">{formatCompact(pr.monto_total)}</TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
+                    <DataTable<CMProveedor>
+                      storageKey="cm-competidores"
+                      rows={detalle.proveedores}
+                      rowKey={(pr) => pr.proveedor}
+                      columns={columnasProveedoresCM}
+                      itemLabel="competidores"
+                      defaultSort={{ id: "monto", dir: "desc" }}
+                      maxHeight="40vh"
+                    />
                   ) : (
                     <div className="py-6 text-center text-muted-foreground text-sm flex items-center justify-center gap-2">
                       <Inbox className="h-4 w-4" /> Sin competidores registrados aún
@@ -475,28 +598,15 @@ export default function ReporteConvenioMarco() {
                   {detalleLoading ? (
                     <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
                   ) : detalle?.compradores?.length ? (
-                    <div className="rounded-lg border overflow-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-muted/50">
-                            <TableHead>Institución</TableHead>
-                            <TableHead className="text-right">Órdenes</TableHead>
-                            <TableHead className="text-right">Precio prom.</TableHead>
-                            <TableHead className="text-right">Monto</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {detalle.compradores.map((c, i) => (
-                            <TableRow key={i}>
-                              <TableCell className="font-medium max-w-[220px] truncate">{c.comprador}</TableCell>
-                              <TableCell className="text-right">{c.lineas}</TableCell>
-                              <TableCell className="text-right font-mono">{c.precio_prom ? formatCurrency(Math.round(c.precio_prom)) : "—"}</TableCell>
-                              <TableCell className="text-right font-mono text-sm">{formatCompact(c.monto_total)}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
+                    <DataTable<CMComprador>
+                      storageKey="cm-compradores"
+                      rows={detalle.compradores}
+                      rowKey={(c) => c.comprador}
+                      columns={COLUMNAS_COMPRADORES_CM}
+                      itemLabel="instituciones"
+                      defaultSort={{ id: "monto", dir: "desc" }}
+                      maxHeight="40vh"
+                    />
                   ) : (
                     <div className="py-6 text-center text-muted-foreground text-sm flex items-center justify-center gap-2">
                       <Inbox className="h-4 w-4" /> Sin compradores registrados aún
@@ -538,39 +648,15 @@ export default function ReporteConvenioMarco() {
                   )}
 
                   {compareSel && (
-                    <div className="rounded-lg border overflow-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-muted/50">
-                            <TableHead>Métrica</TableHead>
-                            <TableHead className="text-right max-w-[160px] truncate">{selected.producto}</TableHead>
-                            <TableHead className="text-right max-w-[160px] truncate">{compareSel.producto}</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {([
-                            ["Precio promedio", (p: CMProducto) => p.precio_prom, true],
-                            ["Precio mínimo", (p: CMProducto) => p.precio_min, true],
-                            ["Precio máximo", (p: CMProducto) => p.precio_max, true],
-                            ["Competidores", (p: CMProducto) => p.proveedores, false],
-                            ["Compradores", (p: CMProducto) => p.compradores, false],
-                            ["Monto transado", (p: CMProducto) => p.monto_total, false],
-                          ] as [string, (p: CMProducto) => number | null, boolean][]).map(([label, get, esPrecio]) => {
-                            const a = get(selected); const b = get(compareSel);
-                            const aMenor = esPrecio && a != null && b != null && a < b;
-                            const bMenor = esPrecio && a != null && b != null && b < a;
-                            const fmt = (v: number | null) => v == null ? "—" : esPrecio ? formatCurrency(Math.round(v)) : formatNumber(v);
-                            return (
-                              <TableRow key={label}>
-                                <TableCell className="text-muted-foreground">{label}</TableCell>
-                                <TableCell className={`text-right font-mono ${aMenor ? "text-emerald-600 font-semibold" : ""}`}>{fmt(a)}</TableCell>
-                                <TableCell className={`text-right font-mono ${bMenor ? "text-emerald-600 font-semibold" : ""}`}>{fmt(b)}</TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                      <div className="p-2 text-right">
+                    <div className="space-y-2">
+                      <DataTable<FilaComparativa>
+                        rows={filasComparativa}
+                        rowKey={(f) => f.label}
+                        columns={columnasComparativa}
+                        itemLabel="métricas"
+                        maxHeight="40vh"
+                      />
+                      <div className="text-right">
                         <Button variant="ghost" size="sm" onClick={() => { setCompareSel(null); setCompareSearch(""); }}>Limpiar</Button>
                       </div>
                     </div>

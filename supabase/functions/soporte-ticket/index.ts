@@ -36,7 +36,7 @@ function transcriptHtml(conv: Msg[]) {
     .filter((m) => m && m.content)
     .map((m) => {
       const esCliente = m.role === 'user';
-      const quien = esCliente ? 'Cliente' : 'Evaristo';
+      const quien = esCliente ? 'Cliente' : 'Don Evaristo';
       const bg = esCliente ? '#eff6ff' : '#f1f5f9';
       const col = esCliente ? '#1E40AF' : '#334155';
       return `<div style="margin:0 0 8px">
@@ -73,7 +73,7 @@ function emailEquipo(t: {
           <div style="font-size:11px;font-weight:700;color:#92400e;margin:0 0 4px">CONSULTA / INQUIETUD</div>
           <div style="font-size:14px;color:#1e293b;white-space:pre-wrap">${esc(t.mensaje) || '—'}</div>
         </div>
-        <div style="font-size:11px;font-weight:700;color:#64748b;margin:0 0 8px">CONVERSACIÓN CON EVARISTO</div>
+        <div style="font-size:11px;font-weight:700;color:#64748b;margin:0 0 8px">CONVERSACIÓN CON DON EVARISTO</div>
         ${transcriptHtml(t.conv)}
         <p style="color:#94a3b8;font-size:12px;line-height:1.6;margin:20px 0 0;border-top:1px solid #e2e8f0;padding-top:14px">
           Responde este correo directamente y tu respuesta le llegará al cliente (${esc(t.email)}).

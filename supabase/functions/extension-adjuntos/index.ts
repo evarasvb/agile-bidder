@@ -75,10 +75,15 @@ Deno.serve(async (req) => {
     const esDocx = !esPdf && ext === "docx" && bytes[0] === 0x50 && bytes[1] === 0x4b;
     // Todo PDF o Word (bases o anexo) se lee: la bases principal se resume con Gemini, los demás
     // adjuntos vivos (anexos, formularios) solo se leen para que el Experto los cite, sin gastar cuota.
-    const basesPendiente = (esPdf || esDocx) && bytes.length <= MAX_BASES_BYTES && !(yaLeida ?? []).length;
+    const yaLeido = !!(yaLeida ?? []).length;
+    const basesPendiente = (esPdf || esDocx) && bytes.length <= MAX_BASES_BYTES && !yaLeido;
+    // Lo que el lector no abre directo (PDF >6 MB, .doc/.docx, ZIP/RAR) va a la cola de conversión
+    // de GitHub Actions (mismo criterio que licitacion-adjuntos) en vez de quedar sin leer.
+    const esZip = /^(zip|rar)$/.test(ext) || contentType.includes("zip") || contentType.includes("rar");
+    const conversionPendiente = !yaLeido && !basesPendiente && ((esPdf && bytes.length > MAX_BASES_BYTES) || ext === "doc" || ext === "docx" || esZip);
     const { error: errFila } = await sb.from("licitaciones_adjuntos").upsert({
       codigo, nombre, tipo, descripcion, fecha_adjunto: null, bytes: bytes.length, content_type: contentType, storage_path: storagePath,
-      es_bases: false, bases_id: null, bases_pendiente: basesPendiente, bajado_en: new Date().toISOString(),
+      es_bases: false, bases_id: null, bases_pendiente: basesPendiente, ocr_pendiente: conversionPendiente, bajado_en: new Date().toISOString(),
     }, { onConflict: "codigo,nombre" });
     if (errFila) return json({ error: "registro", mensaje: errFila.message }, 500);
 

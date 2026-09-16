@@ -8,7 +8,7 @@ const pond = (r: any): number | null => { const n = r.ponderacion_num != null ? 
 
 export async function matrizAExcelPro(m: Matriz) {
   const ExcelJS = (await import('exceljs')).default;
-  const wb = new ExcelJS.Workbook(); wb.creator = 'Experto FirmaVB';
+  const wb = new ExcelJS.Workbook(); wb.creator = 'Don Evaristo';
   const cab = (ws: any, fila: number, cols: string[], anchos: number[]) => {
     const r = ws.getRow(fila); r.values = cols; r.font = { bold: true, color: { argb: 'FFFFFFFF' } }; r.alignment = { vertical: 'middle', wrapText: true }; r.height = 22;
     cols.forEach((_, i) => { r.getCell(i + 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: NAVY } }; ws.getColumn(i + 1).width = anchos[i]; });
@@ -32,7 +32,7 @@ export async function matrizAExcelPro(m: Matriz) {
 
   // 1. Admisibilidad: entrada del usuario + fórmula de cumplimiento
   const ws = wb.addWorksheet('Admisibilidad');
-  titulo(ws, m.titulo ?? 'Matriz de postulación', 'Llena la columna ENTRADA (amarilla). Si una fila dice NO CUMPLE, la oferta queda fuera. Generado con el Experto FirmaVB · firmavb.cl');
+  titulo(ws, m.titulo ?? 'Matriz de postulación', 'Llena la columna ENTRADA (amarilla). Si una fila dice NO CUMPLE, la oferta queda fuera. Generado con Don Evaristo · firmavb.cl');
   cab(ws, 4, ['Requisito', 'Regla de las bases', 'ENTRADA (tu dato)', 'Estado', 'Fuente', 'Nota'], [34, 48, 18, 16, 16, 40]);
   const adm = m.admisibilidad ?? [];
   adm.forEach((r: any, i: number) => {

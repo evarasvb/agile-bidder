@@ -34,3 +34,9 @@ El usuario no programa: el código debe funcionar a la primera, quedar desplegad
 ## Deploy
 - Vercel despliega solo desde `main`. Confirmar que el build local pasa antes de tocar `main`.
 - Variables de entorno nuevas: agregarlas a `.env.example` y avisar que hay que cargarlas en Vercel y Supabase.
+
+## Pruebas y sondeos (no dejar basura)
+- Para probar si una API/servicio externo trae cierto dato (sondeos, "probes"), NO dejar una edge function de prueba desplegada: este entorno no permite borrar edge functions ni ramas remotas, así que quedan colgando.
+- En su lugar: correr todo dentro de UNA sola función efímera (siempre el mismo slug, p. ej. `probe-tmp`) que se auto-reemplaza en cada sondeo, y al terminar dejarla como stub inerte (410, sin leer secretos ni llamar a nada) — o mejor, hacer la prueba con una consulta directa (`net.http_get`/`net.http_post` desde SQL) sin desplegar nada nuevo.
+- Nunca guardar claves de terceros en la bóveda "para probar" y olvidarlas: si se guarda una para un sondeo, borrarla apenas termina.
+- Las ramas de sondeo (WIP) también quedan colgando: preferir no pushear ramas nuevas solo para pruebas; si el hook de git obliga, avisar al dueño que esa rama es descartable.

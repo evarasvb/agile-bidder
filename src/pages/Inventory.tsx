@@ -6,24 +6,17 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { useInventarioPagina, useInventarioResumen, cargarInventarioCompleto, useUpdateInventoryItem, useDeleteInventoryItem, useDeleteInventoryItems, useCreateInventoryItem, InventoryItem, InventoryInput } from "@/hooks/useInventory";
+import { useInventarioPagina, useInventarioResumen, cargarInventarioCompleto, useUpdateInventoryItem, useDeleteInventoryItem, useDeleteInventoryItems, useCreateInventoryItem, InventoryItem, InventoryInput, type InventarioOrdenColumna } from "@/hooks/useInventory";
+import { DataTable, type DataTableSort } from "@/components/ui/data-table";
+
 import { useEnriquecerInventario } from "@/hooks/useEnriquecerInventario";
 import { BuscarFotosDialog } from "@/components/inventory/BuscarFotosDialog";
 import { EditProductDialog } from "@/components/inventory/EditProductDialog";
@@ -42,6 +35,24 @@ import { Link } from "react-router-dom";
 import { Gavel } from "lucide-react";
 import * as XLSX from 'xlsx';
 
+const COLUMNAS_ORDENABLES: InventarioOrdenColumna[] = ['sku', 'nombre_producto', 'categoria', 'precio_unitario', 'margen_minimo', 'stock_disponible', 'created_at'];
+
+function leerPrefInventario<T>(campo: string, porDefecto: T): T {
+  try {
+    const raw = localStorage.getItem(`dt:inventario:${campo}`);
+    return raw ? (JSON.parse(raw) as T) : porDefecto;
+  } catch {
+    return porDefecto;
+  }
+}
+function guardarPrefInventario(campo: string, valor: unknown) {
+  try {
+    localStorage.setItem(`dt:inventario:${campo}`, JSON.stringify(valor));
+  } catch {
+    /* modo privado: se ignora */
+  }
+}
+
 export default function Inventory() {
   const { user } = useAuthUser();
   const [searchQuery, setSearchQuery] = useState("");
@@ -57,10 +68,17 @@ export default function Inventory() {
   const [soloIncompletos, setSoloIncompletos] = useState(false);
   const [fotosProducto, setFotosProducto] = useState<InventoryItem | null>(null);
   
-  // Pagination state for UI performance
+  // Paginación, tamaño y orden en el servidor (el inventario puede tener miles
+  // de filas). Tamaño y orden se recuerdan en el navegador.
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 100; // Show 100 products per page to prevent performance issues
-  
+  const [pageSize, setPageSizeState] = useState<number>(() => leerPrefInventario('pageSize', 100));
+  const [ordenTabla, setOrdenTablaState] = useState<DataTableSort | null>(() => leerPrefInventario('sort', { id: 'created_at', dir: 'desc' }));
+  const setPageSize = (n: number) => { setPageSizeState(n); guardarPrefInventario('pageSize', n); };
+  const setOrdenTabla = (s: DataTableSort | null) => { setOrdenTablaState(s); guardarPrefInventario('sort', s); };
+  const orderBy = ordenTabla && COLUMNAS_ORDENABLES.includes(ordenTabla.id as InventarioOrdenColumna)
+    ? { column: ordenTabla.id as InventarioOrdenColumna, asc: ordenTabla.dir === 'asc' }
+    : undefined;
+
   // Búsqueda con pausa corta: cada cambio es una consulta al servidor.
   const [qServidor, setQServidor] = useState("");
   useEffect(() => {
@@ -69,7 +87,7 @@ export default function Inventory() {
   }, [searchQuery]);
   // Una página a la vez desde el servidor (antes bajaba todo el catálogo).
   const { data: pagina, isLoading, refetch } = useInventarioPagina({
-    page: currentPage, pageSize, q: qServidor, soloIncompletos,
+    page: currentPage, pageSize, q: qServidor, soloIncompletos, orderBy,
   });
   const inventario: InventoryItem[] = pagina?.items ?? [];
   const totalFiltrado = pagina?.total ?? 0;
@@ -197,10 +215,6 @@ export default function Inventory() {
     setCurrentPage(1);
   };
 
-  // Calculate paginated data
-  const totalPages = Math.max(1, Math.ceil(totalFiltrado / pageSize));
-  const startIndex = (currentPage - 1) * pageSize;
-  const paginatedInventory = filteredInventory;
 
   const toggleSelect = (id: string) => {
     const newSelected = new Set(selectedIds);
@@ -212,13 +226,6 @@ export default function Inventory() {
     setSelectedIds(newSelected);
   };
 
-  const toggleSelectAll = () => {
-    if (selectedIds.size === filteredInventory.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(filteredInventory.map(item => item.id)));
-    }
-  };
 
   const getExportData = async () => {
     const todo = await cargarInventarioCompleto();
@@ -226,6 +233,7 @@ export default function Inventory() {
       'SKU': item.sku,
       'Producto': item.nombre_producto,
       'Descripción': item.descripcion || '',
+      'Marca': item.marca || '',
       'Categoría': item.categoria,
       'Proveedor': item.proveedor || '',
       'Precio Unitario': item.precio_unitario,
@@ -256,6 +264,7 @@ export default function Inventory() {
       { wch: 15 }, // SKU
       { wch: 30 }, // Producto
       { wch: 40 }, // Descripción
+      { wch: 15 }, // Marca
       { wch: 15 }, // Categoría
       { wch: 20 }, // Proveedor
       { wch: 12 }, // Precio
@@ -447,284 +456,245 @@ export default function Inventory() {
       {/* Import History Panel */}
       <ImportHistoryPanel />
 
-      {/* Search and Filters */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nombre, SKU o proveedor..."
-            value={searchQuery}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <Button
-          variant={soloIncompletos ? 'default' : 'outline'}
-          size="sm"
-          className="gap-2"
-          onClick={() => { setSoloIncompletos((v) => !v); setCurrentPage(1); }}
-          disabled={incompleteCount === 0 && !soloIncompletos}
-        >
-          <Info className="h-4 w-4" />
-          {soloIncompletos ? 'Ver todos' : `Incompletos (${incompleteCount})`}
-        </Button>
-
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Package className="h-4 w-4" />
-          <span>
-            Mostrando {totalFiltrado === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + pageSize, totalFiltrado)} de {totalFiltrado} productos
-            {totalFiltrado !== totalProducts && ` (${totalProducts} total)`}
-          </span>
-        </div>
-        
-        {selectedIds.size > 0 && (
-          <Button 
-            variant="destructive" 
-            size="sm"
-            className="gap-2"
-            onClick={() => setBulkDeleteOpen(true)}
-          >
-            <Trash className="h-4 w-4" />
-            Eliminar ({selectedIds.size})
-          </Button>
-        )}
-      </div>
-
-      {/* Table */}
-      <div className="rounded-xl border border-border bg-card shadow-sm overflow-x-auto">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : filteredInventory.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-            <Inbox className="h-12 w-12 mb-4 opacity-50" />
-            {totalProducts === 0 ? (
-              // Inventario realmente vacío: CTA de onboarding.
-              <>
-                <p className="text-lg font-medium">No hay productos en el inventario</p>
-                <p className="text-sm">Agrega tus productos para empezar a recibir oportunidades que hagan match</p>
-                <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
-                  <Button onClick={() => setAddDialogOpen(true)}>
-                    <Plus className="h-4 w-4" />
-                    Agrega tu primer producto
-                  </Button>
-                  <Button variant="outline" onClick={() => setBulkUploadOpen(true)}>
-                    <Upload className="h-4 w-4" />
-                    Cargar desde Excel
-                  </Button>
-                </div>
-              </>
-            ) : (
-              // Hay inventario, pero la BÚSQUEDA no arrojó resultados.
-              <>
-                <p className="text-lg font-medium">Sin resultados</p>
-                <p className="text-sm">Ningún producto coincide con tu búsqueda</p>
-              </>
+      {/* Tabla: orden, página y tamaño se resuelven en el servidor (modo manual
+          de la DataTable) porque el inventario puede tener miles de filas. */}
+      <DataTable<InventoryItem>
+        rows={filteredInventory}
+        rowKey={(item) => item.id}
+        loading={isLoading}
+        itemLabel="productos"
+        pageSizeOptions={[50, 100, 200]}
+        manual={{
+          total: totalFiltrado,
+          page: currentPage,
+          pageSize,
+          onPageChange: setCurrentPage,
+          onPageSizeChange: (n) => { setPageSize(n); setCurrentPage(1); },
+          sort: ordenTabla,
+          onSortChange: (s) => { setOrdenTabla(s); setCurrentPage(1); },
+        }}
+        selection={{
+          selected: selectedIds,
+          onToggle: toggleSelect,
+          onToggleMany: (ids, seleccionar) =>
+            setSelectedIds((prev) => {
+              const next = new Set(prev);
+              ids.forEach((id) => (seleccionar ? next.add(id) : next.delete(id)));
+              return next;
+            }),
+        }}
+        toolbar={
+          <>
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nombre, SKU o proveedor..."
+                aria-label="Buscar en el inventario"
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="pl-10 h-10"
+              />
+            </div>
+            <Button
+              variant={soloIncompletos ? 'default' : 'outline'}
+              size="sm"
+              className="gap-2"
+              onClick={() => { setSoloIncompletos((v) => !v); setCurrentPage(1); }}
+              disabled={incompleteCount === 0 && !soloIncompletos}
+            >
+              <Info className="h-4 w-4" />
+              {soloIncompletos ? 'Ver todos' : `Incompletos (${incompleteCount})`}
+            </Button>
+            {selectedIds.size > 0 && (
+              <Button variant="destructive" size="sm" className="gap-2" onClick={() => setBulkDeleteOpen(true)}>
+                <Trash className="h-4 w-4" />
+                Eliminar ({selectedIds.size})
+              </Button>
             )}
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/30 hover:bg-muted/30">
-                <TableHead className="w-[40px]">
-                  <Checkbox
-                    checked={selectedIds.size === filteredInventory.length && filteredInventory.length > 0}
-                    onCheckedChange={toggleSelectAll}
+          </>
+        }
+        emptyMessage={
+          totalProducts === 0 ? (
+            // Inventario realmente vacío: CTA de onboarding.
+            <span className="inline-flex flex-col items-center gap-3">
+              <Inbox className="h-12 w-12 opacity-50" />
+              <span className="text-lg font-medium text-foreground">No hay productos en el inventario</span>
+              <span className="text-sm">Agrega tus productos para empezar a recibir oportunidades que hagan match</span>
+              <span className="flex flex-wrap items-center justify-center gap-2 mt-2">
+                <Button onClick={() => setAddDialogOpen(true)}>
+                  <Plus className="h-4 w-4" />
+                  Agrega tu primer producto
+                </Button>
+                <Button variant="outline" onClick={() => setBulkUploadOpen(true)}>
+                  <Upload className="h-4 w-4" />
+                  Cargar desde Excel
+                </Button>
+              </span>
+            </span>
+          ) : (
+            // Hay inventario, pero la BÚSQUEDA no arrojó resultados.
+            <span className="inline-flex flex-col items-center gap-1">
+              <Inbox className="h-10 w-10 opacity-50" />
+              <span className="text-lg font-medium text-foreground">Sin resultados</span>
+              <span className="text-sm">Ningún producto coincide con tu búsqueda</span>
+            </span>
+          )
+        }
+        columns={[
+          {
+            id: 'imagen',
+            header: 'Imagen',
+            className: 'w-[60px]',
+            cell: (item) => (
+              <button
+                onClick={() => setGalleryProduct(item)}
+                aria-label={`Ver fotos de ${item.nombre_producto}`}
+                className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden relative group hover:ring-2 hover:ring-primary/50 transition-all"
+              >
+                {item.imagen_url ? (
+                  <img
+                    src={item.imagen_url}
+                    alt={item.nombre_producto}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                      (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                    }}
                   />
-                </TableHead>
-                <TableHead className="font-semibold w-[60px]">Imagen</TableHead>
-                <TableHead className="font-semibold">SKU</TableHead>
-                <TableHead className="font-semibold">Producto</TableHead>
-                <TableHead className="font-semibold">Proveedor</TableHead>
-                <TableHead className="font-semibold">Categoría</TableHead>
-                <TableHead className="font-semibold text-right">Precio</TableHead>
-                <TableHead className="font-semibold text-right">Margen</TableHead>
-                <TableHead className="font-semibold text-right">Stock</TableHead>
-                <TableHead className="font-semibold text-center">Oportunidades</TableHead>
-                <TableHead className="font-semibold">Estado</TableHead>
-                <TableHead className="w-[50px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paginatedInventory.map((item) => {
-                return (
-                <TableRow key={item.id} className="data-row">
-                  <TableCell>
-                    <Checkbox
-                      checked={selectedIds.has(item.id)}
-                      onCheckedChange={() => toggleSelect(item.id)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <button 
-                      onClick={() => setGalleryProduct(item)}
-                      className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden relative group hover:ring-2 hover:ring-primary/50 transition-all"
-                    >
-                      {item.imagen_url ? (
-                        <img 
-                          src={item.imagen_url} 
-                          alt={item.nombre_producto}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                            (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
-                          }}
-                        />
-                      ) : null}
-                      <Images className={cn("h-5 w-5 text-muted-foreground", item.imagen_url && "hidden")} />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <Images className="h-4 w-4 text-white" />
-                      </div>
-                    </button>
-                  </TableCell>
-                  <TableCell className="font-mono text-sm font-medium">
-                    {item.sku}
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium">{item.nombre_producto}</p>
-                        {esIncompleto(item) && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Badge className="bg-warning/10 text-warning border-0 gap-1">
-                                <Info className="h-3 w-3" />
-                                {queFalta(item)}
-                              </Badge>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="text-xs">{queFalta(item)} para la ficha técnica del PDF y el matching</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </div>
-                      {/* La descripción solo se muestra si dice algo distinto del nombre (la carga
-                          antigua copió el nombre en la descripción) y completa, no cortada. */}
-                      {item.descripcion && item.descripcion.trim() !== item.nombre_producto?.trim() && (
-                        <p className="text-xs text-muted-foreground line-clamp-2 max-w-[420px]" title={item.descripcion}>
-                          {item.descripcion}
-                        </p>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {item.proveedor || '-'}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {item.categoria || '-'}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    ${item.precio_unitario.toLocaleString("es-CL")}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {item.margen_minimo || 10}%
-                  </TableCell>
-                  <TableCell className={cn(
-                    "text-right font-mono font-medium",
-                    item.stock_disponible === 0 && "text-destructive",
-                    item.stock_disponible > 0 && item.stock_disponible < 50 && "text-warning"
-                  )}>
-                    {item.stock_disponible.toLocaleString("es-CL")}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {isLoadingComprasAgiles ? (
-                      <Loader2 className="h-3 w-3 animate-spin inline text-muted-foreground" />
-                    ) : (matchesByProductId[item.id]?.length ?? 0) === 0 ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="text-xs text-muted-foreground cursor-default">—</span>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="text-xs">Sin compras ágiles activas que hagan match</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setOportunidadesProducto(item)}
-                        aria-label={`Ver oportunidades de ${item.nombre_producto}`}
-                      >
-                        <Badge variant="success" className="cursor-pointer gap-1">
-                          <Gavel className="h-3 w-3" />
-                          {matchesByProductId[item.id].length}
+                ) : null}
+                <Images className={cn("h-5 w-5 text-muted-foreground", item.imagen_url && "hidden")} />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <Images className="h-4 w-4 text-white" />
+                </div>
+              </button>
+            ),
+          },
+          { id: 'sku', header: 'SKU', cell: (item) => <span className="font-mono text-sm font-medium">{item.sku}</span>, sortValue: (item) => item.sku },
+          {
+            id: 'nombre_producto',
+            header: 'Producto',
+            sortValue: (item) => item.nombre_producto,
+            cell: (item) => (
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium">{item.nombre_producto}</p>
+                  {esIncompleto(item) && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge className="bg-warning/10 text-warning border-0 gap-1">
+                          <Info className="h-3 w-3" />
+                          {queFalta(item)}
                         </Badge>
-                      </button>
-                    )}
-                  </TableCell>
-                  <TableCell>{getStatusBadge(item.stock_disponible, item.activo)}</TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-popover">
-                          <DropdownMenuItem
-                            className="gap-2 cursor-pointer"
-                            onClick={() => setEditingProduct(item)}
-                          >
-                            <Edit2 className="h-4 w-4" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="gap-2 cursor-pointer"
-                            onClick={() => handleEnriquecer({ ids: [item.id] })}
-                            disabled={enriquecer.isPending}
-                          >
-                            <Sparkles className="h-4 w-4" />
-                            Enriquecer con IA
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="gap-2 cursor-pointer"
-                            onClick={() => setFotosProducto(item)}
-                          >
-                            <Images className="h-4 w-4" />
-                            Buscar fotos
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="gap-2 text-destructive cursor-pointer"
-                            onClick={() => setConfirmDelete({ id: item.id, nombre: item.nombre_producto })}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            Eliminar
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        )}
-      </div>
-
-      {/* Pagination Controls */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 py-4">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-          >
-            Anterior
-          </Button>
-          <span className="text-sm text-muted-foreground px-4">
-            Página {currentPage} de {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
-          >
-            Siguiente
-          </Button>
-        </div>
-      )}
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">{queFalta(item)} para la ficha técnica del PDF y el matching</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </div>
+                {/* La descripción solo se muestra si dice algo distinto del nombre (la carga
+                    antigua copió el nombre en la descripción) y completa, no cortada. */}
+                {item.descripcion && item.descripcion.trim() !== item.nombre_producto?.trim() && (
+                  <p className="text-xs text-muted-foreground line-clamp-2 max-w-[420px]" title={item.descripcion}>
+                    {item.descripcion}
+                  </p>
+                )}
+              </div>
+            ),
+          },
+          { id: 'proveedor', header: 'Proveedor', cell: (item) => <span className="text-muted-foreground">{item.proveedor || '-'}</span> },
+          { id: 'marca', header: 'Marca', cell: (item) => <span className="text-muted-foreground">{item.marca || '-'}</span>, sortValue: (item) => item.marca ?? '' },
+          { id: 'categoria', header: 'Categoría', cell: (item) => <span className="text-muted-foreground">{item.categoria || '-'}</span>, sortValue: (item) => item.categoria },
+          { id: 'precio_unitario', header: 'Precio', align: 'right', cell: (item) => <span className="font-mono">${item.precio_unitario.toLocaleString("es-CL")}</span>, sortValue: (item) => item.precio_unitario },
+          { id: 'margen_minimo', header: 'Margen', align: 'right', cell: (item) => <span className="font-mono">{item.margen_minimo || 10}%</span>, sortValue: (item) => item.margen_minimo ?? 10 },
+          {
+            id: 'stock_disponible',
+            header: 'Stock',
+            align: 'right',
+            sortValue: (item) => item.stock_disponible ?? 0,
+            cell: (item) => (
+              <span className={cn(
+                "font-mono font-medium",
+                item.stock_disponible === 0 && "text-destructive",
+                (item.stock_disponible ?? 0) > 0 && (item.stock_disponible ?? 0) < 50 && "text-warning"
+              )}>
+                {(item.stock_disponible ?? 0).toLocaleString("es-CL")}
+              </span>
+            ),
+          },
+          {
+            id: 'oportunidades',
+            header: 'Oportunidades',
+            align: 'center',
+            cell: (item) =>
+              isLoadingComprasAgiles ? (
+                <Loader2 className="h-3 w-3 animate-spin inline text-muted-foreground" />
+              ) : (matchesByProductId[item.id]?.length ?? 0) === 0 ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-xs text-muted-foreground cursor-default">—</span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">Sin compras ágiles activas que hagan match</p>
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => setOportunidadesProducto(item)}
+                      aria-label={`Ver oportunidades de ${item.nombre_producto}`}
+                    >
+                      <Badge variant="success" className="cursor-pointer gap-1">
+                        <Gavel className="h-3 w-3" />
+                        {matchesByProductId[item.id].length}
+                      </Badge>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">
+                      {matchesByProductId[item.id].length} compra(s) ágil(es) activa(s) hacen match con este producto. Clic para verlas.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              ),
+          },
+          { id: 'estado', header: 'Estado', cell: (item) => getStatusBadge(item.stock_disponible, item.activo) },
+          {
+            id: 'acciones',
+            header: '',
+            className: 'w-[50px]',
+            cell: (item) => (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Acciones para ${item.nombre_producto}`}>
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-popover">
+                  <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => setEditingProduct(item)}>
+                    <Edit2 className="h-4 w-4" />
+                    Editar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => handleEnriquecer({ ids: [item.id] })} disabled={enriquecer.isPending}>
+                    <Sparkles className="h-4 w-4" />
+                    Enriquecer con IA
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => setFotosProducto(item)}>
+                    <Images className="h-4 w-4" />
+                    Buscar fotos
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="gap-2 text-destructive cursor-pointer" onClick={() => setConfirmDelete({ id: item.id, nombre: item.nombre_producto })}>
+                    <Trash2 className="h-4 w-4" />
+                    Eliminar
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ),
+          },
+        ]}
+      />
 
       {/* Buscar fotos (banco) */}
       <BuscarFotosDialog

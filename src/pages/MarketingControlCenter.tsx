@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { AlertCircle, BarChart3, Rocket, Plus, Send, Users, Download } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 
 interface MarketingContacto {
   id: string;
@@ -27,6 +28,24 @@ interface MarketingContacto {
   estado_suscripcion: string;
   creado_en: string;
 }
+
+const fechaCL = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString('es-CL') : '—');
+
+const COLUMNAS_CONTACTOS: DataTableColumn<MarketingContacto>[] = [
+  { id: 'email', header: 'Email', cell: (c) => <span className="font-medium">{c.email}</span>, sortValue: (c) => c.email },
+  { id: 'nombre', header: 'Nombre', cell: (c) => c.nombre || '—', sortValue: (c) => c.nombre },
+  { id: 'empresa', header: 'Empresa', cell: (c) => c.empresa || '—', sortValue: (c) => c.empresa },
+  { id: 'categoria', header: 'Categoría', cell: (c) => c.categoria || '—', sortValue: (c) => c.categoria },
+  { id: 'rubro', header: 'Rubro', cell: (c) => c.rubro || <span className="text-muted-foreground">Sin información</span>, sortValue: (c) => c.rubro, exportValue: (c) => c.rubro ?? '' },
+  { id: 'fuente', header: 'Fuente', cell: (c) => <Badge variant="outline" className="text-xs">{c.fuente_datos}</Badge>, sortValue: (c) => c.fuente_datos },
+  {
+    id: 'estado',
+    header: 'Estado',
+    cell: (c) => <Badge variant={c.estado_suscripcion === 'suscrito' ? 'default' : 'secondary'} className="text-xs">{c.estado_suscripcion}</Badge>,
+    sortValue: (c) => c.estado_suscripcion,
+  },
+  { id: 'fecha', header: 'Fecha', cell: (c) => <span className="text-muted-foreground">{fechaCL(c.creado_en)}</span>, sortValue: (c) => c.creado_en, exportValue: (c) => fechaCL(c.creado_en) },
+];
 
 export default function MarketingControlCenter() {
   const { campaigns, isLoading } = useCampaigns();
@@ -361,73 +380,29 @@ export default function MarketingControlCenter() {
                 </select>
                 <Button variant="outline" onClick={() => { setBusqueda(''); setFiltroFuente(null); setFiltroRubro(''); setFiltroCategoria(''); setFiltroSuscripcion(''); }}>Limpiar filtros</Button>
               </div>
-              <p className="text-sm text-muted-foreground">Combina filtros para revisar segmentos. Los envíos usan únicamente los contactos suscritos de este segmento.</p>
-              <p className="text-sm text-muted-foreground">
-                Mostrando {contactosFiltrados.length} de {contactos.length} contactos
-              </p>
+              <p className="text-sm text-muted-foreground">Combina filtros para revisar segmentos. Los envíos usan únicamente los contactos suscritos de este segmento ({contactosFiltrados.length} de {contactos.length}).</p>
             </CardContent>
           </Card>
 
           {/* CONTACTS TABLE */}
           {errorContactos && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{errorContactos}<Button variant="outline" className="ml-2" disabled={cargandoContactos} onClick={cargarContactos}>Reintentar</Button></AlertDescription></Alert>}
-          {cargandoContactos ? (
-            <div className="text-center py-8 text-muted-foreground">Cargando contactos…</div>
-          ) : errorContactos && contactos.length === 0 ? null : contactosFiltrados.length === 0 ? (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                {contactos.length === 0 ? 'No hay contactos aún. Importa desde prospects, clientes o webinars.' : 'No se encontraron contactos que coincidan con los filtros.'}
-              </AlertDescription>
-            </Alert>
-          ) : (
+          {errorContactos && contactos.length === 0 ? null : (
             <Card>
               <CardHeader>
                 <CardTitle>Lista de Contactos</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="border rounded-lg overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Nombre</TableHead>
-                        <TableHead>Empresa</TableHead>
-                        <TableHead>Categoría</TableHead>
-                        <TableHead>Rubro</TableHead>
-                        <TableHead>Fuente</TableHead>
-                        <TableHead>Estado</TableHead>
-                        <TableHead>Fecha</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {contactosFiltrados.map((contacto) => (
-                        <TableRow key={contacto.id}>
-                          <TableCell className="text-sm font-medium">{contacto.email}</TableCell>
-                          <TableCell className="text-sm">{contacto.nombre || '—'}</TableCell>
-                          <TableCell className="text-sm">{contacto.empresa || '—'}</TableCell>
-                          <TableCell className="text-sm">{contacto.categoria || '—'}</TableCell>
-                          <TableCell className="text-sm">{contacto.rubro || 'Sin información'}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="text-xs">
-                              {contacto.fuente_datos}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={contacto.estado_suscripcion === 'suscrito' ? 'default' : 'secondary'}
-                              className="text-xs"
-                            >
-                              {contacto.estado_suscripcion}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {new Date(contacto.creado_en).toLocaleDateString('es-CL')}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                <DataTable<MarketingContacto>
+                  storageKey="marketing-audiencia"
+                  rows={contactosFiltrados}
+                  rowKey={(c) => c.id}
+                  loading={cargandoContactos}
+                  itemLabel="contactos"
+                  columns={COLUMNAS_CONTACTOS}
+                  defaultSort={{ id: 'fecha', dir: 'desc' }}
+                  exportFileName="audiencia-marketing"
+                  emptyMessage={contactos.length === 0 ? 'No hay contactos aún. Importa desde prospects, clientes o webinars.' : 'No se encontraron contactos que coincidan con los filtros.'}
+                />
               </CardContent>
             </Card>
           )}
@@ -543,44 +518,32 @@ export default function MarketingControlCenter() {
 
           {cargandoEjecuciones ? (
             <div className="text-center py-8 text-muted-foreground">Cargando…</div>
-          ) : errorEjecuciones ? (<CampaignHistoryError />) : ejecucionesRecientes.length === 0 ? (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>Todavía no se ha ejecutado ningún envío.</AlertDescription>
-            </Alert>
-          ) : (
-            <div className="border rounded-lg overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Campaña</TableHead>
-                    <TableHead>Pieza</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Abierto</TableHead>
-                    <TableHead>Clicks</TableHead>
-                    <TableHead>Fecha</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {ejecucionesRecientes.map((e) => (
-                    <TableRow key={e.id}>
-                      <TableCell className="text-sm">{e.marketing_piezas?.marketing_campanas?.nombre || '—'}</TableCell>
-                      <TableCell className="text-sm">{e.marketing_piezas?.nombre || '—'}</TableCell>
-                      <TableCell className="text-sm">{e.email}</TableCell>
-                      <TableCell>
-                        <Badge variant={e.estado === 'fallo' || e.estado === 'rebote' ? 'destructive' : 'secondary'} className="text-[10px]">
-                          {e.estado}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm">{e.abierto ? 'Sí' : 'No'}</TableCell>
-                      <TableCell className="text-sm">{e.clicks || 0}</TableCell>
-                      <TableCell className="text-sm">{e.fecha_envio ? new Date(e.fecha_envio).toLocaleString('es-CL') : '—'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+          ) : errorEjecuciones ? (<CampaignHistoryError />) : (
+            <DataTable
+              storageKey="marketing-envios"
+              rows={ejecucionesRecientes}
+              rowKey={(e) => String(e.id)}
+              itemLabel="envíos"
+              searchText={(e) => `${e.email ?? ''} ${e.marketing_piezas?.nombre ?? ''} ${e.marketing_piezas?.marketing_campanas?.nombre ?? ''} ${e.estado ?? ''}`}
+              searchPlaceholder="Buscar por correo, pieza o campaña…"
+              defaultSort={{ id: 'fecha', dir: 'desc' }}
+              exportFileName="envios-marketing"
+              emptyMessage="Todavía no se ha ejecutado ningún envío."
+              columns={[
+                { id: 'campana', header: 'Campaña', cell: (e) => e.marketing_piezas?.marketing_campanas?.nombre || '—', sortValue: (e) => e.marketing_piezas?.marketing_campanas?.nombre },
+                { id: 'pieza', header: 'Pieza', cell: (e) => e.marketing_piezas?.nombre || '—', sortValue: (e) => e.marketing_piezas?.nombre },
+                { id: 'email', header: 'Email', cell: (e) => e.email, sortValue: (e) => e.email },
+                {
+                  id: 'estado',
+                  header: 'Estado',
+                  cell: (e) => <Badge variant={e.estado === 'fallo' || e.estado === 'rebote' ? 'destructive' : 'secondary'} className="text-[10px]">{e.estado}</Badge>,
+                  sortValue: (e) => e.estado,
+                },
+                { id: 'abierto', header: 'Abierto', cell: (e) => (e.abierto ? 'Sí' : 'No'), sortValue: (e) => (e.abierto ? 1 : 0), exportValue: (e) => (e.abierto ? 'Sí' : 'No'), align: 'center' },
+                { id: 'clicks', header: 'Clicks', cell: (e) => e.clicks || 0, sortValue: (e) => e.clicks || 0, align: 'right' },
+                { id: 'fecha', header: 'Fecha', cell: (e) => (e.fecha_envio ? new Date(e.fecha_envio).toLocaleString('es-CL') : '—'), sortValue: (e) => e.fecha_envio, exportValue: (e) => (e.fecha_envio ? new Date(e.fecha_envio).toLocaleString('es-CL') : '') },
+              ]}
+            />
           )}
         </TabsContent>
       </Tabs>

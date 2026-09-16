@@ -41,7 +41,7 @@ const txt = (v: any) => v == null ? '' : typeof v === 'boolean' ? (v ? 'Sí' : '
 
 export function matrizAExcel(m: Matriz) {
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[m.titulo ?? 'Matriz de postulación'], [m.resumen ?? ''], ['Generada con el Experto FirmaVB · firmavb.cl', m.generada_en ?? '']]), 'Resumen');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[m.titulo ?? 'Matriz de postulación'], [m.resumen ?? ''], ['Generada con Don Evaristo · firmavb.cl', m.generada_en ?? '']]), 'Resumen');
   for (const s of SECCIONES) {
     const f = filas(m, s.clave); if (!f.length) continue;
     const ws = XLSX.utils.aoa_to_sheet([s.cols.map((c) => c[1]), ...f.map((r) => s.cols.map((c) => c[0] === 'estado' ? ESTADOS[r[c[0]]] ?? txt(r[c[0]]) : txt(r[c[0]])))]);
@@ -64,7 +64,7 @@ export function matrizAMarkdown(m: Matriz): string {
 export function matrizAWord(m: Matriz) {
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const tablas = SECCIONES.map((s) => { const f = filas(m, s.clave); if (!f.length) return ''; return `<h2>${esc(s.titulo)}</h2><table border="1" cellpadding="4" style="border-collapse:collapse;width:100%;font-size:10pt"><tr>${s.cols.map((c) => `<th style="background:#1b2540;color:#fff">${esc(c[1])}</th>`).join('')}</tr>${f.map((r) => `<tr>${s.cols.map((c) => `<td>${esc(c[0] === 'estado' ? ESTADOS[r[c[0]]] ?? txt(r[c[0]]) : txt(r[c[0]]))}</td>`).join('')}</tr>`).join('')}</table>`; }).join('');
-  const html = `<html><head><meta charset="utf-8"><title>${esc(m.titulo ?? 'Matriz')}</title></head><body style="font-family:Arial,sans-serif"><h1 style="color:#1b2540">${esc(m.titulo ?? 'Matriz de postulación')}</h1><p>${esc(m.resumen ?? '')}</p>${tablas}<p style="color:#888;font-size:9pt">Generada con el Experto FirmaVB · firmavb.cl · no reemplaza la lectura de las bases.</p></body></html>`;
+  const html = `<html><head><meta charset="utf-8"><title>${esc(m.titulo ?? 'Matriz')}</title></head><body style="font-family:Arial,sans-serif"><h1 style="color:#1b2540">${esc(m.titulo ?? 'Matriz de postulación')}</h1><p>${esc(m.resumen ?? '')}</p>${tablas}<p style="color:#888;font-size:9pt">Generada con Don Evaristo · firmavb.cl · no reemplaza la lectura de las bases.</p></body></html>`;
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿', html], { type: 'application/msword' })); a.download = `${m.codigo ?? 'licitacion'}-matriz-postulacion.doc`; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
 }

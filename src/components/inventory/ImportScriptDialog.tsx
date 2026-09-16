@@ -156,7 +156,7 @@ export function ImportScriptDialog({ open, onOpenChange, onSuccess }: ImportScri
       onOpenChange(false);
     } catch (error) {
       console.error("Error importing products:", error);
-      toast.error("No pudimos importar el archivo. Escríbenos por el chat de Evaristo (abajo a la derecha) y lo revisamos contigo.");
+      toast.error("No pudimos importar el archivo. Escríbenos por el chat de Don Evaristo (abajo a la derecha) y lo revisamos contigo.");
     } finally {
       setIsLoading(false);
     }

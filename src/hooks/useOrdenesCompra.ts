@@ -142,6 +142,15 @@ function mapItem(i: RawOC): OrdenCompraItem {
   };
 }
 
+// Datos Abiertos manda "NA" (o "N/A") cuando no clasificó la línea. Eso NO es
+// una categoría: se devuelve null para que el reporte la clasifique por el
+// nombre del producto (antes "NA" concentraba el 60% del monto del cubo).
+function limpiarCategoria(v: string | null | undefined): string | null {
+  const s = (v ?? '').trim();
+  if (!s || /^(n\/?a|null|none|sin categor[ií]a|-)$/i.test(s)) return null;
+  return s;
+}
+
 // Línea de producto desde `oc_lineas` (Datos Abiertos, detalle completo del
 // mercado) mapeada a la misma interfaz de ítem que usa la UI.
 function mapLinea(l: RawOC): OrdenCompraItem {
@@ -156,7 +165,10 @@ function mapLinea(l: RawOC): OrdenCompraItem {
     unidad: null,
     precio_unitario_neto: l.precio_neto ?? null,
     total_neto: l.monto_linea ?? null,
-    categoria: l.rubro_n1 ?? l.categoria ?? null,
+    // "NA" / "N/A" vienen así desde Datos Abiertos: se tratan como vacío para que
+    // el reporte clasifique el rubro por el nombre del producto en vez de mostrar
+    // una categoría "NA" que se comía el 60% del monto.
+    categoria: limpiarCategoria(l.rubro_n1) ?? limpiarCategoria(l.categoria) ?? null,
     created_at: '',
   };
 }
