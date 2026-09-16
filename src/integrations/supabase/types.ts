@@ -10284,6 +10284,15 @@ export type Database = {
           precio_unitario: number
         }[]
       }
+      match_sim: {
+        Args: {
+          p_inv_cod: string
+          p_inv_norm: string
+          p_item_cod: string
+          p_item_norm: string
+        }
+        Returns: number
+      }
       medios_norm: { Args: { p: string }; Returns: string }
       medios_organismo: {
         Args: { p_cantidad?: number; p_codigo?: string; p_organismo?: string }

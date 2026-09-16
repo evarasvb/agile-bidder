@@ -291,13 +291,13 @@ export default function Auth() {
                     <p className="text-sm text-muted-foreground">Ingresa una contraseña nueva para tu cuenta.</p>
                   </div>
                   {error && (
-                    <Alert variant="destructive">
+                    <Alert variant="destructive" aria-live="polite" aria-atomic="true">
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription>{error}</AlertDescription>
                     </Alert>
                   )}
                   {success && (
-                    <Alert className="border-[hsl(var(--success))] bg-[hsl(var(--success))]/10">
+                    <Alert className="border-[hsl(var(--success))] bg-[hsl(var(--success))]/10" aria-live="polite" aria-atomic="true">
                       <Sparkles className="h-4 w-4 text-[hsl(var(--success))]" />
                       <AlertDescription className="text-[hsl(var(--success))]">{success}</AlertDescription>
                     </Alert>
@@ -330,13 +330,13 @@ export default function Auth() {
 
                 {/* Error/Success alerts */}
                 {error && (
-                  <Alert variant="destructive" className="mb-4">
+                  <Alert variant="destructive" className="mb-4" aria-live="polite" aria-atomic="true">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>{error}</AlertDescription>
                   </Alert>
                 )}
                 {success && (
-                  <Alert className="mb-4 border-[hsl(var(--success))] bg-[hsl(var(--success))]/10">
+                  <Alert className="mb-4 border-[hsl(var(--success))] bg-[hsl(var(--success))]/10" aria-live="polite" aria-atomic="true">
                     <Sparkles className="h-4 w-4 text-[hsl(var(--success))]" />
                     <AlertDescription className="text-[hsl(var(--success))]">{success}</AlertDescription>
                   </Alert>

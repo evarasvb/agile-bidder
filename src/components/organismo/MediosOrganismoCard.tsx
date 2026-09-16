@@ -71,9 +71,9 @@ export function MediosOrganismoCard({ codigo, organismo }: Props) {
               const t = TIPO[m.tipo_medio] ?? TIPO.otro;
               return (
                 <li key={m.id} className="text-sm">
-                  <a href={m.url} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline inline-flex items-start gap-1">
+                  <a href={m.url} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline inline-flex items-start gap-1" aria-label={`${m.titulo} (abre en nueva pestaña)`}>
                     <span>{m.titulo}</span>
-                    <ExternalLink className="h-3 w-3 mt-1 shrink-0 text-muted-foreground" />
+                    <ExternalLink className="h-3 w-3 mt-1 shrink-0 text-muted-foreground" aria-hidden="true" />
                   </a>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${t.clase}`}><t.Icono className="h-3 w-3 mr-1" />{t.texto}</Badge>

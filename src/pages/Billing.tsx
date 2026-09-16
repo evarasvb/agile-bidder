@@ -314,7 +314,7 @@ export default function Billing() {
                       <div className="flex items-center gap-2 flex-wrap">
                         {getEstadoBadge(factura.estado)}
                         {factura.documento_url && (
-                          <Button variant="outline" size="sm" asChild><a href={factura.documento_url} target="_blank" rel="noreferrer"><Download className="h-4 w-4 mr-1" />PDF</a></Button>
+                          <Button variant="outline" size="sm" asChild><a href={factura.documento_url} target="_blank" rel="noreferrer" aria-label="Descargar comprobante en PDF (abre en nueva pestaña)"><Download className="h-4 w-4 mr-1" aria-hidden="true" />PDF</a></Button>
                         )}
                         {(factura.estado === "facturada" || factura.estado === "por_facturar") && (factura.total ?? 0) > 0 && !(factura.por_suscripcion && factura.cobro_programado_en && !factura.cobro_revertido_en) && (
                           <Button size="sm" disabled={pagando === factura.id} onClick={() => pagarFactura(factura.id)}>

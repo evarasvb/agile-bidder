@@ -950,7 +950,7 @@ export default function MarketingContactosAdmin() {
                 <div>
                   <Label className="text-sm font-medium">Pasos para conectar:</Label>
                   <ol className="text-sm text-muted-foreground mt-2 space-y-1 ml-4 list-decimal">
-                    <li>Ve a <a href="https://console.cloud.google.com" target="_blank" rel="noopener" className="text-blue-600 hover:underline">Google Cloud Console</a></li>
+                    <li>Ve a <a href="https://console.cloud.google.com" target="_blank" rel="noopener" className="text-blue-600 hover:underline" aria-label="Google Cloud Console (abre en nueva pestaña)">Google Cloud Console</a></li>
                     <li>Crea un nuevo proyecto (o selecciona uno existente)</li>
                     <li>Habilita la YouTube Data API v3</li>
                     <li>Crea credenciales OAuth 2.0 (tipo: Aplicación Web)</li>

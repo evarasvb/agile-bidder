@@ -610,7 +610,7 @@ export default function ExtensionConfig() {
           </div>
 
           <div className="border-t pt-4 text-sm text-muted-foreground">
-            ¿Te quedaste pegado en algún paso? Escríbenos a <a className="text-primary font-medium" href="mailto:contacto@firmavb.cl">contacto@firmavb.cl</a> o por WhatsApp al <a className="text-primary font-medium" href="https://wa.me/56994259157" target="_blank" rel="noopener noreferrer">+56 9 9425 9157</a> y te ayudamos a instalarla.
+            ¿Te quedaste pegado en algún paso? Escríbenos a <a className="text-primary font-medium" href="mailto:contacto@firmavb.cl">contacto@firmavb.cl</a> o por WhatsApp al <a className="text-primary font-medium" href="https://wa.me/56994259157" target="_blank" rel="noopener noreferrer" aria-label="+56 9 9425 9157 por WhatsApp (abre en nueva ventana)">+56 9 9425 9157</a> y te ayudamos a instalarla.
           </div>
         </CardContent>
       </Card>

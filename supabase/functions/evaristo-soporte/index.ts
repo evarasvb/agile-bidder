@@ -49,6 +49,7 @@ BASES: el robot baja las bases que Mercado Público entrega sin captcha; las de 
 PLANES: gratis (oportunidades con límites, 3 preguntas al Experto al mes) y Pro (todo ilimitado). Para pagos o planes, deriva al WhatsApp humano https://wa.me/56994259157.
 
 CANALIZAR AL EQUIPO: cuando no puedas resolver algo, o el usuario quiera dejar un caso, invítalo a tocar el botón "¿Prefieres que te contacte el equipo?" que está ABAJO en este chat: registra el caso con número de ticket y el equipo responde a su correo. NO digas que ya lo enviaste tú. Urgencias o hablar con una persona: WhatsApp https://wa.me/56994259157 (+56 9 9425 9157); correo contacto@firmavb.cl.
+EXCEPCIÓN — REPORTE DE ERROR TÉCNICO (algo no funciona, no carga, no redirige, se cae, manda un print de un error): si el usuario tiene sesión, el sistema deja el caso registrado automáticamente al tiro (sin que toque ningún botón) y eso se te avisa aparte en la propia respuesta. En ese caso NO le pidas que toque el botón: solo reconoce el problema, dale tu mejor hipótesis o paso para probar, y sigue con tu día. No prometas tú mismo un número de ticket ni digas "ya quedó registrado": eso lo agrega el sistema si corresponde.
 
 LINKS DE ACCIÓN (úsalos siempre que guíes a una pantalla), formato markdown exacto [Texto](/ruta):
 - Inicio: /dashboard · Inventario: /inventario · Mis Oportunidades: /mis-oportunidades · Compras Ágiles: /compras-agiles · Licitaciones: /licitaciones · Reportes: /reportes · Extensión: /configuracion/extension · Planes: /planes · Mi cuenta: /cuenta · Mi empresa: /mi-empresa
@@ -149,7 +150,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { messages = [], contexto = {}, imagen, conversacion_id, modo } = body ?? {};
+    const { messages = [], contexto = {}, imagen, conversacion_id, modo, identidad } = body ?? {};
     const auth = req.headers.get("Authorization") ?? "";
     const autenticado = rol(auth) === "authenticated";
     const url = Deno.env.get("SUPABASE_URL")!;
@@ -170,9 +171,11 @@ serve(async (req) => {
 
     // Usuario y tope diario.
     let userId: string | null = null;
+    let userEmail: string | null = null;
     if (sbUser) {
       const { data } = await sbUser.auth.getUser();
       userId = data?.user?.id ?? null;
+      userEmail = data?.user?.email ?? null;
       if (userId) {
         const desde = new Date(Date.now() - 864e5).toISOString();
         const { count } = await sbUser.from("evaristo_mensajes").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("rol", "user").gte("creado_en", desde);
@@ -221,8 +224,58 @@ serve(async (req) => {
         diag = `${model}: respuesta vacía`;
       } catch (err) { diag = `${model}: ${String(err).slice(0, 120)}`; console.error("Gemini fetch error:", diag); }
     }
+
+    // Si esto suena a un problema técnico (no a una duda de uso) y sabemos el correo del
+    // usuario, Don Evaristo deja el ticket solo: no espera a que toque "contactar al equipo".
+    // Corre SIEMPRE (aunque Gemini haya fallado arriba): la detección es por regex, no depende
+    // de la IA, y si no la corremos acá un "no carga" con Gemini caído nunca se escala.
+    let ticket: { numero?: number | string } | null = null;
+    try {
+      const ultimo = historial[historial.length - 1];
+      const textoUsuario = ultimo && ultimo.role === "user" ? String(ultimo.content || "") : "";
+      const RE_PROBLEMA = /no (funciona|anda|carga|sirve|deja|redirige|trae nada|pasa nada|hace nada|abre)|error|falla|se (cae|pilla|traba|congela|rompi[oó])|pantalla (en blanco|vac[ií]a)|\bbug\b|qued[oó] pillad/i;
+      const pareceProblema = !!imagen || RE_PROBLEMA.test(textoUsuario);
+      // Si ya se creó un ticket automático antes en esta misma conversación (queda la marca
+      // en la respuesta de Evaristo), no generamos uno nuevo por cada mensaje de seguimiento.
+      const yaTieneTicket = historial.some(
+        (m) => m.role === "assistant" && /caso\s*\*\*#\d+/i.test(String(m.content || "")),
+      );
+      const correo = identidad?.email ?? userEmail;
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+      const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (pareceProblema && !yaTieneTicket && correo && SUPABASE_URL && SERVICE_KEY) {
+        const resumen = (textoUsuario || "El usuario envió una captura reportando un problema.").slice(0, 100);
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/soporte-ticket`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${SERVICE_KEY}`, apikey: SERVICE_KEY, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: correo,
+            user_id: identidad?.userId ?? userId,
+            canal: "app-auto",
+            pantalla: contexto?.page,
+            asunto: `Bug automático: ${resumen}`,
+            mensaje: textoUsuario || "El usuario envió una captura reportando un problema (revisar imagen adjunta).",
+            conversacion: reply ? [...historial, { role: "assistant", content: reply }] : historial,
+            tipo: "bug",
+            origen: "automatico",
+            imagen,
+          }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (r.ok && j?.numero) ticket = { numero: j.numero };
+      }
+    } catch (e) {
+      console.error("evaristo-soporte auto-ticket:", e);
+    }
+
     if (!reply) {
-      return json({ reply: "Uf, tuve un problemita para responderte 🙈. Reintenta en un ratito, o escríbeme por WhatsApp +56 9 9425 9157 / contacto@firmavb.cl.", error: diag || "sin_respuesta" });
+      let fallback = "Uf, tuve un problemita para responderte 🙈. Reintenta en un ratito, o escríbeme por WhatsApp +56 9 9425 9157 / contacto@firmavb.cl.";
+      if (ticket?.numero) fallback += `\n\n✅ Aun así, ya dejé tu problema registrado como caso **#${ticket.numero}**; el equipo técnico te va a responder a **${identidad?.email ?? userEmail}**.`;
+      return json({ reply: fallback, ticket, error: diag || "sin_respuesta" });
+    }
+
+    if (ticket?.numero) {
+      reply += `\n\n✅ Ya dejé esto registrado como caso **#${ticket.numero}** para el equipo técnico, no necesitas hacer nada más. Te van a responder a **${identidad?.email ?? userEmail}**.`;
     }
 
     // Memoria: guardar la vuelta (solo con sesión). Si falla, la respuesta igual sale.
@@ -253,7 +306,7 @@ serve(async (req) => {
       } catch (e) { console.error("memoria evaristo", String(e).slice(0, 160)); }
     }
 
-    return json({ reply, conversacion_id: convId });
+    return json({ reply, conversacion_id: convId, ticket });
   } catch (e) {
     console.error("evaristo-soporte error:", e);
     return json({ reply: "Tuve un error inesperado. Reintenta, y si sigue, escríbeme a contacto@firmavb.cl.", error: String(e) });

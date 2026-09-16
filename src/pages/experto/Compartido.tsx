@@ -57,7 +57,7 @@ export default function Compartido() {
               {data.tipo === 'mapa' || data.tipo === 'infografia'
                 ? <Button size="sm" variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4 mr-1" />Guardar PDF</Button>
                 : <Button size="sm" variant="outline" onClick={async () => { const r = await compartirPdfExperto({ titulo: data.titulo ?? `Análisis ${data.codigo ?? ''}`, empresa: data.empresa, contenido: data.contenido, url: window.location.href, fecha: data.creado_en }, `${data.codigo ?? 'experto'}-${data.tipo}.pdf`); if (r === 'descargado') toast.success('PDF descargado'); }}><Printer className="h-4 w-4 mr-1" />Descargar PDF</Button>}
-              <Button size="sm" className="bg-[#25D366] hover:bg-[#1ebe5d] text-white" asChild><a href={`https://wa.me/?text=${encodeURIComponent(`${data.titulo ?? 'Análisis de Don Evaristo'}\n${window.location.href}`)}`} target="_blank" rel="noreferrer">WhatsApp</a></Button>
+              <Button size="sm" className="bg-[#25D366] hover:bg-[#1ebe5d] text-white" asChild><a href={`https://wa.me/?text=${encodeURIComponent(`${data.titulo ?? 'Análisis de Don Evaristo'}\n${window.location.href}`)}`} target="_blank" rel="noreferrer" aria-label="Compartir por WhatsApp (abre en nueva ventana)">WhatsApp</a></Button>
               <Button size="sm" variant="outline" onClick={compartir}><Share2 className="h-4 w-4 mr-1" />Compartir</Button>
             </div>
             {data.tipo === 'infografia' && parse(data.contenido) ? <div className="mt-6"><Infografia d={{ ...parse(data.contenido), empresa: data.empresa }} /></div>

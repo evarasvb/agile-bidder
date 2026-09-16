@@ -199,6 +199,7 @@ export function AddProductDialog({
                 value={formData.sku}
                 onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                 required
+                autoFocus
               />
             </div>
 

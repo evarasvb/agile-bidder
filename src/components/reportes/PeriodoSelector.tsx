@@ -21,8 +21,8 @@ export function PeriodoSelector({
 }) {
   return (
     <Select value={value} onValueChange={(v) => onChange(v as PeriodoPreset)}>
-      <SelectTrigger className="h-9 w-[190px] bg-white/15 border-white/25 text-white [&>svg]:text-white/70">
-        <Calendar className="h-4 w-4 mr-1.5 opacity-80" />
+      <SelectTrigger className="h-9 w-[190px] bg-white/15 border-white/25 text-white [&>svg]:text-white/70" aria-label="Seleccionar período">
+        <Calendar className="h-4 w-4 mr-1.5 opacity-80" aria-hidden="true" />
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

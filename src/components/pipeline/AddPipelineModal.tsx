@@ -82,6 +82,7 @@ export function AddPipelineModal({ open, onOpenChange }: AddPipelineModalProps) 
               value={titulo}
               onChange={(e) => setTitulo(e.target.value)}
               placeholder="Nombre de la oportunidad"
+              autoFocus
             />
           </div>
 

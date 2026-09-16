@@ -198,7 +198,7 @@ export function OportunidadesTable() {
             </div>
 
             <Select value={tipoFiltro} onValueChange={(v) => { setTipoFiltro(v); setPage(1); }}>
-              <SelectTrigger className="w-[150px]">
+              <SelectTrigger className="w-[150px]" aria-label="Filtrar por tipo de oportunidad">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Tipo" />
               </SelectTrigger>
@@ -210,7 +210,7 @@ export function OportunidadesTable() {
             </Select>
 
             <Select value={estadoFiltro} onValueChange={(v) => { setEstadoFiltro(v); setPage(1); }}>
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger className="w-[140px]" aria-label="Filtrar por estado de oportunidad">
                 <SelectValue placeholder="Estado" />
               </SelectTrigger>
               <SelectContent>

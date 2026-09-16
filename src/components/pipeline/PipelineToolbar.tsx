@@ -95,7 +95,7 @@ export function PipelineToolbar({
                 onFiltersChange({ ...filters, oportunidad_tipo: v === 'todos' ? undefined : v })
               }
             >
-              <SelectTrigger className="h-8 text-xs">
+              <SelectTrigger className="h-8 text-xs" aria-label="Filtrar por tipo de oportunidad">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -112,6 +112,7 @@ export function PipelineToolbar({
             <Label className="text-xs">Rango de monto (CLP)</Label>
             <div className="flex items-center gap-2">
               <Input
+                id="monto-min"
                 type="number"
                 placeholder="Mín"
                 value={filters.montoMin || ''}
@@ -122,9 +123,11 @@ export function PipelineToolbar({
                   })
                 }
                 className="h-8 text-xs"
+                aria-label="Monto mínimo"
               />
               <span className="text-xs text-gray-400">—</span>
               <Input
+                id="monto-max"
                 type="number"
                 placeholder="Máx"
                 value={filters.montoMax || ''}
@@ -135,6 +138,7 @@ export function PipelineToolbar({
                   })
                 }
                 className="h-8 text-xs"
+                aria-label="Monto máximo"
               />
             </div>
           </div>
@@ -144,21 +148,25 @@ export function PipelineToolbar({
             <Label className="text-xs">Fecha cierre</Label>
             <div className="flex items-center gap-2">
               <Input
+                id="fecha-desde"
                 type="date"
                 value={filters.fechaCierreDesde || ''}
                 onChange={(e) =>
                   onFiltersChange({ ...filters, fechaCierreDesde: e.target.value || undefined })
                 }
                 className="h-8 text-xs"
+                aria-label="Fecha cierre mínima"
               />
               <span className="text-xs text-gray-400">—</span>
               <Input
+                id="fecha-hasta"
                 type="date"
                 value={filters.fechaCierreHasta || ''}
                 onChange={(e) =>
                   onFiltersChange({ ...filters, fechaCierreHasta: e.target.value || undefined })
                 }
                 className="h-8 text-xs"
+                aria-label="Fecha cierre máxima"
               />
             </div>
           </div>
