@@ -187,16 +187,19 @@ export function AsignarVendedorModal({ open, onOpenChange, licitacion }: Asignar
           {showNewVendedor && (
             <div className="p-3 rounded-lg border space-y-3">
               <div className="space-y-2">
-                <Label>Nombre</Label>
+                <Label htmlFor="new-vendedor-nombre">Nombre</Label>
                 <Input
+                  id="new-vendedor-nombre"
                   value={newVendedor.nombre}
                   onChange={(e) => setNewVendedor({ ...newVendedor, nombre: e.target.value })}
                   placeholder="Nombre completo"
+                  autoFocus
                 />
               </div>
               <div className="space-y-2">
-                <Label>Email</Label>
+                <Label htmlFor="new-vendedor-email">Email</Label>
                 <Input
+                  id="new-vendedor-email"
                   type="email"
                   value={newVendedor.email}
                   onChange={(e) => setNewVendedor({ ...newVendedor, email: e.target.value })}

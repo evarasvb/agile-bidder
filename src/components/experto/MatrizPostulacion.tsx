@@ -93,14 +93,14 @@ export function MatrizPostulacion({ m, onChange, empresa, url }: { m: Matriz; on
           <p className="font-semibold mb-2">{s.titulo}</p>
           <div className="overflow-x-auto rounded border">
             <table className="w-full text-sm">
-              <thead className="bg-muted/60"><tr>{s.cols.map((c) => <th key={c[0]} className="text-left px-3 py-2 font-semibold whitespace-nowrap text-xs">{c[1]}</th>)}</tr></thead>
+              <thead className="bg-muted/60"><tr>{s.cols.map((c) => <th key={c[0]} scope="col" className="text-left px-3 py-2 font-semibold whitespace-nowrap text-xs">{c[1]}</th>)}</tr></thead>
               <tbody>{fFiltrado.map((r, i) => (
                 <tr key={i} className="border-t align-top">{s.cols.map((c) => (
                   <td key={c[0]} className="px-3 py-2">
                     {c[0] === 'estado' ? (editable
                       ? <select value={r.estado ?? 'pendiente'} onChange={(e) => set(s.clave, i, 'estado', e.target.value)} className={`rounded px-1 py-0.5 text-xs ${colorEstado(r.estado)}`}>{Object.entries(ESTADOS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
                       : <span className={`rounded px-1.5 py-0.5 ${colorEstado(r.estado)}`}>{ESTADOS[r.estado] ?? txt(r.estado)}</span>)
-                    : c[0] === 'nota' && editable ? <input value={txt(r.nota)} onChange={(e) => set(s.clave, i, 'nota', e.target.value)} className="w-full min-w-[160px] bg-transparent border-b border-dashed border-muted-foreground/40 focus:outline-none text-sm" placeholder="anota aquí" aria-label={`Nota para ${r.requisito}`} />
+                    : c[0] === 'nota' && editable ? <input value={txt(r.nota)} onChange={(e) => set(s.clave, i, 'nota', e.target.value)} className="w-full min-w-[160px] bg-transparent border-b border-dashed border-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary text-sm" placeholder="anota aquí" aria-label={`Nota para ${r.requisito}`} />
                     : c[0] === 'entrada' ? (editable
                       ? (r.chequeo?.tipo === 'si_no' || !r.chequeo?.tipo
                         ? <select value={txt(r.entrada)} onChange={(e) => set(s.clave, i, 'entrada', e.target.value)} className="rounded border bg-yellow-50 px-2 py-1 text-sm" aria-label={`Entrada para ${r.requisito}`}><option value="">—</option><option value="SÍ">SÍ</option><option value="NO">NO</option></select>
