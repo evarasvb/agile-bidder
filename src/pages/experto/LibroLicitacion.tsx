@@ -178,7 +178,10 @@ export default function LibroLicitacion() {
   // Streaming SSE del Experto (chat, informe y estudio comparten el formato).
   async function pedir(body: Record<string, unknown>, fn: 'experto-consultar' | 'experto-estudio' | 'experto-bajo-agua', onTexto: (t: string, meta?: any) => void) {
     const r = await fetch(`${SUPA}/functions/v1/${fn}`, { method: 'POST', headers: auth, body: JSON.stringify(body) });
-    if (!r.ok) { const j = await r.json().catch(() => ({})); throw Object.assign(new Error(j.mensaje || j.error || `Error ${r.status}`), { status: r.status }); }
+    // 202 = el Evidence Gate bloqueó la respuesta (documentación incompleta): no es un
+    // stream, es un JSON de una vez. Si se trata como stream, el lector nunca encuentra
+    // líneas "data:" y el chat se queda pegado en "Buscando en las fuentes…" para siempre.
+    if (!r.ok || r.status === 202) { const j = await r.json().catch(() => ({})); throw Object.assign(new Error(j.mensaje || j.error || `Error ${r.status}`), { status: r.status }); }
     const reader = r.body!.getReader(); const dec = new TextDecoder(); let buf = ''; let texto = ''; let meta: any = null;
     while (true) {
       const { done, value } = await reader.read(); if (done) break;
