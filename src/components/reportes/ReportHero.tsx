@@ -58,7 +58,7 @@ export function ReportHero({
             <Link to={backTo}>
               <Button variant="ghost" size="icon" className="text-white hover:bg-white/15 -ml-2"><ArrowLeft className="h-5 w-5" /></Button>
             </Link>
-            {Icon && <div className="p-2.5 rounded-xl bg-white/10 ring-1 ring-white/15 hidden sm:block"><Icon className="h-6 w-6" /></div>}
+            {Icon && <div className="p-2.5 rounded-xl bg-white/10 ring-1 ring-white/15 hidden sm:block"><Icon className="h-6 w-6" aria-hidden="true" /></div>}
             <div>
               <h1 className="text-2xl font-bold leading-tight">{title}</h1>
               <p className="text-white/80 text-sm mt-0.5 max-w-2xl">{subtitle}</p>

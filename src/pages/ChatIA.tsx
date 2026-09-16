@@ -37,8 +37,8 @@ export default function ChatIA() {
     <div className="space-y-4 animate-fade-in h-[calc(100vh-8rem)]">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-          <ArrowLeft className="h-5 w-5" />
+        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} aria-label="Volver">
+          <ArrowLeft className="h-5 w-5" aria-hidden="true" />
         </Button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">

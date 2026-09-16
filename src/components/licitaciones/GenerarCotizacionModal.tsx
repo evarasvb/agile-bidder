@@ -393,7 +393,7 @@ export function GenerarCotizacionModal({
                         >
                           <div className="flex items-center gap-2">
                             {producto.imagen_url ? (
-                              <img src={producto.imagen_url} alt="" className="w-8 h-8 rounded object-cover" />
+                              <img src={producto.imagen_url} alt={`Imagen de ${producto.nombre_producto}`} className="w-8 h-8 rounded object-cover" />
                             ) : (
                               <div className="w-8 h-8 rounded bg-muted flex items-center justify-center">
                                 <Package className="h-4 w-4 text-muted-foreground" />
@@ -430,7 +430,7 @@ export function GenerarCotizacionModal({
                       <CardContent className="p-4">
                         <div className="flex items-center gap-4">
                           {producto.imagen_url ? (
-                            <img src={producto.imagen_url} alt="" className="w-12 h-12 rounded object-cover" />
+                            <img src={producto.imagen_url} alt={`Imagen de ${producto.nombre}`} className="w-12 h-12 rounded object-cover" />
                           ) : (
                             <div className="w-12 h-12 rounded bg-muted flex items-center justify-center">
                               <Image className="h-5 w-5 text-muted-foreground" />

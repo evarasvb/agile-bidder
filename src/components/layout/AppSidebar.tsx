@@ -289,7 +289,7 @@ export function AppSidebar({ open = false, onClose }: AppSidebarProps) {
                                     : "text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground"
                                 )}
                               >
-                                {ChildIcon && <ChildIcon className="h-4 w-4" />}
+                                {ChildIcon && <ChildIcon className="h-4 w-4" aria-hidden="true" />}
                                 {child.title}
                               </NavLink>
                             </li>

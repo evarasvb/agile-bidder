@@ -43,7 +43,7 @@ export function DetalleCompraAgil({ datos }: { datos: DetalleCompraAgilDatos }) 
         <CardContent>
           <p className="text-sm text-muted-foreground">
             Todavía no bajamos el detalle de esta compra desde Mercado Público (el robot lo hace en minutos).{' '}
-            <a href={fichaUrl} target="_blank" rel="noopener noreferrer" className="underline">Ver ficha oficial</a>.
+            <a href={fichaUrl} target="_blank" rel="noopener noreferrer" className="underline" aria-label="Ver ficha oficial en Mercado Público (abre en nueva pestaña)">Ver ficha oficial</a>.
           </p>
         </CardContent>
       </Card>
@@ -95,11 +95,11 @@ export function DetalleCompraAgil({ datos }: { datos: DetalleCompraAgilDatos }) 
                 return (
                   <li key={`${d.id ?? i}`} className="flex items-center gap-2 flex-wrap">
                     {g?.url ? (
-                      <a href={g.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-primary" title="Guardado en FirmaVB">
+                      <a href={g.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-primary" aria-label={`Descargar ${d.nombre} (guardado en FirmaVB, abre en nueva pestaña)`}>
                         {d.nombre}
                       </a>
                     ) : (
-                      <a href={fichaUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-primary" title="Se descarga desde la ficha oficial en Mercado Público (con tu sesión)">
+                      <a href={fichaUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-primary" aria-label={`Ver ${d.nombre} en ficha oficial de Mercado Público (requiere sesión iniciada, abre en nueva pestaña)`}>
                         {d.nombre}
                       </a>
                     )}

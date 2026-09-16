@@ -67,8 +67,9 @@ function BloqueView({ bloque }: { bloque: Bloque }) {
           target="_blank"
           rel="noopener noreferrer"
           className="my-4 inline-flex items-center gap-2 rounded-xl border border-[hsl(var(--success))]/30 bg-[hsl(var(--success))]/10 px-4 py-3 text-sm font-semibold text-[hsl(var(--success))] hover:bg-[hsl(var(--success))]/20 transition-colors"
+          aria-label={`${bloque.texto} (abre en nueva pestaña)`}
         >
-          <Download className="h-4 w-4" />
+          <Download className="h-4 w-4" aria-hidden="true" />
           {bloque.texto}
         </a>
       );
@@ -106,8 +107,9 @@ function BloqueView({ bloque }: { bloque: Bloque }) {
           target="_blank"
           rel="noopener noreferrer"
           className="my-4 inline-flex items-center gap-2 rounded-xl bg-firmavb-blue px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-firmavb-blue/90 transition-colors"
+          aria-label={`${bloque.texto} (abre en nueva pestaña)`}
         >
-          <Calendar className="h-4 w-4" />
+          <Calendar className="h-4 w-4" aria-hidden="true" />
           {bloque.texto}
         </a>
       );
@@ -395,8 +397,8 @@ export default function AcademiaCurso() {
                       asChild
                       className="mt-4 md:mt-0 bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2 shrink-0"
                     >
-                      <a href={agendarUrl} target="_blank" rel="noopener noreferrer">
-                        <Video className="h-4 w-4" />
+                      <a href={agendarUrl} target="_blank" rel="noopener noreferrer" aria-label="Agendar sesión de video (abre en nueva pestaña)">
+                        <Video className="h-4 w-4" aria-hidden="true" />
                         Agendar mi sesión
                       </a>
                     </Button>
@@ -446,8 +448,8 @@ export default function AcademiaCurso() {
                       size="lg"
                       className="bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2"
                     >
-                      <a href={curso.pagoUrl} target="_blank" rel="noopener noreferrer">
-                        <ShoppingCart className="h-5 w-5" />
+                      <a href={curso.pagoUrl} target="_blank" rel="noopener noreferrer" aria-label="Comprar curso con Mercado Pago (abre en nueva pestaña)">
+                        <ShoppingCart className="h-5 w-5" aria-hidden="true" />
                         Comprar con Mercado Pago
                       </a>
                     </Button>

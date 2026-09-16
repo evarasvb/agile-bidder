@@ -30,7 +30,7 @@ export function expertoMd(t: string): string {
     if (/^\s*\|.*\|\s*$/.test(ln) && /^\s*\|?\s*:?-{2,}/.test(lineas[i + 1] ?? '')) {
       cierra();
       const celdas = (l: string) => l.trim().replace(/^\||\|$/g, '').split('|').map((c) => inline(c.trim()));
-      out += '<div class="overflow-x-auto my-2"><table class="w-full text-xs border-collapse"><thead><tr>' + celdas(ln).map((c) => `<th class="text-left px-2 py-1 bg-muted/60 border-b font-semibold">${c}</th>`).join('') + '</tr></thead><tbody>';
+      out += '<div class="overflow-x-auto my-2"><table class="w-full text-xs border-collapse"><thead><tr>' + celdas(ln).map((c) => `<th scope="col" class="text-left px-2 py-1 bg-muted/60 border-b font-semibold">${c}</th>`).join('') + '</tr></thead><tbody>';
       i += 2;
       while (i < lineas.length && /^\s*\|.*\|\s*$/.test(lineas[i])) { out += '<tr class="border-b last:border-0">' + celdas(lineas[i]).map((c) => `<td class="px-2 py-1 align-top">${c}</td>`).join('') + '</tr>'; i++; }
       i--; out += '</tbody></table></div>'; continue;
