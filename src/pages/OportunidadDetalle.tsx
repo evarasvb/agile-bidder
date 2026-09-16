@@ -1,5 +1,7 @@
+import { useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { presupuestoTexto } from "@/lib/organismoPago";
+import { useLicItemMatches } from "@/hooks/useLicItemMatches";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -202,6 +204,20 @@ export default function OportunidadDetalle() {
   const descartar = useDescartarOportunidad();
   const registrarSenal = useRegistrarSenal();
   const crearPipeline = useCreatePipelineItem();
+
+  // Match producto-por-producto de la licitación (por cliente). item_id ==
+  // licitaciones_bi_items.id, que es el mismo id de cada ítem del detalle.
+  // Usar el código RESUELTO de la oportunidad (no el `id` de la ruta): en URLs
+  // legacy el `id` puede ser el UUID de licitaciones_bi, y lic_item_matches se
+  // filtra por licitacion_codigo.
+  const { data: licItemMatches = [] } = useLicItemMatches(
+    tipoNormalized === "licitacion" ? oportunidad?.codigo ?? null : null
+  );
+  const matchPorItem = useMemo(() => {
+    const m = new Map<string, (typeof licItemMatches)[number]>();
+    for (const r of licItemMatches) if (r.item_id) m.set(r.item_id, r);
+    return m;
+  }, [licItemMatches]);
 
   if (isLoading) {
     return (
@@ -416,13 +432,17 @@ export default function OportunidadDetalle() {
                         <TableHead className="text-right">Cantidad</TableHead>
                         <TableHead>Unidad</TableHead>
                         <TableHead className="text-right">P. Unitario</TableHead>
+                        {oportunidad.tipo === "licitacion" && <TableHead>Tu producto (match)</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {oportunidad.items.map((item) => (
+                      {oportunidad.items.map((item) => {
+                        const m = matchPorItem.get(item.id);
+                        const tieneMatch = !!m && (m.score ?? 0) >= 40;
+                        return (
                         <TableRow key={item.id}>
                           <TableCell className="font-medium">{item.nombre_producto}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
+                          <TableCell className="text-sm text-muted-foreground max-w-xs truncate" title={item.descripcion || ""}>
                             {item.descripcion || "-"}
                           </TableCell>
                           <TableCell className="text-right">{item.cantidad || "-"}</TableCell>
@@ -430,8 +450,31 @@ export default function OportunidadDetalle() {
                           <TableCell className="text-right">
                             {item.precio_unitario ? formatCurrency(item.precio_unitario) : "-"}
                           </TableCell>
+                          {oportunidad.tipo === "licitacion" && (
+                            <TableCell>
+                              {tieneMatch ? (
+                                <div className="flex items-center gap-2">
+                                  <Badge
+                                    className={
+                                      (m!.score ?? 0) >= 80
+                                        ? "bg-green-500 text-white"
+                                        : "bg-yellow-500 text-white"
+                                    }
+                                  >
+                                    {Math.round(m!.score ?? 0)}%
+                                  </Badge>
+                                  <span className="text-sm truncate max-w-[200px]" title={m!.nombre_producto || ""}>
+                                    {m!.nombre_producto}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">Sin match</span>
+                              )}
+                            </TableCell>
+                          )}
                         </TableRow>
-                      ))}
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -495,14 +538,6 @@ export default function OportunidadDetalle() {
               <Sparkles className="h-4 w-4" />
               Consultar al experto
             </Button>
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() => navigate(`/oportunidades/${tipo}/${id}/chat`)}
-            >
-              <Sparkles className="h-4 w-4" />
-              Libro del Experto
-            </Button>
             <Button className="gap-2" onClick={handleCotizar}>
               <FileText className="h-4 w-4" />
               Ir a cotizar
@@ -518,8 +553,13 @@ export default function OportunidadDetalle() {
             </Button>
             {oportunidad.link_oficial && (
               <Button variant="outline" className="gap-2" asChild>
-                <a href={oportunidad.link_oficial} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-4 w-4" />
+                <a
+                  href={oportunidad.link_oficial}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Ver oportunidad en Mercado Público (abre en nueva pestaña)"
+                >
+                  <ExternalLink className="h-4 w-4" aria-hidden="true" />
                   Ver en MercadoPúblico
                 </a>
               </Button>

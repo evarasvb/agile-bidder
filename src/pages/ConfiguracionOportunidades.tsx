@@ -412,7 +412,7 @@ export default function ConfiguracionOportunidades() {
               Regiones Activas
             </CardTitle>
             <CardDescription>
-              Solo verás oportunidades de las regiones seleccionadas
+              Marca las regiones donde puedes despachar. Si no marcas ninguna, verás oportunidades de todas las regiones.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -424,25 +424,30 @@ export default function ConfiguracionOportunidades() {
                 Limpiar
               </Button>
               <Badge variant="secondary" className="ml-auto">
-                {regionesActivas.length} seleccionadas
+                {regionesActivas.length === 0 ? "Todas (sin filtro)" : `${regionesActivas.length} seleccionadas`}
               </Badge>
             </div>
             <div className="grid grid-cols-2 gap-2 max-h-[250px] overflow-y-auto p-2 border rounded-md">
-              {REGIONES_CHILE.map((region) => (
-                <div key={region} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={region}
-                    checked={regionesActivas.includes(region)}
-                    onCheckedChange={() => handleToggleRegion(region)}
-                  />
-                  <label
-                    htmlFor={region}
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
-                    {region}
-                  </label>
-                </div>
-              ))}
+              {REGIONES_CHILE.map((region) => {
+                // El id no puede llevar espacios ni apóstrofos (p.ej. "O'Higgins"):
+                // se convierte a un slug para que el clic en el texto marque la casilla.
+                const rid = `region-${region.replace(/[^a-zA-Z0-9]+/g, "-")}`;
+                return (
+                  <div key={region} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={rid}
+                      checked={regionesActivas.includes(region)}
+                      onCheckedChange={() => handleToggleRegion(region)}
+                    />
+                    <label
+                      htmlFor={rid}
+                      className="text-sm font-medium leading-none cursor-pointer"
+                    >
+                      {region}
+                    </label>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>

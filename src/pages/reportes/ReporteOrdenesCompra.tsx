@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable } from "@/components/ui/data-table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -462,69 +463,63 @@ export default function ReporteOrdenesCompra() {
                 <Badge variant="secondary">{ordenesFiltradas.length}</Badge>
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="font-semibold">ID / Código</TableHead>
-                      <TableHead className="font-semibold">Glosa</TableHead>
-                      <TableHead className="font-semibold">Institución</TableHead>
-                      <TableHead className="font-semibold whitespace-nowrap">RUT institución</TableHead>
-                      {!misOC && <TableHead className="font-semibold">Proveedor</TableHead>}
-                      <TableHead className="font-semibold">Estado</TableHead>
-                      <TableHead className="font-semibold whitespace-nowrap">Fecha</TableHead>
-                      <TableHead className="font-semibold text-right whitespace-nowrap">Monto neto</TableHead>
-                      <TableHead className="font-semibold text-right">Monto</TableHead>
-                      <TableHead className="font-semibold">Tipo</TableHead>
-                      <TableHead className="font-semibold text-center">Ver</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {[...ordenesFiltradas].sort((a, b) => (b.total ?? 0) - (a.total ?? 0)).slice(0, 300).map((orden) => (
-                      <TableRow key={orden.id} className="hover:bg-firmavb-blue/5 transition-colors">
-                        <TableCell className="font-mono text-xs font-medium whitespace-nowrap">{orden.codigo}</TableCell>
-                        <TableCell className="max-w-[240px]"><div className="truncate" title={orden.nombre || ""}>{orden.nombre || "Sin nombre"}</div></TableCell>
-                        <TableCell><span className="truncate max-w-[180px] block" title={orden.institucion_nombre || ""}>{orden.institucion_nombre || "N/A"}</span></TableCell>
-                        <TableCell className="font-mono text-xs whitespace-nowrap">{orden.institucion_rut || "—"}</TableCell>
-                        {!misOC && <TableCell><span className="truncate max-w-[160px] block" title={orden.proveedor_nombre || ""}>{orden.proveedor_nombre || "N/A"}</span></TableCell>}
-                        <TableCell className="text-sm whitespace-nowrap">{orden.estado || "—"}</TableCell>
-                        <TableCell className="whitespace-nowrap text-sm">{orden.fecha_creacion ? format(parseISO(orden.fecha_creacion), "dd MMM yyyy", { locale: es }) : "N/A"}</TableCell>
-                        <TableCell className="text-right whitespace-nowrap text-sm">{orden.total_neto ? formatCurrency(orden.total_neto) : "—"}</TableCell>
-                        <TableCell className="text-right font-medium whitespace-nowrap">{orden.total ? formatCurrency(orden.total) : "N/A"}</TableCell>
-                        <TableCell>{esTratoDirecto(orden.tipo) ? <Badge variant="destructive" className="whitespace-nowrap">Trato Directo</Badge> : <Badge variant="outline" className="whitespace-nowrap">{getTipoOCLabel(orden.tipo)}</Badge>}</TableCell>
-                        <TableCell className="text-center">
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button variant="outline" size="sm" onClick={() => setOrdenSeleccionada(orden.codigo)}>Ver</Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-4xl max-h-[90vh]">
-                              <DialogHeader>
-                                <div className="flex items-center justify-between gap-2 pr-8">
-                                  <DialogTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-firmavb-blue" />Detalle de Orden de Compra</DialogTitle>
-                                  {ordenDetalle && (
-                                    <Button variant="outline" size="sm" className="gap-2" onClick={() => descargarOrdenCompraPDF(ordenDetalle)}>
-                                      <Download className="h-4 w-4" /> Exportar PDF
-                                    </Button>
-                                  )}
-                                </div>
-                              </DialogHeader>
-                              <ScrollArea className="max-h-[70vh] pr-4">
-                                {isLoadingDetalle ? (
-                                  <div className="space-y-4"><Skeleton className="h-20 w-full" /><Skeleton className="h-40 w-full" /></div>
-                                ) : ordenDetalle ? <OrdenCompraDetalle orden={ordenDetalle} /> : <p className="text-muted-foreground">No se pudo cargar el detalle</p>}
-                              </ScrollArea>
-                            </DialogContent>
-                          </Dialog>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              {ordenesFiltradas.length > 300 && (
-                <p className="text-xs text-muted-foreground p-3 text-center">Mostrando las 300 de mayor monto. Afina con los cruces o exporta el CSV para el total.</p>
-              )}
+            <CardContent className="pt-4">
+              {/* Ordenable por cualquier columna, con búsqueda y paginación:
+                  ya no se corta en 300 filas. El CSV completo sigue en el botón
+                  de arriba (trae más campos). */}
+              <DataTable<OrdenCompra>
+                storageKey={misOC ? "oc-mis" : "oc-mercado"}
+                rows={ordenesFiltradas}
+                rowKey={(o) => String(o.id)}
+                itemLabel="órdenes"
+                searchText={(o) => `${o.codigo ?? ""} ${o.nombre ?? ""} ${o.institucion_nombre ?? ""} ${o.institucion_rut ?? ""} ${o.proveedor_nombre ?? ""}`}
+                searchPlaceholder="Buscar por código, glosa, institución o proveedor…"
+                defaultSort={{ id: "total", dir: "desc" }}
+                emptyMessage="No hay órdenes en este cruce."
+                columns={[
+                  { id: "codigo", header: "ID / Código", cell: (o) => <span className="font-mono text-xs font-medium whitespace-nowrap">{o.codigo}</span>, sortValue: (o) => o.codigo },
+                  { id: "nombre", header: "Glosa", cell: (o) => <div className="max-w-[240px] truncate" title={o.nombre || ""}>{o.nombre || "Sin nombre"}</div>, sortValue: (o) => o.nombre },
+                  { id: "institucion", header: "Institución", cell: (o) => <span className="block max-w-[180px] truncate" title={o.institucion_nombre || ""}>{o.institucion_nombre || "N/A"}</span>, sortValue: (o) => o.institucion_nombre },
+                  { id: "rut_institucion", header: "RUT institución", cell: (o) => <span className="font-mono text-xs whitespace-nowrap">{o.institucion_rut || "—"}</span>, sortValue: (o) => o.institucion_rut },
+                  ...(!misOC
+                    ? [{ id: "proveedor", header: "Proveedor", cell: (o: OrdenCompra) => <span className="block max-w-[160px] truncate" title={o.proveedor_nombre || ""}>{o.proveedor_nombre || "N/A"}</span>, sortValue: (o: OrdenCompra) => o.proveedor_nombre }]
+                    : []),
+                  { id: "estado", header: "Estado", cell: (o) => <span className="whitespace-nowrap">{o.estado || "—"}</span>, sortValue: (o) => o.estado },
+                  { id: "fecha", header: "Fecha", cell: (o) => <span className="whitespace-nowrap">{o.fecha_creacion ? format(parseISO(o.fecha_creacion), "dd MMM yyyy", { locale: es }) : "N/A"}</span>, sortValue: (o) => o.fecha_creacion, exportValue: (o) => o.fecha_creacion ?? "" },
+                  { id: "total_neto", header: "Monto neto", align: "right", cell: (o) => <span className="whitespace-nowrap">{o.total_neto ? formatCurrency(o.total_neto) : "—"}</span>, sortValue: (o) => o.total_neto ?? null },
+                  { id: "total", header: "Monto", align: "right", cell: (o) => <span className="font-medium whitespace-nowrap">{o.total ? formatCurrency(o.total) : "N/A"}</span>, sortValue: (o) => o.total ?? null },
+                  { id: "tipo", header: "Tipo", cell: (o) => (esTratoDirecto(o.tipo) ? <Badge variant="destructive" className="whitespace-nowrap">Trato Directo</Badge> : <Badge variant="outline" className="whitespace-nowrap">{getTipoOCLabel(o.tipo)}</Badge>), sortValue: (o) => getTipoOCLabel(o.tipo) },
+                  {
+                    id: "ver",
+                    header: "Ver",
+                    align: "center",
+                    cell: (orden) => (
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm" onClick={() => setOrdenSeleccionada(orden.codigo)}>Ver</Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-4xl max-h-[90vh]">
+                          <DialogHeader>
+                            <div className="flex items-center justify-between gap-2 pr-8">
+                              <DialogTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-firmavb-blue" />Detalle de Orden de Compra</DialogTitle>
+                              {ordenDetalle && (
+                                <Button variant="outline" size="sm" className="gap-2" onClick={() => descargarOrdenCompraPDF(ordenDetalle)}>
+                                  <Download className="h-4 w-4" /> Exportar PDF
+                                </Button>
+                              )}
+                            </div>
+                          </DialogHeader>
+                          <ScrollArea className="max-h-[70vh] pr-4">
+                            {isLoadingDetalle ? (
+                              <div className="space-y-4"><Skeleton className="h-20 w-full" /><Skeleton className="h-40 w-full" /></div>
+                            ) : ordenDetalle ? <OrdenCompraDetalle orden={ordenDetalle} /> : <p className="text-muted-foreground">No se pudo cargar el detalle</p>}
+                          </ScrollArea>
+                        </DialogContent>
+                      </Dialog>
+                    ),
+                  },
+                ]}
+              />
             </CardContent>
           </Card>
         </>

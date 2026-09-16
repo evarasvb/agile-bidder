@@ -133,7 +133,7 @@ export function useCalendarioIntegrado() {
       // 2. Compras Ágiles deadlines
       const { data: compras } = await supabase
         .from('compras_agiles')
-        .select('id, codigo, nombre, fecha_cierre, organismo, monto')
+        .select('id, codigo, nombre, fecha_cierre, nombre_organismo, monto_estimado')
         .not('fecha_cierre', 'is', null);
 
       if (compras) {
@@ -153,8 +153,8 @@ export function useCalendarioIntegrado() {
             // el id interno, la búsqueda por código no encuentra nada y la pantalla queda vacía.
             sourceId: c.codigo,
             tipoBadge: 'Cierre Compra Ágil',
-            monto: c.monto,
-            institucion: c.organismo,
+            monto: c.monto_estimado,
+            institucion: c.nombre_organismo,
             descripcion: c.nombre,
             asignado: null,
             ...colors,
@@ -201,12 +201,12 @@ export function useCalendarioIntegrado() {
       // 4. Custom events (eventos_calendario)
       try {
         const { data: customEvents } = await supabase
-          .from('eventos_calendario' as any)
+          .from('eventos_calendario')
           .select('*')
           .eq('user_id', user.id);
 
         if (customEvents) {
-          for (const e of customEvents as unknown as EventoCalendarioRow[]) {
+          for (const e of customEvents as EventoCalendarioRow[]) {
             const tipoBadgeMap: Record<TipoEventoCalendario, string> = {
               cierre: 'Cierre', adjudicacion: 'Adjudicación', tarea: 'Tarea',
               recordatorio: 'Recordatorio', otro: 'Otro',
@@ -247,7 +247,7 @@ export function useCalendarioIntegrado() {
     mutationFn: async (input: CreateEventInput) => {
       if (!user?.id) throw new Error('Not authenticated');
       const { data, error } = await supabase
-        .from('eventos_calendario' as any)
+        .from('eventos_calendario')
         .insert({
           user_id: user.id,
           titulo: input.titulo,
@@ -262,7 +262,7 @@ export function useCalendarioIntegrado() {
           repetir: input.repetir,
           recordatorio_minutos: input.recordatorio_minutos || null,
           color: input.color || null,
-        } as any)
+        })
         .select()
         .single();
       if (error) throw error;
@@ -277,7 +277,7 @@ export function useCalendarioIntegrado() {
   const deleteEvent = useMutation({
     mutationFn: async (eventId: string) => {
       const { error } = await supabase
-        .from('eventos_calendario' as any)
+        .from('eventos_calendario')
         .delete()
         .eq('id', eventId);
       if (error) throw error;

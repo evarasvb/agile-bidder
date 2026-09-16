@@ -1,4 +1,4 @@
-// Experto FirmaVB — bases de licitación (PDF o Word) subidas por el cliente o bajadas por el robot.
+// Don Evaristo — bases de licitación (PDF o Word) subidas por el cliente o bajadas por el robot.
 // Aquí se extrae el texto, se resume con Gemini y queda guardado por código de licitación para
 // que el Experto lo use como fuente y le sirva a los demás usuarios de la misma licitación.
 //   GET  ?codigo=XXXX          -> estado (cuántos archivos hay)

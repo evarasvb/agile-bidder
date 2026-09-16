@@ -53,16 +53,29 @@ export function AdjuntosLicitacion({ codigo }: { codigo: string }) {
         <CardTitle className="text-base flex items-center gap-2"><Paperclip className="h-4 w-4" />Bases y anexos</CardTitle>
         <div className="flex flex-wrap gap-2">
           <input ref={fileRef} type="file" accept=".pdf,application/pdf" multiple className="hidden" onChange={(e) => { subirArchivos(e.target.files); e.target.value = ''; }} />
-          <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={ocupado} title="El PDF queda guardado para todos y el Experto lo lee">
-            {subir.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}Subir bases (PDF)
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => fileRef.current?.click()}
+            disabled={ocupado}
+            title="El PDF queda guardado para todos y el Experto lo lee"
+            aria-label="Subir PDF de bases de la licitación"
+          >
+            {subir.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" aria-hidden="true" /> : <Upload className="h-4 w-4 mr-1" aria-hidden="true" />}Subir bases (PDF)
           </Button>
           <Button size="sm" variant="outline" onClick={traerAhora} disabled={ocupado} title="Baja los anexos y formularios que Mercado Público entrega sin captcha">
             {traer.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Download className="h-4 w-4 mr-1" />}
             {adjuntos.length ? 'Buscar nuevos' : 'Traer anexos'}
           </Button>
           <Button size="sm" variant="ghost" asChild>
-            <a href={urlMp} target="_blank" rel="noopener noreferrer" title="Abre la sección Adjuntos de la ficha oficial (Mercado Público pide captcha)">
-              <ExternalLink className="h-4 w-4 mr-1" />Adjuntos en Mercado Público
+            <a
+              href={urlMp}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Abre la sección Adjuntos de la ficha oficial (Mercado Público pide captcha)"
+              aria-label="Adjuntos en Mercado Público (abre en nueva pestaña)"
+            >
+              <ExternalLink className="h-4 w-4 mr-1" aria-hidden="true" />Adjuntos en Mercado Público
             </a>
           </Button>
         </div>

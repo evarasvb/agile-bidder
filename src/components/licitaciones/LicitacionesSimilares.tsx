@@ -72,7 +72,7 @@ export default function LicitacionesSimilares({ licitacionId, titulo, organismo 
     queryKey: ['licitaciones_similares', licitacionId, titulo],
     queryFn: async () => {
       // First, try to find adjudicated licitaciones from licitaciones_adjudicaciones
-      const { data: adjudicaciones } = await (supabase as any)
+      const { data: adjudicaciones } = await supabase
         .from('licitaciones_adjudicaciones')
         .select(`
           *,
@@ -117,16 +117,16 @@ export default function LicitacionesSimilares({ licitacionId, titulo, organismo 
       // Process compras agiles adjudicadas
       if (comprasAdjudicadas) {
         for (const ca of comprasAdjudicadas) {
-          if (ca.id === licitacionId) continue;
-          
+          if (String(ca.id) === licitacionId) continue;
+
           const similarity = calculateSimilarity(titulo, ca.nombre || '');
           if (similarity >= 30) {
             candidates.push({
-              id: ca.id,
+              id: String(ca.id),
               codigo: ca.codigo,
               nombre: ca.nombre,
-              organismo: ca.organismo,
-              monto: ca.monto,
+              organismo: ca.nombre_organismo,
+              monto: ca.monto_estimado,
               fecha_adjudicacion: ca.updated_at,
               proveedor_ganador: null,
               similarity_score: similarity,

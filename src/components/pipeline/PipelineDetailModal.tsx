@@ -47,14 +47,12 @@ function useLinkOficialOportunidad(tipo: string | undefined, codigo: string | un
   return useQuery({
     queryKey: ['pipeline-link-oficial', tipo, codigo],
     queryFn: async () => {
-      // Cast a `any`: estas columnas son reales en la base pero el archivo de
-      // tipos generado de Supabase está desactualizado y no las conoce.
       if (tipo === 'compra_agil') {
-        const { data } = await (supabase as any).from('compras_agiles').select('url_ficha').eq('codigo', codigo).maybeSingle();
+        const { data } = await supabase.from('compras_agiles').select('url_ficha').eq('codigo', codigo).maybeSingle();
         return data?.url_ficha ?? null;
       }
       if (tipo === 'licitacion') {
-        const { data } = await (supabase as any).from('licitaciones').select('link_detalle').eq('id_licitacion', codigo).maybeSingle();
+        const { data } = await supabase.from('licitaciones').select('link_detalle').eq('codigo', codigo).maybeSingle();
         return data?.link_detalle ?? null;
       }
       return null;

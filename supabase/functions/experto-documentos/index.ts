@@ -1,4 +1,4 @@
-// Experto FirmaVB — documentos de trabajo del usuario (Excel, Word, PDF, texto) por licitación.
+// Don Evaristo — documentos de trabajo del usuario (Excel, Word, PDF, texto) por licitación.
 // El cliente sube sus formatos (matriz de postulación, checklist, anexos a medio llenar) y el Experto
 // los lee en el chat, el estudio profundo y la matriz para anotar y ayudar a completarlos.
 //   GET    ?codigo=XXXX        -> lista (requiere sesión)

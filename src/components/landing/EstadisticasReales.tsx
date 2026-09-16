@@ -12,9 +12,7 @@ function useLandingStats() {
   return useQuery({
     queryKey: ["public-landing-stats"],
     queryFn: async (): Promise<LandingStats> => {
-      // No está en los tipos generados (RPC nueva, ver migración
-      // public_landing_stats) => any, mismo patrón que el resto del código.
-      const { data, error } = await (supabase as any).rpc("public_landing_stats");
+      const { data, error } = await supabase.rpc("public_landing_stats");
       if (error) throw error;
       return data as unknown as LandingStats;
     },

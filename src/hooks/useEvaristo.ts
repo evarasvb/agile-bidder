@@ -65,9 +65,9 @@ export function useEvaristoRevisar() {
         .from('evaristo_logs')
         .insert({
           user_id: session.user.id,
-          action: 'revisar',
+          command: 'revisar',
           status: 'completed',
-          result: { message: 'Revisión del proyecto completada exitosamente' }
+          response: JSON.stringify({ message: 'Revisión del proyecto completada exitosamente' })
         })
         .select('id')
         .single();
@@ -113,14 +113,13 @@ export function useEvaristoMision() {
         .from('evaristo_logs')
         .insert({
           user_id: session.user.id,
-          action: 'mision',
-          mision_file,
+          command: `mision:${mision_file}`,
           status: 'completed',
-          result: { 
+          response: JSON.stringify({
             message: `Misión "${mision_file}" ejecutada exitosamente`,
             tasks_completed: 5,
             optimizations_applied: 3
-          }
+          })
         })
         .select('id')
         .single();

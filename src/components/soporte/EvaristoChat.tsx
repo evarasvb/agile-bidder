@@ -15,7 +15,7 @@ const LS_OPEN = "fvb_evaristo_open";
 const SALUDO: Msg = {
   role: "assistant",
   content:
-    "¡Hola! 👋 Soy Evaristo, tu asistente de firmavb. Cuéntame en qué estás y te ayudo al tiro. Por ejemplo: “¿cómo bajo la extensión?” o “no me aparecen oportunidades”. Si algo te da error, mándame un print. 📸",
+    "¡Hola! 👋 Soy Don Evaristo, tu asistente de FirmaVB. Cuéntame en qué estás y te ayudo al tiro. Por ejemplo: “¿cómo bajo la extensión?” o “no me aparecen oportunidades”. Si algo te da error, mándame un print. 📸",
 };
 
 // Divide una línea en: links de acción markdown [txt](/ruta) o [txt](http…),
@@ -237,13 +237,13 @@ export function EvaristoChat() {
         <button
           onClick={() => setOpen(true)}
           className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full bg-firmavb-blue text-white pl-3 pr-4 py-3 shadow-lg hover:bg-firmavb-blue/90 transition-all hover:scale-105"
-          aria-label="Abrir ayuda de Evaristo"
+          aria-label="Abrir ayuda de Don Evaristo"
         >
           <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/15">
             <Sparkles className="h-5 w-5" />
             <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-firmavb-green ring-2 ring-firmavb-blue" />
           </span>
-          <span className="text-sm font-semibold hidden sm:block">¿Te ayudo?</span>
+          <span className="text-sm font-semibold hidden sm:block">Don Evaristo · ¿Te ayudo?</span>
         </button>
       )}
 
@@ -255,7 +255,7 @@ export function EvaristoChat() {
             <div className="flex items-center gap-2.5">
               <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15"><Bot className="h-5 w-5" /></span>
               <div className="leading-tight">
-                <p className="font-semibold text-sm">Evaristo</p>
+                <p className="font-semibold text-sm">Don Evaristo</p>
                 <p className="text-[11px] text-white/80 flex items-center gap-1">
                   <span className="h-1.5 w-1.5 rounded-full bg-firmavb-green inline-block" /> Asistente de firmavb
                 </p>
@@ -295,7 +295,7 @@ export function EvaristoChat() {
               <div className="flex justify-start">
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-firmavb-blue/10 text-firmavb-blue mr-2"><Sparkles className="h-4 w-4" /></span>
                 <div className="bg-card border border-border/60 rounded-2xl rounded-bl-sm px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Evaristo está escribiendo…
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Don Evaristo está escribiendo…
                 </div>
               </div>
             )}
@@ -355,14 +355,14 @@ export function EvaristoChat() {
                 onClick={abrirEscalar}
                 className="w-full flex items-center justify-center gap-1.5 border-t border-border py-2 text-xs font-medium text-firmavb-blue hover:bg-firmavb-blue/5 transition-colors"
               >
-                <LifeBuoy className="h-3.5 w-3.5" /> ¿Prefieres que te contacte el equipo?
+                <LifeBuoy className="h-3.5 w-3.5" aria-hidden="true" /> ¿Prefieres que te contacte el equipo?
               </button>
 
               {/* Input */}
               <div className="border-t border-border p-2.5 flex items-end gap-2 bg-card">
                 <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickImg} />
                 <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => fileRef.current?.click()} aria-label="Adjuntar captura">
-                  <ImagePlus className="h-5 w-5" />
+                  <ImagePlus className="h-5 w-5" aria-hidden="true" />
                 </Button>
                 <textarea
                   value={input}
@@ -374,7 +374,7 @@ export function EvaristoChat() {
                   className="flex-1 resize-none max-h-24 rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-firmavb-blue/30"
                 />
                 <Button size="icon" className="h-9 w-9 shrink-0 bg-firmavb-blue hover:bg-firmavb-blue/90" onClick={enviar} disabled={loading || (!input.trim() && !img)} aria-label="Enviar">
-                  <Send className="h-4 w-4" />
+                  <Send className="h-4 w-4" aria-hidden="true" />
                 </Button>
               </div>
             </>

@@ -27,8 +27,10 @@ import { UpgradeProProvider } from "@/components/pro/UpgradeProProvider";
 const Index = lazy(() => import("./pages/Index"));
 const Academia = lazy(() => import("./pages/Academia"));
 const WebinarConvenioMarcoSaas = lazy(() => import("./pages/WebinarConvenioMarcoSaas"));
+const WebinarVendeleAlEstado = lazy(() => import("./pages/WebinarVendeleAlEstado"));
 const AcademiaCurso = lazy(() => import("./pages/AcademiaCurso"));
 const AcademiaLeads = lazy(() => import("./pages/AcademiaLeads"));
+const ProveedoresEstado = lazy(() => import("./pages/ProveedoresEstado"));
 const Auth = lazy(() => import("./pages/Auth"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const ClienteOnboarding = lazy(() => import("./pages/ClienteOnboarding"));
@@ -78,9 +80,13 @@ const ReporteMercado = lazy(() => import("./pages/reportes/ReporteMercado"));
 const ReporteCompetidores = lazy(() => import("./pages/reportes/ReporteCompetidores"));
 const ReporteConvenioMarco = lazy(() => import("./pages/reportes/ReporteConvenioMarco"));
 
+const AdminTraccion = lazy(() => import("./pages/AdminTraccion"));
 const AdminEvaristo = lazy(() => import("./pages/AdminEvaristo"));
 const AdminSoporte = lazy(() => import("./pages/AdminSoporte"));
 const MisTickets = lazy(() => import("./pages/MisTickets"));
+
+const MarketingControlCenter = lazy(() => import("./pages/MarketingControlCenter"));
+const MarketingContactosAdmin = lazy(() => import("./pages/MarketingContactosAdmin"));
 
 // Defaults de React Query para que la app se sienta más rápida: cachea 1 min,
 // no re-consulta al volver a la pestaña y reintenta solo 1 vez. Antes cada
@@ -139,6 +145,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:bg-primary focus:text-primary-foreground focus:px-4 focus:py-2 focus:rounded">Ir al contenido principal</a>
         <ScrollToTop />
         {/* ChatWidget eliminado: se superponía con Evaristo (dos burbujas de
             ayuda en la misma esquina). Evaristo cubre soporte con IA + WhatsApp
@@ -155,6 +162,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/academia" element={<Academia />} />
           <Route path="/webinar/convenio-marco-saas" element={<WebinarConvenioMarcoSaas />} />
+          <Route path="/webinar/vendele-al-estado" element={<WebinarVendeleAlEstado />} />
           <Route path="/academia/curso/:slug" element={<AcademiaCurso />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/experto/c/:token" element={<Compartido />} />
@@ -184,6 +192,8 @@ const App = () => (
             {/* Legacy: la lista vieja duplicaba Compras Ágiles (y hasta se titulaba así) */}
             <Route path="/licitaciones" element={<Navigate to="/oportunidades?tipo=licitacion" replace />} />
             <Route path="/licitaciones-nuevas" element={<Navigate to="/oportunidades" replace />} />
+            {/* "/inicio" es lo que escribe la gente para volver al panel: no debe dar 404 */}
+            <Route path="/inicio" element={<Navigate to="/dashboard" replace />} />
 
             {/* ----- OPORTUNIDADES PANEL ----- */}
             <Route path="/oportunidades" element={<OportunidadesPanel />} />
@@ -205,6 +215,8 @@ const App = () => (
 
             {/* ----- ACADEMIA (contactos del formulario público) ----- */}
             <Route path="/academia/leads" element={<AdminOnlyRoute><AcademiaLeads /></AdminOnlyRoute>} />
+            <Route path="/proveedores-estado" element={<AdminOnlyRoute><ProveedoresEstado /></AdminOnlyRoute>} />
+            <Route path="/admin/traccion" element={<AdminOnlyRoute><AdminTraccion /></AdminOnlyRoute>} />
 
             {/* ----- EQUIPO ----- */}
             <Route path="/equipo" element={<Equipo />} />
@@ -228,6 +240,10 @@ const App = () => (
             <Route path="/reportes/competidores" element={<ReporteCompetidores />} />
             <Route path="/reportes/convenio-marco" element={<ReporteConvenioMarco />} />
             <Route path="/reportes/ordenes-compra" element={<ReporteOrdenesCompra />} />
+
+            {/* ----- MARKETING ----- */}
+            <Route path="/marketing/control" element={<AdminOnlyRoute><MarketingControlCenter /></AdminOnlyRoute>} />
+            <Route path="/marketing/contactos" element={<AdminOnlyRoute><MarketingContactosAdmin /></AdminOnlyRoute>} />
 
             {/* ----- CONFIGURACION ----- */}
             <Route path="/configuracion" element={<ConfiguracionOportunidades />} />

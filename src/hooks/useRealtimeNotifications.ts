@@ -172,7 +172,7 @@ export function useRealtimeNotifications({
 
       const { data: urgentLicitaciones } = await supabase
         .from('licitaciones')
-        .select('id_licitacion, titulo, fecha_cierre, match_score')
+        .select('codigo, titulo, fecha_cierre, match_score')
         .eq('match_encontrado', true)
         .gte('fecha_cierre', now.toISOString())
         .lte('fecha_cierre', in24Hours.toISOString())
@@ -185,7 +185,7 @@ export function useRealtimeNotifications({
         const notified = JSON.parse(localStorage.getItem(notifiedKey) || '[]');
         
         for (const lic of urgentLicitaciones) {
-          if (!notified.includes(lic.id_licitacion)) {
+          if (!notified.includes(lic.codigo)) {
             const hoursLeft = Math.ceil(
               (new Date(lic.fecha_cierre!).getTime() - now.getTime()) / (1000 * 60 * 60)
             );
@@ -194,11 +194,11 @@ export function useRealtimeNotifications({
               tipo: 'cierre_proximo',
               titulo: '⏰ ¡Cierre Próximo!',
               mensaje: `"${lic.titulo?.substring(0, 50)}..." cierra en ${hoursLeft}h`,
-              licitacion_id: lic.id_licitacion,
+              licitacion_id: lic.codigo,
               score: lic.match_score || undefined
             });
             
-            notified.push(lic.id_licitacion);
+            notified.push(lic.codigo);
           }
         }
         

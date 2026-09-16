@@ -35,7 +35,9 @@ export function AppLayout({ children }: AppLayoutProps) {
         </div>
 
         <StatusBar />
-        <main className="p-4 sm:p-6">{children}</main>
+        {/* pb generoso: deja aire para que la burbuja flotante de Evaristo
+            (abajo a la derecha) nunca tape la última fila de contenido */}
+        <main id="main-content" className="p-4 sm:p-6 pb-24 sm:pb-28">{children}</main>
       </div>
 
       {/* Asistente de soporte con IA, disponible en toda la app */}

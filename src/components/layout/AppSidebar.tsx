@@ -24,6 +24,7 @@ import {
   Sparkles,
   Shield,
   LifeBuoy,
+  Rocket,
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -109,6 +110,12 @@ const navItems: NavItem[] = [
       { title: "Mi empresa", url: "/configuracion/empresa", icon: Building2 },
       { title: "Extensión Chrome", url: "/configuracion/extension", icon: Puzzle },
     ],
+  },
+  {
+    adminOnly: true,
+    title: "Marketing",
+    url: "/marketing/control",
+    icon: Rocket,
   },
   {
     title: "Soporte",
@@ -232,7 +239,7 @@ export function AppSidebar({ open = false, onClose }: AppSidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 overflow-y-auto scrollbar-thin">
+      <nav aria-label="Navegación principal" className="flex-1 px-3 py-4 overflow-y-auto scrollbar-thin">
         <ul className="space-y-1">
           {navItems.filter((item) => !item.adminOnly || esAdmin).map((item) => {
             const hasChildren = item.children && item.children.length > 0;

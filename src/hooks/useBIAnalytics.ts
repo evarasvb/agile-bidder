@@ -51,7 +51,7 @@ export interface TendenciaMensual {
 export interface PrecioHistorico {
   fecha: string;
   proveedor_nombre: string;
-  proveedor_rut: string;
+  rut_proveedor: string;
   precio_unitario: number;
   cantidad: number;
   total: number;
@@ -80,16 +80,16 @@ export function useProveedorStats(filters: BIFilters) {
     queryFn: async (): Promise<ProveedorStats[]> => {
       let query = supabase
         .from('ordenes_compra')
-        .select('proveedor_rut, proveedor_nombre, total');
+        .select('rut_proveedor, proveedor_nombre, total');
 
       if (filters.fechaDesde) {
-        query = query.gte('fecha_envio', filters.fechaDesde);
+        query = query.gte('fecha_envio_oc', filters.fechaDesde);
       }
       if (filters.fechaHasta) {
-        query = query.lte('fecha_envio', filters.fechaHasta);
+        query = query.lte('fecha_envio_oc', filters.fechaHasta);
       }
       if (filters.institucionRut) {
-        query = query.eq('institucion_rut', filters.institucionRut);
+        query = query.eq('rut_demandante', filters.institucionRut);
       }
 
       const { data, error } = await query;
@@ -98,14 +98,14 @@ export function useProveedorStats(filters: BIFilters) {
       // Agrupar por proveedor
       const proveedoresMap = new Map<string, ProveedorStats>();
       data?.forEach(orden => {
-        const key = orden.proveedor_rut || 'sin-rut';
+        const key = orden.rut_proveedor || 'sin-rut';
         if (proveedoresMap.has(key)) {
           const prov = proveedoresMap.get(key)!;
           prov.total_ordenes++;
           prov.monto_total += orden.total || 0;
         } else {
           proveedoresMap.set(key, {
-            rut: orden.proveedor_rut || '',
+            rut: orden.rut_proveedor || '',
             nombre: orden.proveedor_nombre || 'Sin nombre',
             total_ordenes: 1,
             monto_total: orden.total || 0,
@@ -128,16 +128,16 @@ export function useInstitucionStats(filters: BIFilters) {
     queryFn: async (): Promise<InstitucionStats[]> => {
       let query = supabase
         .from('ordenes_compra')
-        .select('institucion_rut, institucion_nombre, total');
+        .select('rut_demandante, demandante, total');
 
       if (filters.fechaDesde) {
-        query = query.gte('fecha_envio', filters.fechaDesde);
+        query = query.gte('fecha_envio_oc', filters.fechaDesde);
       }
       if (filters.fechaHasta) {
-        query = query.lte('fecha_envio', filters.fechaHasta);
+        query = query.lte('fecha_envio_oc', filters.fechaHasta);
       }
       if (filters.proveedorRut) {
-        query = query.eq('proveedor_rut', filters.proveedorRut);
+        query = query.eq('rut_proveedor', filters.proveedorRut);
       }
 
       const { data, error } = await query;
@@ -146,15 +146,15 @@ export function useInstitucionStats(filters: BIFilters) {
       // Agrupar por institución
       const institucionesMap = new Map<string, InstitucionStats>();
       data?.forEach(orden => {
-        const key = orden.institucion_rut || 'sin-rut';
+        const key = orden.rut_demandante || 'sin-rut';
         if (institucionesMap.has(key)) {
           const inst = institucionesMap.get(key)!;
           inst.total_ordenes++;
           inst.monto_total += orden.total || 0;
         } else {
           institucionesMap.set(key, {
-            rut: orden.institucion_rut || '',
-            nombre: orden.institucion_nombre || 'Sin nombre',
+            rut: orden.rut_demandante || '',
+            nombre: orden.demandante || 'Sin nombre',
             total_ordenes: 1,
             monto_total: orden.total || 0,
             promedio_orden: 0
@@ -184,9 +184,9 @@ export function useProductoStats(filters: BIFilters) {
           precio_unitario_neto,
           total_neto,
           ordenes_compra!inner (
-            fecha_envio,
-            proveedor_rut,
-            institucion_rut
+            fecha_envio_oc,
+            rut_proveedor,
+            rut_demandante
           )
         `);
 
@@ -201,11 +201,11 @@ export function useProductoStats(filters: BIFilters) {
       const productosMap = new Map<string, ProductoStats>();
       data?.forEach((item: any) => {
         // Filtrar por fechas si están definidas
-        const fechaEnvio = item.ordenes_compra?.fecha_envio;
+        const fechaEnvio = item.ordenes_compra?.fecha_envio_oc;
         if (filters.fechaDesde && fechaEnvio < filters.fechaDesde) return;
         if (filters.fechaHasta && fechaEnvio > filters.fechaHasta) return;
-        if (filters.proveedorRut && item.ordenes_compra?.proveedor_rut !== filters.proveedorRut) return;
-        if (filters.institucionRut && item.ordenes_compra?.institucion_rut !== filters.institucionRut) return;
+        if (filters.proveedorRut && item.ordenes_compra?.rut_proveedor !== filters.proveedorRut) return;
+        if (filters.institucionRut && item.ordenes_compra?.rut_demandante !== filters.institucionRut) return;
 
         const key = item.nombre_producto?.toLowerCase().trim() || 'sin-nombre';
         const precio = item.precio_unitario_neto || 0;
@@ -248,19 +248,19 @@ export function useTendenciaMensual(filters: BIFilters) {
     queryFn: async (): Promise<TendenciaMensual[]> => {
       let query = supabase
         .from('ordenes_compra')
-        .select('fecha_envio, total');
+        .select('fecha_envio_oc, total');
 
       if (filters.fechaDesde) {
-        query = query.gte('fecha_envio', filters.fechaDesde);
+        query = query.gte('fecha_envio_oc', filters.fechaDesde);
       }
       if (filters.fechaHasta) {
-        query = query.lte('fecha_envio', filters.fechaHasta);
+        query = query.lte('fecha_envio_oc', filters.fechaHasta);
       }
       if (filters.proveedorRut) {
-        query = query.eq('proveedor_rut', filters.proveedorRut);
+        query = query.eq('rut_proveedor', filters.proveedorRut);
       }
       if (filters.institucionRut) {
-        query = query.eq('institucion_rut', filters.institucionRut);
+        query = query.eq('rut_demandante', filters.institucionRut);
       }
 
       const { data, error } = await query;
@@ -269,8 +269,8 @@ export function useTendenciaMensual(filters: BIFilters) {
       // Agrupar por mes
       const mesesMap = new Map<string, TendenciaMensual>();
       data?.forEach(orden => {
-        if (!orden.fecha_envio) return;
-        const fecha = new Date(orden.fecha_envio);
+        if (!orden.fecha_envio_oc) return;
+        const fecha = new Date(orden.fecha_envio_oc);
         const mes = fecha.toLocaleDateString('es-CL', { month: 'short' });
         const anio = fecha.getFullYear();
         const key = `${anio}-${fecha.getMonth()}`;
@@ -316,9 +316,9 @@ export function usePrecioHistorico(productoNombre: string | null, filters: BIFil
           total_neto,
           ordenes_compra!inner (
             codigo,
-            fecha_envio,
+            fecha_envio_oc,
             proveedor_nombre,
-            proveedor_rut
+            rut_proveedor
           )
         `)
         .ilike('nombre_producto', `%${productoNombre}%`)
@@ -328,9 +328,9 @@ export function usePrecioHistorico(productoNombre: string | null, filters: BIFil
       if (error) throw error;
 
       return (data || []).map((item: any) => ({
-        fecha: item.ordenes_compra?.fecha_envio || '',
+        fecha: item.ordenes_compra?.fecha_envio_oc || '',
         proveedor_nombre: item.ordenes_compra?.proveedor_nombre || '',
-        proveedor_rut: item.ordenes_compra?.proveedor_rut || '',
+        rut_proveedor: item.ordenes_compra?.rut_proveedor || '',
         precio_unitario: item.precio_unitario_neto || 0,
         cantidad: item.cantidad || 0,
         total: item.total_neto || 0,
@@ -360,7 +360,7 @@ export function useSugerenciaPrecio(productoNombre: string | null) {
           total_neto,
           ordenes_compra!inner (
             proveedor_nombre,
-            proveedor_rut,
+            rut_proveedor,
             estado
           )
         `)
@@ -387,7 +387,7 @@ export function useSugerenciaPrecio(productoNombre: string | null) {
       }>();
 
       data.forEach((item: any) => {
-        const rut = item.ordenes_compra?.proveedor_rut || 'sin-rut';
+        const rut = item.ordenes_compra?.rut_proveedor || 'sin-rut';
         if (competidoresMap.has(rut)) {
           const comp = competidoresMap.get(rut)!;
           comp.precios.push(item.precio_unitario_neto || 0);
@@ -481,19 +481,19 @@ export function useBIKPIs(filters: BIFilters) {
   return useQuery({
     queryKey: ['bi-kpis', filters],
     queryFn: async () => {
-      let query = supabase.from('ordenes_compra').select('total, proveedor_rut');
+      let query = supabase.from('ordenes_compra').select('total, rut_proveedor');
 
       if (filters.fechaDesde) {
-        query = query.gte('fecha_envio', filters.fechaDesde);
+        query = query.gte('fecha_envio_oc', filters.fechaDesde);
       }
       if (filters.fechaHasta) {
-        query = query.lte('fecha_envio', filters.fechaHasta);
+        query = query.lte('fecha_envio_oc', filters.fechaHasta);
       }
       if (filters.proveedorRut) {
-        query = query.eq('proveedor_rut', filters.proveedorRut);
+        query = query.eq('rut_proveedor', filters.proveedorRut);
       }
       if (filters.institucionRut) {
-        query = query.eq('institucion_rut', filters.institucionRut);
+        query = query.eq('rut_demandante', filters.institucionRut);
       }
 
       const { data, error } = await query;
@@ -501,7 +501,7 @@ export function useBIKPIs(filters: BIFilters) {
 
       const totalOrdenes = data?.length || 0;
       const montoTotal = data?.reduce((sum, o) => sum + (o.total || 0), 0) || 0;
-      const proveedoresUnicos = new Set(data?.map(o => o.proveedor_rut)).size;
+      const proveedoresUnicos = new Set(data?.map(o => o.rut_proveedor)).size;
       const promedioOrden = totalOrdenes > 0 ? montoTotal / totalOrdenes : 0;
 
       return {

@@ -4,6 +4,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { FolderCheck, Upload, Trash2, CheckCircle2, Circle, Loader2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useCliente } from '@/hooks/useCliente';
@@ -32,12 +43,12 @@ export function DocumentosEmpresaCard() {
   const { data: docs = [] } = useQuery({
     queryKey: ['cliente_documentos', cliente?.id],
     enabled: !!cliente?.id,
-    queryFn: async () => ((await (supabase as any).from('cliente_documentos').select('id, tipo, nombre, archivo_url, created_at').eq('cliente_id', cliente!.id).order('created_at', { ascending: false })).data ?? []) as Doc[],
+    queryFn: async () => ((await supabase.from('cliente_documentos').select('id, tipo, nombre, archivo_url, created_at').eq('cliente_id', cliente!.id).order('created_at', { ascending: false })).data ?? []) as Doc[],
   });
   const { data: checklist = [] } = useQuery({
     queryKey: ['experto_plus_checklist', cliente?.id, docs.length],
     enabled: !!cliente?.id,
-    queryFn: async () => ((await (supabase as any).rpc('experto_plus_checklist')).data ?? []) as ChecklistItem[],
+    queryFn: async () => ((await supabase.rpc('experto_plus_checklist')).data ?? []) as ChecklistItem[],
   });
   const obligatorios = checklist.filter((c) => c.obligatorio);
   const listos = obligatorios.filter((c) => c.listo).length;
@@ -54,9 +65,9 @@ export function DocumentosEmpresaCard() {
     const anterior = docs.find((d) => d.tipo === tipo);
     if (anterior) {
       await supabase.storage.from('documentos-empresa').remove([anterior.archivo_url]);
-      await (supabase as any).from('cliente_documentos').delete().eq('id', anterior.id);
+      await supabase.from('cliente_documentos').delete().eq('id', anterior.id);
     }
-    const ins = await (supabase as any).from('cliente_documentos').insert({ cliente_id: cliente.id, tipo, nombre: file.name, archivo_url: path, descripcion: TIPOS.find((t) => t.tipo === tipo)?.nombre ?? tipo });
+    const ins = await supabase.from('cliente_documentos').insert({ cliente_id: cliente.id, tipo, nombre: file.name, archivo_url: path, descripcion: TIPOS.find((t) => t.tipo === tipo)?.nombre ?? tipo });
     setSubiendo(null);
     if (ins.error) { toast.error('No se pudo registrar: ' + ins.error.message); return; }
     toast.success('Documento guardado');
@@ -64,14 +75,17 @@ export function DocumentosEmpresaCard() {
   };
 
   const borrar = async (d: Doc) => {
-    await supabase.storage.from('documentos-empresa').remove([d.archivo_url]);
-    await (supabase as any).from('cliente_documentos').delete().eq('id', d.id);
+    const { error: eStorage } = await supabase.storage.from('documentos-empresa').remove([d.archivo_url]);
+    const { error: eDb } = await supabase.from('cliente_documentos').delete().eq('id', d.id);
+    if (eStorage || eDb) { toast.error('No se pudo eliminar el documento. Reintenta.'); return; }
+    toast.success('Documento eliminado');
     qc.invalidateQueries({ queryKey: ['cliente_documentos'] });
   };
 
   const abrir = async (d: Doc) => {
-    const { data } = await supabase.storage.from('documentos-empresa').createSignedUrl(d.archivo_url, 300);
-    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+    const { data, error } = await supabase.storage.from('documentos-empresa').createSignedUrl(d.archivo_url, 300);
+    if (error || !data?.signedUrl) { toast.error('No se pudo abrir el documento. Reintenta.'); return; }
+    window.open(data.signedUrl, '_blank');
   };
 
   return (
@@ -105,7 +119,7 @@ export function DocumentosEmpresaCard() {
           const d = docs.find((x) => x.tipo === t.tipo);
           return (
             <div key={t.tipo} className="flex items-center gap-3 p-2 rounded-md bg-muted/40 text-sm">
-              {d ? <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" /> : <Circle className="h-4 w-4 text-muted-foreground shrink-0" />}
+              {d ? <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" aria-hidden="true" /> : <Circle className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden="true" />}
               <div className="flex-1 min-w-0">
                 <p className="font-medium">{t.nombre}{!t.obligatorio && <span className="text-xs text-muted-foreground"> · opcional</span>}</p>
                 <p className="text-xs text-muted-foreground truncate">{d ? `${d.nombre} · ${new Date(d.created_at).toLocaleDateString('es-CL')}` : t.ayuda}</p>
@@ -113,11 +127,35 @@ export function DocumentosEmpresaCard() {
               <input type="file" accept="application/pdf,image/jpeg,image/png" className="hidden" ref={(el) => { inputs.current[t.tipo] = el; }}
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) subir(t.tipo, f); e.target.value = ''; }} />
               {d && <Button variant="ghost" size="sm" onClick={() => abrir(d)}>Ver</Button>}
-              <Button variant={d ? 'ghost' : 'outline'} size="sm" disabled={subiendo === t.tipo} onClick={() => inputs.current[t.tipo]?.click()}>
-                {subiendo === t.tipo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              <Button
+                variant={d ? 'ghost' : 'outline'}
+                size="sm"
+                disabled={subiendo === t.tipo}
+                onClick={() => inputs.current[t.tipo]?.click()}
+                aria-label={d ? `Reemplazar ${t.nombre}` : `Subir ${t.nombre}`}
+              >
+                {subiendo === t.tipo ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Upload className="h-4 w-4" aria-hidden="true" />}
                 <span className="ml-1">{d ? 'Reemplazar' : 'Subir'}</span>
               </Button>
-              {d && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => borrar(d)}><Trash2 className="h-4 w-4" /></Button>}
+              {d && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Eliminar ${t.nombre}`}><Trash2 className="h-4 w-4" aria-hidden="true" /></Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>¿Eliminar este documento?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Se borrará «{t.nombre}» del repositorio de tu empresa. Esta acción no se puede deshacer.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => borrar(d)}>Eliminar</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </div>
           );
         })}

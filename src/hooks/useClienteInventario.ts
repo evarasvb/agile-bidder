@@ -42,7 +42,7 @@ export function useClienteInventario(filters?: ClienteInventarioFilters) {
       let hasMore = true;
 
       while (hasMore) {
-        let query = (supabaseClient as any)
+        let query = supabaseClient
           .from('cliente_inventario')
           .select('*', { count: 'exact' })
           .eq('cliente_id', user.id)
@@ -77,7 +77,7 @@ export function useClienteInventario(filters?: ClienteInventarioFilters) {
       }
 
       // Get unique categories
-      const { data: catData } = await (supabaseClient as any)
+      const { data: catData } = await supabaseClient
         .from('cliente_inventario')
         .select('categoria')
         .eq('cliente_id', user.id)

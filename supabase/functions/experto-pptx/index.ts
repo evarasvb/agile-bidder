@@ -1,4 +1,4 @@
-// Experto FirmaVB — genera un PowerPoint (.pptx) real con la matriz de postulación de una
+// Don Evaristo — genera un PowerPoint (.pptx) real con la matriz de postulación de una
 // licitación: portada, resumen y fechas, admisibilidad, evaluación, tareas por fase, garantías
 // y pendientes que debe validar la empresa. Mismo criterio que "Extraer anexos de las bases":
 // reutiliza experto-matriz (reenviando el mismo Authorization) para no duplicar el prompt ni la
@@ -117,7 +117,7 @@ const PRES_PROPS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:pr
 const VIEW_PROPS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:viewPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:normalViewPr/></p:viewPr>`;
 const TABLE_STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:tblStyleLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" def="{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"/>`;
 const ROOT_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>`;
-const CORE_XML = (titulo: string) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${esc(titulo)}</dc:title><dc:creator>Experto FirmaVB</dc:creator><cp:revision>1</cp:revision><dcterms:created xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:modified></cp:coreProperties>`;
+const CORE_XML = (titulo: string) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${esc(titulo)}</dc:title><dc:creator>Don Evaristo</dc:creator><cp:revision>1</cp:revision><dcterms:created xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${new Date().toISOString()}</dcterms:modified></cp:coreProperties>`;
 const APP_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>FirmaVB</Application></Properties>`;
 
 async function construirPptx(slides: string[], titulo: string): Promise<Uint8Array> {
@@ -167,7 +167,7 @@ function slidePortada(m: any, codigo: string, ficha: any): string {
   const inst = ficha?.institucion ? String(ficha.institucion) : "";
   s += textBox(IN(0.8), IN(3.5), SLIDE_W - IN(1.6), IN(0.6), [{ text: [codigo, inst].filter(Boolean).join(" · "), size: 16, color: "BFDBFE" }]);
   s += textBox(IN(0.8), IN(4.6), SLIDE_W - IN(1.6), IN(1.2), [{ text: String(m.resumen ?? ""), size: 14, color: "E5E7EB" }]);
-  s += textBox(IN(0.8), SLIDE_H - IN(0.7), SLIDE_W - IN(1.6), IN(0.4), [{ text: `Generado por el Experto FirmaVB · ${new Date().toLocaleDateString("es-CL")} · Borrador, validar antes de postular`, size: 10, color: "94A3B8" }]);
+  s += textBox(IN(0.8), SLIDE_H - IN(0.7), SLIDE_W - IN(1.6), IN(0.4), [{ text: `Generado por Don Evaristo · ${new Date().toLocaleDateString("es-CL")} · Borrador, validar antes de postular`, size: 10, color: "94A3B8" }]);
   return s;
 }
 
@@ -180,7 +180,7 @@ function slideResumenFechas(m: any, ficha: any): string {
   const rows = fechas.slice(0, 8).map((f) => [String(f.hito ?? ""), String(f.fecha ?? "")]);
   if (rows.length) s += tableShape(IN(0.5), IN(2.7), MX, IN(0.42), ["Hito", "Fecha"], rows);
   if (m.umbral_adjudicacion != null) s += textBox(IN(0.5), SLIDE_H - IN(1.0), MX, IN(0.4), [{ text: `Puntaje mínimo para adjudicar: ${m.umbral_adjudicacion}`, size: 12, bold: true, color: AZUL }]);
-  s += pie("Experto FirmaVB");
+  s += pie("Don Evaristo");
   return s;
 }
 
@@ -189,7 +189,7 @@ function tablaConTope(titulo: string, header: string[], rows: string[][], max: n
   const usados = rows.slice(0, max);
   s += tableShape(IN(0.5), IN(1.2), MX, IN(0.45), header, usados);
   if (rows.length > max) s += textBox(IN(0.5), IN(1.2) + IN(0.45) * (usados.length + 1) + IN(0.1), MX, IN(0.4), [{ text: `+ ${rows.length - max} más — el detalle completo está en la Matriz dentro de FirmaVB.`, size: 11, color: "64748B" }]);
-  s += pie("Experto FirmaVB");
+  s += pie("Don Evaristo");
   return s;
 }
 
@@ -224,7 +224,7 @@ function slidePendientes(m: any): string {
     const texto = seq.slice(0, 6).sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0)).map((x) => `${x.orden ?? ""}. ${x.documento ?? ""} (${x.donde ?? ""})`).join("\n");
     s += textBox(IN(0.5), IN(5.0), MX, IN(1.8), [{ text: "Orden de carga en el portal:", size: 13, bold: true, color: AZUL_OSC }, { text: texto, size: 12 }]);
   }
-  s += pie("Experto FirmaVB · Borrador de apoyo, valida siempre contra las bases");
+  s += pie("Don Evaristo · Borrador de apoyo, valida siempre contra las bases");
   return s;
 }
 
@@ -237,7 +237,7 @@ Deno.serve(async (req) => {
     const userId = role === "authenticated" ? sub : role === "service_role" ? (body.user_id ?? null) : null;
     if (!userId) return json({ error: "login", mensaje: "Inicia sesión en FirmaVB." }, 401);
     const codigo = String(body.codigo ?? "").trim().toUpperCase();
-    if (!/^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2}$/.test(codigo)) return json({ error: "codigo", mensaje: "Indica el ID de la licitación (ej. 2699-35-LE26)." }, 400);
+    if (!/^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}$/.test(codigo)) return json({ error: "codigo", mensaje: "Indica el ID de la licitación (ej. 2699-35-LE26)." }, 400);
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     // 1. Matriz de postulación: reutiliza experto-matriz (mismo motor, mismo gate de plan Pro),

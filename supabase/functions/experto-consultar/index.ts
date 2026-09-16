@@ -1,7 +1,8 @@
-// Experto FirmaVB — chat y análisis de licitaciones con fuentes reales.
+// Don Evaristo — chat y análisis de licitaciones con fuentes reales.
 // Busca en Postgres (normativa, jurisprudencia, datos de Mercado Público) y
 // responde con Gemini en streaming (SSE). Límites por plan.
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { evidenceGateLicitacion, crearEstadoDocumentacionLicitacion } from "../_shared/evidenceGateHelper.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -133,7 +134,7 @@ ${elegidas.map((c) => `## ${c.s.titulo}\n${c.s.texto}`).join("\n\n") || "(sin co
   return out.join("\n\n");
 }
 
-const SYS_CHAT = `Eres el Experto FirmaVB, asesor con 17 años vendiéndole al Estado chileno por Mercado Público / ChileCompra.
+const SYS_CHAT = `Eres Don Evaristo, asesor con 17 años vendiéndole al Estado chileno por Mercado Público / ChileCompra.
 Hablas como Evaristo Varas en su libro "Véndele al Estado y No Mueras en el Intento": de tú, cercano, directo, como un amigo que ya pasó por esto y te lo cuenta sin adornos. Frases cortas. Nada de "estimado", "revisor en mano" ni saludos largos; entra al grano en la primera línea. Ejemplos concretos de la calle antes que teoría. Cuando toca, un empujón honesto ("no hay atajos", "no basta con querer ganar, hay que poder cumplir"). Si algo es riesgoso, dilo sin rodeos. Cierra siempre con el paso concreto que daría hoy.
 Reglas:
 - Responde SOLO con lo que respaldan las FUENTES y DATOS entregados. Cita entre corchetes [n] la fuente usada después de cada afirmación que provenga de ella. Con ley o reglamento nombra el artículo en la frase; con directivas su número; con dictámenes de Contraloría número y año (advierte si es anterior a dic-2024: puede citar el reglamento antiguo D.250/2004, reemplazado por el D.661/2024); con sentencias del TCP rol y fecha; con el libro, dilo como criterio práctico del autor.
@@ -146,7 +147,7 @@ Reglas:
 - Si las fuentes no cubren la pregunta, dilo ("No tengo fuente en mi base para eso") y señala qué documento consultar. No inventes artículos, plazos, cifras ni licitaciones.
 - Montos en pesos con separador de miles ($1.234.567). Máximo 250 palabras salvo que pidan detalle. Párrafos cortos; lista corta solo para varias licitaciones. Formato Markdown simple.`;
 
-const SYS_INFORME = `Eres el Experto FirmaVB, asesor con 17 años vendiéndole al Estado chileno. Vas a entregar a un proveedor pyme un INFORME DE TRABAJO para una licitación concreta, usando SOLO la ficha, fuentes y datos entregados. Hablas como Evaristo Varas en su libro "Véndele al Estado y No Mueras en el Intento": de tú, cercano, directo, como un amigo que ya pasó por esto y te lo cuenta sin adornos. Frases cortas. Nada de "estimado", "revisor en mano" ni saludos largos; entra al grano en la primera línea. Ejemplos concretos de la calle antes que teoría. Cuando toca, un empujón honesto ("no hay atajos", "no basta con querer ganar, hay que poder cumplir"). Si algo es riesgoso, dilo sin rodeos. Cierra siempre con el paso concreto que daría hoy. Formato Markdown con estas secciones exactas:
+const SYS_INFORME = `Eres Don Evaristo, asesor con 17 años vendiéndole al Estado chileno. Vas a entregar a un proveedor pyme un INFORME DE TRABAJO para una licitación concreta, usando SOLO la ficha, fuentes y datos entregados. Hablas como Evaristo Varas en su libro "Véndele al Estado y No Mueras en el Intento": de tú, cercano, directo, como un amigo que ya pasó por esto y te lo cuenta sin adornos. Frases cortas. Nada de "estimado", "revisor en mano" ni saludos largos; entra al grano en la primera línea. Ejemplos concretos de la calle antes que teoría. Cuando toca, un empujón honesto ("no hay atajos", "no basta con querer ganar, hay que poder cumplir"). Si algo es riesgoso, dilo sin rodeos. Cierra siempre con el paso concreto que daría hoy. Formato Markdown con estas secciones exactas:
 
 ## 1. Resumen ejecutivo
 Qué se compra, quién, cuánto, cuándo cierra, y tu veredicto en una línea: ¿vale la pena postular? (sí / con reservas / no) y por qué.
@@ -215,7 +216,7 @@ Deno.serve(async (req) => {
     }
 
     // Detección de código de licitación en la pregunta
-    const m = (pregunta + " " + (codigo ?? "")).match(/\b\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2}\b/i);
+    const m = (pregunta + " " + (codigo ?? "")).match(/\b\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}\b/i);
     if (m) codigo = m[0].toUpperCase();
     if (modo === "informe" && !codigo) {
       return new Response(JSON.stringify({ error: "falta_codigo", mensaje: "Indica el ID de la licitación (ej. 2699-35-LE26)." }), { status: 400, headers: { ...cors, "Content-Type": "application/json" } });
@@ -230,6 +231,8 @@ Deno.serve(async (req) => {
     if (codigo) tareas.ficha = sb.rpc("experto_ficha_licitacion", { p_codigo: codigo }).then((r) => r.data);
     if (codigo) tareas.bases = sb.rpc("experto_bases_texto", { p_codigo: codigo }).then((r) => r.data ?? []);
     if (codigo) tareas.anexos = sb.rpc("experto_anexos_texto", { p_codigo: codigo }).then((r) => r.data ?? []);
+    if (codigo) tareas.fragmentacion = sb.rpc("experto_fragmentacion_organismo", { p_codigo_licitacion: codigo, p_dias_ventana: 90 }).then((r) => r.data ?? []);
+    if (codigo) tareas.patrones = sb.rpc("experto_patrones_licitacion", { p_codigo_licitacion: codigo, p_anos_atras: 3 }).then((r) => r.data ?? []);
     if (codigo && userId) tareas.docs = sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: codigo, p_max: 8000 }).then((r) => r.data ?? []);
     if (modo === "chat") {
       if (kws.length) {
@@ -321,7 +324,25 @@ Deno.serve(async (req) => {
     if (res.adj?.length) partes.push("LICITACIONES PARECIDAS YA ADJUDICADAS (API OCDS de Mercado Público, 12 meses; quién ganó y con cuánto):\n" + res.adj.map((a: any) => `${a.codigo} | ${a.titulo} | ${a.comprador} | adjudicada ${fecha(a.fecha_adjudicacion)} a ${a.adjudicatario ?? "s/i"} por ${fmt(a.monto_adjudicado)} (presupuesto ${fmt(a.monto_estimado)}) | ${a.num_oferentes ?? "s/i"} oferentes: ${a.oferentes ?? "s/i"}`).join("\n"));
     if (res.topadj?.length) partes.push("QUIÉN LE GANA A ESTE ORGANISMO (API OCDS, 12 meses):\n" + res.topadj.map((t: any) => `${t.adjudicatario} (${t.rut ?? "s/i"}): ${t.licitaciones} licitaciones ganadas por ${fmt(t.monto)}, participó en ${t.participaciones}`).join("\n"));
     if (res.org) partes.push("FICHA ORGANISMO (Datos Mercado Público vía FirmaVB):\n" + textoOrganismo(res.org));
+    if (res.fragmentacion?.length) partes.push("ANÁLISIS: FRAGMENTACIÓN DETECTADA\nEste organismo está licitando múltiples compras del mismo rubro en corto plazo. Señales:\n" + res.fragmentacion.map((f: any) => `- ${f.codigo} (${f.estado}, ${fecha(f.fecha_publicacion)}): ${fmt(f.presupuesto_estimado)} ${f.moneda} — ${f.señal}`).join("\n") + "\n💡 Oportunidad: Negocia volumen directo o espera consolidación; competencia fragmentada = precios altos.");
+    if (res.patrones?.length) partes.push("ANÁLISIS: PATRÓN RECURRENTE\nEste organismo licita esto cada cierto tiempo (compra estructural predecible):\n" + res.patrones.map((p: any) => `- ${p.codigo} (${p.estado}, ${fecha(p.fecha_publicacion)}): ${fmt(p.presupuesto_estimado)} ${p.moneda} — ${p.señal}`).join("\n") + "\n💡 Estrategia: Prepara proceso estándar, optimiza el precio de entrada, revisa cambios en criterios de adjudicación.");
     const contexto = partes.join("\n\n") || "(sin fuentes ni datos para esta pregunta)";
+
+    // Evidence Gate: valida que la documentación esté completa para postular
+    if (codigo) {
+      const estadoDoc = crearEstadoDocumentacionLicitacion(res.ficha, bases, anexos);
+      const gate = evidenceGateLicitacion(estadoDoc);
+      if (!gate.permiteBadgeVerde) {
+        return new Response(JSON.stringify({
+          error: "documentacion_incompleta",
+          veredicto: gate.veredicto,
+          razon: gate.razon,
+          faltantes: gate.faltantes,
+          permiteBadgeVerde: false,
+          mensaje: `No se puede recomendar postular: ${gate.razon}. Faltantes: ${gate.faltantes.join("; ")}.`
+        }), { status: 202, headers: { ...cors, "Content-Type": "application/json" } });
+      }
+    }
 
     const userMsg = modo === "chat" ? `${contexto}\n\nPREGUNTA: ${pregunta}` : `${contexto}\n\nGenera el informe de trabajo para la licitación ${codigo}.${pregunta ? " Contexto del proveedor: " + pregunta : ""}`;
     const messages = [
