@@ -131,7 +131,11 @@ Deno.serve(async (req) => {
     const origen = body.origen === 'automatico' ? 'automatico' : 'manual';
     // Captura opcional (la manda Don Evaristo cuando detecta el bug solo, o el usuario la
     // adjuntó en el chat): se muestra inline en el correo del equipo; no se guarda en la base.
-    const imagen = typeof body.imagen === 'string' && body.imagen.startsWith('data:') && body.imagen.length < 4_000_000
+    // Se valida el formato exacto (solo charset base64) porque va interpolada dentro de un
+    // atributo HTML del correo: así no puede "romper" el atributo ni inyectar markup.
+    // El límite (5.6M) es el tope del cliente (4MB reales) ya expandido por base64 (~x1.37).
+    const IMG_DATA_URL_RE = /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/]+=*$/i;
+    const imagen = typeof body.imagen === 'string' && body.imagen.length < 5_600_000 && IMG_DATA_URL_RE.test(body.imagen)
       ? body.imagen : undefined;
 
     // Enriquecer identidad desde `clientes` si tenemos user_id (o el correo).

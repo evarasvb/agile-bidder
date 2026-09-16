@@ -177,29 +177,25 @@ serve(async (req) => {
       }
     }
 
-    if (!reply) {
-      return new Response(
-        JSON.stringify({
-          reply:
-            "Uf, tuve un problemita para responderte 🙈. Reintenta en un ratito, o escríbeme por WhatsApp +56 9 9425 9157 / contacto@firmavb.cl.",
-          error: diag || "sin_respuesta",
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
     // Si esto suena a un problema técnico (no a una duda de uso) y sabemos el correo del
     // usuario, Don Evaristo deja el ticket solo: no espera a que toque "contactar al equipo".
+    // Corre SIEMPRE (aunque Gemini haya fallado arriba): la detección es por regex, no depende
+    // de la IA, y si no la corremos acá un "no carga" con Gemini caído nunca se escala.
     let ticket: { numero?: number | string } | null = null;
     try {
       const ultimo = historial[historial.length - 1];
       const textoUsuario = ultimo && ultimo.role === "user" ? String(ultimo.content || "") : "";
       const RE_PROBLEMA = /no (funciona|anda|carga|sirve|deja|redirige|trae nada|pasa nada|hace nada|abre)|error|falla|se (cae|pilla|traba|congela|rompi[oó])|pantalla (en blanco|vac[ií]a)|\bbug\b|qued[oó] pillad/i;
       const pareceProblema = !!imagen || RE_PROBLEMA.test(textoUsuario);
+      // Si ya se creó un ticket automático antes en esta misma conversación (queda la marca
+      // en la respuesta de Evaristo), no generamos uno nuevo por cada mensaje de seguimiento.
+      const yaTieneTicket = historial.some(
+        (m) => m.role === "assistant" && /caso\s*\*\*#\d+/i.test(String(m.content || "")),
+      );
       const correo = identidad?.email;
       const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
       const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-      if (pareceProblema && correo && SUPABASE_URL && SERVICE_KEY) {
+      if (pareceProblema && !yaTieneTicket && correo && SUPABASE_URL && SERVICE_KEY) {
         const resumen = (textoUsuario || "El usuario envió una captura reportando un problema.").slice(0, 100);
         const r = await fetch(`${SUPABASE_URL}/functions/v1/soporte-ticket`, {
           method: "POST",
@@ -211,7 +207,7 @@ serve(async (req) => {
             pantalla: contexto?.page,
             asunto: `Bug automático: ${resumen}`,
             mensaje: textoUsuario || "El usuario envió una captura reportando un problema (revisar imagen adjunta).",
-            conversacion: [...historial, { role: "assistant", content: reply }],
+            conversacion: reply ? [...historial, { role: "assistant", content: reply }] : historial,
             tipo: "bug",
             origen: "automatico",
             imagen,
@@ -223,6 +219,19 @@ serve(async (req) => {
     } catch (e) {
       console.error("evaristo-soporte auto-ticket:", e);
     }
+
+    if (!reply) {
+      let fallback =
+        "Uf, tuve un problemita para responderte 🙈. Reintenta en un ratito, o escríbeme por WhatsApp +56 9 9425 9157 / contacto@firmavb.cl.";
+      if (ticket?.numero) {
+        fallback += `\n\n✅ Aun así, ya dejé tu problema registrado como caso **#${ticket.numero}**; el equipo técnico te va a responder a **${identidad?.email}**.`;
+      }
+      return new Response(
+        JSON.stringify({ reply: fallback, ticket, error: diag || "sin_respuesta" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     if (ticket?.numero) {
       reply += `\n\n✅ Ya dejé esto registrado como caso **#${ticket.numero}** para el equipo técnico, no necesitas hacer nada más. Te van a responder a **${identidad.email}**.`;
     }
