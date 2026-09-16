@@ -11,10 +11,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, UserPlus, Shield, User, Mail, Building2, Calendar, MoreHorizontal, Trash2, KeyRound, UserCircle, Sparkles, HelpCircle, RotateCcw } from "lucide-react";
+import { Loader2, UserPlus, Shield, User, Mail, MoreHorizontal, Trash2, KeyRound, UserCircle, Sparkles, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -280,7 +280,7 @@ export default function Users() {
       }
       const errorMessage = error?.message || 'Error al eliminar usuario';
       toast.error(errorMessage, {
-        description: 'Intenta de nuevo; si persiste, escríbenos por el chat de Evaristo.',
+        description: 'Intenta de nuevo; si persiste, escríbenos por el chat de Don Evaristo.',
       });
     },
   });
@@ -454,6 +454,135 @@ export default function Users() {
       });
     },
   });
+
+  const esAdmin = (user: UserWithProfile) => user.roles.some((r) => r.role === 'admin');
+
+  const columnasUsuarios: DataTableColumn<UserWithProfile>[] = [
+    {
+      id: 'usuario',
+      header: 'Usuario',
+      sortValue: (user) => user.profile?.full_name || user.email,
+      exportValue: (user) => `${user.profile?.full_name || 'Sin nombre'} <${user.email}>`,
+      cell: (user) => {
+        const initials = user.profile?.full_name
+          ? user.profile.full_name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
+          : user.email.slice(0, 2).toUpperCase();
+        return (
+          <div className="flex items-center gap-3">
+            <Avatar className="h-9 w-9">
+              <AvatarImage src={user.profile?.avatar_url || undefined} />
+              <AvatarFallback>{initials}</AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="font-medium">{user.profile?.full_name || 'Sin nombre'}</p>
+              <p className="text-sm text-muted-foreground">{user.email}</p>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      id: 'empresa',
+      header: 'Empresa',
+      sortValue: (user) => user.cliente?.empresa_nombre,
+      exportValue: (user) => user.cliente?.empresa_nombre ?? '',
+      cell: (user) => user.cliente?.empresa_nombre || <span className="text-muted-foreground">-</span>,
+    },
+    {
+      id: 'rol',
+      header: 'Rol',
+      sortValue: (user) => (esAdmin(user) ? 'Admin' : 'Usuario'),
+      cell: (user) => {
+        const isUserAdmin = esAdmin(user);
+        return (
+          <div className="flex items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant={isUserAdmin ? "default" : "secondary"} className="cursor-help">
+                  {isUserAdmin ? (
+                    <>
+                      <Shield className="h-3 w-3 mr-1" />
+                      Admin
+                    </>
+                  ) : (
+                    <>
+                      <User className="h-3 w-3 mr-1" />
+                      Usuario
+                    </>
+                  )}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">
+                  {isUserAdmin
+                    ? 'Administrador: Acceso completo al sistema y gestión de usuarios'
+                    : 'Usuario: Acceso básico al sistema'}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+            <Switch
+              checked={isUserAdmin}
+              onCheckedChange={() => {
+                const userName = user.profile?.full_name || user.email;
+                setConfirmRoleChange({
+                  userId: user.id,
+                  isCurrentlyAdmin: isUserAdmin,
+                  newRole: isUserAdmin ? 'user' : 'admin',
+                  userName,
+                });
+              }}
+              disabled={toggleAdminMutation.isPending}
+              className="data-[state=checked]:bg-firmavb-blue"
+            />
+          </div>
+        );
+      },
+    },
+    {
+      id: 'registro',
+      header: 'Registro',
+      className: 'text-sm text-muted-foreground',
+      sortValue: (user) => user.created_at,
+      exportValue: (user) => format(new Date(user.created_at), 'dd-MM-yyyy'),
+      cell: (user) => format(new Date(user.created_at), 'dd MMM yyyy', { locale: es }),
+    },
+    {
+      id: 'acciones',
+      header: '',
+      headerClassName: 'w-[50px]',
+      cell: (user) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" aria-label="Acciones del usuario">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56 z-50">
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                setUserToReset(user.email);
+              }}
+              className="cursor-pointer focus:bg-muted"
+            >
+              <RotateCcw className="h-4 w-4 mr-2 text-blue-600" />
+              <span>Resetear Contraseña</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                setUserToDelete(user.id);
+              }}
+              className="text-destructive cursor-pointer focus:bg-destructive/10 focus:text-destructive"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              <span>Eliminar Usuario</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    },
+  ];
 
   if (profileLoading || isLoading) {
     return (
@@ -757,130 +886,18 @@ export default function Users() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Usuario</TableHead>
-                <TableHead>Empresa</TableHead>
-                <TableHead>Rol</TableHead>
-                <TableHead>Registro</TableHead>
-                <TableHead className="w-[50px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users?.map((user) => {
-                const isUserAdmin = user.roles.some(r => r.role === 'admin');
-                const initials = user.profile?.full_name
-                  ? user.profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-                  : user.email.slice(0, 2).toUpperCase();
-
-                return (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-9 w-9">
-                          <AvatarImage src={user.profile?.avatar_url || undefined} />
-                          <AvatarFallback>{initials}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{user.profile?.full_name || 'Sin nombre'}</p>
-                          <p className="text-sm text-muted-foreground">{user.email}</p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {user.cliente?.empresa_nombre || (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Badge variant={isUserAdmin ? "default" : "secondary"} className="cursor-help">
-                              {isUserAdmin ? (
-                                <>
-                                  <Shield className="h-3 w-3 mr-1" />
-                                  Admin
-                                </>
-                              ) : (
-                                <>
-                                  <User className="h-3 w-3 mr-1" />
-                                  Usuario
-                                </>
-                              )}
-                            </Badge>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-xs">
-                              {isUserAdmin 
-                                ? 'Administrador: Acceso completo al sistema y gestión de usuarios'
-                                : 'Usuario: Acceso básico al sistema'}
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                        <Switch
-                          checked={isUserAdmin}
-                          onCheckedChange={() => {
-                            const userName = user.profile?.full_name || user.email;
-                            setConfirmRoleChange({
-                              userId: user.id,
-                              isCurrentlyAdmin: isUserAdmin,
-                              newRole: isUserAdmin ? 'user' : 'admin',
-                              userName,
-                            });
-                          }}
-                          disabled={toggleAdminMutation.isPending}
-                          className="data-[state=checked]:bg-firmavb-blue"
-                        />
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {format(new Date(user.created_at), 'dd MMM yyyy', { locale: es })}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56 z-50">
-                          <DropdownMenuItem 
-                            onSelect={(e) => {
-                              e.preventDefault();
-                              setUserToReset(user.email);
-                            }}
-                            className="cursor-pointer focus:bg-muted"
-                          >
-                            <RotateCcw className="h-4 w-4 mr-2 text-blue-600" />
-                            <span>Resetear Contraseña</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onSelect={(e) => {
-                              e.preventDefault();
-                              setUserToDelete(user.id);
-                            }}
-                            className="text-destructive cursor-pointer focus:bg-destructive/10 focus:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            <span>Eliminar Usuario</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-              {(!users || users.length === 0) && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    No hay usuarios registrados
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          <DataTable<UserWithProfile>
+            storageKey="admin-usuarios"
+            rows={users ?? []}
+            rowKey={(user) => user.id}
+            columns={columnasUsuarios}
+            itemLabel="usuarios"
+            searchText={(user) => `${user.profile?.full_name ?? ''} ${user.email} ${user.cliente?.empresa_nombre ?? ''} ${esAdmin(user) ? 'admin' : 'usuario'}`}
+            searchPlaceholder="Buscar por nombre, correo o empresa…"
+            defaultSort={{ id: 'registro', dir: 'desc' }}
+            exportFileName="usuarios-registrados"
+            emptyMessage="No hay usuarios registrados"
+          />
         </CardContent>
       </Card>
 

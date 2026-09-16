@@ -57,7 +57,7 @@ export function useDashboardKPIs() {
       // Todo el cálculo se hace en la BD (RPC dashboard_kpis): antes se bajaban
       // TODAS las filas de compras_agiles y licitaciones al navegador cada 30s
       // sólo para contar/sumar. Ahora es una sola llamada sin transferir filas.
-      const { data, error } = await (supabase as any).rpc('dashboard_kpis');
+      const { data, error } = await supabase.rpc('dashboard_kpis');
       if (error) throw error;
       const row = Array.isArray(data) ? data[0] : data;
 
@@ -88,7 +88,7 @@ export function usePipelineByStage() {
     queryFn: async (): Promise<PipelineStage[]> => {
       // Agregación en la BD (RPC): antes bajaba todas las filas para agrupar en
       // el navegador. La RPC ya devuelve estado (en minúscula), cantidad y monto.
-      const { data, error } = await (supabase as any).rpc('dashboard_pipeline_por_estado');
+      const { data, error } = await supabase.rpc('dashboard_pipeline_por_estado');
       if (error) throw error;
 
       const stageMap: Record<string, { count: number; monto: number }> = {};

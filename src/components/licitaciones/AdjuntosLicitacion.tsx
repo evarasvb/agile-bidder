@@ -53,16 +53,29 @@ export function AdjuntosLicitacion({ codigo }: { codigo: string }) {
         <CardTitle className="text-base flex items-center gap-2"><Paperclip className="h-4 w-4" />Bases y anexos</CardTitle>
         <div className="flex flex-wrap gap-2">
           <input ref={fileRef} type="file" accept=".pdf,application/pdf" multiple className="hidden" onChange={(e) => { subirArchivos(e.target.files); e.target.value = ''; }} />
-          <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={ocupado} title="El PDF queda guardado para todos y el Experto lo lee">
-            {subir.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}Subir bases (PDF)
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => fileRef.current?.click()}
+            disabled={ocupado}
+            title="El PDF queda guardado para todos y el Experto lo lee"
+            aria-label="Subir PDF de bases de la licitación"
+          >
+            {subir.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" aria-hidden="true" /> : <Upload className="h-4 w-4 mr-1" aria-hidden="true" />}Subir bases (PDF)
           </Button>
           <Button size="sm" variant="outline" onClick={traerAhora} disabled={ocupado} title="Baja los anexos y formularios que Mercado Público entrega sin captcha">
             {traer.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Download className="h-4 w-4 mr-1" />}
             {adjuntos.length ? 'Buscar nuevos' : 'Traer anexos'}
           </Button>
           <Button size="sm" variant="ghost" asChild>
-            <a href={urlMp} target="_blank" rel="noopener noreferrer" title="Abre la sección Adjuntos de la ficha oficial (Mercado Público pide captcha)">
-              <ExternalLink className="h-4 w-4 mr-1" />Adjuntos en Mercado Público
+            <a
+              href={urlMp}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Abre la sección Adjuntos de la ficha oficial (Mercado Público pide captcha)"
+              aria-label="Adjuntos en Mercado Público (abre en nueva pestaña)"
+            >
+              <ExternalLink className="h-4 w-4 mr-1" aria-hidden="true" />Adjuntos en Mercado Público
             </a>
           </Button>
         </div>
@@ -77,8 +90,9 @@ export function AdjuntosLicitacion({ codigo }: { codigo: string }) {
               {bases.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   Mercado Público protege con captcha la sección donde publica las bases, así que el robot no puede bajarlas solo.
-                  Ábrela con &quot;Adjuntos en Mercado Público&quot;, descarga el PDF y súbelo con &quot;Subir bases (PDF)&quot;: queda
-                  guardado para todos y el Experto lo lee de inmediato.
+                  Ábrela con &quot;Adjuntos en Mercado Público&quot;: si tienes la extensión de firmavb instalada, las bases se suben solas
+                  al abrir esa ventana; si no, descarga el PDF y súbelo con &quot;Subir bases (PDF)&quot;. Quedan guardadas para todos y
+                  Don Evaristo las lee de inmediato.
                 </p>
               ) : (
                 <ul className="space-y-2">
@@ -87,7 +101,7 @@ export function AdjuntosLicitacion({ codigo }: { codigo: string }) {
                       <FileText className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
                       <div className="min-w-0 flex-1">
                         {b.url ? (
-                          <a href={b.url} target="_blank" rel="noopener noreferrer" className="font-medium underline break-all">{b.archivo}</a>
+                          <a href={b.url} target="_blank" rel="noopener noreferrer" className="font-medium underline break-all" aria-label={`Descargar ${b.archivo} (abre en nueva pestaña)`}>{b.archivo}</a>
                         ) : (
                           <span className="font-medium break-all" title="Inicia sesión para descargar">{b.archivo}</span>
                         )}
@@ -117,7 +131,7 @@ export function AdjuntosLicitacion({ codigo }: { codigo: string }) {
                       <FileText className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
                       <div className="min-w-0 flex-1">
                         {a.url ? (
-                          <a href={a.url} target="_blank" rel="noopener noreferrer" className="font-medium underline break-all">{a.nombre}</a>
+                          <a href={a.url} target="_blank" rel="noopener noreferrer" className="font-medium underline break-all" aria-label={`Descargar ${a.nombre} (abre en nueva pestaña)`}>{a.nombre}</a>
                         ) : (
                           <span className="font-medium break-all" title="Inicia sesión para descargar">{a.nombre}</span>
                         )}

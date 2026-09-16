@@ -32,7 +32,7 @@
 
     /* Muted */
     --muted: 240 6% 90%;
-    --muted-foreground: 0 0% 40%;
+    --muted-foreground: 0 0% 32%;
 
     /* Accent - Rojo #D85066 - HSL(351, 62%, 59%) */
     --accent: 351 62% 59%;
@@ -123,7 +123,7 @@
     --secondary-foreground: 240 10% 90%;
 
     --muted: 229 20% 18%;
-    --muted-foreground: 240 10% 60%;
+    --muted-foreground: 240 10% 65%;
 
     --accent: 351 62% 55%;
     --accent-foreground: 0 0% 100%;
@@ -380,5 +380,15 @@
   
   .font-bold {
     font-weight: 700;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

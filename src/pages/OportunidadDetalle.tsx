@@ -313,8 +313,8 @@ export default function OportunidadDetalle() {
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex items-start gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/oportunidades")}>
-          <ArrowLeft className="h-5 w-5" />
+        <Button variant="ghost" size="icon" onClick={() => navigate("/oportunidades")} aria-label="Volver a oportunidades">
+          <ArrowLeft className="h-5 w-5" aria-hidden="true" />
         </Button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
@@ -442,7 +442,7 @@ export default function OportunidadDetalle() {
                         return (
                         <TableRow key={item.id}>
                           <TableCell className="font-medium">{item.nombre_producto}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
+                          <TableCell className="text-sm text-muted-foreground max-w-xs truncate" title={item.descripcion || ""}>
                             {item.descripcion || "-"}
                           </TableCell>
                           <TableCell className="text-right">{item.cantidad || "-"}</TableCell>
@@ -553,8 +553,13 @@ export default function OportunidadDetalle() {
             </Button>
             {oportunidad.link_oficial && (
               <Button variant="outline" className="gap-2" asChild>
-                <a href={oportunidad.link_oficial} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-4 w-4" />
+                <a
+                  href={oportunidad.link_oficial}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Ver oportunidad en Mercado Público (abre en nueva pestaña)"
+                >
+                  <ExternalLink className="h-4 w-4" aria-hidden="true" />
                   Ver en MercadoPúblico
                 </a>
               </Button>

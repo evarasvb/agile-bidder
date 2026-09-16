@@ -20,7 +20,7 @@ export function Infografia({ d }: { d: InfografiaDatos }) {
     <div className="rounded-2xl overflow-hidden border shadow-sm bg-white text-[#1b2a4a] max-w-2xl mx-auto" style={{ fontFamily: 'system-ui, sans-serif' }}>
       <div className="bg-[#1b2a4a] text-white px-6 py-4 flex items-center justify-between">
         <img src={logo} alt="FirmaVB" className="h-8" />
-        <span className="text-xs opacity-80">Experto FirmaVB · Datos Mercado Público</span>
+        <span className="text-xs opacity-80">Don Evaristo · Datos Mercado Público</span>
       </div>
       <div className="px-6 py-5 space-y-4">
         <div>
@@ -35,16 +35,16 @@ export function Infografia({ d }: { d: InfografiaDatos }) {
         </div>
         {(d.ganadores?.length ?? 0) > 0 && (
           <div><p className="text-xs font-semibold uppercase text-slate-500 mb-1">Quién le gana a este organismo (12 meses)</p>
-            <ul className="text-sm space-y-0.5">{d.ganadores!.slice(0, 4).map((g) => <li key={g.nombre} className="flex justify-between gap-2"><span className="truncate">{g.nombre}</span><span className="text-slate-500 shrink-0">{g.n} lic. · {clp(g.monto)}</span></li>)}</ul></div>
+            <ul className="text-sm space-y-0.5">{d.ganadores!.slice(0, 4).map((g) => <li key={g.nombre} className="flex justify-between gap-2"><span className="truncate" title={g.nombre}>{g.nombre}</span><span className="text-slate-500 shrink-0">{g.n} lic. · {clp(g.monto)}</span></li>)}</ul></div>
         )}
         {(d.competencia?.length ?? 0) > 0 && (
           <div><p className="text-xs font-semibold uppercase text-slate-500 mb-1">Quién vende esto al Estado y a qué precio</p>
-            <ul className="text-sm space-y-0.5">{d.competencia!.slice(0, 4).map((c) => <li key={c.proveedor} className="flex justify-between gap-2"><span className="truncate">{c.proveedor}</span><span className="text-slate-500 shrink-0">{c.ordenes} OC{c.precio ? ` · unit. ${clp(c.precio)}` : ''}</span></li>)}</ul></div>
+            <ul className="text-sm space-y-0.5">{d.competencia!.slice(0, 4).map((c) => <li key={c.proveedor} className="flex justify-between gap-2"><span className="truncate" title={c.proveedor}>{c.proveedor}</span><span className="text-slate-500 shrink-0">{c.ordenes} OC{c.precio ? ` · unit. ${clp(c.precio)}` : ''}</span></li>)}</ul></div>
         )}
         {(d.items?.length ?? 0) > 0 && <p className="text-xs text-slate-600"><b>Compran:</b> {d.items!.slice(0, 6).join(' · ')}</p>}
       </div>
       <div className="bg-slate-50 px-6 py-3 text-[11px] text-slate-600 flex items-center justify-between">
-        <span>{d.empresa ? `Análisis de ${d.empresa} con el Experto FirmaVB` : 'Hecho con el Experto FirmaVB'}</span>
+        <span>{d.empresa ? `Análisis de ${d.empresa} con Don Evaristo` : 'Hecho con Don Evaristo'}</span>
         <span>firmavb.cl/experto · primera pregunta gratis</span>
       </div>
     </div>

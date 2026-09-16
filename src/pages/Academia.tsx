@@ -15,7 +15,9 @@ import {
   Clock,
   CalendarClock,
   Play,
+  ArrowRight,
 } from "lucide-react";
+import type { Curso } from "@/data/academiaCursos";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -161,15 +163,6 @@ const CONTENIDO = {
     },
   ],
 
-  // --- Cursos que imparto ---------------------------------------------------
-  cursos: [
-    {
-      titulo: "Nombre del curso",
-      descripcion: "Qué aprenderás y para quién es.",
-      accesoUrl: "", // link de acceso / inscripción
-    },
-  ],
-
   // --- Asesoría gratuita (Google Form) --------------------------------------
   asesoria: {
     descripcion:
@@ -262,6 +255,53 @@ function PendientePorCargar({ texto }: { texto: string }) {
   );
 }
 
+// Tarjeta de un curso individual (gratis o exprés de pago). destacar agrega un
+// anillo y una etiqueta "Empieza aquí" para marcar el punto de partida.
+function CursoCard({ c, destacar = false }: { c: Curso; destacar?: boolean }) {
+  return (
+    <Card
+      className={`border-border/50 hover:shadow-md transition-shadow flex flex-col overflow-hidden ${
+        destacar ? "ring-2 ring-firmavb-blue" : ""
+      }`}
+    >
+      <div className={`relative ${ACENTO[c.acento].portada} h-24 flex items-center justify-center`}>
+        <span className="text-5xl drop-shadow-md">{c.emoji}</span>
+        {destacar ? (
+          <span className="absolute top-2 right-2 bg-firmavb-blue text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
+            👉 Empieza aquí
+          </span>
+        ) : c.premium ? (
+          <span className="absolute top-2 right-2 bg-white/90 text-firmavb-blue text-xs font-bold px-2 py-0.5 rounded-full shadow">
+            💎 Premium
+          </span>
+        ) : (
+          <span className="absolute top-2 right-2 bg-white/90 text-[hsl(var(--success))] text-xs font-bold px-2 py-0.5 rounded-full shadow">
+            Gratis
+          </span>
+        )}
+      </div>
+      <CardContent className="py-6 flex flex-col flex-1">
+        <h3 className="font-semibold text-foreground mb-1">{c.titulo}</h3>
+        <p className="text-sm text-muted-foreground mb-4 flex-1">{c.descripcion}</p>
+        <div className="flex flex-wrap gap-2 mb-4">
+          <Badge variant="outline" className="text-xs">{c.nivel}</Badge>
+          <Badge variant="outline" className="text-xs">{c.duracion}</Badge>
+          {c.premium && c.precio && (
+            <Badge className="text-xs bg-firmavb-blue/10 text-firmavb-blue border-firmavb-blue/20">
+              {c.precio}
+            </Badge>
+          )}
+        </div>
+        <Button asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2 w-full">
+          <Link to={`/academia/curso/${c.slug}`}>
+            {c.premium ? "Ver programa" : "Ver curso gratis"}
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 // Formatea segundos a m:ss para las etiquetas de capítulos.
 function fmtTiempo(seg: number): string {
   const m = Math.floor(seg / 60);
@@ -294,8 +334,12 @@ function estadoProximoMartes(): { dias: number; hoy: boolean } {
 }
 
 export default function Academia() {
-  const { perfil, banner, youtube, musica, linkedin, libros, cursos, asesoria, asesoriaPago, whatsappGrupo, contacto } =
+  const { perfil, banner, youtube, musica, linkedin, libros, asesoria, asesoriaPago, whatsappGrupo, contacto } =
     CONTENIDO;
+
+  // Si la foto de perfil no carga (archivo aún no subido), caemos a las iniciales
+  // en vez de mostrar el ícono de imagen rota.
+  const [fotoPerfilRota, setFotoPerfilRota] = useState(false);
 
   // Salto por capítulos en el video destacado: al elegir un capítulo, recargamos
   // el iframe con ?start= en ese segundo.
@@ -317,7 +361,12 @@ export default function Academia() {
     (p) => (p.url && p.url.trim() !== "") || p.imagenUrl
   );
   const librosCargados = libros.filter((l) => l.titulo.trim() !== "" && l.titulo !== "Título del libro");
-  const cursosCargados = cursos.filter((c) => c.titulo.trim() !== "" && c.titulo !== "Nombre del curso");
+
+  // Jerarquía de la Academia: gratis (punto de partida) → exprés (paga rápida,
+  // fuera de la saga) → saga (las 7 partes secuenciales del programa completo).
+  const cursosGratis = CURSOS.filter((c) => !c.premium);
+  const cursosSaga = CURSOS.filter((c) => c.premium && c.slug.startsWith("saga-"));
+  const cursosExpres = CURSOS.filter((c) => c.premium && !c.slug.startsWith("saga-"));
 
   const nav = [
     { href: "#videos", label: "Videos", icon: Youtube },
@@ -371,10 +420,11 @@ export default function Academia() {
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col md:flex-row items-center gap-8">
             <div className="shrink-0">
-              {perfil.fotoUrl ? (
+              {perfil.fotoUrl && !fotoPerfilRota ? (
                 <img
                   src={perfil.fotoUrl}
                   alt={perfil.nombre}
+                  onError={() => setFotoPerfilRota(true)}
                   className="h-32 w-32 md:h-40 md:w-40 rounded-full object-cover shadow-lg border-4 border-white"
                 />
               ) : (
@@ -427,6 +477,7 @@ export default function Academia() {
                 <img
                   src={banner.imagenUrl}
                   alt={banner.alt}
+                  onError={(e) => { e.currentTarget.style.display = "none"; }}
                   className="w-full rounded-2xl shadow-lg border border-border/50 transition-transform group-hover:scale-[1.01]"
                 />
               </a>
@@ -434,6 +485,7 @@ export default function Academia() {
               <img
                 src={banner.imagenUrl}
                 alt={banner.alt}
+                onError={(e) => { e.currentTarget.style.display = "none"; }}
                 className="w-full rounded-2xl shadow-lg border border-border/50"
               />
             )}
@@ -591,10 +643,15 @@ export default function Academia() {
               asChild
               className="bg-firmavb-red hover:bg-firmavb-red/90 gap-2"
             >
-              <a href={youtube.canalUrl} target="_blank" rel="noopener noreferrer">
-                <Youtube className="h-4 w-4" />
+              <a
+                href={youtube.canalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Ver canal de YouTube (abre en nueva pestaña)"
+              >
+                <Youtube className="h-4 w-4" aria-hidden="true" />
                 Ver mi canal en YouTube
-                <ExternalLink className="h-3 w-3" />
+                <ExternalLink className="h-3 w-3" aria-hidden="true" />
               </a>
             </Button>
           </div>
@@ -630,9 +687,9 @@ export default function Academia() {
                         <span className="font-medium text-foreground">{m.titulo}</span>
                       </div>
                       <Button size="sm" variant="outline" asChild className="gap-2">
-                        <a href={m.url} target="_blank" rel="noopener noreferrer">
+                        <a href={m.url} target="_blank" rel="noopener noreferrer" aria-label={`Escuchar ${m.titulo} (canción, abre en nueva pestaña)`}>
                           Escuchar
-                          <ExternalLink className="h-3 w-3" />
+                          <ExternalLink className="h-3 w-3" aria-hidden="true" />
                         </a>
                       </Button>
                     </CardContent>
@@ -668,11 +725,13 @@ export default function Academia() {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="block bg-muted"
+                      aria-label={`${p.titulo} (abre en nueva pestaña)`}
                     >
                       <img
                         src={p.imagenUrl}
                         alt={p.titulo}
                         loading="lazy"
+                        onError={(e) => { e.currentTarget.style.display = "none"; }}
                         className="w-full aspect-square object-cover hover:opacity-95 transition-opacity"
                       />
                     </a>
@@ -686,9 +745,9 @@ export default function Academia() {
                     <p className="text-sm text-muted-foreground mb-4 flex-1">{p.resumen}</p>
                     {p.url && (
                       <Button size="sm" variant="outline" asChild className="gap-2 self-start">
-                        <a href={p.url} target="_blank" rel="noopener noreferrer">
+                        <a href={p.url} target="_blank" rel="noopener noreferrer" aria-label="Ver publicación (abre en nueva pestaña)">
                           Ver publicación
-                          <ExternalLink className="h-3 w-3" />
+                          <ExternalLink className="h-3 w-3" aria-hidden="true" />
                         </a>
                       </Button>
                     )}
@@ -699,10 +758,10 @@ export default function Academia() {
             {linkedin.perfilUrl && (
               <div className="mt-6">
                 <Button variant="outline" asChild className="gap-2">
-                  <a href={linkedin.perfilUrl} target="_blank" rel="noopener noreferrer">
-                    <Linkedin className="h-4 w-4" />
+                  <a href={linkedin.perfilUrl} target="_blank" rel="noopener noreferrer" aria-label="Ver perfil de LinkedIn (abre en nueva pestaña)">
+                    <Linkedin className="h-4 w-4" aria-hidden="true" />
                     Ver mi perfil de LinkedIn
-                    <ExternalLink className="h-3 w-3" />
+                    <ExternalLink className="h-3 w-3" aria-hidden="true" />
                   </a>
                 </Button>
               </div>
@@ -713,10 +772,10 @@ export default function Academia() {
             <PendientePorCargar texto="Aún no hay posts cargados. Pega los links de tus publicaciones de LinkedIn en el bloque CONTENIDO." />
             {linkedin.perfilUrl && (
               <Button variant="outline" asChild className="gap-2">
-                <a href={linkedin.perfilUrl} target="_blank" rel="noopener noreferrer">
-                  <Linkedin className="h-4 w-4" />
+                <a href={linkedin.perfilUrl} target="_blank" rel="noopener noreferrer" aria-label="Ver perfil de LinkedIn (abre en nueva pestaña)">
+                  <Linkedin className="h-4 w-4" aria-hidden="true" />
                   Ver mi perfil de LinkedIn
-                  <ExternalLink className="h-3 w-3" />
+                  <ExternalLink className="h-3 w-3" aria-hidden="true" />
                 </a>
               </Button>
             )}
@@ -737,7 +796,7 @@ export default function Academia() {
               <Card key={i} className="border-border/50 overflow-hidden flex flex-col">
                 <div className="aspect-[3/4] bg-muted/50 flex items-center justify-center">
                   {l.portadaUrl ? (
-                    <img src={l.portadaUrl} alt={l.titulo} className="w-full h-full object-cover" />
+                    <img src={l.portadaUrl} alt={l.titulo} onError={(e) => { e.currentTarget.style.display = "none"; }} className="w-full h-full object-cover" />
                   ) : (
                     <BookOpen className="h-12 w-12 text-muted-foreground/40" />
                   )}
@@ -753,9 +812,9 @@ export default function Academia() {
                     )}
                     {l.comprarUrl && (
                       <Button size="sm" asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2">
-                        <a href={l.comprarUrl} target="_blank" rel="noopener noreferrer">
+                        <a href={l.comprarUrl} target="_blank" rel="noopener noreferrer" aria-label="Comprar en Amazon (abre en nueva pestaña)">
                           Comprar en Amazon
-                          <ExternalLink className="h-3 w-3" />
+                          <ExternalLink className="h-3 w-3" aria-hidden="true" />
                         </a>
                       </Button>
                     )}
@@ -774,80 +833,100 @@ export default function Academia() {
         id="cursos"
         icon={GraduationCap}
         titulo="Mis cursos"
-        subtitulo="Cursos gratuitos paso a paso, y un programa premium para llevarte al siguiente nivel."
+        subtitulo="Tres formas de avanzar: parte gratis, resuelve rápido con un curso exprés, o haz el camino completo con la Saga."
         alt
       >
-        {SAGA_BUNDLE.activo && (
-          <Card className="mb-6 overflow-hidden border-0 bg-gradient-to-br from-firmavb-blue to-header-dark text-white shadow-xl">
-            <CardContent className="py-6 md:flex items-center justify-between gap-6">
-              <div>
-                <Badge className="mb-2 bg-white/20 text-white border-white/30 hover:bg-white/30">
-                  🎁 Pack con descuento
-                </Badge>
-                <h3 className="text-xl md:text-2xl font-bold">{SAGA_BUNDLE.titulo}</h3>
-                <p className="text-white/90 max-w-xl">{SAGA_BUNDLE.descripcion}</p>
-              </div>
-              <div className="mt-4 md:mt-0 text-center shrink-0">
-                <p className="text-3xl font-bold mb-2">{SAGA_BUNDLE.precio}</p>
-                {SAGA_BUNDLE.pagoUrl ? (
-                  <Button
-                    asChild
-                    size="lg"
-                    className="bg-white text-firmavb-blue hover:bg-white/90 font-semibold gap-2"
-                  >
-                    <a href={SAGA_BUNDLE.pagoUrl} target="_blank" rel="noopener noreferrer">
-                      Comprar la saga completa
-                    </a>
-                  </Button>
-                ) : (
-                  <Button size="lg" disabled>
-                    Muy pronto
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+        {/* 1. Punto de partida: los 3 cursos gratis, con el primero destacado */}
+        <div className="mb-12">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">
+            1. Empieza gratis
+          </h3>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {cursosGratis.map((c, i) => (
+              <CursoCard key={c.slug} c={c} destacar={i === 0} />
+            ))}
+          </div>
+        </div>
+
+        {/* 2. Cursos exprés: alternativa paga y rápida, sin comprometerse a la saga */}
+        {cursosExpres.length > 0 && (
+          <div className="mb-12">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">
+              2. ¿Con prisa? Cursos exprés
+            </h3>
+            <div className="grid sm:grid-cols-2 gap-6">
+              {cursosExpres.map((c) => (
+                <CursoCard key={c.slug} c={c} />
+              ))}
+            </div>
+          </div>
         )}
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {CURSOS.map((c) => (
-            <Card
-              key={c.slug}
-              className="border-border/50 hover:shadow-md transition-shadow flex flex-col overflow-hidden"
-            >
-              <div className={`relative ${ACENTO[c.acento].portada} h-24 flex items-center justify-center`}>
-                <span className="text-5xl drop-shadow-md">{c.emoji}</span>
-                {c.premium ? (
-                  <span className="absolute top-2 right-2 bg-white/90 text-firmavb-blue text-xs font-bold px-2 py-0.5 rounded-full shadow">
-                    💎 Premium
-                  </span>
-                ) : (
-                  <span className="absolute top-2 right-2 bg-white/90 text-[hsl(var(--success))] text-xs font-bold px-2 py-0.5 rounded-full shadow">
-                    Gratis
-                  </span>
-                )}
-              </div>
-              <CardContent className="py-6 flex flex-col flex-1">
-                <h3 className="font-semibold text-foreground mb-1">{c.titulo}</h3>
-                <p className="text-sm text-muted-foreground mb-4 flex-1">{c.descripcion}</p>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  <Badge variant="outline" className="text-xs">{c.nivel}</Badge>
-                  <Badge variant="outline" className="text-xs">{c.duracion}</Badge>
-                  {c.premium && c.precio && (
-                    <Badge className="text-xs bg-firmavb-blue/10 text-firmavb-blue border-firmavb-blue/20">
-                      {c.precio}
+        {/* 3. La Saga completa: 7 partes secuenciales, en formato lista (no 7 tarjetas
+            repetidas) para que se lea como un programa y no como 7 cursos sueltos. */}
+        {cursosSaga.length > 0 && (
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">
+              3. El camino completo: Saga Véndele al Estado
+            </h3>
+            {SAGA_BUNDLE.activo && (
+              <Card className="mb-4 overflow-hidden border-0 bg-gradient-to-br from-firmavb-blue to-header-dark text-white shadow-xl">
+                <CardContent className="py-6 md:flex items-center justify-between gap-6">
+                  <div>
+                    <Badge className="mb-2 bg-white/20 text-white border-white/30 hover:bg-white/30">
+                      🎁 Pack con descuento
                     </Badge>
+                    <h3 className="text-xl md:text-2xl font-bold">{SAGA_BUNDLE.titulo}</h3>
+                    <p className="text-white/90 max-w-xl">{SAGA_BUNDLE.descripcion}</p>
+                  </div>
+                  <div className="mt-4 md:mt-0 text-center shrink-0">
+                    <p className="text-3xl font-bold mb-2">{SAGA_BUNDLE.precio}</p>
+                    {SAGA_BUNDLE.pagoUrl ? (
+                      <Button
+                        asChild
+                        size="lg"
+                        className="bg-white text-firmavb-blue hover:bg-white/90 font-semibold gap-2"
+                      >
+                        <a href={SAGA_BUNDLE.pagoUrl} target="_blank" rel="noopener noreferrer" aria-label="Comprar la saga completa (abre en nueva pestaña)">
+                          Comprar la saga completa
+                        </a>
+                      </Button>
+                    ) : (
+                      <Button size="lg" disabled>
+                        Muy pronto
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            <div className="rounded-xl border border-border/50 bg-card divide-y divide-border/50 overflow-hidden">
+              {cursosSaga.map((c, i) => (
+                <Link
+                  key={c.slug}
+                  to={`/academia/curso/${c.slug}`}
+                  className="flex items-center gap-4 px-4 py-3 hover:bg-muted/50 transition-colors"
+                >
+                  <span
+                    className={`shrink-0 h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold ${ACENTO[c.acento].chip}`}
+                  >
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-foreground truncate">{c.titulo}</p>
+                    <p className="text-xs text-muted-foreground truncate">{c.descripcion}</p>
+                  </div>
+                  {c.precio && (
+                    <span className="hidden sm:inline text-sm font-semibold text-firmavb-blue shrink-0">
+                      {c.precio}
+                    </span>
                   )}
-                </div>
-                <Button asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2 w-full">
-                  <Link to={`/academia/curso/${c.slug}`}>
-                    {c.premium ? "Ver programa" : "Ver curso gratis"}
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </Seccion>
 
       {/* Asesoría gratuita */}
@@ -876,7 +955,7 @@ export default function Academia() {
                   )}
                   {asesoriaPago.pagoUrl ? (
                     <Button asChild className="bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2">
-                      <a href={asesoriaPago.pagoUrl} target="_blank" rel="noopener noreferrer">
+                      <a href={asesoriaPago.pagoUrl} target="_blank" rel="noopener noreferrer" aria-label="Agendar asesoría con pago (abre en nueva pestaña)">
                         Agendar (con pago)
                       </a>
                     </Button>
@@ -935,8 +1014,8 @@ export default function Academia() {
                   asChild
                   className="bg-[hsl(var(--success))] hover:bg-[hsl(var(--success))]/90 gap-2"
                 >
-                  <a href={whatsappGrupo.invitacionUrl} target="_blank" rel="noopener noreferrer">
-                    <MessageCircle className="h-4 w-4" />
+                  <a href={whatsappGrupo.invitacionUrl} target="_blank" rel="noopener noreferrer" aria-label="Unirse al grupo de WhatsApp (abre en nueva ventana)">
+                    <MessageCircle className="h-4 w-4" aria-hidden="true" />
                     Unirme al grupo
                   </a>
                 </Button>
@@ -957,8 +1036,8 @@ export default function Academia() {
               </p>
               <div className="flex flex-wrap gap-3">
                 <Button asChild variant="outline" className="gap-2">
-                  <a href={contacto.whatsapp} target="_blank" rel="noopener noreferrer">
-                    <MessageCircle className="h-4 w-4" />
+                  <a href={contacto.whatsapp} target="_blank" rel="noopener noreferrer" aria-label="Contactar por WhatsApp (abre en nueva ventana)">
+                    <MessageCircle className="h-4 w-4" aria-hidden="true" />
                     WhatsApp
                   </a>
                 </Button>

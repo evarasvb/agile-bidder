@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -67,8 +67,9 @@ function BloqueView({ bloque }: { bloque: Bloque }) {
           target="_blank"
           rel="noopener noreferrer"
           className="my-4 inline-flex items-center gap-2 rounded-xl border border-[hsl(var(--success))]/30 bg-[hsl(var(--success))]/10 px-4 py-3 text-sm font-semibold text-[hsl(var(--success))] hover:bg-[hsl(var(--success))]/20 transition-colors"
+          aria-label={`${bloque.texto} (abre en nueva pestaña)`}
         >
-          <Download className="h-4 w-4" />
+          <Download className="h-4 w-4" aria-hidden="true" />
           {bloque.texto}
         </a>
       );
@@ -106,8 +107,9 @@ function BloqueView({ bloque }: { bloque: Bloque }) {
           target="_blank"
           rel="noopener noreferrer"
           className="my-4 inline-flex items-center gap-2 rounded-xl bg-firmavb-blue px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-firmavb-blue/90 transition-colors"
+          aria-label={`${bloque.texto} (abre en nueva pestaña)`}
         >
-          <Calendar className="h-4 w-4" />
+          <Calendar className="h-4 w-4" aria-hidden="true" />
           {bloque.texto}
         </a>
       );
@@ -117,13 +119,68 @@ function BloqueView({ bloque }: { bloque: Bloque }) {
   }
 }
 
-// Render de los módulos con lecciones numeradas (cursos gratis y premium ya desbloqueados)
-function ModulosContenido({ modulos }: { modulos: Modulo[] }) {
+// Progreso de lectura de un curso, guardado en este navegador (localStorage).
+// No es un sistema de cuentas: es solo para que quien vuelve a entrar vea por
+// dónde iba. Clave por slug del curso, así cada curso lleva su propio avance.
+function useProgresoCurso(slug: string) {
+  const key = `academia-progreso-${slug}`;
+  const [leidas, setLeidas] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(key, JSON.stringify([...leidas]));
+    } catch {
+      // localStorage puede fallar (modo privado, cuota); el progreso solo se
+      // pierde al recargar, no bloquea la lectura del curso.
+    }
+  }, [leidas, key]);
+  const marcar = (id: string) =>
+    setLeidas((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  return { leidas, marcar };
+}
+
+// Render de los módulos con lecciones numeradas (cursos gratis y premium ya desbloqueados).
+// Cada módulo tiene un ancla (#modulo-N) para el índice, y cada lección se puede
+// marcar como leída: así quien vuelve ve cuánto le falta.
+function ModulosContenido({ modulos, slug }: { modulos: Modulo[]; slug: string }) {
+  const { leidas, marcar } = useProgresoCurso(slug);
+  const totalLecciones = useMemo(
+    () => modulos.reduce((n, m) => n + m.lecciones.length, 0),
+    [modulos]
+  );
+  const leidasEnCurso = leidas.size;
   let leccionNum = 0;
   return (
     <>
+      <div className="rounded-xl border border-border/50 bg-card p-4 flex items-center gap-4">
+        <div className="flex-1">
+          <div className="flex items-center justify-between text-sm mb-1.5">
+            <span className="font-medium text-foreground">Tu avance</span>
+            <span className="text-muted-foreground">
+              {leidasEnCurso} de {totalLecciones} lecciones leídas
+            </span>
+          </div>
+          <div className="h-2 rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full rounded-full bg-firmavb-blue transition-all"
+              style={{ width: `${totalLecciones ? (leidasEnCurso / totalLecciones) * 100 : 0}%` }}
+            />
+          </div>
+        </div>
+      </div>
       {modulos.map((modulo, mi) => (
-        <Card key={mi} className="border-border/50">
+        <Card key={mi} id={`modulo-${mi}`} className="border-border/50 scroll-mt-24">
           <CardContent className="py-6">
             <h2 className="text-xl font-bold text-firmavb-blue mb-4 pb-3 border-b border-border/50">
               {modulo.titulo}
@@ -131,13 +188,24 @@ function ModulosContenido({ modulos }: { modulos: Modulo[] }) {
             <div className="space-y-8">
               {modulo.lecciones.map((leccion, li) => {
                 leccionNum += 1;
+                const id = `l-${mi}-${li}`;
+                const leida = leidas.has(id);
                 return (
                   <article key={li}>
                     <h3 className="text-lg font-semibold text-foreground flex items-center gap-3">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-firmavb-blue text-white text-sm font-bold">
-                        {leccionNum}
-                      </span>
-                      {leccion.titulo}
+                      <button
+                        type="button"
+                        onClick={() => marcar(id)}
+                        title={leida ? "Marcar como no leída" : "Marcar como leída"}
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-colors ${
+                          leida
+                            ? "bg-[hsl(var(--success))] text-white"
+                            : "bg-firmavb-blue text-white hover:opacity-80"
+                        }`}
+                      >
+                        {leida ? <CheckCircle2 className="h-4 w-4" /> : leccionNum}
+                      </button>
+                      <span className={leida ? "text-muted-foreground" : ""}>{leccion.titulo}</span>
                     </h3>
                     <div className="mt-2 sm:pl-10">
                       {leccion.bloques.map((bloque, bi) => (
@@ -267,16 +335,30 @@ export default function AcademiaCurso() {
             </div>
           </div>
 
-          {/* Índice del curso */}
+          {/* Índice del curso. En el curso gratis salta al módulo (mismo contenido
+              que se lee abajo); en el premium es solo el temario de venta, porque
+              el contenido real (server-side) puede traer más módulos que este. */}
           <div className="mt-6 rounded-xl border border-border/50 bg-card p-5">
             <p className="text-sm font-semibold text-foreground mb-3">En este curso verás:</p>
             <ol className="space-y-2">
-              {curso.modulos.map((m, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <span className={`font-bold ${ACENTO[curso.acento].texto}`}>{i + 1}.</span>
-                  {m.titulo}
-                </li>
-              ))}
+              {curso.modulos.map((m, i) =>
+                curso.premium ? (
+                  <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <span className={`font-bold ${ACENTO[curso.acento].texto}`}>{i + 1}.</span>
+                    {m.titulo}
+                  </li>
+                ) : (
+                  <li key={i}>
+                    <a
+                      href={`#modulo-${i}`}
+                      className="flex items-start gap-2 text-sm text-muted-foreground hover:text-firmavb-blue transition-colors"
+                    >
+                      <span className={`font-bold ${ACENTO[curso.acento].texto}`}>{i + 1}.</span>
+                      {m.titulo}
+                    </a>
+                  </li>
+                )
+              )}
             </ol>
           </div>
         </div>
@@ -286,7 +368,7 @@ export default function AcademiaCurso() {
       <section className="px-6 pb-12">
         <div className="max-w-4xl mx-auto space-y-8">
           {/* Curso gratis: contenido completo */}
-          {!curso.premium && <ModulosContenido modulos={curso.modulos} />}
+          {!curso.premium && <ModulosContenido modulos={curso.modulos} slug={curso.slug} />}
 
           {/* Curso premium ya desbloqueado */}
           {curso.premium && desbloqueado && (
@@ -315,8 +397,8 @@ export default function AcademiaCurso() {
                       asChild
                       className="mt-4 md:mt-0 bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2 shrink-0"
                     >
-                      <a href={agendarUrl} target="_blank" rel="noopener noreferrer">
-                        <Video className="h-4 w-4" />
+                      <a href={agendarUrl} target="_blank" rel="noopener noreferrer" aria-label="Agendar sesión de video (abre en nueva pestaña)">
+                        <Video className="h-4 w-4" aria-hidden="true" />
                         Agendar mi sesión
                       </a>
                     </Button>
@@ -324,7 +406,7 @@ export default function AcademiaCurso() {
                 </Card>
               )}
 
-              <ModulosContenido modulos={desbloqueado} />
+              <ModulosContenido modulos={desbloqueado} slug={curso.slug} />
             </>
           )}
 
@@ -366,8 +448,8 @@ export default function AcademiaCurso() {
                       size="lg"
                       className="bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2"
                     >
-                      <a href={curso.pagoUrl} target="_blank" rel="noopener noreferrer">
-                        <ShoppingCart className="h-5 w-5" />
+                      <a href={curso.pagoUrl} target="_blank" rel="noopener noreferrer" aria-label="Comprar curso con Mercado Pago (abre en nueva pestaña)">
+                        <ShoppingCart className="h-5 w-5" aria-hidden="true" />
                         Comprar con Mercado Pago
                       </a>
                     </Button>

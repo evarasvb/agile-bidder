@@ -142,6 +142,15 @@ function mapItem(i: RawOC): OrdenCompraItem {
   };
 }
 
+// Datos Abiertos manda "NA" (o "N/A") cuando no clasificó la línea. Eso NO es
+// una categoría: se devuelve null para que el reporte la clasifique por el
+// nombre del producto (antes "NA" concentraba el 60% del monto del cubo).
+function limpiarCategoria(v: string | null | undefined): string | null {
+  const s = (v ?? '').trim();
+  if (!s || /^(n\/?a|null|none|sin categor[ií]a|-)$/i.test(s)) return null;
+  return s;
+}
+
 // Línea de producto desde `oc_lineas` (Datos Abiertos, detalle completo del
 // mercado) mapeada a la misma interfaz de ítem que usa la UI.
 function mapLinea(l: RawOC): OrdenCompraItem {
@@ -156,7 +165,10 @@ function mapLinea(l: RawOC): OrdenCompraItem {
     unidad: null,
     precio_unitario_neto: l.precio_neto ?? null,
     total_neto: l.monto_linea ?? null,
-    categoria: l.rubro_n1 ?? l.categoria ?? null,
+    // "NA" / "N/A" vienen así desde Datos Abiertos: se tratan como vacío para que
+    // el reporte clasifique el rubro por el nombre del producto en vez de mostrar
+    // una categoría "NA" que se comía el 60% del monto.
+    categoria: limpiarCategoria(l.rubro_n1) ?? limpiarCategoria(l.categoria) ?? null,
     created_at: '',
   };
 }
@@ -169,7 +181,7 @@ async function fetchItemsPorCodigos(codigos: string[]): Promise<Map<string, Orde
   const cods = codigos.filter(Boolean);
   if (!cods.length) return map;
 
-  const { data: lineas, error: lErr } = await (supabase as any)
+  const { data: lineas, error: lErr } = await supabase
     .from('oc_lineas')
     .select('linea_id, codigo, correlativo, producto, categoria, rubro_n1, cantidad, precio_neto, monto_linea')
     .in('codigo', cods)
@@ -183,7 +195,7 @@ async function fetchItemsPorCodigos(codigos: string[]): Promise<Map<string, Orde
 
   const faltan = cods.filter((c) => !map.has(c));
   if (faltan.length) {
-    const { data: items, error: iErr } = await (supabase as any)
+    const { data: items, error: iErr } = await supabase
       .from('ordenes_compra_items')
       .select('*')
       .in('numero_oc', faltan);
@@ -207,7 +219,7 @@ export function useOrdenesCompra(
     queryKey: ['ordenes_compra', filters, includeItems],
     enabled: options?.enabled ?? true,
     queryFn: async (): Promise<OrdenCompra[]> => {
-      let query = (supabase as any)
+      let query = supabase
         .from('ordenes_compra')
         .select(
           'id, codigo, nombre, estado, fecha_emision, fecha_envio_oc, monto_total, total, neto, ' +
@@ -291,7 +303,7 @@ export function useOrdenCompra(codigo: string | null, includeItems = true) {
     queryFn: async (): Promise<OrdenCompra | null> => {
       if (!codigo) return null;
 
-      const { data: orden, error: ordenError } = await (supabase as any)
+      const { data: orden, error: ordenError } = await supabase
         .from('ordenes_compra')
         .select('*')
         .eq('codigo', codigo)
@@ -323,7 +335,7 @@ export function useOrdenCompraItems(numeroOc: string | null) {
     queryKey: ['orden_compra_items', numeroOc],
     queryFn: async (): Promise<OrdenCompraItem[]> => {
       if (!numeroOc) return [];
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('ordenes_compra_items')
         .select('*')
         .eq('numero_oc', numeroOc);
@@ -360,7 +372,7 @@ export function useUpsertOrdenCompra() {
         estado: orden.estado ?? null,
       };
 
-      const { data: savedOrden, error: ordenError } = await (supabase as any)
+      const { data: savedOrden, error: ordenError } = await supabase
         .from('ordenes_compra')
         .upsert(ordenData, { onConflict: 'codigo' })
         .select()
@@ -383,7 +395,7 @@ export function useUpsertOrdenCompra() {
           valor_total: item.total_neto ?? null,
         }));
 
-        const { error: itemsError } = await (supabase as any)
+        const { error: itemsError } = await supabase
           .from('ordenes_compra_items')
           .insert(itemsData);
         if (itemsError) console.error('Error insertando items:', itemsError);
@@ -409,7 +421,7 @@ export function useOpcionesOC(campo: 'proveedor_nombre' | 'organismo_comprador',
   return useQuery({
     queryKey: ['opciones-oc', campo, term],
     queryFn: async (): Promise<string[]> => {
-      let query = (supabase as any)
+      let query = supabase
         .from('ordenes_compra')
         .select(campo)
         .not(campo, 'is', null)
@@ -433,7 +445,7 @@ export function useRutProveedor(nombre: string | null) {
     enabled: !!nombre,
     queryFn: async (): Promise<string | null> => {
       if (!nombre) return null;
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('ordenes_compra')
         .select('rut_proveedor')
         .eq('proveedor_nombre', nombre)
@@ -456,7 +468,7 @@ export function useSyncMisOC() {
     // clienteId → trae las OC del cliente logueado; rut → trae las de CUALQUIER
     // proveedor (modo Mercado, bajo demanda). Uno de los dos.
     mutationFn: async ({ clienteId, rut, anio }: { clienteId?: string; rut?: string; anio?: number }) => {
-      const { data, error } = await (supabase as any).functions.invoke('sync-mis-oc', {
+      const { data, error } = await supabase.functions.invoke('sync-mis-oc', {
         body: { cliente_id: clienteId, rut, anio },
       });
       if (error) throw error;
@@ -474,13 +486,13 @@ export function useOrdenesCompraStats() {
   return useQuery({
     queryKey: ['ordenes_compra_stats'],
     queryFn: async () => {
-      const { count: total, error: countError } = await (supabase as any)
+      const { count: total, error: countError } = await supabase
         .from('ordenes_compra')
         .select('*', { count: 'exact', head: true });
       if (countError) throw countError;
 
       // Suma de montos (columna real `total`).
-      const { data: montoData } = await (supabase as any)
+      const { data: montoData } = await supabase
         .from('ordenes_compra')
         .select('total')
         .limit(20000);

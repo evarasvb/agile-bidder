@@ -9,7 +9,7 @@ import { recalcularMatchInventario } from '@/lib/matchRecalc';
 // escritura exige clientes.id y el match une por clientes.id). Ver función SQL
 // cliente_owner_id(). Devuelve null si aún no hay empresa.
 async function resolverClienteOwnerId(): Promise<string | null> {
-  const { data, error } = await (supabase as any).rpc('cliente_owner_id');
+  const { data, error } = await supabase.rpc('cliente_owner_id');
   if (error) {
     console.error('[inventory] cliente_owner_id error:', error);
     return null;
@@ -29,7 +29,8 @@ export interface InventoryItem {
   margen_minimo: number | null;
   margen_objetivo: number | null; // UI field, stored as margen_minimo in DB
   stock_disponible: number | null;
-  unidad_medida: string | null; // UI field, not in cliente_inventario
+  unidad_medida: string | null;
+  marca: string | null;
   tiempo_entrega_dias: number | null;
   proveedor: string | null; // UI field, not in cliente_inventario
   activo: boolean | null;
@@ -49,7 +50,8 @@ export interface InventoryInput {
   margen_minimo?: number | null;
   margen_objetivo?: number | null; // UI field
   stock_disponible?: number | null;
-  unidad_medida?: string | null; // UI field
+  unidad_medida?: string | null;
+  marca?: string | null;
   tiempo_entrega_dias?: number | null;
   proveedor?: string | null; // UI field
   activo?: boolean | null;
@@ -69,7 +71,8 @@ function mapRowToInventoryItem(row: any): InventoryItem {
     margen_minimo: row.margen_minimo,
     margen_objetivo: row.margen_minimo, // Use same value as fallback
     stock_disponible: row.stock_disponible,
-    unidad_medida: 'unidad', // Default since not in table
+    unidad_medida: row.unidad_medida ?? 'unidad',
+    marca: row.marca ?? null,
     tiempo_entrega_dias: row.tiempo_entrega,
     proveedor: null, // Not in table
     activo: true, /* no existe columna activo en cliente_inventario */
@@ -84,11 +87,16 @@ function mapRowToInventoryItem(row: any): InventoryItem {
 // Inventario PAGINADO en el servidor (pantalla Inventario). Antes la pantalla
 // bajaba las 16.000 filas al navegador en tandas de 1.000 y filtraba ahí.
 // -----------------------------------------------------------------------------
+/** Columnas reales de cliente_inventario por las que se puede ordenar en el servidor. */
+export type InventarioOrdenColumna = 'sku' | 'nombre_producto' | 'categoria' | 'precio_unitario' | 'margen_minimo' | 'stock_disponible' | 'created_at';
+
 export interface InventarioPaginaOpts {
   page: number;
   pageSize: number;
   q?: string;
   soloIncompletos?: boolean;
+  /** Orden en el servidor (por defecto created_at desc). */
+  orderBy?: { column: InventarioOrdenColumna; asc: boolean };
 }
 
 const escapaIlike = (s: string) => s.replace(/[%_,()]/g, ' ').trim();
@@ -99,7 +107,7 @@ export function useInventarioPagina(opts: InventarioPaginaOpts) {
   const q = (opts.q || '').trim();
 
   return useQuery({
-    queryKey: ['inventory', 'pagina', clienteId, opts.page, opts.pageSize, q, !!opts.soloIncompletos],
+    queryKey: ['inventory', 'pagina', clienteId, opts.page, opts.pageSize, q, !!opts.soloIncompletos, opts.orderBy?.column ?? 'created_at', opts.orderBy?.asc ?? false],
     queryFn: async (): Promise<{ items: InventoryItem[]; total: number }> => {
       if (!clienteId) return { items: [], total: 0 };
       const ownerId = await resolverClienteOwnerId();
@@ -118,8 +126,12 @@ export function useInventarioPagina(opts: InventarioPaginaOpts) {
         // Sin descripción o sin imagen (lo que resta calidad al match y al PDF).
         query = query.or('descripcion.is.null,descripcion.eq.,imagen_url.is.null,imagen_url.eq.');
       }
+      // Orden pedido por la tabla + id como desempate para que las páginas no
+      // repitan ni salten filas; los vacíos siempre al final.
+      const orden = opts.orderBy ?? { column: 'created_at' as const, asc: false };
       const { data, error, count } = await query
-        .order('created_at', { ascending: false })
+        .order(orden.column, { ascending: orden.asc, nullsFirst: false })
+        .order('id', { ascending: true })
         .range(from, from + opts.pageSize - 1);
       if (error) {
         console.error('[useInventarioPagina]', error);
@@ -152,15 +164,21 @@ export function useInventarioResumen() {
     queryFn: async (): Promise<InventarioResumen> => {
       const vacio: InventarioResumen = { total: 0, activos: 0, sin_stock: 0, stock_bajo: 0, incompletos: 0, valor: 0, categorias: [] };
       if (!clienteId) return vacio;
-      const { data, error } = await (supabase as any).rpc('cliente_inventario_resumen');
+      const { data, error } = await supabase.rpc('cliente_inventario_resumen');
       if (error) {
         console.error('[useInventarioResumen]', error);
         throw error;
       }
-      return { ...vacio, ...(data || {}), categorias: (data?.categorias as string[]) || [] };
+      const resumen = (data || {}) as Partial<InventarioResumen>;
+      return { ...vacio, ...resumen, categorias: (resumen.categorias as string[]) || [] };
     },
     enabled: !!clienteId && !authLoading,
     staleTime: 60 * 1000,
+    // Los KPIs quedaban en 0·0·0·0 al entrar directo a /inventario hasta que
+    // algo forzaba un refetch (p.ej. escribir en el buscador). Forzar la
+    // consulta al montar y reintentar si la RPC falla al primer intento.
+    refetchOnMount: 'always',
+    retry: 2,
   });
 }
 
@@ -374,6 +392,8 @@ export function useCreateInventoryItem() {
         precio_unitario: item.precio_unitario,
         margen_minimo: item.margen_minimo ?? item.margen_objetivo ?? 15,
         stock_disponible: item.stock_disponible ?? 0,
+        unidad_medida: item.unidad_medida ?? null,
+        marca: item.marca?.trim() || null,
         tiempo_entrega: item.tiempo_entrega_dias ?? 5,
                 imagen_url: item.imagen_url,
       };
@@ -436,6 +456,8 @@ export function useUpdateInventoryItem() {
       if (updates.precio_unitario !== undefined) updateData.precio_unitario = updates.precio_unitario;
       if (updates.margen_minimo !== undefined) updateData.margen_minimo = updates.margen_minimo;
       if (updates.stock_disponible !== undefined) updateData.stock_disponible = updates.stock_disponible;
+      if (updates.unidad_medida !== undefined) updateData.unidad_medida = updates.unidad_medida;
+      if (updates.marca !== undefined) updateData.marca = (updates.marca?.trim() || null);
       if (updates.tiempo_entrega_dias !== undefined) updateData.tiempo_entrega = updates.tiempo_entrega_dias;
             if (updates.imagen_url !== undefined) updateData.imagen_url = updates.imagen_url;
       if (updates.sku !== undefined) updateData.sku = updates.sku;

@@ -82,7 +82,7 @@ export default function OnboardingStep3() {
                 />
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <Icon className={`w-4 h-4 ${isSelected ? 'text-destructive' : 'text-muted-foreground'}`} />
+                    <Icon className={`w-4 h-4 ${isSelected ? 'text-destructive' : 'text-muted-foreground'}`} aria-hidden="true" />
                     <span className="font-medium">{excl.label}</span>
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">{excl.description}</p>

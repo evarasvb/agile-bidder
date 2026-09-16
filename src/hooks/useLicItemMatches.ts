@@ -23,7 +23,7 @@ export function useLicItemMatches(codigo: string | null | undefined) {
     queryKey: ['lic-item-matches', codigo],
     enabled: !!codigo,
     queryFn: async (): Promise<LicItemMatch[]> => {
-      const { data, error } = await (supabaseClient as any)
+      const { data, error } = await supabaseClient
         .from('lic_item_matches')
         .select('*')
         .eq('licitacion_codigo', codigo);

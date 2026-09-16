@@ -1,8 +1,9 @@
-// Experto FirmaVB — ESTUDIO PROFUNDO (plan Pro). Para una licitación, mira hacia atrás todo lo
+// Don Evaristo — ESTUDIO PROFUNDO (plan Pro). Para una licitación, mira hacia atrás todo lo
 // parecido que compró ese organismo: quién ganó, a qué precio respecto del presupuesto, cuántos
 // compitieron, quién es el incumbente, cómo paga, y (si están) las bases. Misma salida SSE que
 // experto-consultar para reutilizar la interfaz.
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { evidenceGateLicitacion, crearEstadoDocumentacionLicitacion } from "../_shared/evidenceGateHelper.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
@@ -25,7 +26,7 @@ function ipCliente(req: Request): string | null {
   return ip ? ip.slice(0, 64) : null;
 }
 
-const SYS = `Eres el Experto FirmaVB, asesor con 17 años vendiéndole al Estado chileno. Entregas a un proveedor pyme un ESTUDIO PROFUNDO de una licitación: no solo esta compra, sino el historial de compras parecidas del mismo organismo. Usa SOLO los datos y fuentes entregados. Hablas como Evaristo Varas en su libro "Véndele al Estado y No Mueras en el Intento": de tú, cercano, directo, como un amigo que ya pasó por esto y te lo cuenta sin adornos. Frases cortas. Nada de "estimado", "revisor en mano" ni saludos largos; entra al grano en la primera línea. Ejemplos concretos de la calle antes que teoría. Cuando toca, un empujón honesto ("no hay atajos", "no basta con querer ganar, hay que poder cumplir"). Si algo es riesgoso, dilo sin rodeos. Cierra siempre con el paso concreto que daría hoy. Siempre con cifras. Formato Markdown con estas secciones exactas:
+const SYS = `Eres Don Evaristo, asesor con 17 años vendiéndole al Estado chileno. Entregas a un proveedor pyme un ESTUDIO PROFUNDO de una licitación: no solo esta compra, sino el historial de compras parecidas del mismo organismo. Usa SOLO los datos y fuentes entregados. Hablas como Evaristo Varas en su libro "Véndele al Estado y No Mueras en el Intento": de tú, cercano, directo, como un amigo que ya pasó por esto y te lo cuenta sin adornos. Frases cortas. Nada de "estimado", "revisor en mano" ni saludos largos; entra al grano en la primera línea. Ejemplos concretos de la calle antes que teoría. Cuando toca, un empujón honesto ("no hay atajos", "no basta con querer ganar, hay que poder cumplir"). Si algo es riesgoso, dilo sin rodeos. Cierra siempre con el paso concreto que daría hoy. Siempre con cifras. Formato Markdown con estas secciones exactas:
 
 ## 1. Qué compra este organismo y cada cuánto
 Historial de procesos parecidos (código, fecha, estado, presupuesto). Si se repite cada año, dilo con las fechas.
@@ -100,10 +101,24 @@ Deno.serve(async (req) => {
     const res: Record<string, any> = {};
     await Promise.all(Object.entries(t).map(async ([k, p]) => { try { res[k] = await p; } catch { res[k] = null; } }));
 
+    // Evidence Gate: valida que la documentación esté completa para postular
+    const bases: any[] = res.bases ?? [];
+    const estadoDoc = crearEstadoDocumentacionLicitacion(ficha, bases, []);
+    const gate = evidenceGateLicitacion(estadoDoc);
+    if (!gate.permiteBadgeVerde) {
+      return json({
+        error: "documentacion_incompleta",
+        veredicto: gate.veredicto,
+        razon: gate.razon,
+        faltantes: gate.faltantes,
+        permiteBadgeVerde: false,
+        mensaje: `No se puede recomendar postular: ${gate.razon}. Faltantes: ${gate.faltantes.join("; ")}.`
+      }, 202);
+    }
+
     // Fuentes normativas [1..n], luego bases
     const vistos = new Set<number>();
     const frag: any[] = [...(res.n1 ?? []), ...(res.n2 ?? []), ...(res.n3 ?? [])].filter((f) => !vistos.has(f.id) && vistos.add(f.id));
-    const bases: any[] = res.bases ?? [];
     const partes: string[] = [];
     if (frag.length) partes.push("FUENTES:\n" + frag.map((f, i) => `[${i + 1}] ${f.fuente}${f.seccion ? " — " + f.seccion : ""}\n${String(f.texto).slice(0, 1200)}`).join("\n\n"));
     const o = ficha.organismo ?? {};

@@ -61,8 +61,7 @@ export function TeaserResultados({ termino }: { termino: string }) {
     setLoading(true);
     setError(false);
     (async () => {
-      // El RPC es nuevo y aún no está en los tipos generados de Supabase -> cast.
-      const { data: resp, error: err } = await (supabase.rpc as any)(
+      const { data: resp, error: err } = await supabase.rpc(
         "buscar_teaser_licitaciones",
         { termino: q, limite: 6 }
       );

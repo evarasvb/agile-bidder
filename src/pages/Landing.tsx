@@ -249,10 +249,10 @@ export default function Landing() {
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
               </Button>
-              <Button 
-                size="lg" 
-                variant="outline" 
-                className="text-base h-12 px-8 gap-2 border-2 hover:bg-muted/50 transition-all hover:scale-105 active:scale-95"
+              <Button
+                size="lg"
+                variant="ghost"
+                className="text-base h-12 px-8 gap-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all"
                 onClick={() => setDemoOpen(true)}
               >
                 <Play className="h-4 w-4" />
@@ -278,9 +278,9 @@ export default function Landing() {
 <Shield className="h-3 w-3 mr-1" />
 Convenio Marco CM 2239-2-LR26
 </Badge>
-<h3 className="text-xl md:text-2xl font-bold text-foreground mb-2">
+<h2 className="text-xl md:text-2xl font-bold text-foreground mb-2">
 Puedes postular al Convenio Marco de Software y Servicios TI?
-</h3>
+</h2>
 <p className="text-muted-foreground">
 Valida en 2 minutos si tu empresa cumple los requisitos de admisibilidad y que puntaje tecnico podrias alcanzar.
 </p>
@@ -480,11 +480,12 @@ Validar Admisibilidad Gratis
               >
                 📧 contacto@firmavb.cl
               </a>
-              <a 
-                href="https://wa.me/56994259157" 
+              <a
+                href="https://wa.me/56994259157"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2"
+                aria-label="+56 9 9425 9157 por WhatsApp (abre en nueva ventana)"
               >
                 💬 +56 9 9425 9157
               </a>

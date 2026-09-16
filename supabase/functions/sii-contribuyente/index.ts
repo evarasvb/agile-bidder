@@ -7,6 +7,9 @@
 //       GET  /functions/v1/sii-contribuyente?rut=76192083-9&refresh=1   (ignora caché)
 //
 // Secret requerido: APIGATEWAY_TOKEN
+//
+// (Fuente versionada desde la función ya desplegada en producción; la usa
+// `src/hooks/useEmpresaPorRut.ts` para autocompletar "Mi empresa" por RUT.)
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 

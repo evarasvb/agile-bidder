@@ -186,7 +186,7 @@ export function useInvoiceHistory() {
         .order("fecha_emision", { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      return (data || []) as unknown as FacturaComision[];
     },
     enabled: !!user?.id,
   });

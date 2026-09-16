@@ -125,17 +125,17 @@ export default function Planes() {
               )}
               <ul className="mt-1 space-y-2 text-sm text-muted-foreground flex-1">
                 {p.puntos.map((punto) => (
-                  <li key={punto} className="flex items-start gap-2">
-                    <Check className="h-4 w-4 mt-0.5 text-[hsl(var(--success))] shrink-0" />
-                    <span>{punto}</span>
+                  <li key={punto} className="flex items-start gap-3">
+                    <Check className="h-5 w-5 text-[hsl(var(--success))] shrink-0 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm leading-relaxed">{punto}</span>
                   </li>
                 ))}
               </ul>
-              <div className="mt-4">
+              <div className="mt-6">
                 {isAuthenticated ? (
                   <Button
-                    size="sm"
-                    className="w-full"
+                    size="default"
+                    className="w-full h-11 font-medium"
                     variant={p.id === "erp" ? "default" : "outline"}
                     asChild
                   >
@@ -151,7 +151,7 @@ export default function Planes() {
                   <Button
                     size="sm"
                     className="w-full"
-                    variant={p.id === "erp" ? "default" : "outline"}
+                    variant="default"
                     asChild
                   >
                     <Link to="/auth?tab=signup">

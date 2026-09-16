@@ -31,17 +31,17 @@ export function useLicitacionItemsReal(licitacionId: string | undefined) {
       if (!licitacionId) return [];
 
       // Try licitacion_items first
-      const { data: itemsData, error: itemsError } = await (supabaseClient as any)
+      const { data: itemsData, error: itemsError } = await supabaseClient
         .from('licitacion_items')
         .select('*')
-        .eq('licitacion_id', licitacionId)
+        .eq('licitacion_codigo', licitacionId)
         .order('id', { ascending: true });
 
       if (!itemsError && itemsData && itemsData.length > 0) {
         return itemsData.map((item: any) => ({
           id: item.id,
-          licitacion_id: item.licitacion_id,
-          nombre_producto: item.nombre_producto,
+          licitacion_id: item.licitacion_codigo,
+          nombre_producto: item.nombre,
           descripcion: item.descripcion,
           cantidad: item.cantidad,
           unidad: item.unidad,
@@ -51,7 +51,7 @@ export function useLicitacionItemsReal(licitacionId: string | undefined) {
       }
 
       // Try licitaciones_bi_items
-      const { data: biItemsData, error: biItemsError } = await (supabaseClient as any)
+      const { data: biItemsData, error: biItemsError } = await supabaseClient
         .from('licitaciones_bi_items')
         .select('*')
         .eq('licitacion_id', licitacionId)
@@ -83,10 +83,10 @@ export function useCompraAgilItems(compraAgilId: string | undefined) {
     queryFn: async () => {
       if (!compraAgilId) return [];
 
-      const { data, error } = await (supabaseClient as any)
+      const { data, error } = await supabaseClient
         .from('compras_agiles_items')
         .select('*')
-        .eq('compra_agil_id', compraAgilId)
+        .eq('compra_agil_id', Number(compraAgilId))
         .order('id', { ascending: true });
 
       if (error) {

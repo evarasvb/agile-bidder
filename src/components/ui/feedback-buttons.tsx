@@ -75,7 +75,7 @@ export function FeedbackButtons({
                 onClick={() => onFeedback(type)}
                 disabled={isLoading}
               >
-                <Icon className={iconSize} />
+                <Icon className={iconSize} aria-hidden="true" />
                 {showLabels && (
                   <span className="ml-1 text-xs">{label}</span>
                 )}

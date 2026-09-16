@@ -51,10 +51,20 @@ const UNITS = [
   { value: 'caja', label: 'Caja' },
   { value: 'pack', label: 'Pack' },
   { value: 'kit', label: 'Kit' },
-  { value: 'resma', label: 'Resma' },
+  { value: 'juego', label: 'Juego / Set' },
+  { value: 'par', label: 'Par' },
+  { value: 'docena', label: 'Docena' },
+  { value: 'metro', label: 'Metro' },
+  { value: 'metro2', label: 'Metro cuadrado' },
+  { value: 'rollo', label: 'Rollo' },
+  { value: 'plancha', label: 'Plancha' },
   { value: 'saco', label: 'Saco' },
+  { value: 'bolsa', label: 'Bolsa' },
+  { value: 'balde', label: 'Balde' },
+  { value: 'galon', label: 'Galón' },
   { value: 'litro', label: 'Litro' },
   { value: 'kg', label: 'Kilogramo' },
+  { value: 'resma', label: 'Resma' },
 ];
 
 export function AddProductDialog({
@@ -66,6 +76,7 @@ export function AddProductDialog({
   const [formData, setFormData] = useState<InventoryInput>({
     sku: '',
     nombre_producto: '',
+    marca: '',
     descripcion: '',
     categoria: '',
     keywords: [],
@@ -188,6 +199,7 @@ export function AddProductDialog({
                 value={formData.sku}
                 onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                 required
+                autoFocus
               />
             </div>
 
@@ -212,15 +224,26 @@ export function AddProductDialog({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="nombre">Nombre del Producto *</Label>
-            <Input
-              id="nombre"
-              placeholder="Resma Papel Carta"
-              value={formData.nombre_producto}
-              onChange={(e) => setFormData({ ...formData, nombre_producto: e.target.value })}
-              required
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="nombre">Nombre del Producto *</Label>
+              <Input
+                id="nombre"
+                placeholder="Taladro percutor 1/2 pulg. 750W"
+                value={formData.nombre_producto}
+                onChange={(e) => setFormData({ ...formData, nombre_producto: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="marca">Marca</Label>
+              <Input
+                id="marca"
+                placeholder="Bosch, Stanley, Genérico…"
+                value={formData.marca || ''}
+                onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
+              />
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -261,10 +284,10 @@ export function AddProductDialog({
                     onClick={() => { setFormData((prev) => ({ ...prev, imagen_url: c.url })); toast.success('Foto seleccionada'); }}
                     className="relative h-16 w-16 rounded-lg border overflow-hidden shrink-0 hover:ring-2 hover:ring-primary transition"
                   >
-                    <img src={c.thumb || c.url} alt="Sugerencia" className="h-full w-full object-cover" />
+                    <img src={c.thumb || c.url} alt="Foto de producto sugerida" className="h-full w-full object-cover" />
                     {formData.imagen_url === c.url && (
-                      <span className="absolute inset-0 bg-primary/40 flex items-center justify-center">
-                        <Check className="h-6 w-6 text-white" />
+                      <span className="absolute inset-0 bg-primary/40 flex items-center justify-center" aria-label="Foto seleccionada">
+                        <Check className="h-6 w-6 text-white" aria-hidden="true" />
                       </span>
                     )}
                   </button>
@@ -278,9 +301,9 @@ export function AddProductDialog({
             <div className="flex items-center gap-4">
               <div className="h-16 w-16 rounded-lg border bg-muted/40 flex items-center justify-center overflow-hidden shrink-0">
                 {formData.imagen_url ? (
-                  <img src={formData.imagen_url} alt="Producto" className="h-full w-full object-contain" />
+                  <img src={formData.imagen_url} alt="Foto del producto seleccionado" className="h-full w-full object-contain" />
                 ) : (
-                  <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                  <ImageIcon className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
                 )}
               </div>
               <div>
@@ -297,8 +320,9 @@ export function AddProductDialog({
                   size="sm"
                   onClick={() => document.getElementById('foto-producto')?.click()}
                   disabled={subiendoFoto}
+                  aria-label={formData.imagen_url ? "Cambiar foto del producto" : "Subir foto del producto"}
                 >
-                  {subiendoFoto ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                  {subiendoFoto ? <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden="true" /> : <Upload className="h-4 w-4 mr-2" aria-hidden="true" />}
                   {formData.imagen_url ? 'Cambiar foto' : 'Subir foto'}
                 </Button>
                 <p className="text-xs text-muted-foreground mt-1">Aparecerá en la ficha técnica del PDF.</p>

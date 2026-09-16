@@ -52,7 +52,7 @@ export function PrimerosPasos() {
   const { data: cliente, isLoading: cargandoCliente } = useCliente();
   // Eventos reales: libros del Experto (licitaciones analizadas) también cuentan como avance.
   const { session } = useAuth();
-  const { data: libros, isLoading: cargandoLib } = useQuery({ queryKey: ["experto_mis_libros"], enabled: !!session, queryFn: async () => ((await (supabase as any).rpc("experto_mis_libros")).data ?? []) as any[] });
+  const { data: libros, isLoading: cargandoLib } = useQuery({ queryKey: ["experto_mis_libros"], enabled: !!session, queryFn: async () => ((await supabase.rpc("experto_mis_libros")).data ?? []) as any[] });
   const cargando = cargandoInv || cargandoOf || cargandoLib || cargandoCliente;
 
   const perfilListo = cliente?.onboarding_completado === true;
@@ -87,6 +87,13 @@ export function PrimerosPasos() {
       aviso: "Vamos a armar tu perfil 🏷️",
     },
     {
+      id: "extension", done: isConnected, opcional: true, icon: Plug,
+      titulo: "Conecta la extensión (opcional, pero te ahorra harto)",
+      desc: "Autocompleta tus cotizaciones en Mercado Público y manda solas las bases y anexos de una licitación al Experto — sin descargar ni subir nada a mano.",
+      to: "/configuracion/extension",
+      aviso: "Te muestro cómo conectar la extensión 🔌",
+    },
+    {
       id: "inventario", done: tieneInventario, icon: Package,
       titulo: "Carga tu inventario",
       desc: "Es lo que firmavb usa para encontrar las oportunidades que puedes ganar. Sin esto, no hay match.",
@@ -108,13 +115,6 @@ export function PrimerosPasos() {
       desc: "Elige una oportunidad y crea la oferta con tus precios, o abre su libro con el Experto.",
       to: "/oportunidades?tipo=compra_agil",
       aviso: "Elige una compra ágil y arma tu oferta 📝",
-    },
-    {
-      id: "extension", done: isConnected, opcional: true, icon: Plug,
-      titulo: "Conecta la extensión (opcional)",
-      desc: "Para que autocomplete tus cotizaciones mientras postulas en Mercado Público.",
-      to: "/configuracion/extension",
-      aviso: "Te muestro cómo conectar la extensión 🔌",
     },
   ];
 

@@ -10,6 +10,7 @@ export interface BulkProductRow {
   categoria?: string;
   precio_unitario: number;
   unidad_medida: string;
+  marca?: string;
   keywords?: string;
   imagen_url?: string;
   stock?: number;
@@ -38,6 +39,15 @@ export interface ImportProgress {
   message: string;
 }
 
+// Excel convierte códigos como "01-09" a fecha y llegan como
+// "Tue Sep 01 8471 00:00:00 GMT-0400" (o un Date): quedaban guardados como
+// SKU corrupto e imposibles de buscar. Se rechaza la fila con aviso claro.
+export function esSkuFecha(sku: unknown): boolean {
+  if (sku instanceof Date) return true;
+  const s = String(sku ?? '').trim();
+  return /GMT|UTC|^[A-Z][a-z]{2} [A-Z][a-z]{2} \d{1,2} \d{4}|^\d{4}-\d{2}-\d{2}T\d{2}:/i.test(s);
+}
+
 export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void) {
   const queryClient = useQueryClient();
 
@@ -57,7 +67,7 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
 
       // El inventario vive bajo clientes.id (no auth.uid()). Antes se usaba
       // user.id → los inserts se rechazaban por RLS y nada quedaba cargado.
-      const { data: ownerId } = await (supabase as any).rpc('cliente_owner_id');
+      const { data: ownerId } = await supabase.rpc('cliente_owner_id');
       if (!ownerId) {
         throw new Error('No se encontró tu empresa. Completa tu perfil e intenta de nuevo.');
       }
@@ -102,8 +112,13 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
         const row = products[i];
         const rowNum = i + 2;
 
-        if (!row.sku || row.sku.trim() === '') {
+        if (!row.sku || String(row.sku).trim() === '') {
           errors.push({ row: rowNum, field: 'Código', message: 'Código es obligatorio' });
+          continue;
+        }
+
+        if (esSkuFecha(row.sku)) {
+          errors.push({ row: rowNum, field: 'Código', message: 'El código parece una fecha: en Excel pon la columna en formato Texto y vuelve a cargar' });
           continue;
         }
 
@@ -138,6 +153,8 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
           descripcion: row.descripcion?.trim() || null,
           categoria: row.categoria?.trim() || 'General',
           precio_unitario: Number(row.precio_unitario),
+          unidad_medida: row.unidad_medida?.trim() || null,
+          marca: row.marca?.trim() || null,
           palabras_clave: keywords,
           imagen_url: row.imagen_url?.trim() || null,
           stock_disponible: row.stock !== undefined ? Number(row.stock) : 0,
@@ -258,30 +275,32 @@ export function generateInventoryTemplateData() {
   return [
     {
       'Código': 'PROD-001',
-      'Descripción': 'Resma Papel Carta 500 hojas',
-      'Precio Unitario': 4500,
+      'Descripción': 'Taladro percutor 1/2" 750W',
+      'Marca': 'Bosch',
+      'Precio Unitario': 45900,
       'Unidad': 'UN',
-      'Categoría': 'Insumos de Oficina',
+      'Categoría': 'Herramientas',
       'Stock': 100,
       'Margen Mínimo (%)': 10,
       'Margen Objetivo (%)': 15,
       'Tiempo Entrega (días)': 3,
-      'Proveedor': 'Papelera Nacional',
-      'Keywords': 'papel, resma, carta, hojas, impresión',
+      'Proveedor': 'Distribuidora Central',
+      'Keywords': 'taladro, percutor, herramienta, bosch',
       'URL Imagen': 'https://ejemplo.com/imagen-producto.jpg',
     },
     {
       'Código': 'PROD-002',
-      'Descripción': 'Tóner HP 85A Compatible',
-      'Precio Unitario': 18500,
-      'Unidad': 'UN',
-      'Categoría': 'Tecnología',
+      'Descripción': 'Tornillo autoperforante 8x1" (caja 100u)',
+      'Marca': 'Genérico',
+      'Precio Unitario': 3200,
+      'Unidad': 'caja',
+      'Categoría': 'Fijaciones',
       'Stock': 50,
       'Margen Mínimo (%)': 12,
       'Margen Objetivo (%)': 20,
       'Tiempo Entrega (días)': 2,
-      'Proveedor': 'TechSupply',
-      'Keywords': 'toner, hp, impresora, cartucho, laser',
+      'Proveedor': 'Ferretería Mayorista',
+      'Keywords': 'tornillo, autoperforante, fijación',
       'URL Imagen': '',
     },
   ];
@@ -298,7 +317,10 @@ export function generateInventoryInstructions() {
     { 'Instrucciones': '   • Precio Unitario: Precio en pesos chilenos (solo números, > 0)' },
     { 'Instrucciones': '   • Unidad: UN (unidad), KG, LT, MT, etc.' },
     { 'Instrucciones': '' },
+    { 'Instrucciones': '   • Unidad: UN, caja, metro, rollo, plancha, kg, litro, par, juego, etc.' },
+    { 'Instrucciones': '' },
     { 'Instrucciones': '2. CAMPOS OPCIONALES:' },
+    { 'Instrucciones': '   • Marca: Marca del producto (Bosch, Stanley, Genérico…). Importante para ferretería.' },
     { 'Instrucciones': '   • Categoría: Categoría del producto' },
     { 'Instrucciones': '   • Stock: Cantidad disponible (por defecto: 0)' },
     { 'Instrucciones': '   • Margen Mínimo (%): Margen mínimo aceptable (por defecto: 10)' },

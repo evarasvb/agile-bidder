@@ -239,7 +239,7 @@ export function AppSidebar({ open = false, onClose }: AppSidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 overflow-y-auto scrollbar-thin">
+      <nav aria-label="Navegación principal" className="flex-1 px-3 py-4 overflow-y-auto scrollbar-thin">
         <ul className="space-y-1">
           {navItems.filter((item) => !item.adminOnly || esAdmin).map((item) => {
             const hasChildren = item.children && item.children.length > 0;
@@ -289,7 +289,7 @@ export function AppSidebar({ open = false, onClose }: AppSidebarProps) {
                                     : "text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground"
                                 )}
                               >
-                                {ChildIcon && <ChildIcon className="h-4 w-4" />}
+                                {ChildIcon && <ChildIcon className="h-4 w-4" aria-hidden="true" />}
                                 {child.title}
                               </NavLink>
                             </li>

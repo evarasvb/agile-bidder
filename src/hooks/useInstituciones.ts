@@ -78,7 +78,7 @@ export function useInstituciones(filters?: {
   return useQuery({
     queryKey: ['instituciones', filters],
     queryFn: async () => {
-      let query = (supabase as any)
+      let query = supabase
         .from('instituciones')
         .select('*')
         .order('monto_total_compras', { ascending: false, nullsFirst: false });
@@ -111,7 +111,7 @@ export function useInstitucion(id: string | null) {
     queryKey: ['institucion', id],
     queryFn: async () => {
       if (!id) return null;
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('instituciones')
         .select('*')
         .eq('id', id)
@@ -128,7 +128,7 @@ export function useInstitucionesDashboard() {
   return useQuery({
     queryKey: ['instituciones-dashboard'],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('instituciones_dashboard')
         .select('*, instituciones(nombre, rut, region)')
         .order('score_oportunidad', { ascending: false });
@@ -143,7 +143,7 @@ export function useInstitucionesGestion(userId?: string) {
   return useQuery({
     queryKey: ['instituciones-gestion', userId],
     queryFn: async () => {
-      let query = (supabase as any)
+      let query = supabase
         .from('instituciones_gestion')
         .select('*, instituciones(nombre, rut, region)')
         .order('prioridad', { ascending: false });
@@ -165,7 +165,7 @@ export function useUpsertGestion() {
   
   return useMutation({
     mutationFn: async (gestion: Partial<InstitucionGestion>) => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('instituciones_gestion')
         .upsert(gestion)
         .select()
@@ -185,7 +185,7 @@ export function useInstitucionInteracciones(institucionId: string | null) {
     queryKey: ['institucion-interacciones', institucionId],
     queryFn: async () => {
       if (!institucionId) return [];
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('instituciones_interacciones')
         .select('*')
         .eq('institucion_id', institucionId)
@@ -203,7 +203,7 @@ export function useCrearInteraccion() {
   
   return useMutation({
     mutationFn: async (interaccion: Partial<InstitucionInteraccion>) => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('instituciones_interacciones')
         .insert(interaccion)
         .select()
@@ -223,7 +223,7 @@ export function useConductaPago(institucionId: string | null) {
     queryKey: ['conducta-pago', institucionId],
     queryFn: async () => {
       if (!institucionId) return null;
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('conducta_pago')
         .select('*')
         .eq('institucion_id', institucionId)
@@ -240,12 +240,12 @@ export function useInstitucionesStats() {
   return useQuery({
     queryKey: ['instituciones-stats'],
     queryFn: async () => {
-      const { data, error, count } = await (supabase as any)
+      const { data, error, count } = await supabase
         .from('instituciones')
         .select('*', { count: 'exact', head: false })
         .limit(1);
 
-      const { data: topData } = await (supabase as any)
+      const { data: topData } = await supabase
         .from('instituciones')
         .select('monto_total_compras')
         .order('monto_total_compras', { ascending: false })
@@ -266,7 +266,7 @@ export function useBIInstitucion() {
   return useQuery({
     queryKey: ['bi-instituciones'],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('bi_oc_negocios_por_institucion')
         .select('*')
         .limit(50);

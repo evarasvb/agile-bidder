@@ -25,7 +25,7 @@ export function PlanesEscalera() {
   const { data: experto } = useQuery({
     queryKey: ['experto_pro_estado', session?.user?.id],
     enabled: !!session?.user?.id,
-    queryFn: async () => (await (supabase as any).from('experto_pro').select('nivel, hasta').eq('user_id', session!.user.id).maybeSingle()).data as { nivel: string; hasta: string } | null,
+    queryFn: async () => (await supabase.from('experto_pro').select('nivel, hasta').eq('user_id', session!.user.id).maybeSingle()).data as { nivel: string; hasta: string } | null,
   });
   const expertoActivo = experto && new Date(experto.hasta) > new Date() ? experto : null;
   // Prueba gratis de Experto Pro: 14 dias, una vez por cuenta y sin tarjeta.
@@ -35,7 +35,7 @@ export function PlanesEscalera() {
   });
   const iniciarPrueba = async () => {
     setCargando('prueba');
-    const { error } = await (supabase as any).rpc('experto_prueba_iniciar');
+    const { error } = await supabase.rpc('experto_prueba_iniciar');
     setCargando(null);
     if (error) { toast.error(error.message.replace(/^.*?: /, '')); return; }
     toast.success('Experto Pro activo por 14 días. Abre una licitación y arma su sala de postulación.');

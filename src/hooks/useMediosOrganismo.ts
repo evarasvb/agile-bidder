@@ -21,7 +21,7 @@ export function useMediosOrganismo(codigo?: string | null, organismo?: string | 
   return useQuery({
     queryKey: clave(codigo, organismo),
     queryFn: async (): Promise<MencionMedio[]> => {
-      const { data, error } = await (supabase as any).rpc('medios_organismo', {
+      const { data, error } = await supabase.rpc('medios_organismo', {
         p_codigo: codigo ?? null,
         p_organismo: organismo ?? null,
         p_cantidad: 30,
