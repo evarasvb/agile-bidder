@@ -2193,6 +2193,39 @@ export type Database = {
         }
         Relationships: []
       }
+      evaristo_conversaciones: {
+        Row: {
+          actualizado_en: string
+          canal: string
+          cliente_id: string | null
+          contexto: Json | null
+          creado_en: string
+          id: string
+          titulo: string | null
+          user_id: string
+        }
+        Insert: {
+          actualizado_en?: string
+          canal?: string
+          cliente_id?: string | null
+          contexto?: Json | null
+          creado_en?: string
+          id?: string
+          titulo?: string | null
+          user_id: string
+        }
+        Update: {
+          actualizado_en?: string
+          canal?: string
+          cliente_id?: string | null
+          contexto?: Json | null
+          creado_en?: string
+          id?: string
+          titulo?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       evaristo_logs: {
         Row: {
           command: string
@@ -2219,6 +2252,47 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      evaristo_mensajes: {
+        Row: {
+          adjuntos: Json | null
+          contenido: string
+          conversacion_id: string
+          creado_en: string
+          id: number
+          meta: Json | null
+          rol: string
+          user_id: string
+        }
+        Insert: {
+          adjuntos?: Json | null
+          contenido: string
+          conversacion_id: string
+          creado_en?: string
+          id?: number
+          meta?: Json | null
+          rol: string
+          user_id: string
+        }
+        Update: {
+          adjuntos?: Json | null
+          contenido?: string
+          conversacion_id?: string
+          creado_en?: string
+          id?: number
+          meta?: Json | null
+          rol?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evaristo_mensajes_conversacion_id_fkey"
+            columns: ["conversacion_id"]
+            isOneToOne: false
+            referencedRelation: "evaristo_conversaciones"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       eventos_calendario: {
         Row: {
@@ -9365,6 +9439,7 @@ export type Database = {
           total_productos: number
         }[]
       }
+      evaristo_contexto: { Args: { p_codigo?: string }; Returns: Json }
       exec_sql: { Args: { sql_text: string }; Returns: Json }
       experto_activar_pro:
         | {
