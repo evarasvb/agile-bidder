@@ -148,10 +148,17 @@ async function procesar(sb: SupabaseClient, codigo: string, deadline: number, le
           // Todo PDF o Word (bases o anexo) queda pendiente para que el Experto lo lea: la bases
           // principal se resume con Gemini, los anexos solo se leen (leerBasesPendientes decide
           // el tipo con el mismo criterio de siempre, RE_BASES/RE_NO_BASES, y lo avisa a experto-bases).
-          const basesPendiente = (esPdf || esDocx) && bytes.length <= MAX_BASES_BYTES && !basesNombres.has(f.nombre);
+          const yaLeido = basesNombres.has(f.nombre);
+          const basesPendiente = (esPdf || esDocx) && bytes.length <= MAX_BASES_BYTES && !yaLeido;
+          // Lo que el lector no puede abrir directo va a la cola de conversión (GitHub Actions, sin
+          // tope de tamaño ni de tiempo): PDF grandes (se comprimen), Word .doc/.docx (LibreOffice →
+          // PDF) y ZIP/RAR (se extraen las bases de adentro). Antes esto quedaba en el bucket sin leer.
+          const esZip = /^(zip|rar)$/.test(ext) || contentType.includes("zip") || contentType.includes("rar");
+          const conversionPendiente = !yaLeido && !basesPendiente && ((esPdf && bytes.length > MAX_BASES_BYTES) || ext === "doc" || ext === "docx" || esZip);
           const { error: errFila } = await sb.from("licitaciones_adjuntos").upsert({
             codigo, nombre: f.nombre, tipo: f.tipo, descripcion: f.descripcion, fecha_adjunto: f.fecha, bytes: bytes.length,
-            content_type: contentType, storage_path: storagePath, es_bases: false, bases_id: null, bases_pendiente: basesPendiente, bajado_en: new Date().toISOString(),
+            content_type: contentType, storage_path: storagePath, es_bases: false, bases_id: null, bases_pendiente: basesPendiente,
+            ocr_pendiente: conversionPendiente, bajado_en: new Date().toISOString(),
           }, { onConflict: "codigo,nombre" });
           if (errFila) { res.errores.push(`${f.nombre}: ${errFila.message}`); continue; }
           guardados.add(f.nombre);
@@ -193,7 +200,8 @@ async function leerBasesPendientes(sb: SupabaseClient, deadline: number, codigo?
     const intentos = (f.bases_intentos ?? 0) + 1;
     await sb.from("licitaciones_adjuntos").update({ bases_intento_en: new Date().toISOString(), bases_intentos: intentos, ...(intentos > 3 ? { bases_pendiente: false } : {}) }).eq("id", f.id);
     if (intentos > 3) { console.log(`bases descartada tras ${intentos - 1} intentos ${f.codigo} ${f.nombre}`); continue; }
-    if (f.bytes > MAX_BASES_BYTES) { await sb.from("licitaciones_adjuntos").update({ bases_pendiente: false }).eq("id", f.id); continue; }
+    // Demasiado grande para leerlo aquí: a la cola de conversión (se comprime en GitHub Actions y vuelve).
+    if (f.bytes > MAX_BASES_BYTES) { await sb.from("licitaciones_adjuntos").update({ bases_pendiente: false, ocr_pendiente: !f.ocr_hecho }).eq("id", f.id); continue; }
     // Mismo criterio que al bajarlo: si parece la bases principal se resume con Gemini; si no
     // (formulario, anexo, acta, declaración) solo se lee el texto, sin gastar cuota de resumen.
     const pinta = `${f.nombre} ${f.tipo ?? ""} ${f.descripcion ?? ""}`;
@@ -216,10 +224,14 @@ async function leerBasesPendientes(sb: SupabaseClient, deadline: number, codigo?
         // Escaneado, ilegible, formato raro, demasiado grande o que agota el tiempo de experto-bases (504):
         // no se reintenta. Otros errores (Gemini caído, 5xx transitorio distinto) sí.
         console.log(`bases no leídas ${f.codigo} ${f.nombre}: ${j.error ?? r.status}`);
-        // PDF sin capa de texto o que el extractor no pudo abrir (firmado, capa rara): pasa a la cola de OCR
-        // (Tesseract en GitHub Actions), que lo rehace y reencola. Si ya pasó por OCR, se descarta (sin bucle).
-        const escaneado = ["sin_texto", "lectura"].includes(String(j.error)) && (f.content_type ?? "").includes("pdf") && !f.ocr_hecho;
-        if (["sin_texto", "lectura", "no_pdf", "tamano", "codigo"].includes(String(j.error)) || r.status === 504) await sb.from("licitaciones_adjuntos").update({ bases_pendiente: false, ocr_pendiente: escaneado }).eq("id", f.id);
+        // PDF sin capa de texto o que el extractor no pudo abrir (firmado, capa rara), Word que no se
+        // pudo leer, o lectura que agotó el tiempo (504, típico de PDF pesados): pasa a la cola de
+        // conversión/OCR (GitHub Actions: LibreOffice, Ghostscript y Tesseract), que lo rehace y
+        // reencola. Si ya pasó por ahí, se descarta (sin bucle).
+        const ct = f.content_type ?? "";
+        const convertible = ct.includes("pdf") || ct.includes("word") || ct.includes("wordprocessingml");
+        const aConversion = (["sin_texto", "lectura", "tamano"].includes(String(j.error)) || r.status === 504) && convertible && !f.ocr_hecho;
+        if (["sin_texto", "lectura", "no_pdf", "tamano", "codigo"].includes(String(j.error)) || r.status === 504) await sb.from("licitaciones_adjuntos").update({ bases_pendiente: false, ocr_pendiente: aConversion }).eq("id", f.id);
       }
     } catch (e) {
       console.log(`bases timeout ${f.codigo} ${f.nombre}: ${String(e).slice(0, 80)}`); // queda pendiente para la próxima pasada
