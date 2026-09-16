@@ -6609,8 +6609,10 @@ export type Database = {
           mensaje: string | null
           nombre: string | null
           numero: number
+          origen: string
           pantalla: string | null
           telefono: string | null
+          tipo: string
           updated_at: string
           user_id: string | null
         }
@@ -6627,8 +6629,10 @@ export type Database = {
           mensaje?: string | null
           nombre?: string | null
           numero?: number
+          origen?: string
           pantalla?: string | null
           telefono?: string | null
+          tipo?: string
           updated_at?: string
           user_id?: string | null
         }
@@ -6645,8 +6649,10 @@ export type Database = {
           mensaje?: string | null
           nombre?: string | null
           numero?: number
+          origen?: string
           pantalla?: string | null
           telefono?: string | null
+          tipo?: string
           updated_at?: string
           user_id?: string | null
         }
@@ -9715,6 +9721,20 @@ export type Database = {
           region: string
           tipo: string
           url: string
+        }[]
+      }
+      experto_licitaciones_similares: {
+        Args: { p_cantidad?: number; p_codigo: string; p_meses?: number }
+        Returns: {
+          adjudicatario_nombre: string
+          adjudicatario_rut: string
+          codigo: string
+          fecha_cierre: string
+          institucion: string
+          monto_adjudicado: number
+          monto_estimado: number
+          tipo_producto: string
+          titulo: string
         }[]
       }
       experto_matriz_guardar: {
