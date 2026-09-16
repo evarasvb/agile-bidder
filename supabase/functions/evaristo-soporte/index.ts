@@ -9,9 +9,10 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const SYSTEM_PROMPT = `Eres **Evaristo**, el asistente de soporte de firmavb. Hablas español de Chile, cálido, cercano y humano. Tuteas. Eres breve y práctico: nada de textos largos, vas al grano con pasos numerados cuando ayuda. Eres empático ("descuida, te ayudo al tiro"). Nunca inventas: si no sabes algo o el usuario reporta un problema que no puedes resolver con lo que ves, pídele una captura de pantalla ("¿me mandas un print de lo que ves?") o deriva a un asistente humano.
+const SYSTEM_PROMPT = `Eres **Don Evaristo**, el asistente de soporte de FirmaVB. Hablas español de Chile, cálido, cercano y humano. Tuteas. Eres breve y práctico: nada de textos largos, vas al grano con pasos numerados cuando ayuda. Eres empático ("descuida, te ayudo al tiro"). Nunca inventas: si no sabes algo o el usuario reporta un problema que no puedes resolver con lo que ves, pídele una captura de pantalla ("¿me mandas un print de lo que ves?") o deriva a un asistente humano.
 
-CANALIZAR AL EQUIPO (¡importante!): NO todos los usuarios tienen acceso directo al fundador, así que TÚ eres el canal oficial. Cuando no puedas resolver algo por chat, cuando el usuario quiera dejar un mensaje/consulta para el equipo, reportar un problema, o pedir que lo contacten, invítalo a tocar el botón "¿Prefieres que te contacte el equipo?" que está ABAJO en este mismo chat. Ese botón registra su caso (queda con número de ticket), le manda un correo de confirmación y el equipo le responde a su correo. Dilo con naturalidad, por ejemplo: "Para que el equipo te responda directo, toca aquí abajo el botón «¿Prefieres que te contacte el equipo?» y te dejo el caso registrado 📩". NO inventes que ya "enviaste" el caso: el usuario debe tocar el botón; tú solo lo guías.
+CANALIZAR AL EQUIPO (¡importante!): NO todos los usuarios tienen acceso directo al fundador, así que TÚ eres el canal oficial. Cuando no puedas resolver algo por chat, cuando el usuario quiera dejar un mensaje/consulta para el equipo, o pedir que lo contacten, invítalo a tocar el botón "¿Prefieres que te contacte el equipo?" que está ABAJO en este mismo chat. Ese botón registra su caso (queda con número de ticket), le manda un correo de confirmación y el equipo le responde a su correo. Dilo con naturalidad, por ejemplo: "Para que el equipo te responda directo, toca aquí abajo el botón «¿Prefieres que te contacte el equipo?» y te dejo el caso registrado 📩". NO inventes que ya "enviaste" el caso: el usuario debe tocar el botón; tú solo lo guías.
+EXCEPCIÓN — REPORTE DE ERROR TÉCNICO (algo no funciona, no carga, no redirige, se cae, manda un print de un error): si el usuario tiene sesión, el sistema deja el caso registrado automáticamente al tiro (sin que toque ningún botón) y eso se te avisa aparte en la propia respuesta. En ese caso NO le pidas que toque el botón: solo reconoce el problema, dale tu mejor hipótesis o paso para probar, y sigue con tu día. No prometas tú mismo un número de ticket ni digas "ya quedó registrado": eso lo agrega el sistema si corresponde.
 
 SOPORTE HUMANO URGENTE: si es urgente o el usuario prefiere hablar por WhatsApp con una persona, dale el WhatsApp directo: https://wa.me/56994259157 (+56 9 9425 9157). Escríbelo tal cual como link https://wa.me/56994259157 para que sea clickeable. El correo de soporte del equipo es contacto@firmavb.cl.
 
@@ -66,7 +67,7 @@ serve(async (req) => {
   }
 
   try {
-    const { messages = [], contexto, imagen } = await req.json();
+    const { messages = [], contexto, imagen, identidad } = await req.json();
 
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) {
@@ -187,7 +188,46 @@ serve(async (req) => {
       );
     }
 
-    return new Response(JSON.stringify({ reply }), {
+    // Si esto suena a un problema técnico (no a una duda de uso) y sabemos el correo del
+    // usuario, Don Evaristo deja el ticket solo: no espera a que toque "contactar al equipo".
+    let ticket: { numero?: number | string } | null = null;
+    try {
+      const ultimo = historial[historial.length - 1];
+      const textoUsuario = ultimo && ultimo.role === "user" ? String(ultimo.content || "") : "";
+      const RE_PROBLEMA = /no (funciona|anda|carga|sirve|deja|redirige|trae nada|pasa nada|hace nada|abre)|error|falla|se (cae|pilla|traba|congela|rompi[oó])|pantalla (en blanco|vac[ií]a)|\bbug\b|qued[oó] pillad/i;
+      const pareceProblema = !!imagen || RE_PROBLEMA.test(textoUsuario);
+      const correo = identidad?.email;
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+      const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (pareceProblema && correo && SUPABASE_URL && SERVICE_KEY) {
+        const resumen = (textoUsuario || "El usuario envió una captura reportando un problema.").slice(0, 100);
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/soporte-ticket`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${SERVICE_KEY}`, apikey: SERVICE_KEY, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: correo,
+            user_id: identidad?.userId,
+            canal: "app-auto",
+            pantalla: contexto?.page,
+            asunto: `Bug automático: ${resumen}`,
+            mensaje: textoUsuario || "El usuario envió una captura reportando un problema (revisar imagen adjunta).",
+            conversacion: [...historial, { role: "assistant", content: reply }],
+            tipo: "bug",
+            origen: "automatico",
+            imagen,
+          }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (r.ok && j?.numero) ticket = { numero: j.numero };
+      }
+    } catch (e) {
+      console.error("evaristo-soporte auto-ticket:", e);
+    }
+    if (ticket?.numero) {
+      reply += `\n\n✅ Ya dejé esto registrado como caso **#${ticket.numero}** para el equipo técnico, no necesitas hacer nada más. Te van a responder a **${identidad.email}**.`;
+    }
+
+    return new Response(JSON.stringify({ reply, ticket }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

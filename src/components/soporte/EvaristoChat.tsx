@@ -157,6 +157,7 @@ export function EvaristoChat() {
             tieneInventario: (invStats?.total ?? 0) > 0,
             extensionConectada: !!isConnected,
           },
+          identidad,
           imagen,
         },
       });

@@ -1,7 +1,7 @@
 // soporte-ticket — canaliza un caso de soporte al equipo.
 //
 // Qué hace:
-//  1) Guarda el ticket (con el transcript de la conversación con Evaristo) en
+//  1) Guarda el ticket (con el transcript de la conversación con Don Evaristo) en
 //     public.soporte_tickets → queda REGISTRO para seguimiento.
 //  2) Envía un correo a contacto@firmavb.cl con toda la conversación + la
 //     identidad del cliente. El reply_to es el correo del CLIENTE, así el equipo
@@ -36,7 +36,7 @@ function transcriptHtml(conv: Msg[]) {
     .filter((m) => m && m.content)
     .map((m) => {
       const esCliente = m.role === 'user';
-      const quien = esCliente ? 'Cliente' : 'Evaristo';
+      const quien = esCliente ? 'Cliente' : 'Don Evaristo';
       const bg = esCliente ? '#eff6ff' : '#f1f5f9';
       const col = esCliente ? '#1E40AF' : '#334155';
       return `<div style="margin:0 0 8px">
@@ -49,16 +49,21 @@ function transcriptHtml(conv: Msg[]) {
 
 function emailEquipo(t: {
   numero: number | string; nombre: string; email: string; empresa: string; telefono: string;
-  canal: string; pantalla: string; mensaje: string; conv: Msg[];
+  canal: string; pantalla: string; mensaje: string; conv: Msg[]; tipo: string; origen: string; imagen?: string;
 }) {
   const filaDato = (k: string, v: string) =>
     v ? `<tr><td style="padding:3px 10px 3px 0;color:#64748b;font-size:12px">${k}</td><td style="padding:3px 0;font-size:13px;color:#1e293b">${esc(v)}</td></tr>` : '';
+  const esBug = t.tipo === 'bug';
+  const esAuto = t.origen === 'automatico';
+  const insignia = esBug
+    ? `<span style="display:inline-block;background:#fee2e2;color:#991b1b;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;margin-left:8px">🐞 BUG${esAuto ? ' · detectado por Don Evaristo' : ''}</span>`
+    : '';
   return `<!doctype html><html><body style="margin:0;background:#f4f7fa;font-family:Segoe UI,Arial,sans-serif;color:#1e293b">
   <div style="max-width:640px;margin:0 auto;padding:28px 18px">
     <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden">
-      <div style="background:#1E40AF;padding:18px 24px;color:#fff">
+      <div style="background:${esBug ? '#7f1d1d' : '#1E40AF'};padding:18px 24px;color:#fff">
         <div style="font-size:13px;opacity:.85">FirmaVB · Soporte</div>
-        <div style="font-size:19px;font-weight:700">🎫 Ticket #${t.numero}</div>
+        <div style="font-size:19px;font-weight:700">🎫 Ticket #${t.numero}${insignia}</div>
       </div>
       <div style="padding:22px 24px">
         <table style="border-collapse:collapse;margin:0 0 16px">
@@ -70,10 +75,11 @@ function emailEquipo(t: {
           ${filaDato('Pantalla', t.pantalla)}
         </table>
         <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin:0 0 18px">
-          <div style="font-size:11px;font-weight:700;color:#92400e;margin:0 0 4px">CONSULTA / INQUIETUD</div>
+          <div style="font-size:11px;font-weight:700;color:#92400e;margin:0 0 4px">${esBug ? 'PROBLEMA REPORTADO' : 'CONSULTA / INQUIETUD'}</div>
           <div style="font-size:14px;color:#1e293b;white-space:pre-wrap">${esc(t.mensaje) || '—'}</div>
         </div>
-        <div style="font-size:11px;font-weight:700;color:#64748b;margin:0 0 8px">CONVERSACIÓN CON EVARISTO</div>
+        ${t.imagen ? `<div style="margin:0 0 18px"><div style="font-size:11px;font-weight:700;color:#64748b;margin:0 0 8px">CAPTURA DEL USUARIO</div><img src="${t.imagen}" alt="captura" style="max-width:100%;border:1px solid #e2e8f0;border-radius:10px"/></div>` : ''}
+        <div style="font-size:11px;font-weight:700;color:#64748b;margin:0 0 8px">CONVERSACIÓN CON DON EVARISTO</div>
         ${transcriptHtml(t.conv)}
         <p style="color:#94a3b8;font-size:12px;line-height:1.6;margin:20px 0 0;border-top:1px solid #e2e8f0;padding-top:14px">
           Responde este correo directamente y tu respuesta le llegará al cliente (${esc(t.email)}).
@@ -121,6 +127,12 @@ Deno.serve(async (req) => {
     let empresa = String(body.empresa || '');
     let telefono = String(body.telefono || '');
     let nombre = String(body.nombre || '');
+    const tipo = body.tipo === 'bug' ? 'bug' : 'consulta';
+    const origen = body.origen === 'automatico' ? 'automatico' : 'manual';
+    // Captura opcional (la manda Don Evaristo cuando detecta el bug solo, o el usuario la
+    // adjuntó en el chat): se muestra inline en el correo del equipo; no se guarda en la base.
+    const imagen = typeof body.imagen === 'string' && body.imagen.startsWith('data:') && body.imagen.length < 4_000_000
+      ? body.imagen : undefined;
 
     // Enriquecer identidad desde `clientes` si tenemos user_id (o el correo).
     try {
@@ -152,6 +164,8 @@ Deno.serve(async (req) => {
         asunto,
         mensaje: mensaje || null,
         conversacion: conv,
+        tipo,
+        origen,
       })
       .select('numero')
       .single();
@@ -174,8 +188,8 @@ Deno.serve(async (req) => {
             from: FROM,
             to: [CONTACTO],
             reply_to: email,
-            subject: `🎫 Ticket #${numero} · ${empresa || nombre || email} — ${asunto}`.slice(0, 120),
-            html: emailEquipo({ numero, nombre, email, empresa, telefono, canal: String(body.canal || 'app'), pantalla: String(body.pantalla || ''), mensaje, conv }),
+            subject: `${tipo === 'bug' ? '🐞 BUG' : '🎫'} Ticket #${numero} · ${empresa || nombre || email} — ${asunto}`.slice(0, 120),
+            html: emailEquipo({ numero, nombre, email, empresa, telefono, canal: String(body.canal || 'app'), pantalla: String(body.pantalla || ''), mensaje, conv, tipo, origen, imagen }),
           }),
         });
         email_equipo = r1.ok;
@@ -197,7 +211,7 @@ Deno.serve(async (req) => {
       } catch (e) { console.error('resend cliente:', e); }
     }
 
-    return json({ ok: true, numero, email_equipo, email_cliente });
+    return json({ ok: true, numero, tipo, origen, email_equipo, email_cliente });
   } catch (e) {
     console.error('soporte-ticket error:', e);
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);
