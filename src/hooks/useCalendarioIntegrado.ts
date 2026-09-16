@@ -149,8 +149,8 @@ export function useCalendarioIntegrado() {
             allDay: true,
             type,
             sourceType: 'compra_agil',
-            // La página de detalle vive en /compras-agiles/:codigo (no /:id): si se manda
-            // el id interno, la búsqueda por código no encuentra nada y la pantalla queda vacía.
+            // La ficha /compras-agiles/:codigo busca por CÓDIGO (ej. 2307-437-COT26),
+            // no por el id interno: mandar el código o "Ver Oportunidad" abre vacío.
             sourceId: c.codigo,
             tipoBadge: 'Cierre Compra Ágil',
             monto: c.monto_estimado,
