@@ -42,19 +42,12 @@ jobs:
             "$SUPABASE_URL/rest/v1/licitaciones_adjuntos?ocr_pendiente=eq.true&select=id,codigo,nombre,storage_path,content_type,bytes&order=bajado_en.asc&limit=$LIMITE" > pendientes.json \
             || { echo "::error::No pude listar pendientes"; exit 1; }
           n=$(jq length pendientes.json); echo "Pendientes: $n"; echo "n=$n" >> "$GITHUB_OUTPUT"
-          word=$(jq '[.[] | select(.content_type | test("word|wordprocessingml|zip|rar"))] | length' pendientes.json)
-          echo "word=$word" >> "$GITHUB_OUTPUT"
 
       - name: Instalar Tesseract, ocrmypdf y Ghostscript
         if: steps.lista.outputs.n != '0'
         run: |
           sudo apt-get update -q
           sudo apt-get install -y -q ocrmypdf tesseract-ocr-spa poppler-utils ghostscript jq unzip unrar-free
-
-      # LibreOffice pesa: solo cuando hay Word o comprimidos en la cola.
-      - name: Instalar LibreOffice
-        if: steps.lista.outputs.n != '0' && steps.lista.outputs.word != '0'
-        run: sudo apt-get install -y -q libreoffice-writer libreoffice-calc
 
       - name: Procesar pendientes
         if: steps.lista.outputs.n != '0'
@@ -77,10 +70,15 @@ jobs:
             done
             [ "$(stat -c%s "$f")" -le "$MAX_BYTES" ]
           }
-          # OCR solo si el PDF no trae texto útil (rápido cuando ya lo trae: --skip-text no toca esas páginas).
-          ocr_si_hace_falta() {
-            local f="$1" antes; antes=$(chars "$f")
-            if [ "$antes" -ge 200 ] && [ "${2:-}" != "forzar" ]; then return 0; fi
+          # LibreOffice pesa (~1 min de instalación): se instala la primera vez que hace falta,
+          # aunque el Word aparezca recién en un lote posterior.
+          asegurar_soffice() { command -v soffice > /dev/null 2>&1 || { echo "   instalando LibreOffice…"; sudo apt-get install -y -q libreoffice-writer libreoffice-calc > /dev/null; }; }
+          # OCR de un PDF. Modo "siempre": se rehace aunque traiga texto (--force-ocr) porque ese texto es
+          # justo el que el lector no pudo usar (capa rara, firmado). Modo "si_falta": solo si no trae texto
+          # (PDF encolados por tamaño: su texto está bien, solo pesan mucho).
+          ocr() {
+            local f="$1" cuando="$2" antes; antes=$(chars "$f")
+            if [ "$antes" -ge 200 ] && [ "$cuando" = si_falta ]; then return 0; fi
             local modo=--skip-text; [ "$antes" -ge 200 ] && modo=--force-ocr
             echo "   texto previo: $antes caracteres · OCR $modo"
             if ! timeout 900 ocrmypdf -l spa $modo --invalidate-digital-signatures --rotate-pages --optimize 0 --output-type pdf --jobs 2 "$f" ocr.pdf > ocr.log 2>&1; then
@@ -140,13 +138,17 @@ jobs:
             case "$ext" in
               pdf)
                 cp in.pdf out.pdf
-                ocr_si_hace_falta out.pdf
+                # Encolado por tamaño (>6 MB): su texto sirve, solo hay que comprimir; OCR solo si no trae texto.
+                # Encolado por lectura fallida (≤6 MB): se rehace el OCR siempre, como antes.
+                if [ "$(stat -c%s in.pdf)" -gt "$MAX_BYTES" ]; then ocr out.pdf si_falta; else ocr out.pdf siempre; fi
                 if ! comprimir out.pdf; then
                   echo "   sigue sobre el tope tras comprimir"; patch "$id" '{"ocr_pendiente":false,"ocr_hecho":true}'; sin=$((sin+1)); continue
                 fi
-                if [ "$(chars out.pdf)" -ge 200 ]; then reencolar "$id" "$ruta" out.pdf; else gemini "$id" "$codigo" "$nombre" in.pdf; fi
+                # A Gemini va la copia ya comprimida (la original puede superar su tope de 20 MB).
+                if [ "$(chars out.pdf)" -ge 200 ]; then reencolar "$id" "$ruta" out.pdf; else gemini "$id" "$codigo" "$nombre" out.pdf; fi
                 ;;
               doc|docx)
+                asegurar_soffice
                 if timeout 300 soffice --headless --convert-to pdf --outdir . "in.$ext" > /dev/null 2>&1 && [ -s in.pdf ]; then
                   mv in.pdf out.pdf
                   if comprimir out.pdf && [ "$(chars out.pdf)" -ge 200 ]; then
@@ -165,8 +167,8 @@ jobs:
                 while IFS= read -r -d '' interno; do
                   base=$(basename "$interno"); iext="${base##*.}"; iext=$(echo "$iext" | tr 'A-Z' 'a-z')
                   cp "$interno" "int.$iext"; rm -f out.pdf
-                  if [ "$iext" = pdf ]; then cp int.pdf out.pdf; ocr_si_hace_falta out.pdf
-                  else timeout 300 soffice --headless --convert-to pdf --outdir . "int.$iext" > /dev/null 2>&1; [ -s int.pdf ] && mv int.pdf out.pdf; fi
+                  if [ "$iext" = pdf ]; then cp int.pdf out.pdf; ocr out.pdf si_falta
+                  else asegurar_soffice; timeout 300 soffice --headless --convert-to pdf --outdir . "int.$iext" > /dev/null 2>&1; [ -s int.pdf ] && mv int.pdf out.pdf; fi
                   if [ ! -s out.pdf ] || ! comprimir out.pdf || [ "$(chars out.pdf)" -lt 200 ]; then echo "   · $base: sin texto útil, se omite"; continue; fi
                   nuevo_nombre="$nombre » $base"
                   limpio=$(echo "${base%.*}" | iconv -f utf8 -t ascii//TRANSLIT 2>/dev/null | sed 's/[^A-Za-z0-9._-]/_/g' | cut -c1-120)
