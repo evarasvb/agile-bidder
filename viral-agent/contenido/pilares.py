@@ -98,8 +98,8 @@ PILARES = [
             (
                 "Un cliente perdió una licitación adjudicable por subir el anexo en el "
                 "formato equivocado. Nada de precio, nada de calidad técnica — un PDF. "
-                "Por eso el capítulo de admisibilidad de '{titulo}' es el que más releo "
-                "recomendar."
+                "Por eso el capítulo de admisibilidad de '{titulo}' es el que más "
+                "recomiendo releer."
             ),
             (
                 "La primera vez que gané una licitación pública no fue por tener el mejor "
@@ -178,6 +178,11 @@ PILARES = [
             (
                 "Última llamada para quienes postulan seguido y siguen perdiendo por temas "
                 "administrativos: '{titulo}' resuelve justo eso. Link en bio."
+            ),
+            (
+                "¿Primera vez postulando a una licitación pública? Empieza con el pie "
+                "derecho: '{titulo}' te lleva de la mano por bases, anexos, garantías y "
+                "evaluación. Disponible en Amazon, link en bio."
             ),
         ],
     },
