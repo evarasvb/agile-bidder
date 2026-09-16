@@ -11,12 +11,24 @@ interface Msg { role: "user" | "assistant"; content: string; img?: string }
 
 const LS_MSGS = "fvb_evaristo_msgs";
 const LS_OPEN = "fvb_evaristo_open";
+const LS_CONV = "fvb_evaristo_conv";
 
 const SALUDO: Msg = {
   role: "assistant",
   content:
-    "¡Hola! 👋 Soy Don Evaristo, tu asistente de FirmaVB. Cuéntame en qué estás y te ayudo al tiro. Por ejemplo: “¿cómo bajo la extensión?” o “no me aparecen oportunidades”. Si algo te da error, mándame un print. 📸",
+    "¡Hola! 👋 Soy Don Evaristo, tu experto en Mercado Público y en FirmaVB. Cuéntame en qué estás y te ayudo al tiro. Por ejemplo: “¿cómo bajo la extensión?” o “¿me conviene esta licitación?”. Si algo te da error, mándame un print. 📸",
 };
+
+// Código de licitación o compra ágil en la URL (ej: /licitaciones/1234-56-LE26).
+const RE_CODIGO = /^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}$/i;
+const codigoEnRuta = (path: string): string | null => {
+  const hit = path.split("/").filter(Boolean).map(decodeURIComponent).find((s) => RE_CODIGO.test(s));
+  return hit ? hit.toUpperCase() : null;
+};
+
+// Tablas de memoria de Don Evaristo (aún no están en los tipos generados).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = supabase as any;
 
 // Divide una línea en: links de acción markdown [txt](/ruta) o [txt](http…),
 // **negritas** y URLs sueltas. Todo sin HTML crudo.
@@ -101,6 +113,15 @@ export function EvaristoChat() {
   const [escMensaje, setEscMensaje] = useState("");
   const [enviandoTicket, setEnviandoTicket] = useState(false);
 
+  // Memoria: id de la conversación abierta (se guarda en Supabase, sobrevive al
+  // dispositivo) y último código sobre el que Don Evaristo ya saludó.
+  const [convId, setConvId] = useState<string | null>(() => {
+    try { return localStorage.getItem(LS_CONV); } catch { return null; }
+  });
+  const historialCargado = useRef(false);
+  const ultimoSaludo = useRef<string | null>(null);
+  const codigo = codigoEnRuta(location.pathname);
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       const u = data?.user;
@@ -108,7 +129,62 @@ export function EvaristoChat() {
     }).catch(() => { /* sin sesión (landing): pediremos el correo en el form) */ });
   }, []);
 
+  // Saludo con contexto (sin IA): qué está mirando, qué le urge, qué le falta.
+  const saludar = async (codigoActual: string | null, reemplazar: boolean) => {
+    try {
+      const { data } = await supabase.functions.invoke("evaristo-soporte", { body: { modo: "contexto", contexto: { codigo: codigoActual } } });
+      const saludo = (data as any)?.saludo as string | undefined;
+      if (!saludo) return;
+      ultimoSaludo.current = codigoActual ?? "";
+      setMsgs((prev) => {
+        if (reemplazar) return [{ role: "assistant", content: saludo }];
+        const ultimo = prev[prev.length - 1];
+        return ultimo?.role === "assistant" && ultimo.content === saludo ? prev : [...prev, { role: "assistant", content: saludo }];
+      });
+    } catch { /* sin contexto: queda el saludo genérico */ }
+  };
+
+  // Al entrar con sesión: retomar la última conversación guardada; si no hay,
+  // pedir un saludo con contexto en vez del genérico.
+  useEffect(() => {
+    if (!identidad.userId || historialCargado.current) return;
+    historialCargado.current = true;
+    (async () => {
+      try {
+        let id = convId;
+        if (!id) {
+          const { data: conv } = await db.from("evaristo_conversaciones").select("id").eq("user_id", identidad.userId)
+            .order("actualizado_en", { ascending: false }).limit(1).maybeSingle();
+          id = conv?.id ?? null;
+        }
+        if (id) {
+          const { data: rows } = await db.from("evaristo_mensajes").select("rol, contenido, adjuntos").eq("conversacion_id", id)
+            .order("id", { ascending: false }).limit(30);
+          const cargados: Msg[] = (rows ?? []).reverse().map((r: any) => ({ role: r.rol, content: r.contenido }));
+          if (cargados.length) {
+            setConvId(id);
+            setMsgs(cargados);
+            if (open && codigo && codigo !== ultimoSaludo.current) await saludar(codigo, false);
+            return;
+          }
+        }
+        await saludar(codigo, msgs.length <= 1);
+      } catch { /* sin memoria: seguimos con localStorage */ }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identidad.userId]);
+
+  // Al abrir el chat mirando una licitación/compra ágil nueva, Don Evaristo la comenta.
+  useEffect(() => {
+    if (!open || !identidad.userId || !historialCargado.current || !codigo || codigo === ultimoSaludo.current || loading) return;
+    saludar(codigo, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, codigo, identidad.userId]);
+
   useEffect(() => { try { localStorage.setItem(LS_MSGS, JSON.stringify(msgs.slice(-30))); } catch { /* noop */ } }, [msgs]);
+  useEffect(() => {
+    try { if (convId) localStorage.setItem(LS_CONV, convId); else localStorage.removeItem(LS_CONV); } catch { /* noop */ }
+  }, [convId]);
   useEffect(() => { try { localStorage.setItem(LS_OPEN, open ? "1" : "0"); } catch { /* noop */ } }, [open]);
   useEffect(() => {
     if (open && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -154,14 +230,19 @@ export function EvaristoChat() {
           messages: historial.map((m) => ({ role: m.role, content: m.content })),
           contexto: {
             page: nombrePagina(location.pathname),
+            ruta: location.pathname,
+            codigo,
             tieneInventario: (invStats?.total ?? 0) > 0,
             extensionConectada: !!isConnected,
           },
           imagen,
+          conversacion_id: convId,
         },
       });
       if (error) throw error;
       const reply = (data as any)?.reply || "No te entendí bien 😅 ¿me lo repites?";
+      const nuevoId = (data as any)?.conversacion_id;
+      if (typeof nuevoId === "string" && nuevoId !== convId) setConvId(nuevoId);
       setMsgs((prev) => [...prev, { role: "assistant", content: reply }]);
     } catch {
       setMsgs((prev) => [...prev, { role: "assistant", content: "Uf, no pude responderte. Reintenta en un ratito 🙏" }]);
@@ -170,7 +251,14 @@ export function EvaristoChat() {
     }
   };
 
-  const limpiar = () => { setMsgs([SALUDO]); setImg(null); };
+  // Nueva conversación: la anterior queda guardada en la memoria de Don Evaristo.
+  const limpiar = () => {
+    setMsgs([SALUDO]);
+    setImg(null);
+    setConvId(null);
+    ultimoSaludo.current = null;
+    if (identidad.userId) saludar(codigo, true);
+  };
 
   // Abre el formulario para dejar el caso al equipo, prellenando lo que sabemos.
   const abrirEscalar = () => {
@@ -256,7 +344,7 @@ export function EvaristoChat() {
               <div className="leading-tight">
                 <p className="font-semibold text-sm">Don Evaristo</p>
                 <p className="text-[11px] text-white/80 flex items-center gap-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-firmavb-green inline-block" /> Asistente de firmavb
+                  <span className="h-1.5 w-1.5 rounded-full bg-firmavb-green inline-block" /> Experto en Mercado Público · firmavb
                 </p>
               </div>
             </div>
@@ -270,7 +358,7 @@ export function EvaristoChat() {
               >
                 <MessageCircle className="h-3.5 w-3.5" /> Humano
               </a>
-              <Button variant="ghost" size="sm" onClick={limpiar} className="text-white/80 hover:text-white hover:bg-white/10 h-7 px-2 text-xs">Reiniciar</Button>
+              <Button variant="ghost" size="sm" onClick={limpiar} title="Empezar una conversación nueva (la anterior queda guardada)" className="text-white/80 hover:text-white hover:bg-white/10 h-7 px-2 text-xs">Nueva</Button>
               <Button variant="ghost" size="icon" onClick={() => setOpen(false)} className="text-white hover:bg-white/10 h-7 w-7"><X className="h-4 w-4" /></Button>
             </div>
           </div>
