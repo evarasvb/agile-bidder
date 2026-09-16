@@ -1,4 +1,6 @@
 // Lici-Brain Module: Odoo Connector
+// Solo lo llama el Database Webhook de Supabase (service_role); ningún usuario
+// debe poder crear leads en Odoo ni gastar el cupo de SendGrid a su antojo.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const ODOO_URL = Deno.env.get("ODOO_URL")!;
@@ -7,7 +9,21 @@ const ODOO_USER_ID = Deno.env.get("ODOO_USER_ID")!;
 const ODOO_PASSWORD = Deno.env.get("ODOO_PASSWORD")!;
 const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY")!;
 
+function rolDelJwt(auth: string): string {
+  try {
+    const t = auth.replace(/^Bearer\s+/i, "");
+    const payload = JSON.parse(atob(t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return payload.role ?? "";
+  } catch { return ""; }
+}
+
 serve(async (req) => {
+  if (rolDelJwt(req.headers.get("Authorization") ?? "") !== "service_role") {
+    return new Response(JSON.stringify({ error: "no autorizado" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
   try {
     const { record } = await req.json();
 

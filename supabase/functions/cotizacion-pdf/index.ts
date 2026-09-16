@@ -9,11 +9,26 @@ const INDIGO = rgb(0.28,0.35,0.68); const ROSE = rgb(0.83,0.32,0.40);
 const DARK = rgb(0.12,0.14,0.22); const GREY = rgb(0.42,0.46,0.55); const LINE = rgb(0.86,0.88,0.92);
 const money = (n:number)=> '$' + Math.round(n||0).toLocaleString('es-CL');
 
+function rolYSub(auth: string): { role: string; sub: string | null } {
+  try { const p = JSON.parse(atob(auth.replace(/^Bearer\s+/i, '').split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); return { role: p.role ?? '', sub: p.sub ?? null }; }
+  catch { return { role: '', sub: null }; }
+}
+
 Deno.serve(async (req)=>{
   if(req.method==='OPTIONS') return new Response('ok',{headers:cors});
   const sb = createClient(Deno.env.get('SUPABASE_URL')??'', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')??'');
   let body:any={}; try{ body = await req.json(); }catch(_){}
-  const clienteId = body.cliente_id; const codigo = body.codigo;
+  const codigo = body.codigo;
+  const { role, sub } = rolYSub(req.headers.get('Authorization') ?? '');
+  // El cliente_id nunca se toma del body para un usuario normal: se deriva de su
+  // propio JWT, para que no pueda pedir la cotización (RUT, precio, contacto) de otro
+  // proveedor solo adivinando su UUID. Solo un caller service_role (interno) puede
+  // pasar cliente_id explícito.
+  let clienteId: string | null = role === 'service_role' ? (body.cliente_id ?? null) : null;
+  if (role === 'authenticated' && sub) {
+    const { data: propio } = await sb.from('clientes').select('id').eq('user_id', sub).maybeSingle();
+    clienteId = propio?.id ?? null;
+  }
   if(!clienteId || !codigo) return new Response(JSON.stringify({error:'faltan cliente_id y codigo'}),{status:400,headers:{...cors,'Content-Type':'application/json'}});
 
   // Datos empresa (proveedor)

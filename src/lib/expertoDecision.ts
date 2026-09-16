@@ -87,7 +87,14 @@ export function evaluarCompletitudExpediente(input: EntradaCompletitud): Complet
   const puedeEmitirVeredictoDefinitivo = faltantesCriticos.length === 0
     && fuentes.ficha.estado === 'completa'
     && fuentes.items.estado === 'completa'
-    && (!requiereBases || (fuentes.bases.estado === 'completa' && fuentes.anexos.estado === 'completa'));
+    && (!requiereBases || (
+      fuentes.bases.estado === 'completa'
+      && fuentes.anexos.estado === 'completa'
+      // Una licitación puede tener modificaciones posteriores a la publicación
+      // (fechas, requisitos, montos). No se puede dar un veredicto definitivo
+      // mientras no se hayan revisado, aunque el resto del expediente esté completo.
+      && fuentes.modificaciones.estado === 'completa'
+    ));
 
   let nivel: NivelCompletitud;
   if (!puedeEmitirVeredictoDefinitivo || porcentaje < 45) nivel = 'insuficiente';

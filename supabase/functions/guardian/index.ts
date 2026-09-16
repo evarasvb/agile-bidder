@@ -63,6 +63,16 @@ interface Evaluado {
 const url = Deno.env.get('SUPABASE_URL')!;
 const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+// Solo el cron (que llama con la service_role key) puede disparar reparaciones
+// y escrituras globales de monitoreo; un usuario autenticado normal no debe poder.
+function rolDelJwt(auth: string): string {
+  try {
+    const t = auth.replace(/^Bearer\s+/i, '');
+    const payload = JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return payload.role ?? '';
+  } catch { return ''; }
+}
+
 // Ninguna llamada saliente puede colgar al guardián.
 async function fetchConTimeout(destino: string, opciones: RequestInit, ms: number): Promise<Response> {
   return await fetch(destino, { ...opciones, signal: AbortSignal.timeout(ms) });
@@ -161,6 +171,12 @@ async function enviarCorreo(asunto: string, html: string): Promise<boolean> {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
+  if (rolDelJwt(req.headers.get('Authorization') ?? '') !== 'service_role') {
+    return new Response(JSON.stringify({ error: 'no autorizado' }), {
+      status: 401,
+      headers: { ...cors, 'Content-Type': 'application/json' },
+    });
+  }
   const t0 = Date.now();
   const db = createClient(url, service);
 

@@ -52,10 +52,12 @@ Deno.serve(async (req) => {
     const { data: yaAsignado } = await admin.from('academia_accesos').select('id').eq('mp_payment_id', mpPaymentId).maybeSingle();
     if (yaAsignado) return new Response('ya procesado', { status: 200 });
 
-    const { data: libre } = await admin.from('academia_accesos').select('id, codigo').eq('curso_slug', cursoSlug).eq('estado', 'disponible').limit(1).maybeSingle();
-    if (!libre) return new Response('sin códigos disponibles', { status: 200 });
-
-    await admin.from('academia_accesos').update({ estado: 'asignado', email, mp_payment_id: mpPaymentId, asignado_at: new Date().toISOString() }).eq('id', libre.id);
+    // Reclamo atómico (FOR UPDATE SKIP LOCKED en el server): si dos pagos llegan a
+    // la vez, cada uno se lleva una fila distinta en vez de pisarse.
+    const { data: reclamado, error: errReclamo } = await admin
+      .rpc('academia_reclamar_codigo', { p_curso_slug: cursoSlug, p_email: email, p_mp_payment_id: mpPaymentId })
+      .maybeSingle();
+    if (errReclamo || !reclamado) return new Response('sin códigos disponibles', { status: 200 });
     return new Response(JSON.stringify({ ok: true, curso: cursoSlug }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   } catch (_e) {
     return new Response('error', { status: 200 });

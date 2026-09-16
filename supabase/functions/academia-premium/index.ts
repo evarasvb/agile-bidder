@@ -142,8 +142,28 @@ Deno.serve(async (req) => {
       const mail = String(email || '').trim().toLowerCase();
       if (!mail) return json({ ok: false, error: 'Ingresa tu correo.' }, 400);
       const { data } = await admin.from('academia_accesos').select('codigo').eq('curso_slug', slug).eq('email', mail).not('mp_payment_id', 'is', null).maybeSingle();
-      if (!data) return json({ ok: false, error: 'No encontramos una compra con ese correo. Si acabas de pagar, espera un minuto.' }, 200);
-      return json({ ok: true, codigo: data.codigo, modulos: contenido });
+      // Respuesta idéntica exista o no la compra: así no se puede usar este endpoint
+      // para confirmar qué correos compraron. El código y el contenido pago NUNCA
+      // se devuelven en la respuesta — solo se mandan al correo, que es la prueba
+      // de que quien pide la recuperación es realmente el dueño de esa casilla.
+      if (data?.codigo) {
+        const resendKey = Deno.env.get('RESEND_API_KEY');
+        if (resendKey) {
+          try {
+            await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                from: 'FirmaVB <notificaciones@notifications.firmavb.cl>',
+                to: [mail],
+                subject: 'Tu código de acceso a la Academia · FirmaVB',
+                html: `<p>Tu código de acceso es: <b>${data.codigo}</b></p><p>Ingrésalo en la Academia para ver tu curso.</p>`,
+              }),
+            });
+          } catch (e) { console.error('resend recuperar-academia:', e); }
+        }
+      }
+      return json({ ok: true, mensaje: 'Si el correo tiene una compra registrada, te enviamos el código.' });
     }
 
     return json({ ok: false, error: 'Acción no válida' }, 400);
