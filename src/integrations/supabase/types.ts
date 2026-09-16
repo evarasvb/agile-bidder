@@ -1590,6 +1590,93 @@ export type Database = {
         }
         Relationships: []
       }
+      cluster_metadata: {
+        Row: {
+          avg_purchase_value: number | null
+          cluster_description: string | null
+          cluster_id: number
+          cluster_name: string
+          created_at: string | null
+          customer_count: number | null
+          fecha_creacion: string | null
+          id: string
+          key_characteristics: string | null
+          recommended_messaging: string | null
+          regions: Json | null
+          sectors: Json | null
+          total_purchases: number | null
+          ultima_actualizacion: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          avg_purchase_value?: number | null
+          cluster_description?: string | null
+          cluster_id: number
+          cluster_name: string
+          created_at?: string | null
+          customer_count?: number | null
+          fecha_creacion?: string | null
+          id?: string
+          key_characteristics?: string | null
+          recommended_messaging?: string | null
+          regions?: Json | null
+          sectors?: Json | null
+          total_purchases?: number | null
+          ultima_actualizacion?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          avg_purchase_value?: number | null
+          cluster_description?: string | null
+          cluster_id?: number
+          cluster_name?: string
+          created_at?: string | null
+          customer_count?: number | null
+          fecha_creacion?: string | null
+          id?: string
+          key_characteristics?: string | null
+          recommended_messaging?: string | null
+          regions?: Json | null
+          sectors?: Json | null
+          total_purchases?: number | null
+          ultima_actualizacion?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      clustering_log: {
+        Row: {
+          clientes_procesados: number | null
+          clusters_generados: number | null
+          created_at: string | null
+          detalles: Json | null
+          fecha_clustering: string | null
+          id: string
+          status: string | null
+          tiempo_segundos: number | null
+        }
+        Insert: {
+          clientes_procesados?: number | null
+          clusters_generados?: number | null
+          created_at?: string | null
+          detalles?: Json | null
+          fecha_clustering?: string | null
+          id?: string
+          status?: string | null
+          tiempo_segundos?: number | null
+        }
+        Update: {
+          clientes_procesados?: number | null
+          clusters_generados?: number | null
+          created_at?: string | null
+          detalles?: Json | null
+          fecha_clustering?: string | null
+          id?: string
+          status?: string | null
+          tiempo_segundos?: number | null
+        }
+        Relationships: []
+      }
       compras_agiles: {
         Row: {
           asignado_a: string | null
@@ -1887,6 +1974,57 @@ export type Database = {
           registros_actualizados?: number | null
           registros_nuevos?: number | null
           registros_procesados?: number | null
+        }
+        Relationships: []
+      }
+      customer_clusters: {
+        Row: {
+          ai_profile: string | null
+          characteristics: Json | null
+          cluster_description: string | null
+          cluster_id: number
+          cluster_name: string
+          created_at: string | null
+          customer_name: string | null
+          customer_rut: string
+          customer_type: string | null
+          fecha_clustering: string | null
+          id: string
+          purchase_history: Json | null
+          ultima_actualizacion: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ai_profile?: string | null
+          characteristics?: Json | null
+          cluster_description?: string | null
+          cluster_id: number
+          cluster_name: string
+          created_at?: string | null
+          customer_name?: string | null
+          customer_rut: string
+          customer_type?: string | null
+          fecha_clustering?: string | null
+          id?: string
+          purchase_history?: Json | null
+          ultima_actualizacion?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ai_profile?: string | null
+          characteristics?: Json | null
+          cluster_description?: string | null
+          cluster_id?: number
+          cluster_name?: string
+          created_at?: string | null
+          customer_name?: string | null
+          customer_rut?: string
+          customer_type?: string | null
+          fecha_clustering?: string | null
+          id?: string
+          purchase_history?: Json | null
+          ultima_actualizacion?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -4109,6 +4247,7 @@ export type Database = {
         Row: {
           actualizado_en: string
           audiencia_estimada: number | null
+          audiencia_estimada_final: number | null
           canal_primario: string | null
           creado_en: string
           creado_por: string | null
@@ -4124,10 +4263,12 @@ export type Database = {
           notas: string | null
           objetivo: string
           presupuesto: number | null
+          segmentos_seleccionados: string[] | null
         }
         Insert: {
           actualizado_en?: string
           audiencia_estimada?: number | null
+          audiencia_estimada_final?: number | null
           canal_primario?: string | null
           creado_en?: string
           creado_por?: string | null
@@ -4143,10 +4284,12 @@ export type Database = {
           notas?: string | null
           objetivo: string
           presupuesto?: number | null
+          segmentos_seleccionados?: string[] | null
         }
         Update: {
           actualizado_en?: string
           audiencia_estimada?: number | null
+          audiencia_estimada_final?: number | null
           canal_primario?: string | null
           creado_en?: string
           creado_por?: string | null
@@ -4162,6 +4305,7 @@ export type Database = {
           notas?: string | null
           objetivo?: string
           presupuesto?: number | null
+          segmentos_seleccionados?: string[] | null
         }
         Relationships: []
       }
@@ -10322,6 +10466,14 @@ export type Database = {
         Returns: boolean
       }
       validar_email_basico: { Args: { p_email: string }; Returns: string }
+      youtube_sincronizar_suscriptores: {
+        Args: { p_canal_id: string }
+        Returns: {
+          duplicados: number
+          errores: number
+          sincronizados: number
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "user" | "super_admin" | "vendedor" | "visor"
