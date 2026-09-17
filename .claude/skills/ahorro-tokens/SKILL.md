@@ -30,6 +30,16 @@ Objetivo: entregar el mismo resultado con la menor cantidad de lectura, escritur
 - No crear archivos `.md` nuevos por cada tarea. Actualizar el README o el documento existente si hace falta. Este repo ya tiene demasiados documentos sueltos.
 - Commits con mensaje de una línea claro. Sin PR salvo que se pida.
 
+## Modelo según la tarea (regla de Evaristo, 2026-09-17)
+- Tareas simples van a un subagente con modelo barato (`haiku`): desplegar edge functions, leer logs, revisar el estado de una PR o de un workflow, consultar cifras de la base, buscar archivos, renombrar, mover, verificar que algo existe.
+- Tareas medianas (cambios acotados de código, tests, redacción de PR) pueden ir a `sonnet`.
+- El modelo principal se reserva para lo complejo: diseñar, decidir, depurar bugs difíciles, migraciones con riesgo, prompts del Experto y de Don Evaristo, y para revisar lo que los subagentes entregan.
+- En la app pasa lo mismo: Gemini flash-lite para chat y saludos, modelos más grandes solo para informes y estudios profundos.
+
+## Chequeos automáticos de PR
+- Cada 3 horas, no cada hora. El chequeo rutinario lo hace un subagente `haiku`; el principal solo entra si hay algo que corregir.
+- Se cortan cuando la PR se mergea o se cierra.
+
 ## Costos externos (Vercel, Supabase, APIs)
 - Antes de crear recursos pagos (proyectos, funciones, dominios, créditos), avisar el costo y esperar confirmación.
 - Preferir planes gratis, cache, ISR y consultas indexadas. Ver skill `vercel-optimize` para reducir la cuenta de Vercel.
