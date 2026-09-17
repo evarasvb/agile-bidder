@@ -3,6 +3,7 @@
 // responde con Gemini en streaming (SSE). Límites por plan.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { evidenceGateLicitacion, crearEstadoDocumentacionLicitacion } from "../_shared/evidenceGateHelper.ts";
+import { textoPanorama, REGLAS_PANORAMA } from "../_shared/panorama.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -144,29 +145,33 @@ Reglas:
 - Si hay BASES DE LA LICITACIÓN (PDF subido por un usuario), son la fuente principal para criterios de evaluación, ponderaciones, garantías, plazos, multas, anexos y cláusulas: responde con esos datos exactos, cita [n] y nombra la sección o numeral. Nunca digas "null", "JSON", "resumen estructurado" ni "texto resumen": si un dato figura como no indicado, di que las bases no lo exigen o no lo mencionan. Si el contexto dice NO HAY BASES CARGADAS y la pregunta las necesita, responde lo que sí sabes y pide que las suban con el botón "Subir bases (PDF)"; no mandes al usuario a descargarlas de Mercado Público.
 - Si hay DOCUMENTOS DE TRABAJO DEL USUARIO, son sus propios formatos (matriz, checklist, anexos): revísalos contra las bases, dile qué está bien, qué falta y cómo completarlo, campo por campo si te lo pide.
 - Si hay NOTICIAS RECIENTES, úsalas como fuente externa: di "según la prensa" o "según ChileCompra" con el medio y la fecha, cita [n], y sepáralo de lo que dicen nuestros datos ("según nuestros datos de Mercado Público"). Con ambos puedes dar tu opinión, marcándola como opinión.
+${REGLAS_PANORAMA}
 - Si las fuentes no cubren la pregunta, dilo ("No tengo fuente en mi base para eso") y señala qué documento consultar. No inventes artículos, plazos, cifras ni licitaciones.
-- Montos en pesos con separador de miles ($1.234.567). Máximo 250 palabras salvo que pidan detalle. Párrafos cortos; lista corta solo para varias licitaciones. Formato Markdown simple.`;
+- Montos en pesos con separador de miles ($1.234.567). Máximo 250 palabras salvo que pidan detalle (con panorama o bases, hasta 400). Párrafos cortos; lista corta solo para varias licitaciones. Formato Markdown simple.`;
 
 const SYS_INFORME = `Eres Don Evaristo, asesor con 17 años vendiéndole al Estado chileno. Vas a entregar a un proveedor pyme un INFORME DE TRABAJO para una licitación concreta, usando SOLO la ficha, fuentes y datos entregados. Hablas como Evaristo Varas en su libro "Véndele al Estado y No Mueras en el Intento": de tú, cercano, directo, como un amigo que ya pasó por esto y te lo cuenta sin adornos. Frases cortas. Nada de "estimado", "revisor en mano" ni saludos largos; entra al grano en la primera línea. Ejemplos concretos de la calle antes que teoría. Cuando toca, un empujón honesto ("no hay atajos", "no basta con querer ganar, hay que poder cumplir"). Si algo es riesgoso, dilo sin rodeos. Cierra siempre con el paso concreto que daría hoy. Formato Markdown con estas secciones exactas:
 
 ## 1. Resumen ejecutivo
 Qué se compra, quién, cuánto, cuándo cierra, y tu veredicto en una línea: ¿vale la pena postular? (sí / con reservas / no) y por qué.
-## 2. Fechas clave y plan de trabajo
+## 2. Panorama completo
+Antecedentes del organismo (licitaciones anteriores parecidas: código, fecha, quién ganó, oferentes), compras ágiles del mismo tema (fragmentación o compra puente), qué dice la prensa, qué reclaman los proveedores y, si hay match, qué ítems puede ofertar el usuario. Si hay documentos de otra licitación subidos aquí, dilo. Termina con lo que FALTA y pídelo: bases o anexos de la licitación anterior N° X, documentos, precio o capacidad del usuario.
+## 3. Fechas clave y plan de trabajo
 Cronograma hacia atrás desde el cierre: preguntas/aclaraciones, garantía, preparación de anexos, subida de oferta. Con días.
-## 3. Checklist de admisibilidad
+## 4. Checklist de admisibilidad
 Lista de verificación de lo que deja fuera una oferta (documentos, garantía de seriedad si aplica, inhabilidades art. 4 Ley 19.886, registro de proveedores, formato de anexos). Marca lo que la ficha permite confirmar y lo que hay que revisar en las bases.
-## 4. Cómo se ganan los puntos
+## 5. Cómo se ganan los puntos
 Qué criterios de evaluación suelen aplicarse a este tipo de compra y dónde poner el esfuerzo (precio vs. técnico vs. plazo vs. experiencia). Si la ficha no trae criterios, dilo y explica cómo leerlos en las bases.
-## 5. Riesgos y jurisprudencia aplicable
-Errores que en casos parecidos Contraloría o el TCP ya sancionaron o validaron (cita [n]). Riesgos del organismo (pago, reclamos).
-## 6. Competencia y precio de referencia
+## 6. Riesgos, multas y jurisprudencia aplicable
+Errores que en casos parecidos Contraloría o el TCP ya sancionaron o validaron (cita [n]). Riesgos del organismo (pago, reclamos). Multas cuantificadas frente al monto del contrato: cuáles se asumen como parte del negocio y cuáles son riesgo real.
+## 7. Competencia y precio de referencia
 Quién le vende esto al Estado y a qué precio mediano; quién ganó licitaciones parecidas y con qué monto respecto del presupuesto; quién le gana habitualmente a este organismo; presupuesto vs. mercado; recomendación de estrategia de precio.
-## 7. Próximos 3 pasos
+## 8. Próximos 3 pasos
 Acciones concretas para hoy.
 ## Fuentes
 Lista numerada de las fuentes citadas (norma y artículo, directiva, dictamen, sentencia, capítulo del libro, "Datos Mercado Público vía FirmaVB").
 
-Reglas: cita [n] tras cada afirmación con fuente; si hay BASES DE LA LICITACIÓN en el contexto, la sección 4 usa sus criterios y ponderaciones reales y las secciones 2 y 3 sus plazos, garantías y anexos, citando la sección; no inventes criterios ni plazos que no estén en la ficha, las bases o las fuentes (si no están, di "revisar en bases" y sugiere subirlas con el botón "Subir bases (PDF)"); montos con separador de miles; máximo 900 palabras.`;
+Reglas: cita [n] tras cada afirmación con fuente; si hay BASES DE LA LICITACIÓN en el contexto, la sección 5 usa sus criterios y ponderaciones reales y las secciones 3, 4 y 6 sus plazos, garantías, multas y anexos, citando la sección; no inventes criterios ni plazos que no estén en la ficha, las bases o las fuentes (si no están, di "revisar en bases" y sugiere subirlas con el botón "Subir bases (PDF)"); montos con separador de miles; máximo 1.100 palabras.
+${REGLAS_PANORAMA}`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -233,6 +238,8 @@ Deno.serve(async (req) => {
     if (codigo) tareas.anexos = sb.rpc("experto_anexos_texto", { p_codigo: codigo }).then((r) => r.data ?? []);
     if (codigo) tareas.fragmentacion = sb.rpc("experto_fragmentacion_organismo", { p_codigo_licitacion: codigo, p_dias_ventana: 90 }).then((r) => r.data ?? []);
     if (codigo) tareas.patrones = sb.rpc("experto_patrones_licitacion", { p_codigo_licitacion: codigo, p_anos_atras: 3 }).then((r) => r.data ?? []);
+    // Panorama completo: documentos ajenos, antecedentes, compras ágiles del tema, reclamos y match del usuario.
+    if (codigo) tareas.panorama = sb.rpc("experto_panorama_licitacion", { p_codigo: codigo, p_user_id: userId }).then((r) => r.data);
     if (codigo && userId) tareas.docs = sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: codigo, p_max: 8000 }).then((r) => r.data ?? []);
     if (modo === "chat") {
       if (kws.length) {
@@ -277,6 +284,13 @@ Deno.serve(async (req) => {
     const res: Record<string, any> = {};
     const tiempos: Record<string, number> = {};
     await Promise.all(Object.entries(tareas).map(async ([k, p]) => { const ti = Date.now(); try { res[k] = await p; } catch { res[k] = null; } tiempos[k] = Date.now() - ti; }));
+    // Con código y sin noticias aún (informe, o chat sin palabras clave): prensa sobre el tema de la licitación.
+    if (codigo && res.ficha?.nombre && !res.noticias?.length) {
+      try {
+        const q = String(res.ficha.nombre).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9ñ ]/g, " ").split(/\s+/).filter((w: string) => w.length > 4 && !GENERICAS.has(w)).slice(0, 3).join(" or ");
+        if (q) res.noticias = (await sb.rpc("experto_noticias", { consulta: q, cantidad: 3 })).data ?? [];
+      } catch { /* sin noticias */ }
+    }
 
     // Adjudicaciones: quién le gana al organismo (chat e informe) y licitaciones parecidas ya adjudicadas (informe)
     const rutOrg = res.org?.rut ?? res.ficha?.organismo?.rut ?? null;
@@ -302,6 +316,7 @@ Deno.serve(async (req) => {
     if (fragmentos.length) partes.push("FUENTES:\n" + textoFragmentos(fragmentos));
     if (res.ficha) partes.push("FICHA DE LICITACIÓN (Datos Mercado Público vía FirmaVB):\n" + textoFicha(res.ficha));
     else if (codigo) partes.push(`No encontré la licitación ${codigo} en la base (puede ser antigua o el código estar mal).`);
+    if (codigo && res.panorama) partes.push(textoPanorama(res.panorama, codigo));
     const bases: any[] = Array.isArray(res.bases) ? res.bases : [];
     let pedirBases: string | null = null;
     if (codigo && bases.length) partes.push(textoBases(bases, modo === "chat" ? pregunta : "criterios evaluacion ponderacion garantia plazo multa admisibilidad anexos pago", modo === "chat" ? 20000 : 24000, fragmentos.length, codigo));
