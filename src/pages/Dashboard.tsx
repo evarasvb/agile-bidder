@@ -2,9 +2,6 @@ import { useState } from "react";
 import {
   Target,
   Zap,
-  DollarSign,
-  TrendingUp,
-  TrendingDown,
   ArrowRight,
   Clock,
   Eye,
@@ -14,7 +11,6 @@ import {
   RefreshCw,
   Inbox,
   AlertTriangle,
-  Info,
   BarChart3,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,7 +26,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  useDashboardKPIs,
   usePipelineByStage,
   useOportunidadesPorTipo,
   useCierresProximos,
@@ -52,23 +47,13 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  MetricCardSkeleton,
-  ChartSkeleton,
-} from "@/components/dashboard/DashboardSkeleton";
+import { ChartSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { PrimerosPasos } from "@/components/dashboard/PrimerosPasos";
 import { TutorialBienvenida } from "@/components/dashboard/TutorialBienvenida";
 import { ResumenEjecutivo } from "@/components/dashboard/ResumenEjecutivo";
 import { FirmaVBHeader } from "@/components/layout/FirmaVBHeader";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { useQueryClient } from "@tanstack/react-query";
 
 const PIE_COLORS = [
   "hsl(var(--firmavb-blue))",
@@ -91,20 +76,16 @@ const formatCompact = (value: number) => {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const {
-    data: kpis,
-    isLoading: kpisLoading,
-    error: kpisError,
-    refetch: refetchKPIs,
-  } = useDashboardKPIs();
-  const { data: pipelineData, isLoading: pipelineLoading } =
+  const queryClient = useQueryClient();
+  const { data: pipelineData, isLoading: pipelineLoading, error: pipelineError } =
     usePipelineByStage();
-  const { data: porTipoData, isLoading: porTipoLoading } =
+  const { data: porTipoData, isLoading: porTipoLoading, error: porTipoError } =
     useOportunidadesPorTipo();
-  const { data: cierresData, isLoading: cierresLoading } =
+  const { data: cierresData, isLoading: cierresLoading, error: cierresError } =
     useCierresProximos();
-  const { data: matchesData, isLoading: matchesLoading } =
+  const { data: matchesData, isLoading: matchesLoading, error: matchesError } =
     useUltimosMatches();
+  const dashboardError = pipelineError || porTipoError || cierresError || matchesError;
   // "Buscar oportunidades para mí": corre el match del PROPIO cliente y lleva a
   // la bandeja. Antes era "Ejecutar Matching IA" con un diálogo que contaba
   // oportunidades de TODO el sistema (jerga + números ajenos al cliente).
@@ -112,10 +93,12 @@ export default function Dashboard() {
   const handleBuscarParaMi = async () => {
     setIsMatching(true);
     try {
-      await supabase.rpc("generar_matches_ca_para_mi");
+      const { error } = await (supabase as any).rpc("generar_matches_ca_para_mi");
+      if (error) throw error;
+      await queryClient.invalidateQueries({ queryKey: ["dashboard-principal"] });
       toast({
         title: "¡Listo!",
-        description: "Buscamos coincidencias nuevas con tu inventario.",
+        description: "Actualizamos tus Compras Ágiles. Las licitaciones se renuevan automáticamente cada hora.",
       });
       navigate("/oportunidades");
     } catch {
@@ -129,11 +112,22 @@ export default function Dashboard() {
   };
 
   const handleForceRefresh = async () => {
-    await refetchKPIs();
-    toast({
-      title: "Datos actualizados",
-      description: "Se han recargado las métricas del dashboard",
-    });
+    try {
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ["dashboard-principal"] }),
+        queryClient.refetchQueries({ queryKey: ["pipeline"] }),
+      ]);
+      toast({
+        title: "Datos actualizados",
+        description: "Recargamos tus oportunidades, cierres, matches y pipeline.",
+      });
+    } catch {
+      toast({
+        title: "No pudimos actualizar todo",
+        description: "Revisa tu conexión y vuelve a intentarlo.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -155,10 +149,10 @@ export default function Dashboard() {
                 variant="outline"
                 size="sm"
                 onClick={handleForceRefresh}
-                disabled={kpisLoading}
+                disabled={pipelineLoading || porTipoLoading || cierresLoading || matchesLoading}
               >
                 <RefreshCw
-                  className={`h-4 w-4 mr-2 ${kpisLoading ? "animate-spin" : ""}`}
+                  className={`h-4 w-4 mr-2 ${pipelineLoading || porTipoLoading || cierresLoading || matchesLoading ? "animate-spin" : ""}`}
                 />
                 Actualizar
               </Button>
@@ -203,7 +197,7 @@ export default function Dashboard() {
       <ResumenEjecutivo />
 
       {/* Error Banner */}
-      {kpisError && (
+      {dashboardError && (
         <div className="bg-firmavb-red/10 border border-firmavb-red/20 rounded-lg px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2 text-firmavb-red">
             <AlertTriangle className="h-4 w-4" />
@@ -214,7 +208,7 @@ export default function Dashboard() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => refetchKPIs()}
+            onClick={handleForceRefresh}
             className="border-firmavb-red/30 text-firmavb-red hover:bg-firmavb-red/10"
           >
             Reintentar
@@ -405,7 +399,7 @@ export default function Dashboard() {
                 </p>
               </div>
             ) : (
-              <div className="rounded-lg border overflow-hidden">
+              <div className="rounded-lg border overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50">
@@ -531,7 +525,7 @@ export default function Dashboard() {
                 </p>
               </div>
             ) : (
-              <div className="rounded-lg border overflow-hidden">
+              <div className="rounded-lg border overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50">
@@ -624,59 +618,5 @@ export default function Dashboard() {
           "[12:03] Scraper…" — con un botón "Forzar Escaneo" que no escaneaba.
           Pantalla de desarrollador, no de cliente.) */}
     </div>
-  );
-}
-
-// --- KPI Card Component ---
-interface KPICardProps {
-  title: string;
-  value: string | number;
-  icon: React.ComponentType<{ className?: string }>;
-  color: "blue" | "green" | "amber" | "emerald";
-  trend: number | null;
-  subtitle?: string;
-}
-
-function KPICard({ title, value, icon: Icon, color, trend, subtitle }: KPICardProps) {
-  const colorClasses = {
-    blue: "text-firmavb-blue bg-firmavb-blue/10",
-    green: "text-firmavb-green bg-firmavb-green/10",
-    amber: "text-firmavb-amber bg-firmavb-amber/10",
-    emerald: "text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30",
-  };
-
-  return (
-    <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
-      <CardContent className="pt-6">
-        <div className="flex items-center justify-between mb-3">
-          <div className={`p-2.5 rounded-lg ${colorClasses[color]}`}>
-            <Icon className="h-5 w-5" />
-          </div>
-          {trend !== null && trend !== undefined && (
-            <Badge
-              variant="outline"
-              className={
-                trend >= 0
-                  ? "text-firmavb-green border-firmavb-green/30"
-                  : "text-firmavb-red border-firmavb-red/30"
-              }
-            >
-              {trend >= 0 ? (
-                <TrendingUp className="h-3 w-3 mr-1" />
-              ) : (
-                <TrendingDown className="h-3 w-3 mr-1" />
-              )}
-              {trend >= 0 ? "+" : ""}
-              {trend}%
-            </Badge>
-          )}
-        </div>
-        <p className="text-2xl font-heading font-bold">{value}</p>
-        <p className="text-sm text-muted-foreground mt-1">{title}</p>
-        {subtitle && (
-          <p className="text-xs text-muted-foreground/70 mt-0.5">{subtitle}</p>
-        )}
-      </CardContent>
-    </Card>
   );
 }

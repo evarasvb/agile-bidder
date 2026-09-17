@@ -1,10 +1,11 @@
 import { Link } from "react-router-dom";
-import { Check, Crown, Sparkles, ArrowLeft } from "lucide-react";
+import { Check, Crown, Sparkles, ArrowLeft, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Seo } from "@/components/Seo";
 import { useAuth } from "@/hooks/useAuth";
 import { usePlan } from "@/hooks/usePlan";
+import { useExpertoLanzamiento } from "@/hooks/useExpertoLanzamiento";
 import { PLANES } from "@/data/planes";
 import logoFirmavbOriginal from "@/assets/logo-firmavb-original.png";
 
@@ -15,6 +16,38 @@ import logoFirmavbOriginal from "@/assets/logo-firmavb-original.png";
 export default function Planes() {
   const { isAuthenticated } = useAuth();
   const { isPro } = usePlan();
+  const { data: lanzamiento } = useExpertoLanzamiento(false);
+
+  if (lanzamiento?.fase !== 'monetizacion') {
+    const usados = lanzamiento?.cupos_usados ?? 0;
+    const maximo = lanzamiento?.cupos_maximos ?? 10;
+    return (
+      <div className="min-h-screen bg-firmavb-gray">
+        <Seo title="Beta fundadora — Experto FirmaVB" description="Acceso gratuito para las primeras 10 empresas que prueben el Experto FirmaVB." path="/planes" />
+        <header className="px-6 py-4 border-b border-border/50 bg-white">
+          <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
+            <Link to="/"><img src={logoFirmavbOriginal} alt="FirmaVB" className="h-10 w-auto object-contain" /></Link>
+            <Button asChild><Link to={isAuthenticated ? "/experto" : "/auth?tab=signup"}>{isAuthenticated ? "Usar el Experto" : "Crear cuenta gratis"}</Link></Button>
+          </div>
+        </header>
+        <main className="max-w-3xl mx-auto px-6 py-16">
+          <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-8"><ArrowLeft className="h-4 w-4" />Volver a FirmaVB</Link>
+          <div className="rounded-3xl border border-firmavb-blue/30 bg-white p-8 sm:p-12 text-center shadow-sm">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-firmavb-blue text-white"><Users className="h-7 w-7" /></div>
+            <Badge className="mt-5 bg-firmavb-blue">Beta fundadora</Badge>
+            <h1 className="mt-4 text-3xl sm:text-4xl font-heading font-bold">Primero, 10 clientes que lo usen de verdad</h1>
+            <p className="mt-4 text-muted-foreground">Durante esta etapa el Experto completo es gratuito para las primeras 10 empresas. Queremos observar el uso real, corregir fricciones y dejar el producto aceitado antes de activar pruebas o cobros.</p>
+            <div className="mx-auto mt-7 max-w-md">
+              <div className="h-3 overflow-hidden rounded-full bg-muted"><div className="h-full bg-firmavb-blue" style={{ width: `${Math.min(100, (usados / maximo) * 100)}%` }} /></div>
+              <p className="mt-2 text-sm font-medium">{usados} de {maximo} cupos ocupados</p>
+            </div>
+            <Button size="lg" className="mt-8 bg-firmavb-blue hover:bg-firmavb-blue/90" asChild><Link to={isAuthenticated ? "/experto" : "/auth?tab=signup"}>{isAuthenticated ? "Entrar al Experto" : "Quiero ser cliente fundador"}</Link></Button>
+            <p className="mt-4 text-xs text-muted-foreground">Sin tarjeta. Sin prueba de 14 días. Sin plan Pro activo durante la beta.</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-firmavb-gray">
@@ -134,11 +167,11 @@ export default function Planes() {
         <p className="text-center text-xs text-muted-foreground mt-8">
           Pagos con Mercado Pago. Experto Pro y Plus son pagos únicos por 30 días; el ERP es
           suscripción mensual que puedes cancelar cuando quieras. Sin tarjeta de crédito para el
-          plan gratuito.
+          primer uso del Experto ni para la prueba Pro de 14 días.
         </p>
         <p className="text-center text-xs text-muted-foreground mt-2">
-          Modo Bajo el Agua (investigación profunda de una licitación a partir de su ID): 1 informe
-          gratis para probar; Experto Pro 10 al mes, Experto Plus 30 al mes, ERP sin límite.
+          Primero tienes un resultado gratis; al iniciar sesión puedes probar Experto Pro durante
+          14 días. Después: Pro 10 informes Bajo el Agua al mes, Plus 30 y ERP sin límite.
         </p>
       </main>
     </div>

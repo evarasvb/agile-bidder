@@ -267,12 +267,12 @@ export default function AcademiaCurso() {
     });
     setRecuperando(false);
     if (error || !data?.ok) {
-      toast.error(data?.error || "No encontramos tu compra con ese correo.");
+      toast.error(data?.error || "No pudimos procesar la recuperación. Intenta nuevamente.");
       return;
     }
-    setDesbloqueado(data.modulos as Modulo[]);
-    toast.success("¡Acceso recuperado! 🎉");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    // El backend ya no devuelve el código ni el curso directo (para que no baste con
+    // adivinar un correo ajeno): lo manda por email y el usuario lo ingresa abajo.
+    toast.success("Si ese correo tiene una compra registrada, te enviamos el código. Revisa tu bandeja.");
   };
 
   const esPremiumBloqueado = curso.premium && !desbloqueado;

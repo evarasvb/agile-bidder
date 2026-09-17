@@ -4,7 +4,7 @@ import { Briefcase, DollarSign, Trophy, TrendingUp } from "lucide-react";
 import { usePipeline } from "@/hooks/usePipeline";
 import { ETAPA_CONFIG, PIPELINE_ETAPAS, type PipelineEtapa } from "@/components/pipeline/pipelineConstants";
 
-const POSTULADAS: PipelineEtapa[] = ["postulada", "evaluacion", "adjudicada", "oc_emitida", "pagada"];
+const POSTULADAS: PipelineEtapa[] = ["postulada", "evaluacion", "adjudicada", "oc_emitida", "pagada", "perdida"];
 const GANADAS: PipelineEtapa[] = ["adjudicada", "oc_emitida", "pagada"];
 const ACTIVAS: PipelineEtapa[] = ["preparacion", "postulada", "evaluacion"];
 
