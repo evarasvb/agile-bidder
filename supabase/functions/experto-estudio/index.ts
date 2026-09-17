@@ -98,25 +98,16 @@ Deno.serve(async (req) => {
     const res: Record<string, any> = {};
     await Promise.all(Object.entries(t).map(async ([k, p]) => { try { res[k] = await p; } catch { res[k] = null; } }));
 
-    // Evidence Gate: valida que la documentación esté completa para postular
+    // Evidence Gate: no bloquea el estudio (nunca da "verde" por diseño); va como regla
+    // para la IA: analiza con lo que hay y deja explícito qué documentación falta.
     const bases: any[] = res.bases ?? [];
-    const estadoDoc = crearEstadoDocumentacionLicitacion(ficha, bases, []);
-    const gate = evidenceGateLicitacion(estadoDoc);
-    if (!gate.permiteBadgeVerde) {
-      return json({
-        error: "documentacion_incompleta",
-        veredicto: gate.veredicto,
-        razon: gate.razon,
-        faltantes: gate.faltantes,
-        permiteBadgeVerde: false,
-        mensaje: `No se puede recomendar postular: ${gate.razon}. Faltantes: ${gate.faltantes.join("; ")}.`
-      }, 202);
-    }
+    const gate = evidenceGateLicitacion(crearEstadoDocumentacionLicitacion(ficha, bases, []));
 
     // Fuentes normativas [1..n], luego bases
     const vistos = new Set<number>();
     const frag: any[] = [...(res.n1 ?? []), ...(res.n2 ?? []), ...(res.n3 ?? [])].filter((f) => !vistos.has(f.id) && vistos.add(f.id));
     const partes: string[] = [];
+    partes.push(`ESTADO DOCUMENTAL (regla determinista de FirmaVB, veredicto: ${gate.veredicto}): ${gate.razon}${gate.faltantes.length ? ` Faltantes: ${gate.faltantes.join("; ")}.` : ""} Haz el estudio con lo que tienes, pero nunca recomiendes postular como algo seguro: señala qué falta y qué debe subir o revisar el usuario.`);
     if (frag.length) partes.push("FUENTES:\n" + frag.map((f, i) => `[${i + 1}] ${f.fuente}${f.seccion ? " — " + f.seccion : ""}\n${String(f.texto).slice(0, 1200)}`).join("\n\n"));
     const o = ficha.organismo ?? {};
     partes.push(`FICHA DE LA LICITACIÓN ${codigo} (Datos Mercado Público vía FirmaVB):\n${nombre}\nOrganismo: ${ficha.institucion} (RUT ${rut ?? "s/i"}) — ${ficha.comuna ?? ""}, ${ficha.region ?? ""}\nEstado: ${ficha.estado} | Tipo: ${ficha.tipo ?? "s/i"} | Presupuesto: ${fmt(ficha.presupuesto)} | Modalidad: ${ficha.modalidad ?? "s/i"} | Pago: ${ficha.tipo_pago ?? "s/i"} | Contrato: ${ficha.duracion_contrato ?? "s/i"}\nPublicada ${fecha(ficha.fecha_publicacion)} | Cierre ${fecha(ficha.fecha_cierre)} | Adjudicación estimada ${fecha(ficha.fecha_adjudicacion)}\nDescripción: ${String(ficha.descripcion ?? "").slice(0, 1200)}\nÍtems: ${(ficha.items ?? []).slice(0, 20).map((i: any) => `${i.producto}${i.cantidad ? ` (${i.cantidad} ${i.unidad ?? ""})` : ""}`).join("; ") || "s/i"}\nLink: ${ficha.url}`);

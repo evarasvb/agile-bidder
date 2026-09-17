@@ -328,23 +328,16 @@ Deno.serve(async (req) => {
     if (res.patrones?.length) partes.push("ANÁLISIS: PATRÓN RECURRENTE\nEste organismo licita esto cada cierto tiempo (compra estructural predecible):\n" + res.patrones.map((p: any) => `- ${p.codigo} (${p.estado}, ${fecha(p.fecha_publicacion)}): ${fmt(p.presupuesto_estimado)} ${p.moneda} — ${p.señal}`).join("\n") + "\n💡 Estrategia: Prepara proceso estándar, optimiza el precio de entrada, revisa cambios en criterios de adjudicación.");
     const contexto = partes.join("\n\n") || "(sin fuentes ni datos para esta pregunta)";
 
-    // Evidence Gate: valida que la documentación esté completa para postular
+    // Evidence Gate: NO bloquea la respuesta (el gate es conservador por diseño y nunca
+    // da "verde", así que cortar aquí dejaba al Experto mudo en toda licitación). Se le
+    // entrega a la IA como regla: responde con lo que hay y deja claro qué falta.
+    let notaGate = "";
     if (codigo) {
-      const estadoDoc = crearEstadoDocumentacionLicitacion(res.ficha, bases, anexos);
-      const gate = evidenceGateLicitacion(estadoDoc);
-      if (!gate.permiteBadgeVerde) {
-        return new Response(JSON.stringify({
-          error: "documentacion_incompleta",
-          veredicto: gate.veredicto,
-          razon: gate.razon,
-          faltantes: gate.faltantes,
-          permiteBadgeVerde: false,
-          mensaje: `No se puede recomendar postular: ${gate.razon}. Faltantes: ${gate.faltantes.join("; ")}.`
-        }), { status: 202, headers: { ...cors, "Content-Type": "application/json" } });
-      }
+      const gate = evidenceGateLicitacion(crearEstadoDocumentacionLicitacion(res.ficha, bases, anexos));
+      notaGate = `\n\nESTADO DOCUMENTAL (regla determinista de FirmaVB, veredicto: ${gate.veredicto}): ${gate.razon}${gate.faltantes.length ? ` Faltantes: ${gate.faltantes.join("; ")}.` : ""} Responde igual con lo que tienes (bases, anexos, ficha, fuentes), pero NUNCA recomiendes postular como algo seguro: si falta documentación dilo explícitamente y qué debe subir o revisar el usuario.`;
     }
 
-    const userMsg = modo === "chat" ? `${contexto}\n\nPREGUNTA: ${pregunta}` : `${contexto}\n\nGenera el informe de trabajo para la licitación ${codigo}.${pregunta ? " Contexto del proveedor: " + pregunta : ""}`;
+    const userMsg = modo === "chat" ? `${contexto}${notaGate}\n\nPREGUNTA: ${pregunta}` : `${contexto}${notaGate}\n\nGenera el informe de trabajo para la licitación ${codigo}.${pregunta ? " Contexto del proveedor: " + pregunta : ""}`;
     const messages = [
       { role: "system", content: modo === "chat" ? SYS_CHAT : SYS_INFORME },
       ...historial.filter((h) => h && (h.role === "user" || h.role === "assistant") && h.content).map((h) => ({ role: h.role, content: String(h.content).slice(0, 2000) })),
