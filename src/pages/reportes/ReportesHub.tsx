@@ -12,6 +12,7 @@ import {
   Landmark,
   ArrowRight,
 } from "lucide-react";
+import { Boxes } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useBIStats } from "@/hooks/useBI";
 import { formatCompact, formatNumber } from "@/hooks/useReportes";
@@ -37,6 +38,7 @@ const reports: {
   // Cada reporte se presenta como la PREGUNTA que responde (un dueño de PYME
   // busca decisiones, no "rankings"). El más accionable va primero: Convenio
   // Marco trae "Mi competitividad" (Ganas / Competitivo / Caro por producto).
+  { title: "Consulta libre", description: "Cruza proveedores, instituciones, productos, precios y meses en Convenio Marco, Compra Ágil, Trato Directo y licitaciones adjudicadas. Pregunta en tus palabras y profundiza con un clic", icon: Boxes, href: "/reportes/consulta", accent: "celeste" },
   { title: "¿Estoy caro o barato?", description: "Compara tus precios contra el mercado, producto por producto: Ganas · Competitivo · Caro", icon: FileCheck, href: "/reportes/convenio-marco", accent: "celeste" },
   { title: "¿Quién me está ganando?", description: "Tus competidores: quiénes se adjudican las compras de tu rubro y qué tan concentrado está", icon: Swords, href: "/reportes/competidores", accent: "red" },
   { title: "¿Quién compra lo que vendo?", description: "Las instituciones que más compran tu tipo de producto, para enfocar tus postulaciones", icon: Building2, href: "/reportes/compradores", accent: "orange" },
