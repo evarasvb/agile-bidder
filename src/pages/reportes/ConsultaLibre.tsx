@@ -157,7 +157,7 @@ export default function ConsultaLibre() {
         m("lineas", "Líneas", (r) => formatNumber(Number(r.lineas ?? 0))),
         m("cantidad", "Unidades", (r) => formatNumber(Math.round(Number(r.cantidad ?? 0)))),
         m("precio_min", "Precio mín.", (r) => pesos(r.precio_min)),
-        m("precio_med", "Precio mediano", (r) => pesos(r.precio_med)),
+        m("precio_med", "Precio típico", (r) => pesos(r.precio_med)),
         m("precio_max", "Precio máx.", (r) => pesos(r.precio_max)),
         m("proveedores", "Proveedores", (r) => formatNumber(Number(r.proveedores ?? 0))),
         m("organismos", "Instituciones", (r) => formatNumber(Number(r.organismos ?? 0))),

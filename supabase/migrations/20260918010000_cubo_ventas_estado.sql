@@ -94,14 +94,11 @@ create or replace function public.cubo_consultar(
 language plpgsql stable security definer set search_path = public as $$
 declare
   v_dims_sql text := '';
-  v_dims_sel text := '';
   v_where text := 'true';
   v_metricas text;
   v_orden text;
   v_sql text;
-  v_filas jsonb;
-  v_total bigint;
-  v_totales jsonb;
+  v_out jsonb;
   d text;
   v_mapa jsonb;
   v_ordenes jsonb;
@@ -147,30 +144,27 @@ begin
 
   -- Dimensiones (solo las de la lista blanca).
   foreach d in array coalesce(p_dims, '{}'::text[]) loop
-    if v_mapa ? d then
-      v_dims_sel := v_dims_sel || format('%I, ', v_mapa->>d);
-      v_dims_sql := v_dims_sql || format('%I, ', v_mapa->>d);
-    end if;
+    if v_mapa ? d then v_dims_sql := v_dims_sql || format('%I, ', v_mapa->>d); end if;
   end loop;
   v_dims_sql := rtrim(v_dims_sql, ', ');
-
   v_orden := case when v_ordenes ? coalesce(p_orden, '') then p_orden else 'monto' end;
 
   if v_dims_sql = '' then
-    v_sql := format('select %s from %s where %s', v_metricas, v_tabla, v_where);
-    execute format('select coalesce((select to_jsonb(x) from (%s) x), ''{}''::jsonb)', v_sql) into v_totales;
-    return jsonb_build_object('total_filas', 0, 'totales', v_totales, 'filas', '[]'::jsonb);
+    execute format('select jsonb_build_object(''total_filas'', 0, ''filas'', ''[]''::jsonb, ''totales'', (select to_jsonb(t) from (select %s from %s where %s) t))', v_metricas, v_tabla, v_where) into v_out;
+    return v_out;
   end if;
 
-  v_sql := format('select %s %s from %s where %s group by %s', v_dims_sel, v_metricas, v_tabla, v_where, v_dims_sql);
-
-  execute format('select count(*) from (%s) c', v_sql) into v_total;
-  execute format('select coalesce(jsonb_agg(to_jsonb(x)), ''[]''::jsonb) from (%s order by %I %s nulls last limit %s offset %s) x',
-                 v_sql, v_orden, case when p_desc then 'desc' else 'asc' end, greatest(1, least(coalesce(p_limite, 50), 500)), greatest(0, coalesce(p_offset, 0)))
-    into v_filas;
-  execute format('select coalesce((select to_jsonb(x) from (select %s from %s where %s) x), ''{}''::jsonb)', v_metricas, v_tabla, v_where) into v_totales;
-
-  return jsonb_build_object('total_filas', v_total, 'totales', v_totales, 'filas', v_filas);
+  -- Una sola pasada agrupada (CTE materializada): total de filas, página y totales salen de ahí.
+  v_sql := format('select %s, %s from %s where %s group by %s', v_dims_sql, v_metricas, v_tabla, v_where, v_dims_sql);
+  execute format(
+    'with g as materialized (%s) select jsonb_build_object('
+    || '''total_filas'', (select count(*) from g), '
+    || '''filas'', (select coalesce(jsonb_agg(to_jsonb(x)), ''[]''::jsonb) from (select * from g order by %I %s nulls last limit %s offset %s) x), '
+    || '''totales'', (select to_jsonb(t) from (select %s from %s where %s) t))',
+    v_sql, v_orden, case when p_desc then 'desc' else 'asc' end,
+    greatest(1, least(coalesce(p_limite, 50), 500)), greatest(0, coalesce(p_offset, 0)),
+    v_metricas, v_tabla, v_where) into v_out;
+  return v_out;
 end;
 $$;
 
