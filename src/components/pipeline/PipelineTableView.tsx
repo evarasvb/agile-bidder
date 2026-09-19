@@ -77,7 +77,7 @@ const COLUMNAS_PIPELINE: DataTableColumn<PipelineItem>[] = [
   },
   {
     id: 'match',
-    header: 'Match',
+    header: 'Afinidad',
     align: 'right',
     sortValue: (item) => (item.match_score > 0 ? item.match_score : null),
     exportValue: (item) => (item.match_score > 0 ? `${item.match_score}%` : ''),

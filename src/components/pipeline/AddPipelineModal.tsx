@@ -20,6 +20,12 @@ import { ETAPA_LIST, type PipelineEtapa } from './pipelineConstants';
 import { useCreatePipelineItem } from '@/hooks/usePipeline';
 import { toast } from 'sonner';
 
+// Al crear una postulación solo se elige una etapa de partida. Las etapas de
+// resultado (adjudicada, OC, pagada, perdida) son un desenlace, no un inicio.
+const ETAPAS_INICIALES = ETAPA_LIST.filter(
+  (e) => !['adjudicada', 'oc_emitida', 'pagada', 'perdida'].includes(e.key),
+);
+
 interface AddPipelineModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -122,7 +128,7 @@ export function AddPipelineModal({ open, onOpenChange }: AddPipelineModalProps) 
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ETAPA_LIST.map((e) => (
+                {ETAPAS_INICIALES.map((e) => (
                   <SelectItem key={e.key} value={e.key}>
                     {e.label}
                   </SelectItem>
