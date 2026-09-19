@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
@@ -20,6 +20,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -88,7 +99,13 @@ export function PipelineDetailModal({
   const deleteItem = useDeletePipelineItem();
   const { data: linkOficial } = useLinkOficialOportunidad(item?.oportunidad_tipo, item?.oportunidad_id, open);
 
-  // Sync notas when item changes
+  // Al abrir otra postulación, descartar la edición en curso para que las notas
+  // no se arrastren de una tarjeta a otra.
+  useEffect(() => {
+    setNotas('');
+    setNotasEdited(false);
+  }, [item?.id]);
+
   const displayNotas = notasEdited ? notas : (item?.notas || '');
 
   if (!item) return null;
@@ -209,7 +226,7 @@ export function PipelineDetailModal({
             )}
             {item.match_score > 0 && (
               <div className="flex items-center gap-2 text-gray-600">
-                <span className="font-medium">{item.match_score}%</span> match
+                <span className="font-medium">{item.match_score}%</span> afinidad
               </div>
             )}
           </div>
@@ -340,17 +357,35 @@ export function PipelineDetailModal({
 
           <Separator />
 
-          {/* Delete action */}
+          {/* Delete action: con confirmación, porque borrar era irreversible y
+              con un solo clic se perdía la postulación y su historial. */}
           <div className="flex justify-end">
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleDelete}
-              disabled={deleteItem.isPending}
-            >
-              <Trash2 className="h-4 w-4 mr-1" />
-              Eliminar del pipeline
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" disabled={deleteItem.isPending}>
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Eliminar del pipeline
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Eliminar esta postulación?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Se quitará «{item.titulo}» del seguimiento junto con su historial de
+                    etapas y notas. Esta acción no se puede deshacer.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Eliminar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
       </DialogContent>
