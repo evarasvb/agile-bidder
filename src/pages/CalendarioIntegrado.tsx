@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -17,6 +17,7 @@ import {
   Tag,
   ChevronRight,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +40,17 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
@@ -49,7 +61,6 @@ import {
   useCalendarioIntegrado,
   type CalendarioEvent,
   type TipoEventoCalendario,
-  type RepetirEvento,
   type CreateEventInput,
 } from "@/hooks/useCalendarioIntegrado";
 import { useNavigate } from "react-router-dom";
@@ -60,7 +71,7 @@ const typeFilters = [
   { key: "deadline_yellow", label: "Cierres Próximos", color: "bg-amber-500", dotColor: "bg-amber-500" },
   { key: "pipeline", label: "Pipeline", color: "bg-blue-500", dotColor: "bg-blue-500" },
   { key: "won", label: "Adjudicadas / OC", color: "bg-green-500", dotColor: "bg-green-500" },
-  { key: "team", label: "Tareas Equipo", color: "bg-purple-500", dotColor: "bg-purple-500" },
+  { key: "team", label: "Tareas", color: "bg-purple-500", dotColor: "bg-purple-500" },
   { key: "custom", label: "Eventos Manuales", color: "bg-gray-500", dotColor: "bg-gray-500" },
 ] as const;
 
@@ -72,11 +83,15 @@ const formatMonto = (monto: number) => {
   return `$${monto.toLocaleString("es-CL")}`;
 };
 
+// Fecha de hoy en horario local (Chile). `toISOString()` usa UTC y de noche
+// sugería el día siguiente.
+const hoyLocal = () => format(new Date(), "yyyy-MM-dd");
+
 // ── Component ──────────────────────────────────────────────────────
 export default function CalendarioIntegrado() {
   const navigate = useNavigate();
   const calendarRef = useRef<FullCalendar>(null);
-  const { events, isLoading, createEvent } = useCalendarioIntegrado();
+  const { events, isLoading, error, createEvent, deleteEvent } = useCalendarioIntegrado();
 
   // Filters
   const [activeFilters, setActiveFilters] = useState<Set<FilterKey>>(
@@ -86,6 +101,16 @@ export default function CalendarioIntegrado() {
   const [showSidebar, setShowSidebar] = useState(() =>
     typeof window === 'undefined' ? true : window.innerWidth >= 1024
   );
+  // Barra del calendario compacta en celular: los 3 botones de vista + título +
+  // navegación se desbordaban en pantallas angostas.
+  const [isNarrow, setIsNarrow] = useState(() =>
+    typeof window !== "undefined" && window.innerWidth < 640
+  );
+  useEffect(() => {
+    const onResize = () => setIsNarrow(window.innerWidth < 640);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   // Modals
   const [selectedEvent, setSelectedEvent] = useState<CalendarioEvent | null>(null);
@@ -166,10 +191,28 @@ export default function CalendarioIntegrado() {
     }
   };
 
+  // Delete a manual event (con confirmación en el modal de detalle)
+  const handleDeleteEvent = () => {
+    if (!selectedEvent || selectedEvent.sourceType !== "custom") return;
+    // El id del evento viene como "evt-<uuid>"; la tabla espera el uuid puro.
+    const rawId = selectedEvent.id.replace(/^evt-/, "");
+    deleteEvent.mutate(rawId, {
+      onSuccess: () => {
+        toast.success("Evento eliminado");
+        setSelectedEvent(null);
+      },
+      onError: () => toast.error("Error al eliminar el evento"),
+    });
+  };
+
   // Submit new event
   const handleCreateEvent = async () => {
     if (!newEvent.titulo || !newEvent.fecha_inicio) {
       toast.error("Título y fecha son obligatorios");
+      return;
+    }
+    if (newEvent.fecha_fin && newEvent.fecha_fin < newEvent.fecha_inicio) {
+      toast.error("La fecha de fin no puede ser anterior a la de inicio");
       return;
     }
     try {
@@ -211,10 +254,10 @@ export default function CalendarioIntegrado() {
             {showSidebar ? "Ocultar Panel" : "Mostrar Panel"}
           </Button>
           <Button size="sm" onClick={() => {
-            setAddFormDate(new Date().toISOString().slice(0, 10));
+            setAddFormDate(hoyLocal());
             setNewEvent((prev) => ({
               ...prev,
-              fecha_inicio: new Date().toISOString().slice(0, 10),
+              fecha_inicio: hoyLocal(),
               todo_el_dia: true,
             }));
             setShowAddModal(true);
@@ -234,16 +277,29 @@ export default function CalendarioIntegrado() {
               <div className="flex items-center justify-center h-[600px]">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
+            ) : error ? (
+              // Antes, si la carga fallaba, se veía un calendario vacío sin aviso.
+              <div className="flex flex-col items-center justify-center h-[600px] text-center gap-2 px-6">
+                <CalendarIcon className="h-8 w-8 text-muted-foreground/60" />
+                <p className="text-sm font-medium">No pudimos cargar el calendario</p>
+                <p className="text-xs text-muted-foreground">
+                  Revisa tu conexión e inténtalo de nuevo en unos segundos.
+                </p>
+              </div>
             ) : (
               <FullCalendar
                 ref={calendarRef}
                 plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
                 initialView="dayGridMonth"
-                headerToolbar={{
-                  left: "prev,next today",
-                  center: "title",
-                  right: "dayGridMonth,timeGridWeek,timeGridDay",
-                }}
+                headerToolbar={
+                  isNarrow
+                    ? { left: "title", center: "", right: "prev,next today" }
+                    : {
+                        left: "prev,next today",
+                        center: "title",
+                        right: "dayGridMonth,timeGridWeek,timeGridDay",
+                      }
+                }
                 locale="es"
                 buttonText={{
                   today: "Hoy",
@@ -475,38 +531,75 @@ export default function CalendarioIntegrado() {
               </div>
 
               {/* Actions */}
-              {selectedEvent.sourceType !== "custom" && selectedEvent.sourceId && (
+              {selectedEvent.sourceType === "pipeline" ? (
+                // El pipeline no guarda id de oportunidad, así que siempre
+                // llevamos al tablero (antes no aparecía ningún botón).
                 <>
                   <Separator />
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => {
-                        navigateToOpportunity(selectedEvent);
-                        setSelectedEvent(null);
-                      }}
-                    >
-                      <ExternalLink className="h-4 w-4 mr-1" />
-                      Ver Oportunidad
-                    </Button>
-                    {selectedEvent.sourceType === "pipeline" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1"
-                        onClick={() => {
-                          navigate("/pipeline");
-                          setSelectedEvent(null);
-                        }}
-                      >
-                        Ir al Pipeline
-                      </Button>
-                    )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      navigate("/pipeline");
+                      setSelectedEvent(null);
+                    }}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-1" />
+                    Ir al Pipeline
+                  </Button>
+                </>
+              ) : selectedEvent.sourceType !== "custom" && selectedEvent.sourceId ? (
+                <>
+                  <Separator />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      navigateToOpportunity(selectedEvent);
+                      setSelectedEvent(null);
+                    }}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-1" />
+                    Ver Oportunidad
+                  </Button>
+                </>
+              ) : selectedEvent.sourceType === "custom" ? (
+                // Eventos manuales: ahora se pueden eliminar (antes quedaban
+                // atrapados para siempre). Con confirmación porque no hay deshacer.
+                <>
+                  <Separator />
+                  <div className="flex justify-end">
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="sm" variant="destructive" disabled={deleteEvent.isPending}>
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Eliminar evento
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>¿Eliminar este evento?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Se quitará «{selectedEvent.title}» del calendario. Esta acción no
+                            se puede deshacer.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={handleDeleteEvent}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Eliminar
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </>
-              )}
+              ) : null}
             </div>
           )}
         </DialogContent>
@@ -584,79 +677,27 @@ export default function CalendarioIntegrado() {
               />
             </div>
 
-            {/* Type + Repeat row */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>Tipo</Label>
-                <Select
-                  value={newEvent.tipo}
-                  onValueChange={(v) =>
-                    setNewEvent((prev) => ({
-                      ...prev,
-                      tipo: v as TipoEventoCalendario,
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cierre">Cierre</SelectItem>
-                    <SelectItem value="adjudicacion">Adjudicación</SelectItem>
-                    <SelectItem value="tarea">Tarea</SelectItem>
-                    <SelectItem value="recordatorio">Recordatorio</SelectItem>
-                    <SelectItem value="otro">Otro</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Repetir</Label>
-                <Select
-                  value={newEvent.repetir}
-                  onValueChange={(v) =>
-                    setNewEvent((prev) => ({
-                      ...prev,
-                      repetir: v as RepetirEvento,
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No repetir</SelectItem>
-                    <SelectItem value="daily">Diario</SelectItem>
-                    <SelectItem value="weekly">Semanal</SelectItem>
-                    <SelectItem value="monthly">Mensual</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Reminder */}
+            {/* Type */}
             <div className="space-y-2">
-              <Label>Recordatorio</Label>
+              <Label htmlFor="evt-tipo">Tipo</Label>
               <Select
-                value={
-                  newEvent.recordatorio_minutos != null
-                    ? String(newEvent.recordatorio_minutos)
-                    : "none"
-                }
+                value={newEvent.tipo}
                 onValueChange={(v) =>
                   setNewEvent((prev) => ({
                     ...prev,
-                    recordatorio_minutos: v === "none" ? undefined : Number(v),
+                    tipo: v as TipoEventoCalendario,
                   }))
                 }
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sin recordatorio" />
+                <SelectTrigger id="evt-tipo" aria-label="Tipo de evento">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Sin recordatorio</SelectItem>
-                  <SelectItem value="15">15 minutos antes</SelectItem>
-                  <SelectItem value="60">1 hora antes</SelectItem>
-                  <SelectItem value="1440">1 día antes</SelectItem>
+                  <SelectItem value="cierre">Cierre</SelectItem>
+                  <SelectItem value="adjudicacion">Adjudicación</SelectItem>
+                  <SelectItem value="tarea">Tarea</SelectItem>
+                  <SelectItem value="recordatorio">Recordatorio</SelectItem>
+                  <SelectItem value="otro">Otro</SelectItem>
                 </SelectContent>
               </Select>
             </div>
