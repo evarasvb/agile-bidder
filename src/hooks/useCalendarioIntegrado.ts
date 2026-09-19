@@ -109,6 +109,9 @@ export function useCalendarioIntegrado() {
       if (licitaciones) {
         for (const l of licitaciones) {
           if (!l.fecha_cierre) continue;
+          // Cierre ya vencido: no lo mostramos. Antes cientos de cierres
+          // históricos se pintaban en rojo "urgente" e inundaban el calendario.
+          if (differenceInDays(parseISO(l.fecha_cierre), new Date()) < 0) continue;
           const type = classifyDeadline(l.fecha_cierre);
           const colors = getEventColors(type);
           events.push({
@@ -139,6 +142,7 @@ export function useCalendarioIntegrado() {
       if (compras) {
         for (const c of compras) {
           if (!c.fecha_cierre) continue;
+          if (differenceInDays(parseISO(c.fecha_cierre), new Date()) < 0) continue;
           const type = classifyDeadline(c.fecha_cierre);
           const colors = getEventColors(type);
           events.push({
@@ -211,7 +215,16 @@ export function useCalendarioIntegrado() {
               cierre: 'Cierre', adjudicacion: 'Adjudicación', tarea: 'Tarea',
               recordatorio: 'Recordatorio', otro: 'Otro',
             };
-            const type = e.tipo === 'tarea' ? 'team' as const : 'custom' as const;
+            // El tipo elegido al crear debe caer en el filtro/leyenda correcto:
+            // antes 'Adjudicación' y 'Cierre' terminaban en gris "Eventos Manuales".
+            const typePorTipo: Record<TipoEventoCalendario, CalendarioEvent['type']> = {
+              cierre: 'deadline_yellow',
+              adjudicacion: 'won',
+              tarea: 'team',
+              recordatorio: 'custom',
+              otro: 'custom',
+            };
+            const type = typePorTipo[e.tipo];
             const colors = e.color
               ? { color: e.color, textColor: '#ffffff', borderColor: e.color }
               : getEventColors(type);
