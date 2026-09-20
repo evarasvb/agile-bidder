@@ -46,17 +46,20 @@ export function PipelineToolbar({
 
   return (
     <div className="flex flex-wrap items-center gap-3">
-      {/* Search */}
-      <div className="relative flex-1 min-w-[200px] max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <Input
-          placeholder="Buscar oportunidades..."
-          value={filters.search || ''}
-          onChange={(e) => onFiltersChange({ ...filters, search: e.target.value })}
-          className="pl-9 h-9"
-          aria-label="Buscar oportunidades en el pipeline"
-        />
-      </div>
+      {/* Search: solo en kanban. La tabla trae su propio buscador (DataTable),
+          y dos cajas encimadas confundían. */}
+      {view === 'kanban' && (
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Buscar oportunidades..."
+            value={filters.search || ''}
+            onChange={(e) => onFiltersChange({ ...filters, search: e.target.value })}
+            className="pl-9 h-9"
+            aria-label="Buscar oportunidades en el pipeline"
+          />
+        </div>
+      )}
 
       {/* Filters popover */}
       <Popover>
