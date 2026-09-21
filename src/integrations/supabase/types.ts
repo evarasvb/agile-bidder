@@ -2193,6 +2193,78 @@ export type Database = {
         }
         Relationships: []
       }
+      evaristo_acciones: {
+        Row: {
+          actualizado_en: string
+          api_key_id: string | null
+          cliente_id: string | null
+          codigo: string | null
+          conversacion_id: string | null
+          creada_por: string
+          creado_en: string
+          error: string | null
+          estado: string
+          id: string
+          iniciada_en: string | null
+          payload: Json
+          resultado: Json | null
+          terminada_en: string | null
+          tipo: string
+          user_id: string
+        }
+        Insert: {
+          actualizado_en?: string
+          api_key_id?: string | null
+          cliente_id?: string | null
+          codigo?: string | null
+          conversacion_id?: string | null
+          creada_por?: string
+          creado_en?: string
+          error?: string | null
+          estado?: string
+          id?: string
+          iniciada_en?: string | null
+          payload?: Json
+          resultado?: Json | null
+          terminada_en?: string | null
+          tipo: string
+          user_id: string
+        }
+        Update: {
+          actualizado_en?: string
+          api_key_id?: string | null
+          cliente_id?: string | null
+          codigo?: string | null
+          conversacion_id?: string | null
+          creada_por?: string
+          creado_en?: string
+          error?: string | null
+          estado?: string
+          id?: string
+          iniciada_en?: string | null
+          payload?: Json
+          resultado?: Json | null
+          terminada_en?: string | null
+          tipo?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evaristo_acciones_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evaristo_acciones_conversacion_id_fkey"
+            columns: ["conversacion_id"]
+            isOneToOne: false
+            referencedRelation: "evaristo_conversaciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       evaristo_conversaciones: {
         Row: {
           actualizado_en: string
@@ -8092,6 +8164,77 @@ export type Database = {
         }
         Relationships: []
       }
+      cubo_lic: {
+        Row: {
+          adjudicatario: string | null
+          codigo: string | null
+          comprador: string | null
+          comprador_rut: string | null
+          fecha_adjudicacion: string | null
+          mes: string | null
+          metodo: string | null
+          monto_adjudicado: number | null
+          monto_estimado: number | null
+          num_oferentes: number | null
+          rubro: string | null
+          rut_adjudicatario: string | null
+          titulo: string | null
+        }
+        Relationships: []
+      }
+      cubo_oc: {
+        Row: {
+          cantidad: number | null
+          categoria: string | null
+          lineas: number | null
+          mes: string | null
+          monto: number | null
+          organismo: string | null
+          precio_max: number | null
+          precio_med: number | null
+          precio_min: number | null
+          producto: string | null
+          producto_key: string | null
+          proveedor: string | null
+          rut_organismo: string | null
+          rut_proveedor: string | null
+          tipo: string | null
+        }
+        Relationships: []
+      }
+      cubo_oc_1d: {
+        Row: {
+          cantidad: number | null
+          clave: string | null
+          dim: string | null
+          etiqueta: string | null
+          lineas: number | null
+          monto: number | null
+          organismos: number | null
+          precio_max: number | null
+          precio_med: number | null
+          precio_min: number | null
+          productos: number | null
+          proveedores: number | null
+          tipo: string | null
+        }
+        Relationships: []
+      }
+      cubo_oc_tot: {
+        Row: {
+          cantidad: number | null
+          lineas: number | null
+          monto: number | null
+          organismos: number | null
+          precio_max: number | null
+          precio_med: number | null
+          precio_min: number | null
+          productos: number | null
+          proveedores: number | null
+          tipo: string | null
+        }
+        Relationships: []
+      }
       dashboard_estado: {
         Row: {
           con_match: number | null
@@ -9210,6 +9353,46 @@ export type Database = {
           rut: string
         }[]
       }
+      admin_evaristo_conversaciones: {
+        Args: { dias?: number; lim?: number }
+        Returns: {
+          actualizado_en: string
+          canal: string
+          email: string
+          empresa_nombre: string
+          id: string
+          mensajes: number
+          titulo: string
+          ultima_pregunta: string
+          user_id: string
+        }[]
+      }
+      admin_evaristo_mensajes: {
+        Args: { p_conversacion_id: string }
+        Returns: {
+          contenido: string
+          creado_en: string
+          id: number
+          rol: string
+        }[]
+      }
+      admin_experto_consultas: {
+        Args: { buscar?: string; dias?: number; lim?: number }
+        Returns: {
+          creado_en: string
+          email: string
+          empresa_nombre: string
+          huella: string
+          id: number
+          licitacion: string
+          modo: string
+          ms: number
+          pregunta: string
+          respuesta: string
+          user_id: string
+        }[]
+      }
+      admin_experto_resumen: { Args: never; Returns: Json }
       admin_marketing_contactos_cruce: {
         Args: never
         Returns: {
@@ -9403,6 +9586,32 @@ export type Database = {
         Args: { user_id: string }
         Returns: string
       }
+      cubo_consultar: {
+        Args: {
+          p_desc?: boolean
+          p_desde?: string
+          p_dims?: string[]
+          p_filtros?: Json
+          p_fuente?: string
+          p_hasta?: string
+          p_limite?: number
+          p_offset?: number
+          p_orden?: string
+        }
+        Returns: Json
+      }
+      cubo_opciones: {
+        Args: {
+          p_dim?: string
+          p_fuente?: string
+          p_limite?: number
+          p_texto?: string
+          p_tipo?: string
+        }
+        Returns: Json
+      }
+      cubo_refrescar: { Args: never; Returns: undefined }
+      cubo_refrescar_1d: { Args: never; Returns: undefined }
       dashboard_kpis: {
         Args: never
         Returns: {
@@ -9438,6 +9647,14 @@ export type Database = {
           total_licitaciones: number
           total_productos: number
         }[]
+      }
+      evaristo_accion_decidir: {
+        Args: { p_confirmar: boolean; p_id: string }
+        Returns: Json
+      }
+      evaristo_acciones_recientes: {
+        Args: { p_limite?: number }
+        Returns: Json
       }
       evaristo_contexto: { Args: { p_codigo?: string }; Returns: Json }
       exec_sql: { Args: { sql_text: string }; Returns: Json }
@@ -9890,6 +10107,10 @@ export type Database = {
           top_instituciones: Json
           top_regiones: Json
         }[]
+      }
+      experto_panorama_licitacion: {
+        Args: { p_codigo: string; p_user_id?: string }
+        Returns: Json
       }
       experto_patrones_licitacion: {
         Args: { p_anos_atras?: number; p_codigo_licitacion: string }
