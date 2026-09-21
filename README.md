@@ -31,7 +31,7 @@ Crea un archivo `.env` en la raíz del proyecto:
 
 ```env
 # Supabase Configuration (REQUERIDO)
-VITE_SUPABASE_URL=https://euzqadopjvdszcdjegmo.supabase.co
+VITE_SUPABASE_URL=https://juiskeeutbaipwbeeezw.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=tu_clave_anon_de_supabase_aqui
 
 # Odoo Configuration (Opcional)

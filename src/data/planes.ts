@@ -16,7 +16,7 @@ export const PLANES: readonly PlanEscalera[] = [
     nombre: 'Gratis',
     precio: '$0',
     periodo: '',
-    puntos: ['3 preguntas y 1 informe al mes en el Experto', 'Ver las oportunidades de tu rubro'],
+    puntos: ['1 resultado gratis antes de registrarte', 'Prueba Pro de 14 días al iniciar sesión', 'Ver las oportunidades de tu rubro'],
   },
   {
     id: 'pro_30',

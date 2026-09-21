@@ -41,9 +41,12 @@ Deno.serve(async (req) => {
     const codigo = String(body.codigo ?? "").trim().toUpperCase();
     if (!/^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}$/.test(codigo)) return json({ error: "codigo" }, 400);
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const { data: lanzamiento, error: lanzamientoError } = await sb.rpc("experto_beta_reclamar_usuario", { p_user_id: userId });
+    if (lanzamientoError) return json({ error: "lanzamiento_no_disponible", mensaje: "No pude verificar tu acceso al Experto." }, 503);
+    if (lanzamiento?.[0]?.fase === "beta_10" && !lanzamiento[0].permitido) return json({ error: "beta_completa", mensaje: "Los 10 cupos de la beta inicial ya están ocupados." }, 403);
     const { data: uso } = await sb.rpc("experto_uso_mes", { p_user_id: userId, p_huella: "libro" });
     const u = uso?.[0] ?? { plan: "free" };
-    if (!u.plan || u.plan === "free") return json({ error: "pro", mensaje: "La matriz de postulación es del plan Pro: $50.000 por 30 días, con estudios, matrices y preguntas sin límite.", uso: u }, 402);
+    if (!u.plan || u.plan === "free") return json({ error: "pro", mensaje: "La matriz de postulación requiere acceso al Experto.", uso: u }, 402);
 
     const [ficha, bases, docs, perfil] = await Promise.all([
       sb.rpc("experto_ficha_licitacion", { p_codigo: codigo }).then((r) => r.data),

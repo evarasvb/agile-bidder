@@ -62,14 +62,14 @@ Luego crear archivo `/pages/api/enrichment-scheduler.ts`:
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') {
+  if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
   try {
     // Verificar que viene de Vercel Cron
-    const cronSecret = process.env.VERCEL_CRON_SECRET
-    if (cronSecret !== req.headers['x-vercel-cron-secret']) {
+    const cronSecret = process.env.CRON_SECRET
+    if (!cronSecret || req.headers.authorization !== `Bearer ${cronSecret}`) {
       return res.status(401).json({ error: 'Unauthorized' })
     }
 
@@ -101,6 +101,7 @@ En Vercel Settings → Environment Variables:
 ```
 ENRICHMENT_SCHEDULER_TOKEN=tu_token_secreto
 SUPABASE_SERVICE_ROLE_KEY=clave_supabase_service_role
+CRON_SECRET=secreto_largo_y_aleatorio
 ```
 
 ## Características
@@ -178,8 +179,8 @@ Ver logs en:
 Ejecutar enriquecimiento a demanda desde el dashboard o:
 
 ```bash
-curl -X POST https://tu-api.vercel.app/api/enrichment-scheduler \
-  -H "x-vercel-cron-secret: $VERCEL_CRON_SECRET"
+curl https://tu-api.vercel.app/api/enrichment-scheduler \
+  -H "Authorization: Bearer $CRON_SECRET"
 ```
 
 ## Mejoras Futuras
