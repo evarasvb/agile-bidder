@@ -22,3 +22,16 @@ begin
   new.actualizado_en := now();
   return new;
 end $$;
+
+-- Corregir el trigger no alcanza: cualquier fila insertada mientras estuvo
+-- regresionado conserva el cliente_id que haya mandado el cliente. Se
+-- recalcula para toda acción que todavía puede ejecutarse (no terminal);
+-- una acción ya hecha/fallida/cancelada no la vuelve a tomar la extensión.
+-- (No hubo ninguna acción creada en la ventana de ~19 minutos expuesta,
+-- verificado por fecha antes de aplicar esto; se deja igual por si acaso.)
+update public.evaristo_acciones ea
+set cliente_id = c.id
+from public.clientes c
+where c.user_id = ea.user_id
+  and ea.estado not in ('hecha', 'fallida', 'cancelada')
+  and ea.cliente_id is distinct from c.id;
