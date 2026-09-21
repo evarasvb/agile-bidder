@@ -39,16 +39,30 @@ export async function procesarAcciones() {
     if (!apiKey) return { success: false, error: 'No API key configured' };
 
     if (firmavbAccion) {
+      // Un reporte final que no se pudo mandar la vez pasada (offline, 5xx del servidor):
+      // se reintenta antes que nada, sin tocar pestañas ni marcar por pestaña cerrada.
+      if (firmavbAccion.pendingReport) {
+        const rr = await accionResultado(firmavbAccion.pendingReport);
+        if (rr && rr.success) {
+          if (firmavbAccion.pendingReport.cerrarPestanas && firmavbAccion.tabId) {
+            chrome.tabs.remove(firmavbAccion.tabId).catch(() => {});
+          }
+          await chrome.storage.local.remove('firmavbAccion');
+        }
+        return { success: true, esperando: firmavbAccion.id };
+      }
       const vigente = Date.now() - (firmavbAccion.ts || 0) < EXPIRA_MS;
       if (vigente && (await tabViva(firmavbAccion.tabId))) {
         return { success: true, esperando: firmavbAccion.id };
       }
-      await accionResultado({
+      const rr = await accionResultado({
         accion_id: firmavbAccion.id,
         success: false,
         error: vigente ? 'Se cerró la pestaña antes de terminar.' : 'Pasaron 20 minutos sin terminar. Revisa que tu sesión de Mercado Público esté iniciada y vuelve a pedirla.',
       });
-      await chrome.storage.local.remove('firmavbAccion');
+      // Si tampoco esto se pudo mandar, queda para reintentar en el próximo ciclo en vez
+      // de perderse (la fila del servidor igual se marcará fallida sola a los 15 min).
+      if (rr && rr.success) await chrome.storage.local.remove('firmavbAccion');
     }
 
     const r = await accionesPendientes();
@@ -106,17 +120,24 @@ export async function reportarResultado(data, sender) {
   const r = await accionResultado(data);
   if (!data.parcial) {
     const { firmavbAccion } = await chrome.storage.local.get('firmavbAccion');
-    if (firmavbAccion && firmavbAccion.id === data.accion_id) {
-      await chrome.storage.local.remove('firmavbAccion');
-      // Las acciones silenciosas (sincronizar) cierran sus pestañas al terminar.
-      if (data.cerrarPestanas) {
-        const ids = new Set([firmavbAccion.tabId, sender && sender.tab && sender.tab.id].filter(Boolean));
-        for (const id of ids) chrome.tabs.remove(id).catch(() => {});
+    if (r && r.success) {
+      if (firmavbAccion && firmavbAccion.id === data.accion_id) {
+        await chrome.storage.local.remove('firmavbAccion');
+        // Las acciones silenciosas (sincronizar) cierran sus pestañas al terminar.
+        if (data.cerrarPestanas) {
+          const ids = new Set([firmavbAccion.tabId, sender && sender.tab && sender.tab.id].filter(Boolean));
+          for (const id of ids) chrome.tabs.remove(id).catch(() => {});
+        }
       }
+      try {
+        showNotification('Don Evaristo', data.success ? `Listo: ${data.resumen || NOMBRE_TIPO[firmavbAccion && firmavbAccion.tipo] || 'acción terminada'}` : `No pude: ${data.error || 'error'}`);
+      } catch {}
+    } else if (firmavbAccion && firmavbAccion.id === data.accion_id) {
+      // El servidor no confirmó el resultado (sin red, 5xx…): se guarda para reintentar en
+      // el próximo ciclo en vez de cerrar la pestaña y perder el único intento de reportarlo.
+      console.warn('[Acciones] No se pudo reportar el resultado, reintento en el próximo ciclo', data.accion_id, r && r.error);
+      await chrome.storage.local.set({ firmavbAccion: { ...firmavbAccion, pendingReport: data } }).catch(() => {});
     }
-    try {
-      showNotification('Don Evaristo', data.success ? `Listo: ${data.resumen || NOMBRE_TIPO[firmavbAccion && firmavbAccion.tipo] || 'acción terminada'}` : `No pude: ${data.error || 'error'}`);
-    } catch {}
   }
   return r;
 }

@@ -420,7 +420,7 @@
       const productos = oferta.productos || oferta.productos_ofertados || [];
       if (!productos.length) {
         showMessage('error', 'La oferta no tiene productos con precio.');
-        return;
+        return { ok: false, error: 'La oferta no tiene productos con precio.' };
       }
 
       // Los inputs de MUI son controlados por React: asignar .value directo NO
@@ -537,9 +537,13 @@
       // Nota: NO se marca la oferta como "enviada" automáticamente. El formulario
       // tiene reCAPTCHA y adjunto obligatorio, así que el envío final lo realiza la
       // persona; de este modo el estado de la oferta refleja la realidad.
+      return filledFields > 0
+        ? { ok: true, filled: filledFields, extras }
+        : { ok: false, filled: 0, extras, error: 'No encontré las casillas de "Valor unitario" para completar el formulario.' };
     } catch (error) {
       console.error('Autofill error:', error);
       showMessage('error', 'Error al completar el formulario');
+      return { ok: false, error: 'Error al completar el formulario: ' + (error && error.message) };
     }
   }
 
@@ -749,7 +753,10 @@
       reportarAccion(accion.id, { success: sync.ok, resultado: { ficha: sync.ok, items: sync.items, adjuntos: 0 }, error: sync.ok ? null : sync.error, resumen: `${codigo}: ficha sincronizada, sin adjuntos`, cerrarPestanas: true });
       return;
     }
-    await chrome.storage.local.set({ firmavbExtraer: { codigo, ts: Date.now() } }).catch(() => {});
+    // fichaOk viaja con el pedido: la página de adjuntos (otra navegación, otro turno de
+    // content.js) necesita saber si la ficha realmente se sincronizó para no reportar éxito
+    // si falló, aunque los adjuntos sí se hayan subido.
+    await chrome.storage.local.set({ firmavbExtraer: { codigo, ts: Date.now(), fichaOk: sync.ok, fichaError: sync.ok ? null : sync.error } }).catch(() => {});
     reportarAccion(accion.id, { parcial: true, resultado: { paso: 'adjuntos', ficha: sync.ok, items: sync.items } });
     if (destino === 'click') {
       document.getElementById('imgAdjuntos').click();
@@ -803,9 +810,21 @@
       reportarAccion(accion.id, { success: false, error: (r && r.error) || `No hay una oferta armada en FirmaVB para ${codigo}. Genérala primero desde la app.` });
       return;
     }
-    showAutofillModal(r.oferta, codigo);
+    // Se pidió explícitamente desde el chat: se completa directo, sin el diálogo de
+    // confirmación (ese es para cuando el cliente aprieta el botón manual en la página).
+    // Si solo abriéramos el modal, el resultado se reportaría "hecho" antes de que el
+    // formulario tuviera un solo campo lleno.
+    const relleno = performAutofill(r.oferta);
+    if (!relleno || !relleno.ok) {
+      reportarAccion(accion.id, { success: false, error: (relleno && relleno.error) || 'No pude completar el formulario: revísalo a mano.' });
+      return;
+    }
     const productos = (r.oferta.productos || r.oferta.productos_ofertados || []).length;
-    reportarAccion(accion.id, { success: true, resultado: { oferta_id: r.oferta.id || null, productos, revisar: true }, resumen: `${codigo}: oferta abierta en Mercado Público para que la revises y envíes` });
+    reportarAccion(accion.id, {
+      success: true,
+      resultado: { oferta_id: r.oferta.id || null, productos, campos_completados: relleno.filled, revisar: true },
+      resumen: `${codigo}: oferta completada en Mercado Público (${relleno.filled} precio${relleno.filled === 1 ? '' : 's'}) para que la revises y envíes`,
+    });
   }
 
   // Punto de entrada: ¿esta página corresponde a una acción en curso?
@@ -1204,8 +1223,18 @@
     const codigo = (auto && pedido.codigo) || (document.body.textContent.match(RE_CODIGO_LIC) || [])[0] || null;
     // Si esta ventana la abrió una acción de Don Evaristo, al terminar se le reporta.
     const accion = codigo ? await accionParaCodigo(codigo, 'sincronizar_licitacion') : null;
+    // Resultado real de la sincronización de la ficha (turno anterior, antes de llegar acá).
+    // Sin pedido o auto=false no viene de una acción, así que se asume ok (flujo manual).
+    const fichaOk = !(auto && pedido && pedido.fichaOk === false);
+    const fichaError = auto && pedido ? pedido.fichaError : null;
     if (!filas.length) {
-      if (accion) reportarAccion(accion.id, { success: true, resultado: { ficha: true, adjuntos: 0 }, resumen: `${codigo}: ficha sincronizada, sin adjuntos`, cerrarPestanas: true });
+      if (accion) reportarAccion(accion.id, {
+        success: fichaOk,
+        resultado: { ficha: fichaOk, adjuntos: 0 },
+        error: fichaOk ? null : (fichaError || 'La ficha no se pudo sincronizar.'),
+        resumen: `${codigo}: ${fichaOk ? 'ficha sincronizada' : 'la ficha tuvo un error'}, sin adjuntos`,
+        cerrarPestanas: true,
+      });
       return;
     }
     if (!codigo) {
@@ -1216,11 +1245,12 @@
       chrome.storage.local.remove('firmavbExtraer').catch(() => {});
       const res = await enviarAdjuntos(codigo, filas);
       if (accion) {
+        const huboAdjuntos = res.errores < filas.length;
         reportarAccion(accion.id, {
-          success: res.errores < filas.length,
-          resultado: { ficha: true, adjuntos: res.ok, errores: res.errores, bases_pdf: res.bases },
-          error: res.errores >= filas.length ? 'No pude subir ningún adjunto.' : null,
-          resumen: `${codigo}: ${res.ok} adjunto${res.ok === 1 ? '' : 's'} a FirmaVB`,
+          success: fichaOk && huboAdjuntos,
+          resultado: { ficha: fichaOk, adjuntos: res.ok, errores: res.errores, bases_pdf: res.bases },
+          error: !fichaOk ? (fichaError || 'La ficha no se pudo sincronizar.') : (huboAdjuntos ? null : 'No pude subir ningún adjunto.'),
+          resumen: `${codigo}: ${res.ok} adjunto${res.ok === 1 ? '' : 's'} a FirmaVB${fichaOk ? '' : ' (la ficha tuvo un error)'}`,
           cerrarPestanas: true,
         });
       }

@@ -856,11 +856,14 @@ Deno.serve(async (req) => {
           if (tomada) reclamadas.push(tomada);
         }
 
-        if (reclamadas.length) {
-          await logActivity(supabase, apiKeyId, clienteId, 'acciones-pendientes', null, null, {
-            acciones: reclamadas.map((a) => ({ id: a.id, tipo: a.tipo, codigo: a.codigo }))
-          }, req);
-        }
+        // Se registra SIEMPRE, incluso con la cola vacía: la extensión llama esto cada minuto y
+        // es la única señal de "sigue viva y consultando" que le llega a evaristo_contexto
+        // (que mide ultima_actividad por el máximo de extension_activity_log). Sin este registro,
+        // tras ~10 minutos sin acciones Don Evaristo la daría por desconectada y dejaría de
+        // programar acciones nuevas aunque la extensión siga funcionando.
+        await logActivity(supabase, apiKeyId, clienteId, 'acciones-pendientes', null, null, {
+          acciones: reclamadas.map((a) => ({ id: a.id, tipo: a.tipo, codigo: a.codigo }))
+        }, req);
 
         return new Response(
           JSON.stringify({ success: true, acciones: reclamadas }),
