@@ -265,7 +265,17 @@ export function useInvitarMiembro() {
       const { data, error } = await supabase.functions.invoke('invitar-miembro', {
         body: { nombre, email, rol, telefono, app_url: appUrl },
       });
-      if (error) throw error;
+      if (error) {
+        // El mensaje útil de la función (p. ej. "Esa persona ya tiene una cuenta
+        // activa.") viaja en el cuerpo de la respuesta no-2xx, que invoke no expone
+        // en error.message. Lo recuperamos desde error.context.
+        const ctx = (error as { context?: Response }).context;
+        let msg = error.message;
+        if (ctx && typeof ctx.json === 'function') {
+          try { const b = await ctx.json(); if (b?.error) msg = b.error; } catch { /* cuerpo no-JSON */ }
+        }
+        throw new Error(msg);
+      }
       if (data?.error) throw new Error(data.error);
       return data as InvitacionResultado;
     },
