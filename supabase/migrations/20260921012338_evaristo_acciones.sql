@@ -28,12 +28,19 @@ create table if not exists public.evaristo_acciones (
 create index if not exists evaristo_acciones_cliente_estado_idx on public.evaristo_acciones (cliente_id, estado, creado_en);
 create index if not exists evaristo_acciones_user_idx on public.evaristo_acciones (user_id, creado_en desc);
 
--- cliente_id sale del usuario; actualizado_en se mantiene solo.
+-- cliente_id sale del usuario; actualizado_en se mantiene solo. Las acciones que
+-- publican en Mercado Público (publicar_cm) siempre nacen en 'confirmar', pase lo
+-- que pase en el insert: la policy de insert solo valida user_id, así que sin esto
+-- cualquier cliente podía crear directo un publicar_cm en 'pendiente' y saltarse la
+-- confirmación desde el chat.
 create or replace function public.evaristo_acciones_antes()
 returns trigger language plpgsql as $$
 begin
   if new.cliente_id is null then
     select c.id into new.cliente_id from public.clientes c where c.user_id = new.user_id limit 1;
+  end if;
+  if tg_op = 'INSERT' and new.tipo = 'publicar_cm' then
+    new.estado := 'confirmar';
   end if;
   new.actualizado_en := now();
   return new;
@@ -79,6 +86,7 @@ begin
   return to_jsonb(v_row);
 end $$;
 
+revoke execute on function public.evaristo_accion_decidir(uuid, boolean) from public, anon;
 grant execute on function public.evaristo_accion_decidir(uuid, boolean) to authenticated;
 
 -- El chat sigue el estado en vivo.
@@ -101,4 +109,5 @@ returns jsonb language sql stable security invoker as $$
   ) a;
 $$;
 
+revoke execute on function public.evaristo_acciones_recientes(int) from public, anon;
 grant execute on function public.evaristo_acciones_recientes(int) to authenticated;

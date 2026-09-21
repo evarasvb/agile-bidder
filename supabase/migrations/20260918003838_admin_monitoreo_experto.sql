@@ -12,7 +12,7 @@
 create or replace function public.admin_experto_resumen()
 returns jsonb
 language sql stable security definer set search_path = public, experto as $$
-  select case when (auth.jwt() ->> 'email') <> 'evaras@firmavb.cl' then null else jsonb_build_object(
+  select case when coalesce(auth.jwt() ->> 'email', '') <> 'evaras@firmavb.cl' then null else jsonb_build_object(
     'consultas_total', (select count(*) from experto.consultas),
     'consultas_hoy', (select count(*) from experto.consultas where creado_en > now() - interval '1 day'),
     'consultas_7d', (select count(*) from experto.consultas where creado_en > now() - interval '7 days'),
@@ -20,6 +20,7 @@ language sql stable security definer set search_path = public, experto as $$
     'evaristo_mensajes_7d', (select count(*) from public.evaristo_mensajes where creado_en > now() - interval '7 days' and rol = 'user')
   ) end;
 $$;
+revoke execute on function public.admin_experto_resumen() from public, anon;
 grant execute on function public.admin_experto_resumen() to authenticated;
 
 create or replace function public.admin_experto_consultas(dias int default 7, lim int default 200, buscar text default null)
@@ -33,7 +34,7 @@ language sql stable security definer set search_path = public, experto as $$
   from experto.consultas q
   left join public.clientes c on c.user_id = q.user_id
   left join auth.users u on u.id = q.user_id
-  where (auth.jwt() ->> 'email') = 'evaras@firmavb.cl'
+  where coalesce(auth.jwt() ->> 'email', '') = 'evaras@firmavb.cl'
     and q.creado_en > now() - make_interval(days => dias)
     and (
       buscar is null or buscar = ''
@@ -44,6 +45,7 @@ language sql stable security definer set search_path = public, experto as $$
   order by q.creado_en desc
   limit lim;
 $$;
+revoke execute on function public.admin_experto_consultas(int, int, text) from public, anon;
 grant execute on function public.admin_experto_consultas(int, int, text) to authenticated;
 
 create or replace function public.admin_evaristo_conversaciones(dias int default 7, lim int default 100)
@@ -59,11 +61,12 @@ language sql stable security definer set search_path = public as $$
   from public.evaristo_conversaciones conv
   left join public.clientes c on c.user_id = conv.user_id
   left join auth.users u on u.id = conv.user_id
-  where (auth.jwt() ->> 'email') = 'evaras@firmavb.cl'
+  where coalesce(auth.jwt() ->> 'email', '') = 'evaras@firmavb.cl'
     and conv.actualizado_en > now() - make_interval(days => dias)
   order by conv.actualizado_en desc
   limit lim;
 $$;
+revoke execute on function public.admin_evaristo_conversaciones(int, int) from public, anon;
 grant execute on function public.admin_evaristo_conversaciones(int, int) to authenticated;
 
 create or replace function public.admin_evaristo_mensajes(p_conversacion_id uuid)
@@ -71,7 +74,8 @@ returns table (id bigint, rol text, contenido text, creado_en timestamptz)
 language sql stable security definer set search_path = public as $$
   select m.id, m.rol, m.contenido, m.creado_en
   from public.evaristo_mensajes m
-  where (auth.jwt() ->> 'email') = 'evaras@firmavb.cl' and m.conversacion_id = p_conversacion_id
+  where coalesce(auth.jwt() ->> 'email', '') = 'evaras@firmavb.cl' and m.conversacion_id = p_conversacion_id
   order by m.id asc;
 $$;
+revoke execute on function public.admin_evaristo_mensajes(uuid) from public, anon;
 grant execute on function public.admin_evaristo_mensajes(uuid) to authenticated;
