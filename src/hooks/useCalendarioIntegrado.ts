@@ -181,7 +181,8 @@ export function useCalendarioIntegrado() {
           const etapaLabel = {
             descubierta: 'Descubierta', seguimiento: 'Seguimiento', preparacion: 'Preparación',
             postulada: 'Postulada', evaluacion: 'Evaluación', adjudicada: 'Adjudicada',
-            oc_emitida: 'OC Emitida', pagada: 'Pagada',
+            oc_emitida: 'OC Emitida', pagada: 'Pagada', perdida: 'Perdida',
+            no_participaremos: 'No participaremos',
           }[p.etapa] || p.etapa;
           events.push({
             id: `pipe-${p.id}`,

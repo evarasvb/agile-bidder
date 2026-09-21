@@ -23,7 +23,7 @@ import { toast } from 'sonner';
 // Al crear una postulación solo se elige una etapa de partida. Las etapas de
 // resultado (adjudicada, OC, pagada, perdida) son un desenlace, no un inicio.
 const ETAPAS_INICIALES = ETAPA_LIST.filter(
-  (e) => !['adjudicada', 'oc_emitida', 'pagada', 'perdida'].includes(e.key),
+  (e) => !['adjudicada', 'oc_emitida', 'pagada', 'perdida', 'no_participaremos'].includes(e.key),
 );
 
 interface AddPipelineModalProps {
