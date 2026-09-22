@@ -18,6 +18,7 @@ export async function fetchClaudeComoOpenAI(
       method: "POST",
       headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
       body: JSON.stringify({ model: opts.modelo, max_tokens: opts.maxTokens, temperature: opts.temperature ?? 0.3, system: sys || undefined, messages: resto, stream: true }),
+      signal: AbortSignal.timeout(15000),
     });
   } catch (e) { console.error("claude fetch", String(e)); return null; }
   if (!r.ok || !r.body) { console.error("claude", opts.modelo, r.status, (await r.text().catch(() => "")).slice(0, 300)); return null; }

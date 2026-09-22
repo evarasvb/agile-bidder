@@ -365,17 +365,22 @@ Deno.serve(async (req) => {
 
     const key = Deno.env.get("GEMINI_API_KEY");
 
-    // Llamada a Gemini con streaming; probamos modelos en orden
+    // Llamada a Gemini con streaming; probamos modelos en orden. Cada intento tiene un
+    // tope de tiempo corto: si un modelo se cuelga, no puede consumir todo el tiempo que
+    // el navegador espera antes de cortar la conexión, dejando sin turno al respaldo de Claude.
     let upstream: Response | null = null; let modelo = "";
     if (key) {
       for (const mdl of (modo === "chat" ? MODELOS_CHAT : MODELOS_INFORME)) {
-        const r = await fetch(GEMINI_URL, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ model: mdl, messages, temperature: 0.3, max_tokens: modo === "chat" ? 2500 : 4000, stream: true, reasoning_effort: "low" }),
-        });
-        if (r.ok && r.body) { upstream = r; modelo = mdl; break; }
-        console.error("gemini", mdl, r.status, (await r.text()).slice(0, 200));
+        try {
+          const r = await fetch(GEMINI_URL, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ model: mdl, messages, temperature: 0.3, max_tokens: modo === "chat" ? 2500 : 4000, stream: true, reasoning_effort: "low" }),
+            signal: AbortSignal.timeout(8000),
+          });
+          if (r.ok && r.body) { upstream = r; modelo = mdl; break; }
+          console.error("gemini", mdl, r.status, (await r.text()).slice(0, 200));
+        } catch (e) { console.error("gemini fetch", mdl, String(e)); }
       }
     }
     if (!upstream) {
