@@ -415,6 +415,7 @@ export default function LibroLicitacion() {
           precioUnitario: match.inventoryItem.precio_unitario,
           total: match.inventoryItem.precio_unitario * item.cantidad,
           matchScore: match.score,
+          imagenUrl: match.inventoryItem.imagen_url ?? null,
         } as ItemCotizacion;
       })
       .filter((x): x is ItemCotizacion => x !== null);

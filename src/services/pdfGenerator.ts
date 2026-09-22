@@ -25,6 +25,42 @@ export interface ItemCotizacion {
   precioUnitario: number;
   total: number;
   matchScore?: number;
+  imagenUrl?: string | null;
+}
+
+interface ImagenCargada {
+  dataUrl: string;
+  format: string;
+  w: number;
+  h: number;
+}
+
+// Descarga una foto de producto (URL pública del bucket) y la convierte a data
+// URL + sus dimensiones reales (para no deformarla al dibujarla). Nunca lanza:
+// si falla (sin foto, 404, CORS), la fila sale sin imagen, no rompe el PDF.
+async function cargarImagenProducto(url?: string | null): Promise<ImagenCargada | null> {
+  if (!url) return null;
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    const blob = await resp.blob();
+    const dataUrl: string = await new Promise((res, rej) => {
+      const fr = new FileReader();
+      fr.onload = () => res(fr.result as string);
+      fr.onerror = rej;
+      fr.readAsDataURL(blob);
+    });
+    const dims: { w: number; h: number } = await new Promise((res) => {
+      const img = new Image();
+      img.onload = () => res({ w: img.naturalWidth || 1, h: img.naturalHeight || 1 });
+      img.onerror = () => res({ w: 1, h: 1 });
+      img.src = dataUrl;
+    });
+    const format = blob.type.includes('png') ? 'PNG' : blob.type.includes('webp') ? 'WEBP' : 'JPEG';
+    return { dataUrl, format, w: dims.w, h: dims.h };
+  } catch {
+    return null;
+  }
 }
 
 export interface DatosEmpresa {
@@ -60,7 +96,7 @@ const COLORS = {
 /**
  * Genera PDF de cotización profesional
  */
-export function generarCotizacionPDF(datos: DatosCotizacion): jsPDF {
+export function generarCotizacionPDF(datos: DatosCotizacion, fotos: Array<ImagenCargada | null> = []): jsPDF {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 15;
@@ -153,21 +189,24 @@ export function generarCotizacionPDF(datos: DatosCotizacion): jsPDF {
   doc.text('DETALLE DE PRODUCTOS', margin, yPos);
   yPos += 4;
   
-  const tableData = datos.items.map((item, index) => [
-    (index + 1).toString(),
-    item.itemRequerido.substring(0, 35) + (item.itemRequerido.length > 35 ? '...' : ''),
-    item.productoOfertado.substring(0, 30) + (item.productoOfertado.length > 30 ? '...' : ''),
+  // La foto va en su propia columna, dibujada con didDrawCell (autoTable no
+  // pinta imágenes desde los datos de la celda). La celda queda con texto
+  // vacío; si el producto no tiene foto, la columna simplemente queda en blanco.
+  const tableData = datos.items.map((item) => [
+    '',
+    item.itemRequerido.substring(0, 32) + (item.itemRequerido.length > 32 ? '...' : ''),
+    item.productoOfertado.substring(0, 28) + (item.productoOfertado.length > 28 ? '...' : ''),
     item.sku,
     item.cantidad.toString(),
     item.unidad,
     formatCurrency(item.precioUnitario),
     formatCurrency(item.total)
   ]);
-  
+
   autoTable(doc, {
     startY: yPos,
     head: [[
-      '#',
+      'Foto',
       'Item Requerido',
       'Producto Ofertado',
       'SKU',
@@ -188,21 +227,39 @@ export function generarCotizacionPDF(datos: DatosCotizacion): jsPDF {
     bodyStyles: {
       fontSize: 8,
       textColor: COLORS.text,
+      valign: 'middle',
+      minCellHeight: 18,
     },
     columnStyles: {
-      0: { halign: 'center', cellWidth: 10 },
-      1: { cellWidth: 35 },
-      2: { cellWidth: 35 },
-      3: { cellWidth: 20, halign: 'center' },
-      4: { cellWidth: 15, halign: 'center' },
-      5: { cellWidth: 15, halign: 'center' },
-      6: { cellWidth: 22, halign: 'right' },
-      7: { cellWidth: 25, halign: 'right' },
+      0: { halign: 'center', cellWidth: 18 },
+      1: { cellWidth: 32 },
+      2: { cellWidth: 32 },
+      3: { cellWidth: 18, halign: 'center' },
+      4: { cellWidth: 13, halign: 'center' },
+      5: { cellWidth: 13, halign: 'center' },
+      6: { cellWidth: 20, halign: 'right' },
+      7: { cellWidth: 22, halign: 'right' },
     },
     alternateRowStyles: {
       fillColor: COLORS.lightGray,
     },
     margin: { left: margin, right: margin },
+    didDrawCell: (data) => {
+      if (data.section !== 'body' || data.column.index !== 0) return;
+      const foto = fotos[data.row.index];
+      if (!foto) return;
+      try {
+        const boxW = data.cell.width - 3;
+        const boxH = data.cell.height - 3;
+        const ratio = foto.w / foto.h || 1;
+        let w = boxW;
+        let h = w / ratio;
+        if (h > boxH) { h = boxH; w = h * ratio; }
+        const x = data.cell.x + (data.cell.width - w) / 2;
+        const y = data.cell.y + (data.cell.height - h) / 2;
+        doc.addImage(foto.dataUrl, foto.format, x, y, w, h);
+      } catch { /* si la foto no se puede pintar, la fila sigue sin ella */ }
+    },
   });
   
   // @ts-ignore - autoTable adds finalY
@@ -324,7 +381,11 @@ async function conLogoResuelto(datos: DatosCotizacion): Promise<DatosCotizacion>
 }
 
 export async function descargarCotizacionPDF(datos: DatosCotizacion): Promise<void> {
-  const doc = generarCotizacionPDF(await conLogoResuelto(datos));
+  const [datosConLogo, fotos] = await Promise.all([
+    conLogoResuelto(datos),
+    Promise.all(datos.items.map((it) => cargarImagenProducto(it.imagenUrl))),
+  ]);
+  const doc = generarCotizacionPDF(datosConLogo, fotos);
   const filename = `cotizacion_${datos.numero}_${datos.compra.codigo.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
   doc.save(filename);
 }
@@ -333,7 +394,11 @@ export async function descargarCotizacionPDF(datos: DatosCotizacion): Promise<vo
  * Abre el PDF en una nueva pestaña
  */
 export async function previsualizarCotizacionPDF(datos: DatosCotizacion): Promise<void> {
-  const doc = generarCotizacionPDF(await conLogoResuelto(datos));
+  const [datosConLogo, fotos] = await Promise.all([
+    conLogoResuelto(datos),
+    Promise.all(datos.items.map((it) => cargarImagenProducto(it.imagenUrl))),
+  ]);
+  const doc = generarCotizacionPDF(datosConLogo, fotos);
   const pdfBlob = doc.output('blob');
   const url = URL.createObjectURL(pdfBlob);
   window.open(url, '_blank');
