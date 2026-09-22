@@ -128,6 +128,14 @@ export default function LibroLicitacion() {
     toast.success(archivado ? 'Libro archivado (sigue guardado, lo ves en Archivados)' : 'Libro reactivado');
     qc.invalidateQueries({ queryKey: ['experto_mis_libros'] });
   };
+  const eliminarLibro = async (c: string) => {
+    if (!window.confirm(`¿Eliminar el libro ${c}? Se borra el chat, informes y entregables de esta licitación. No se puede deshacer.`)) return;
+    const { error } = await supabase.rpc('experto_libro_eliminar', { p_codigo: c });
+    if (error) { toast.error('No pude eliminar el libro'); return; }
+    toast.success('Libro eliminado');
+    qc.invalidateQueries({ queryKey: ['experto_mis_libros'] });
+    if (cod && cod.toUpperCase() === c.toUpperCase()) navigate('/experto');
+  };
 
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [codigoAbrir, setCodigoAbrir] = useState('');
@@ -574,6 +582,7 @@ export default function LibroLicitacion() {
         )}
         <Button size="sm" variant="ghost" className="h-8" onClick={() => navigate('/experto/compartidos')}>Mis compartidos</Button>
         {cod && <Button size="sm" variant="ghost" className="h-8 text-muted-foreground" onClick={() => archivarLibro(cod, true).then(() => navigate('/experto'))}>Archivar libro</Button>}
+        {cod && <Button size="sm" variant="ghost" className="h-8 text-destructive" onClick={() => eliminarLibro(cod)}>Eliminar libro</Button>}
         {f && <Button variant="outline" size="sm" onClick={() => navigate(String(f.tipo ?? '').toLowerCase().includes('gil') ? `/compras-agiles/${cod}` : `/oportunidades/licitacion/${cod}`)}>Ver la oportunidad</Button>}
         {cod && <BookOpen className="h-5 w-5 text-primary" />}
         {cod && <h1 className="text-xl font-bold">{cod}</h1>}
@@ -618,6 +627,7 @@ export default function LibroLicitacion() {
                       <p className="text-[11px] text-muted-foreground">{l.cierre ? `cierra ${fecha(l.cierre)} · ` : ''}{l.consultas} interacciones</p>
                     </button>
                     <button className="text-[11px] text-muted-foreground underline shrink-0" onClick={() => archivarLibro(l.codigo, !l.archivado)}>{l.archivado ? 'Reactivar' : 'Archivar'}</button>
+                    <button className="text-[11px] text-destructive underline shrink-0" onClick={() => eliminarLibro(l.codigo)}>Eliminar</button>
                   </div>
                 ))}
               </CardContent>

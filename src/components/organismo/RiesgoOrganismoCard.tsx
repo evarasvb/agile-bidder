@@ -120,7 +120,7 @@ export function RiesgoOrganismoCard({ codigo, organismo }: Props) {
           variant="outline"
           size="sm"
           className="w-full"
-          onClick={() => navigate(`/experto?pregunta=${encodeURIComponent(`¿Es riesgoso venderle a ${data.institucion}? ¿Cómo paga?`)}`)}
+          onClick={() => navigate(`/experto/libro/${codigo}?pregunta=${encodeURIComponent(`¿Es riesgoso venderle a ${data.institucion}? ¿Cómo paga?`)}`)}
         >
           <Sparkles className="h-4 w-4 mr-2" />
           Preguntarle al Experto

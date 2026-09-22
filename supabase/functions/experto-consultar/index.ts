@@ -4,6 +4,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { evidenceGateLicitacion, crearEstadoDocumentacionLicitacion } from "../_shared/evidenceGateHelper.ts";
 import { textoPanorama, REGLAS_PANORAMA } from "../_shared/panorama.ts";
+import { fetchClaudeComoOpenAI } from "../_shared/claudeFallback.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -23,6 +24,9 @@ const MAX_ANON_24H = Number(Deno.env.get("EXPERTO_MAX_ANON_24H") ?? 500);
 const MODELOS_CHAT = [Deno.env.get("GEMINI_MODEL_CHAT"), "gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-3.6-flash"].filter(Boolean) as string[];
 const MODELOS_INFORME = [Deno.env.get("GEMINI_MODEL_INFORME"), "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.5-flash-lite", "gemini-flash-lite-latest"].filter(Boolean) as string[];
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+// Respaldo si Gemini falla en TODOS sus modelos (ej. cuota de la cuenta agotada): Claude.
+const CLAUDE_MODELO_CHAT = "claude-haiku-4-5-20251001";
+const CLAUDE_MODELO_INFORME = "claude-sonnet-5";
 
 const STOP = new Set("de la el los las un una unos unas y o u que en para por con sin sobre al del se su sus es son fue ser hay como cuando donde qué que cual cuál cuáles quien quién cómo cuánto cuánta cuántos cuántas mi mis me tu tus le les lo nos si no más muy este esta estos estas ese esa eso aquel puedo puede pueden podemos debo debe deben hacer tiene tienen tengo hay está están estoy ese esa alguna algun algún alguno algunos algunas alguien algo otra otro otras otros".split(" "));
 
@@ -360,18 +364,28 @@ Deno.serve(async (req) => {
     ];
 
     const key = Deno.env.get("GEMINI_API_KEY");
-    if (!key) return new Response(JSON.stringify({ error: "sin_ia" }), { status: 500, headers: cors });
 
-    // Llamada a Gemini con streaming; probamos modelos en orden
+    // Llamada a Gemini con streaming; probamos modelos en orden. Cada intento tiene un
+    // tope de tiempo corto: si un modelo se cuelga, no puede consumir todo el tiempo que
+    // el navegador espera antes de cortar la conexión, dejando sin turno al respaldo de Claude.
     let upstream: Response | null = null; let modelo = "";
-    for (const mdl of (modo === "chat" ? MODELOS_CHAT : MODELOS_INFORME)) {
-      const r = await fetch(GEMINI_URL, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: mdl, messages, temperature: 0.3, max_tokens: modo === "chat" ? 2500 : 4000, stream: true, reasoning_effort: "low" }),
-      });
-      if (r.ok && r.body) { upstream = r; modelo = mdl; break; }
-      console.error("gemini", mdl, r.status, (await r.text()).slice(0, 200));
+    if (key) {
+      for (const mdl of (modo === "chat" ? MODELOS_CHAT : MODELOS_INFORME)) {
+        try {
+          const r = await fetch(GEMINI_URL, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ model: mdl, messages, temperature: 0.3, max_tokens: modo === "chat" ? 2500 : 4000, stream: true, reasoning_effort: "low" }),
+            signal: AbortSignal.timeout(8000),
+          });
+          if (r.ok && r.body) { upstream = r; modelo = mdl; break; }
+          console.error("gemini", mdl, r.status, (await r.text()).slice(0, 200));
+        } catch (e) { console.error("gemini fetch", mdl, String(e)); }
+      }
+    }
+    if (!upstream) {
+      const claude = await fetchClaudeComoOpenAI(messages, { modelo: modo === "chat" ? CLAUDE_MODELO_CHAT : CLAUDE_MODELO_INFORME, maxTokens: modo === "chat" ? 2500 : 4000, temperature: 0.3 });
+      if (claude) { upstream = claude.resp; modelo = claude.modelo; }
     }
     if (!upstream) return new Response(JSON.stringify({ error: "ia_no_disponible" }), { status: 502, headers: cors });
 
