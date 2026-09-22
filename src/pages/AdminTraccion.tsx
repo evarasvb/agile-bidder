@@ -3,13 +3,15 @@
 // Solo la ve el admin (AdminOnlyRoute + RPC security-definer). Sirve para saber
 // a quién contactar y si el negocio está creciendo o no.
 import { useState } from "react";
-import { useTraccionResumen, useClientesNuevos, useCampanasResumen, useClientesActividad, type ClienteNuevo, type CampanasResumen } from "@/hooks/useAdminTraccion";
+import { useTraccionResumen, useClientesNuevos, useCampanasResumen, useClientesActividad, type ClienteNuevo, type ClienteActividad, type CampanasResumen } from "@/hooks/useAdminTraccion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, Users, Package, FileText, Wifi, Crown, Mail, UserPlus, Activity } from "lucide-react";
+import { TrendingUp, Users, Package, FileText, Wifi, Crown, Mail, UserPlus, Activity, Pencil } from "lucide-react";
+import { GestionClienteDialog } from "@/components/traccion/GestionClienteDialog";
 
 type CampanaWebinar = CampanasResumen["webinar_por_campana"][number];
 
@@ -91,7 +93,25 @@ function EstadoActividad({ ultima }: { ultima: string | null }) {
   return <Badge variant="secondary" className="text-[10px]">inactivo</Badge>;
 }
 
-const COLUMNAS_ACTIVIDAD: DataTableColumn<ClienteNuevo>[] = [
+const ESTADO_GESTION_LABEL: Record<string, string> = {
+  nuevo: "Nuevo", contactado: "Contactado", en_seguimiento: "En seguimiento",
+  activo: "Activo", en_riesgo: "En riesgo", perdido: "Perdido",
+};
+const ESTADO_GESTION_CLASE: Record<string, string> = {
+  nuevo: "bg-slate-100 text-slate-700 hover:bg-slate-100",
+  contactado: "bg-blue-100 text-blue-700 hover:bg-blue-100",
+  en_seguimiento: "bg-amber-100 text-amber-700 hover:bg-amber-100",
+  activo: "bg-green-100 text-green-700 hover:bg-green-100",
+  en_riesgo: "bg-orange-100 text-orange-700 hover:bg-orange-100",
+  perdido: "bg-red-100 text-red-700 hover:bg-red-100",
+};
+
+function EstadoGestion({ estado }: { estado: string }) {
+  return <Badge className={`text-[10px] ${ESTADO_GESTION_CLASE[estado] || ESTADO_GESTION_CLASE.nuevo}`}>{ESTADO_GESTION_LABEL[estado] || estado}</Badge>;
+}
+
+function columnasActividad(onGestionar: (c: ClienteActividad) => void): DataTableColumn<ClienteActividad>[] {
+  return [
   {
     id: "cliente",
     header: "Cliente",
@@ -133,7 +153,30 @@ const COLUMNAS_ACTIVIDAD: DataTableColumn<ClienteNuevo>[] = [
     cell: (c) => <Badge variant={c.plan && c.plan !== "free" ? "default" : "secondary"} className="text-[10px]">{c.plan || "free"}</Badge>,
     sortValue: (c) => c.plan || "free",
   },
-];
+  {
+    id: "gestion",
+    header: "Gestión",
+    className: "min-w-[180px]",
+    cell: (c) => (
+      <div className="flex items-center gap-2">
+        <div className="min-w-0">
+          <EstadoGestion estado={c.estado_gestion} />
+          {c.proxima_accion && (
+            <p className="text-[10px] text-muted-foreground truncate max-w-[160px] mt-0.5">
+              {c.proxima_accion}{c.proxima_fecha ? ` · ${fecha(c.proxima_fecha)}` : ""}
+            </p>
+          )}
+        </div>
+        <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => onGestionar(c)}>
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    ),
+    sortValue: (c) => `${c.prioridad}-${c.estado_gestion}`,
+    exportValue: (c) => `${ESTADO_GESTION_LABEL[c.estado_gestion] || c.estado_gestion}${c.proxima_accion ? ` · ${c.proxima_accion}` : ""}`,
+  },
+  ];
+}
 
 const COLUMNAS_CAMPANAS: DataTableColumn<CampanaWebinar>[] = [
   { id: "campana", header: "Campaña", cell: (w) => <span className="font-medium">{w.campana}</span>, sortValue: (w) => w.campana },
@@ -159,10 +202,12 @@ function Kpi({ icon: Icon, label, value, sub }: { icon: any; label: string; valu
 
 export default function AdminTraccion() {
   const [dias, setDias] = useState(30);
+  const [clienteGestionando, setClienteGestionando] = useState<ClienteActividad | null>(null);
   const { data: resumen, isLoading: cargandoResumen } = useTraccionResumen();
   const { data: clientes = [], isLoading: cargandoClientes } = useClientesNuevos(dias);
   const { data: campanas, isLoading: cargandoCampanas } = useCampanasResumen();
   const { data: actividad = [], isLoading: cargandoActividad } = useClientesActividad();
+  const columnasActividadConGestion = columnasActividad(setClienteGestionando);
 
   const activacionPct = resumen && resumen.clientes_total > 0
     ? Math.round((resumen.activados / resumen.clientes_total) * 100) : 0;
@@ -199,13 +244,13 @@ export default function AdminTraccion() {
           <CardTitle className="text-base flex items-center gap-2"><Activity className="h-4 w-4" />Actividad de clientes</CardTitle>
         </CardHeader>
         <CardContent>
-          <DataTable<ClienteNuevo>
+          <DataTable<ClienteActividad>
             storageKey="traccion-actividad"
             rows={actividad}
             rowKey={(c) => c.id}
             loading={cargandoActividad}
             itemLabel="clientes"
-            columns={COLUMNAS_ACTIVIDAD}
+            columns={columnasActividadConGestion}
             searchText={(c) => `${c.empresa_nombre ?? ""} ${c.email ?? ""} ${c.plan ?? ""}`}
             searchPlaceholder="Buscar por empresa, correo o plan…"
             defaultSort={{ id: "conexion", dir: "asc" }}
@@ -292,6 +337,8 @@ export default function AdminTraccion() {
           )}
         </CardContent>
       </Card>
+
+      <GestionClienteDialog cliente={clienteGestionando} onOpenChange={(open) => !open && setClienteGestionando(null)} />
     </div>
   );
 }
