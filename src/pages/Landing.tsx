@@ -1,26 +1,13 @@
-import { 
-  ArrowRight, 
-  Zap, 
-  Target, 
-  Clock, 
-  Shield, 
-  BarChart3, 
+import {
+  ArrowRight,
+  Target,
+  Shield,
   CheckCircle2,
   FileText,
-  TrendingUp,
-  Building2,
-  Star,
   Search,
   Brain,
-  DollarSign,
-  PieChart,
   Users,
   Sparkles,
-  LineChart,
-  Calculator,
-  FileSearch,
-  Lightbulb,
-  Repeat,
   Scale,
   LogOut,
   Play,
@@ -93,8 +80,8 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-firmavb-gray">
       <Seo
-        title="FirmaVB — Vende a Mercado Público con IA | PYMEs de Chile"
-        description="La plataforma para PYMEs chilenas que quieren vender al Estado: IA que encuentra licitaciones y compras ágiles que calzan con tu inventario, arma tu oferta y te avisa antes que cierren."
+        title="FirmaVB — Don Evaristo, tu experto para venderle al Estado | PYMEs de Chile"
+        description="Don Evaristo es tu experto, tu abogado y tu equipo de postulación en Mercado Público: encuentra licitaciones y compras ágiles que calzan con tu inventario, te asesora en compras públicas y te ayuda a cobrar cuando el Estado paga tarde."
         path="/"
       />
       {/* Demo Modal */}
