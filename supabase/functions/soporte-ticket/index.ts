@@ -22,7 +22,7 @@ function json(b: unknown, s = 200) {
   return new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
 }
 
-const FROM = 'FirmaVB <notificaciones@notifications.firmavb.cl>';
+const FROM = 'FirmaVB <notificaciones@firmavb.cl>';
 const CONTACTO = 'contacto@firmavb.cl';
 
 const esc = (s: string) =>

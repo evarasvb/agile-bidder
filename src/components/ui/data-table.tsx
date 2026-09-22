@@ -277,9 +277,11 @@ export function DataTable<T>({
         </div>
       </div>
 
-      {/* Tabla con scroll interno y encabezado fijo */}
-      <div className="rounded-lg border overflow-auto" style={{ maxHeight }}>
-        <Table className="text-sm">
+      {/* Tabla con scroll interno y encabezado fijo. min-w-max: si las columnas
+          no caben, la tabla crece a su ancho real en vez de comprimirse, y
+          scrollbar-x-visible hace evidente que hay una barra para deslizar. */}
+      <div className="rounded-lg border overflow-auto scrollbar-x-visible" style={{ maxHeight }}>
+        <Table className="text-sm min-w-max">
           {/* sticky va en cada th (en thead no funciona en todos los navegadores) */}
           <TableHeader className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-muted [&_th]:shadow-[inset_0_-1px_0_hsl(var(--border))] [&_tr]:border-b">
             <TableRow className="hover:bg-transparent">

@@ -77,6 +77,7 @@ interface LibroExperto {
   bases?: any[];
   documentos?: any[];
   top_adjudicatarios?: any[];
+  licitaciones_similares?: { codigo: string; titulo?: string; adjudicatario?: string; monto_adjudicado?: number | null; monto_estimado?: number | null }[];
   plan?: string;
   bajo_agua_cuota?: { plan?: string; usados?: number; maximo?: number | null; periodo?: string };
 }

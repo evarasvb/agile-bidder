@@ -66,7 +66,7 @@ export function useAprendizaje() {
     queryFn: async (): Promise<Aprendizaje> => {
       const { data, error } = await supabase.rpc('cliente_aprendizaje', { p_cliente: clienteId });
       if (error) throw error;
-      return (data as Aprendizaje) ?? {
+      return (data as unknown as Aprendizaje) ?? {
         total_senales: 0, descartadas: 0, cotizadas: 0, excluir_sugeridas: [], incluir_sugeridas: [],
       };
     },

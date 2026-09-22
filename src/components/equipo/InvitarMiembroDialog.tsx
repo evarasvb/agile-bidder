@@ -116,6 +116,11 @@ export function InvitarMiembroDialog({ open, onOpenChange }: InvitarMiembroDialo
                   ? <>Le enviamos un correo a <strong className="text-foreground">{enviado.email}</strong> para activar su cuenta.</>
                   : <>No pudimos enviar el correo automáticamente. Comparte el enlace de activación tú mismo:</>}
               </p>
+              {!enviado.email_enviado && enviado.email_error && (
+                <p className="text-xs text-destructive bg-destructive/10 rounded px-2 py-1.5 break-all">
+                  Motivo: {enviado.email_error}
+                </p>
+              )}
 
               <div className="rounded-lg border bg-muted/30 p-3">
                 <p className="text-xs text-muted-foreground mb-1">Enlace de activación</p>

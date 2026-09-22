@@ -80,8 +80,12 @@ export default function OnboardingResultados({ cliente }: { cliente: Cliente }) 
         ]);
         if (cancelado) return;
         if (lic.error) setError(true);
-        else { setTotal((lic.data?.total as number) ?? 0); setItems((lic.data?.items as Item[]) ?? []); }
-        if (!res.error) setResumen(res.data as Resumen);
+        else {
+          const licData = lic.data as unknown as { total?: number; items?: Item[] } | null;
+          setTotal(licData?.total ?? 0);
+          setItems(licData?.items ?? []);
+        }
+        if (!res.error) setResumen(res.data as unknown as Resumen);
       } catch {
         if (!cancelado) setError(true);
       } finally {

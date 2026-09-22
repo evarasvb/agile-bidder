@@ -118,6 +118,12 @@ const navItems: NavItem[] = [
     icon: Rocket,
   },
   {
+    adminOnly: true,
+    title: "Tracción",
+    url: "/admin/traccion",
+    icon: TrendingUp,
+  },
+  {
     title: "Soporte",
     url: "/soporte",
     icon: LifeBuoy,

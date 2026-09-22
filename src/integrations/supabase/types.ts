@@ -9329,6 +9329,21 @@ export type Database = {
         Returns: string
       }
       admin_campanas_resumen: { Args: never; Returns: Json }
+      admin_clientes_actividad: {
+        Args: { lim?: number }
+        Returns: {
+          created_at: string
+          email: string
+          empresa_nombre: string
+          id: string
+          industrias: string[]
+          items_inventario: number
+          last_sign_in_at: string
+          ofertas: number
+          palabras_clave_busqueda: string[]
+          plan: string
+        }[]
+      }
       admin_clientes_nuevos: {
         Args: { dias?: number; lim?: number }
         Returns: {
@@ -10813,6 +10828,7 @@ export type Database = {
         | "oc_emitida"
         | "pagada"
         | "perdida"
+        | "no_participaremos"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -10952,8 +10968,8 @@ export const Constants = {
         "oc_emitida",
         "pagada",
         "perdida",
+        "no_participaremos",
       ],
     },
   },
 } as const
-

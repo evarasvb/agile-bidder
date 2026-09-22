@@ -208,7 +208,7 @@ export function ProductGalleryInline({
         <>
           <img
             src={principalImage.image_url}
-            alt={`Galería de ${productName}`}
+            alt="Galería del producto"
             className="w-full h-full object-cover"
           />
           {imageCount > 1 && (

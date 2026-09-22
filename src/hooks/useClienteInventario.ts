@@ -12,7 +12,6 @@ export interface ClienteInventarioItem {
   categoria: string | null;
   precio_unitario: number;
   stock: number | null;
-  activo: boolean | null;
   imagen_url: string | null;
   margen_minimo: number | null;
   palabras_clave: string[] | null;
@@ -24,7 +23,6 @@ export interface ClienteInventarioItem {
 export interface ClienteInventarioFilters {
   search?: string;
   categoria?: string;
-  activo?: boolean;
 }
 
 export function useClienteInventario(filters?: ClienteInventarioFilters) {
@@ -56,10 +54,6 @@ export function useClienteInventario(filters?: ClienteInventarioFilters) {
         if (filters?.categoria && filters.categoria !== 'all') {
           query = query.eq('categoria', filters.categoria);
         }
-        if (filters?.activo !== undefined) {
-          query = query.eq('activo', filters.activo);
-        }
-
         const { data, error, count } = await query;
 
         if (error) {
@@ -68,7 +62,22 @@ export function useClienteInventario(filters?: ClienteInventarioFilters) {
         }
 
         if (data && data.length > 0) {
-          allItems.push(...data);
+          allItems.push(...data.map((d) => ({
+            id: d.id,
+            cliente_id: d.cliente_id,
+            sku: d.sku,
+            nombre: d.nombre,
+            descripcion: d.descripcion,
+            categoria: d.categoria,
+            precio_unitario: d.precio_unitario,
+            stock: d.stock_disponible,
+            imagen_url: d.imagen_url,
+            margen_minimo: d.margen_minimo,
+            palabras_clave: d.palabras_clave,
+            tiempo_entrega_dias: d.tiempo_entrega,
+            created_at: d.created_at,
+            updated_at: d.updated_at,
+          })));
           from += pageSize;
           hasMore = data.length === pageSize;
         } else {
@@ -98,9 +107,9 @@ export function useClienteInventario(filters?: ClienteInventarioFilters) {
   const stats = {
     totalProductos: query.data?.total || 0,
     totalCategorias: query.data?.categorias.length || 0,
-    valorInventario: query.data?.items.reduce((acc, item) => 
+    valorInventario: query.data?.items.reduce((acc, item) =>
       acc + (item.precio_unitario * (item.stock || 0)), 0) || 0,
-    productosActivos: query.data?.items.filter(i => i.activo !== false).length || 0,
+    productosActivos: query.data?.total || 0,
   };
 
   return {
