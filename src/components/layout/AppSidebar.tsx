@@ -23,8 +23,10 @@ import {
   GraduationCap,
   Sparkles,
   Shield,
+  ShieldCheck,
   LifeBuoy,
   Rocket,
+  Scale,
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -65,6 +67,10 @@ const navItems: NavItem[] = [
     title: "Experto",
     url: "/experto",
     icon: GraduationCap,
+    children: [
+      { title: "Libro de licitación", url: "/experto", icon: GraduationCap },
+      { title: "Don Evaristo Abogado", url: "/experto/abogado", icon: Scale },
+    ],
   },
   {
     title: "Postulaciones",
@@ -75,6 +81,11 @@ const navItems: NavItem[] = [
     title: "Inventario",
     url: "/inventario",
     icon: Package,
+  },
+  {
+    title: "Convenio Marco",
+    url: "/convenio-marco",
+    icon: ShieldCheck,
   },
   {
     title: "Academia",

@@ -170,6 +170,30 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
     );
   };
 
+  // El cliente puede reescribir el ítem: lo que pide la licitación tal como se
+  // extrajo (a veces viene con errores de OCR o una redacción confusa) y el
+  // nombre del producto que va a ofertar (lo que efectivamente sale en el PDF
+  // de cotización, aunque haya salido de un match automático).
+  const handleNombreChange = (itemId: string, nombre: string) => {
+    setItemsSeleccionados(prev =>
+      prev.map(item => (item.itemId === itemId ? { ...item, nombre } : item))
+    );
+  };
+
+  const handleDescripcionChange = (itemId: string, descripcion: string) => {
+    setItemsSeleccionados(prev =>
+      prev.map(item => (item.itemId === itemId ? { ...item, descripcion } : item))
+    );
+  };
+
+  const handleNombreOfertadoChange = (itemId: string, nombre: string) => {
+    setItemsSeleccionados(prev =>
+      prev.map(item =>
+        item.itemId === itemId && item.match ? { ...item, match: { ...item.match, nombre } } : item
+      )
+    );
+  };
+
   const handleToggleItem = (itemId: string) => {
     setItemsSeleccionados(prev =>
       prev.map(item => 
@@ -364,9 +388,11 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
     }
   };
 
-  // Descarga la cotización en PDF con los datos reales de la empresa.
+  // Descarga la cotización en PDF con los datos reales de la empresa y la foto
+  // de cada producto (buscada en el inventario por SKU, igual que la ficha técnica).
   const handleDescargarCotizacion = async () => {
     if (!compra) return;
+    const invBySku = new Map((inventario || []).map((p: any) => [p.sku, p]));
     const itemsPDF: ItemCotizacion[] = itemsActivos.map(item => ({
       itemRequerido: item.nombre,
       productoOfertado: item.match?.nombre || item.nombre,
@@ -375,7 +401,8 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
       unidad: item.unidadMedida,
       precioUnitario: item.precioUnitario,
       total: item.precioUnitario * item.cantidad,
-      matchScore: item.match?.matchScore
+      matchScore: item.match?.matchScore,
+      imagenUrl: (item.match?.sku ? invBySku.get(item.match.sku)?.imagen_url : null) ?? null,
     }));
     const datosPDF: DatosCotizacion = {
       numero: `COT-${Date.now().toString().slice(-8)}`,
@@ -665,11 +692,20 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between">
-                        <div>
-                          <h4 className="font-medium text-sm">{item.nombre}</h4>
-                          {item.descripcion && (
-                            <p className="text-xs text-muted-foreground mt-1">{item.descripcion}</p>
-                          )}
+                        <div className="flex-1 min-w-0">
+                          <Input
+                            value={item.nombre}
+                            onChange={(e) => handleNombreChange(item.itemId, e.target.value)}
+                            placeholder="Nombre del ítem"
+                            className="h-7 text-sm font-medium px-2 -ml-2 border-transparent bg-transparent hover:border-input focus-visible:border-input focus-visible:bg-background"
+                            title="Puedes editar el texto del ítem (por ejemplo, si vino con errores de la ficha)"
+                          />
+                          <Input
+                            value={item.descripcion}
+                            onChange={(e) => handleDescripcionChange(item.itemId, e.target.value)}
+                            placeholder="Descripción (opcional)"
+                            className="h-6 text-xs text-muted-foreground px-2 -ml-2 mt-0.5 border-transparent bg-transparent hover:border-input focus-visible:border-input focus-visible:bg-background"
+                          />
                           <div className="flex items-center gap-3 mt-2">
                             <span className="text-xs bg-muted px-2 py-1 rounded">
                               Solicitado: {item.cantidadSolicitada} {unidadLabel(item.unidadMedida)}
@@ -688,8 +724,14 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-2">
-                                <span className="font-mono text-xs">{item.match.sku}</span>
-                                <span className="text-xs font-medium">{item.match.nombre}</span>
+                                <span className="font-mono text-xs shrink-0">{item.match.sku}</span>
+                                <Input
+                                  value={item.match.nombre}
+                                  onChange={(e) => handleNombreOfertadoChange(item.itemId, e.target.value)}
+                                  placeholder="Nombre del producto ofertado"
+                                  className="h-6 text-xs font-medium px-2 -ml-2 border-transparent bg-transparent hover:border-input focus-visible:border-input focus-visible:bg-background flex-1 min-w-0"
+                                  title="Este es el nombre que sale en la cotización como 'Producto Ofertado'"
+                                />
                                 {item.match.matchScore < 100 && (
                                   <Badge variant="secondary" className="text-xs">
                                     Match: {item.match.matchScore}%

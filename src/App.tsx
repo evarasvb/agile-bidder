@@ -47,6 +47,7 @@ const ChatIA = lazy(() => import("./pages/ChatIA"));
 const LibroLicitacion = lazy(() => import("./pages/experto/LibroLicitacion"));
 const Compartido = lazy(() => import("./pages/experto/Compartido"));
 const Compartidos = lazy(() => import("./pages/experto/Compartidos"));
+const Abogado = lazy(() => import("./pages/experto/Abogado"));
 
 const OportunidadesPanel = lazy(() => import("./pages/Oportunidades"));
 const OportunidadDetalle = lazy(() => import("./pages/OportunidadDetalle"));
@@ -81,6 +82,7 @@ const ReporteMercado = lazy(() => import("./pages/reportes/ReporteMercado"));
 const ReporteCompetidores = lazy(() => import("./pages/reportes/ReporteCompetidores"));
 const ReporteConvenioMarco = lazy(() => import("./pages/reportes/ReporteConvenioMarco"));
 const ConsultaLibre = lazy(() => import("./pages/reportes/ConsultaLibre"));
+const ConvenioMarcoGestion = lazy(() => import("./pages/ConvenioMarcoGestion"));
 
 const AdminTraccion = lazy(() => import("./pages/AdminTraccion"));
 const AdminEvaristo = lazy(() => import("./pages/AdminEvaristo"));
@@ -191,6 +193,7 @@ const App = () => (
             <Route path="/experto" element={<LibroLicitacion />} />
             <Route path="/experto/libro/:codigo" element={<LibroLicitacion />} />
             <Route path="/experto/compartidos" element={<Compartidos />} />
+            <Route path="/experto/abogado" element={<Abogado />} />
             {/* Legacy: la lista vieja duplicaba Compras Ágiles (y hasta se titulaba así) */}
             <Route path="/licitaciones" element={<Navigate to="/oportunidades?tipo=licitacion" replace />} />
             <Route path="/licitaciones-nuevas" element={<Navigate to="/oportunidades" replace />} />
@@ -244,6 +247,9 @@ const App = () => (
             <Route path="/reportes/convenio-marco" element={<ReporteConvenioMarco />} />
             <Route path="/reportes/consulta" element={<ConsultaLibre />} />
             <Route path="/reportes/ordenes-compra" element={<ReporteOrdenesCompra />} />
+
+            {/* ----- CONVENIO MARCO (gestión de marca / distribuidores) ----- */}
+            <Route path="/convenio-marco" element={<ConvenioMarcoGestion />} />
 
             {/* ----- MARKETING ----- */}
             <Route path="/marketing/control" element={<AdminOnlyRoute><MarketingControlCenter /></AdminOnlyRoute>} />

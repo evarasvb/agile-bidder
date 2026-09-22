@@ -467,19 +467,23 @@
     return `Continuo: ${l.stats.guardados} guardados · ${l.stats.saltados} saltados · ${l.stats.vacios} sin precio.`;
   }
 
-  async function iniciarLote() {
+  // `accion`: si viene de Don Evaristo (ya confirmada en el chat) no se vuelve a preguntar.
+  async function iniciarLote(accion) {
+    const desdeAccion = !!(accion && typeof accion.id === 'string' && accion.tipo === 'publicar_cm');
     try {
       if (!esLista()) {
         setEstado('Para el modo continuo, ábrelo desde la <b>lista de productos</b> (Mis productos) o desde los resultados de <b>Agregar producto</b>, y vuelve a darle.');
+        if (desdeAccion) reportarAccionCM(accion.id, { success: false, error: 'La página no es la lista de productos de Convenio Marco. Abre "Mis productos" y vuelve a pedírmelo.' });
         return;
       }
       const enlaces = enlacesFichaEnPagina();
       if (enlaces.length === 0) {
         setEstado('No encontré enlaces a las fichas en esta lista (el menú puede armar el link al abrirlo). Mándale a Claude una captura del menú "SELECCIONE" abierto.');
+        if (desdeAccion) reportarAccionCM(accion.id, { success: false, error: 'No encontré productos en la lista de Convenio Marco.' });
         return;
       }
-      if (!window.confirm(`Modo continuo: abriré cada producto, pondré el precio (referencia − $1) y GUARDARÉ, uno tras otro (${enlaces.length} en esta página, sigue con las demás).\n\nSe publican precios reales. Puedes Detener cuando quieras.\n\n¿Empezar?`)) return;
-      const lote = { activo: true, ts: Date.now(), listaUrl: location.href, procesados: [], stats: { guardados: 0, saltados: 0, vacios: 0 } };
+      if (!desdeAccion && !window.confirm(`Modo continuo: abriré cada producto, pondré el precio (referencia − $1) y GUARDARÉ, uno tras otro (${enlaces.length} en esta página, sigue con las demás).\n\nSe publican precios reales. Puedes Detener cuando quieras.\n\n¿Empezar?`)) return;
+      const lote = { activo: true, ts: Date.now(), listaUrl: location.href, procesados: [], stats: { guardados: 0, saltados: 0, vacios: 0 }, accionId: desdeAccion ? accion.id : null };
       await guardarLote(lote);
       mostrarDetener(true);
       setEstado('Modo continuo iniciado…');
@@ -488,9 +492,59 @@
   }
 
   async function detenerLote(msg) {
+    let lote = null;
+    try { lote = (await chrome.storage.local.get('cmLote')).cmLote || null; } catch {}
     try { await chrome.storage.local.set({ cmLote: null }); } catch {}
     mostrarDetener(false);
     setEstado(msg || 'Modo continuo detenido.');
+    // Si el lote lo pidió Don Evaristo, se le reporta cómo terminó.
+    if (lote && lote.accionId) {
+      const s = lote.stats || { guardados: 0, saltados: 0, vacios: 0 };
+      const termino = /^✅/.test(msg || '');
+      reportarAccionCM(lote.accionId, {
+        success: termino || s.guardados > 0,
+        resultado: { guardados: s.guardados, saltados: s.saltados, sin_precio: s.vacios, productos_vistos: (lote.procesados || []).length, completo: termino },
+        error: termino || s.guardados > 0 ? null : (msg || 'Se detuvo sin publicar nada.').replace(/<[^>]+>/g, ''),
+        resumen: `Convenio Marco: ${s.guardados} publicados, ${s.saltados} saltados, ${s.vacios} sin precio`,
+      });
+    }
+  }
+
+  // ---------- acciones de Don Evaristo ----------
+  function reportarAccionCM(id, data) {
+    return chrome.runtime.sendMessage({ action: 'ACCION_RESULTADO', data: { accion_id: id, ...data } }).catch(() => null);
+  }
+
+  // publicar_cm: la extensión abrió esta pestaña por pedido de Don Evaristo (ya confirmado
+  // en el chat). En la lista arranca el continuo; en una ficha procesa ese producto y guarda.
+  async function atenderAccionCM() {
+    let accion = null;
+    try { accion = ((await chrome.runtime.sendMessage({ action: 'ACCION_ACTIVA' })) || {}).accion || null; } catch {}
+    if (!accion || accion.tipo !== 'publicar_cm') return;
+    if (await leerLote()) return; // ya está corriendo (reanudarLote lo sigue)
+    const p = accion.payload || {};
+    try {
+      const { cmConfig } = await chrome.storage.local.get('cmConfig');
+      const cfg = { ...(cmConfig || { regiones: [], marcas: [], autoPublicar: false }) };
+      if (Array.isArray(p.regiones) && p.regiones.length) cfg.regiones = p.regiones;
+      if (Array.isArray(p.marcas) && p.marcas.length) cfg.marcas = p.marcas;
+      await chrome.storage.local.set({ cmConfig: cfg });
+    } catch {}
+    if (esLista()) { setEstado('Don Evaristo pidió publicar en Convenio Marco: partiendo el modo continuo…'); iniciarLote(accion); return; }
+    if (esFicha()) {
+      const chk = document.getElementById('firmavb-cm-autoguardar');
+      if (chk) chk.checked = p.guardar !== false;
+      try {
+        await procesarProducto();
+        const estado = (document.getElementById('firmavb-cm-status') || {}).innerHTML || '';
+        const guardo = /Publicado autom|Guardado/i.test(estado);
+        reportarAccionCM(accion.id, { success: guardo, resultado: { guardados: guardo ? 1 : 0, detalle: estado.replace(/<[^>]+>/g, ' ').slice(0, 400) }, error: guardo ? null : 'No se pudo publicar este producto: ' + estado.replace(/<[^>]+>/g, ' ').slice(0, 200), resumen: `Convenio Marco: ${nombreProducto()} ${guardo ? 'publicado' : 'no publicado'}` });
+      } catch (e) {
+        reportarAccionCM(accion.id, { success: false, error: 'Error al procesar el producto: ' + (e && e.message) });
+      }
+      return;
+    }
+    reportarAccionCM(accion.id, { success: false, error: 'Mercado Público no abrió la lista de productos de Convenio Marco (¿sesión iniciada?). Abre "Mis productos" y vuelve a pedírmelo.' });
   }
 
   async function loteEnFicha(lote) {
@@ -549,7 +603,7 @@
     } catch (e) { detenerLote('Se detuvo el continuo por un error: ' + (e && e.message)); }
   }
 
-  function init() { crearPanel(); reanudarLote(); }
+  function init() { crearPanel(); reanudarLote(); setTimeout(atenderAccionCM, 1500); }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
