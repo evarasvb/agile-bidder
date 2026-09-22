@@ -6,6 +6,20 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const FROM = 'FirmaVB <notificaciones@notifications.firmavb.cl>';
 
+// Título legible por slug (para el correo). Debe calzar con los slugs reales de
+// los cursos y con crear-pago-curso. Fallback al slug si no está mapeado.
+const TITULOS: Record<string, string> = {
+  'programa-pro-adjudica-al-estado': 'Programa Pro: Estudia y Gana Licitaciones',
+  'iniciar-en-mercado-publico': 'Inicia en Mercado Público (Express)',
+  'saga-1-fundamentos': 'Saga 1 · Fundamentos del Sistema',
+  'saga-2-oportunidades': 'Saga 2 · Oportunidades',
+  'saga-3-ofertas': 'Saga 3 · Ofertas',
+  'saga-4-ganar': 'Saga 4 · Ganar',
+  'saga-5-ejecutar': 'Saga 5 · Ejecutar',
+  'saga-6-escalar': 'Saga 6 · Escalar',
+  'saga-7-automatizacion': 'Saga 7 · Automatización',
+};
+
 function emailHtml(titulo: string, codigo: string, slug: string) {
   const url = `https://firmavb.cl/academia/curso/${slug}`;
   return `<!doctype html><html><body style="margin:0;background:#f4f7fa;font-family:Segoe UI,Arial,sans-serif;color:#1e293b">
@@ -79,7 +93,7 @@ Deno.serve(async (req) => {
         if (resendKey && buyerEmail) {
           await fetch('https://api.resend.com/emails', {
             method: 'POST', headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ from: FROM, to: [buyerEmail], subject: 'Tu acceso al curso — FirmaVB Academia', html: emailHtml(slug, codigo, slug) }),
+            body: JSON.stringify({ from: FROM, to: [buyerEmail], subject: 'Tu acceso al curso — FirmaVB Academia', html: emailHtml(TITULOS[slug] || slug, codigo, slug) }),
           }).catch(() => {});
         }
       } else {
