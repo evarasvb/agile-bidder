@@ -42,6 +42,14 @@ verify_jwt = true
 [functions.mercadopublico-api]
 verify_jwt = false
 
+# google-drive: acciones autenticadas (start/listar/descargar/desconectar)
+[functions.google-drive]
+verify_jwt = true
+
+# google-drive-callback: Google redirige aquí sin JWT (verifica un state firmado)
+[functions.google-drive-callback]
+verify_jwt = false
+
 [functions.resumir-bases]
 verify_jwt = true
 

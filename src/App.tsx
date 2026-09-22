@@ -67,6 +67,7 @@ const VendedorDetalle = lazy(() => import("./pages/VendedorDetalle"));
 const ConfiguracionOportunidades = lazy(() => import("./pages/ConfiguracionOportunidades"));
 const Users = lazy(() => import("./pages/Users"));
 const ExtensionConfig = lazy(() => import("./pages/ExtensionConfig"));
+const Integraciones = lazy(() => import("./pages/Integraciones"));
 
 const Cuenta = lazy(() => import("./pages/Cuenta"));
 const Billing = lazy(() => import("./pages/Billing"));
@@ -252,6 +253,7 @@ const App = () => (
             <Route path="/configuracion/empresa" element={<MiEmpresa />} />
             <Route path="/configuracion/equipo" element={<Users />} />
             <Route path="/configuracion/extension" element={<ExtensionConfig />} />
+            <Route path="/configuracion/integraciones" element={<Integraciones />} />
             
             {/* ----- SOPORTE (mis consultas) ----- */}
             <Route path="/soporte" element={<MisTickets />} />
