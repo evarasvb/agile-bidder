@@ -358,3 +358,34 @@ export function useDatoCurioso() {
     staleTime: 60 * 60 * 1000,
   });
 }
+
+// --- Noticias de tus Instituciones Hook ---
+
+export interface NoticiaInstitucion {
+  institucion: string;
+  noticia_id: number;
+  fuente: string;
+  seccion: string | null;
+  url: string;
+  texto: string;
+  fecha: string;
+}
+
+// Noticias recientes de las instituciones donde el cliente ya postuló o tiene
+// matches activos (RPC cliente_noticias_instituciones: reutiliza la misma base
+// de noticias del Experto, acotada por institución y segura para el cliente).
+export function useNoticiasInstituciones() {
+  return useQuery({
+    queryKey: ['dashboard-principal', 'noticias-instituciones'],
+    queryFn: async (): Promise<NoticiaInstitucion[]> => {
+      // Cast: RPC nueva, aún no está en los tipos generados de Supabase.
+      const { data, error } = await (supabase as any).rpc('cliente_noticias_instituciones', {
+        p_max_instituciones: 5,
+        p_por_institucion: 3,
+      });
+      if (error) throw error;
+      return (data || []) as NoticiaInstitucion[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}

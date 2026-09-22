@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   Info,
   BarChart3,
+  Newspaper,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +36,7 @@ import {
   useOportunidadesPorTipo,
   useCierresProximos,
   useUltimosMatches,
+  useNoticiasInstituciones,
 } from "@/hooks/useDashboardPrincipal";
 import {
   BarChart,
@@ -106,6 +108,8 @@ export default function Dashboard() {
     useCierresProximos();
   const { data: matchesData, isLoading: matchesLoading } =
     useUltimosMatches();
+  const { data: noticiasData, isLoading: noticiasLoading } =
+    useNoticiasInstituciones();
   // "Buscar oportunidades para mí": corre el match del PROPIO cliente y lleva a
   // la bandeja. Antes era "Ejecutar Matching IA" con un diálogo que contaba
   // oportunidades de TODO el sistema (jerga + números ajenos al cliente).
@@ -622,10 +626,56 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Row 4: Activity Feed */}
-      {/* (ActivityFeed eliminado: era un log técnico global tipo consola —
-          "[12:03] Scraper…" — con un botón "Forzar Escaneo" que no escaneaba.
-          Pantalla de desarrollador, no de cliente.) */}
+      {/* Row 4: Noticias de tus instituciones */}
+      <Card className="border-border/50 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-heading font-semibold flex items-center gap-2">
+            <Newspaper className="h-4 w-4 text-firmavb-blue" />
+            Noticias de tus instituciones
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Lo último de las instituciones donde ya postulaste o tienes match. Para saber qué pasa con ellas antes de tu próxima oferta.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {noticiasLoading ? (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-20 w-full" />
+              ))}
+            </div>
+          ) : !noticiasData?.length ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Inbox className="h-10 w-10 mx-auto mb-3 opacity-50" />
+              <p className="text-sm">Todavía no hay noticias para mostrar</p>
+              <p className="text-xs mt-1">
+                Aparecen apenas postules o tengas match con alguna institución
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {noticiasData.map((n) => (
+                <a
+                  key={n.noticia_id}
+                  href={n.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block rounded-lg border p-3 hover:bg-muted/50 transition-colors"
+                >
+                  <p className="text-xs font-semibold text-firmavb-blue truncate mb-1">
+                    {n.institucion}
+                  </p>
+                  <p className="text-sm line-clamp-2">{n.texto}</p>
+                  <p className="text-xs text-muted-foreground mt-1.5">
+                    {n.fuente.replace(/^Noticia:\s*/, "")}
+                    {n.fecha && ` · ${new Date(n.fecha).toLocaleDateString("es-CL", { day: "2-digit", month: "short" })}`}
+                  </p>
+                </a>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
