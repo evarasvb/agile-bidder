@@ -282,30 +282,56 @@ export function useMarketingEjecucionesRecientes(limit: number = 100) {
   return { ejecuciones: data || [], isLoading, isError };
 }
 
-export function useCampaignMetricas(campaignId: string, days: number = 7) {
-  const { data: metricas, isLoading } = useQuery({
-    queryKey: ['marketing_metricas', campaignId, days],
+// La tabla marketing_metricas no la llena ningún proceso (quedó como snapshot sin
+// job que la actualice); las métricas se calculan en vivo desde marketing_ejecucion,
+// que es donde marketing-ejecutar deja cada envío real.
+export function useCampaignMetricas(campaignId: string, days: number = 30) {
+  const { data: ejecuciones, isLoading } = useQuery({
+    queryKey: ['marketing_ejecucion_campania', campaignId, days],
     queryFn: async () => {
+      const { data: piezas, error: errPiezas } = await supabase
+        .from('marketing_piezas')
+        .select('id')
+        .eq('campana_id', campaignId);
+      if (errPiezas) throw errPiezas;
+      const piezaIds = (piezas ?? []).map((p) => p.id);
+      if (!piezaIds.length) return [];
+
       const { data, error } = await supabase
-        .from('marketing_metricas')
-        .select('*')
-        .eq('campana_id', campaignId)
-        .gte('fecha', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
-        .order('fecha', { ascending: true });
+        .from('marketing_ejecucion')
+        .select('estado, abierto, clicks, fecha_envio, creado_en')
+        .in('pieza_id', piezaIds)
+        .gte('creado_en', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
 
       if (error) throw error;
-      return (data || []) as MarketingMetricas[];
+      return (data ?? []) as { estado: string; abierto: boolean; clicks: number; fecha_envio: string | null; creado_en: string }[];
     },
     enabled: !!campaignId,
   });
 
+  const rows = ejecuciones ?? [];
+  const enviados = rows.filter((r) => r.estado !== 'fallo' && r.estado !== 'rebote');
+  const totalEnviados = enviados.length;
+  const totalAbiertos = enviados.filter((r) => r.abierto).length;
+
+  const porDia = new Map<string, MarketingMetricas>();
+  for (const r of enviados) {
+    const fecha = (r.fecha_envio ?? r.creado_en).slice(0, 10);
+    const dia = porDia.get(fecha) ?? { campana_id: campaignId, fecha, total_enviados: 0, total_entregados: 0, total_abiertos: 0, total_clicks: 0, total_conversiones: 0 };
+    dia.total_enviados += 1;
+    if (r.abierto) dia.total_abiertos += 1;
+    dia.total_clicks += r.clicks || 0;
+    porDia.set(fecha, dia);
+  }
+  const metricas = [...porDia.values()].sort((a, b) => a.fecha.localeCompare(b.fecha));
+
   return {
-    metricas: metricas || [],
+    metricas,
     isLoading,
-    totalEnviados: metricas?.reduce((sum, m) => sum + (m.total_enviados || 0), 0) || 0,
-    totalConversiones: metricas?.reduce((sum, m) => sum + (m.total_conversiones || 0), 0) || 0,
-    promTasaApertura: metricas && metricas.length > 0
-      ? metricas.reduce((sum, m) => sum + (m.tasa_apertura || 0), 0) / metricas.length
-      : 0,
+    totalEnviados,
+    // Las conversiones todavía no se rastrean por envío (no hay vínculo con
+    // postulaciones u otra acción del contacto); queda en 0 hasta que exista esa fuente.
+    totalConversiones: 0,
+    promTasaApertura: totalEnviados > 0 ? totalAbiertos / totalEnviados : 0,
   };
 }

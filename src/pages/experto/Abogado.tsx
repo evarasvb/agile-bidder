@@ -27,8 +27,11 @@ const conCitas = (html: string, fuentes?: any[]) => html.replace(/\[(\d{1,2})\]/
 const TIPOS_DOCUMENTO = [
   { value: 'apelacion', label: 'Recurso / reclamo por una licitación o compra ágil' },
   { value: 'reclamo_contraloria', label: 'Reclamo ante la Contraloría' },
+  { value: 'cobro_intereses_mora', label: 'Nota de débito / cobro de intereses por mora' },
   { value: 'carta', label: 'Carta formal (aclaración, objeción, solicitud)' },
 ];
+
+const fmtCLP = (n: number) => '$' + Math.round(n).toLocaleString('es-CL');
 
 export default function Abogado() {
   const navigate = useNavigate();
@@ -51,6 +54,14 @@ export default function Abogado() {
   const [peticion, setPeticion] = useState('');
   const [documento, setDocumento] = useState('');
   const [generando, setGenerando] = useState(false);
+  // Solo tipo "cobro_intereses_mora": datos para el cálculo exacto de intereses.
+  const [montoAdeudado, setMontoAdeudado] = useState('');
+  const [fechaVencimiento, setFechaVencimiento] = useState('');
+  const [sigueImpago, setSigueImpago] = useState(true);
+  const [fechaPago, setFechaPago] = useState('');
+  const [calculoMora, setCalculoMora] = useState<any>(null);
+  // Tasas que el cliente indica a mano para meses sin certificado CMF cargado (clave: mes, valor: % escrito).
+  const [tasasManual, setTasasManual] = useState<Record<string, string>>({});
 
   // Documentos de respaldo (contratos, notificaciones, reclamos previos)
   const [documentos, setDocumentos] = useState<{ id: string; nombre: string; tipo: string }[]>([]);
@@ -91,15 +102,28 @@ export default function Abogado() {
     setEnviando(false);
   };
 
+  const esMora = tipoDoc === 'cobro_intereses_mora';
+  const faltanDatosMora = esMora && (!montoAdeudado || Number(montoAdeudado) <= 0 || !fechaVencimiento || (!sigueImpago && !fechaPago));
+  const puedeGenerar = esMora ? !faltanDatosMora : !!hechos.trim();
+
   const generarDocumento = async () => {
-    if (!hechos.trim() || generando) return;
-    setGenerando(true); setDocumento('');
+    if (!puedeGenerar || generando) return;
+    setGenerando(true); setDocumento(''); setCalculoMora(null);
+    // Para el cobro de mora, los hechos los arman los propios campos (monto/fechas);
+    // lo que el usuario escriba en "Hechos" se agrega como contexto adicional.
+    const hechosFinal = esMora
+      ? `Se adeuda ${fmtCLP(Number(montoAdeudado))}, que debía pagarse el ${fechaVencimiento}. ${sigueImpago ? 'A la fecha sigue sin pagarse.' : `Se pagó el ${fechaPago || '(fecha no indicada)'}.`}${hechos.trim() ? ' ' + hechos.trim() : ''}`
+      : hechos;
     try {
       await pedir({
-        modo: 'documento', tipo_documento: tipoDoc, destinatario, codigo: codigo || undefined, hechos, peticion,
+        modo: 'documento', tipo_documento: tipoDoc, destinatario, codigo: codigo || undefined, hechos: hechosFinal, peticion,
         ciudad_fecha: new Date().toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' }),
         huella: 'abogado',
-      }, (t) => setDocumento(t));
+        ...(esMora ? {
+          monto_adeudado: Number(montoAdeudado), fecha_vencimiento: fechaVencimiento, fecha_pago: sigueImpago ? undefined : (fechaPago || undefined),
+          tasas_manual: Object.entries(tasasManual).filter(([, v]) => Number(v) > 0).map(([mes, v]) => ({ mes, tasa_anual: Number(v) })),
+        } : {}),
+      }, (t, meta) => { setDocumento(t); if (meta?.calculo_mora) setCalculoMora(meta.calculo_mora); });
     } catch (e: any) {
       toast.error(e.message, e.status === 402 ? { action: { label: 'Ver planes', onClick: () => navigate('/cuenta') } } : undefined);
     }
@@ -219,20 +243,90 @@ export default function Abogado() {
                   <Input value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="Ej: 2699-35-LE26" />
                 </div>
               </div>
+              {esMora && (
+                <div className="space-y-3 rounded-md border p-3 bg-muted/30">
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label>Monto adeudado (CLP)</Label>
+                      <Input type="number" min={1} value={montoAdeudado} onChange={(e) => setMontoAdeudado(e.target.value)} placeholder="Ej: 850000" />
+                    </div>
+                    <div>
+                      <Label>Fecha en que debía pagarse</Label>
+                      <Input type="date" value={fechaVencimiento} onChange={(e) => setFechaVencimiento(e.target.value)} />
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={sigueImpago} onChange={(e) => setSigueImpago(e.target.checked)} />
+                    A la fecha sigue sin pagarse
+                  </label>
+                  {!sigueImpago && (
+                    <div>
+                      <Label>Fecha en que le pagaron</Label>
+                      <Input type="date" value={fechaPago} onChange={(e) => setFechaPago(e.target.value)} />
+                    </div>
+                  )}
+                </div>
+              )}
               <div>
-                <Label>Hechos — cuéntame qué pasó</Label>
-                <Textarea value={hechos} onChange={(e) => setHechos(e.target.value)} rows={5} placeholder="Ej: Postulé a la licitación X, me declararon inadmisible el 12 de marzo por..." />
+                <Label>{esMora ? 'Detalles adicionales (opcional)' : 'Hechos — cuéntame qué pasó'}</Label>
+                <Textarea value={hechos} onChange={(e) => setHechos(e.target.value)} rows={esMora ? 2 : 5}
+                  placeholder={esMora ? 'Algo más que deba saber (ej: número de OC, contacto del organismo)' : 'Ej: Postulé a la licitación X, me declararon inadmisible el 12 de marzo por...'} />
               </div>
               <div>
                 <Label>Qué quieres pedir (opcional)</Label>
                 <Textarea value={peticion} onChange={(e) => setPeticion(e.target.value)} rows={2} placeholder="Ej: que reconsideren y admitan mi oferta" />
               </div>
-              <Button onClick={generarDocumento} disabled={generando || !hechos.trim()}>
+              <Button onClick={generarDocumento} disabled={generando || !puedeGenerar}>
                 {generando ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileText className="h-4 w-4 mr-2" />}
                 Generar documento
               </Button>
             </CardContent>
           </Card>
+
+          {esMora && calculoMora && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Cálculo del interés</CardTitle></CardHeader>
+              <CardContent className="text-sm space-y-1">
+                <p>Capital adeudado: <strong>{fmtCLP(calculoMora.monto_adeudado)}</strong></p>
+                <p>Días de atraso: <strong>{calculoMora.dias_atraso}</strong></p>
+                {(calculoMora.detalle?.length ?? 0) > 1 && <p className="text-muted-foreground">La tasa de la CMF cambia cada mes, así que el atraso se partió por tramos:</p>}
+                <table className="w-full mt-1 text-xs">
+                  <tbody>
+                    {calculoMora.detalle?.map((t: any) => (
+                      <tr key={t.mes} className="border-b">
+                        <td className="py-1 pr-2">{t.mes}</td>
+                        <td className="py-1 pr-2">{t.dias} días</td>
+                        {t.tasa_anual != null ? (
+                          <>
+                            <td className="py-1 pr-2">{t.tasa_anual}% anual{t.origen === 'usuario' && <span className="text-yellow-700"> (indicada por ti, sin verificar)</span>}</td>
+                            <td className="py-1 text-right">{fmtCLP(t.interes)}</td>
+                          </>
+                        ) : (
+                          <td className="py-1" colSpan={2}>
+                            <div className="flex items-center gap-1">
+                              <span className="text-muted-foreground whitespace-nowrap">Sin tasa CMF —</span>
+                              <Input type="number" min={0} step="0.01" className="h-7 w-20 text-xs" placeholder="% anual"
+                                value={tasasManual[t.mes] ?? ''} onChange={(e) => setTasasManual((s) => ({ ...s, [t.mes]: e.target.value }))} />
+                              <span className="text-muted-foreground">% si la sabes</span>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!calculoMora.completo && (
+                  <Button size="sm" variant="outline" className="mt-2" onClick={generarDocumento} disabled={generando}>
+                    {generando ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}Recalcular con esas tasas
+                  </Button>
+                )}
+                <p className="pt-1">Interés {(calculoMora.detalle?.length ?? 0) > 1 ? 'total' : ''}: <strong>{fmtCLP(calculoMora.interes)}</strong></p>
+                <p className="text-base">Total a cobrar: <strong>{fmtCLP(calculoMora.total)}</strong></p>
+                {!calculoMora.completo && <p className="text-xs text-yellow-700">Faltan tasas por completar arriba — mientras tanto el documento pide el capital y deja el interés de esos meses pendiente.</p>}
+                <p className="text-xs text-muted-foreground pt-1">Verifica que las tasas sigan vigentes antes de presentar el cobro.</p>
+              </CardContent>
+            </Card>
+          )}
 
           {documento && (
             <Card>
