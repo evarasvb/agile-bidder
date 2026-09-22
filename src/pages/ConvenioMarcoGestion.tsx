@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ShieldCheck, Plus, Trash2, Search, Copy, Send, Tag, Building2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, Plus, Trash2, Search, Copy, Send, Tag, Building2, AlertTriangle, CheckCircle2, FileDown, ChevronDown, FileWarning, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -22,9 +22,11 @@ import {
   useCmMarcas, useCrearMarca, useEliminarMarca,
   useCmDistribuidores, useAgregarDistribuidor, useEliminarDistribuidor,
   useCmSolicitudes, useCrearSolicitud, useActualizarSolicitud, useEliminarSolicitud,
-  normalizarNombre, plantillaSolicitud,
-  type CmMarca, type CmSolicitud, type CmEstadoSolicitud,
+  useCmOrdenesProveedor, fetchOrdenesProveedor,
+  normalizarNombre, plantillaSolicitud, plantillaCartaAviso,
+  type CmMarca, type CmSolicitud, type CmEstadoSolicitud, type CmEtapa, type CmOrden,
 } from '@/hooks/useConvenioMarcoGestion';
+import { descargarCartaAviso, descargarCartasMasivas, type CartaAvisoData } from '@/services/convenioMarcoPdf';
 
 const ESTADO_LABEL: Record<CmEstadoSolicitud, string> = {
   borrador: 'Borrador',
@@ -37,6 +39,10 @@ const ESTADO_BADGE: Record<CmEstadoSolicitud, string> = {
   enviada: 'bg-blue-50 text-blue-700 border-blue-200',
   aceptada: 'bg-green-50 text-green-700 border-green-200',
   rechazada: 'bg-red-50 text-red-700 border-red-200',
+};
+const ETAPA_LABEL: Record<CmEtapa, string> = {
+  aviso: 'Carta de aviso',
+  baja: 'Solicitud de baja',
 };
 
 export default function ConvenioMarcoGestion() {
@@ -72,7 +78,7 @@ export default function ConvenioMarcoGestion() {
           <TabDetectar marcas={marcas} empresa={cliente?.empresa_nombre ?? null} />
         </TabsContent>
         <TabsContent value="solicitudes" className="mt-4">
-          <TabSolicitudes />
+          <TabSolicitudes empresa={cliente?.empresa_nombre ?? null} />
         </TabsContent>
       </Tabs>
     </div>
@@ -245,6 +251,8 @@ function TabDetectar({ marcas, empresa }: { marcas: CmMarca[]; empresa: string |
   const [marcaId, setMarcaId] = useState<string>('');
   const [termino, setTermino] = useState('');
   const [productoKey, setProductoKey] = useState<string | null>(null);
+  const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
+  const [ocupado, setOcupado] = useState<string | null>(null);
 
   const marca = marcas.find((m) => m.id === marcaId) || null;
   const { data: distribuidores = [] } = useCmDistribuidores(marcaId || null);
@@ -268,26 +276,82 @@ function TabDetectar({ marcas, empresa }: { marcas: CmMarca[]; empresa: string |
 
   const productoSel = productos.find((p) => p.producto_key === productoKey) || null;
 
-  const generarSolicitud = async (proveedorNombre: string) => {
+  const cartaData = (proveedor: string, rut: string | null, ordenes: CmOrden[]): CartaAvisoData => ({
+    empresa, marca: marca!.nombre, proveedor, rut,
+    texto: plantillaCartaAviso({ empresa, marca: marca!.nombre, proveedor }),
+    ordenes,
+  });
+
+  // Carta de aviso individual: descarga el PDF y registra la etapa "aviso".
+  const generarCarta = async (proveedor: string) => {
     if (!marca) return;
-    const texto = plantillaSolicitud({
-      empresa, marca: marca.nombre, proveedor: proveedorNombre, producto: productoSel?.producto ?? null,
-    });
+    setOcupado(proveedor);
     try {
+      const ordenes = await fetchOrdenesProveedor(proveedor, termino || marca.nombre);
+      descargarCartaAviso(cartaData(proveedor, ordenes[0]?.rut_proveedor ?? null, ordenes));
       await crearSolicitud.mutateAsync({
-        marca_id: marca.id,
-        marca_nombre: marca.nombre,
-        proveedor_nombre: proveedorNombre,
-        producto: productoSel?.producto ?? null,
-        producto_key: productoKey,
-        motivo: 'No es distribuidor autorizado',
-        texto,
+        marca_id: marca.id, marca_nombre: marca.nombre, proveedor_nombre: proveedor,
+        proveedor_rut: ordenes[0]?.rut_proveedor ?? null,
+        producto: productoSel?.producto ?? null, producto_key: productoKey,
+        motivo: 'No es distribuidor autorizado', etapa: 'aviso',
+        texto: plantillaCartaAviso({ empresa, marca: marca.nombre, proveedor }), ordenes,
       });
-      toast.success('Solicitud de baja creada (en la pestaña "Solicitudes de baja")');
+      toast.success('Carta de aviso descargada y registrada en "Solicitudes de baja"');
+    } catch (e) {
+      toast.error((e as Error).message || 'No se pudo generar la carta');
+    } finally { setOcupado(null); }
+  };
+
+  // Solicitud de baja formal (segunda etapa).
+  const generarBaja = async (proveedor: string) => {
+    if (!marca) return;
+    setOcupado(proveedor);
+    try {
+      const ordenes = await fetchOrdenesProveedor(proveedor, termino || marca.nombre);
+      await crearSolicitud.mutateAsync({
+        marca_id: marca.id, marca_nombre: marca.nombre, proveedor_nombre: proveedor,
+        proveedor_rut: ordenes[0]?.rut_proveedor ?? null,
+        producto: productoSel?.producto ?? null, producto_key: productoKey,
+        motivo: 'No es distribuidor autorizado', etapa: 'baja',
+        texto: plantillaSolicitud({ empresa, marca: marca.nombre, proveedor, producto: productoSel?.producto ?? null }),
+        ordenes,
+      });
+      toast.success('Solicitud de baja creada en "Solicitudes de baja"');
     } catch (e) {
       toast.error((e as Error).message || 'No se pudo crear la solicitud');
-    }
+    } finally { setOcupado(null); }
   };
+
+  // Envío masivo: una carta por proveedor seleccionado, en un solo PDF.
+  const generarMasivas = async () => {
+    if (!marca || seleccionados.size === 0) return;
+    setOcupado('__bulk__');
+    try {
+      const cartas: CartaAvisoData[] = [];
+      for (const proveedor of seleccionados) {
+        const ordenes = await fetchOrdenesProveedor(proveedor, termino || marca.nombre);
+        cartas.push(cartaData(proveedor, ordenes[0]?.rut_proveedor ?? null, ordenes));
+        await crearSolicitud.mutateAsync({
+          marca_id: marca.id, marca_nombre: marca.nombre, proveedor_nombre: proveedor,
+          proveedor_rut: ordenes[0]?.rut_proveedor ?? null,
+          producto: productoSel?.producto ?? null, producto_key: productoKey,
+          motivo: 'No es distribuidor autorizado', etapa: 'aviso',
+          texto: plantillaCartaAviso({ empresa, marca: marca.nombre, proveedor }), ordenes,
+        });
+      }
+      descargarCartasMasivas(cartas, marca.nombre);
+      toast.success(`${cartas.length} cartas descargadas y registradas`);
+      setSeleccionados(new Set());
+    } catch (e) {
+      toast.error((e as Error).message || 'No se pudieron generar las cartas');
+    } finally { setOcupado(null); }
+  };
+
+  const toggleSel = (proveedor: string) => setSeleccionados((prev) => {
+    const next = new Set(prev);
+    if (next.has(proveedor)) next.delete(proveedor); else next.add(proveedor);
+    return next;
+  });
 
   if (marcas.length === 0) {
     return <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">
@@ -330,7 +394,7 @@ function TabDetectar({ marcas, empresa }: { marcas: CmMarca[]; empresa: string |
             ) : (
               <div className="flex flex-wrap gap-2">
                 {productos.slice(0, 20).map((p) => (
-                  <button key={p.producto_key} onClick={() => setProductoKey(p.producto_key)}
+                  <button key={p.producto_key} onClick={() => { setProductoKey(p.producto_key); setSeleccionados(new Set()); }}
                     className={`rounded-full border px-3 py-1 text-xs transition ${productoKey === p.producto_key ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:bg-muted'}`}>
                     {p.producto} <span className="text-muted-foreground">({p.proveedores})</span>
                   </button>
@@ -347,44 +411,38 @@ function TabDetectar({ marcas, empresa }: { marcas: CmMarca[]; empresa: string |
             <CardTitle className="text-sm">Proveedores que venden este producto</CardTitle>
             <CardDescription>
               Los marcados como <span className="font-medium text-red-600">No autorizado</span> no están en tu lista de
-              distribuidores de {marca?.nombre}. Puedes generar una solicitud de baja.
+              distribuidores de {marca?.nombre}. Puedes ver sus órdenes de compra, generar una carta de aviso o la solicitud de baja.
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {seleccionados.size > 0 && (
+              <div className="mb-3 flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
+                <span className="text-sm font-medium">{seleccionados.size} proveedor(es) seleccionado(s)</span>
+                <Button size="sm" onClick={generarMasivas} disabled={ocupado === '__bulk__'}>
+                  <FileDown className="mr-1 h-4 w-4" /> Generar cartas ({seleccionados.size})
+                </Button>
+              </div>
+            )}
             {cargandoDetalle ? (
               <p className="text-sm text-muted-foreground">Cargando…</p>
             ) : (detalle?.proveedores?.length ?? 0) === 0 ? (
               <p className="text-sm text-muted-foreground">Sin proveedores para este producto.</p>
             ) : (
               <ul className="divide-y">
-                {detalle!.proveedores.map((pr) => {
-                  const autorizado = autorizadosSet.has(normalizarNombre(pr.proveedor));
-                  return (
-                    <li key={pr.proveedor} className="flex items-center justify-between gap-3 py-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{pr.proveedor}</p>
-                        <p className="text-xs text-muted-foreground">{pr.lineas} líneas</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {autorizado ? (
-                          <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
-                            <CheckCircle2 className="mr-1 h-3 w-3" /> Autorizado
-                          </Badge>
-                        ) : (
-                          <>
-                            <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700">
-                              <AlertTriangle className="mr-1 h-3 w-3" /> No autorizado
-                            </Badge>
-                            <Button size="sm" variant="outline" onClick={() => generarSolicitud(pr.proveedor)}
-                              disabled={crearSolicitud.isPending}>
-                              Solicitar baja
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
+                {detalle!.proveedores.map((pr) => (
+                  <FilaProveedor
+                    key={pr.proveedor}
+                    proveedor={pr.proveedor}
+                    lineas={pr.lineas}
+                    autorizado={autorizadosSet.has(normalizarNombre(pr.proveedor))}
+                    termino={termino || marca?.nombre || ''}
+                    seleccionado={seleccionados.has(pr.proveedor)}
+                    ocupado={ocupado === pr.proveedor}
+                    onToggle={() => toggleSel(pr.proveedor)}
+                    onCarta={() => generarCarta(pr.proveedor)}
+                    onBaja={() => generarBaja(pr.proveedor)}
+                  />
+                ))}
               </ul>
             )}
           </CardContent>
@@ -394,8 +452,92 @@ function TabDetectar({ marcas, empresa }: { marcas: CmMarca[]; empresa: string |
   );
 }
 
+function fmtCLP(v: number | null): string {
+  return v == null ? '-' : '$' + Math.round(v).toLocaleString('es-CL');
+}
+
+function FilaProveedor({ proveedor, lineas, autorizado, termino, seleccionado, ocupado, onToggle, onCarta, onBaja }: {
+  proveedor: string; lineas: number; autorizado: boolean; termino: string;
+  seleccionado: boolean; ocupado: boolean;
+  onToggle: () => void; onCarta: () => void; onBaja: () => void;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const { data: ordenes = [], isFetching } = useCmOrdenesProveedor(proveedor, termino, abierto);
+
+  return (
+    <li className="py-2">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          {!autorizado && (
+            <input type="checkbox" checked={seleccionado} onChange={onToggle}
+              className="h-4 w-4 rounded border-input" aria-label={`Seleccionar ${proveedor}`} />
+          )}
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium">{proveedor}</p>
+            <button onClick={() => setAbierto((v) => !v)} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+              <ChevronDown className={`h-3 w-3 transition ${abierto ? 'rotate-180' : ''}`} /> {lineas} líneas · ver órdenes
+            </button>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {autorizado ? (
+            <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
+              <CheckCircle2 className="mr-1 h-3 w-3" /> Autorizado
+            </Badge>
+          ) : (
+            <>
+              <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700">
+                <AlertTriangle className="mr-1 h-3 w-3" /> No autorizado
+              </Badge>
+              <Button size="sm" variant="outline" onClick={onCarta} disabled={ocupado}>
+                <FileWarning className="mr-1 h-4 w-4" /> Carta de aviso
+              </Button>
+              <Button size="sm" variant="outline" onClick={onBaja} disabled={ocupado}>
+                Solicitar baja
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+      {abierto && (
+        <div className="mt-2 rounded-md bg-muted/40 p-2">
+          {isFetching ? (
+            <p className="text-xs text-muted-foreground">Cargando órdenes…</p>
+          ) : ordenes.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Sin órdenes de compra para este proveedor y palabra clave.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="text-muted-foreground">
+                  <tr>
+                    <th className="py-1 pr-3">Fecha</th><th className="py-1 pr-3">N° OC</th>
+                    <th className="py-1 pr-3">Organismo</th><th className="py-1 pr-3 text-right">Total</th><th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ordenes.map((o, i) => (
+                    <tr key={`${o.codigo}-${i}`} className="border-t border-border/50">
+                      <td className="py-1 pr-3 whitespace-nowrap">{o.fecha ? new Date(o.fecha).toLocaleDateString('es-CL') : '-'}</td>
+                      <td className="py-1 pr-3 font-medium">{o.codigo}</td>
+                      <td className="py-1 pr-3">{o.organismo ?? '-'}</td>
+                      <td className="py-1 pr-3 text-right">{fmtCLP(o.valor_total)}</td>
+                      <td className="py-1">
+                        {o.link && <a href={o.link} target="_blank" rel="noreferrer" className="text-primary hover:underline" aria-label="Abrir OC"><ExternalLink className="h-3.5 w-3.5" /></a>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
+
 // ======================= TAB 3: SOLICITUDES =================================
-function TabSolicitudes() {
+function TabSolicitudes({ empresa }: { empresa: string | null }) {
   const { data: solicitudes = [], isLoading } = useCmSolicitudes();
   const actualizar = useActualizarSolicitud();
   const eliminar = useEliminarSolicitud();
@@ -410,7 +552,7 @@ function TabSolicitudes() {
   return (
     <div className="space-y-3">
       {solicitudes.map((s) => (
-        <SolicitudCard key={s.id} s={s}
+        <SolicitudCard key={s.id} s={s} empresa={empresa}
           onEstado={async (estado) => {
             try { await actualizar.mutateAsync({ id: s.id, estado }); toast.success('Estado actualizado'); }
             catch (e) { toast.error((e as Error).message); }
@@ -418,6 +560,13 @@ function TabSolicitudes() {
           onGuardarTexto={async (texto) => {
             try { await actualizar.mutateAsync({ id: s.id, texto }); toast.success('Texto guardado'); }
             catch (e) { toast.error((e as Error).message); }
+          }}
+          onEscalar={async () => {
+            try {
+              const texto = plantillaSolicitud({ empresa, marca: s.marca_nombre ?? '', proveedor: s.proveedor_nombre, producto: s.producto });
+              await actualizar.mutateAsync({ id: s.id, etapa: 'baja', texto });
+              toast.success('Escalado a solicitud de baja');
+            } catch (e) { toast.error((e as Error).message); }
           }}
           onEliminar={async () => {
             try { await eliminar.mutateAsync(s.id); toast.success('Solicitud eliminada'); }
@@ -429,10 +578,12 @@ function TabSolicitudes() {
   );
 }
 
-function SolicitudCard({ s, onEstado, onGuardarTexto, onEliminar }: {
+function SolicitudCard({ s, empresa, onEstado, onGuardarTexto, onEscalar, onEliminar }: {
   s: CmSolicitud;
+  empresa: string | null;
   onEstado: (e: CmEstadoSolicitud) => void;
   onGuardarTexto: (t: string) => void;
+  onEscalar: () => void;
   onEliminar: () => void;
 }) {
   const [texto, setTexto] = useState(s.texto ?? '');
@@ -443,17 +594,26 @@ function SolicitudCard({ s, onEstado, onGuardarTexto, onEliminar }: {
     catch { toast.error('No se pudo copiar'); }
   };
 
+  const descargarPdf = () => {
+    descargarCartaAviso({
+      empresa, marca: s.marca_nombre ?? '', proveedor: s.proveedor_nombre,
+      rut: s.proveedor_rut, texto: s.texto ?? '', ordenes: s.ordenes ?? [],
+    });
+  };
+
   return (
     <Card>
       <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Building2 className="h-4 w-4 text-muted-foreground" />
             <p className="truncate font-medium">{s.proveedor_nombre}</p>
+            <Badge variant="outline" className="border-primary/30 bg-primary/5 text-primary">{ETAPA_LABEL[s.etapa]}</Badge>
             <Badge variant="outline" className={ESTADO_BADGE[s.estado]}>{ESTADO_LABEL[s.estado]}</Badge>
           </div>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Marca: {s.marca_nombre ?? '—'}{s.producto ? ` · Producto: ${s.producto}` : ''}
+            {s.ordenes?.length ? ` · ${s.ordenes.length} OC` : ''}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -465,13 +625,22 @@ function SolicitudCard({ s, onEstado, onGuardarTexto, onEliminar }: {
             </SelectContent>
           </Select>
 
+          {s.etapa === 'aviso' && (
+            <>
+              <Button size="sm" variant="outline" onClick={descargarPdf}>
+                <FileDown className="mr-1 h-4 w-4" /> PDF
+              </Button>
+              <Button size="sm" variant="outline" onClick={onEscalar}>Escalar a baja</Button>
+            </>
+          )}
+
           <Dialog open={abierto} onOpenChange={setAbierto}>
             <DialogTrigger asChild>
               <Button size="sm" variant="outline"><Send className="mr-1 h-4 w-4" /> Ver texto</Button>
             </DialogTrigger>
             <DialogContent className="max-w-lg">
               <DialogHeader>
-                <DialogTitle>Solicitud de baja</DialogTitle>
+                <DialogTitle>{ETAPA_LABEL[s.etapa]}</DialogTitle>
                 <DialogDescription>Edita el texto y cópialo para enviarlo a ChileCompra o al proveedor.</DialogDescription>
               </DialogHeader>
               <Textarea value={texto} onChange={(e) => setTexto(e.target.value)} rows={12} className="font-mono text-xs" />

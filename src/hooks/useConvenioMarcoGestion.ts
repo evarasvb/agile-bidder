@@ -31,6 +31,19 @@ export interface CmDistribuidor {
 }
 
 export type CmEstadoSolicitud = 'borrador' | 'enviada' | 'aceptada' | 'rechazada';
+export type CmEtapa = 'aviso' | 'baja';
+
+export interface CmOrden {
+  codigo: string;
+  organismo: string | null;
+  fecha: string | null;
+  producto: string | null;
+  cantidad: number | null;
+  precio_unitario: number | null;
+  valor_total: number | null;
+  link: string | null;
+  rut_proveedor: string | null;
+}
 
 export interface CmSolicitud {
   id: string;
@@ -42,8 +55,10 @@ export interface CmSolicitud {
   producto: string | null;
   producto_key: string | null;
   motivo: string | null;
+  etapa: CmEtapa;
   estado: CmEstadoSolicitud;
   texto: string | null;
+  ordenes: CmOrden[];
   fecha_envio: string | null;
   created_at: string;
   updated_at: string;
@@ -193,6 +208,8 @@ export function useCrearSolicitud() {
       producto_key?: string | null;
       motivo?: string | null;
       texto?: string | null;
+      etapa?: CmEtapa;
+      ordenes?: CmOrden[];
     }) => {
       if (!cliente?.id) throw new Error('No hay cliente activo');
       const { error } = await sb.from('cm_solicitudes').insert({
@@ -205,6 +222,8 @@ export function useCrearSolicitud() {
         producto_key: input.producto_key ?? null,
         motivo: input.motivo ?? null,
         texto: input.texto ?? null,
+        etapa: input.etapa ?? 'aviso',
+        ordenes: input.ordenes ?? [],
         estado: 'borrador',
       });
       if (error) throw error;
@@ -216,14 +235,15 @@ export function useCrearSolicitud() {
 export function useActualizarSolicitud() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { id: string; estado?: CmEstadoSolicitud; texto?: string | null }) => {
-      const { id, estado, texto } = input;
+    mutationFn: async (input: { id: string; estado?: CmEstadoSolicitud; texto?: string | null; etapa?: CmEtapa }) => {
+      const { id, estado, texto, etapa } = input;
       const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
       if (estado !== undefined) {
         patch.estado = estado;
         patch.fecha_envio = estado === 'enviada' ? new Date().toISOString() : null;
       }
       if (texto !== undefined) patch.texto = texto;
+      if (etapa !== undefined) patch.etapa = etapa;
       const { error } = await sb.from('cm_solicitudes').update(patch).eq('id', id);
       if (error) throw error;
     },
@@ -239,6 +259,28 @@ export function useEliminarSolicitud() {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['cm-solicitudes'] }),
+  });
+}
+
+// ----- Órdenes de compra del proveedor (evidencia) --------------------------
+// Trae las OCs donde el proveedor vendió productos que calzan con la marca.
+// Misma fuente que la detección (RPC security-definer sobre ordenes_compra).
+export async function fetchOrdenesProveedor(
+  proveedor: string, termino: string | null, tipo = 'convenio_marco', limite = 50,
+): Promise<CmOrden[]> {
+  const { data, error } = await supabase.rpc('cm_ordenes_proveedor' as never, {
+    p_proveedor: proveedor, p_termino: termino, p_tipo: tipo, limite,
+  } as never);
+  if (error) throw error;
+  return (data ?? []) as CmOrden[];
+}
+
+export function useCmOrdenesProveedor(proveedor: string | null, termino: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ['cm-ordenes-proveedor', proveedor, termino],
+    enabled: enabled && !!proveedor,
+    queryFn: () => fetchOrdenesProveedor(proveedor!, termino),
+    staleTime: 60_000,
   });
 }
 
@@ -273,6 +315,42 @@ export function plantillaSolicitud(params: {
     `Quedamos atentos a los antecedentes adicionales que requieran para gestionar esta solicitud.`,
     ``,
     `Saludos cordiales,`,
+    empresa || '',
+  ].join('\n');
+}
+
+// Texto de la CARTA DE AVISO dirigida al proveedor (primer paso, antes de la
+// solicitud de baja ante ChileCompra).
+export function plantillaCartaAviso(params: {
+  empresa?: string | null;
+  marca: string;
+  proveedor: string;
+  fecha?: string;
+}): string {
+  const { empresa, marca, proveedor } = params;
+  const hoy = params.fecha || new Date().toLocaleDateString('es-CL');
+  return [
+    `${hoy}`,
+    ``,
+    `Señores`,
+    `${proveedor}`,
+    `Presente`,
+    ``,
+    `Ref.: Comercialización no autorizada de productos marca "${marca}" en Convenio Marco.`,
+    ``,
+    `Estimados:`,
+    ``,
+    `${empresa ? `${empresa}, ` : ''}en calidad de titular/representante de la marca "${marca}", ha detectado que su empresa ofrece y ha vendido productos de dicha marca a través del Catálogo de Convenio Marco de ChileCompra, sin ser distribuidor autorizado.`,
+    ``,
+    `A continuación se detallan las órdenes de compra que respaldan esta observación:`,
+    ``,
+    `[Ver detalle de órdenes de compra al pie de esta carta]`,
+    ``,
+    `Por lo anterior, solicitamos regularizar esta situación retirando dichos productos de sus fichas del catálogo dentro de un plazo de 10 días hábiles. De no mediar respuesta, nos reservamos el derecho de presentar la solicitud de baja formal ante ChileCompra y las acciones legales que correspondan.`,
+    ``,
+    `Quedamos atentos a su pronta respuesta.`,
+    ``,
+    `Atentamente,`,
     empresa || '',
   ].join('\n');
 }
