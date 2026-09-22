@@ -55,6 +55,18 @@ const TIPOS_DOC: Record<string, { titulo: string; guia: string }> = {
     titulo: "Carta formal (aclaración, objeción a bases, solicitud, respuesta a un organismo)",
     guia: "Carta profesional breve y directa: antecedentes del proceso, lo que se solicita o aclara, y el fundamento (legal o contractual) si corresponde. No es un recurso legal, es comunicación formal."
   },
+  carta_cobranza: {
+    titulo: "Carta de cobro de una factura impaga (a un organismo del Estado o a un cliente privado)",
+    guia: `Es una carta formal de cobro dirigida al deudor por una factura vencida e impaga. Estructura: identifica la factura (número, fecha de emisión y de recepción, monto), el bien o servicio entregado y su recepción conforme; indica los días de atraso respecto del plazo legal o pactado; requiere el pago dentro de un plazo breve (por ejemplo 5 días hábiles) e indica los medios de pago; y advierte, de forma profesional y sin amenazar, las consecuencias del no pago.
+FUNDAMENTO LEGAL que puedes invocar como marco (es correcto en Chile; cítalo por su nombre y número aunque no aparezca en las FUENTES): (a) Ley 21.131 sobre pago a treinta días: las facturas deben pagarse en un máximo de 30 días corridos desde su recepción, salvo acuerdo en contrario dentro de los márgenes legales, y su atraso hace correr intereses moratorios y una comisión fija por recuperación de costos de cobranza; (b) Ley 19.983: la copia cedible de la factura, recibida y no reclamada dentro de 8 días corridos, tiene mérito ejecutivo, esto es, permite iniciar un juicio ejecutivo de cobro; (c) si el deudor es un organismo del Estado, rige además el deber de pago oportuno de la Ley 19.886 y el proveedor puede reclamar el no pago ante la propia institución, ChileCompra (gestión de pago / ProntoPago) y la Contraloría General de la República.
+Tono firme pero cordial: es el primer requerimiento formal y busca cobrar sin romper la relación comercial. No inventes montos de interés exactos: si no se entregan, refiérete a "los intereses y la comisión que la ley establece". Máximo 500 palabras.`
+  },
+  requerimiento_pago: {
+    titulo: "Requerimiento pre-judicial de pago (última gestión formal antes de demandar)",
+    guia: `Es el requerimiento FORMAL Y FINAL de pago antes de ejercer acciones judiciales de cobro. Estructura: identifica la factura y su recepción conforme; expone el atraso y el monto adeudado; requiere el pago íntegro (capital más intereses y comisión legal) dentro de un plazo perentorio (por ejemplo 5 días hábiles); y advierte expresamente que, de no pagarse, se ejercerán las acciones legales de cobro que la ley franquea.
+FUNDAMENTO LEGAL (correcto en Chile; cítalo por nombre y número): (a) Ley 19.983: la copia cedible de la factura recibida y no reclamada dentro de 8 días corridos constituye título ejecutivo, habilitando la demanda ejecutiva de cobro; (b) Ley 21.131: pago a 30 días, con intereses moratorios y comisión por recuperación de costos de cobranza sobre el monto adeudado; (c) para deudores del Estado, el deber de pago oportuno de la Ley 19.886 y el reclamo ante ChileCompra y la Contraloría por el no pago.
+Deja claro que este es el último requerimiento amistoso antes de demandar. Tono formal y enérgico, sin insultos ni amenazas ilegítimas. No inventes montos de interés exactos: si no se entregan, refiérete a "los intereses y la comisión que la ley establece". Máximo 550 palabras.`
+  },
 };
 
 const SYS_CHAT = `Eres Don Evaristo Abogado, el asesor legal de FirmaVB, experto en Mercado Público / ChileCompra: Ley 19.886, Reglamento (Decreto 661/2024), dictámenes de Contraloría y jurisprudencia del Tribunal de Contratación Pública (TCP).
