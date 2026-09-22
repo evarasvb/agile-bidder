@@ -74,11 +74,20 @@ const COLUMNAS_CLIENTES: DataTableColumn<ClienteNuevo>[] = [
 // ordenar ascendente), no como vacío al final (así ordena esta tabla por defecto).
 const EPOCA = "1970-01-01T00:00:00Z";
 
-function EstadoActividad({ ultima }: { ultima: string | null }) {
-  if (!ultima) return <Badge variant="destructive" className="text-[10px]">nunca</Badge>;
+// Mismos umbrales para la insignia en pantalla y para el CSV exportado.
+function claseActividad(ultima: string | null): "nunca" | "activo" | "poco activo" | "inactivo" {
+  if (!ultima) return "nunca";
   const dias = (Date.now() - new Date(ultima).getTime()) / 86_400_000;
-  if (dias <= 7) return <Badge className="bg-green-100 text-green-700 hover:bg-green-100 text-[10px]">activo</Badge>;
-  if (dias <= 30) return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 text-[10px]">poco activo</Badge>;
+  if (dias <= 7) return "activo";
+  if (dias <= 30) return "poco activo";
+  return "inactivo";
+}
+
+function EstadoActividad({ ultima }: { ultima: string | null }) {
+  const clase = claseActividad(ultima);
+  if (clase === "nunca") return <Badge variant="destructive" className="text-[10px]">nunca</Badge>;
+  if (clase === "activo") return <Badge className="bg-green-100 text-green-700 hover:bg-green-100 text-[10px]">activo</Badge>;
+  if (clase === "poco activo") return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 text-[10px]">poco activo</Badge>;
   return <Badge variant="secondary" className="text-[10px]">inactivo</Badge>;
 }
 
@@ -100,7 +109,7 @@ const COLUMNAS_ACTIVIDAD: DataTableColumn<ClienteNuevo>[] = [
     header: "Actividad",
     cell: (c) => <EstadoActividad ultima={c.last_sign_in_at} />,
     sortValue: (c) => c.last_sign_in_at ?? EPOCA,
-    exportValue: (c) => (c.last_sign_in_at ? "activo" : "nunca"),
+    exportValue: (c) => claseActividad(c.last_sign_in_at),
   },
   {
     id: "conexion",

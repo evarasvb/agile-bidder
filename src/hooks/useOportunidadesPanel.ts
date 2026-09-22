@@ -647,6 +647,8 @@ export function useOportunidadDetalle(id: string | null, tipo: 'compra_agil' | '
             .from('conducta_pago')
             .select('*')
             .eq('rut_institucion', institucion.rut)
+            .order('created_at', { ascending: false })
+            .limit(1)
             .maybeSingle();
           if (pago) {
             scorePago = pago.porcentaje_morosidad != null ? Math.round(100 - pago.porcentaje_morosidad) : null;
@@ -754,6 +756,8 @@ export function useOportunidadDetalle(id: string | null, tipo: 'compra_agil' | '
           .from('conducta_pago')
           .select('*')
           .eq('rut_institucion', institucion.rut)
+          .order('created_at', { ascending: false })
+          .limit(1)
           .maybeSingle();
         if (pago) {
           scorePago = pago.porcentaje_morosidad != null ? Math.round(100 - pago.porcentaje_morosidad) : null;

@@ -56,7 +56,11 @@ export function useCampanasResumen() {
 // inventario y ofertas, para saber quién usa el sistema y quién no.
 export function useClientesActividad() {
   return useQuery({
+    // Sin tope práctico: la RPC ordena por última conexión ascendente y, si se
+    // truncara con un límite bajo, un negocio con más clientes que ese límite
+    // perdería justo a los que sí se conectaron hace poco (quedarían fuera del
+    // corte). 20000 es "todos" para cualquier escala realista de este negocio.
     queryKey: ['admin_clientes_actividad'],
-    queryFn: async () => ((await supabase.rpc('admin_clientes_actividad', { lim: 500 })).data ?? []) as ClienteNuevo[],
+    queryFn: async () => ((await supabase.rpc('admin_clientes_actividad', { lim: 20000 })).data ?? []) as ClienteNuevo[],
   });
 }
