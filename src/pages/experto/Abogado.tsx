@@ -284,10 +284,28 @@ export default function Abogado() {
               <CardContent className="text-sm space-y-1">
                 <p>Capital adeudado: <strong>{fmtCLP(calculoMora.monto_adeudado)}</strong></p>
                 <p>Días de atraso: <strong>{calculoMora.dias_atraso}</strong></p>
-                <p>Tasa de interés corriente anual aplicada: <strong>{calculoMora.tasa_anual}%</strong> (CMF, vigente en {calculoMora.mes_tasa})</p>
-                <p>Interés: <strong>{fmtCLP(calculoMora.interes)}</strong></p>
+                {(calculoMora.detalle?.length ?? 0) > 1 ? (
+                  <div className="pt-1">
+                    <p className="text-muted-foreground">La tasa de la CMF cambia cada mes, así que el atraso se partió por tramos:</p>
+                    <table className="w-full mt-1 text-xs">
+                      <tbody>
+                        {calculoMora.detalle.map((t: any) => (
+                          <tr key={t.mes} className="border-b">
+                            <td className="py-1 pr-2">{t.mes}</td>
+                            <td className="py-1 pr-2">{t.dias} días</td>
+                            <td className="py-1 pr-2">{t.tasa_anual}% anual</td>
+                            <td className="py-1 text-right">{fmtCLP(t.interes)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p>Tasa de interés corriente anual aplicada: <strong>{calculoMora.detalle?.[0]?.tasa_anual}%</strong> (CMF, vigente desde {calculoMora.detalle?.[0]?.mes_tasa})</p>
+                )}
+                <p>Interés {(calculoMora.detalle?.length ?? 0) > 1 ? 'total' : ''}: <strong>{fmtCLP(calculoMora.interes)}</strong></p>
                 <p className="text-base">Total a cobrar: <strong>{fmtCLP(calculoMora.total)}</strong></p>
-                <p className="text-xs text-muted-foreground pt-1">Verifica que la tasa siga vigente antes de presentar el cobro.</p>
+                <p className="text-xs text-muted-foreground pt-1">Verifica que las tasas sigan vigentes antes de presentar el cobro.</p>
               </CardContent>
             </Card>
           )}

@@ -183,17 +183,20 @@ Deno.serve(async (req) => {
       partes.push(`DATOS DEL DOCUMENTO A REDACTAR:\nDestinatario/institución: ${destinatario || "[completar: destinatario]"}\nCiudad y fecha: ${ciudadFecha || "[completar: fecha]"}\nHECHOS que cuenta el usuario:\n${hechos}\n${peticion ? "Lo que pide el usuario: " + peticion : ""}`);
     }
     if (tipoDocumento === "cobro_intereses_mora") {
-      if (montoAdeudado && fechaVencimiento && res.calculo?.tasa_anual != null) {
+      if (montoAdeudado && fechaVencimiento && res.calculo?.completo) {
         const c = res.calculo;
-        partes.push(`CÁLCULO DE INTERESES POR MORA (determinístico — cita estos números EXACTOS, no los recalcules ni los redondees distinto):
+        const tramos: any[] = c.detalle ?? [];
+        const desgloseTramos = tramos.map((t) => `- ${t.mes} (${t.dias} días a ${t.tasa_anual}% anual, CMF vigente desde ${t.mes_tasa}): $${Number(t.interes).toLocaleString("es-CL")}`).join("\n");
+        partes.push(`CÁLCULO DE INTERESES POR MORA (determinístico — cita estos números EXACTOS, no los recalcules ni los redondees distinto). La tasa de interés corriente la publica la CMF cada mes y puede cambiar de un mes a otro, así que el período se partió por mes calendario, cada tramo con la tasa vigente ese mes:
 Capital adeudado: $${Math.round(montoAdeudado).toLocaleString("es-CL")}
-Días de atraso: ${c.dias_atraso}
-Tasa de interés corriente anual (no reajustable, 90 días o más, según CMF vigente en ${c.mes_tasa}): ${c.tasa_anual}%
-Interés calculado (capital × tasa/100 × días/360): $${Number(c.interes).toLocaleString("es-CL")}
+Días de atraso totales: ${c.dias_atraso}
+Tramos por mes:
+${desgloseTramos}
+Interés total (suma de los tramos): $${Number(c.interes).toLocaleString("es-CL")}
 Total a cobrar (capital + interés): $${Number(c.total).toLocaleString("es-CL")}
-Advertencia obligatoria a incluir en el documento: verificar que la tasa siga vigente antes de presentar el cobro.`);
+Si hay más de un tramo, menciona en el documento que el interés se calculó por tramos mensuales según la tasa vigente en cada uno (no apliques una sola tasa a todo el período). Advertencia obligatoria a incluir en el documento: verificar que las tasas sigan vigentes antes de presentar el cobro.`);
       } else if (montoAdeudado && fechaVencimiento) {
-        partes.push("CÁLCULO DE INTERESES POR MORA: no tengo cargada la tasa de interés corriente de la CMF para ese mes/monto todavía. No inventes una tasa ni un monto de interés: redacta el documento pidiendo el pago del capital adeudado y deja el cálculo del interés pendiente de completar, indicando que se agregará con la tasa vigente.");
+        partes.push("CÁLCULO DE INTERESES POR MORA: no tengo cargada la tasa de interés corriente de la CMF para todos los meses que cubre este atraso (puede ser que aún no cargue meses anteriores). No inventes una tasa ni un monto de interés: redacta el documento pidiendo el pago del capital adeudado y deja el cálculo del interés pendiente de completar, indicando que se agregará con la tasa vigente de cada mes.");
       } else {
         partes.push("CÁLCULO DE INTERESES POR MORA: faltan el monto adeudado o la fecha en que debía pagarse. No calcules nada: pide esos datos en el documento.");
       }
@@ -227,7 +230,7 @@ Advertencia obligatoria a incluir en el documento: verificar que la tasa siga vi
     let respuesta = "";
     const stream = new ReadableStream({
       async start(ctrl) {
-        ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ meta: { modelo, fuentes: fuentesMeta, codigo, uso: u, tipo_documento: modo === "documento" ? tipoDocumento : undefined, calculo_mora: tipoDocumento === "cobro_intereses_mora" ? (res.calculo?.tasa_anual != null ? { ...res.calculo, monto_adeudado: montoAdeudado } : null) : undefined } })}\n\n`));
+        ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ meta: { modelo, fuentes: fuentesMeta, codigo, uso: u, tipo_documento: modo === "documento" ? tipoDocumento : undefined, calculo_mora: tipoDocumento === "cobro_intereses_mora" ? (res.calculo?.completo ? { ...res.calculo, monto_adeudado: montoAdeudado } : null) : undefined } })}\n\n`));
         const reader = upstream!.body!.getReader(); let buf = "";
         try {
           while (true) {
