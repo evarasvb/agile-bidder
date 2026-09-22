@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -94,6 +95,7 @@ export default function CalendarioIntegrado() {
   const calendarRef = useRef<FullCalendar>(null);
   const { events, isLoading, error, createEvent, deleteEvent } = useCalendarioIntegrado();
   const deletePipelineItem = useDeletePipelineItem();
+  const queryClient = useQueryClient();
 
   // Filters
   const [activeFilters, setActiveFilters] = useState<Set<FilterKey>>(
@@ -215,6 +217,7 @@ export default function CalendarioIntegrado() {
     const rawId = selectedEvent.id.replace(/^pipe-/, "");
     deletePipelineItem.mutate(rawId, {
       onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["calendario-integrado"] });
         toast.success("Negocio quitado del calendario");
         setSelectedEvent(null);
       },

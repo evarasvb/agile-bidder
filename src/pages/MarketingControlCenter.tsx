@@ -136,7 +136,7 @@ export default function MarketingControlCenter() {
   // Piezas de la campaña que se está EDITANDO, que puede ser distinta de la
   // seleccionada (se puede editar una tarjeta sin haberla seleccionado antes).
   const {
-    piezas: piezasEditando, createPiezaAsync, creandoPieza,
+    piezas: piezasEditando, isLoading: piezasEditandoLoading, createPiezaAsync, creandoPieza,
     updatePiezaAsync: actualizarPiezaEditando, deletePiezaAsync, eliminandoPieza,
   } = useCampaignPiezas(campanaEditando?.id || '');
   const { metricas, totalEnviados, totalConversiones, promTasaApertura } = useCampaignMetricas(selectedCampaignId || '');
@@ -625,6 +625,7 @@ export default function MarketingControlCenter() {
         onEliminarPieza={deletePiezaAsync}
         guardando={actualizandoCampaign}
         procesandoPiezas={creandoPieza || eliminandoPieza}
+        piezasLoading={piezasEditandoLoading}
       />
 
       <AlertDialog open={!!campanaBorrando} onOpenChange={(open) => !open && !eliminandoCampaign && setCampanaBorrando(null)}>

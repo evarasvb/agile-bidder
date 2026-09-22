@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,11 +45,12 @@ interface EditarCampanaDialogProps {
   onEliminarPieza: (id: string) => Promise<unknown>;
   guardando: boolean;
   procesandoPiezas: boolean;
+  piezasLoading: boolean;
 }
 
 export function EditarCampanaDialog({
   campana, piezas, rubros, categorias, suscripciones, onOpenChange, onGuardar,
-  onCrearPieza, onActualizarPieza, onEliminarPieza, guardando, procesandoPiezas,
+  onCrearPieza, onActualizarPieza, onEliminarPieza, guardando, procesandoPiezas, piezasLoading,
 }: EditarCampanaDialogProps) {
   const [nombre, setNombre] = useState('');
   const [objetivo, setObjetivo] = useState('');
@@ -59,6 +60,11 @@ export function EditarCampanaDialog({
   const [audienciaCategoria, setAudienciaCategoria] = useState(TODAS);
   const [audienciaSuscripcion, setAudienciaSuscripcion] = useState(TODAS);
   const [canalesElegidos, setCanalesElegidos] = useState<Set<CanalTipo>>(new Set());
+  // Qué campaña ya tiene sus canales sincronizados desde `piezas`. Evita que,
+  // si `piezas` todavía no cargó (array vacío) cuando se abre el diálogo,
+  // se pise canalesElegidos con un set vacío y luego "guardar" borre piezas
+  // reales por creer que el usuario las destildó.
+  const canalesSincronizadosDe = useRef<string | null>(null);
 
   useEffect(() => {
     if (campana) {
@@ -69,13 +75,19 @@ export function EditarCampanaDialog({
       setAudienciaRubro(campana.audiencia_rubro || TODAS);
       setAudienciaCategoria(campana.audiencia_categoria || TODAS);
       setAudienciaSuscripcion(campana.audiencia_suscripcion || TODAS);
-      setCanalesElegidos(new Set(piezas.map((p) => p.canal as CanalTipo).filter((c) => CANALES.some((x) => x.id === c))));
+      if (canalesSincronizadosDe.current !== campana.id) canalesSincronizadosDe.current = null;
     }
-    // Los canales solo se sincronizan al abrir (piezas cambia todo el tiempo
-    // por invalidaciones de React Query; no queremos pisar lo que el usuario
-    // recién marcó mientras el diálogo sigue abierto).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campana]);
+
+  useEffect(() => {
+    if (!campana || piezasLoading) return;
+    if (canalesSincronizadosDe.current === campana.id) return;
+    setCanalesElegidos(new Set(piezas.map((p) => p.canal as CanalTipo).filter((c) => CANALES.some((x) => x.id === c))));
+    canalesSincronizadosDe.current = campana.id;
+    // Una vez sincronizado para esta campaña, no se vuelve a pisar aunque
+    // `piezas` cambie (invalidaciones de React Query mientras el usuario
+    // sigue editando el checklist).
+  }, [campana, piezasLoading, piezas]);
 
   const toggleCanal = (c: CanalTipo) => {
     setCanalesElegidos((prev) => {
@@ -87,6 +99,10 @@ export function EditarCampanaDialog({
 
   const guardar = async () => {
     if (!campana || !nombre.trim() || !objetivo.trim()) { toast.error('Nombre y objetivo son obligatorios'); return; }
+    if (piezasLoading || canalesSincronizadosDe.current !== campana.id) {
+      toast.error('Espera a que carguen las piezas de la campaña antes de guardar');
+      return;
+    }
     try {
       const nombreAnterior = campana.nombre;
       const nombreNuevo = nombre.trim();
@@ -144,7 +160,7 @@ export function EditarCampanaDialog({
     }
   };
 
-  const procesando = guardando || procesandoPiezas;
+  const procesando = guardando || procesandoPiezas || piezasLoading;
 
   return (
     <Dialog open={!!campana} onOpenChange={onOpenChange}>
