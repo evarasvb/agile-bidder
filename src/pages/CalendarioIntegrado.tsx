@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -63,6 +64,7 @@ import {
   type TipoEventoCalendario,
   type CreateEventInput,
 } from "@/hooks/useCalendarioIntegrado";
+import { useDeletePipelineItem } from "@/hooks/usePipeline";
 import { useNavigate } from "react-router-dom";
 
 // ── Color / type config ────────────────────────────────────────────
@@ -92,6 +94,8 @@ export default function CalendarioIntegrado() {
   const navigate = useNavigate();
   const calendarRef = useRef<FullCalendar>(null);
   const { events, isLoading, error, createEvent, deleteEvent } = useCalendarioIntegrado();
+  const deletePipelineItem = useDeletePipelineItem();
+  const queryClient = useQueryClient();
 
   // Filters
   const [activeFilters, setActiveFilters] = useState<Set<FilterKey>>(
@@ -202,6 +206,22 @@ export default function CalendarioIntegrado() {
         setSelectedEvent(null);
       },
       onError: () => toast.error("Error al eliminar el evento"),
+    });
+  };
+
+  // Quitar un negocio del pipeline (y por lo tanto del calendario): el
+  // cliente decide qué lleva al calendario agregándolo al pipeline, y si ya
+  // no le interesa lo saca desde acá mismo, sin ir al tablero.
+  const handleRemoveFromPipeline = () => {
+    if (!selectedEvent || selectedEvent.sourceType !== "pipeline") return;
+    const rawId = selectedEvent.id.replace(/^pipe-/, "");
+    deletePipelineItem.mutate(rawId, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["calendario-integrado"] });
+        toast.success("Negocio quitado del calendario");
+        setSelectedEvent(null);
+      },
+      onError: () => toast.error("No se pudo quitar el negocio"),
     });
   };
 
@@ -532,22 +552,48 @@ export default function CalendarioIntegrado() {
 
               {/* Actions */}
               {selectedEvent.sourceType === "pipeline" ? (
-                // El pipeline no guarda id de oportunidad, así que siempre
-                // llevamos al tablero (antes no aparecía ningún botón).
                 <>
                   <Separator />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => {
-                      navigate("/pipeline");
-                      setSelectedEvent(null);
-                    }}
-                  >
-                    <ExternalLink className="h-4 w-4 mr-1" />
-                    Ir al Pipeline
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        navigate("/pipeline");
+                        setSelectedEvent(null);
+                      }}
+                    >
+                      <ExternalLink className="h-4 w-4 mr-1" />
+                      Ir al Pipeline
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="sm" variant="destructive" disabled={deletePipelineItem.isPending}>
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Quitar
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>¿Quitar este negocio del calendario?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Se quitará «{selectedEvent.title}» de tu pipeline y dejará de aparecer en el
+                            calendario. Esta acción no se puede deshacer.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={handleRemoveFromPipeline}
+                          >
+                            Quitar
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 </>
               ) : selectedEvent.sourceType !== "custom" && selectedEvent.sourceId ? (
                 <>

@@ -133,10 +133,26 @@ export default function MarketingControlCenter() {
 
   const selectedCampaign = campaigns.find(c => c.id === selectedCampaignId);
   const { piezas, updatePiezaAsync, actualizandoPieza, ejecutarPieza, ejecutandoPieza } = useCampaignPiezas(selectedCampaignId || '');
+  // Piezas de la campaña que se está EDITANDO, que puede ser distinta de la
+  // seleccionada (se puede editar una tarjeta sin haberla seleccionado antes).
+  const {
+    piezas: piezasEditando, isLoading: piezasEditandoLoading, createPiezaAsync, creandoPieza,
+    updatePiezaAsync: actualizarPiezaEditando, deletePiezaAsync, eliminandoPieza,
+  } = useCampaignPiezas(campanaEditando?.id || '');
   const { metricas, totalEnviados, totalConversiones, promTasaApertura } = useCampaignMetricas(selectedCampaignId || '');
   const { ejecuciones: ejecucionesRecientes, isLoading: cargandoEjecuciones, isError: errorEjecuciones } = useMarketingEjecucionesRecientes();
 
   const audiencia = campaignAudience(contactosFiltrados, audienciaConfiable && !cargandoContactos && !errorContactos);
+  // Audiencia REAL de envío: la de la campaña seleccionada (su propio cluster
+  // guardado), no el filtro suelto de "Gestión de Contactos" — no todas las
+  // campañas son para todos.
+  const contactosDeCampana = (campana: MarketingCampaign | undefined) => !campana ? [] : contactos.filter(c =>
+    (!campana.audiencia_fuente || c.fuente_datos === campana.audiencia_fuente) &&
+    (!campana.audiencia_rubro || c.rubro === campana.audiencia_rubro) &&
+    (!campana.audiencia_categoria || c.categoria === campana.audiencia_categoria) &&
+    (!campana.audiencia_suscripcion || c.estado_suscripcion === campana.audiencia_suscripcion)
+  );
+  const audienciaCampana = campaignAudience(contactosDeCampana(selectedCampaign), audienciaConfiable && !cargandoContactos && !errorContactos);
   const piezaActual = piezaAbierta ? piezas.find(p => p.id === piezaAbierta.id) || null : null;
   const resultadoEnvio = piezaActual ? resultadosEnvio[piezaActual.id] : null;
   const handleExecutePieza = async (piezaId: string) => {
@@ -144,9 +160,9 @@ export default function MarketingControlCenter() {
     const pieza = piezas.find(p => p.id === piezaId);
     if (!pieza || pieza.canal !== 'email' || pieza.estado !== 'draft') return;
     const showResult = (message: string) => setResultadosEnvio(current => ({ ...current, [piezaId]: message }));
-    if (audiencia.error) { showResult(audiencia.error); return; }
-    const ids = [...audiencia.ids];
-    if (!window.confirm('¿Enviar «' + pieza.nombre + '» a los ' + ids.length + ' contactos suscritos del segmento de Gestión de Contactos? Se usará el contenido guardado. Esta acción enviará correos reales y no se puede deshacer.')) return;
+    if (audienciaCampana.error) { showResult(audienciaCampana.error); return; }
+    const ids = [...audienciaCampana.ids];
+    if (!window.confirm('¿Enviar «' + pieza.nombre + '» a los ' + ids.length + ' contactos suscritos del cluster de esta campaña? Se usará el contenido guardado. Esta acción enviará correos reales y no se puede deshacer.')) return;
     envioEnCurso.current = true;
     showResult('Enviando correos… Espera el resultado antes de intentar otro envío.');
     try {
@@ -190,7 +206,11 @@ export default function MarketingControlCenter() {
 
         {/* CAMPAIGNS TAB */}
         <TabsContent value="campaigns" className="space-y-4">
-          <p role="status" className="text-sm">{audiencia.error || `Audiencia seleccionada: ${audiencia.ids.length} contactos suscritos. Ajusta los filtros en Gestión de Contactos.`}</p>
+          <p role="status" className="text-sm">
+            {!selectedCampaign
+              ? 'Elige una campaña para ver su audiencia.'
+              : audienciaCampana.error || `«${selectedCampaign.nombre}» le llega a ${audienciaCampana.ids.length} contactos suscritos. Cambia el cluster desde Editar campaña.`}
+          </p>
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
             <h2 className="text-xl sm:text-2xl font-bold">Tus campañas</h2>
             <Button onClick={() => setShowNewCampaign(true)}>
@@ -287,7 +307,7 @@ export default function MarketingControlCenter() {
                         <Button
                           size="sm"
                           onClick={(e) => { e.stopPropagation(); handleExecutePieza(pieza.id); }}
-                          disabled={!!audiencia.error || !!bloqueados[pieza.id] || ejecutandoPieza || pieza.estado !== 'draft' || pieza.canal !== 'email'}
+                          disabled={!!audienciaCampana.error || !!bloqueados[pieza.id] || ejecutandoPieza || pieza.estado !== 'draft' || pieza.canal !== 'email'}
                         >
                           <Send className="w-3 h-3 mr-1" />
                           {ejecutandoPieza ? 'Enviando…' : pieza.estado === 'ejecutado' ? 'Ejecutado' : pieza.canal !== 'email' ? 'Manual' : 'Revisar envío'}
@@ -587,16 +607,25 @@ export default function MarketingControlCenter() {
         }}
         onEjecutar={handleExecutePieza}
         resultadoEnvio={resultadoEnvio}
-        bloqueoEnvio={audiencia.error || (piezaActual && bloqueados[piezaActual.id] ? "Este envío ya fue procesado o requiere revisión manual; no se repetirá." : null)}
+        bloqueoEnvio={audienciaCampana.error || (piezaActual && bloqueados[piezaActual.id] ? "Este envío ya fue procesado o requiere revisión manual; no se repetirá." : null)}
         guardando={actualizandoPieza}
         ejecutando={ejecutandoPieza}
       />
 
       <EditarCampanaDialog
         campana={campanaEditando}
+        piezas={piezasEditando}
+        rubros={rubros}
+        categorias={categorias}
+        suscripciones={suscripciones}
         onOpenChange={(open) => !open && setCampanaEditando(null)}
         onGuardar={(id, updates) => updateCampaignAsync({ id, ...updates })}
+        onCrearPieza={createPiezaAsync}
+        onActualizarPieza={({ id, ...updates }) => actualizarPiezaEditando({ id, ...updates })}
+        onEliminarPieza={deletePiezaAsync}
         guardando={actualizandoCampaign}
+        procesandoPiezas={creandoPieza || eliminandoPieza}
+        piezasLoading={piezasEditandoLoading}
       />
 
       <AlertDialog open={!!campanaBorrando} onOpenChange={(open) => !open && !eliminandoCampaign && setCampanaBorrando(null)}>
