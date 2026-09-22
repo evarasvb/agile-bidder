@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface TraccionResumen {
@@ -22,6 +22,16 @@ export interface ClienteNuevo {
   items_inventario: number;
   ofertas: number;
   last_sign_in_at: string | null;
+}
+
+// Actividad + gestión comercial (clientes_gestion vía admin_clientes_actividad).
+export interface ClienteActividad extends ClienteNuevo {
+  estado_gestion: string;
+  prioridad: number;
+  notas: string | null;
+  proxima_accion: string | null;
+  proxima_fecha: string | null;
+  etiquetas: string[] | null;
 }
 
 export interface CampanasResumen {
@@ -61,6 +71,39 @@ export function useClientesActividad() {
     // perdería justo a los que sí se conectaron hace poco (quedarían fuera del
     // corte). 20000 es "todos" para cualquier escala realista de este negocio.
     queryKey: ['admin_clientes_actividad'],
-    queryFn: async () => ((await supabase.rpc('admin_clientes_actividad', { lim: 20000 })).data ?? []) as ClienteNuevo[],
+    queryFn: async () => ((await supabase.rpc('admin_clientes_actividad', { lim: 20000 })).data ?? []) as ClienteActividad[],
+  });
+}
+
+export interface GuardarGestionInput {
+  cliente_id: string;
+  estado: string;
+  prioridad: number;
+  notas: string | null;
+  proxima_accion: string | null;
+  proxima_fecha: string | null;
+  etiquetas: string[] | null;
+}
+
+// Guarda el pipeline comercial de un cliente (estado, prioridad, notas,
+// próxima acción/fecha, etiquetas) desde la tabla de Actividad de Tracción.
+export function useGuardarClienteGestion() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: GuardarGestionInput) => {
+      const { error } = await supabase.rpc('admin_cliente_gestion_guardar', {
+        p_cliente_id: input.cliente_id,
+        p_estado: input.estado,
+        p_prioridad: input.prioridad,
+        p_notas: input.notas,
+        p_proxima_accion: input.proxima_accion,
+        p_proxima_fecha: input.proxima_fecha,
+        p_etiquetas: input.etiquetas,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin_clientes_actividad'] });
+    },
   });
 }
