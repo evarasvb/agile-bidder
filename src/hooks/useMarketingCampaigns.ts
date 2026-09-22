@@ -121,6 +121,9 @@ export function useCampaigns() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['marketing_campaigns'] });
+      // Las ejecuciones de la campaña borrada también se van en cascada; si no
+      // se invalida, la pestaña Ejecución sigue mostrando envíos ya eliminados.
+      queryClient.invalidateQueries({ queryKey: ['marketing_ejecucion_recientes'] });
     },
   });
 

@@ -599,7 +599,7 @@ export default function MarketingControlCenter() {
         guardando={actualizandoCampaign}
       />
 
-      <AlertDialog open={!!campanaBorrando} onOpenChange={(open) => !open && setCampanaBorrando(null)}>
+      <AlertDialog open={!!campanaBorrando} onOpenChange={(open) => !open && !eliminandoCampaign && setCampanaBorrando(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar campaña?</AlertDialogTitle>
@@ -608,7 +608,7 @@ export default function MarketingControlCenter() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={eliminandoCampaign}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={eliminandoCampaign}
