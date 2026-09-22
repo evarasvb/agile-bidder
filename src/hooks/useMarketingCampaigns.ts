@@ -18,6 +18,12 @@ export interface MarketingCampaign {
   creado_en: string;
   actualizado_en: string;
   notas?: string;
+  // Cluster de clientes al que le llega esta campaña — no todas son para
+  // todos. null/undefined = ese filtro no aplica (llega a todos en ese eje).
+  audiencia_fuente?: string | null;
+  audiencia_rubro?: string | null;
+  audiencia_categoria?: string | null;
+  audiencia_suscripcion?: string | null;
 }
 
 export interface MarketingPieza {
@@ -207,15 +213,29 @@ export function useCampaignPiezas(campaignId: string) {
     },
   });
 
+  const deletePieza = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('marketing_piezas').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['marketing_piezas', campaignId] });
+    },
+  });
+
   return {
     piezas: piezas || [],
     isLoading,
     createPieza: createPieza.mutate,
+    createPiezaAsync: createPieza.mutateAsync,
+    creandoPieza: createPieza.isPending,
     ejecutarPieza: ejecutarPieza.mutateAsync,
     ejecutandoPieza: ejecutarPieza.isPending,
     updatePieza: updatePieza.mutate,
     updatePiezaAsync: updatePieza.mutateAsync,
     actualizandoPieza: updatePieza.isPending,
+    deletePiezaAsync: deletePieza.mutateAsync,
+    eliminandoPieza: deletePieza.isPending,
   };
 }
 

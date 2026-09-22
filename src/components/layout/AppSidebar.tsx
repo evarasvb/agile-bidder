@@ -39,7 +39,7 @@ interface NavItem {
   url: string;
   icon: React.ElementType;
   adminOnly?: boolean;
-  children?: { title: string; url: string; icon?: React.ElementType }[];
+  children?: { title: string; url: string; icon?: React.ElementType; adminOnly?: boolean }[];
 }
 
 // Navigation items - organized per requirements
@@ -77,10 +77,13 @@ const navItems: NavItem[] = [
     icon: Package,
   },
   {
-    adminOnly: true,
     title: "Academia",
-    url: "/academia/leads",
+    url: "/academia/cursos",
     icon: GraduationCap,
+    children: [
+      { title: "Mis cursos", url: "/academia/cursos", icon: GraduationCap },
+      { title: "Contactos", url: "/academia/leads", icon: Users, adminOnly: true },
+    ],
   },
   {
     title: "Reportes",
@@ -280,7 +283,7 @@ export function AppSidebar({ open = false, onClose }: AppSidebarProps) {
                     </button>
                     {isExpanded && (
                       <ul className="mt-1 ml-4 space-y-1">
-                        {item.children?.map((child) => {
+                        {item.children?.filter((child) => !child.adminOnly || esAdmin).map((child) => {
                           const ChildIcon = child.icon;
                           const isChildActive = child.url === bestUrl && bestLen >= 0;
                           return (
