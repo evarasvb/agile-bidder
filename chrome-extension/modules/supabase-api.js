@@ -333,6 +333,19 @@ export async function caDocumentos({ codigo }) {
   return supabaseApiRequest(apiKey, 'ca-documentos', { codigo });
 }
 
+// ---- Acciones de Don Evaristo (cola en evaristo_acciones) ----
+export async function accionesPendientes() {
+  const { apiKey } = await chrome.storage.local.get('apiKey');
+  if (!apiKey) return { success: false, error: 'No API key configured' };
+  return supabaseApiRequest(apiKey, 'acciones-pendientes', {});
+}
+
+export async function accionResultado({ accion_id, success, resultado, error, parcial }) {
+  const { apiKey } = await chrome.storage.local.get('apiKey');
+  if (!apiKey) return { success: false, error: 'No API key configured' };
+  return supabaseApiRequest(apiKey, 'accion-resultado', { accion_id, success: !!success, resultado: resultado || null, error: error || null, parcial: !!parcial });
+}
+
 export async function caPendientes({ limit, soloMatch } = {}) {
   const { apiKey } = await chrome.storage.local.get('apiKey');
   if (!apiKey) return { success: false, error: 'La extensión no está conectada a FirmaVB' };

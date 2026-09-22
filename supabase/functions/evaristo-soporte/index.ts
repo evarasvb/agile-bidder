@@ -51,6 +51,13 @@ PLANES: gratis (oportunidades con límites, 3 preguntas al Experto al mes) y Pro
 CANALIZAR AL EQUIPO: cuando no puedas resolver algo, o el usuario quiera dejar un caso, invítalo a tocar el botón "¿Prefieres que te contacte el equipo?" que está ABAJO en este chat: registra el caso con número de ticket y el equipo responde a su correo. NO digas que ya lo enviaste tú. Urgencias o hablar con una persona: WhatsApp https://wa.me/56994259157 (+56 9 9425 9157); correo contacto@firmavb.cl.
 EXCEPCIÓN — REPORTE DE ERROR TÉCNICO (algo no funciona, no carga, no redirige, se cae, manda un print de un error): si el usuario tiene sesión, el sistema deja el caso registrado automáticamente al tiro (sin que toque ningún botón) y eso se te avisa aparte en la propia respuesta. En ese caso NO le pidas que toque el botón: solo reconoce el problema, dale tu mejor hipótesis o paso para probar, y sigue con tu día. No prometas tú mismo un número de ticket ni digas "ya quedó registrado": eso lo agrega el sistema si corresponde.
 
+ACCIONES QUE PUEDES EJECUTAR (no solo aconsejas: también haces). Tienes herramientas para dejar acciones en cola; la extensión de Chrome del cliente las ejecuta en SU navegador, con SU sesión de Mercado Público, en el próximo minuto. Solo funcionan si la extensión está conectada (lo dice el contexto: "Extensión lista para ejecutar acciones"). Si no está conectada, no llames la herramienta: guíalo a instalarla y conectarla.
+- sincronizar_licitacion (código de licitación 1234-56-LE26): trae la ficha, los ítems y las bases/anexos con captcha a FirmaVB. Úsala cuando el Experto no tiene las bases, cuando el cliente pide "tráeme/sincroniza/baja las bases", o cuando detectes que faltan.
+- sincronizar_ca (código de compra ágil 1234-56-COT26): trae los documentos (términos de referencia, fotos) de la compra ágil.
+- preparar_oferta (código): abre la ficha en Mercado Público con la oferta de FirmaVB ya cargada en el formulario para que el cliente la revise y la envíe él. Requiere que exista una oferta generada en FirmaVB; si no existe, mándalo a generarla primero. Tú NUNCA envías la oferta: la envía el cliente.
+- publicar_cm (Convenio Marco): recorre "Mis productos" del cliente en conveniomarco.mercadopublico.cl y publica precio (referencial menos $1) y regiones en cada producto. Publica precios reales, por eso queda en estado "confirmar": el cliente debe apretar Confirmar en la tarjeta del chat. Opcional: regiones y marcas a considerar.
+Reglas: (1) antes de programar, di en una frase qué vas a hacer; (2) después de programar, cuenta que quedó en cola y que en un minuto la extensión la ejecuta (o que espera su Confirmar), sin inventar que ya terminó; (3) el estado real lo ves con estado_acciones: "hecha" es terminada, "fallida" trae el motivo, "en_curso" sigue corriendo; (4) no programes dos veces lo mismo; (5) si el cliente pide algo que ninguna herramienta cubre (por ejemplo enviar la oferta, firmar, pagar garantía), explica que eso lo hace él y dile cómo.
+
 LINKS DE ACCIÓN (úsalos siempre que guíes a una pantalla), formato markdown exacto [Texto](/ruta):
 - Inicio: /dashboard · Inventario: /inventario · Mis Oportunidades: /mis-oportunidades · Compras Ágiles: /compras-agiles · Licitaciones: /licitaciones · Reportes: /reportes · Extensión: /configuracion/extension · Planes: /planes · Mi cuenta: /cuenta · Mi empresa: /mi-empresa
 - Detalle de una compra ágil: /compras-agiles/CODIGO · Detalle de una licitación: /licitaciones/CODIGO · Libro del Experto: /experto/libro/CODIGO
@@ -195,6 +202,102 @@ serve(async (req) => {
       contextoTxt += `\n\n[MODO LANDING PÚBLICO: el visitante todavía NO tiene cuenta ni sesión. NO uses links de acción a rutas internas porque no puede entrar. Explica con gancho comercial qué gana con FirmaVB (más adjudicaciones, flujo de caja, IA que encuentra licitaciones que calzan con lo que vende), responde su duda concreta con tu experiencia en Mercado Público, e invítalo a crear su cuenta o a tocar "Configurar mi empresa" / "Ver demostración". Si pide hablar con alguien o cotización, dale el WhatsApp y email del contexto. Sé breve, cercano y vendedor, nunca genérico.]`;
     }
 
+    // ---- Acciones ejecutables (solo con sesión): estado de la extensión y cola reciente ----
+    const ext = (ctx as Ctx | null)?.extension ?? null;
+    const actividadReciente = !!(ext?.ultima_actividad && Date.now() - new Date(ext.ultima_actividad).getTime() < 10 * 60_000);
+    const extensionLista = !!(sbUser && userId && ext && Number(ext.claves_activas) > 0 && (contexto?.extensionConectada === true || actividadReciente));
+    const acciones: any[] = []; // filas creadas o afectadas en esta vuelta: van al chat como tarjetas
+    if (sbUser && userId) {
+      contextoTxt += `\nExtensión lista para ejecutar acciones: ${extensionLista ? "SÍ" : "NO (sin actividad en los últimos 10 min o sin API key)"}`;
+      try {
+        const { data: rec } = await sbUser.rpc("evaristo_acciones_recientes", { p_limite: 6 });
+        const lista = Array.isArray(rec) ? rec : [];
+        if (lista.length) {
+          contextoTxt += `\nAcciones recientes de Evaristo (más nueva primero): ` + lista.map((a: any) =>
+            `${a.tipo}${a.codigo ? " " + a.codigo : ""} → ${a.estado}${a.error ? ` (${String(a.error).slice(0, 80)})` : ""}${a.resultado && a.estado === "hecha" ? ` ${JSON.stringify(a.resultado).slice(0, 90)}` : ""}`).join(" · ");
+        }
+      } catch (e) { console.error("acciones recientes", String(e).slice(0, 120)); }
+    }
+
+    const TIPOS_ACCION = ["sincronizar_licitacion", "sincronizar_ca", "preparar_oferta", "publicar_cm"];
+    const TOOLS = [
+      {
+        type: "function",
+        function: {
+          name: "programar_accion",
+          description: "Deja una acción en cola para que la extensión de Chrome del cliente la ejecute en Mercado Público con su sesión. publicar_cm queda esperando la confirmación del cliente en el chat.",
+          parameters: {
+            type: "object",
+            properties: {
+              tipo: { type: "string", enum: TIPOS_ACCION },
+              codigo: { type: "string", description: "Código de la licitación (1234-56-LE26) o compra ágil (1234-56-COT26). No aplica a publicar_cm." },
+              regiones: { type: "array", items: { type: "string" }, description: "Solo publicar_cm: regiones a marcar (nombres cortos: Metropolitana, Biobío…)." },
+              marcas: { type: "array", items: { type: "string" }, description: "Solo publicar_cm: marcas o palabras que debe tener el producto para tocarlo." },
+            },
+            required: ["tipo"],
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "estado_acciones",
+          description: "Devuelve las últimas acciones programadas y su estado real (confirmar, pendiente, en_curso, hecha, fallida, cancelada).",
+          parameters: { type: "object", properties: {} },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "cancelar_accion",
+          description: "Cancela una acción que todavía no se ejecutó (estado confirmar o pendiente).",
+          parameters: { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
+        },
+      },
+    ];
+
+    async function ejecutarTool(name: string, args: any): Promise<any> {
+      if (!sbUser || !userId) return { ok: false, motivo: "sin_sesion" };
+      try {
+        if (name === "programar_accion") {
+          const tipo = String(args?.tipo || "");
+          if (!TIPOS_ACCION.includes(tipo)) return { ok: false, motivo: "tipo_invalido", tipos: TIPOS_ACCION };
+          const cod = tipo === "publicar_cm" ? null : String(args?.codigo || codigo || "").trim().toUpperCase();
+          if (tipo !== "publicar_cm" && !/^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}$/.test(cod || "")) return { ok: false, motivo: "codigo_invalido", detalle: "Necesito el código con formato 1234-56-LE26 o 1234-56-COT26." };
+          if (!extensionLista) return { ok: false, motivo: "extension_no_conectada", detalle: "La extensión de Chrome no está conectada o no ha dado señales en 10 minutos. Guía al cliente a /configuracion/extension." };
+          // No duplicar: si ya hay una igual viva, se devuelve esa.
+          let q = sbUser.from("evaristo_acciones").select("id, tipo, codigo, estado, creado_en").eq("user_id", userId).eq("tipo", tipo).in("estado", ["confirmar", "pendiente", "en_curso"]);
+          q = cod ? q.eq("codigo", cod) : q.is("codigo", null);
+          const { data: viva } = await q.order("creado_en", { ascending: false }).limit(1).maybeSingle();
+          if (viva) { if (!acciones.some((a) => a.id === viva.id)) acciones.push(viva); return { ok: true, repetida: true, ...viva }; }
+          const payload: Record<string, unknown> = {};
+          if (Array.isArray(args?.regiones) && args.regiones.length) payload.regiones = args.regiones.map(String).slice(0, 16);
+          if (Array.isArray(args?.marcas) && args.marcas.length) payload.marcas = args.marcas.map(String).slice(0, 30);
+          const estado = tipo === "publicar_cm" ? "confirmar" : "pendiente";
+          const { data: fila, error } = await sbUser.from("evaristo_acciones")
+            .insert({ user_id: userId, tipo, codigo: cod, payload, estado, creada_por: "evaristo" })
+            .select("id, tipo, codigo, estado, creado_en").single();
+          if (error || !fila) return { ok: false, motivo: "error_bd", detalle: error?.message };
+          acciones.push(fila);
+          return { ok: true, ...fila, nota: estado === "confirmar" ? "Queda esperando que el cliente apriete Confirmar en la tarjeta del chat." : "La extensión la toma en el próximo minuto." };
+        }
+        if (name === "estado_acciones") {
+          const { data } = await sbUser.rpc("evaristo_acciones_recientes", { p_limite: 8 });
+          return { ok: true, acciones: Array.isArray(data) ? data : [] };
+        }
+        if (name === "cancelar_accion") {
+          const { data, error } = await sbUser.rpc("evaristo_accion_decidir", { p_id: String(args?.id || ""), p_confirmar: false });
+          if (error) return { ok: false, detalle: error.message };
+          const fila = data as any;
+          if (fila?.id) { const i = acciones.findIndex((a) => a.id === fila.id); if (i >= 0) acciones[i] = fila; else acciones.push(fila); }
+          return { ok: true, estado: fila?.estado };
+        }
+        return { ok: false, motivo: "herramienta_desconocida" };
+      } catch (e) {
+        return { ok: false, motivo: "excepcion", detalle: String(e).slice(0, 160) };
+      }
+    }
+
     const historial = (messages as Array<{ role: string; content: string }>)
       .filter((m) => m && (m.role === "user" || m.role === "assistant") && m.content)
       .slice(-12);
@@ -210,19 +313,49 @@ serve(async (req) => {
 
     const t0 = Date.now();
     let reply = "", diag = "", modeloUsado = "";
+    const conTools = !!(sbUser && userId && contexto?.canal !== "landing");
     for (const model of MODELOS) {
       try {
-        const response = await fetch(GEMINI_URL, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${GEMINI_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ model, messages: chatMessages, temperature: 0.5, max_tokens: 800 }),
-        });
-        if (!response.ok) { diag = `${model}: ${response.status} ${(await response.text()).slice(0, 160)}`; console.error("Gemini error:", diag); continue; }
-        const data = await response.json();
-        const c = data?.choices?.[0]?.message?.content;
-        if (c && String(c).trim()) { reply = String(c); modeloUsado = model; break; }
+        const msgs = [...chatMessages];
+        let texto = "";
+        let fallo = false;
+        // Hasta 2 rondas de herramientas y una respuesta final.
+        for (let ronda = 0; ronda < 3; ronda++) {
+          const usarTools = conTools && ronda < 2;
+          const response = await fetch(GEMINI_URL, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${GEMINI_API_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ model, messages: msgs, temperature: 0.5, max_tokens: 800, ...(usarTools ? { tools: TOOLS, tool_choice: "auto" } : {}) }),
+          });
+          if (!response.ok) { diag = `${model}: ${response.status} ${(await response.text()).slice(0, 160)}`; console.error("Gemini error:", diag); fallo = true; break; }
+          const data = await response.json();
+          const m = data?.choices?.[0]?.message;
+          const calls = Array.isArray(m?.tool_calls) ? m.tool_calls : [];
+          if (calls.length) {
+            msgs.push({ role: "assistant", content: m?.content ?? null, tool_calls: calls });
+            for (const c of calls) {
+              let args: any = {};
+              try { args = JSON.parse(c?.function?.arguments || "{}"); } catch { args = {}; }
+              const out = await ejecutarTool(String(c?.function?.name || ""), args);
+              msgs.push({ role: "tool", tool_call_id: c.id, content: JSON.stringify(out) });
+            }
+            continue;
+          }
+          texto = m?.content ? String(m.content) : "";
+          break;
+        }
+        if (fallo) continue;
+        if (texto.trim()) { reply = texto; modeloUsado = model; break; }
         diag = `${model}: respuesta vacía`;
       } catch (err) { diag = `${model}: ${String(err).slice(0, 120)}`; console.error("Gemini fetch error:", diag); }
+    }
+    // Si la IA se cayó después de programar algo, igual se le cuenta al cliente.
+    if (!reply && acciones.length) {
+      const NOMBRE: Record<string, string> = { sincronizar_licitacion: "sincronizar la licitación", sincronizar_ca: "traer los documentos de la compra ágil", preparar_oferta: "dejar lista la oferta de", publicar_cm: "publicar en Convenio Marco" };
+      reply = acciones.map((a) => a.estado === "confirmar"
+        ? `Dejé lista la acción de ${NOMBRE[a.tipo] || a.tipo}: aprieta **Confirmar** en la tarjeta de abajo y la extensión parte al tiro.`
+        : `Ya dejé en cola ${NOMBRE[a.tipo] || a.tipo}${a.codigo ? ` ${a.codigo}` : ""}. La extensión de Chrome la ejecuta en el próximo minuto; te aviso el resultado en la tarjeta de abajo.`).join("\n\n");
+      modeloUsado = "fallback";
     }
 
     // Si esto suena a un problema técnico (no a una duda de uso) y sabemos el correo del
@@ -300,13 +433,15 @@ serve(async (req) => {
         if (convId) {
           await sbUser.from("evaristo_mensajes").insert([
             { conversacion_id: convId, user_id: userId, rol: "user", contenido: ultimoUser?.content ?? "(captura)", adjuntos: imagen ? [{ tipo: "imagen" }] : null, meta },
-            { conversacion_id: convId, user_id: userId, rol: "assistant", contenido: reply, meta: { ...meta, modelo: modeloUsado, ms: Date.now() - t0 } },
+            { conversacion_id: convId, user_id: userId, rol: "assistant", contenido: reply, meta: { ...meta, modelo: modeloUsado, ms: Date.now() - t0, ...(acciones.length ? { acciones: acciones.map((a) => ({ id: a.id, tipo: a.tipo, codigo: a.codigo, estado: a.estado })) } : {}) } },
           ]);
+          const sinConv = acciones.filter((a) => a.id).map((a) => a.id);
+          if (sinConv.length) await sbUser.from("evaristo_acciones").update({ conversacion_id: convId }).in("id", sinConv).is("conversacion_id", null);
         }
       } catch (e) { console.error("memoria evaristo", String(e).slice(0, 160)); }
     }
 
-    return json({ reply, conversacion_id: convId, ticket });
+    return json({ reply, conversacion_id: convId, ticket, acciones });
   } catch (e) {
     console.error("evaristo-soporte error:", e);
     return json({ reply: "Tuve un error inesperado. Reintenta, y si sigue, escríbeme a contacto@firmavb.cl.", error: String(e) });

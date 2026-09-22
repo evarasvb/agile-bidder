@@ -25,6 +25,7 @@ import {
   Shield,
   LifeBuoy,
   Rocket,
+  Scale,
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -65,6 +66,10 @@ const navItems: NavItem[] = [
     title: "Experto",
     url: "/experto",
     icon: GraduationCap,
+    children: [
+      { title: "Libro de licitación", url: "/experto", icon: GraduationCap },
+      { title: "Don Evaristo Abogado", url: "/experto/abogado", icon: Scale },
+    ],
   },
   {
     title: "Postulaciones",
