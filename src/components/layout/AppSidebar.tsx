@@ -23,6 +23,7 @@ import {
   GraduationCap,
   Sparkles,
   Shield,
+  ShieldCheck,
   LifeBuoy,
   Rocket,
 } from "lucide-react";
@@ -75,6 +76,11 @@ const navItems: NavItem[] = [
     title: "Inventario",
     url: "/inventario",
     icon: Package,
+  },
+  {
+    title: "Convenio Marco",
+    url: "/convenio-marco",
+    icon: ShieldCheck,
   },
   {
     adminOnly: true,

@@ -80,6 +80,7 @@ const ReporteMercado = lazy(() => import("./pages/reportes/ReporteMercado"));
 const ReporteCompetidores = lazy(() => import("./pages/reportes/ReporteCompetidores"));
 const ReporteConvenioMarco = lazy(() => import("./pages/reportes/ReporteConvenioMarco"));
 const ConsultaLibre = lazy(() => import("./pages/reportes/ConsultaLibre"));
+const ConvenioMarcoGestion = lazy(() => import("./pages/ConvenioMarcoGestion"));
 
 const AdminTraccion = lazy(() => import("./pages/AdminTraccion"));
 const AdminEvaristo = lazy(() => import("./pages/AdminEvaristo"));
@@ -242,6 +243,9 @@ const App = () => (
             <Route path="/reportes/convenio-marco" element={<ReporteConvenioMarco />} />
             <Route path="/reportes/consulta" element={<ConsultaLibre />} />
             <Route path="/reportes/ordenes-compra" element={<ReporteOrdenesCompra />} />
+
+            {/* ----- CONVENIO MARCO (gestión de marca / distribuidores) ----- */}
+            <Route path="/convenio-marco" element={<ConvenioMarcoGestion />} />
 
             {/* ----- MARKETING ----- */}
             <Route path="/marketing/control" element={<AdminOnlyRoute><MarketingControlCenter /></AdminOnlyRoute>} />
