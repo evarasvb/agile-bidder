@@ -4,6 +4,7 @@
 // (Ley 19.886, Reglamento, dictámenes de Contraloría, sentencias del TCP, el libro)
 // y los mismos datos de organismos que ya usa Don Evaristo Experto.
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { fetchClaudeComoOpenAI } from "../_shared/claudeFallback.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -15,6 +16,9 @@ const LIMITES_FREE = { chat: 3, informe: 1 };
 const MODELOS_CHAT = [Deno.env.get("GEMINI_MODEL_CHAT"), "gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-3.6-flash"].filter(Boolean) as string[];
 const MODELOS_DOC = [Deno.env.get("GEMINI_MODEL_INFORME"), "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.5-flash-lite", "gemini-flash-lite-latest"].filter(Boolean) as string[];
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+// Respaldo si Gemini falla en TODOS sus modelos (ej. cuota de la cuenta agotada): Claude.
+const CLAUDE_MODELO_CHAT = "claude-haiku-4-5-20251001";
+const CLAUDE_MODELO_DOC = "claude-sonnet-5";
 
 const STOP = new Set("de la el los las un una unos unas y o u que en para por con sin sobre al del se su sus es son fue ser hay como cuando donde qué que cual cuál cuáles quien quién cómo cuánto cuánta cuántos cuántas mi mis me tu tus le les lo nos si no más muy este esta estos estas ese esa eso aquel puedo puede pueden podemos debo debe deben hacer tiene tienen tengo".split(" "));
 function palabrasClave(t: string): string[] {
@@ -240,17 +244,21 @@ Si hay más de un tramo, menciona en el documento que el interés se calculó po
     ];
 
     const key = Deno.env.get("GEMINI_API_KEY");
-    if (!key) return new Response(JSON.stringify({ error: "sin_ia" }), { status: 500, headers: cors });
-
     let upstream: Response | null = null; let modelo = "";
-    for (const mdl of (modo === "chat" ? MODELOS_CHAT : MODELOS_DOC)) {
-      const r = await fetch(GEMINI_URL, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: mdl, messages, temperature: modo === "chat" ? 0.3 : 0.2, max_tokens: modo === "chat" ? 2000 : 3200, stream: true, reasoning_effort: "low" }),
-      });
-      if (r.ok && r.body) { upstream = r; modelo = mdl; break; }
-      console.error("gemini", mdl, r.status, (await r.text()).slice(0, 200));
+    if (key) {
+      for (const mdl of (modo === "chat" ? MODELOS_CHAT : MODELOS_DOC)) {
+        const r = await fetch(GEMINI_URL, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ model: mdl, messages, temperature: modo === "chat" ? 0.3 : 0.2, max_tokens: modo === "chat" ? 2000 : 3200, stream: true, reasoning_effort: "low" }),
+        });
+        if (r.ok && r.body) { upstream = r; modelo = mdl; break; }
+        console.error("gemini", mdl, r.status, (await r.text()).slice(0, 200));
+      }
+    }
+    if (!upstream) {
+      const claude = await fetchClaudeComoOpenAI(messages, { modelo: modo === "chat" ? CLAUDE_MODELO_CHAT : CLAUDE_MODELO_DOC, maxTokens: modo === "chat" ? 2000 : 3200, temperature: modo === "chat" ? 0.3 : 0.2 });
+      if (claude) { upstream = claude.resp; modelo = claude.modelo; }
     }
     if (!upstream) return new Response(JSON.stringify({ error: "ia_no_disponible" }), { status: 502, headers: cors });
 
