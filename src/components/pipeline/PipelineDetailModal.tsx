@@ -12,6 +12,7 @@ import {
   Clock,
   FileText,
   ChevronRight,
+  HardDrive,
 } from 'lucide-react';
 import {
   Dialog,
@@ -50,6 +51,8 @@ import {
 } from './pipelineConstants';
 import { useUpdatePipelineItem, useMovePipelineItem, useDeletePipelineItem } from '@/hooks/usePipeline';
 import { supabaseClient as supabase } from '@/lib/supabaseClient';
+import { useDriveEstado, type DriveFile } from '@/hooks/useGoogleDrive';
+import { DriveFilePicker } from '@/components/drive/DriveFilePicker';
 import { toast } from 'sonner';
 
 // Link real a la ficha en Mercado Público (scrapeado), buscado por código. Antes
@@ -94,6 +97,8 @@ export function PipelineDetailModal({
 }: PipelineDetailModalProps) {
   const [notas, setNotas] = useState('');
   const [notasEdited, setNotasEdited] = useState(false);
+  const [driveOpen, setDriveOpen] = useState(false);
+  const { data: driveEstado } = useDriveEstado();
   const updateItem = useUpdatePipelineItem();
   const moveItem = useMovePipelineItem();
   const deleteItem = useDeletePipelineItem();
@@ -147,6 +152,17 @@ export function PipelineDetailModal({
       },
       onError: () => toast.error('Error al eliminar'),
     });
+  };
+
+  const handleAttachDrive = (file: DriveFile) => {
+    const nuevos = [
+      ...(item.archivos || []),
+      { nombre: file.name, url: file.webViewLink || '', fecha: new Date().toISOString() },
+    ];
+    updateItem.mutate(
+      { id: item.id, archivos: nuevos },
+      { onError: () => toast.error('No se pudo guardar el adjunto') },
+    );
   };
 
   const detailUrl =
@@ -331,29 +347,48 @@ export function PipelineDetailModal({
             )}
           </div>
 
-          {/* Attachments placeholder */}
-          {item.archivos && item.archivos.length > 0 && (
-            <>
-              <Separator />
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-2">Archivos</h4>
-                <div className="space-y-1">
-                  {item.archivos.map((archivo, idx) => (
-                    <a
-                      key={idx}
-                      href={archivo.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-xs text-primary hover:underline"
-                    >
-                      <FileText className="h-3 w-3" />
-                      {archivo.nombre}
-                    </a>
-                  ))}
-                </div>
+          {/* Archivos: adjuntos de la postulación + adjuntar desde Google Drive */}
+          <Separator />
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-semibold text-gray-900">Archivos</h4>
+              {driveEstado?.conectado ? (
+                <Button size="sm" variant="outline" className="h-7 gap-1.5" onClick={() => setDriveOpen(true)}>
+                  <HardDrive className="h-3.5 w-3.5" />
+                  Adjuntar desde Drive
+                </Button>
+              ) : (
+                <Link to="/configuracion/integraciones" className="text-xs text-primary hover:underline">
+                  Conectar Google Drive
+                </Link>
+              )}
+            </div>
+            {item.archivos && item.archivos.length > 0 ? (
+              <div className="space-y-1">
+                {item.archivos.map((archivo, idx) => (
+                  <a
+                    key={idx}
+                    href={archivo.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-xs text-primary hover:underline"
+                  >
+                    <FileText className="h-3 w-3" />
+                    {archivo.nombre}
+                  </a>
+                ))}
               </div>
-            </>
-          )}
+            ) : (
+              <p className="text-xs text-gray-400">Sin archivos adjuntos</p>
+            )}
+          </div>
+
+          <DriveFilePicker
+            open={driveOpen}
+            onOpenChange={setDriveOpen}
+            onAttach={handleAttachDrive}
+            codigo={item.oportunidad_tipo === 'licitacion' ? item.oportunidad_id : null}
+          />
 
           <Separator />
 

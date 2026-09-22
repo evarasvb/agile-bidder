@@ -20,6 +20,7 @@ import {
   FileCheck,
   FileSearch,
   Puzzle,
+  HardDrive,
   GraduationCap,
   Sparkles,
   Shield,
@@ -122,6 +123,7 @@ const navItems: NavItem[] = [
     icon: Settings,
     children: [
       { title: "Mi empresa", url: "/configuracion/empresa", icon: Building2 },
+      { title: "Integraciones", url: "/configuracion/integraciones", icon: HardDrive },
       { title: "Extensión Chrome", url: "/configuracion/extension", icon: Puzzle },
     ],
   },
