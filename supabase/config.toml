@@ -42,6 +42,14 @@ verify_jwt = true
 [functions.mercadopublico-api]
 verify_jwt = false
 
+# crear-pago-curso: la Academia es pública; el comprador puede no tener cuenta
+[functions.crear-pago-curso]
+verify_jwt = false
+
+# mp-curso-webhook: Mercado Pago notifica sin JWT (se verifica el pago contra la API de MP)
+[functions.mp-curso-webhook]
+verify_jwt = false
+
 [functions.resumir-bases]
 verify_jwt = true
 
