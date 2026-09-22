@@ -310,6 +310,13 @@ export interface DatoCurioso {
 // "faCHADA" al buscar "hada" o "circoNIO" al buscar "circo" con substring).
 const PALABRAS_CURIOSAS = /\b(circo|desfile|payasos?|piñatas?|piniatas?|tortas?|choripanes?|disfraces?|disfraz|carnaval|comparsas?|zancos?|magos?|malabar\w*)\b/i;
 
+// Hash simple y determinístico (no cripto) de un string a un entero positivo.
+function hashCode(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return h >>> 0;
+}
+
 export function useDatoCurioso() {
   return useQuery({
     queryKey: ['dashboard-principal', 'dato-curioso'],
@@ -331,9 +338,14 @@ export function useDatoCurioso() {
       const candidatos = (data || []).filter((r) => PALABRAS_CURIOSAS.test(r.nombre || ''));
       if (candidatos.length === 0) return null;
 
-      // Elegido estable durante el día (mismo dato todo el día, cambia mañana).
-      const semilla = Number(new Date().toISOString().slice(0, 10).split('-').join(''));
-      const elegido = candidatos[semilla % candidatos.length];
+      // Elegido estable durante el día: el hash depende del propio código de
+      // cada candidato (no de su posición ni del largo de la lista), así un
+      // refetch dentro del mismo día no lo cambia aunque entre/salga algún
+      // ítem nuevo — solo cambia si el ganador de hoy deja de calificar.
+      const semilla = new Date().toISOString().slice(0, 10);
+      const elegido = candidatos.reduce((mejor, actual) =>
+        hashCode(`${semilla}-${actual.codigo}`) < hashCode(`${semilla}-${mejor.codigo}`) ? actual : mejor
+      );
 
       return {
         codigo: elegido.codigo,

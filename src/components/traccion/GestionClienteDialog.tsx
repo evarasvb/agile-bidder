@@ -55,7 +55,9 @@ export function GestionClienteDialog({ cliente, onOpenChange }: GestionClienteDi
         prioridad,
         notas: notas.trim() || null,
         proxima_accion: proximaAccion.trim() || null,
-        proxima_fecha: proximaFecha ? new Date(proximaFecha).toISOString() : null,
+        // Mediodía LOCAL (no medianoche UTC): así el offset de Chile nunca cruza
+        // al día anterior al mostrarlo de vuelta en la tabla.
+        proxima_fecha: proximaFecha ? new Date(`${proximaFecha}T12:00:00`).toISOString() : null,
         etiquetas: etiquetas.trim() ? etiquetas.split(',').map((e) => e.trim()).filter(Boolean) : null,
       });
       toast.success('Gestión guardada');
