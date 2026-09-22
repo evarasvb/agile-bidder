@@ -42,6 +42,24 @@ Reclamos por no pago: ${recl} | Conducta de pago: ${o.conducta_pago ?? "s/i"} ($
 Reclamos desglosados 12 meses: ${o.reclamos_pago_12m ?? "s/i"} por pago no oportuno, ${o.reclamos_proceso_12m ?? "s/i"} por irregularidad en el proceso.`;
 }
 
+// Completa con la tasa que el propio cliente indica los meses sin certificado CMF cargado
+// (calcular_interes_mora ya no inventa nada ahí: deja tasa_anual null). Cada tramo llenado
+// así queda marcado "origen: usuario" para que el documento y la UI lo digan explícito.
+function gapFillTasas(calculo: any, monto: number, tasasManual: Record<string, number>) {
+  const detalle = (calculo?.detalle ?? []).map((t: any) => {
+    if (t.tasa_anual != null) return { ...t, origen: "cmf" };
+    const tasa = tasasManual[t.mes];
+    if (tasa) {
+      const interes = Math.round(monto * (tasa / 100) * t.dias / 360);
+      return { ...t, tasa_anual: tasa, interes, mes_tasa: null, origen: "usuario" };
+    }
+    return { ...t, origen: "cmf" };
+  });
+  const completo = detalle.every((t: any) => t.tasa_anual != null);
+  const interes = detalle.reduce((a: number, t: any) => a + (t.interes ?? 0), 0);
+  return { dias_atraso: calculo?.dias_atraso ?? 0, interes, total: monto + interes, completo, detalle };
+}
+
 const TIPOS_DOC: Record<string, { titulo: string; guia: string }> = {
   apelacion: {
     titulo: "Recurso/reclamo formal por una licitación o compra ágil",
@@ -119,6 +137,15 @@ Deno.serve(async (req) => {
     const montoAdeudado: number | null = Number.isFinite(Number(body.monto_adeudado)) && Number(body.monto_adeudado) > 0 ? Number(body.monto_adeudado) : null;
     const fechaVencimiento: string | null = /^\d{4}-\d{2}-\d{2}$/.test(String(body.fecha_vencimiento ?? "")) ? String(body.fecha_vencimiento) : null;
     const fechaPago: string | null = /^\d{4}-\d{2}-\d{2}$/.test(String(body.fecha_pago ?? "")) ? String(body.fecha_pago) : null;
+    // Tasas que el propio cliente indica para meses sin certificado CMF cargado (ver gapFillTasas).
+    const tasasManual: Record<string, number> = {};
+    if (Array.isArray(body.tasas_manual)) {
+      for (const t of body.tasas_manual) {
+        const mes = /^\d{4}-\d{2}-\d{2}$/.test(String(t?.mes ?? "")) ? String(t.mes) : null;
+        const tasa = Number(t?.tasa_anual);
+        if (mes && Number.isFinite(tasa) && tasa > 0 && tasa < 200) tasasManual[mes] = tasa;
+      }
+    }
 
     const { role, sub } = rolYSub(req.headers.get("Authorization") ?? "");
     const userId = role === "authenticated" ? sub : (role === "service_role" && body.user_id ? String(body.user_id) : null);
@@ -167,6 +194,7 @@ Deno.serve(async (req) => {
 
     const res: Record<string, any> = {};
     await Promise.all(Object.entries(tareas).map(async ([k, p]) => { try { res[k] = await p; } catch { res[k] = null; } }));
+    if (res.calculo && montoAdeudado) res.calculo = gapFillTasas(res.calculo, montoAdeudado, tasasManual);
 
     let fragmentos: any[] = [];
     const vistos = new Set<number>();
@@ -186,7 +214,8 @@ Deno.serve(async (req) => {
       if (montoAdeudado && fechaVencimiento && res.calculo?.completo) {
         const c = res.calculo;
         const tramos: any[] = c.detalle ?? [];
-        const desgloseTramos = tramos.map((t) => `- ${t.mes} (${t.dias} días a ${t.tasa_anual}% anual, CMF vigente desde ${t.mes_tasa}): $${Number(t.interes).toLocaleString("es-CL")}`).join("\n");
+        const desgloseTramos = tramos.map((t) => `- ${t.mes} (${t.dias} días a ${t.tasa_anual}% anual, ${t.origen === "usuario" ? "tasa indicada por el cliente, NO verificada contra la CMF" : `CMF vigente desde ${t.mes_tasa}`}): $${Number(t.interes).toLocaleString("es-CL")}`).join("\n");
+        const hayManual = tramos.some((t) => t.origen === "usuario");
         partes.push(`CÁLCULO DE INTERESES POR MORA (determinístico — cita estos números EXACTOS, no los recalcules ni los redondees distinto). La tasa de interés corriente la publica la CMF cada mes y puede cambiar de un mes a otro, así que el período se partió por mes calendario, cada tramo con la tasa vigente ese mes:
 Capital adeudado: $${Math.round(montoAdeudado).toLocaleString("es-CL")}
 Días de atraso totales: ${c.dias_atraso}
@@ -194,7 +223,7 @@ Tramos por mes:
 ${desgloseTramos}
 Interés total (suma de los tramos): $${Number(c.interes).toLocaleString("es-CL")}
 Total a cobrar (capital + interés): $${Number(c.total).toLocaleString("es-CL")}
-Si hay más de un tramo, menciona en el documento que el interés se calculó por tramos mensuales según la tasa vigente en cada uno (no apliques una sola tasa a todo el período). Advertencia obligatoria a incluir en el documento: verificar que las tasas sigan vigentes antes de presentar el cobro.`);
+Si hay más de un tramo, menciona en el documento que el interés se calculó por tramos mensuales según la tasa vigente en cada uno (no apliques una sola tasa a todo el período).${hayManual ? " Al menos un tramo usa una tasa que indicó el cliente (no viene del certificado de la CMF): dilo explícitamente en el documento para ese tramo y pide verificarla antes de presentar el cobro." : ""} Advertencia obligatoria a incluir en el documento: verificar que las tasas sigan vigentes antes de presentar el cobro.`);
       } else if (montoAdeudado && fechaVencimiento) {
         partes.push("CÁLCULO DE INTERESES POR MORA: no tengo cargada la tasa de interés corriente de la CMF para todos los meses que cubre este atraso (puede ser que aún no cargue meses anteriores). No inventes una tasa ni un monto de interés: redacta el documento pidiendo el pago del capital adeudado y deja el cálculo del interés pendiente de completar, indicando que se agregará con la tasa vigente de cada mes.");
       } else {
@@ -230,7 +259,7 @@ Si hay más de un tramo, menciona en el documento que el interés se calculó po
     let respuesta = "";
     const stream = new ReadableStream({
       async start(ctrl) {
-        ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ meta: { modelo, fuentes: fuentesMeta, codigo, uso: u, tipo_documento: modo === "documento" ? tipoDocumento : undefined, calculo_mora: tipoDocumento === "cobro_intereses_mora" ? (res.calculo?.completo ? { ...res.calculo, monto_adeudado: montoAdeudado } : null) : undefined } })}\n\n`));
+        ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ meta: { modelo, fuentes: fuentesMeta, codigo, uso: u, tipo_documento: modo === "documento" ? tipoDocumento : undefined, calculo_mora: tipoDocumento === "cobro_intereses_mora" && res.calculo ? { ...res.calculo, monto_adeudado: montoAdeudado } : undefined } })}\n\n`));
         const reader = upstream!.body!.getReader(); let buf = "";
         try {
           while (true) {

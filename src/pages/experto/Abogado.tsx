@@ -60,6 +60,8 @@ export default function Abogado() {
   const [sigueImpago, setSigueImpago] = useState(true);
   const [fechaPago, setFechaPago] = useState('');
   const [calculoMora, setCalculoMora] = useState<any>(null);
+  // Tasas que el cliente indica a mano para meses sin certificado CMF cargado (clave: mes, valor: % escrito).
+  const [tasasManual, setTasasManual] = useState<Record<string, string>>({});
 
   // Documentos de respaldo (contratos, notificaciones, reclamos previos)
   const [documentos, setDocumentos] = useState<{ id: string; nombre: string; tipo: string }[]>([]);
@@ -117,7 +119,10 @@ export default function Abogado() {
         modo: 'documento', tipo_documento: tipoDoc, destinatario, codigo: codigo || undefined, hechos: hechosFinal, peticion,
         ciudad_fecha: new Date().toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' }),
         huella: 'abogado',
-        ...(esMora ? { monto_adeudado: Number(montoAdeudado), fecha_vencimiento: fechaVencimiento, fecha_pago: sigueImpago ? undefined : (fechaPago || undefined) } : {}),
+        ...(esMora ? {
+          monto_adeudado: Number(montoAdeudado), fecha_vencimiento: fechaVencimiento, fecha_pago: sigueImpago ? undefined : (fechaPago || undefined),
+          tasas_manual: Object.entries(tasasManual).filter(([, v]) => Number(v) > 0).map(([mes, v]) => ({ mes, tasa_anual: Number(v) })),
+        } : {}),
       }, (t, meta) => { setDocumento(t); if (meta?.calculo_mora) setCalculoMora(meta.calculo_mora); });
     } catch (e: any) {
       toast.error(e.message, e.status === 402 ? { action: { label: 'Ver planes', onClick: () => navigate('/cuenta') } } : undefined);
@@ -284,35 +289,43 @@ export default function Abogado() {
               <CardContent className="text-sm space-y-1">
                 <p>Capital adeudado: <strong>{fmtCLP(calculoMora.monto_adeudado)}</strong></p>
                 <p>Días de atraso: <strong>{calculoMora.dias_atraso}</strong></p>
-                {(calculoMora.detalle?.length ?? 0) > 1 ? (
-                  <div className="pt-1">
-                    <p className="text-muted-foreground">La tasa de la CMF cambia cada mes, así que el atraso se partió por tramos:</p>
-                    <table className="w-full mt-1 text-xs">
-                      <tbody>
-                        {calculoMora.detalle.map((t: any) => (
-                          <tr key={t.mes} className="border-b">
-                            <td className="py-1 pr-2">{t.mes}</td>
-                            <td className="py-1 pr-2">{t.dias} días</td>
-                            <td className="py-1 pr-2">{t.tasa_anual}% anual</td>
+                {(calculoMora.detalle?.length ?? 0) > 1 && <p className="text-muted-foreground">La tasa de la CMF cambia cada mes, así que el atraso se partió por tramos:</p>}
+                <table className="w-full mt-1 text-xs">
+                  <tbody>
+                    {calculoMora.detalle?.map((t: any) => (
+                      <tr key={t.mes} className="border-b">
+                        <td className="py-1 pr-2">{t.mes}</td>
+                        <td className="py-1 pr-2">{t.dias} días</td>
+                        {t.tasa_anual != null ? (
+                          <>
+                            <td className="py-1 pr-2">{t.tasa_anual}% anual{t.origen === 'usuario' && <span className="text-yellow-700"> (indicada por ti, sin verificar)</span>}</td>
                             <td className="py-1 text-right">{fmtCLP(t.interes)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p>Tasa de interés corriente anual aplicada: <strong>{calculoMora.detalle?.[0]?.tasa_anual}%</strong> (CMF, vigente desde {calculoMora.detalle?.[0]?.mes_tasa})</p>
+                          </>
+                        ) : (
+                          <td className="py-1" colSpan={2}>
+                            <div className="flex items-center gap-1">
+                              <span className="text-muted-foreground whitespace-nowrap">Sin tasa CMF —</span>
+                              <Input type="number" min={0} step="0.01" className="h-7 w-20 text-xs" placeholder="% anual"
+                                value={tasasManual[t.mes] ?? ''} onChange={(e) => setTasasManual((s) => ({ ...s, [t.mes]: e.target.value }))} />
+                              <span className="text-muted-foreground">% si la sabes</span>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!calculoMora.completo && (
+                  <Button size="sm" variant="outline" className="mt-2" onClick={generarDocumento} disabled={generando}>
+                    {generando ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}Recalcular con esas tasas
+                  </Button>
                 )}
-                <p>Interés {(calculoMora.detalle?.length ?? 0) > 1 ? 'total' : ''}: <strong>{fmtCLP(calculoMora.interes)}</strong></p>
+                <p className="pt-1">Interés {(calculoMora.detalle?.length ?? 0) > 1 ? 'total' : ''}: <strong>{fmtCLP(calculoMora.interes)}</strong></p>
                 <p className="text-base">Total a cobrar: <strong>{fmtCLP(calculoMora.total)}</strong></p>
+                {!calculoMora.completo && <p className="text-xs text-yellow-700">Faltan tasas por completar arriba — mientras tanto el documento pide el capital y deja el interés de esos meses pendiente.</p>}
                 <p className="text-xs text-muted-foreground pt-1">Verifica que las tasas sigan vigentes antes de presentar el cobro.</p>
               </CardContent>
             </Card>
-          )}
-          {esMora && documento && !calculoMora && (
-            <div className="rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-900">
-              Aún no tengo cargada la tasa de interés corriente de la CMF para calcular el monto exacto — el documento pide el pago del capital y deja el interés pendiente de completar.
-            </div>
           )}
 
           {documento && (
