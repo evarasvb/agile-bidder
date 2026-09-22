@@ -28,6 +28,7 @@ import {
   LifeBuoy,
   Rocket,
   Scale,
+  HandCoins,
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -71,6 +72,7 @@ const navItems: NavItem[] = [
     children: [
       { title: "Libro de licitación", url: "/experto", icon: GraduationCap },
       { title: "Don Evaristo Abogado", url: "/experto/abogado", icon: Scale },
+      { title: "Cobranza de facturas", url: "/experto/cobranza", icon: HandCoins },
     ],
   },
   {
