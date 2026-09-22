@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ShieldCheck, Plus, Trash2, Search, Copy, Send, Tag, Building2, AlertTriangle, CheckCircle2, FileDown, ChevronDown, FileWarning, ExternalLink } from 'lucide-react';
+import { ShieldCheck, Plus, Trash2, Search, Copy, Send, Tag, Building2, AlertTriangle, CheckCircle2, FileDown, ChevronDown, FileWarning, ExternalLink, TrendingUp, TrendingDown, Minus, Store } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -65,9 +65,10 @@ export default function ConvenioMarcoGestion() {
       </header>
 
       <Tabs defaultValue="marcas" className="w-full">
-        <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
           <TabsTrigger value="marcas">Mis marcas</TabsTrigger>
           <TabsTrigger value="detectar">Detectar proveedores</TabsTrigger>
+          <TabsTrigger value="catalogo">Catálogo y precios</TabsTrigger>
           <TabsTrigger value="solicitudes">Solicitudes de baja</TabsTrigger>
         </TabsList>
 
@@ -76,6 +77,9 @@ export default function ConvenioMarcoGestion() {
         </TabsContent>
         <TabsContent value="detectar" className="mt-4">
           <TabDetectar marcas={marcas} empresa={cliente?.empresa_nombre ?? null} />
+        </TabsContent>
+        <TabsContent value="catalogo" className="mt-4">
+          <TabCatalogo marcas={marcas} />
         </TabsContent>
         <TabsContent value="solicitudes" className="mt-4">
           <TabSolicitudes empresa={cliente?.empresa_nombre ?? null} />
@@ -533,6 +537,153 @@ function FilaProveedor({ proveedor, lineas, autorizado, termino, seleccionado, o
         </div>
       )}
     </li>
+  );
+}
+
+// ==================== TAB: CATÁLOGO Y PRECIOS ==============================
+// Inteligencia de precios sobre los mismos datos de Convenio Marco: por
+// producto muestra el rango de precios del mercado y, por proveedor, si está
+// caro o barato respecto del precio ganador (el más bajo).
+function precioVs(prom: number | null, min: number | null) {
+  if (prom == null || min == null || min <= 0) return null;
+  const diff = ((prom - min) / min) * 100;
+  if (diff <= 1) return { label: 'Más barato', cls: 'border-green-200 bg-green-50 text-green-700', Icon: TrendingDown };
+  if (diff <= 10) return { label: `+${diff.toFixed(0)}%`, cls: 'border-amber-200 bg-amber-50 text-amber-700', Icon: Minus };
+  return { label: `Caro +${diff.toFixed(0)}%`, cls: 'border-red-200 bg-red-50 text-red-700', Icon: TrendingUp };
+}
+
+function TabCatalogo({ marcas }: { marcas: CmMarca[] }) {
+  const [marcaId, setMarcaId] = useState<string>('');
+  const [termino, setTermino] = useState('');
+  const [productoKey, setProductoKey] = useState<string | null>(null);
+
+  const { data: prodData, isFetching: buscando } = useCMProductos(termino, 'convenio_marco');
+  const productos = prodData?.items ?? [];
+  const { data: detalle, isFetching: cargandoDetalle } = useCMProductoDetalle(productoKey, 'convenio_marco');
+  const productoSel = productos.find((p) => p.producto_key === productoKey) || null;
+  const resumen = detalle?.resumen ?? null;
+  const precioMin = resumen?.precio_min ?? productoSel?.precio_min ?? null;
+
+  const elegirMarca = (id: string) => {
+    setMarcaId(id);
+    setProductoKey(null);
+    const m = marcas.find((x) => x.id === id);
+    setTermino(m?.palabras_clave?.[0] ?? m?.nombre ?? '');
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-end">
+          {marcas.length > 0 && (
+            <div className="flex-1">
+              <Label>Marca (opcional)</Label>
+              <Select value={marcaId} onValueChange={elegirMarca}>
+                <SelectTrigger><SelectValue placeholder="Elige una marca" /></SelectTrigger>
+                <SelectContent>
+                  {marcas.map((m) => <SelectItem key={m.id} value={m.id}>{m.nombre}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <div className="flex-1">
+            <Label htmlFor="c-termino">Buscar producto en Convenio Marco</Label>
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input id="c-termino" className="pl-8" value={termino} onChange={(e) => { setTermino(e.target.value); setProductoKey(null); }}
+                placeholder="ej: tóner, papel, bolsa de basura" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {termino.trim().length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Productos y rango de precios</CardTitle>
+            <CardDescription>Precios de mercado en Convenio Marco. Elige un producto para ver el detalle por proveedor.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {buscando ? (
+              <p className="text-sm text-muted-foreground">Buscando…</p>
+            ) : productos.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Sin coincidencias. Prueba otra palabra.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="text-xs text-muted-foreground">
+                    <tr>
+                      <th className="py-1 pr-3">Producto</th>
+                      <th className="py-1 pr-3 text-right">Proveedores</th>
+                      <th className="py-1 pr-3 text-right">Más bajo</th>
+                      <th className="py-1 pr-3 text-right">Promedio</th>
+                      <th className="py-1 pr-3 text-right">Más alto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {productos.slice(0, 25).map((p) => (
+                      <tr key={p.producto_key}
+                        onClick={() => setProductoKey(p.producto_key)}
+                        className={`cursor-pointer border-t border-border/50 hover:bg-muted/50 ${productoKey === p.producto_key ? 'bg-primary/5' : ''}`}>
+                        <td className="py-1.5 pr-3">{p.producto}</td>
+                        <td className="py-1.5 pr-3 text-right">{p.proveedores}</td>
+                        <td className="py-1.5 pr-3 text-right text-green-700">{fmtCLP(p.precio_min)}</td>
+                        <td className="py-1.5 pr-3 text-right">{fmtCLP(p.precio_prom)}</td>
+                        <td className="py-1.5 pr-3 text-right text-red-700">{fmtCLP(p.precio_max)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {productoKey && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Proveedores y competitividad</CardTitle>
+            <CardDescription className="truncate">{productoSel?.producto}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {cargandoDetalle ? (
+              <p className="text-sm text-muted-foreground">Cargando…</p>
+            ) : (detalle?.proveedores?.length ?? 0) === 0 ? (
+              <p className="text-sm text-muted-foreground">Sin proveedores para este producto.</p>
+            ) : (
+              <ul className="divide-y">
+                {detalle!.proveedores.map((pr) => {
+                  const badge = precioVs(pr.precio_prom, precioMin);
+                  return (
+                    <li key={pr.proveedor} className="flex items-center justify-between gap-3 py-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{pr.proveedor}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {pr.lineas} líneas · precio prom. {fmtCLP(pr.precio_prom)}
+                        </p>
+                      </div>
+                      {badge && (
+                        <Badge variant="outline" className={badge.cls}>
+                          <badge.Icon className="mr-1 h-3 w-3" /> {badge.label}
+                        </Badge>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {termino.trim().length === 0 && (
+        <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">
+          <Store className="mx-auto mb-2 h-6 w-6 opacity-50" />
+          Busca un producto (o elige una marca) para ver precios de mercado y qué proveedores están caros o baratos.
+        </CardContent></Card>
+      )}
+    </div>
   );
 }
 
