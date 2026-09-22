@@ -204,9 +204,9 @@ export default function Landing() {
             </p>
 
             <p className="text-xl text-muted-foreground font-light mb-8 max-w-3xl mx-auto">
-              FirmaVB maximiza tu <span className="text-success font-medium">flujo de caja</span> y 
-              <span className="text-firmavb-blue font-medium"> rentabilidad</span> con inteligencia 
-              artificial que transforma cómo compites en Mercado Público.
+              FirmaVB pone a <span className="text-firmavb-blue font-medium">Don Evaristo</span> a trabajar para ti:
+              tu experto, tu abogado y tu equipo de postulación en un solo lugar — para que venderle
+              al Estado sea constante, no una vez al año.
             </p>
 
             {/* Smart Search Bar */}
@@ -338,53 +338,54 @@ Validar Admisibilidad Gratis
         </div>
       </section>
 
-{/* Inteligencia Generativa - 3 Pilares */}
+{/* Don Evaristo - propuesta de valor real: un experto a tu lado, no solo un buscador */}
       <section className="py-20 px-6 bg-gradient-to-b from-muted/30 to-background">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
             <Badge className="mb-4 bg-[hsl(var(--success))]/10 text-[hsl(var(--success))] border-[hsl(var(--success))]/20">
-              <Brain className="h-3 w-3 mr-1" />
-              Powered by AI
+              <Sparkles className="h-3 w-3 mr-1" />
+              Don Evaristo, con IA
             </Badge>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Inteligencia Generativa para tu Negocio
+              No estás solo vendiéndole al Estado
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-              Tres pilares fundamentales que trabajan juntos para maximizar tus resultados
+              17 años vendiéndole al Estado, convertidos en un experto, un abogado y un equipo de
+              postulación que trabajan para ti dentro de FirmaVB.
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
             <PillarCard
-              icon={DollarSign}
-              title="Flujo de Caja Optimizado"
-              description="Priorizamos licitaciones con mejores condiciones de pago para mantener tu empresa líquida"
+              icon={Brain}
+              title="Un experto que ve lo que otros no ven"
+              description="No es un buscador: es un asesor cercano que revisa cada licitación y te dice qué conviene, qué riesgo tiene el organismo y qué se te puede estar escapando."
               features={[
-                "Análisis de términos de pago",
-                "Predicción de fechas de cobro",
-                "Scoring de riesgo financiero"
+                "Analiza más allá de lo evidente",
+                "Te acompaña en el chat, no solo lista resultados",
+                "Conoce tu rubro y tu inventario"
               ]}
               color="success"
             />
             <PillarCard
-              icon={PieChart}
-              title="Rentabilidad Protegida"
-              description="Nunca comprometas tus márgenes. La IA calcula precios óptimos automáticamente"
+              icon={Scale}
+              title="Un abogado experto en compras públicas"
+              description="Te apoya en el día a día: redacta tus reclamos y apelaciones citando la ley, y te ayuda a cobrar los intereses cuando el Estado te paga tarde."
               features={[
-                "Cálculo automático de márgenes",
-                "Alertas de rentabilidad mínima",
-                "Análisis de competencia"
+                "Reclamos y apelaciones con fundamento legal",
+                "Gestión de cobranza y cálculo de intereses por mora",
+                "Te dice si el caso tiene mérito, sin rodeos"
               ]}
               color="blue"
             />
             <PillarCard
-              icon={Repeat}
-              title="Crecimiento Sostenido"
-              description="Más adjudicaciones con menos esfuerzo. Escala tu participación en licitaciones"
+              icon={Users}
+              title="Postula más y mejor, sin perder tiempo"
+              description="Cruza tu inventario con las compras ágiles abiertas, arma el libro de cada licitación y ordena la gestión de tu equipo comercial en un solo lugar."
               features={[
-                "Matching inteligente 24/7",
-                "Ofertas automáticas",
-                "Historial de éxito"
+                "Matching automático inventario ↔ compras ágiles",
+                "Libro de licitación con revisión de postulaciones",
+                "Gestión de tu equipo comercial"
               ]}
               color="warning"
             />
