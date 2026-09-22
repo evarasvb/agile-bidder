@@ -112,12 +112,31 @@ export function useCampaigns() {
     },
   });
 
+  const deleteCampaign = useMutation({
+    mutationFn: async (id: string) => {
+      // Borra en cascada piezas, métricas y ejecuciones de esta campaña (FK
+      // on delete cascade en la base).
+      const { error } = await supabase.from('marketing_campanas').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['marketing_campaigns'] });
+      // Las ejecuciones de la campaña borrada también se van en cascada; si no
+      // se invalida, la pestaña Ejecución sigue mostrando envíos ya eliminados.
+      queryClient.invalidateQueries({ queryKey: ['marketing_ejecucion_recientes'] });
+    },
+  });
+
   return {
     campaigns: campaigns || [],
     isLoading,
     error,
     createCampaign: createCampaign.mutate,
     updateCampaign: updateCampaign.mutate,
+    updateCampaignAsync: updateCampaign.mutateAsync,
+    actualizandoCampaign: updateCampaign.isPending,
+    deleteCampaign: deleteCampaign.mutateAsync,
+    eliminandoCampaign: deleteCampaign.isPending,
   };
 }
 
