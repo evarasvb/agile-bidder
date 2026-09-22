@@ -1,77 +1,80 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-// Types
+// Types (alineados a las tablas reales: instituciones se identifica por `rut`, no por `id`)
 export interface Institucion {
-  id: string;
-  nombre: string;
   rut: string;
-  codigo?: string;
-  tipo?: string;
-  sector?: string;
-  region?: string;
-  comuna?: string;
-  direccion?: string;
-  total_licitaciones?: number;
-  total_ordenes?: number;
-  monto_total_compras?: number;
-  created_at: string;
-  updated_at: string;
+  nombre: string | null;
+  codigo_entidad?: string | null;
+  sector?: string | null;
+  region?: string | null;
+  comuna?: string | null;
+  direccion?: string | null;
+  oc_total?: number | null;
+  oc_monto_total?: number | null;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 export interface InstitucionDashboard {
-  id: string;
-  institucion_id: string;
-  total_compras: number;
-  monto_total_compras: number;
-  promedio_por_compra: number;
-  ultima_compra_fecha?: string;
-  tendencia_compras?: string;
-  categoria_gasto?: string;
-  score_oportunidad: number;
-  updated_at: string;
+  rut: string | null;
+  nombre: string | null;
+  region: string | null;
+  comuna: string | null;
+  sector: string | null;
+  oc_total: number | null;
+  oc_monto_total: number | null;
+  pago_promedio_dias: number | null;
+  estado_gestion: string | null;
+  prioridad: number | null;
+  asignado_a: string | null;
+  bloqueada: boolean | null;
+  motivo_bloqueo: string | null;
+  notas: string | null;
+  etiquetas: string[] | null;
 }
 
 export interface InstitucionGestion {
-  id: string;
-  institucion_id: string;
-  user_id?: string;
-  estado_gestion: string;
-  fecha_ultimo_contacto?: string;
-  proximo_seguimiento?: string;
-  notas?: string;
-  prioridad: number;
-  created_at: string;
-  updated_at: string;
+  rut: string;
+  asignado_a?: string | null;
+  bloqueada?: boolean;
+  estado?: string;
+  etiquetas?: string[] | null;
+  motivo_bloqueo?: string | null;
+  notas?: string | null;
+  prioridad?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface InstitucionInteraccion {
   id: string;
-  institucion_id: string;
-  gestion_id?: string;
-  user_id?: string;
-  tipo_interaccion: string;
-  descripcion?: string;
-  resultado?: string;
-  fecha_interaccion: string;
+  rut: string;
+  tipo: string;
+  resumen?: string | null;
+  resultado?: string | null;
+  proxima_accion?: string | null;
+  proxima_fecha?: string | null;
   created_at: string;
 }
 
 export interface ConductaPago {
   id: string;
-  institucion_id: string;
-  promedio_dias_pago?: number;
-  ordenes_pagadas_a_tiempo: number;
-  ordenes_pagadas_tardias: number;
-  monto_pendiente: number;
-  score_pago: number;
-  ultima_actualizacion: string;
+  rut_institucion: string;
+  institucion?: string | null;
+  unidad_compra?: string | null;
+  periodo?: string | null;
+  dias_promedio_pago?: number | null;
+  porcentaje_morosidad?: number | null;
+  muestras?: number | null;
+  fuente?: string | null;
+  created_at: string;
 }
 
 // Hook: Listar instituciones
-export function useInstituciones(filters?: { 
-  region?: string; 
-  sector?: string; 
+export function useInstituciones(filters?: {
+  region?: string;
+  sector?: string;
   search?: string;
   limit?: number;
 }) {
@@ -81,7 +84,7 @@ export function useInstituciones(filters?: {
       let query = supabase
         .from('instituciones')
         .select('*')
-        .order('monto_total_compras', { ascending: false, nullsFirst: false });
+        .order('oc_monto_total', { ascending: false, nullsFirst: false });
 
       if (filters?.region) {
         query = query.eq('region', filters.region);
@@ -100,61 +103,85 @@ export function useInstituciones(filters?: {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as Institucion[];
+      return (data || []).map((i) => ({
+        rut: i.rut,
+        nombre: i.nombre,
+        codigo_entidad: i.codigo_entidad,
+        sector: i.sector,
+        region: i.region,
+        comuna: i.comuna,
+        direccion: i.domicilio_legal,
+        oc_total: i.oc_total,
+        oc_monto_total: i.oc_monto_total,
+        created_at: i.created_at,
+        updated_at: i.updated_at,
+      })) as Institucion[];
     },
   });
 }
 
-// Hook: Obtener una institución
-export function useInstitucion(id: string | null) {
+// Hook: Obtener una institución (por rut)
+export function useInstitucion(rut: string | null) {
   return useQuery({
-    queryKey: ['institucion', id],
+    queryKey: ['institucion', rut],
     queryFn: async () => {
-      if (!id) return null;
+      if (!rut) return null;
       const { data, error } = await supabase
         .from('instituciones')
         .select('*')
-        .eq('id', id)
+        .eq('rut', rut)
         .single();
       if (error) throw error;
-      return data as Institucion;
+      return {
+        rut: data.rut,
+        nombre: data.nombre,
+        codigo_entidad: data.codigo_entidad,
+        sector: data.sector,
+        region: data.region,
+        comuna: data.comuna,
+        direccion: data.domicilio_legal,
+        oc_total: data.oc_total,
+        oc_monto_total: data.oc_monto_total,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+      } as Institucion;
     },
-    enabled: !!id,
+    enabled: !!rut,
   });
 }
 
-// Hook: Dashboard de instituciones
+// Hook: Dashboard de instituciones (vista con gestión comercial ya unida)
 export function useInstitucionesDashboard() {
   return useQuery({
     queryKey: ['instituciones-dashboard'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('instituciones_dashboard')
-        .select('*, instituciones(nombre, rut, region)')
-        .order('score_oportunidad', { ascending: false });
+        .select('*')
+        .order('oc_monto_total', { ascending: false, nullsFirst: false });
       if (error) throw error;
-      return data as (InstitucionDashboard & { instituciones: Partial<Institucion> })[];
+      return (data || []) as InstitucionDashboard[];
     },
   });
 }
 
 // Hook: Gestión comercial de instituciones
-export function useInstitucionesGestion(userId?: string) {
+export function useInstitucionesGestion(asignadoA?: string) {
   return useQuery({
-    queryKey: ['instituciones-gestion', userId],
+    queryKey: ['instituciones-gestion', asignadoA],
     queryFn: async () => {
       let query = supabase
         .from('instituciones_gestion')
         .select('*, instituciones(nombre, rut, region)')
         .order('prioridad', { ascending: false });
 
-      if (userId) {
-        query = query.eq('user_id', userId);
+      if (asignadoA) {
+        query = query.eq('asignado_a', asignadoA);
       }
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as (InstitucionGestion & { instituciones: Partial<Institucion> })[];
+      return (data || []) as (InstitucionGestion & { instituciones: Partial<Institucion> | null })[];
     },
   });
 }
@@ -162,9 +189,9 @@ export function useInstitucionesGestion(userId?: string) {
 // Hook: Crear/Actualizar gestión
 export function useUpsertGestion() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async (gestion: Partial<InstitucionGestion>) => {
+    mutationFn: async (gestion: InstitucionGestion) => {
       const { data, error } = await supabase
         .from('instituciones_gestion')
         .upsert(gestion)
@@ -180,29 +207,29 @@ export function useUpsertGestion() {
 }
 
 // Hook: Interacciones de una institución
-export function useInstitucionInteracciones(institucionId: string | null) {
+export function useInstitucionInteracciones(rut: string | null) {
   return useQuery({
-    queryKey: ['institucion-interacciones', institucionId],
+    queryKey: ['institucion-interacciones', rut],
     queryFn: async () => {
-      if (!institucionId) return [];
+      if (!rut) return [];
       const { data, error } = await supabase
         .from('instituciones_interacciones')
         .select('*')
-        .eq('institucion_id', institucionId)
-        .order('fecha_interaccion', { ascending: false });
+        .eq('rut', rut)
+        .order('created_at', { ascending: false });
       if (error) throw error;
-      return data as InstitucionInteraccion[];
+      return (data || []) as InstitucionInteraccion[];
     },
-    enabled: !!institucionId,
+    enabled: !!rut,
   });
 }
 
 // Hook: Crear interacción
 export function useCrearInteraccion() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async (interaccion: Partial<InstitucionInteraccion>) => {
+    mutationFn: async (interaccion: Omit<InstitucionInteraccion, 'id' | 'created_at'>) => {
       const { data, error } = await supabase
         .from('instituciones_interacciones')
         .insert(interaccion)
@@ -212,26 +239,28 @@ export function useCrearInteraccion() {
       return data;
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['institucion-interacciones', variables.institucion_id] });
+      queryClient.invalidateQueries({ queryKey: ['institucion-interacciones', variables.rut] });
     },
   });
 }
 
-// Hook: Conducta de pago
-export function useConductaPago(institucionId: string | null) {
+// Hook: Conducta de pago (última muestra registrada para la institución)
+export function useConductaPago(rutInstitucion: string | null) {
   return useQuery({
-    queryKey: ['conducta-pago', institucionId],
+    queryKey: ['conducta-pago', rutInstitucion],
     queryFn: async () => {
-      if (!institucionId) return null;
+      if (!rutInstitucion) return null;
       const { data, error } = await supabase
         .from('conducta_pago')
         .select('*')
-        .eq('institucion_id', institucionId)
-        .single();
-      if (error && error.code !== 'PGRST116') throw error;
+        .eq('rut_institucion', rutInstitucion)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
       return data as ConductaPago | null;
     },
-    enabled: !!institucionId,
+    enabled: !!rutInstitucion,
   });
 }
 
@@ -240,18 +269,17 @@ export function useInstitucionesStats() {
   return useQuery({
     queryKey: ['instituciones-stats'],
     queryFn: async () => {
-      const { data, error, count } = await supabase
+      const { count } = await supabase
         .from('instituciones')
-        .select('*', { count: 'exact', head: false })
-        .limit(1);
+        .select('*', { count: 'exact', head: true });
 
       const { data: topData } = await supabase
         .from('instituciones')
-        .select('monto_total_compras')
-        .order('monto_total_compras', { ascending: false })
+        .select('oc_monto_total')
+        .order('oc_monto_total', { ascending: false })
         .limit(10);
 
-      const totalMonto = topData?.reduce((sum: number, i: any) => sum + (i.monto_total_compras || 0), 0) || 0;
+      const totalMonto = topData?.reduce((sum: number, i) => sum + (i.oc_monto_total || 0), 0) || 0;
 
       return {
         totalInstituciones: count || 0,

@@ -357,7 +357,7 @@ export function useUpsertOrdenCompra() {
   return useMutation({
     mutationFn: async ({ orden, items }: { orden: Partial<OrdenCompra>; items?: Partial<OrdenCompraItem>[] }) => {
       // Mapea la interfaz a columnas reales de la tabla.
-      const ordenData: RawOC = {
+      const ordenData = {
         codigo: orden.codigo!,
         numero_oc: orden.codigo!,
         nombre: orden.nombre ?? null,

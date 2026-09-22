@@ -3,9 +3,11 @@ import { useState, useEffect, useRef } from 'react';
 import { campaignAudience } from '@/services/campaignResult';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useCampaigns, useCampaignPiezas, useCampaignMetricas, useMarketingEjecucionesRecientes, type MarketingPieza } from '@/hooks/useMarketingCampaigns';
+import { useCampaigns, useCampaignPiezas, useCampaignMetricas, useMarketingEjecucionesRecientes, type MarketingPieza, type MarketingCampaign } from '@/hooks/useMarketingCampaigns';
 import { NuevaCampanaRapida } from '@/components/marketing/NuevaCampanaRapida';
+import { EditarCampanaDialog } from '@/components/marketing/EditarCampanaDialog';
 import { PiezaDetalleDialog } from '@/components/marketing/PiezaDetalleDialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ContactosSaludPanel } from '@/components/marketing/ContactosSaludPanel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,7 +15,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { AlertCircle, BarChart3, Rocket, Plus, Send, Users, Download } from 'lucide-react';
+import { AlertCircle, BarChart3, Rocket, Plus, Send, Users, Download, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 
@@ -48,8 +51,10 @@ const COLUMNAS_CONTACTOS: DataTableColumn<MarketingContacto>[] = [
 ];
 
 export default function MarketingControlCenter() {
-  const { campaigns, isLoading } = useCampaigns();
+  const { campaigns, isLoading, updateCampaignAsync, actualizandoCampaign, deleteCampaign, eliminandoCampaign } = useCampaigns();
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
+  const [campanaEditando, setCampanaEditando] = useState<MarketingCampaign | null>(null);
+  const [campanaBorrando, setCampanaBorrando] = useState<MarketingCampaign | null>(null);
   const [showNewCampaign, setShowNewCampaign] = useState(false);
   const [piezaAbierta, setPiezaAbierta] = useState<MarketingPieza | null>(null);
   const [contactos, setContactos] = useState<MarketingContacto[]>([]);
@@ -128,10 +133,26 @@ export default function MarketingControlCenter() {
 
   const selectedCampaign = campaigns.find(c => c.id === selectedCampaignId);
   const { piezas, updatePiezaAsync, actualizandoPieza, ejecutarPieza, ejecutandoPieza } = useCampaignPiezas(selectedCampaignId || '');
+  // Piezas de la campaña que se está EDITANDO, que puede ser distinta de la
+  // seleccionada (se puede editar una tarjeta sin haberla seleccionado antes).
+  const {
+    piezas: piezasEditando, isLoading: piezasEditandoLoading, createPiezaAsync, creandoPieza,
+    updatePiezaAsync: actualizarPiezaEditando, deletePiezaAsync, eliminandoPieza,
+  } = useCampaignPiezas(campanaEditando?.id || '');
   const { metricas, totalEnviados, totalConversiones, promTasaApertura } = useCampaignMetricas(selectedCampaignId || '');
   const { ejecuciones: ejecucionesRecientes, isLoading: cargandoEjecuciones, isError: errorEjecuciones } = useMarketingEjecucionesRecientes();
 
   const audiencia = campaignAudience(contactosFiltrados, audienciaConfiable && !cargandoContactos && !errorContactos);
+  // Audiencia REAL de envío: la de la campaña seleccionada (su propio cluster
+  // guardado), no el filtro suelto de "Gestión de Contactos" — no todas las
+  // campañas son para todos.
+  const contactosDeCampana = (campana: MarketingCampaign | undefined) => !campana ? [] : contactos.filter(c =>
+    (!campana.audiencia_fuente || c.fuente_datos === campana.audiencia_fuente) &&
+    (!campana.audiencia_rubro || c.rubro === campana.audiencia_rubro) &&
+    (!campana.audiencia_categoria || c.categoria === campana.audiencia_categoria) &&
+    (!campana.audiencia_suscripcion || c.estado_suscripcion === campana.audiencia_suscripcion)
+  );
+  const audienciaCampana = campaignAudience(contactosDeCampana(selectedCampaign), audienciaConfiable && !cargandoContactos && !errorContactos);
   const piezaActual = piezaAbierta ? piezas.find(p => p.id === piezaAbierta.id) || null : null;
   const resultadoEnvio = piezaActual ? resultadosEnvio[piezaActual.id] : null;
   const handleExecutePieza = async (piezaId: string) => {
@@ -139,9 +160,9 @@ export default function MarketingControlCenter() {
     const pieza = piezas.find(p => p.id === piezaId);
     if (!pieza || pieza.canal !== 'email' || pieza.estado !== 'draft') return;
     const showResult = (message: string) => setResultadosEnvio(current => ({ ...current, [piezaId]: message }));
-    if (audiencia.error) { showResult(audiencia.error); return; }
-    const ids = [...audiencia.ids];
-    if (!window.confirm('¿Enviar «' + pieza.nombre + '» a los ' + ids.length + ' contactos suscritos del segmento de Gestión de Contactos? Se usará el contenido guardado. Esta acción enviará correos reales y no se puede deshacer.')) return;
+    if (audienciaCampana.error) { showResult(audienciaCampana.error); return; }
+    const ids = [...audienciaCampana.ids];
+    if (!window.confirm('¿Enviar «' + pieza.nombre + '» a los ' + ids.length + ' contactos suscritos del cluster de esta campaña? Se usará el contenido guardado. Esta acción enviará correos reales y no se puede deshacer.')) return;
     envioEnCurso.current = true;
     showResult('Enviando correos… Espera el resultado antes de intentar otro envío.');
     try {
@@ -185,7 +206,11 @@ export default function MarketingControlCenter() {
 
         {/* CAMPAIGNS TAB */}
         <TabsContent value="campaigns" className="space-y-4">
-          <p role="status" className="text-sm">{audiencia.error || `Audiencia seleccionada: ${audiencia.ids.length} contactos suscritos. Ajusta los filtros en Gestión de Contactos.`}</p>
+          <p role="status" className="text-sm">
+            {!selectedCampaign
+              ? 'Elige una campaña para ver su audiencia.'
+              : audienciaCampana.error || `«${selectedCampaign.nombre}» le llega a ${audienciaCampana.ids.length} contactos suscritos. Cambia el cluster desde Editar campaña.`}
+          </p>
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
             <h2 className="text-xl sm:text-2xl font-bold">Tus campañas</h2>
             <Button onClick={() => setShowNewCampaign(true)}>
@@ -214,8 +239,24 @@ export default function MarketingControlCenter() {
                   className={`min-w-0 transition-colors focus-within:ring-2 focus-within:ring-ring ${selectedCampaignId === campaign.id ? 'border-primary bg-primary/5' : ''}`}
 
                 >
-                  <CardHeader>
-                    <CardTitle className="text-lg break-words"><button type="button" className="min-h-11 w-full text-left rounded-sm hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-pressed={selectedCampaignId === campaign.id} onClick={() => setSelectedCampaignId(campaign.id)}>{campaign.nombre}</button></CardTitle>
+                  <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
+                    <CardTitle className="text-lg break-words flex-1"><button type="button" className="min-h-11 w-full text-left rounded-sm hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-pressed={selectedCampaignId === campaign.id} onClick={() => setSelectedCampaignId(campaign.id)}>{campaign.nombre}</button></CardTitle>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        type="button" variant="ghost" size="icon" className="h-8 w-8"
+                        aria-label={`Editar ${campaign.nombre}`}
+                        onClick={(e) => { e.stopPropagation(); setCampanaEditando(campaign); }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive"
+                        aria-label={`Eliminar ${campaign.nombre}`}
+                        onClick={(e) => { e.stopPropagation(); setCampanaBorrando(campaign); }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-2">
                     <div>
@@ -266,7 +307,7 @@ export default function MarketingControlCenter() {
                         <Button
                           size="sm"
                           onClick={(e) => { e.stopPropagation(); handleExecutePieza(pieza.id); }}
-                          disabled={!!audiencia.error || !!bloqueados[pieza.id] || ejecutandoPieza || pieza.estado !== 'draft' || pieza.canal !== 'email'}
+                          disabled={!!audienciaCampana.error || !!bloqueados[pieza.id] || ejecutandoPieza || pieza.estado !== 'draft' || pieza.canal !== 'email'}
                         >
                           <Send className="w-3 h-3 mr-1" />
                           {ejecutandoPieza ? 'Enviando…' : pieza.estado === 'ejecutado' ? 'Ejecutado' : pieza.canal !== 'email' ? 'Manual' : 'Revisar envío'}
@@ -566,10 +607,59 @@ export default function MarketingControlCenter() {
         }}
         onEjecutar={handleExecutePieza}
         resultadoEnvio={resultadoEnvio}
-        bloqueoEnvio={audiencia.error || (piezaActual && bloqueados[piezaActual.id] ? "Este envío ya fue procesado o requiere revisión manual; no se repetirá." : null)}
+        bloqueoEnvio={audienciaCampana.error || (piezaActual && bloqueados[piezaActual.id] ? "Este envío ya fue procesado o requiere revisión manual; no se repetirá." : null)}
         guardando={actualizandoPieza}
         ejecutando={ejecutandoPieza}
       />
+
+      <EditarCampanaDialog
+        campana={campanaEditando}
+        piezas={piezasEditando}
+        rubros={rubros}
+        categorias={categorias}
+        suscripciones={suscripciones}
+        onOpenChange={(open) => !open && setCampanaEditando(null)}
+        onGuardar={(id, updates) => updateCampaignAsync({ id, ...updates })}
+        onCrearPieza={createPiezaAsync}
+        onActualizarPieza={({ id, ...updates }) => actualizarPiezaEditando({ id, ...updates })}
+        onEliminarPieza={deletePiezaAsync}
+        guardando={actualizandoCampaign}
+        procesandoPiezas={creandoPieza || eliminandoPieza}
+        piezasLoading={piezasEditandoLoading}
+      />
+
+      <AlertDialog open={!!campanaBorrando} onOpenChange={(open) => !open && !eliminandoCampaign && setCampanaBorrando(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar campaña?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará "{campanaBorrando?.nombre}" junto con todas sus piezas, métricas y envíos registrados. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={eliminandoCampaign}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={eliminandoCampaign}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!campanaBorrando) return;
+                try {
+                  await deleteCampaign(campanaBorrando.id);
+                  if (selectedCampaignId === campanaBorrando.id) setSelectedCampaignId(null);
+                  toast.success('Campaña eliminada');
+                  setCampanaBorrando(null);
+                } catch (error) {
+                  toast.error(`No se pudo eliminar: ${error instanceof Error ? error.message : 'error desconocido'}`);
+                }
+              }}
+            >
+              {eliminandoCampaign && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

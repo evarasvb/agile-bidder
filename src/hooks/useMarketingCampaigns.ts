@@ -18,6 +18,12 @@ export interface MarketingCampaign {
   creado_en: string;
   actualizado_en: string;
   notas?: string;
+  // Cluster de clientes al que le llega esta campaña — no todas son para
+  // todos. null/undefined = ese filtro no aplica (llega a todos en ese eje).
+  audiencia_fuente?: string | null;
+  audiencia_rubro?: string | null;
+  audiencia_categoria?: string | null;
+  audiencia_suscripcion?: string | null;
 }
 
 export interface MarketingPieza {
@@ -112,12 +118,31 @@ export function useCampaigns() {
     },
   });
 
+  const deleteCampaign = useMutation({
+    mutationFn: async (id: string) => {
+      // Borra en cascada piezas, métricas y ejecuciones de esta campaña (FK
+      // on delete cascade en la base).
+      const { error } = await supabase.from('marketing_campanas').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['marketing_campaigns'] });
+      // Las ejecuciones de la campaña borrada también se van en cascada; si no
+      // se invalida, la pestaña Ejecución sigue mostrando envíos ya eliminados.
+      queryClient.invalidateQueries({ queryKey: ['marketing_ejecucion_recientes'] });
+    },
+  });
+
   return {
     campaigns: campaigns || [],
     isLoading,
     error,
     createCampaign: createCampaign.mutate,
     updateCampaign: updateCampaign.mutate,
+    updateCampaignAsync: updateCampaign.mutateAsync,
+    actualizandoCampaign: updateCampaign.isPending,
+    deleteCampaign: deleteCampaign.mutateAsync,
+    eliminandoCampaign: deleteCampaign.isPending,
   };
 }
 
@@ -181,7 +206,17 @@ export function useCampaignPiezas(campaignId: string) {
         .single();
 
       if (error) throw error;
-      return data;
+      return data as unknown as MarketingPieza;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['marketing_piezas', campaignId] });
+    },
+  });
+
+  const deletePieza = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('marketing_piezas').delete().eq('id', id);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['marketing_piezas', campaignId] });
@@ -192,11 +227,15 @@ export function useCampaignPiezas(campaignId: string) {
     piezas: piezas || [],
     isLoading,
     createPieza: createPieza.mutate,
+    createPiezaAsync: createPieza.mutateAsync,
+    creandoPieza: createPieza.isPending,
     ejecutarPieza: ejecutarPieza.mutateAsync,
     ejecutandoPieza: ejecutarPieza.isPending,
     updatePieza: updatePieza.mutate,
     updatePiezaAsync: updatePieza.mutateAsync,
     actualizandoPieza: updatePieza.isPending,
+    deletePiezaAsync: deletePieza.mutateAsync,
+    eliminandoPieza: deletePieza.isPending,
   };
 }
 

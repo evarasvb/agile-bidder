@@ -12,7 +12,6 @@ import {
   CheckCircle2,
   ClipboardList,
   ShoppingCart,
-  Lock,
   Check,
   KeyRound,
   Loader2,
@@ -232,6 +231,16 @@ export default function AcademiaCurso() {
   const [desbloqueado, setDesbloqueado] = useState<Modulo[] | null>(null);
   const [email, setEmail] = useState("");
   const [recuperando, setRecuperando] = useState(false);
+  const [comprando, setComprando] = useState(false);
+
+  // Aviso al volver de Mercado Pago (?pago=ok|pendiente|error).
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get("pago");
+    if (p === "ok") toast.success("¡Pago recibido! Te enviamos el código por correo. Desbloquéalo abajo con tu correo o código.");
+    else if (p === "pendiente") toast.info("Tu pago quedó pendiente. Cuando se apruebe te llega el código por correo.");
+    else if (p === "error") toast.error("El pago no se completó. Puedes intentar de nuevo.");
+    if (p) window.history.replaceState({}, "", window.location.pathname);
+  }, []);
 
   if (!curso) {
     return <Navigate to="/academia" replace />;
@@ -273,6 +282,21 @@ export default function AcademiaCurso() {
     setDesbloqueado(data.modulos as Modulo[]);
     toast.success("¡Acceso recuperado! 🎉");
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Compra dinámica con Mercado Pago (Checkout Pro): crea la preferencia en el
+  // servidor y redirige. Reemplaza el link estático mpago.la.
+  const comprarConMP = async () => {
+    setComprando(true);
+    const { data, error } = await supabase.functions.invoke("crear-pago-curso", {
+      body: { slug: curso.slug, back_url: window.location.origin },
+    });
+    if (error || !data?.url) {
+      setComprando(false);
+      toast.error(data?.error || "No pudimos iniciar el pago. Intenta de nuevo.");
+      return;
+    }
+    window.location.href = data.url;
   };
 
   const esPremiumBloqueado = curso.premium && !desbloqueado;
@@ -442,23 +466,16 @@ export default function AcademiaCurso() {
                       </ul>
                     </div>
                   )}
-                  {curso.pagoUrl ? (
-                    <Button
-                      asChild
-                      size="lg"
-                      className="bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2"
-                    >
-                      <a href={curso.pagoUrl} target="_blank" rel="noopener noreferrer" aria-label="Comprar curso con Mercado Pago (abre en nueva pestaña)">
-                        <ShoppingCart className="h-5 w-5" aria-hidden="true" />
-                        Comprar con Mercado Pago
-                      </a>
-                    </Button>
-                  ) : (
-                    <Button size="lg" disabled className="gap-2">
-                      <Lock className="h-5 w-5" />
-                      Disponible muy pronto
-                    </Button>
-                  )}
+                  <Button
+                    size="lg"
+                    onClick={comprarConMP}
+                    disabled={comprando}
+                    className="bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2"
+                    aria-label="Comprar curso con Mercado Pago"
+                  >
+                    {comprando ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <ShoppingCart className="h-5 w-5" aria-hidden="true" />}
+                    {curso.precio ? `Comprar con Mercado Pago · ${curso.precio}` : "Comprar con Mercado Pago"}
+                  </Button>
                 </CardContent>
               </Card>
 

@@ -30,6 +30,7 @@ const WebinarConvenioMarcoSaas = lazy(() => import("./pages/WebinarConvenioMarco
 const WebinarVendeleAlEstado = lazy(() => import("./pages/WebinarVendeleAlEstado"));
 const AcademiaCurso = lazy(() => import("./pages/AcademiaCurso"));
 const AcademiaLeads = lazy(() => import("./pages/AcademiaLeads"));
+const MisCursos = lazy(() => import("./pages/MisCursos"));
 const ProveedoresEstado = lazy(() => import("./pages/ProveedoresEstado"));
 const Auth = lazy(() => import("./pages/Auth"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
@@ -46,6 +47,7 @@ const ChatIA = lazy(() => import("./pages/ChatIA"));
 const LibroLicitacion = lazy(() => import("./pages/experto/LibroLicitacion"));
 const Compartido = lazy(() => import("./pages/experto/Compartido"));
 const Compartidos = lazy(() => import("./pages/experto/Compartidos"));
+const Abogado = lazy(() => import("./pages/experto/Abogado"));
 
 const OportunidadesPanel = lazy(() => import("./pages/Oportunidades"));
 const OportunidadDetalle = lazy(() => import("./pages/OportunidadDetalle"));
@@ -81,6 +83,7 @@ const ReporteMercado = lazy(() => import("./pages/reportes/ReporteMercado"));
 const ReporteCompetidores = lazy(() => import("./pages/reportes/ReporteCompetidores"));
 const ReporteConvenioMarco = lazy(() => import("./pages/reportes/ReporteConvenioMarco"));
 const ConsultaLibre = lazy(() => import("./pages/reportes/ConsultaLibre"));
+const ConvenioMarcoGestion = lazy(() => import("./pages/ConvenioMarcoGestion"));
 
 const AdminTraccion = lazy(() => import("./pages/AdminTraccion"));
 const AdminEvaristo = lazy(() => import("./pages/AdminEvaristo"));
@@ -191,6 +194,7 @@ const App = () => (
             <Route path="/experto" element={<LibroLicitacion />} />
             <Route path="/experto/libro/:codigo" element={<LibroLicitacion />} />
             <Route path="/experto/compartidos" element={<Compartidos />} />
+            <Route path="/experto/abogado" element={<Abogado />} />
             {/* Legacy: la lista vieja duplicaba Compras Ágiles (y hasta se titulaba así) */}
             <Route path="/licitaciones" element={<Navigate to="/oportunidades?tipo=licitacion" replace />} />
             <Route path="/licitaciones-nuevas" element={<Navigate to="/oportunidades" replace />} />
@@ -215,7 +219,8 @@ const App = () => (
             {/* ----- PIPELINE ----- */}
             <Route path="/pipeline" element={<Pipeline />} />
 
-            {/* ----- ACADEMIA (contactos del formulario público) ----- */}
+            {/* ----- ACADEMIA ----- */}
+            <Route path="/academia/cursos" element={<MisCursos />} />
             <Route path="/academia/leads" element={<AdminOnlyRoute><AcademiaLeads /></AdminOnlyRoute>} />
             <Route path="/proveedores-estado" element={<AdminOnlyRoute><ProveedoresEstado /></AdminOnlyRoute>} />
             <Route path="/admin/traccion" element={<AdminOnlyRoute><AdminTraccion /></AdminOnlyRoute>} />
@@ -243,6 +248,9 @@ const App = () => (
             <Route path="/reportes/convenio-marco" element={<ReporteConvenioMarco />} />
             <Route path="/reportes/consulta" element={<ConsultaLibre />} />
             <Route path="/reportes/ordenes-compra" element={<ReporteOrdenesCompra />} />
+
+            {/* ----- CONVENIO MARCO (gestión de marca / distribuidores) ----- */}
+            <Route path="/convenio-marco" element={<ConvenioMarcoGestion />} />
 
             {/* ----- MARKETING ----- */}
             <Route path="/marketing/control" element={<AdminOnlyRoute><MarketingControlCenter /></AdminOnlyRoute>} />

@@ -291,19 +291,19 @@ export function useOrdenesCompraBI(filters?: {
           *,
           ordenes_compra_items (*)
         `)
-        .order('fecha_envio', { ascending: false });
+        .order('fecha_envio_oc', { ascending: false });
 
       if (filters?.desde) {
-        query = query.gte('fecha_envio', filters.desde);
+        query = query.gte('fecha_envio_oc', filters.desde);
       }
       if (filters?.hasta) {
-        query = query.lte('fecha_envio', filters.hasta);
+        query = query.lte('fecha_envio_oc', filters.hasta);
       }
       if (filters?.proveedor_rut) {
-        query = query.eq('proveedor_rut', filters.proveedor_rut);
+        query = query.eq('rut_proveedor', filters.proveedor_rut);
       }
       if (filters?.institucion_rut) {
-        query = query.eq('institucion_rut', filters.institucion_rut);
+        query = query.eq('rut_demandante', filters.institucion_rut);
       }
       if (filters?.limit) {
         query = query.limit(filters.limit);

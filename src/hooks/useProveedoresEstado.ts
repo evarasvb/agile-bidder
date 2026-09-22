@@ -58,7 +58,7 @@ export function useProveedorEstadoDetalle(rut: string | null) {
       if (!rut) return null;
       const { data, error } = await supabase.rpc('proveedor_estado_detalle', { p_rut: rut });
       if (error) throw error;
-      return (data || { rubros: [], instituciones: [] }) as ProveedorDetalle;
+      return (data || { rubros: [], instituciones: [] }) as unknown as ProveedorDetalle;
     },
     staleTime: 60000,
   });

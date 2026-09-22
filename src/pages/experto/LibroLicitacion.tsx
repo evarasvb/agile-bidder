@@ -77,6 +77,7 @@ interface LibroExperto {
   bases?: any[];
   documentos?: any[];
   top_adjudicatarios?: any[];
+  licitaciones_similares?: { codigo: string; titulo?: string; adjudicatario?: string; monto_adjudicado?: number | null; monto_estimado?: number | null }[];
   plan?: string;
   bajo_agua_cuota?: { plan?: string; usados?: number; maximo?: number | null; periodo?: string };
 }
@@ -415,6 +416,7 @@ export default function LibroLicitacion() {
           precioUnitario: match.inventoryItem.precio_unitario,
           total: match.inventoryItem.precio_unitario * item.cantidad,
           matchScore: match.score,
+          imagenUrl: match.inventoryItem.imagen_url ?? null,
         } as ItemCotizacion;
       })
       .filter((x): x is ItemCotizacion => x !== null);

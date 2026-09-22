@@ -24,8 +24,10 @@ import {
   GraduationCap,
   Sparkles,
   Shield,
+  ShieldCheck,
   LifeBuoy,
   Rocket,
+  Scale,
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -40,7 +42,7 @@ interface NavItem {
   url: string;
   icon: React.ElementType;
   adminOnly?: boolean;
-  children?: { title: string; url: string; icon?: React.ElementType }[];
+  children?: { title: string; url: string; icon?: React.ElementType; adminOnly?: boolean }[];
 }
 
 // Navigation items - organized per requirements
@@ -66,6 +68,10 @@ const navItems: NavItem[] = [
     title: "Experto",
     url: "/experto",
     icon: GraduationCap,
+    children: [
+      { title: "Libro de licitación", url: "/experto", icon: GraduationCap },
+      { title: "Don Evaristo Abogado", url: "/experto/abogado", icon: Scale },
+    ],
   },
   {
     title: "Postulaciones",
@@ -78,10 +84,18 @@ const navItems: NavItem[] = [
     icon: Package,
   },
   {
-    adminOnly: true,
+    title: "Convenio Marco",
+    url: "/convenio-marco",
+    icon: ShieldCheck,
+  },
+  {
     title: "Academia",
-    url: "/academia/leads",
+    url: "/academia/cursos",
     icon: GraduationCap,
+    children: [
+      { title: "Mis cursos", url: "/academia/cursos", icon: GraduationCap },
+      { title: "Contactos", url: "/academia/leads", icon: Users, adminOnly: true },
+    ],
   },
   {
     title: "Reportes",
@@ -118,6 +132,12 @@ const navItems: NavItem[] = [
     title: "Marketing",
     url: "/marketing/control",
     icon: Rocket,
+  },
+  {
+    adminOnly: true,
+    title: "Tracción",
+    url: "/admin/traccion",
+    icon: TrendingUp,
   },
   {
     title: "Soporte",
@@ -276,7 +296,7 @@ export function AppSidebar({ open = false, onClose }: AppSidebarProps) {
                     </button>
                     {isExpanded && (
                       <ul className="mt-1 ml-4 space-y-1">
-                        {item.children?.map((child) => {
+                        {item.children?.filter((child) => !child.adminOnly || esAdmin).map((child) => {
                           const ChildIcon = child.icon;
                           const isChildActive = child.url === bestUrl && bestLen >= 0;
                           return (
