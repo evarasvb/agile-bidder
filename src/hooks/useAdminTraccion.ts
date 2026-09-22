@@ -34,7 +34,7 @@ export interface CampanasResumen {
 export function useTraccionResumen() {
   return useQuery({
     queryKey: ['admin_traccion_resumen'],
-    queryFn: async () => (await supabase.rpc('admin_traccion_resumen')).data as TraccionResumen | null,
+    queryFn: async () => (await supabase.rpc('admin_traccion_resumen')).data as unknown as TraccionResumen | null,
   });
 }
 
@@ -48,6 +48,19 @@ export function useClientesNuevos(dias = 30) {
 export function useCampanasResumen() {
   return useQuery({
     queryKey: ['admin_campanas_resumen'],
-    queryFn: async () => (await supabase.rpc('admin_campanas_resumen')).data as CampanasResumen | null,
+    queryFn: async () => (await supabase.rpc('admin_campanas_resumen')).data as unknown as CampanasResumen | null,
+  });
+}
+
+// Actividad de TODOS los clientes (no solo los nuevos): última conexión,
+// inventario y ofertas, para saber quién usa el sistema y quién no.
+export function useClientesActividad() {
+  return useQuery({
+    // Sin tope práctico: la RPC ordena por última conexión ascendente y, si se
+    // truncara con un límite bajo, un negocio con más clientes que ese límite
+    // perdería justo a los que sí se conectaron hace poco (quedarían fuera del
+    // corte). 20000 es "todos" para cualquier escala realista de este negocio.
+    queryKey: ['admin_clientes_actividad'],
+    queryFn: async () => ((await supabase.rpc('admin_clientes_actividad', { lim: 20000 })).data ?? []) as ClienteNuevo[],
   });
 }

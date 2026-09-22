@@ -181,7 +181,7 @@ export function useCampaignPiezas(campaignId: string) {
         .single();
 
       if (error) throw error;
-      return data;
+      return data as unknown as MarketingPieza;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['marketing_piezas', campaignId] });

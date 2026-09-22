@@ -3,13 +3,13 @@
 // Solo la ve el admin (AdminOnlyRoute + RPC security-definer). Sirve para saber
 // a quién contactar y si el negocio está creciendo o no.
 import { useState } from "react";
-import { useTraccionResumen, useClientesNuevos, useCampanasResumen, type ClienteNuevo, type CampanasResumen } from "@/hooks/useAdminTraccion";
+import { useTraccionResumen, useClientesNuevos, useCampanasResumen, useClientesActividad, type ClienteNuevo, type CampanasResumen } from "@/hooks/useAdminTraccion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, Users, Package, FileText, Wifi, Crown, Mail, UserPlus } from "lucide-react";
+import { TrendingUp, Users, Package, FileText, Wifi, Crown, Mail, UserPlus, Activity } from "lucide-react";
 
 type CampanaWebinar = CampanasResumen["webinar_por_campana"][number];
 
@@ -70,6 +70,71 @@ const COLUMNAS_CLIENTES: DataTableColumn<ClienteNuevo>[] = [
   },
 ];
 
+// "Nunca se conectó" debe ordenar como lo más antiguo (para verlo primero al
+// ordenar ascendente), no como vacío al final (así ordena esta tabla por defecto).
+const EPOCA = "1970-01-01T00:00:00Z";
+
+// Mismos umbrales para la insignia en pantalla y para el CSV exportado.
+function claseActividad(ultima: string | null): "nunca" | "activo" | "poco activo" | "inactivo" {
+  if (!ultima) return "nunca";
+  const dias = (Date.now() - new Date(ultima).getTime()) / 86_400_000;
+  if (dias <= 7) return "activo";
+  if (dias <= 30) return "poco activo";
+  return "inactivo";
+}
+
+function EstadoActividad({ ultima }: { ultima: string | null }) {
+  const clase = claseActividad(ultima);
+  if (clase === "nunca") return <Badge variant="destructive" className="text-[10px]">nunca</Badge>;
+  if (clase === "activo") return <Badge className="bg-green-100 text-green-700 hover:bg-green-100 text-[10px]">activo</Badge>;
+  if (clase === "poco activo") return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 text-[10px]">poco activo</Badge>;
+  return <Badge variant="secondary" className="text-[10px]">inactivo</Badge>;
+}
+
+const COLUMNAS_ACTIVIDAD: DataTableColumn<ClienteNuevo>[] = [
+  {
+    id: "cliente",
+    header: "Cliente",
+    cell: (c) => (
+      <>
+        <p className="font-medium truncate max-w-[180px]">{c.empresa_nombre || "—"}</p>
+        <p className="text-xs text-muted-foreground truncate max-w-[180px]">{c.email}</p>
+      </>
+    ),
+    sortValue: (c) => c.empresa_nombre || c.email,
+    exportValue: (c) => [c.empresa_nombre, c.email].filter(Boolean).join(" · "),
+  },
+  {
+    id: "estado",
+    header: "Actividad",
+    cell: (c) => <EstadoActividad ultima={c.last_sign_in_at} />,
+    sortValue: (c) => c.last_sign_in_at ?? EPOCA,
+    exportValue: (c) => claseActividad(c.last_sign_in_at),
+  },
+  {
+    id: "conexion",
+    header: "Última conexión",
+    cell: (c) => <span className="whitespace-nowrap text-xs">{c.last_sign_in_at ? fecha(c.last_sign_in_at) : "Nunca"}</span>,
+    sortValue: (c) => c.last_sign_in_at ?? EPOCA,
+    exportValue: (c) => (c.last_sign_in_at ? fecha(c.last_sign_in_at) : "Nunca"),
+  },
+  {
+    id: "registro",
+    header: "Cliente desde",
+    cell: (c) => <span className="whitespace-nowrap text-xs">{fecha(c.created_at)}</span>,
+    sortValue: (c) => c.created_at,
+    exportValue: (c) => fecha(c.created_at),
+  },
+  { id: "inventario", header: "Inventario", align: "center", cell: (c) => <BadgeConteo n={c.items_inventario} />, sortValue: (c) => Number(c.items_inventario || 0) },
+  { id: "ofertas", header: "Ofertas", align: "center", cell: (c) => <BadgeConteo n={c.ofertas} />, sortValue: (c) => Number(c.ofertas || 0) },
+  {
+    id: "plan",
+    header: "Plan",
+    cell: (c) => <Badge variant={c.plan && c.plan !== "free" ? "default" : "secondary"} className="text-[10px]">{c.plan || "free"}</Badge>,
+    sortValue: (c) => c.plan || "free",
+  },
+];
+
 const COLUMNAS_CAMPANAS: DataTableColumn<CampanaWebinar>[] = [
   { id: "campana", header: "Campaña", cell: (w) => <span className="font-medium">{w.campana}</span>, sortValue: (w) => w.campana },
   { id: "total", header: "Total", align: "center", cell: (w) => w.total, sortValue: (w) => Number(w.total || 0) },
@@ -97,6 +162,7 @@ export default function AdminTraccion() {
   const { data: resumen, isLoading: cargandoResumen } = useTraccionResumen();
   const { data: clientes = [], isLoading: cargandoClientes } = useClientesNuevos(dias);
   const { data: campanas, isLoading: cargandoCampanas } = useCampanasResumen();
+  const { data: actividad = [], isLoading: cargandoActividad } = useClientesActividad();
 
   const activacionPct = resumen && resumen.clientes_total > 0
     ? Math.round((resumen.activados / resumen.clientes_total) * 100) : 0;
@@ -126,6 +192,29 @@ export default function AdminTraccion() {
           <Kpi icon={Crown} label="Plan Pro" value={resumen.plan_pro} />
         </div>
       )}
+
+      {/* Actividad de TODOS los clientes: quién usa el sistema y quién no */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2"><Activity className="h-4 w-4" />Actividad de clientes</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DataTable<ClienteNuevo>
+            storageKey="traccion-actividad"
+            rows={actividad}
+            rowKey={(c) => c.id}
+            loading={cargandoActividad}
+            itemLabel="clientes"
+            columns={COLUMNAS_ACTIVIDAD}
+            searchText={(c) => `${c.empresa_nombre ?? ""} ${c.email ?? ""} ${c.plan ?? ""}`}
+            searchPlaceholder="Buscar por empresa, correo o plan…"
+            defaultSort={{ id: "conexion", dir: "asc" }}
+            exportFileName="clientes-actividad"
+            emptyMessage="Sin clientes registrados."
+            maxHeight="60vh"
+          />
+        </CardContent>
+      </Card>
 
       {/* Clientes nuevos */}
       <Card>

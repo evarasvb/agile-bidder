@@ -22,7 +22,7 @@ const FIRMAVB_COLORS = {
 };
 
 const FIRMAVB_LOGO = 'https://firmavb.cl/logo.png';
-const FIRMAVB_FROM = 'FirmaVB <notificaciones@notifications.firmavb.cl>';
+const FIRMAVB_FROM = 'FirmaVB <notificaciones@firmavb.cl>';
 const FIRMAVB_URL = 'https://firmavb.cl';
 
 interface NotificationRequest {

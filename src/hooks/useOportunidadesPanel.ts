@@ -249,8 +249,9 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         if (palabras.length) {
           const res = await Promise.all(
             palabras.map((pal) =>
-              supabase
-                .rpc('buscar_oportunidades', { p_texto: pal, p_incluir_cerradas: incluirCerradas, p_limite: 100 })
+              Promise.resolve(
+                supabase.rpc('buscar_oportunidades', { p_texto: pal, p_incluir_cerradas: incluirCerradas, p_limite: 100 }),
+              )
                 .then((r: any) => ({ pal, hits: (r?.data || []) as any[] }))
                 .catch(() => ({ pal, hits: [] as any[] })),
             ),
@@ -313,7 +314,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         rubroCAQuery,
         rubroLicQuery,
         afinidadQuery,
-        supabase.rpc('cliente_owner_id').then((r: any) => r).catch(() => ({ data: null })),
+        Promise.resolve(supabase.rpc('cliente_owner_id')).then((r: any) => r).catch(() => ({ data: null })),
         incluirCerradas ? Promise.resolve(null) : licCountQuery,
         incluirCerradas ? Promise.resolve(null) : caCountQuery,
       ]);
@@ -645,11 +646,15 @@ export function useOportunidadDetalle(id: string | null, tipo: 'compra_agil' | '
           const { data: pago } = await supabase
             .from('conducta_pago')
             .select('*')
-            .eq('institucion_id', institucion.id)
+            .eq('rut_institucion', institucion.rut)
+            .order('created_at', { ascending: false })
+            .limit(1)
             .maybeSingle();
           if (pago) {
-            scorePago = pago.score_pago;
-            promedioDiasPago = pago.promedio_dias_pago;
+            scorePago = pago.porcentaje_morosidad != null ? Math.round(100 - pago.porcentaje_morosidad) : null;
+            promedioDiasPago = pago.dias_promedio_pago ?? institucion.pago_promedio_dias;
+          } else {
+            promedioDiasPago = institucion.pago_promedio_dias;
           }
         }
 
@@ -667,16 +672,16 @@ export function useOportunidadDetalle(id: string | null, tipo: 'compra_agil' | '
         }));
 
         const buyer: BuyerProfile | null = institucion ? {
-          id: institucion.id,
+          id: institucion.rut,
           nombre: institucion.nombre,
           rut: institucion.rut,
-          direccion: institucion.direccion,
+          direccion: institucion.domicilio_legal,
           region: institucion.region,
           comuna: institucion.comuna,
           sector: institucion.sector,
-          total_licitaciones: institucion.total_licitaciones,
-          total_ordenes: institucion.total_ordenes,
-          monto_total_compras: institucion.monto_total_compras,
+          total_licitaciones: null,
+          total_ordenes: institucion.oc_total,
+          monto_total_compras: institucion.oc_monto_total,
           score_pago: scorePago,
           promedio_dias_pago: promedioDiasPago,
         } : null;
@@ -750,25 +755,29 @@ export function useOportunidadDetalle(id: string | null, tipo: 'compra_agil' | '
         const { data: pago } = await supabase
           .from('conducta_pago')
           .select('*')
-          .eq('institucion_id', institucion.id)
+          .eq('rut_institucion', institucion.rut)
+          .order('created_at', { ascending: false })
+          .limit(1)
           .maybeSingle();
         if (pago) {
-          scorePago = pago.score_pago;
-          promedioDiasPago = pago.promedio_dias_pago;
+          scorePago = pago.porcentaje_morosidad != null ? Math.round(100 - pago.porcentaje_morosidad) : null;
+          promedioDiasPago = pago.dias_promedio_pago ?? institucion.pago_promedio_dias;
+        } else {
+          promedioDiasPago = institucion.pago_promedio_dias;
         }
       }
 
       const buyer: BuyerProfile | null = institucion ? {
-        id: institucion.id,
+        id: institucion.rut,
         nombre: institucion.nombre,
         rut: institucion.rut,
-        direccion: institucion.direccion,
+        direccion: institucion.domicilio_legal,
         region: institucion.region,
         comuna: institucion.comuna,
         sector: institucion.sector,
-        total_licitaciones: institucion.total_licitaciones,
-        total_ordenes: institucion.total_ordenes,
-        monto_total_compras: institucion.monto_total_compras,
+        total_licitaciones: null,
+        total_ordenes: institucion.oc_total,
+        monto_total_compras: institucion.oc_monto_total,
         score_pago: scorePago,
         promedio_dias_pago: promedioDiasPago,
       } : null;

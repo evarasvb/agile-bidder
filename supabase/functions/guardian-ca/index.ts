@@ -8,7 +8,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' };
 const UMBRAL = 50;
-const FROM = 'FirmaVB <notificaciones@notifications.firmavb.cl>';
+const FROM = 'FirmaVB <notificaciones@firmavb.cl>';
 const ALERT_TO = 'evaras@firmavb.cl';
 
 Deno.serve(async (req) => {

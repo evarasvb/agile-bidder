@@ -56,7 +56,7 @@ export function useMisTickets() {
         .eq('user_id', user!.id)
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return (data || []) as SoporteTicket[];
+      return (data || []) as unknown as SoporteTicket[];
     },
   });
 }
@@ -73,7 +73,7 @@ export function useTicketsAdmin(estado?: EstadoTicket | 'todos') {
       if (estado && estado !== 'todos') q = q.eq('estado', estado);
       const { data, error } = await q;
       if (error) throw error;
-      return (data || []) as SoporteTicket[];
+      return (data || []) as unknown as SoporteTicket[];
     },
     refetchInterval: 60000,
   });
