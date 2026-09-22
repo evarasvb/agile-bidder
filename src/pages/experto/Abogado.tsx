@@ -101,7 +101,7 @@ export default function Abogado() {
   };
 
   const esMora = tipoDoc === 'cobro_intereses_mora';
-  const faltanDatosMora = esMora && (!montoAdeudado || Number(montoAdeudado) <= 0 || !fechaVencimiento);
+  const faltanDatosMora = esMora && (!montoAdeudado || Number(montoAdeudado) <= 0 || !fechaVencimiento || (!sigueImpago && !fechaPago));
   const puedeGenerar = esMora ? !faltanDatosMora : !!hechos.trim();
 
   const generarDocumento = async () => {
