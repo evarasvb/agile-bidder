@@ -55,6 +55,10 @@ const TIPOS_DOC: Record<string, { titulo: string; guia: string }> = {
     titulo: "Carta formal (aclaración, objeción a bases, solicitud, respuesta a un organismo)",
     guia: "Carta profesional breve y directa: antecedentes del proceso, lo que se solicita o aclara, y el fundamento (legal o contractual) si corresponde. No es un recurso legal, es comunicación formal."
   },
+  cobro_intereses_mora: {
+    titulo: "Nota de débito / carta de cobro de intereses por mora en el pago",
+    guia: "Estructura: identificación de la deuda (monto, fecha en que debía pagarse, fecha de pago o que sigue impaga); fundamento legal del derecho a cobrar interés corriente por el atraso (Ley 18.010 y, si aplica, Ley 21.131 de pago a 30 días o la cláusula de pago de la licitación/OC); el CÁLCULO DE INTERESES entregado en el contexto —cópialo tal cual, con los mismos números, nunca lo recalcules ni inventes una tasa distinta—; petitorio de pago del interés (y del capital si sigue impago)."
+  },
 };
 
 const SYS_CHAT = `Eres Don Evaristo Abogado, el asesor legal de FirmaVB, experto en Mercado Público / ChileCompra: Ley 19.886, Reglamento (Decreto 661/2024), dictámenes de Contraloría y jurisprudencia del Tribunal de Contratación Pública (TCP).
@@ -64,6 +68,7 @@ Reglas:
 - Si hay FICHA ORGANISMO, úsala para evaluar el caso (reclamos previos contra ese organismo, conducta de pago).
 - Si hay DOCUMENTOS DEL USUARIO (contratos, notificaciones, actas, reclamos previos que subió), son la base de los hechos: léelos y úsalos como evidencia concreta del caso.
 - Si el usuario necesita presentar algo formal (recurso, reclamo, carta, apelación), NO redactes el documento completo en el chat: explícale qué documento le conviene y en qué plazo, y dile que lo genere con el botón "Generar documento" de este mismo módulo, donde queda con formato profesional listo para firmar y descargar en PDF.
+- Si te cuenta que le pagaron atrasado o le deben plata (mora), explícale en el chat que tiene derecho a cobrar interés corriente por el atraso [cítalo], sin calcular el monto tú mismo (no hagas la aritmética en el chat). Dile que en "Generar documento" con el tipo "Nota de débito / cobro de intereses por mora" le pides el monto adeudado, la fecha en que debía pagarse y si ya le pagaron o sigue impago, y ahí Don Evaristo Abogado hace el cálculo exacto y redacta la nota de débito lista para enviar.
 - Si las fuentes no cubren la pregunta, dilo ("No tengo fuente en mi base para eso") y no inventes artículos, plazos ni jurisprudencia.
 - Máximo 280 palabras salvo que pidan detalle. Párrafos cortos. Formato Markdown simple.`;
 
@@ -110,6 +115,10 @@ Deno.serve(async (req) => {
     const hechos: string = String(body.hechos ?? "").trim().slice(0, 4000);
     const peticion: string = String(body.peticion ?? "").trim().slice(0, 1000);
     const ciudadFecha: string = String(body.ciudad_fecha ?? "").trim().slice(0, 100);
+    // Solo tipo_documento = cobro_intereses_mora: datos exactos para el cálculo determinístico.
+    const montoAdeudado: number | null = Number.isFinite(Number(body.monto_adeudado)) && Number(body.monto_adeudado) > 0 ? Number(body.monto_adeudado) : null;
+    const fechaVencimiento: string | null = /^\d{4}-\d{2}-\d{2}$/.test(String(body.fecha_vencimiento ?? "")) ? String(body.fecha_vencimiento) : null;
+    const fechaPago: string | null = /^\d{4}-\d{2}-\d{2}$/.test(String(body.fecha_pago ?? "")) ? String(body.fecha_pago) : null;
 
     const { role, sub } = rolYSub(req.headers.get("Authorization") ?? "");
     const userId = role === "authenticated" ? sub : (role === "service_role" && body.user_id ? String(body.user_id) : null);
@@ -151,6 +160,10 @@ Deno.serve(async (req) => {
     const busquedaOrg = destinatario || org?.[0];
     if (busquedaOrg) tareas.org = sb.rpc("experto_buscar_organismo", { p_texto: busquedaOrg.replace(/[?¿.,]/g, "").trim().slice(0, 60) }).then(async (r) => r.data ? (await sb.rpc("experto_organismo", { nombre_o_rut: r.data })).data?.[0] : null);
     if (userId) tareas.perfil = sb.from("clientes").select("empresa_nombre, rut, region").eq("user_id", userId).maybeSingle().then((r) => r.data);
+    // Cálculo determinístico de intereses por mora (nunca lo hace la IA): se pasa el resultado ya calculado.
+    if (tipoDocumento === "cobro_intereses_mora" && montoAdeudado && fechaVencimiento) {
+      tareas.calculo = sb.rpc("calcular_interes_mora", { p_monto: montoAdeudado, p_fecha_vencimiento: fechaVencimiento, p_fecha_pago: fechaPago }).then((r) => r.data?.[0] ?? null);
+    }
 
     const res: Record<string, any> = {};
     await Promise.all(Object.entries(tareas).map(async ([k, p]) => { try { res[k] = await p; } catch { res[k] = null; } }));
@@ -168,6 +181,22 @@ Deno.serve(async (req) => {
     if (res.perfil) partes.push(`DATOS DEL PROVEEDOR (para firmar el documento): empresa "${res.perfil.empresa_nombre ?? "s/i"}", RUT ${res.perfil.rut ?? "s/i"}, región ${res.perfil.region ?? "s/i"}.`);
     if (modo === "documento") {
       partes.push(`DATOS DEL DOCUMENTO A REDACTAR:\nDestinatario/institución: ${destinatario || "[completar: destinatario]"}\nCiudad y fecha: ${ciudadFecha || "[completar: fecha]"}\nHECHOS que cuenta el usuario:\n${hechos}\n${peticion ? "Lo que pide el usuario: " + peticion : ""}`);
+    }
+    if (tipoDocumento === "cobro_intereses_mora") {
+      if (montoAdeudado && fechaVencimiento && res.calculo?.tasa_anual != null) {
+        const c = res.calculo;
+        partes.push(`CÁLCULO DE INTERESES POR MORA (determinístico — cita estos números EXACTOS, no los recalcules ni los redondees distinto):
+Capital adeudado: $${Math.round(montoAdeudado).toLocaleString("es-CL")}
+Días de atraso: ${c.dias_atraso}
+Tasa de interés corriente anual (no reajustable, 90 días o más, según CMF vigente en ${c.mes_tasa}): ${c.tasa_anual}%
+Interés calculado (capital × tasa/100 × días/360): $${Number(c.interes).toLocaleString("es-CL")}
+Total a cobrar (capital + interés): $${Number(c.total).toLocaleString("es-CL")}
+Advertencia obligatoria a incluir en el documento: verificar que la tasa siga vigente antes de presentar el cobro.`);
+      } else if (montoAdeudado && fechaVencimiento) {
+        partes.push("CÁLCULO DE INTERESES POR MORA: no tengo cargada la tasa de interés corriente de la CMF para ese mes/monto todavía. No inventes una tasa ni un monto de interés: redacta el documento pidiendo el pago del capital adeudado y deja el cálculo del interés pendiente de completar, indicando que se agregará con la tasa vigente.");
+      } else {
+        partes.push("CÁLCULO DE INTERESES POR MORA: faltan el monto adeudado o la fecha en que debía pagarse. No calcules nada: pide esos datos en el documento.");
+      }
     }
     const contexto = partes.join("\n\n") || "(sin fuentes ni datos para esta consulta)";
 
@@ -198,7 +227,7 @@ Deno.serve(async (req) => {
     let respuesta = "";
     const stream = new ReadableStream({
       async start(ctrl) {
-        ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ meta: { modelo, fuentes: fuentesMeta, codigo, uso: u, tipo_documento: modo === "documento" ? tipoDocumento : undefined } })}\n\n`));
+        ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ meta: { modelo, fuentes: fuentesMeta, codigo, uso: u, tipo_documento: modo === "documento" ? tipoDocumento : undefined, calculo_mora: tipoDocumento === "cobro_intereses_mora" ? (res.calculo?.tasa_anual != null ? { ...res.calculo, monto_adeudado: montoAdeudado } : null) : undefined } })}\n\n`));
         const reader = upstream!.body!.getReader(); let buf = "";
         try {
           while (true) {
