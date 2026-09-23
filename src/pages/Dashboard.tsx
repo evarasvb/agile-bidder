@@ -62,6 +62,7 @@ import { PrimerosPasos } from "@/components/dashboard/PrimerosPasos";
 import { DatoCuriosoCard } from "@/components/dashboard/DatoCuriosoCard";
 import { TutorialBienvenida } from "@/components/dashboard/TutorialBienvenida";
 import { ResumenEjecutivo } from "@/components/dashboard/ResumenEjecutivo";
+import { PanelProveedorCard } from "@/components/dashboard/PanelProveedorCard";
 import { FirmaVBHeader } from "@/components/layout/FirmaVBHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -206,6 +207,9 @@ export default function Dashboard() {
 
       {/* Resumen ejecutivo del negocio (datos reales del pipeline) */}
       <ResumenEjecutivo />
+
+      {/* Panel del proveedor: qué vende según sus OC, keywords sugeridas y clientes a seguir */}
+      <PanelProveedorCard />
 
       {/* Error Banner */}
       {kpisError && (
