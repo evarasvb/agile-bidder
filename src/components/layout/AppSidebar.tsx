@@ -96,7 +96,6 @@ const navItems: NavItem[] = [
     icon: GraduationCap,
     children: [
       { title: "Mis cursos", url: "/academia/cursos", icon: GraduationCap },
-      { title: "Contactos", url: "/academia/leads", icon: Users, adminOnly: true },
     ],
   },
   {
@@ -131,15 +130,15 @@ const navItems: NavItem[] = [
   },
   {
     adminOnly: true,
-    title: "Marketing",
-    url: "/marketing/control",
-    icon: Rocket,
-  },
-  {
-    adminOnly: true,
-    title: "Tracción",
+    title: "Fundador",
     url: "/admin/traccion",
-    icon: TrendingUp,
+    icon: Rocket,
+    children: [
+      { title: "Tracción", url: "/admin/traccion", icon: TrendingUp, adminOnly: true },
+      { title: "Marketing", url: "/marketing/control", icon: Rocket, adminOnly: true },
+      { title: "Contactos", url: "/academia/leads", icon: Users, adminOnly: true },
+      { title: "Compradores", url: "/academia/compradores", icon: CreditCard, adminOnly: true },
+    ],
   },
   {
     title: "Soporte",
