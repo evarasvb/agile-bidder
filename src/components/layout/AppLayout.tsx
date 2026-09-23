@@ -4,21 +4,49 @@ import { AppSidebar } from "./AppSidebar";
 import { StatusBar } from "./StatusBar";
 import { EvaristoChat } from "@/components/soporte/EvaristoChat";
 import { AvisosBell } from "@/components/notifications/AvisosBell";
+import { cn } from "@/lib/utils";
 import logoFirmavbBlanco from "@/assets/logo-firmavb-blanco.png";
 
 interface AppLayoutProps {
   children: ReactNode;
 }
 
+const SIDEBAR_COLLAPSED_KEY = "firmavb-sidebar-collapsed";
+
 export function AppLayout({ children }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Preferencia de menú achicado (solo escritorio), guardada en el navegador.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleSidebarCollapsed = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
+      } catch {
+        // localStorage puede fallar (modo privado, cuota); no es crítico.
+      }
+      return next;
+    });
+  };
 
   return (
     <div className="min-h-screen bg-background">
-      <AppSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <AppSidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={toggleSidebarCollapsed}
+      />
 
       {/* En escritorio deja espacio para el sidebar fijo; en móvil ocupa todo */}
-      <div className="lg:pl-64">
+      <div className={cn("transition-[padding] duration-200", sidebarCollapsed ? "lg:pl-[4.5rem]" : "lg:pl-64")}>
         {/* Barra superior móvil: menú + logo + campana */}
         <div className="lg:hidden sticky top-0 z-30 flex items-center gap-3 h-14 px-4 bg-sidebar border-b border-sidebar-border text-sidebar-foreground">
           <button
