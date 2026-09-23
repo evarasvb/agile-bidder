@@ -3,6 +3,7 @@ import { Menu } from "lucide-react";
 import { AppSidebar } from "./AppSidebar";
 import { StatusBar } from "./StatusBar";
 import { EvaristoChat } from "@/components/soporte/EvaristoChat";
+import { AvisosBell } from "@/components/notifications/AvisosBell";
 import logoFirmavbBlanco from "@/assets/logo-firmavb-blanco.png";
 
 interface AppLayoutProps {
@@ -18,8 +19,8 @@ export function AppLayout({ children }: AppLayoutProps) {
 
       {/* En escritorio deja espacio para el sidebar fijo; en móvil ocupa todo */}
       <div className="lg:pl-64">
-        {/* Barra superior solo en móvil: logo + botón de menú */}
-        <div className="lg:hidden sticky top-0 z-30 flex items-center gap-3 h-14 px-4 bg-sidebar border-b border-sidebar-border">
+        {/* Barra superior móvil: menú + logo + campana */}
+        <div className="lg:hidden sticky top-0 z-30 flex items-center gap-3 h-14 px-4 bg-sidebar border-b border-sidebar-border text-sidebar-foreground">
           <button
             onClick={() => setSidebarOpen(true)}
             className="p-2 -ml-2 text-sidebar-foreground rounded-md hover:bg-sidebar-accent"
@@ -32,6 +33,14 @@ export function AppLayout({ children }: AppLayoutProps) {
             alt="FirmaVB"
             className="h-7 w-auto object-contain"
           />
+          <div className="ml-auto">
+            <AvisosBell className="text-sidebar-foreground hover:text-sidebar-foreground" />
+          </div>
+        </div>
+
+        {/* Barra superior escritorio: campana a la derecha */}
+        <div className="hidden lg:flex sticky top-0 z-30 items-center justify-end h-12 px-6 bg-background/95 backdrop-blur border-b">
+          <AvisosBell />
         </div>
 
         <StatusBar />
