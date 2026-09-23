@@ -8,13 +8,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 interface AdminOnlyRouteProps {
   children: ReactNode;
   allowedEmails?: string[]; // Lista de emails permitidos
+  restrictedTitle?: string;
+  restrictedDescription?: string;
 }
 
 const DEFAULT_ALLOWED_EMAILS = ['evaras@firmavb.cl'];
 
 export function AdminOnlyRoute({ 
   children, 
-  allowedEmails = DEFAULT_ALLOWED_EMAILS 
+  allowedEmails = DEFAULT_ALLOWED_EMAILS,
+  restrictedTitle = 'Acceso Restringido',
+  restrictedDescription = 'Esta sección es solo para administradores autorizados',
 }: AdminOnlyRouteProps) {
   const { user, isAuthenticated, loading } = useAuth();
   const location = useLocation();
@@ -50,9 +54,9 @@ export function AdminOnlyRoute({
                 <ShieldAlert className="h-5 w-5 text-firmavb-red" />
               </div>
               <div>
-                <CardTitle className="text-firmavb-red">Acceso Restringido</CardTitle>
+                <CardTitle className="text-firmavb-red">{restrictedTitle}</CardTitle>
                 <CardDescription>
-                  Esta sección es solo para administradores autorizados
+                  {restrictedDescription}
                 </CardDescription>
               </div>
             </div>
@@ -72,4 +76,16 @@ export function AdminOnlyRoute({
   }
 
   return <>{children}</>;
+}
+
+export function FounderOnlyRoute({ children }: Pick<AdminOnlyRouteProps, 'children'>) {
+  return (
+    <AdminOnlyRoute
+      allowedEmails={DEFAULT_ALLOWED_EMAILS}
+      restrictedTitle="Área personal del fundador"
+      restrictedDescription="Marketing y Tracción son de uso exclusivo de Enrique"
+    >
+      {children}
+    </AdminOnlyRoute>
+  );
 }

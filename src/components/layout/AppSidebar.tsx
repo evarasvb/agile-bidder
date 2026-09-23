@@ -43,6 +43,7 @@ interface NavItem {
   url: string;
   icon: React.ElementType;
   adminOnly?: boolean;
+  founderOnly?: boolean;
   children?: { title: string; url: string; icon?: React.ElementType; adminOnly?: boolean }[];
 }
 
@@ -130,13 +131,13 @@ const navItems: NavItem[] = [
     ],
   },
   {
-    adminOnly: true,
+    founderOnly: true,
     title: "Marketing",
     url: "/marketing/control",
     icon: Rocket,
   },
   {
-    adminOnly: true,
+    founderOnly: true,
     title: "Tracción",
     url: "/admin/traccion",
     icon: TrendingUp,
@@ -157,7 +158,7 @@ export function AppSidebar({ open = false, onClose }: AppSidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
-  const esAdmin = (user?.email || "").toLowerCase() === "evaras@firmavb.cl";
+  const esFundador = (user?.email || "").toLowerCase() === "evaras@firmavb.cl";
 
   // Destino activo = la URL de nav MÁS ESPECÍFICA que calza con la ruta actual
   // (por igualdad o como prefijo de sub-ruta). Usar el match más largo evita que
@@ -265,7 +266,7 @@ export function AppSidebar({ open = false, onClose }: AppSidebarProps) {
       {/* Navigation */}
       <nav aria-label="Navegación principal" className="flex-1 px-3 py-4 overflow-y-auto scrollbar-thin">
         <ul className="space-y-1">
-          {navItems.filter((item) => !item.adminOnly || esAdmin).map((item) => {
+          {navItems.filter((item) => (!item.adminOnly || esFundador) && (!item.founderOnly || esFundador)).map((item) => {
             const hasChildren = item.children && item.children.length > 0;
             const isExpanded = expandedItems.includes(item.title);
             const isItemActive = hasChildren
@@ -298,7 +299,7 @@ export function AppSidebar({ open = false, onClose }: AppSidebarProps) {
                     </button>
                     {isExpanded && (
                       <ul className="mt-1 ml-4 space-y-1">
-                        {item.children?.filter((child) => !child.adminOnly || esAdmin).map((child) => {
+                        {item.children?.filter((child) => !child.adminOnly || esFundador).map((child) => {
                           const ChildIcon = child.icon;
                           const isChildActive = child.url === bestUrl && bestLen >= 0;
                           return (
@@ -337,7 +338,12 @@ export function AppSidebar({ open = false, onClose }: AppSidebarProps) {
                       "h-5 w-5 transition-colors",
                       isItemActive ? "text-sidebar-primary-foreground" : "text-sidebar-muted"
                     )} />
-                    {item.title}
+                    <span className="flex-1">{item.title}</span>
+                    {item.founderOnly ? (
+                      <span className="rounded-full bg-sidebar-accent px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sidebar-muted">
+                        Personal
+                      </span>
+                    ) : null}
                   </NavLink>
                 )}
               </li>

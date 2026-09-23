@@ -183,8 +183,11 @@ export default function MarketingControlCenter() {
   return (
     <div className="w-full min-w-0 max-w-7xl mx-auto px-4 py-6 pb-24 sm:px-6 space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl sm:text-3xl font-bold">Centro de Control de Marketing</h1>
-        <p className="text-muted-foreground">Organiza tus campañas, contactos y resultados en un solo lugar</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl sm:text-3xl font-bold">Centro de Control de Marketing</h1>
+          <Badge variant="secondary">Personal · Enrique</Badge>
+        </div>
+        <p className="text-muted-foreground">Área personal del fundador para organizar campañas, contactos y resultados.</p>
       </div>
 
       <Alert>

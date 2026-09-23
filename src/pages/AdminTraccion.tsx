@@ -1,6 +1,6 @@
 // Página ADMIN: "Tracción". Clientes nuevos y su activación (inventario, ofertas,
 // última conexión) + estado de las campañas en curso (webinar, prospección).
-// Solo la ve el admin (AdminOnlyRoute + RPC security-definer). Sirve para saber
+// Solo la ve el fundador (FounderOnlyRoute + RPC security-definer). Sirve para saber
 // a quién contactar y si el negocio está creciendo o no.
 import { useState } from "react";
 import { useTraccionResumen, useClientesNuevos, useCampanasResumen, useClientesActividad, type ClienteNuevo, type ClienteActividad, type CampanasResumen } from "@/hooks/useAdminTraccion";
@@ -217,8 +217,11 @@ export default function AdminTraccion() {
       <div className="flex items-center gap-3">
         <TrendingUp className="h-6 w-6 text-firmavb-blue" />
         <div>
-          <h1 className="text-2xl font-bold">Tracción</h1>
-          <p className="text-sm text-muted-foreground">Clientes nuevos, activación y campañas en curso. Solo tú ves esto.</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-bold">Tracción</h1>
+            <Badge variant="secondary">Personal · Enrique</Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">Área personal del fundador para revisar clientes, activación y campañas en curso.</p>
         </div>
       </div>
 

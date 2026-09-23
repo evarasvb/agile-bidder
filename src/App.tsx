@@ -15,7 +15,7 @@ import { HelmetProvider } from "react-helmet-async";
 import { BrowserRouter, Routes, Route, Outlet, Navigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
-import { AdminOnlyRoute } from "@/components/auth/AdminOnlyRoute";
+import { AdminOnlyRoute, FounderOnlyRoute } from "@/components/auth/AdminOnlyRoute";
 import { ScrollToTop } from "@/components/ScrollToTop";
 
 import { useCliente } from "@/hooks/useCliente";
@@ -225,7 +225,7 @@ const App = () => (
             <Route path="/academia/cursos" element={<MisCursos />} />
             <Route path="/academia/leads" element={<AdminOnlyRoute><AcademiaLeads /></AdminOnlyRoute>} />
             <Route path="/proveedores-estado" element={<AdminOnlyRoute><ProveedoresEstado /></AdminOnlyRoute>} />
-            <Route path="/admin/traccion" element={<AdminOnlyRoute><AdminTraccion /></AdminOnlyRoute>} />
+            <Route path="/admin/traccion" element={<FounderOnlyRoute><AdminTraccion /></FounderOnlyRoute>} />
 
             {/* ----- EQUIPO ----- */}
             <Route path="/equipo" element={<Equipo />} />
@@ -255,8 +255,8 @@ const App = () => (
             <Route path="/convenio-marco" element={<ConvenioMarcoGestion />} />
 
             {/* ----- MARKETING ----- */}
-            <Route path="/marketing/control" element={<AdminOnlyRoute><MarketingControlCenter /></AdminOnlyRoute>} />
-            <Route path="/marketing/contactos" element={<AdminOnlyRoute><MarketingContactosAdmin /></AdminOnlyRoute>} />
+            <Route path="/marketing/control" element={<FounderOnlyRoute><MarketingControlCenter /></FounderOnlyRoute>} />
+            <Route path="/marketing/contactos" element={<FounderOnlyRoute><MarketingContactosAdmin /></FounderOnlyRoute>} />
 
             {/* ----- CONFIGURACION ----- */}
             <Route path="/configuracion" element={<ConfiguracionOportunidades />} />
