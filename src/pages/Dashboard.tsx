@@ -59,7 +59,6 @@ import {
   ChartSkeleton,
 } from "@/components/dashboard/DashboardSkeleton";
 import { PrimerosPasos } from "@/components/dashboard/PrimerosPasos";
-import { DatoCuriosoCard } from "@/components/dashboard/DatoCuriosoCard";
 import { TutorialBienvenida } from "@/components/dashboard/TutorialBienvenida";
 import { ResumenEjecutivo } from "@/components/dashboard/ResumenEjecutivo";
 import { PanelProveedorCard } from "@/components/dashboard/PanelProveedorCard";
@@ -385,8 +384,6 @@ export default function Dashboard() {
           </Card>
         )}
       </div>
-
-      <DatoCuriosoCard />
 
       {/* Row 3: Cierres Próximos + Últimos Matches */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
