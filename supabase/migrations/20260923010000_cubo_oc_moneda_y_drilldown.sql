@@ -109,12 +109,15 @@ begin
   if nullif(v_f->>'precio_max', '') is not null then v_where := v_where || format(' and l.precio_neto <= %s', (v_f->>'precio_max')::numeric); end if;
   if p_desde is not null then v_where := v_where || format(' and l.fecha >= %L', p_desde); end if;
   if p_hasta is not null then v_where := v_where || format(' and l.fecha < %L', (p_hasta + interval '1 month')::date); end if;
+  -- Mismo predicado de moneda que cubo_oc: si no se filtrara, una OC con
+  -- líneas en USD/UF aparecería aquí sumada como si fuera CLP y el total no
+  -- cuadraría con lo que el cubo (ya filtrado a CLP) muestra arriba.
+  v_where := v_where || ' and (l.moneda is null or upper(btrim(l.moneda)) = ''CLP'')';
 
   v_sql := format(
     'select coalesce(jsonb_agg(to_jsonb(x)), ''[]''::jsonb) from ('
     || 'select l.codigo, max(l.proveedor_nombre) as proveedor, max(l.organismo) as organismo, max(l.tipo) as tipo, '
-    || 'count(*)::int as lineas, sum(l.monto_linea) as monto, '
-    || 'case when count(distinct l.moneda) > 1 then ''MIXTA'' else max(l.moneda) end as moneda, '
+    || 'count(*)::int as lineas, sum(l.monto_linea) as monto, max(l.moneda) as moneda, '
     || 'max(l.fecha) as fecha '
     || 'from public.oc_lineas l where %s group by l.codigo order by sum(l.monto_linea) desc limit %s) x',
     v_where, greatest(1, least(coalesce(p_limite, 200), 500)));

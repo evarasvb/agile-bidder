@@ -93,9 +93,11 @@ export const ESTADO_OC: Record<string, string> = {
   '9': 'Cancelada',
   '12': 'Recepción conforme',
 };
-// Códigos que cuentan como "aceptada" para efectos de cobranza: la OC ya la
-// recibió el organismo, no está en borrador ni cancelada.
-export const ESTADOS_OC_ACEPTADA = ['5', '6', '12'];
+// Códigos que cuentan como "aceptada" para efectos de cobranza: el código
+// oficial de Mercado Público (CodigoEstado) usa 5 = "En proceso" (todavía NO
+// aceptada por el proveedor), 6 = "Aceptada" y 12 = "Recepción conforme". Se
+// excluye el 5 para que el respaldo de cobranza sea real.
+export const ESTADOS_OC_ACEPTADA = ['6', '12'];
 export function etiquetaEstado(estado?: string | null): string | null {
   if (estado == null || estado === '') return null;
   return ESTADO_OC[String(estado).trim()] ?? `Estado ${estado}`;

@@ -436,7 +436,10 @@ function NuevaFacturaDialog() {
       // allSettled se limpia el que tuvo éxito antes de abortar.
       if (rFactura.status === 'rejected' || rGuia.status === 'rejected') {
         const subido = [rFactura, rGuia].filter((r): r is PromiseFulfilledResult<{ url: string; nombre: string } | null> => r.status === 'fulfilled').map((r) => r.value?.url).filter((p): p is string => !!p);
-        if (subido.length) await supabase.storage.from('documentos-empresa').remove(subido);
+        if (subido.length) {
+          const { error: errLimpieza } = await supabase.storage.from('documentos-empresa').remove(subido);
+          if (errLimpieza) console.error('[CobranzaFacturas] No se pudo limpiar el adjunto huérfano tras falla parcial de subida:', errLimpieza);
+        }
         throw (rFactura.status === 'rejected' ? rFactura.reason : (rGuia as PromiseRejectedResult).reason);
       }
       const factura = rFactura.value;
@@ -452,7 +455,10 @@ function NuevaFacturaDialog() {
         });
       } catch (e) {
         const huerfanos = [factura?.url, guia?.url].filter((p): p is string => !!p);
-        if (huerfanos.length) await supabase.storage.from('documentos-empresa').remove(huerfanos);
+        if (huerfanos.length) {
+          const { error: errLimpieza } = await supabase.storage.from('documentos-empresa').remove(huerfanos);
+          if (errLimpieza) console.error('[CobranzaFacturas] No se pudo limpiar el adjunto huérfano tras falla del insert:', errLimpieza);
+        }
         throw e;
       }
       toast.success('Factura registrada');
@@ -475,7 +481,7 @@ function NuevaFacturaDialog() {
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2">
             <Label>¿A quién le cobras?</Label>
-            <Select value={tipo} onValueChange={(v) => { setTipo(v as DeudorTipo); setNombre(''); setRut(''); setOc(''); }}>
+            <Select value={tipo} onValueChange={(v) => { setTipo(v as DeudorTipo); setNombre(''); setRut(''); setOc(''); setMonto(''); setEmision(''); }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="estado">Institución del Estado</SelectItem>

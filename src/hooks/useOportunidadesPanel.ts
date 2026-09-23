@@ -418,10 +418,12 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         // El % que se muestra es COBERTURA (cuántos de los productos pedidos
         // calzan con tu inventario), no el mejor score individual: si la
         // compra pide 10 productos y calzan 5, es 50% de match, no el 100%
-        // del ítem que mejor calzó. Si aún no hay desglose por ítem — o si la
-        // consulta de ca_item_matches falló — se cae al mejor score a nivel de
-        // compra (ca_matches) como respaldo, en vez de mostrar 0% para todas.
-        const coverageScore = !itemMatchesFallaron && itemsCount > 0 ? Math.round((itemsMatched / itemsCount) * 100) : null;
+        // del ítem que mejor calzó. Si aún no hay desglose por ítem para ESTA
+        // compra en particular (0 matches: puede ser que de verdad no calce
+        // nada, o que el cron todavía no la procesó) — o si la consulta de
+        // ca_item_matches falló para todo el panel — se cae al mejor score a
+        // nivel de compra (ca_matches) como respaldo, en vez de forzar 0%.
+        const coverageScore = !itemMatchesFallaron && itemsCount > 0 && itemsMatched > 0 ? Math.round((itemsMatched / itemsCount) * 100) : null;
         const fallbackScore = bestMatchByCodigo[c.codigo]?.score ?? (c.match_score >= PISO_MATCH ? c.match_score : null);
         return {
           id: c.id,
