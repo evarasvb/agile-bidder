@@ -85,7 +85,7 @@ function derivarTipo(codigo?: string | null): string | null {
 }
 
 // Estado de la OC viene como código numérico de Mercado Público.
-const ESTADO_OC: Record<string, string> = {
+export const ESTADO_OC: Record<string, string> = {
   '3': 'Guardada',
   '4': 'Enviada',
   '5': 'Aceptada',
@@ -93,7 +93,10 @@ const ESTADO_OC: Record<string, string> = {
   '9': 'Cancelada',
   '12': 'Recepción conforme',
 };
-function etiquetaEstado(estado?: string | null): string | null {
+// Códigos que cuentan como "aceptada" para efectos de cobranza: la OC ya la
+// recibió el organismo, no está en borrador ni cancelada.
+export const ESTADOS_OC_ACEPTADA = ['5', '6', '12'];
+export function etiquetaEstado(estado?: string | null): string | null {
   if (estado == null || estado === '') return null;
   return ESTADO_OC[String(estado).trim()] ?? `Estado ${estado}`;
 }
@@ -457,6 +460,50 @@ export function useRutProveedor(nombre: string | null) {
       let mejor: string | null = null; let max = 0;
       for (const [rut, n] of conteo) { if (n > max) { max = n; mejor = rut; } }
       return mejor;
+    },
+    staleTime: 60000,
+  });
+}
+
+// OC propias del cliente (donde es proveedor) que ya están aceptadas/recibidas
+// por el organismo — para la cobranza: solo se puede cobrar lo que el Estado
+// ya aceptó. Opcionalmente filtradas por institución.
+export function useMisOcAceptadas(rut: string | null, nombre: string | null, institucion?: string) {
+  return useQuery({
+    queryKey: ['mis-oc-aceptadas', rut, nombre, institucion],
+    enabled: !!(rut || nombre),
+    queryFn: async () => {
+      let query = supabase
+        .from('ordenes_compra')
+        .select('codigo, organismo_comprador, rut_demandante, total, fecha_emision, link_oficial, estado')
+        .in('estado', ESTADOS_OC_ACEPTADA)
+        .order('fecha_emision', { ascending: false, nullsFirst: false })
+        .limit(60);
+      if (rut && nombre) query = query.or(`rut_proveedor.eq.${rut},proveedor_nombre.eq.${nombre}`);
+      else if (rut) query = query.eq('rut_proveedor', rut);
+      else query = query.eq('proveedor_nombre', nombre!);
+      if (institucion) query = query.ilike('organismo_comprador', `%${institucion}%`);
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []) as { codigo: string; organismo_comprador: string | null; rut_demandante: string | null; total: number | null; fecha_emision: string | null; link_oficial: string | null; estado: string | null }[];
+    },
+    staleTime: 30000,
+  });
+}
+
+// Link oficial de Mercado Público para OC ya registradas por código — para
+// mostrar "Ver OC oficial" en las facturas de cobranza sin volver a subir nada.
+export function useOcLinksPorCodigos(codigos: string[]) {
+  const cods = Array.from(new Set(codigos.filter(Boolean))).sort();
+  return useQuery({
+    queryKey: ['oc-links', cods],
+    enabled: cods.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('ordenes_compra').select('codigo, link_oficial, estado').in('codigo', cods);
+      if (error) throw error;
+      const map = new Map<string, { link_oficial: string | null; estado: string | null }>();
+      for (const row of (data || []) as any[]) map.set(row.codigo, { link_oficial: row.link_oficial, estado: row.estado });
+      return map;
     },
     staleTime: 60000,
   });

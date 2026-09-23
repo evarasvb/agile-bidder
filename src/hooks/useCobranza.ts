@@ -23,6 +23,10 @@ export interface FacturaCobrar {
   fecha_vencimiento: string | null;
   estado: EstadoCobro;
   notas: string | null;
+  factura_archivo_url: string | null;
+  factura_archivo_nombre: string | null;
+  guia_archivo_url: string | null;
+  guia_archivo_nombre: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -93,6 +97,23 @@ export function useEliminarFactura() {
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['facturas-cobrar'] }),
   });
+}
+
+// Las fechas de una factura tienen un orden lógico: se emite, luego se recibe
+// (conforme) y recién ahí corre el plazo hasta el vencimiento. Si el cliente
+// las cruza (a mano o por un dato mal copiado), el documento de cobro saldría
+// con una cronología que no se sostiene ante el organismo.
+export function fechasConsistentes(emision: string, recepcion: string, vencimiento: string): string | null {
+  const e = emision ? new Date(emision + 'T00:00:00') : null;
+  const r = recepcion ? new Date(recepcion + 'T00:00:00') : null;
+  const v = vencimiento ? new Date(vencimiento + 'T00:00:00') : null;
+  if (e && r && e > r) return 'La fecha de emisión no puede ser posterior a la de recepción.';
+  if (r && v && r > v) return 'La fecha de recepción no puede ser posterior al vencimiento.';
+  if (e && v && e > v) return 'La fecha de emisión no puede ser posterior al vencimiento.';
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  if (e && e > hoy) return 'La fecha de emisión no puede ser futura.';
+  if (r && r > hoy) return 'La fecha de recepción no puede ser futura.';
+  return null;
 }
 
 // ----- Utilidades de cobro --------------------------------------------------
