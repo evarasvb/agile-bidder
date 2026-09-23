@@ -427,10 +427,20 @@ function NuevaFacturaDialog() {
     const m = Number(String(monto).replace(/[^0-9]/g, ''));
     setSubiendo(true);
     try {
-      const [factura, guia] = await Promise.all([
+      const [rFactura, rGuia] = await Promise.allSettled([
         facturaFile ? subirArchivo(facturaFile, 'factura') : Promise.resolve(null),
         guiaFile ? subirArchivo(guiaFile, 'guia') : Promise.resolve(null),
       ]);
+      // Si un adjunto se subió y el otro falló, Promise.all habría descartado
+      // el que sí subió sin borrarlo del storage (queda huérfano). Con
+      // allSettled se limpia el que tuvo éxito antes de abortar.
+      if (rFactura.status === 'rejected' || rGuia.status === 'rejected') {
+        const subido = [rFactura, rGuia].filter((r): r is PromiseFulfilledResult<{ url: string; nombre: string } | null> => r.status === 'fulfilled').map((r) => r.value?.url).filter((p): p is string => !!p);
+        if (subido.length) await supabase.storage.from('documentos-empresa').remove(subido);
+        throw (rFactura.status === 'rejected' ? rFactura.reason : (rGuia as PromiseRejectedResult).reason);
+      }
+      const factura = rFactura.value;
+      const guia = rGuia.value;
       try {
         await crear.mutateAsync({
           deudor_tipo: tipo, deudor_nombre: nombre.trim(), deudor_rut: rut.trim() || null,
@@ -477,7 +487,7 @@ function NuevaFacturaDialog() {
             <>
               <div className="col-span-2">
                 <Label>Organismo</Label>
-                <InstitucionCombobox value={nombre} onSelect={(v) => { setNombre(v); setOc(''); }} />
+                <InstitucionCombobox value={nombre} onSelect={(v) => { setNombre(v); setOc(''); setRut(''); setMonto(''); setEmision(''); }} />
               </div>
               <div className="col-span-2">
                 <Label>Orden de Compra aceptada</Label>

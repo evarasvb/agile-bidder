@@ -479,8 +479,11 @@ export function useMisOcAceptadas(rut: string | null, nombre: string | null, ins
         .in('estado', ESTADOS_OC_ACEPTADA)
         .order('fecha_emision', { ascending: false, nullsFirst: false })
         .limit(60);
-      if (rut && nombre) query = query.or(`rut_proveedor.eq.${rut},proveedor_nombre.eq.${nombre}`);
-      else if (rut) query = query.eq('rut_proveedor', rut);
+      // El RUT ya identifica al proveedor sin ambigüedad; si además viene el
+      // nombre no hace falta cruzarlo con un .or() de texto crudo, que se
+      // rompe con nombres de empresa que traen coma o paréntesis (delimitadores
+      // del filtro de PostgREST).
+      if (rut) query = query.eq('rut_proveedor', rut);
       else query = query.eq('proveedor_nombre', nombre!);
       if (institucion) query = query.ilike('organismo_comprador', `%${institucion}%`);
       const { data, error } = await query;

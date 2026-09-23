@@ -101,7 +101,10 @@ export function useEliminarFactura() {
       const { error } = await sb.from('facturas_por_cobrar').delete().eq('id', id);
       if (error) throw error;
       const archivos = [fila?.factura_archivo_url, fila?.guia_archivo_url].filter((p): p is string => !!p);
-      if (archivos.length) await supabase.storage.from('documentos-empresa').remove(archivos);
+      if (archivos.length) {
+        const { error: errStorage } = await supabase.storage.from('documentos-empresa').remove(archivos);
+        if (errStorage) throw new Error(`Factura eliminada, pero no se pudieron borrar sus adjuntos: ${errStorage.message}`);
+      }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['facturas-cobrar'] }),
   });
