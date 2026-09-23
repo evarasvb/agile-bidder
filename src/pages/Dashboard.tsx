@@ -1,14 +1,10 @@
 import { useState } from "react";
 import {
   Target,
-  Zap,
   DollarSign,
   TrendingUp,
   TrendingDown,
   ArrowRight,
-  Clock,
-  Eye,
-  Plus,
   Loader2,
   Sparkles,
   RefreshCw,
@@ -21,21 +17,11 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   useDashboardKPIs,
   usePipelineByStage,
   useOportunidadesPorTipo,
-  useCierresProximos,
-  useUltimosMatches,
   useNoticiasInstituciones,
 } from "@/hooks/useDashboardPrincipal";
 import {
@@ -104,10 +90,6 @@ export default function Dashboard() {
     usePipelineByStage();
   const { data: porTipoData, isLoading: porTipoLoading } =
     useOportunidadesPorTipo();
-  const { data: cierresData, isLoading: cierresLoading } =
-    useCierresProximos();
-  const { data: matchesData, isLoading: matchesLoading } =
-    useUltimosMatches();
   const { data: noticiasData, isLoading: noticiasLoading } =
     useNoticiasInstituciones();
   // "Buscar oportunidades para mí": corre el match del PROPIO cliente y lleva a
@@ -383,248 +365,6 @@ export default function Dashboard() {
       </div>
 
       <DatoCuriosoCard />
-
-      {/* Row 3: Cierres Próximos + Últimos Matches */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        {/* Cierres Próximos */}
-        <Card className="border-border/50 shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-heading font-semibold flex items-center gap-2">
-              <Clock className="h-4 w-4 text-firmavb-amber" />
-              Cierres Próximos (7 días)
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Oportunidades que cierran esta semana. Postula antes de que venza el plazo.
-            </p>
-          </CardHeader>
-          <CardContent>
-            {cierresLoading ? (
-              <div className="space-y-3">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-14 w-full" />
-                ))}
-              </div>
-            ) : !cierresData?.length ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Inbox className="h-10 w-10 mx-auto mb-3 opacity-50" />
-                <p className="text-sm">
-                  Sin oportunidades por cerrar esta semana
-                </p>
-              </div>
-            ) : (
-              <div className="rounded-lg border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="font-semibold">Título</TableHead>
-                      <TableHead className="font-semibold">
-                        Institución
-                      </TableHead>
-                      <TableHead className="font-semibold">Cierre</TableHead>
-                      <TableHead className="font-semibold">Match</TableHead>
-                      <TableHead className="font-semibold">Etapa</TableHead>
-                      <TableHead className="text-right" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {cierresData.map((item) => (
-                      <TableRow key={item.codigo} className="data-row">
-                        <TableCell>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <p className="font-medium text-sm line-clamp-1 max-w-[200px] cursor-help">
-                                  {item.nombre}
-                                </p>
-                              </TooltipTrigger>
-                              <TooltipContent side="top" className="max-w-xs">
-                                {item.nombre}
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </TableCell>
-                        <TableCell>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <p className="text-sm text-muted-foreground line-clamp-1 max-w-[150px] cursor-help">
-                                  {item.institucion}
-                                </p>
-                              </TooltipTrigger>
-                              <TooltipContent side="top" className="max-w-xs">
-                                {item.institucion}
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={
-                              item.diasRestantes <= 2
-                                ? "border-firmavb-red text-firmavb-red"
-                                : "border-firmavb-amber text-firmavb-amber"
-                            }
-                          >
-                            {item.diasRestantes === 0
-                              ? "¡Hoy!"
-                              : item.diasRestantes === 1
-                                ? "Mañana"
-                                : `${item.diasRestantes}d`}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {item.match_score ? (
-                            <span className="font-mono text-sm font-medium">
-                              {item.match_score}%
-                            </span>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">
-                              —
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className="text-xs">
-                            {item.etapa}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Link
-                            to={
-                              item.tipo === "Compra Ágil"
-                                ? `/compras-agiles/${item.codigo}`
-                                : `/licitaciones/${item.codigo}`
-                            }
-                          >
-                            <Button variant="ghost" size="sm">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </Link>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Últimos Matches */}
-        <Card className="border-border/50 shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-heading font-semibold flex items-center gap-2">
-              <Zap className="h-4 w-4 text-firmavb-green" />
-              Últimos Matches
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Compras del Estado que calzan con tu inventario. A mayor %, mejor encaje.
-            </p>
-          </CardHeader>
-          <CardContent>
-            {matchesLoading ? (
-              <div className="space-y-3">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-14 w-full" />
-                ))}
-              </div>
-            ) : !matchesData?.length ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Inbox className="h-10 w-10 mx-auto mb-3 opacity-50" />
-                <p className="text-sm">Sin matches recientes</p>
-                <p className="text-xs mt-1">
-                  Ejecuta el Matching IA para encontrar oportunidades
-                </p>
-              </div>
-            ) : (
-              <div className="rounded-lg border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="font-semibold">Título</TableHead>
-                      <TableHead className="font-semibold">Match</TableHead>
-                      <TableHead className="font-semibold">
-                        Institución
-                      </TableHead>
-                      <TableHead className="font-semibold">Tipo</TableHead>
-                      <TableHead className="text-right" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {matchesData.map((item) => (
-                      <TableRow key={item.codigo} className="data-row">
-                        <TableCell>
-                          <p className="font-medium text-sm line-clamp-1 max-w-[200px]">
-                            {item.nombre}
-                          </p>
-                        </TableCell>
-                        <TableCell>
-                          {item.match_score ? (
-                            <div className="flex items-center gap-2">
-                              <div className="w-12 h-2 bg-muted rounded-full overflow-hidden">
-                                <div
-                                  className="h-full rounded-full bg-firmavb-green"
-                                  style={{
-                                    width: `${item.match_score}%`,
-                                  }}
-                                />
-                              </div>
-                              <span className="text-sm font-mono font-medium">
-                                {item.match_score}%
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">
-                              —
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <p className="text-sm text-muted-foreground line-clamp-1 max-w-[140px]">
-                            {item.institucion}
-                          </p>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            className={
-                              item.tipo === "Compra Ágil"
-                                ? "bg-firmavb-blue text-white"
-                                : "bg-firmavb-green text-white"
-                            }
-                          >
-                            {item.tipo}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Link
-                              to={
-                                item.tipo === "Compra Ágil"
-                                  ? `/compras-agiles/${item.codigo}`
-                                  : `/licitaciones/${item.codigo}`
-                              }
-                            >
-                              <Button variant="ghost" size="sm">
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </Link>
-                            <Link to="/oportunidades">
-                              <Button variant="ghost" size="sm">
-                                <Plus className="h-4 w-4" />
-                              </Button>
-                            </Link>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Row 4: Noticias de tus instituciones */}
       <Card className="border-border/50 shadow-sm">
