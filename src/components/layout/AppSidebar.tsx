@@ -131,9 +131,10 @@ const navItems: NavItem[] = [
   {
     adminOnly: true,
     title: "Fundador",
-    url: "/admin/traccion",
+    url: "/fundador",
     icon: Rocket,
     children: [
+      { title: "Resumen", url: "/fundador", icon: BarChart3, adminOnly: true },
       { title: "Tracción", url: "/admin/traccion", icon: TrendingUp, adminOnly: true },
       { title: "Marketing", url: "/marketing/control", icon: Rocket, adminOnly: true },
       { title: "Contactos", url: "/academia/leads", icon: Users, adminOnly: true },
