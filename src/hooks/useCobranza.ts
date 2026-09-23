@@ -92,8 +92,16 @@ export function useEliminarFactura() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      const { data: fila, error: errFila } = await sb
+        .from('facturas_por_cobrar')
+        .select('factura_archivo_url, guia_archivo_url')
+        .eq('id', id)
+        .maybeSingle();
+      if (errFila) throw errFila;
       const { error } = await sb.from('facturas_por_cobrar').delete().eq('id', id);
       if (error) throw error;
+      const archivos = [fila?.factura_archivo_url, fila?.guia_archivo_url].filter((p): p is string => !!p);
+      if (archivos.length) await supabase.storage.from('documentos-empresa').remove(archivos);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['facturas-cobrar'] }),
   });

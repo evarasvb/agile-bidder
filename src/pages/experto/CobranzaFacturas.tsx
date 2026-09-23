@@ -412,7 +412,7 @@ function NuevaFacturaDialog() {
 
   const subirArchivo = async (file: File, tag: 'factura' | 'guia'): Promise<{ url: string; nombre: string } | null> => {
     if (!cliente?.user_id) return null;
-    if (file.size > 20 * 1024 * 1024) { toast.error('Máximo 20 MB por archivo'); return null; }
+    if (file.size > 20 * 1024 * 1024) throw new Error(`${tag === 'factura' ? 'La factura' : 'La guía'} supera el máximo de 20 MB`);
     const ext = file.name.split('.').pop()?.toLowerCase() || 'pdf';
     const path = `${cliente.user_id}/cobranza_${tag}_${Date.now()}.${ext}`;
     const up = await supabase.storage.from('documentos-empresa').upload(path, file, { contentType: file.type || 'application/pdf' });
@@ -431,14 +431,20 @@ function NuevaFacturaDialog() {
         facturaFile ? subirArchivo(facturaFile, 'factura') : Promise.resolve(null),
         guiaFile ? subirArchivo(guiaFile, 'guia') : Promise.resolve(null),
       ]);
-      await crear.mutateAsync({
-        deudor_tipo: tipo, deudor_nombre: nombre.trim(), deudor_rut: rut.trim() || null,
-        oc_codigo: oc.trim() || null, numero_factura: numero.trim() || null, monto: m || 0,
-        fecha_emision: emision || null, fecha_recepcion: recepcion || null, fecha_vencimiento: vencimiento || null,
-        notas: notas.trim() || null,
-        factura_archivo_url: factura?.url || null, factura_archivo_nombre: factura?.nombre || null,
-        guia_archivo_url: guia?.url || null, guia_archivo_nombre: guia?.nombre || null,
-      });
+      try {
+        await crear.mutateAsync({
+          deudor_tipo: tipo, deudor_nombre: nombre.trim(), deudor_rut: rut.trim() || null,
+          oc_codigo: oc.trim() || null, numero_factura: numero.trim() || null, monto: m || 0,
+          fecha_emision: emision || null, fecha_recepcion: recepcion || null, fecha_vencimiento: vencimiento || null,
+          notas: notas.trim() || null,
+          factura_archivo_url: factura?.url || null, factura_archivo_nombre: factura?.nombre || null,
+          guia_archivo_url: guia?.url || null, guia_archivo_nombre: guia?.nombre || null,
+        });
+      } catch (e) {
+        const huerfanos = [factura?.url, guia?.url].filter((p): p is string => !!p);
+        if (huerfanos.length) await supabase.storage.from('documentos-empresa').remove(huerfanos);
+        throw e;
+      }
       toast.success('Factura registrada');
       limpiar();
       setAbierto(false);
@@ -477,9 +483,9 @@ function NuevaFacturaDialog() {
                 <Label>Orden de Compra aceptada</Label>
                 <OcAceptadaCombobox institucion={nombre} value={oc} onSelect={(o) => {
                   setOc(o.codigo);
-                  if (o.rut_demandante) setRut(o.rut_demandante);
-                  if (o.total) setMonto(String(o.total));
-                  if (o.fecha_emision) setEmision(o.fecha_emision.slice(0, 10));
+                  setRut(o.rut_demandante || '');
+                  setMonto(o.total ? String(o.total) : '');
+                  setEmision(o.fecha_emision ? o.fecha_emision.slice(0, 10) : '');
                 }} />
                 <p className="mt-1 text-[11px] text-muted-foreground">Solo se listan OC ya aceptadas o con recepción conforme — así el respaldo del cobro es real.</p>
               </div>
