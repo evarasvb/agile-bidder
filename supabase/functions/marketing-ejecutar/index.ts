@@ -21,6 +21,24 @@ function jsonResponse(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), { status, headers: jsonHeaders });
 }
 
+// Cuánto manda cada corrida y qué tan seguido, para no mandar todo el envío
+// de golpe (riesgo de listas negras). Lo que sobra lo retoma solo el cron
+// marketing-continuar-envios cada pocos minutos.
+const MAX_EMAILS_PER_RUN = 40;
+const SEND_DELAY_MS = 350;
+
+// El cron llama esta misma función con el JWT de service_role para retomar
+// envíos pendientes; el resto de las llamadas (desde la pantalla) vienen con
+// el JWT del usuario evaras@firmavb.cl. Mismo patrón que otras funciones del
+// repo (p. ej. sync-licitaciones-bi).
+function jwtRole(authorization: string | null): string | null {
+  try {
+    const token = (authorization ?? '').replace(/^Bearer\s+/i, '');
+    const encoded = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(encoded)).role ?? null;
+  } catch { return null; }
+}
+
 async function sendEmailViaResend(
   resendKey: string,
   input: {
@@ -101,10 +119,15 @@ serve(async (req) => {
 
     const sb = createClient(supabaseUrl, supabaseServiceKey);
     const token = authHeader.slice('Bearer '.length);
-    const { data: { user }, error: authError } = await sb.auth.getUser(token);
 
-    if (authError || !user || user.email !== 'evaras@firmavb.cl') {
-      return jsonResponse({ error: 'Unauthorized' }, 403);
+    // El cron de continuación llama con el JWT de service_role: no tiene un
+    // usuario detrás, así que se valida por rol en vez de por auth.getUser.
+    const esServiceRole = jwtRole(authHeader) === 'service_role';
+    if (!esServiceRole) {
+      const { data: { user }, error: authError } = await sb.auth.getUser(token);
+      if (authError || !user || user.email !== 'evaras@firmavb.cl') {
+        return jsonResponse({ error: 'Unauthorized' }, 403);
+      }
     }
 
     const contentLength = Number(req.headers.get('content-length') || '0');
@@ -125,9 +148,22 @@ serve(async (req) => {
 
     const outcome = await executeMarketingCampaign(body, {
       store: {
-        claimPiece: (pieceId) => {
+        claimPiece: (pieceId, contactosIds) => {
           const query = sb.from('marketing_piezas') as unknown as AtomicClaimQuery;
-          return claimEmailPiece(query, pieceId);
+          return claimEmailPiece(query, pieceId, contactosIds);
+        },
+        getSentContactIds: async (pieceId) => {
+          const { data, error } = await sb
+            .from('marketing_ejecucion')
+            .select('contacto_id')
+            .eq('pieza_id', pieceId)
+            .eq('estado', 'enviado');
+
+          if (error) {
+            console.error('No se pudo revisar envíos previos:', error.code);
+            return new Set<string>();
+          }
+          return new Set((data || []).map((r: { contacto_id: string }) => r.contacto_id));
         },
         releasePieceClaim: async (pieceId) => {
           const { data, error } = await sb
@@ -146,7 +182,12 @@ serve(async (req) => {
           return getMarketingContactsPage(table, filters);
         },
         persistExecutions: async (rows: MarketingExecutionRow[]) => {
-          const { error } = await sb.from('marketing_ejecucion').insert(rows);
+          // upsert + ignoreDuplicates: si el cron de continuación y una
+          // corrida anterior se llegaran a superponer, no duplica filas para
+          // el mismo (pieza_id, contacto_id).
+          const { error } = await sb
+            .from('marketing_ejecucion')
+            .upsert(rows, { onConflict: 'pieza_id,contacto_id', ignoreDuplicates: true });
           if (error) {
             console.error('No se pudieron registrar resultados:', error.code);
             throw new Error('execution_persistence_failed');
@@ -190,6 +231,8 @@ serve(async (req) => {
         },
       },
       sendEmail: (input) => sendEmailViaResend(resendApiKey, input),
+      maxPerRun: MAX_EMAILS_PER_RUN,
+      sendDelayMs: SEND_DELAY_MS,
     });
 
     if ('total_procesados' in outcome.body) {
