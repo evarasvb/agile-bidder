@@ -3,17 +3,24 @@ import { Link } from "react-router-dom";
 import {
   Building2,
   Plus,
-  Check,
   Bell,
   BellRing,
   Tag,
   ShoppingCart,
   Loader2,
   ArrowRight,
+  HelpCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   usePanelProveedor,
   useSeguirInstitucion,
@@ -21,6 +28,52 @@ import {
   CLP_PANEL,
 } from "@/hooks/usePanelProveedor";
 import { useClienteFiltros } from "@/hooks/useClienteFiltros";
+
+// Botón de ayuda: explica en simple qué es cada parte del panel y qué pasa al
+// seguir una institución.
+function AyudaPanel() {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-muted-foreground">
+          <HelpCircle className="h-4 w-4" /> ¿Cómo funciona?
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Tu Panel del proveedor</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 text-sm">
+          <div>
+            <p className="font-medium text-foreground">Qué le vendes al Estado</p>
+            <p className="text-muted-foreground">
+              Leemos tu RUT y resumimos tus ventas históricas a Mercado Público: cuántas
+              órdenes de compra, cuánto has vendido y a cuántas instituciones.
+            </p>
+          </div>
+          <div>
+            <p className="font-medium text-foreground">Palabras clave sugeridas</p>
+            <p className="text-muted-foreground">
+              Salen de los productos que más vendes. Al agregarlas, el buscador te trae más
+              licitaciones y compras ágiles parecidas a lo que ya vendes.
+            </p>
+          </div>
+          <div>
+            <p className="font-medium text-foreground">Tus mejores clientes y el botón "Seguir"</p>
+            <p className="text-muted-foreground">
+              Son las instituciones que más te compran. Cuando sigues una:
+            </p>
+            <ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
+              <li>Te avisamos apenas publique una nueva licitación o compra ágil (por correo si lo tienes activado).</li>
+              <li>Sus noticias aparecen en el panel "Noticias de tus instituciones", más abajo.</li>
+              <li>Puedes dejar de seguirla cuando quieras con el mismo botón.</li>
+            </ul>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 // Panel del proveedor: qué vende (según sus órdenes de compra), palabras clave
 // sugeridas para el buscador y sus mejores instituciones compradoras para seguir.
@@ -95,10 +148,13 @@ export function PanelProveedorCard() {
   return (
     <Card className="border-firmavb-blue/30">
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Building2 className="h-4 w-4 text-firmavb-blue" />
-          Panel del proveedor
-        </CardTitle>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Building2 className="h-4 w-4 text-firmavb-blue" />
+            Panel del proveedor
+          </CardTitle>
+          <AyudaPanel />
+        </div>
       </CardHeader>
       <CardContent className="space-y-5">
         {sinDatos ? (
