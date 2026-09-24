@@ -364,23 +364,25 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       const bestMatchByCodigo: Record<string, { score: number; producto: string | null; count: number }> = {};
       const itemMatchCountByCodigo: Record<string, number> = {};
       let itemMatchesFallaron = false;
-      {
-        // Si el RPC de empresa dueña no resolvió (p. ej. caché de esquema o un
-        // usuario sin fila en clientes), NO dejamos el panel sin matches: caemos
-        // al comportamiento anterior (matches por código, mejor score).
-        let matchQuery = supabase
+      // Si el RPC de empresa dueña no resolvió (p. ej. un usuario recién
+      // registrado que todavía no tiene fila en `clientes`), NO se muestran
+      // matches. Antes se caía a leer ca_matches/ca_item_matches de TODOS los
+      // clientes sin filtro por cliente_id ("matches por código, mejor score"),
+      // lo que le mostraba a un cliente el match calculado con el INVENTARIO DE
+      // OTRO cliente como si fuera el suyo (bug reportado: "me sale 100% de
+      // match y no tengo esos productos en mi inventario").
+      if (clienteIdPanel) {
+        const matchQuery = supabase
           .from('ca_matches')
           .select('compra_agil_codigo, score, nombre_producto')
+          .eq('cliente_id', clienteIdPanel)
           .gte('fecha_cierre', nowIso);
-        let itemQuery = supabase
+        const itemQuery = supabase
           .from('ca_item_matches')
           .select('compra_agil_codigo')
+          .eq('cliente_id', clienteIdPanel)
           .gte('fecha_cierre', nowIso)
           .gte('score', PISO_MATCH);
-        if (clienteIdPanel) {
-          matchQuery = matchQuery.eq('cliente_id', clienteIdPanel);
-          itemQuery = itemQuery.eq('cliente_id', clienteIdPanel);
-        }
         const [matchesRes, itemMatchesRes] = await Promise.all([matchQuery, itemQuery]);
         if ((matchesRes as any)?.error) {
           console.error('[OportunidadesPanel] Error fetching ca_matches:', (matchesRes as any).error);

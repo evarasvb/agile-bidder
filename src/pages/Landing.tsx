@@ -13,7 +13,6 @@ import {
   Play,
   Bot,
   GraduationCap,
-  MonitorPlay
 } from "lucide-react";
 import { Seo } from "@/components/Seo";
 import { EstadisticasReales } from "@/components/landing/EstadisticasReales";
@@ -102,19 +101,6 @@ export default function Landing() {
             <Button
               variant="outline"
               asChild
-              className="gap-1.5 border-firmavb-green/40 text-firmavb-green hover:bg-firmavb-green/10 transition-colors px-2.5 sm:px-4 hidden sm:inline-flex"
-            >
-              <Link to="/webinar/vendele-al-estado">
-                <span className="relative flex h-2 w-2 mr-0.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-firmavb-green opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-firmavb-green" />
-                </span>
-                En vivo · martes
-              </Link>
-            </Button>
-            <Button
-              variant="outline"
-              asChild
               className="gap-1.5 border-firmavb-blue/30 text-firmavb-blue hover:bg-firmavb-blue/10 transition-colors px-2.5 sm:px-4"
             >
               <Link to="/academia">
@@ -156,22 +142,8 @@ export default function Landing() {
         </div>
       </header>
 
-      {/* Banner: conversación semanal en vivo (todos los martes) */}
-      <div className="pt-20 px-6">
-        <Link
-          to="/webinar/vendele-al-estado"
-          className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-2 rounded-xl bg-firmavb-green/10 border border-firmavb-green/20 px-4 py-2.5 text-sm text-firmavb-green hover:bg-firmavb-green/15 transition-colors"
-        >
-          <MonitorPlay className="h-4 w-4 shrink-0" />
-          <span>
-            <b>En vivo, gratis · todos los martes 19:00 hrs:</b> Véndele al Estado y no mueras en el intento — inscríbete y te llega la cita al calendario
-          </span>
-          <ArrowRight className="h-4 w-4 shrink-0" />
-        </Link>
-      </div>
-
       {/* Hero Section with Smart Search */}
-      <section className="pt-8 pb-16 px-6">
+      <section className="pt-28 pb-16 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center max-w-4xl mx-auto">
             <Badge className="mb-6 bg-firmavb-blue/10 text-firmavb-blue border-firmavb-blue/20 hover:bg-firmavb-blue/20 px-4 py-2">

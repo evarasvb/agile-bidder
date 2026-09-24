@@ -3,23 +3,52 @@ import { Menu } from "lucide-react";
 import { AppSidebar } from "./AppSidebar";
 import { StatusBar } from "./StatusBar";
 import { EvaristoChat } from "@/components/soporte/EvaristoChat";
+import { AvisosBell } from "@/components/notifications/AvisosBell";
+import { cn } from "@/lib/utils";
 import logoFirmavbBlanco from "@/assets/logo-firmavb-blanco.png";
 
 interface AppLayoutProps {
   children: ReactNode;
 }
 
+const SIDEBAR_COLLAPSED_KEY = "firmavb-sidebar-collapsed";
+
 export function AppLayout({ children }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Preferencia de menú achicado (solo escritorio), guardada en el navegador.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleSidebarCollapsed = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
+      } catch {
+        // localStorage puede fallar (modo privado, cuota); no es crítico.
+      }
+      return next;
+    });
+  };
 
   return (
     <div className="min-h-screen bg-background">
-      <AppSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <AppSidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={toggleSidebarCollapsed}
+      />
 
       {/* En escritorio deja espacio para el sidebar fijo; en móvil ocupa todo */}
-      <div className="lg:pl-64">
-        {/* Barra superior solo en móvil: logo + botón de menú */}
-        <div className="lg:hidden sticky top-0 z-30 flex items-center gap-3 h-14 px-4 bg-sidebar border-b border-sidebar-border">
+      <div className={cn("transition-[padding] duration-200", sidebarCollapsed ? "lg:pl-[4.5rem]" : "lg:pl-64")}>
+        {/* Barra superior móvil: menú + logo + campana */}
+        <div className="lg:hidden sticky top-0 z-30 flex items-center gap-3 h-14 px-4 bg-sidebar border-b border-sidebar-border text-sidebar-foreground">
           <button
             onClick={() => setSidebarOpen(true)}
             className="p-2 -ml-2 text-sidebar-foreground rounded-md hover:bg-sidebar-accent"
@@ -32,6 +61,14 @@ export function AppLayout({ children }: AppLayoutProps) {
             alt="FirmaVB"
             className="h-7 w-auto object-contain"
           />
+          <div className="ml-auto">
+            <AvisosBell className="text-sidebar-foreground hover:text-sidebar-foreground" />
+          </div>
+        </div>
+
+        {/* Barra superior escritorio: campana a la derecha */}
+        <div className="hidden lg:flex sticky top-0 z-30 items-center justify-end h-12 px-6 bg-background/95 backdrop-blur border-b">
+          <AvisosBell />
         </div>
 
         <StatusBar />
