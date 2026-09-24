@@ -29,9 +29,10 @@ import { descargarCartaAbogadoPDF } from '@/services/cartaAbogadoPdf';
 import { useOpcionesOC, useMisOcAceptadas, useOcLinksPorCodigos, useSyncMisOC, etiquetaEstado } from '@/hooks/useOrdenesCompra';
 import {
   useFacturasCobrar, useCrearFactura, useActualizarFactura, useEliminarFactura,
-  diasAtraso, interesEstimado, hechosCobranza, fechasConsistentes, CLP, ESTADO_COBRO_LABEL,
+  diasAtraso, interesEstimado, hechosCobranza, fechasConsistentes, subirAdjuntoCobranza, CLP, ESTADO_COBRO_LABEL,
   type FacturaCobrar, type DeudorTipo, type EstadoCobro,
 } from '@/hooks/useCobranza';
+import { CargaMasivaCobranzaDialog } from '@/components/experto/CargaMasivaCobranza';
 
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string;
 const ANON = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
@@ -147,7 +148,10 @@ export default function CobranzaFacturas() {
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">{facturas.length} factura(s) registrada(s)</p>
-        <NuevaFacturaDialog />
+        <div className="flex items-center gap-2">
+          <CargaMasivaCobranzaDialog />
+          <NuevaFacturaDialog />
+        </div>
       </div>
 
       {isLoading ? (
@@ -184,15 +188,19 @@ export default function CobranzaFacturas() {
                       {f.oc_codigo ? ` · OC ${f.oc_codigo}` : ''}
                     </p>
                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                      {f.factura_archivo_url && (
+                      {f.factura_archivo_url ? (
                         <button type="button" className="inline-flex items-center gap-1 text-firmavb-blue hover:underline" onClick={() => abrirArchivo(f.factura_archivo_url!)}>
                           <Paperclip className="h-3 w-3" /> Ver factura
                         </button>
+                      ) : (
+                        <AdjuntarBoton factura={f} tipo="factura" />
                       )}
-                      {f.guia_archivo_url && (
+                      {f.guia_archivo_url ? (
                         <button type="button" className="inline-flex items-center gap-1 text-firmavb-blue hover:underline" onClick={() => abrirArchivo(f.guia_archivo_url!)}>
                           <Paperclip className="h-3 w-3" /> Ver guía
                         </button>
+                      ) : (
+                        <AdjuntarBoton factura={f} tipo="guia" />
                       )}
                       {f.deudor_tipo === 'estado' && f.oc_codigo && ocLinks?.get(f.oc_codigo)?.link_oficial && (
                         <a href={ocLinks.get(f.oc_codigo)!.link_oficial!} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-firmavb-blue hover:underline">
@@ -382,6 +390,45 @@ function OcAceptadaCombobox({
         {sync.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
       </Button>
     </div>
+  );
+}
+
+// Adjuntar la factura o la guía DESPUÉS de creada (p. ej. tras una carga
+// masiva por Excel, que solo trae los datos, no los PDF). Solo se muestra
+// cuando ese documento en particular todavía falta.
+function AdjuntarBoton({ factura, tipo }: { factura: FacturaCobrar; tipo: 'factura' | 'guia' }) {
+  const { data: cliente } = useCliente();
+  const actualizar = useActualizarFactura();
+  const [subiendo, setSubiendo] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const onFile = async (file: File) => {
+    if (!cliente?.user_id) { toast.error('No hay cliente activo'); return; }
+    setSubiendo(true);
+    try {
+      const { url, nombre } = await subirAdjuntoCobranza(cliente.user_id, file, tipo);
+      await actualizar.mutateAsync(tipo === 'factura'
+        ? { id: factura.id, factura_archivo_url: url, factura_archivo_nombre: nombre }
+        : { id: factura.id, guia_archivo_url: url, guia_archivo_nombre: nombre });
+      toast.success(tipo === 'factura' ? 'Factura adjuntada' : 'Guía adjuntada');
+    } catch (e) {
+      toast.error((e as Error).message || 'No se pudo subir el archivo');
+    } finally {
+      setSubiendo(false);
+    }
+  };
+
+  return (
+    <>
+      <input ref={inputRef} type="file" accept="application/pdf,image/jpeg,image/png" className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }} />
+      <button type="button" disabled={subiendo}
+        className="inline-flex items-center gap-1 text-muted-foreground hover:text-firmavb-blue hover:underline disabled:opacity-50"
+        onClick={() => inputRef.current?.click()}>
+        {subiendo ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+        {tipo === 'factura' ? 'Adjuntar factura' : 'Adjuntar guía'}
+      </button>
+    </>
   );
 }
 

@@ -73,6 +73,35 @@ export function useCrearFactura() {
   });
 }
 
+// Carga masiva desde Excel: una sola inserción con todas las filas válidas.
+export function useCrearFacturasMasivo() {
+  const qc = useQueryClient();
+  const { data: cliente } = useCliente();
+  return useMutation({
+    mutationFn: async (filas: NuevaFactura[]) => {
+      if (!cliente?.id) throw new Error('No hay cliente activo');
+      if (!filas.length) return 0;
+      const { error } = await sb.from('facturas_por_cobrar').insert(filas.map((f) => ({ ...f, cliente_id: cliente.id })));
+      if (error) throw error;
+      return filas.length;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['facturas-cobrar'] }),
+  });
+}
+
+// Sube un adjunto (factura o guía) al bucket privado de la empresa. Mismo
+// patrón de carpeta por user_id y límite de 20MB que usa el formulario de
+// alta; se reutiliza acá para poder adjuntar documentos a una factura ya
+// creada (carga masiva primero, documentos después).
+export async function subirAdjuntoCobranza(userId: string, file: File, tag: 'factura' | 'guia'): Promise<{ url: string; nombre: string }> {
+  if (file.size > 20 * 1024 * 1024) throw new Error(`${tag === 'factura' ? 'La factura' : 'La guía'} supera el máximo de 20 MB`);
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'pdf';
+  const path = `${userId}/cobranza_${tag}_${Date.now()}.${ext}`;
+  const up = await supabase.storage.from('documentos-empresa').upload(path, file, { contentType: file.type || 'application/pdf' });
+  if (up.error) throw new Error(`No se pudo subir ${tag === 'factura' ? 'la factura' : 'la guía'}: ${up.error.message}`);
+  return { url: path, nombre: file.name };
+}
+
 export function useActualizarFactura() {
   const qc = useQueryClient();
   return useMutation({
