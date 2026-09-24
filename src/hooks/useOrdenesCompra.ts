@@ -84,13 +84,17 @@ function derivarTipo(codigo?: string | null): string | null {
   return m ? m[1].toUpperCase() : null;
 }
 
-// Estado de la OC viene como código numérico de Mercado Público.
+// Estado de la OC viene como código numérico de Mercado Público (CodigoEstado).
+// Verificado contra raw_json real de ordenes_compra: 4 = Enviada a proveedor,
+// 5 = En proceso (todavía NO aceptada), 6 = Aceptada, 9 = Cancelada,
+// 11 = No aceptada, 12 = Recepción conforme.
 export const ESTADO_OC: Record<string, string> = {
   '3': 'Guardada',
-  '4': 'Enviada',
-  '5': 'Aceptada',
-  '6': 'Recepción conforme',
+  '4': 'Enviada a proveedor',
+  '5': 'En proceso',
+  '6': 'Aceptada',
   '9': 'Cancelada',
+  '11': 'No aceptada',
   '12': 'Recepción conforme',
 };
 // Códigos que cuentan como "aceptada" para efectos de cobranza: el código

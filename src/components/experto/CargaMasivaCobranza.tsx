@@ -47,19 +47,49 @@ function descargarPlantilla() {
 
 // Acepta fecha como texto (AAAA-MM-DD o DD-MM-AAAA / DD/MM/AAAA) o como
 // número de serie de Excel (cuando la celda quedó con formato de fecha).
-function parsearFecha(raw: unknown): string | null {
-  if (raw == null || raw === '') return null;
+interface FechaParseada { valor: string | null; invalida: boolean }
+
+// Distingue celda vacía (válida, fecha opcional) de un valor que vino pero no
+// se pudo leer o no es una fecha real de calendario (p. ej. "2026-02-30"): un
+// insert con esa fecha tal cual la rechaza Postgres y aborta TODO el lote, así
+// que hay que detectarla acá, no dejar que llegue a la base.
+function parsearFecha(raw: unknown): FechaParseada {
+  if (raw == null || raw === '') return { valor: null, invalida: false };
   if (typeof raw === 'number') {
     const ms = Math.round((raw - 25569) * 86400 * 1000);
     const d = new Date(ms);
-    return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+    return Number.isNaN(d.getTime()) ? { valor: null, invalida: true } : { valor: d.toISOString().slice(0, 10), invalida: false };
   }
   const s = String(raw).trim();
+  if (!s) return { valor: null, invalida: false };
   const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (iso) return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
   const dmy = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
-  if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
-  return null;
+  let y: number, m: number, day: number;
+  if (iso) { y = Number(iso[1]); m = Number(iso[2]); day = Number(iso[3]); }
+  else if (dmy) { y = Number(dmy[3]); m = Number(dmy[2]); day = Number(dmy[1]); }
+  else return { valor: null, invalida: true };
+  const d = new Date(Date.UTC(y, m - 1, day));
+  if (d.getUTCFullYear() !== y || d.getUTCMonth() !== m - 1 || d.getUTCDate() !== day) return { valor: null, invalida: true };
+  return { valor: `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`, invalida: false };
+}
+
+// Acepta números de Excel tal cual, o texto con separador de miles chileno
+// ("1.500.000"), decimal con coma o punto, y rechaza negativos (no es un
+// monto a cobrar válido) en vez de convertirlos en un positivo al quitar el
+// signo.
+function parsearMonto(raw: unknown): number | null {
+  if (raw == null || raw === '') return null;
+  if (typeof raw === 'number') return Number.isFinite(raw) ? Math.round(raw) : null;
+  let s = String(raw).trim();
+  if (!s) return null;
+  if (s.startsWith('-')) return null;
+  s = s.replace(/[^0-9.,]/g, '');
+  if (!s) return null;
+  if (/,\d{1,2}$/.test(s)) s = s.replace(/\./g, '').replace(',', '.');
+  else if (/\.\d{1,2}$/.test(s) && !/\.\d{3}(\D|$)/.test(s)) s = s.replace(/,/g, '');
+  else s = s.replace(/[.,]/g, '');
+  const n = Number(s);
+  return Number.isFinite(n) ? Math.round(n) : null;
 }
 
 function parsearFila(row: Record<string, unknown>, numeroFila: number): FilaParseada {
@@ -68,14 +98,18 @@ function parsearFila(row: Record<string, unknown>, numeroFila: number): FilaPars
   const nombre = String(row[COL_NOMBRE] ?? '').trim();
   const rut = String(row[COL_RUT] ?? '').trim();
   const numero = String(row[COL_NUMERO] ?? '').trim();
-  const monto = Number(String(row[COL_MONTO] ?? '').replace(/[^0-9]/g, ''));
-  const emision = parsearFecha(row[COL_EMISION]);
-  const recepcion = parsearFecha(row[COL_RECEPCION]);
-  const vencimiento = parsearFecha(row[COL_VENCIMIENTO]);
+  const monto = parsearMonto(row[COL_MONTO]);
+  const emisionP = parsearFecha(row[COL_EMISION]);
+  const recepcionP = parsearFecha(row[COL_RECEPCION]);
+  const vencimientoP = parsearFecha(row[COL_VENCIMIENTO]);
   const notas = String(row[COL_NOTAS] ?? '').trim();
 
   if (!nombre) return { fila: numeroFila, factura: null, error: 'Falta institución o cliente', resumen: '—' };
-  if (!monto || monto <= 0) return { fila: numeroFila, factura: null, error: 'Monto inválido', resumen: nombre };
+  if (monto == null || monto <= 0) return { fila: numeroFila, factura: null, error: 'Monto inválido', resumen: nombre };
+  if (emisionP.invalida || recepcionP.invalida || vencimientoP.invalida) {
+    return { fila: numeroFila, factura: null, error: 'Fecha inválida (usa AAAA-MM-DD)', resumen: nombre };
+  }
+  const emision = emisionP.valor, recepcion = recepcionP.valor, vencimiento = vencimientoP.valor;
   const errorFechas = fechasConsistentes(emision || '', recepcion || '', vencimiento || '');
   if (errorFechas) return { fila: numeroFila, factura: null, error: errorFechas, resumen: nombre };
 

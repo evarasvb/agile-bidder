@@ -407,9 +407,15 @@ function AdjuntarBoton({ factura, tipo }: { factura: FacturaCobrar; tipo: 'factu
     setSubiendo(true);
     try {
       const { url, nombre } = await subirAdjuntoCobranza(cliente.user_id, file, tipo);
-      await actualizar.mutateAsync(tipo === 'factura'
-        ? { id: factura.id, factura_archivo_url: url, factura_archivo_nombre: nombre }
-        : { id: factura.id, guia_archivo_url: url, guia_archivo_nombre: nombre });
+      try {
+        await actualizar.mutateAsync(tipo === 'factura'
+          ? { id: factura.id, factura_archivo_url: url, factura_archivo_nombre: nombre }
+          : { id: factura.id, guia_archivo_url: url, guia_archivo_nombre: nombre });
+      } catch (e) {
+        const { error: errLimpieza } = await supabase.storage.from('documentos-empresa').remove([url]);
+        if (errLimpieza) console.error('[CobranzaFacturas] No se pudo limpiar el adjunto huérfano tras falla al actualizar la factura:', errLimpieza);
+        throw e;
+      }
       toast.success(tipo === 'factura' ? 'Factura adjuntada' : 'Guía adjuntada');
     } catch (e) {
       toast.error((e as Error).message || 'No se pudo subir el archivo');
