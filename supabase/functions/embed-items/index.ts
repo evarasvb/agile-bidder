@@ -8,7 +8,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // con service role; procesa lotes hasta agotar el presupuesto de tiempo.
 //
 // Costo: gemini-embedding-001 cobra por token de entrada; un ítem son ~15 tokens,
-// así que 40.000 textos cuestan centavos de dólar.
+// así que 40.000 textos cuestan centavos de dólar. Con la API key en plan gratis
+// la cuota es ~100 textos por minuto: cada corrida hace ~200 y el cron va cada 2 min.
 
 const LOTE = 50;
 const MODELOS = ['gemini-embedding-001', 'text-embedding-004'];
@@ -24,7 +25,7 @@ async function embeber(textos: string[], apiKey: string): Promise<number[][]> {
     if (model === 'gemini-embedding-001') body.dimensions = 768;
     // Reintento con espera ante 429 (cuota por minuto) y 5xx; un 404 es "modelo
     // no existe" y se pasa al siguiente de inmediato.
-    for (let intento = 0; intento < 4; intento++) {
+    for (let intento = 0; intento < 3; intento++) {
       const resp = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/embeddings', {
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -39,7 +40,10 @@ async function embeber(textos: string[], apiKey: string): Promise<number[][]> {
       }
       const txt = (await resp.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 200);
       errores.push(`${model}: ${resp.status} ${txt}`);
-      if (resp.status === 429 || resp.status >= 500) { await dormir(4000 * (intento + 1)); continue; }
+      // 429 = cuota por minuto de la API key (en el plan gratis, ~100 textos/min):
+      // se espera a que pase el minuto y se reintenta. 5xx: espera corta.
+      if (resp.status === 429) { await dormir(61_000); continue; }
+      if (resp.status >= 500) { await dormir(4000 * (intento + 1)); continue; }
       break;
     }
   }
