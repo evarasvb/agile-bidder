@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, Package, Calculator, Check, Loader2, Percent, Download, Edit, Search, Plus, X, TrendingUp, TrendingDown, CheckCircle2, XCircle } from "lucide-react";
+import { FileText, Package, Calculator, Check, Loader2, Download, Edit, Search, Plus, X, TrendingUp, TrendingDown, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 import { useUpdateCompraAgil } from "@/hooks/useComprasAgiles";
@@ -658,9 +658,9 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
         <div className="flex-1 overflow-hidden">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <Label className="text-sm font-medium">Configura los items de la propuesta</Label>
+              <Label className="text-sm font-medium">Ítems de la propuesta</Label>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Ajusta cantidades y precios según los requerimientos de la licitación
+                Marca los que vas a ofertar y ajusta cantidad y precio neto. El subtotal se calcula solo.
               </p>
             </div>
             <Button
@@ -673,254 +673,168 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
             </Button>
           </div>
 
-          {/* Altura flexible: en pantallas chicas la lista se adapta en vez de
-              empujar el pie fuera del diálogo (antes era h-[400px] fija). */}
-          <ScrollArea className="h-[45vh] sm:h-[400px] pr-4 -mr-4">
-            <div className="space-y-4">
-              {itemsSeleccionados.map((item) => (
-                <div
-                  key={item.itemId}
-                  className={`border rounded-lg p-4 transition-colors ${
-                    item.selected ? 'border-primary/50 bg-primary/5' : 'border-border'
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <Checkbox
-                      checked={item.selected}
-                      onCheckedChange={() => handleToggleItem(item.itemId)}
-                      className="mt-1"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <Input
-                            value={item.nombre}
-                            onChange={(e) => handleNombreChange(item.itemId, e.target.value)}
-                            placeholder="Nombre del ítem"
-                            className="h-7 text-sm font-medium px-2 -ml-2 border-transparent bg-transparent hover:border-input focus-visible:border-input focus-visible:bg-background"
-                            title="Puedes editar el texto del ítem (por ejemplo, si vino con errores de la ficha)"
-                          />
-                          <Input
-                            value={item.descripcion}
-                            onChange={(e) => handleDescripcionChange(item.itemId, e.target.value)}
-                            placeholder="Descripción (opcional)"
-                            className="h-6 text-xs text-muted-foreground px-2 -ml-2 mt-0.5 border-transparent bg-transparent hover:border-input focus-visible:border-input focus-visible:bg-background"
-                          />
-                          <div className="flex items-center gap-3 mt-2">
-                            <span className="text-xs bg-muted px-2 py-1 rounded">
-                              Solicitado: {item.cantidadSolicitada} {unidadLabel(item.unidadMedida)}
-                            </span>
-                            {item.match && (
-                              <Badge variant="secondary" className="text-xs">
-                                Match: {item.match.matchScore}%
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {item.match && (
-                        <div className="mt-3 p-3 bg-muted/30 rounded-md">
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="font-mono text-xs shrink-0">{item.match.sku}</span>
-                                <Input
-                                  value={item.match.nombre}
-                                  onChange={(e) => handleNombreOfertadoChange(item.itemId, e.target.value)}
-                                  placeholder="Nombre del producto ofertado"
-                                  className="h-6 text-xs font-medium px-2 -ml-2 border-transparent bg-transparent hover:border-input focus-visible:border-input focus-visible:bg-background flex-1 min-w-0"
-                                  title="Este es el nombre que sale en la cotización como 'Producto Ofertado'"
-                                />
-                                {item.match.matchScore < 100 && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    Match: {item.match.matchScore}%
-                                  </Badge>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-3 flex-wrap text-xs">
-                                <span className="text-muted-foreground">
-                                  Stock: {item.match.stock ?? 'N/A'}
-                                </span>
-                                <span className="text-muted-foreground">
-                                  Precio base: {formatCurrency(item.match.precio_unitario)}
-                                </span>
-                                {recargoAplicado > 0 && (
-                                  <span className="text-primary font-medium">
-                                    Con recargo: {formatCurrency(item.precioUnitario || 0)} (+{recargoAplicado}%)
+          {/* Listado compacto: una fila por ítem (antes era una tarjeta grande por
+              ítem con datos repetidos y una etiqueta "Margen" que no significaba nada
+              porque el inventario no guarda costo: comparaba el precio de oferta con
+              el mismo precio de lista). */}
+          <ScrollArea className="h-[45vh] sm:h-[420px] pr-4 -mr-4">
+            <div className="hidden sm:grid grid-cols-[1.5rem_minmax(0,1.3fr)_minmax(0,1fr)_5rem_7rem_6.5rem] gap-3 px-2 pb-2 text-[11px] uppercase tracking-wide text-muted-foreground border-b">
+              <span />
+              <span>Ítem solicitado</span>
+              <span>Tu producto</span>
+              <span className="text-right">Cant.</span>
+              <span className="text-right">Precio neto</span>
+              <span className="text-right">Subtotal</span>
+            </div>
+            <div className="divide-y">
+              {itemsSeleccionados.map((item) => {
+                const selector = (
+                  <Popover open={productoSeleccionando === item.itemId} onOpenChange={(o) => setProductoSeleccionando(o ? item.itemId : null)}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
+                        {item.match ? <Edit className="h-3 w-3 mr-1" /> : <Search className="h-3 w-3 mr-1" />}
+                        {item.match ? 'Cambiar' : 'Buscar'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80 p-0" align="end">
+                      <Command>
+                        <CommandInput placeholder="Buscar producto..." />
+                        <CommandList>
+                          <CommandEmpty>No se encontraron productos.</CommandEmpty>
+                          <CommandGroup>
+                            {inventario?.map((prod) => (
+                              <CommandItem key={prod.id} onSelect={() => handleCambiarProducto(item.itemId, prod)}>
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{prod.nombre_producto}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    SKU: {prod.sku} | {formatCurrency(prod.precio_unitario)}
                                   </span>
-                                )}
-                              </div>
-                            </div>
-                            <Popover open={productoSeleccionando === item.itemId} onOpenChange={(open) => setProductoSeleccionando(open ? item.itemId : null)}>
-                              <PopoverTrigger asChild>
-                                <Button variant="outline" size="sm" className="ml-2">
-                                  <Edit className="h-3.5 w-3.5 mr-1" />
-                                  Cambiar
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-80 p-0" align="end">
-                                <Command>
-                                  <CommandInput placeholder="Buscar producto..." />
-                                  <CommandList>
-                                    <CommandEmpty>No se encontraron productos.</CommandEmpty>
-                                    <CommandGroup>
-                                      {inventario?.map((prod) => (
-                                        <CommandItem
-                                          key={prod.id}
-                                          onSelect={() => handleCambiarProducto(item.itemId, prod)}
-                                        >
-                                          <div className="flex flex-col">
-                                            <span className="font-medium">{prod.nombre_producto}</span>
-                                            <span className="text-xs text-muted-foreground">
-                                              SKU: {prod.sku} | {formatCurrency(prod.precio_unitario)}
-                                            </span>
-                                          </div>
-                                        </CommandItem>
-                                      ))}
-                                    </CommandGroup>
-                                  </CommandList>
-                                </Command>
-                              </PopoverContent>
-                            </Popover>
-                          </div>
-                        </div>
-                      )}
-                      {!item.match && (
-                        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                          <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <span className="text-xs text-yellow-800">
-                              Sin match en tu inventario · puedes buscarlo u ofertarlo con precio manual
-                            </span>
-                            <div className="flex items-center gap-2">
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => { if (!item.selected) handleToggleItem(item.itemId); }}
-                              title="Ofrecer este ítem con tu propio precio, sin producto del inventario"
-                            >
-                              <Plus className="h-3.5 w-3.5 mr-1" />
-                              Ofertar manual
-                            </Button>
-                            <Popover open={productoSeleccionando === item.itemId} onOpenChange={(open) => setProductoSeleccionando(open ? item.itemId : null)}>
-                              <PopoverTrigger asChild>
-                                <Button variant="outline" size="sm">
-                                  <Search className="h-3.5 w-3.5 mr-1" />
-                                  Buscar Producto
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-80 p-0" align="end">
-                                <Command>
-                                  <CommandInput placeholder="Buscar producto..." />
-                                  <CommandList>
-                                    <CommandEmpty>No se encontraron productos.</CommandEmpty>
-                                    <CommandGroup>
-                                      {inventario?.map((prod) => (
-                                        <CommandItem
-                                          key={prod.id}
-                                          onSelect={() => handleCambiarProducto(item.itemId, prod)}
-                                        >
-                                          <div className="flex flex-col">
-                                            <span className="font-medium">{prod.nombre_producto}</span>
-                                            <span className="text-xs text-muted-foreground">
-                                              SKU: {prod.sku} | {formatCurrency(prod.precio_unitario)}
-                                            </span>
-                                          </div>
-                                        </CommandItem>
-                                      ))}
-                                    </CommandGroup>
-                                  </CommandList>
-                                </Command>
-                              </PopoverContent>
-                            </Popover>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      {item.esManual && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="mt-2 text-destructive hover:text-destructive"
-                          onClick={() => handleEliminarItem(item.itemId)}
-                        >
-                          <X className="h-3.5 w-3.5 mr-1" />
-                          Eliminar
-                        </Button>
-                      )}
-
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
-                        <div>
-                          <Label className="text-xs">Cantidad a ofertar</Label>
-                          <Input
-                            type="number"
-                            min={1}
-                            max={item.cantidadSolicitada * 2}
-                            value={item.cantidad}
-                            onChange={(e) => handleCantidadChange(item.itemId, parseInt(e.target.value) || 1)}
-                            disabled={!item.selected}
-                            className="h-8 text-sm"
-                          />
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Solicitado: {item.cantidadSolicitada}
-                          </p>
-                        </div>
-                        <div>
-                          <Label className="text-xs">Precio unitario (CLP)</Label>
-                          <Input
-                            type="number"
-                            min={0}
-                            step={100}
-                            value={item.precioUnitario || ''}
-                            onChange={(e) => handlePrecioChange(item.itemId, parseFloat(e.target.value) || 0)}
-                            disabled={!item.selected}
-                            className="h-8 text-sm"
-                          />
-                          {item.match && (
-                            <div className="mt-1 space-y-0.5">
-                              <p className="text-xs text-muted-foreground">
-                                Base: {formatCurrency(item.match.precio_unitario)}
-                              </p>
-                              {recargoAplicado > 0 && (
-                                <p className="text-xs text-primary font-medium">
-                                  Recargo aplicado: +{recargoAplicado}%
-                                </p>
-                              )}
-                            </div>
-                          )}
-                          {item.selected && <PrecioMercadoHint nombre={item.match?.nombre || item.nombre} disabled={!item.selected} onUsar={(p) => handlePrecioChange(item.itemId, p)} />}
-                          {/* Mostrar margen en tiempo real */}
-                          {item.match && item.precioUnitario > 0 && (
-                            <div className="mt-1">
-                              <Badge 
-                                variant={
-                                  item.margen >= 30 ? 'success' :
-                                  item.margen >= 15 ? 'default' :
-                                  item.margen >= 10 ? 'warning' :
-                                  'destructive'
-                                }
-                                className="text-xs"
-                              >
-                                <Percent className="h-3 w-3 mr-1" />
-                                Margen: {item.margen.toFixed(1)}%
-                              </Badge>
-                            </div>
-                          )}
-                        </div>
-                        <div className="text-right">
-                          <Label className="text-xs">Subtotal</Label>
-                          <p className="text-sm font-semibold text-primary mt-2">
-                            {formatCurrency((item.precioUnitario || 0) * item.cantidad)}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {item.cantidad} × {formatCurrency(item.precioUnitario || 0)}
-                          </p>
-                        </div>
-                      </div>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                );
+                const categoria = item.descripcion && item.descripcion !== item.nombre ? item.nombre : null;
+                return (
+                  <div
+                    key={item.itemId}
+                    className={`grid grid-cols-1 sm:grid-cols-[1.5rem_minmax(0,1.3fr)_minmax(0,1fr)_5rem_7rem_6.5rem] gap-2 sm:gap-3 items-start px-2 py-3 ${
+                      item.selected ? '' : 'opacity-60'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 sm:block">
+                      <Checkbox checked={item.selected} onCheckedChange={() => handleToggleItem(item.itemId)} className="mt-0.5" />
+                      <span className="sm:hidden text-xs text-muted-foreground">{item.selected ? 'Incluido' : 'No incluido'}</span>
                     </div>
+
+                    <div className="min-w-0">
+                      {/* Editable: a veces la ficha viene con errores de OCR o redacción confusa */}
+                      <Input
+                        value={item.descripcion || item.nombre}
+                        onChange={(e) => (item.descripcion ? handleDescripcionChange : handleNombreChange)(item.itemId, e.target.value)}
+                        placeholder="Ítem solicitado"
+                        title="Puedes corregir el texto del ítem"
+                        className="h-7 text-sm font-medium px-1.5 -ml-1.5 border-transparent bg-transparent hover:border-input focus-visible:border-input focus-visible:bg-background"
+                      />
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Piden {item.cantidadSolicitada} {unidadLabel(item.unidadMedida)}
+                        {categoria ? ` · ${categoria}` : ''}
+                      </p>
+                      {item.esManual && (
+                        <button type="button" className="text-xs text-destructive mt-1 inline-flex items-center" onClick={() => handleEliminarItem(item.itemId)}>
+                          <X className="h-3 w-3 mr-1" />Quitar
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="min-w-0">
+                      {item.match ? (
+                        <>
+                          <div className="flex items-center gap-1 min-w-0">
+                            <span className="font-mono text-xs text-muted-foreground shrink-0">{item.match.sku}</span>
+                            <Input
+                              value={item.match.nombre}
+                              onChange={(e) => handleNombreOfertadoChange(item.itemId, e.target.value)}
+                              placeholder="Nombre del producto ofertado"
+                              title="Así sale en la cotización como 'Producto Ofertado'"
+                              className="h-7 text-sm px-1.5 border-transparent bg-transparent hover:border-input focus-visible:border-input focus-visible:bg-background flex-1 min-w-0"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <Badge variant={item.match.matchScore >= 80 ? 'success' : item.match.matchScore >= 60 ? 'secondary' : 'warning'} className="text-[10px] px-1.5 py-0">
+                              {item.match.matchScore}% parecido
+                            </Badge>
+                            {selector}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs text-amber-700">Sin producto en tu inventario</span>
+                          {selector}
+                          {!item.selected && (
+                            <Button variant="secondary" size="sm" className="h-7 px-2 text-xs" onClick={() => handleToggleItem(item.itemId)} title="Ofrecer este ítem con tu propio precio">
+                              <Plus className="h-3 w-3 mr-1" />Ofertar manual
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <Label className="sm:hidden text-xs">Cantidad</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={item.cantidadSolicitada * 2}
+                        value={item.cantidad}
+                        onChange={(e) => handleCantidadChange(item.itemId, parseInt(e.target.value) || 1)}
+                        disabled={!item.selected}
+                        className="h-8 text-sm text-right"
+                        aria-label="Cantidad a ofertar"
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="sm:hidden text-xs">Precio unitario neto (CLP)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        step={100}
+                        value={item.precioUnitario || ''}
+                        onChange={(e) => handlePrecioChange(item.itemId, parseFloat(e.target.value) || 0)}
+                        disabled={!item.selected}
+                        className="h-8 text-sm text-right"
+                        aria-label="Precio unitario neto"
+                      />
+                      {item.match && item.match.precio_unitario > 0 && (
+                        <p className="text-[11px] text-muted-foreground mt-1 text-right">
+                          Lista: {formatCurrency(item.match.precio_unitario)}
+                          {recargoAplicado > 0 ? ` +${recargoAplicado}%` : ''}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="sm:text-right">
+                      <Label className="sm:hidden text-xs">Subtotal</Label>
+                      <p className="text-sm font-semibold text-primary sm:mt-1.5">
+                        {formatCurrency((item.precioUnitario || 0) * item.cantidad)}
+                      </p>
+                    </div>
+
+                    {/* Precio de mercado (OC reales): va debajo de la fila, a todo el
+                        ancho, para no estirar la columna angosta de precio. */}
+                    {item.selected && (
+                      <div className="sm:col-start-2 sm:col-span-5 -mt-1">
+                        <PrecioMercadoHint nombre={item.match?.nombre || item.nombre} disabled={!item.selected} onUsar={(p) => handlePrecioChange(item.itemId, p)} />
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </ScrollArea>
         </div>
