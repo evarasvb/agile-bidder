@@ -93,8 +93,13 @@ serve(async (req: Request) => {
       if (!errUpdate && count) actualizados++;
     }
 
+    // pendientes también en true si alguna fila se saltó por edición
+    // concurrente (quedó con embedding null pese a no venir de un lote
+    // lleno): si no, el llamador la da por terminada y esa fila no se
+    // reintenta hasta recargar la página.
+    const pendientes = filas.length === LOTE || actualizados < filas.length;
     return new Response(
-      JSON.stringify({ actualizados, pendientes: filas.length === LOTE }),
+      JSON.stringify({ actualizados, pendientes }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (e) {
