@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -145,13 +145,26 @@ export default function Abogado() {
     });
   };
 
+  // Si hay código, lista SOLO los documentos ligados a ese caso (si no, el
+  // endpoint devuelve la carpeta general): antes siempre listaba general y
+  // el documento recién subido a un código desaparecía de "Mis documentos".
+  const documentosListados = useRef(false);
   const listarDocumentos = async () => {
     try {
-      const r = await fetch(`${SUPA}/functions/v1/experto-documentos`, { headers: auth });
+      const qs = codigo ? `?codigo=${encodeURIComponent(codigo)}` : '';
+      const r = await fetch(`${SUPA}/functions/v1/experto-documentos${qs}`, { headers: auth });
       const j = await r.json().catch(() => ({}));
       setDocumentos(j.documentos ?? []);
+      documentosListados.current = true;
     } catch { /* silencioso */ }
   };
+
+  // Si el usuario cambia el código estando en la pestaña "Mis documentos",
+  // recarga la lista para ese código (solo después del primer listado).
+  useEffect(() => {
+    if (documentosListados.current) listarDocumentos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [codigo]);
 
   const subirDocumento = async (files: FileList | File[]) => {
     const lista = Array.from(files); if (!lista.length) return;
