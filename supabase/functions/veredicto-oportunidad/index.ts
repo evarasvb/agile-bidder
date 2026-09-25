@@ -29,6 +29,7 @@ interface Veredicto {
 async function armarResumen(supabase: ReturnType<typeof createClient>, tipo: Tipo, codigo: string, clienteId: string) {
   let nombre = '';
   let organismo = '';
+  let rutOrganismo: string | null = null;
   let monto: number | null = null;
   let fechaCierre: string | null = null;
   let descripcion: string | null = null;
@@ -37,13 +38,14 @@ async function armarResumen(supabase: ReturnType<typeof createClient>, tipo: Tip
   if (tipo === 'compra_agil') {
     const { data: compra, error: errCompra } = await supabase
       .from('compras_agiles')
-      .select('nombre, nombre_organismo, monto_estimado, fecha_cierre, descripcion, compras_agiles_items(id)')
+      .select('nombre, nombre_organismo, organismo_rut, monto_estimado, fecha_cierre, descripcion, compras_agiles_items(id)')
       .eq('codigo', codigo)
       .maybeSingle();
     if (errCompra) throw errCompra;
     if (!compra) return null;
     nombre = (compra as any).nombre || 'Sin título';
     organismo = (compra as any).nombre_organismo || 'Sin organismo';
+    rutOrganismo = (compra as any).organismo_rut || null;
     monto = (compra as any).monto_estimado ?? null;
     fechaCierre = (compra as any).fecha_cierre ?? null;
     descripcion = (compra as any).descripcion ?? null;
@@ -51,13 +53,14 @@ async function armarResumen(supabase: ReturnType<typeof createClient>, tipo: Tip
   } else {
     const { data: lic, error: errLic } = await supabase
       .from('licitaciones_bi')
-      .select('nombre, institucion_nombre, presupuesto_estimado, fecha_cierre, descripcion, licitaciones_bi_items(id)')
+      .select('nombre, institucion_nombre, institucion_rut, presupuesto_estimado, fecha_cierre, descripcion, licitaciones_bi_items(id)')
       .eq('codigo', codigo)
       .maybeSingle();
     if (errLic) throw errLic;
     if (!lic) return null;
     nombre = (lic as any).nombre || 'Sin título';
     organismo = (lic as any).institucion_nombre || 'Sin organismo';
+    rutOrganismo = (lic as any).institucion_rut || null;
     monto = (lic as any).presupuesto_estimado ?? null;
     fechaCierre = (lic as any).fecha_cierre ?? null;
     descripcion = (lic as any).descripcion ?? null;
@@ -87,15 +90,16 @@ async function armarResumen(supabase: ReturnType<typeof createClient>, tipo: Tip
   let scorePago: number | null = null;
   let diasPromedioPago: number | null = null;
   let totalOrdenes: number | null = null;
-  // .maybeSingle() falla si el ilike matchea más de una institución (nombre
-  // ambiguo); se propaga en vez de tratarlo silenciosamente como "sin
-  // comprador" — eso dejaría un veredicto persistido con el dato del
-  // comprador vacío sin que nada avise que en realidad había varios.
-  const { data: institucion, error: errInstitucion } = await supabase
-    .from('instituciones')
-    .select('rut, oc_total, oc_monto_total, pago_promedio_dias')
-    .ilike('nombre', `%${organismo}%`)
-    .maybeSingle();
+  // Match por RUT (identificador exacto del organismo) cuando la oportunidad
+  // lo trae; el nombre por ilike queda solo de respaldo si no hay RUT, porque
+  // abreviaturas/prefijos distintos en el nombre hacían fallar el match aunque
+  // fuera el mismo organismo. .maybeSingle() además falla si el ilike matchea
+  // más de una institución (nombre ambiguo); se propaga en vez de tratarlo
+  // silenciosamente como "sin comprador" — eso dejaría un veredicto
+  // persistido con el dato del comprador vacío sin avisar que había varios.
+  const { data: institucion, error: errInstitucion } = rutOrganismo
+    ? await supabase.from('instituciones').select('rut, oc_total, oc_monto_total, pago_promedio_dias').eq('rut', rutOrganismo).maybeSingle()
+    : await supabase.from('instituciones').select('rut, oc_total, oc_monto_total, pago_promedio_dias').ilike('nombre', `%${organismo}%`).maybeSingle();
   if (errInstitucion) throw errInstitucion;
   if (institucion) {
     totalOrdenes = (institucion as any).oc_total ?? null;
