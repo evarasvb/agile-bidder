@@ -31,11 +31,26 @@ export function useAvisos() {
     queryFn: async (): Promise<Aviso[]> => {
       const { data, error } = await sb
         .from('notificaciones_log')
-        .select('id, tipo, licitacion_id, datos, leida, created_at')
+        .select('id, tipo, licitacion_id, datos, created_at')
         .order('created_at', { ascending: false })
         .limit(30);
       if (error) throw error;
-      return (data ?? []) as Aviso[];
+      const notifs = data ?? [];
+      // "Leída" es POR USUARIO (notificaciones_log_leidas), no por fila: la
+      // campanita ahora la ve todo el equipo, y una sola columna compartida
+      // en notificaciones_log haría que un miembro marcándola leída se la
+      // marcara leída a todos los demás sin que la hayan visto.
+      const ids = notifs.map((n: any) => n.id);
+      let leidasIds = new Set<string>();
+      if (ids.length) {
+        const { data: leidas, error: errLeidas } = await sb
+          .from('notificaciones_log_leidas')
+          .select('notificacion_id')
+          .in('notificacion_id', ids);
+        if (errLeidas) throw errLeidas;
+        leidasIds = new Set((leidas ?? []).map((l: any) => l.notificacion_id));
+      }
+      return notifs.map((n: any) => ({ ...n, leida: leidasIds.has(n.id) })) as Aviso[];
     },
   });
 
@@ -92,6 +107,14 @@ export function useAvisos() {
         { event: 'UPDATE', schema: 'public', table: 'notificaciones_log', filter: `cliente_id=eq.${clienteId}` },
         invalidar,
       )
+      // "Leída" ahora vive en notificaciones_log_leidas (por usuario): esto
+      // sincroniza en vivo cuando el propio usuario marca leído desde otra
+      // pestaña/dispositivo.
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notificaciones_log_leidas', filter: `user_id=eq.${uid}` },
+        invalidar,
+      )
       // Entre el snapshot inicial del useQuery y que el canal llegue a
       // SUBSCRIBED hay una ventana donde ninguno de los dos captura un
       // aviso nuevo (el query ya corrió, el canal todavía no escucha).
@@ -111,12 +134,22 @@ export function useAvisos() {
 
 export function useMarcarAvisosLeidos() {
   const qc = useQueryClient();
+  const { user } = useAuth();
   return useMutation({
     mutationFn: async () => {
+      if (!user?.id) return;
+      // "Leída" es por usuario (ver useAvisos): se inserta un recibo propio
+      // por cada aviso todavía no leído, en vez de tocar una columna
+      // compartida por toda la empresa.
+      const avisos = qc.getQueryData<Aviso[]>(['avisos', user.id]) ?? [];
+      const noLeidos = avisos.filter((a) => !a.leida).map((a) => a.id);
+      if (!noLeidos.length) return;
       const { error } = await sb
-        .from('notificaciones_log')
-        .update({ leida: true })
-        .eq('leida', false);
+        .from('notificaciones_log_leidas')
+        .upsert(
+          noLeidos.map((id) => ({ notificacion_id: id, user_id: user.id })),
+          { onConflict: 'notificacion_id,user_id', ignoreDuplicates: true },
+        );
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['avisos'] }),
@@ -125,12 +158,16 @@ export function useMarcarAvisosLeidos() {
 
 export function useMarcarAvisoLeido() {
   const qc = useQueryClient();
+  const { user } = useAuth();
   return useMutation({
     mutationFn: async (id: string) => {
+      if (!user?.id) return;
       const { error } = await sb
-        .from('notificaciones_log')
-        .update({ leida: true })
-        .eq('id', id);
+        .from('notificaciones_log_leidas')
+        .upsert(
+          { notificacion_id: id, user_id: user.id },
+          { onConflict: 'notificacion_id,user_id', ignoreDuplicates: true },
+        );
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['avisos'] }),
