@@ -47,7 +47,12 @@ export function useAvisos() {
   const { data: clienteId } = useQuery({
     queryKey: ['cliente-owner-id', user?.id],
     enabled: !!user?.id,
-    staleTime: 5 * 60_000,
+    // Para un usuario recién autenticado, OnboardingGate dispara la creación
+    // de su fila en `clientes` en paralelo a este RPC; si este corre primero
+    // puede devolver null antes de que esa fila exista todavía. Reintenta
+    // cada 15s mientras siga en null (en vez de cachearlo como definitivo)
+    // y deja de reintentar apenas resuelve un cliente_id real.
+    refetchInterval: (query) => (query.state.data ? false : 15_000),
     queryFn: async (): Promise<string | null> => {
       const { data, error } = await supabase.rpc('cliente_owner_id');
       if (error) throw error;
