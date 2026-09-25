@@ -62,13 +62,21 @@ async function armarResumen(supabase: ReturnType<typeof createClient>, tipo: Tip
     itemsCount = ((lic as any).licitaciones_bi_items || []).length;
   }
 
+  // PISO_MATCH = 40: mismo piso que usa el panel de oportunidades
+  // (useOportunidadesPanel.ts) para decidir qué cuenta como match real. Los
+  // generadores de matches guardan filas desde 30, así que sin este filtro
+  // una oportunidad con puros matches débiles (30-39%) se reportaría con
+  // cobertura de inventario inflada.
+  const PISO_MATCH = 40;
   const tablaMatches = tipo === 'compra_agil' ? 'ca_item_matches' : 'lic_item_matches';
   const columnaCodigo = tipo === 'compra_agil' ? 'compra_agil_codigo' : 'licitacion_codigo';
-  const { data: matchesRaw } = await supabase
+  const { data: matchesRaw, error: errMatches } = await supabase
     .from(tablaMatches)
     .select('nombre_solicitado, cantidad, nombre_producto, precio_unitario, score')
     .eq(columnaCodigo, codigo)
-    .eq('cliente_id', clienteId);
+    .eq('cliente_id', clienteId)
+    .gte('score', PISO_MATCH);
+  if (errMatches) throw errMatches;
   const matches = (matchesRaw || []) as ItemMatchRow[];
   const itemsMatched = matches.filter((m) => m.nombre_producto).length;
   const cobertura = itemsCount > 0 ? Math.round((itemsMatched / itemsCount) * 100) : null;
@@ -98,17 +106,13 @@ async function armarResumen(supabase: ReturnType<typeof createClient>, tipo: Tip
     }
   }
 
-  // Historial propio del cliente en el pipeline (solo si hay muestra suficiente
-  // para que el número diga algo, si no se omite para no confundir a la IA).
-  let tasaExitoPropia: number | null = null;
-  const { data: pipelineRows } = await supabase
-    .from('pipeline')
-    .select('etapa')
-    .in('etapa', ['adjudicada', 'oc_emitida', 'pagada', 'perdida']);
-  if (pipelineRows && pipelineRows.length >= 3) {
-    const ganadas = pipelineRows.filter((p: any) => p.etapa !== 'perdida').length;
-    tasaExitoPropia = Math.round((ganadas / pipelineRows.length) * 100);
-  }
+  // Historial del EQUIPO (no solo de quien pide el veredicto) en el pipeline
+  // — el veredicto es una fila compartida por cliente_owner_id(), así que la
+  // tasa de éxito también debe serlo; si no, el dueño y un vendedor invitado
+  // calculan números distintos para el mismo veredicto. La función ya deja
+  // en null si hay menos de 3 casos (muestra insuficiente).
+  const { data: tasaExitoEquipo } = await supabase.rpc('pipeline_tasa_exito_equipo');
+  const tasaExitoPropia = (tasaExitoEquipo as number | null) ?? null;
 
   const diasRestantes = fechaCierre ? Math.ceil((new Date(fechaCierre).getTime() - Date.now()) / 86400000) : null;
 
@@ -132,7 +136,7 @@ async function armarResumen(supabase: ReturnType<typeof createClient>, tipo: Tip
       dias_promedio_pago: diasPromedioPago,
       total_ordenes_historicas: totalOrdenes,
     },
-    tasa_exito_propia_pct: tasaExitoPropia,
+    tasa_exito_equipo_pct: tasaExitoPropia,
   };
 }
 
