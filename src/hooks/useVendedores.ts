@@ -97,9 +97,14 @@ export function useCreateVendedor() {
       // al propio auth.uid() del que inserta (nunca a otra persona), así que esto no
       // reabre el hueco de seguridad que ese trigger cierra.
       const { data: { user } } = await supabase.auth.getUser();
+      // estado_invitacion por defecto en la tabla es 'activada' — sin esto,
+      // esta fila placeholder (user_id null) quedaba marcada como si ya
+      // tuviera cuenta activa, y si el dueño después la invitaba de verdad
+      // con "Invitar miembro" (mismo email), invitar-miembro la rechazaba
+      // como "ya tiene una cuenta activa" antes de generar el token real.
       const { data, error } = await supabase
         .from('vendedores')
-        .insert({ ...vendedor, invitado_por: user?.id ?? null })
+        .insert({ ...vendedor, invitado_por: user?.id ?? null, estado_invitacion: 'pendiente' })
         .select()
         .single();
       
@@ -134,6 +139,11 @@ export function useEsDuenoEquipo() {
   return useQuery({
     queryKey: ['equipo', 'es-dueno', user?.id],
     enabled: !!user?.id,
+    // Revalida cada 5 min: si el dueño desactiva/reactiva a este usuario
+    // mientras sigue logueado, vendedores_owner_auth_id() cambia — sin esto
+    // (y sin refetch por foco de ventana, deshabilitado a nivel global) el
+    // resultado quedaba pegado al de antes del cambio por el resto de la sesión.
+    refetchInterval: 5 * 60_000,
     queryFn: async (): Promise<boolean> => {
       const { data, error } = await supabase.rpc('vendedores_owner_auth_id');
       if (error) throw error;
