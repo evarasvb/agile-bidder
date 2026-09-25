@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
 export interface Vendedor {
@@ -124,14 +125,19 @@ export function useCreateVendedor() {
 // acción solo ahí; ver el hallazgo de Codex en la migración de RLS de
 // vendedores del 25-09).
 export function useEsDuenoEquipo() {
+  // La queryKey lleva el user.id: sin esto, cambiar de cuenta dentro de la
+  // misma sesión de la SPA (sin recarga completa) podía servir el resultado
+  // cacheado de la cuenta anterior mientras el refetch corre en segundo
+  // plano — un miembro invitado heredaba el "true" de un dueño recién
+  // deslogueado y veía la acción de crear vendedores.
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ['equipo', 'es-dueno'],
+    queryKey: ['equipo', 'es-dueno', user?.id],
+    enabled: !!user?.id,
     queryFn: async (): Promise<boolean> => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return false;
       const { data, error } = await supabase.rpc('vendedores_owner_auth_id');
       if (error) throw error;
-      return data === user.id;
+      return data === user!.id;
     },
   });
 }

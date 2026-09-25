@@ -88,7 +88,13 @@ export function useAvisos() {
         { event: 'UPDATE', schema: 'public', table: 'notificaciones_log', filter: `cliente_id=eq.${clienteId}` },
         invalidar,
       )
-      .subscribe();
+      // Entre el snapshot inicial del useQuery y que el canal llegue a
+      // SUBSCRIBED hay una ventana donde ninguno de los dos captura un
+      // aviso nuevo (el query ya corrió, el canal todavía no escucha).
+      // Al quedar SUBSCRIBED se fuerza un refetch para cerrar ese hueco.
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') invalidar();
+      });
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
