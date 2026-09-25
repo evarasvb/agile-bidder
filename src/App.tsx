@@ -33,6 +33,7 @@ const AcademiaLeads = lazy(() => import("./pages/AcademiaLeads"));
 const AcademiaCompradores = lazy(() => import("./pages/AcademiaCompradores"));
 const FundadorPanel = lazy(() => import("./pages/FundadorPanel"));
 const FundadorCompradores = lazy(() => import("./pages/FundadorCompradores"));
+const FundadorAjustes = lazy(() => import("./pages/FundadorAjustes"));
 const MisCursos = lazy(() => import("./pages/MisCursos"));
 const ProveedoresEstado = lazy(() => import("./pages/ProveedoresEstado"));
 const Auth = lazy(() => import("./pages/Auth"));
@@ -230,6 +231,7 @@ const App = () => (
             <Route path="/academia/compradores" element={<AdminOnlyRoute><AcademiaCompradores /></AdminOnlyRoute>} />
             <Route path="/fundador" element={<AdminOnlyRoute><FundadorPanel /></AdminOnlyRoute>} />
             <Route path="/fundador/compradores" element={<AdminOnlyRoute><FundadorCompradores /></AdminOnlyRoute>} />
+            <Route path="/fundador/ajustes" element={<AdminOnlyRoute><FundadorAjustes /></AdminOnlyRoute>} />
             <Route path="/proveedores-estado" element={<AdminOnlyRoute><ProveedoresEstado /></AdminOnlyRoute>} />
             <Route path="/admin/traccion" element={<AdminOnlyRoute><AdminTraccion /></AdminOnlyRoute>} />
 
