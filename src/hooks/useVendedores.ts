@@ -90,9 +90,15 @@ export function useCreateVendedor() {
   
   return useMutation({
     mutationFn: async (vendedor: Omit<Vendedor, 'id' | 'created_at' | 'updated_at'>) => {
+      // La política de INSERT exige user_id = auth.uid() o invitado_por = auth.uid():
+      // una fila "pendiente" (user_id null, como la que crea "Nuevo Vendedor") solo
+      // pasa por la segunda vía. El trigger de la tabla solo deja fijar invitado_por
+      // al propio auth.uid() del que inserta (nunca a otra persona), así que esto no
+      // reabre el hueco de seguridad que ese trigger cierra.
+      const { data: { user } } = await supabase.auth.getUser();
       const { data, error } = await supabase
         .from('vendedores')
-        .insert(vendedor)
+        .insert({ ...vendedor, invitado_por: user?.id ?? null })
         .select()
         .single();
       
