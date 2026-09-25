@@ -18,14 +18,17 @@ interface Pendiente { tabla: string; id: string; texto: string }
 
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+class CuotaAgotada extends Error {}
+
 async function embeber(textos: string[], apiKey: string): Promise<number[][]> {
   const errores: string[] = [];
   for (const model of MODELOS) {
     const body: Record<string, unknown> = { model, input: textos };
     if (model === 'gemini-embedding-001') body.dimensions = 768;
-    // Reintento con espera ante 429 (cuota por minuto) y 5xx; un 404 es "modelo
-    // no existe" y se pasa al siguiente de inmediato.
-    for (let intento = 0; intento < 3; intento++) {
+    // Un 429 puede ser la cuota por minuto (se espera y se reintenta UNA vez) o la
+    // cuota diaria del plan gratis (vuelve a dar 429: se corta la corrida para no
+    // quedarse esperando hasta el timeout del cron). Un 404 es "modelo no existe".
+    for (let intento = 0; intento < 2; intento++) {
       const resp = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/embeddings', {
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -38,12 +41,13 @@ async function embeber(textos: string[], apiKey: string): Promise<number[][]> {
         errores.push(`${model}: respuesta incompleta (${v.length}/${textos.length})`);
         break;
       }
-      const txt = (await resp.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 200);
+      const txt = (await resp.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 400);
       errores.push(`${model}: ${resp.status} ${txt}`);
-      // 429 = cuota por minuto de la API key (en el plan gratis, ~100 textos/min):
-      // se espera a que pase el minuto y se reintenta. 5xx: espera corta.
-      if (resp.status === 429) { await dormir(61_000); continue; }
-      if (resp.status >= 500) { await dormir(4000 * (intento + 1)); continue; }
+      if (resp.status === 429) {
+        if (intento === 0) { await dormir(61_000); continue; }
+        throw new CuotaAgotada(`cuota Gemini agotada: ${txt}`);
+      }
+      if (resp.status >= 500) { await dormir(4000); continue; }
       break;
     }
   }
@@ -83,7 +87,15 @@ serve(async (req: Request) => {
       for (const p of pend) porTabla.set(p.tabla, [...(porTabla.get(p.tabla) || []), p]);
       const [tabla, filas] = [...porTabla.entries()].sort((a, b) => b[1].length - a[1].length)[0];
       const lote = filas.slice(0, LOTE);
-      const vectores = await embeber(lote.map((f) => (f.texto || '').trim() || 'sin descripcion'), GEMINI_API_KEY);
+      let vectores: number[][];
+      try {
+        vectores = await embeber(lote.map((f) => (f.texto || '').trim() || 'sin descripcion'), GEMINI_API_KEY);
+      } catch (e) {
+        if (e instanceof CuotaAgotada) {
+          return new Response(JSON.stringify({ ok: false, cuota_agotada: true, lotes, totales, quedan: true, detalle: e.message.slice(0, 400), ms: Date.now() - inicio }), { headers: { 'Content-Type': 'application/json' } });
+        }
+        throw e;
+      }
       let ok = 0;
       for (let i = 0; i < lote.length; i++) {
         const vec = vectores[i];
