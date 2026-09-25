@@ -99,7 +99,7 @@ export interface InventarioPaginaOpts {
   orderBy?: { column: InventarioOrdenColumna; asc: boolean };
 }
 
-const escapaIlike = (s: string) => s.replace(/[%_,()]/g, ' ').trim();
+export const escapaIlike = (s: string) => s.replace(/[%_,()]/g, ' ').trim();
 
 export function useInventarioPagina(opts: InventarioPaginaOpts) {
   const { user, loading: authLoading } = useAuth();

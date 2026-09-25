@@ -76,11 +76,16 @@ serve(async (req: Request) => {
     for (let i = 0; i < filas.length; i++) {
       const vec = vectores[i];
       if (!Array.isArray(vec) || !vec.length) continue;
-      const { error: errUpdate } = await supabase
+      // .is('embedding', null) además del id: si el producto se editó mientras
+      // este embedding se calculaba, el trigger ya lo invalidó (lo dejó en
+      // null otra vez) y este update no debe pisarlo con un vector calculado
+      // sobre el texto viejo — se recalculará en el próximo backfill.
+      const { error: errUpdate, count } = await supabase
         .from('cliente_inventario')
-        .update({ embedding: `[${vec.join(',')}]` })
-        .eq('id', (filas[i] as Fila).id);
-      if (!errUpdate) actualizados++;
+        .update({ embedding: `[${vec.join(',')}]` }, { count: 'exact' })
+        .eq('id', (filas[i] as Fila).id)
+        .is('embedding', null);
+      if (!errUpdate && count) actualizados++;
     }
 
     return new Response(

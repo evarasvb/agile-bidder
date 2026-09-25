@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { escapaIlike } from '@/hooks/useInventory';
 
 // Espera una pausa al escribir antes de disparar la búsqueda: sin esto, cada
 // tecla arma su propia queryKey y, si trae pocos resultados de inventario,
@@ -37,18 +39,24 @@ const CLP = (v: number) => '$' + Math.round(v || 0).toLocaleString('es-CL');
 // se suma solo cuando el texto trae pocos resultados de inventario, para no
 // gastar una llamada a IA en cada tecla.
 export function useBusquedaGlobal(query: string) {
+  const { user } = useAuth();
+  const clienteId = user?.id || null;
   const qDebounced = useDebounce(query.trim(), 350);
   const q = qDebounced;
-  const habilitado = q.length >= 2;
+  const habilitado = q.length >= 2 && !!clienteId;
 
   return useQuery({
-    queryKey: ['busqueda-global', q],
+    // Incluye el usuario: el QueryClient es un singleton que sobrevive a
+    // signOut()/login de otra cuenta en la misma pestaña, así que sin esto
+    // un segundo usuario podría ver en caché resultados privados del primero.
+    queryKey: ['busqueda-global', clienteId, q],
     enabled: habilitado,
     queryFn: async (): Promise<ResultadoBusqueda[]> => {
+      const t = `%${escapaIlike(q)}%`;
       const [oportunidadesRes, productosRes, facturasRes] = await Promise.all([
         supabase.rpc('busqueda_global_oportunidades', { p_termino: q, p_limite: 6 }),
-        supabase.from('cliente_inventario').select('id, nombre_producto, sku').or(`nombre_producto.ilike.%${q}%,sku.ilike.%${q}%`).limit(5),
-        supabase.from('facturas_por_cobrar').select('id, deudor_nombre, numero_factura, monto').or(`deudor_nombre.ilike.%${q}%,numero_factura.ilike.%${q}%`).limit(5),
+        supabase.from('cliente_inventario').select('id, nombre_producto, sku').or(`nombre_producto.ilike.${t},sku.ilike.${t}`).limit(5),
+        supabase.from('facturas_por_cobrar').select('id, deudor_nombre, numero_factura, monto').or(`deudor_nombre.ilike.${t},numero_factura.ilike.${t}`).limit(5),
       ]);
 
       const resultados: ResultadoBusqueda[] = [];

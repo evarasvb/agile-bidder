@@ -81,16 +81,21 @@ export function BusquedaGlobalProvider({ children }: { children: ReactNode }) {
     // lotes mientras la función avise que quedan pendientes; el tope de 10
     // (hasta 400 productos) es solo para no quedar pegado si algo falla.
     if (backfillHecho.current) return;
-    backfillHecho.current = true;
     (async () => {
+      let agotado = false;
       for (let i = 0; i < 10; i++) {
         try {
           const { data, error } = await supabase.functions.invoke<{ actualizados: number; pendientes: boolean }>('embeddings-inventario', {});
-          if (error || !data?.pendientes) break;
+          if (error) break;
+          if (!data?.pendientes) { agotado = true; break; }
         } catch {
           break;
         }
       }
+      // Solo se marca "hecho" si de verdad no quedan productos sin embedding;
+      // si se cortó por error o por el tope de 10 lotes, se reintenta la
+      // próxima vez que se abra el buscador.
+      if (agotado) backfillHecho.current = true;
     })();
   }, [open]);
 
