@@ -25,12 +25,6 @@ function palabrasClave(t: string): string[] {
   return [...new Set(t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9ñ\- ]/g, " ").split(/\s+/)
     .filter((w) => w.length > 3 && !STOP.has(w)))].slice(0, 10);
 }
-function rolYSub(auth: string): { role: string; sub: string | null } {
-  try {
-    const p = JSON.parse(atob(auth.replace(/^Bearer\s+/i, "").split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-    return { role: p.role ?? "", sub: p.sub ?? null };
-  } catch { return { role: "", sub: null }; }
-}
 function ipCliente(req: Request): string | null {
   const xff = (req.headers.get("x-forwarded-for") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   const ip = xff.length ? xff[xff.length - 1] : (req.headers.get("x-real-ip") ?? req.headers.get("cf-connecting-ip") ?? "").trim();
@@ -179,11 +173,20 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { role, sub } = rolYSub(req.headers.get("Authorization") ?? "");
-    const userId = role === "authenticated" ? sub : (role === "service_role" && body.user_id ? String(body.user_id) : null);
-    if (!userId) return new Response(JSON.stringify({ error: "login", mensaje: "Inicia sesión en FirmaVB para usar a Don Evaristo Abogado." }), { status: 401, headers: { ...cors, "Content-Type": "application/json" } });
     const ip = ipCliente(req);
-    const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const sb = createClient(Deno.env.get("SUPABASE_URL")!, serviceRoleKey);
+    const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+    let userId: string | null = null;
+
+    if (token && token === serviceRoleKey && body.user_id) {
+      userId = String(body.user_id);
+    } else if (token) {
+      const { data: { user } } = await sb.auth.getUser(token);
+      userId = user?.id ?? null;
+    }
+
+    if (!userId) return new Response(JSON.stringify({ error: "login", mensaje: "Inicia sesión en FirmaVB para usar a Don Evaristo Abogado." }), { status: 401, headers: { ...cors, "Content-Type": "application/json" } });
 
     if (modo === "documento" && !hechos) {
       return new Response(JSON.stringify({ error: "faltan_hechos", mensaje: "Cuéntame qué pasó (los hechos) para redactar el documento." }), { status: 400, headers: { ...cors, "Content-Type": "application/json" } });
