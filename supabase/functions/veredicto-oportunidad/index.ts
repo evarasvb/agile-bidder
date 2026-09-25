@@ -226,7 +226,8 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: 'Falta tipo o codigo válidos' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const { data: ownerId } = await supabase.rpc('cliente_owner_id');
+    const { data: ownerId, error: errOwnerId } = await supabase.rpc('cliente_owner_id');
+    if (errOwnerId) throw errOwnerId;
     const clienteId = (ownerId as string | null) || userData.user.id;
 
     const resumen = await armarResumen(supabase, tipo, codigo, clienteId);
