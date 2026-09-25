@@ -35,11 +35,12 @@ async function armarResumen(supabase: ReturnType<typeof createClient>, tipo: Tip
   let itemsCount = 0;
 
   if (tipo === 'compra_agil') {
-    const { data: compra } = await supabase
+    const { data: compra, error: errCompra } = await supabase
       .from('compras_agiles')
       .select('nombre, nombre_organismo, monto_estimado, fecha_cierre, descripcion, compras_agiles_items(id)')
       .eq('codigo', codigo)
       .maybeSingle();
+    if (errCompra) throw errCompra;
     if (!compra) return null;
     nombre = (compra as any).nombre || 'Sin título';
     organismo = (compra as any).nombre_organismo || 'Sin organismo';
@@ -48,11 +49,12 @@ async function armarResumen(supabase: ReturnType<typeof createClient>, tipo: Tip
     descripcion = (compra as any).descripcion ?? null;
     itemsCount = ((compra as any).compras_agiles_items || []).length;
   } else {
-    const { data: lic } = await supabase
+    const { data: lic, error: errLic } = await supabase
       .from('licitaciones_bi')
       .select('nombre, institucion_nombre, presupuesto_estimado, fecha_cierre, descripcion, licitaciones_bi_items(id)')
       .eq('codigo', codigo)
       .maybeSingle();
+    if (errLic) throw errLic;
     if (!lic) return null;
     nombre = (lic as any).nombre || 'Sin título';
     organismo = (lic as any).institucion_nombre || 'Sin organismo';
