@@ -149,20 +149,30 @@ export default function Abogado() {
   // endpoint devuelve la carpeta general): antes siempre listaba general y
   // el documento recién subido a un código desaparecía de "Mis documentos".
   const documentosListados = useRef(false);
+  // Sigue el código más reciente: si una respuesta llega después de que el
+  // usuario ya cambió el código (p. ej. tecleando rápido), se descarta en vez
+  // de pisar la lista con datos de un código que ya no es el actual.
+  const codigoRef = useRef('');
+  codigoRef.current = codigo;
   const listarDocumentos = async () => {
+    const codigoAlPedir = codigo;
     try {
-      const qs = codigo ? `?codigo=${encodeURIComponent(codigo)}` : '';
+      const qs = codigoAlPedir ? `?codigo=${encodeURIComponent(codigoAlPedir)}` : '';
       const r = await fetch(`${SUPA}/functions/v1/experto-documentos${qs}`, { headers: auth });
       const j = await r.json().catch(() => ({}));
+      if (codigoAlPedir !== codigoRef.current) return;
       setDocumentos(j.documentos ?? []);
       documentosListados.current = true;
     } catch { /* silencioso */ }
   };
 
   // Si el usuario cambia el código estando en la pestaña "Mis documentos",
-  // recarga la lista para ese código (solo después del primer listado).
+  // recarga la lista para ese código (con un pequeño debounce para no
+  // disparar una petición por cada tecla, solo después del primer listado).
   useEffect(() => {
-    if (documentosListados.current) listarDocumentos();
+    if (!documentosListados.current) return;
+    const t = setTimeout(() => listarDocumentos(), 400);
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [codigo]);
 

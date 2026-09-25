@@ -243,6 +243,7 @@ Deno.serve(async (req) => {
     const partes: string[] = [];
     if (fragmentos.length) partes.push("FUENTES:\n" + textoFragmentos(fragmentos));
     if (res.ficha) partes.push(`LICITACIÓN ${res.ficha.codigo}: ${res.ficha.nombre}\nOrganismo: ${res.ficha.institucion} | Estado: ${res.ficha.estado} | Cierre: ${res.ficha.fecha_cierre ?? "s/i"}`);
+    else if (codigo) partes.push(`No encontré la licitación o compra ${codigo} en la base (puede ser antigua, una compra ágil, o el código estar mal escrito).`);
     if (codigo && res.panorama) partes.push(textoPanorama(res.panorama, codigo));
     if (res.org) partes.push("FICHA ORGANISMO (Datos Mercado Público vía FirmaVB):\n" + textoOrganismo(res.org));
     if (res.docs?.length) partes.push("DOCUMENTOS DEL USUARIO (contratos, notificaciones, reclamos previos que subió; son evidencia de los hechos):\n" + res.docs.map((d: any) => `### ${d.nombre} (${d.tipo})\n${d.texto}`).join("\n\n"));
