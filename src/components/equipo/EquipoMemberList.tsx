@@ -40,13 +40,14 @@ export function EquipoMemberList() {
   const [editingMember, setEditingMember] = useState<Vendedor | null>(null);
   const [editForm, setEditForm] = useState({ nombre: '', email: '', rol: '', telefono: '' });
 
-  // La RLS de `vendedores` solo deja editar/desactivar filas propias (user_id)
-  // o de quien uno invitó (invitado_por) — el roster ahora se ve completo
-  // (dueño y equipo ven a todos), pero un compañero no puede gestionar a
-  // otro: sin este chequeo, veía botones de Editar/Desactivar que siempre
-  // terminaban en error de RLS.
+  // Gestionar (editar / activar / desactivar) es solo del dueño que invitó
+  // esa fila (invitado_por = mi auth.uid()) — no basta con que sea mi propia
+  // fila: un trigger en la base ya deja fijo `activo` para cualquiera que no
+  // sea el dueño o service_role (así un miembro no puede reactivarse a sí
+  // mismo tras ser desactivado), así que tampoco se muestra ese control para
+  // la propia fila.
   const puedeGestionar = (member: Vendedor) =>
-    !!user?.id && (member.user_id === user.id || member.invitado_por === user.id);
+    !!user?.id && member.invitado_por === user.id;
 
   const handleEdit = (member: Vendedor) => {
     setEditingMember(member);

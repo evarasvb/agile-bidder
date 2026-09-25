@@ -116,6 +116,26 @@ export function useCreateVendedor() {
   });
 }
 
+// Un vendedor invitado que use "Nuevo Vendedor" crearía una fila con
+// invitado_por = su propio auth.uid() (el trigger solo permite fijarlo así),
+// pero el SELECT de vendedores la scopea por vendedores_owner_auth_id() del
+// dueño real — la fila quedaría invisible para todos, dueño incluido. Este
+// hook resuelve si el usuario actual ES el dueño efectivo (para mostrar la
+// acción solo ahí; ver el hallazgo de Codex en la migración de RLS de
+// vendedores del 25-09).
+export function useEsDuenoEquipo() {
+  return useQuery({
+    queryKey: ['equipo', 'es-dueno'],
+    queryFn: async (): Promise<boolean> => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return false;
+      const { data, error } = await supabase.rpc('vendedores_owner_auth_id');
+      if (error) throw error;
+      return data === user.id;
+    },
+  });
+}
+
 // Hook para obtener asignaciones de un vendedor
 export function useVendedorAsignaciones(vendedorId: string | null) {
   return useQuery({
