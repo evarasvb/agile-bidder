@@ -79,12 +79,33 @@ export function useAvisos() {
     },
   });
 
-  // Campanita en vivo: se suscribe a los cambios de notificaciones_log del
-  // propio cliente (INSERT = aviso nuevo, UPDATE = otra pestaña/dispositivo
-  // marcó leído) y refresca la lista al toque en vez de esperar el poll.
-  // Los eventos se agrupan (debounce corto) porque "Marcar leídas" puede
-  // disparar un UPDATE por cada fila no leída — sin esto, una cuenta con
-  // historial grande dispararía una ráfaga de refetch por un solo click.
+  // La política de notificaciones_log deja ver tanto la fila de la empresa
+  // dueña (cliente_owner_id()) como la fila `clientes` PROPIA del usuario
+  // (user_id = auth.uid()) — un vendedor invitado tiene ambas, y son
+  // distintas entre sí. El poll inicial ya trae avisos de las dos por RLS,
+  // pero la suscripción de abajo solo escuchaba la del dueño: un aviso
+  // generado bajo la fila propia del vendedor no disparaba Realtime.
+  const { data: propioClienteId } = useQuery({
+    queryKey: ['cliente-propio-id', user?.id],
+    enabled: !!user?.id,
+    refetchInterval: (query) => (query.state.data ? 5 * 60_000 : 15_000),
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await sb
+        .from('clientes')
+        .select('id')
+        .eq('user_id', user!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as any)?.id ?? null;
+    },
+  });
+
+  // Campanita en vivo: se suscribe a los cambios de notificaciones_log de
+  // ambos scopes visibles (INSERT = aviso nuevo, UPDATE = otra pestaña/
+  // dispositivo marcó leído) y refresca la lista al toque en vez de esperar
+  // el poll. Los eventos se agrupan (debounce corto) porque "Marcar leídas"
+  // puede disparar un UPDATE por cada fila no leída — sin esto, una cuenta
+  // con historial grande dispararía una ráfaga de refetch por un solo click.
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!clienteId || !user?.id) return;
@@ -95,18 +116,26 @@ export function useAvisos() {
         qc.invalidateQueries({ queryKey: ['avisos', uid] });
       }, 400);
     };
-    const channel = supabase
-      .channel(`notificaciones-log-${clienteId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notificaciones_log', filter: `cliente_id=eq.${clienteId}` },
-        invalidar,
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'notificaciones_log', filter: `cliente_id=eq.${clienteId}` },
-        invalidar,
-      )
+    // Para el dueño, propioClienteId === clienteId (su fila propia ES la de
+    // la empresa) — sin este filtro se registraría el mismo listener dos veces.
+    const clienteIds = propioClienteId && propioClienteId !== clienteId
+      ? [clienteId, propioClienteId]
+      : [clienteId];
+    let channel = supabase.channel(`notificaciones-log-${clienteId}-${uid}`);
+    for (const cid of clienteIds) {
+      channel = channel
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'notificaciones_log', filter: `cliente_id=eq.${cid}` },
+          invalidar,
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'notificaciones_log', filter: `cliente_id=eq.${cid}` },
+          invalidar,
+        );
+    }
+    channel = channel
       // "Leída" ahora vive en notificaciones_log_leidas (por usuario): esto
       // sincroniza en vivo cuando el propio usuario marca leído desde otra
       // pestaña/dispositivo.
@@ -127,7 +156,7 @@ export function useAvisos() {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       supabase.removeChannel(channel);
     };
-  }, [clienteId, user?.id, qc]);
+  }, [clienteId, propioClienteId, user?.id, qc]);
 
   return query;
 }
