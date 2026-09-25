@@ -43,16 +43,20 @@ Deno.serve(async (req) => {
     const inviter = userData?.user;
     if (!inviter) return json({ error: 'No autenticado' }, 401);
 
-    // El botón "Invitar miembro" lo puede usar cualquiera del equipo, no
-    // solo el dueño. Si se usara inviter.id tal cual como invitado_por, un
-    // miembro invitado creaba la fila nueva "propia" de ÉL (no del dueño
-    // real) — invisible para el dueño y para el resto del equipo, scopeados
-    // por vendedores_owner_auth_id(). Se resuelve el dueño EFECTIVO con la
-    // misma RPC (vía el cliente autenticado como quien invita, para que
-    // auth.uid() adentro de la función resuelva bien) y se usa ESE id.
+    // Solo el dueño invita (mismo criterio que "Nuevo Vendedor", gateado en
+    // el cliente con useEsDuenoEquipo()). Esto es la verificación real: sin
+    // ella, cualquier miembro activo del equipo —incluido un 'visor' de solo
+    // lectura— podía usar este endpoint para sumar gente nueva a la empresa
+    // ajena, porque la función no validaba nada más que estar autenticado.
+    // Se resuelve el dueño EFECTIVO con vendedores_owner_auth_id() (vía el
+    // cliente autenticado como quien invita, para que auth.uid() adentro de
+    // la función resuelva bien) y se exige que sea el propio invitador.
     const { data: ownerAuthId, error: errOwner } = await asUser.rpc('vendedores_owner_auth_id');
     if (errOwner) return json({ error: errOwner.message }, 500);
     const ownerId: string = (ownerAuthId as string | null) ?? inviter.id;
+    if (ownerId !== inviter.id) {
+      return json({ error: 'Solo el dueño del equipo puede invitar miembros.' }, 403);
+    }
 
     const body = await req.json().catch(() => ({}));
     const nombre = String(body.nombre || '').trim();
