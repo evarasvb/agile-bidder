@@ -50,9 +50,13 @@ export function useAvisos() {
     // Para un usuario recién autenticado, OnboardingGate dispara la creación
     // de su fila en `clientes` en paralelo a este RPC; si este corre primero
     // puede devolver null antes de que esa fila exista todavía. Reintenta
-    // cada 15s mientras siga en null (en vez de cachearlo como definitivo)
-    // y deja de reintentar apenas resuelve un cliente_id real.
-    refetchInterval: (query) => (query.state.data ? false : 15_000),
+    // cada 15s mientras siga en null (en vez de cachearlo como definitivo).
+    // Una vez resuelto sigue revalidando cada 5 min (no se detiene del todo):
+    // si el dueño desactiva o saca al vendedor de la empresa mientras sigue
+    // logueado, cliente_owner_id() cambia y sin esto la campanita quedaba
+    // pegada a la empresa vieja el resto de la sesión (sin refetch por foco
+    // de ventana, que está deshabilitado a nivel global).
+    refetchInterval: (query) => (query.state.data ? 5 * 60_000 : 15_000),
     queryFn: async (): Promise<string | null> => {
       const { data, error } = await supabase.rpc('cliente_owner_id');
       if (error) throw error;
