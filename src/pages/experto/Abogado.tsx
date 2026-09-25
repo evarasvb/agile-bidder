@@ -148,7 +148,11 @@ export default function Abogado() {
   // Si hay código, lista SOLO los documentos ligados a ese caso (si no, el
   // endpoint devuelve la carpeta general): antes siempre listaba general y
   // el documento recién subido a un código desaparecía de "Mis documentos".
-  const documentosListados = useRef(false);
+  // "Armada" apenas se abre la pestaña (no cuando la primera respuesta
+  // llega): si el usuario cambia el código mientras esa primera petición
+  // sigue en vuelo, igual queda armado el reintento por el efecto de abajo,
+  // en vez de perder la respuesta y quedar sin recargar hasta la próxima vez.
+  const documentosArmados = useRef(false);
   // Sigue el código más reciente: si una respuesta llega después de que el
   // usuario ya cambió el código (p. ej. tecleando rápido), se descarta en vez
   // de pisar la lista con datos de un código que ya no es el actual.
@@ -162,15 +166,14 @@ export default function Abogado() {
       const j = await r.json().catch(() => ({}));
       if (codigoAlPedir !== codigoRef.current) return;
       setDocumentos(j.documentos ?? []);
-      documentosListados.current = true;
     } catch { /* silencioso */ }
   };
 
   // Si el usuario cambia el código estando en la pestaña "Mis documentos",
   // recarga la lista para ese código (con un pequeño debounce para no
-  // disparar una petición por cada tecla, solo después del primer listado).
+  // disparar una petición por cada tecla, solo después de abrir la pestaña).
   useEffect(() => {
-    if (!documentosListados.current) return;
+    if (!documentosArmados.current) return;
     const t = setTimeout(() => listarDocumentos(), 400);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -212,7 +215,7 @@ export default function Abogado() {
         <TabsList>
           <TabsTrigger value="chat">Chat</TabsTrigger>
           <TabsTrigger value="documento">Generar documento</TabsTrigger>
-          <TabsTrigger value="documentos" onClick={listarDocumentos}>Mis documentos</TabsTrigger>
+          <TabsTrigger value="documentos" onClick={() => { documentosArmados.current = true; listarDocumentos(); }}>Mis documentos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="chat" className="space-y-3">
