@@ -19,6 +19,7 @@ import {
 } from "recharts";
 import { formatCurrency, formatCompact, formatNumber, exportToCSV } from "@/hooks/useReportes";
 import { ReportHero } from "@/components/reportes/ReportHero";
+import { CMPorConvenio } from "@/components/reportes/CMPorConvenio";
 import {
   useCMProductos, useCMProductoDetalle, useCMProductoTendencia, useMiCompetitividad, useCMStats,
   type TipoOrigenCM, type CMProducto, type CMProveedor, type CMComprador, type CMCompetitividad,
@@ -166,7 +167,7 @@ function KPI({ label, value, icon: Icon, iconClass = "bg-primary/10 text-primary
 }
 
 export default function ReporteConvenioMarco() {
-  const [modo, setModo] = useState<"explorar" | "mia">("explorar");
+  const [modo, setModo] = useState<"explorar" | "mia" | "convenios">("explorar");
   const [tipoSel, setTipoSel] = useState<string>("convenio_marco");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<CMProducto | null>(null);
@@ -313,6 +314,7 @@ export default function ReporteConvenioMarco() {
         <div className="inline-flex rounded-lg border bg-card p-0.5">
           <Button variant={modo === "explorar" ? "default" : "ghost"} size="sm" className="h-8" onClick={() => setModo("explorar")}>Explorar</Button>
           <Button variant={modo === "mia" ? "default" : "ghost"} size="sm" className="h-8" onClick={() => setModo("mia")}>Mi competitividad</Button>
+          <Button variant={modo === "convenios" ? "default" : "ghost"} size="sm" className="h-8" onClick={() => setModo("convenios")}>Por convenio</Button>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Select value={tipoSel} onValueChange={(v) => { setTipoSel(v); seleccionar(null); }}>
@@ -326,6 +328,9 @@ export default function ReporteConvenioMarco() {
           </Button>
         </div>
       </div>
+
+      {/* Vista: Por convenio (cuánto se compra por cada convenio, quién vende, quién compra) */}
+      {modo === "convenios" && <CMPorConvenio />}
 
       {/* Vista: Mi competitividad */}
       {modo === "mia" && (
