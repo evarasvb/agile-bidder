@@ -816,7 +816,6 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                           {recargoAplicado > 0 ? ` +${recargoAplicado}%` : ''}
                         </p>
                       )}
-                      {item.selected && <PrecioMercadoHint nombre={item.match?.nombre || item.nombre} disabled={!item.selected} onUsar={(p) => handlePrecioChange(item.itemId, p)} />}
                     </div>
 
                     <div className="sm:text-right">
@@ -825,6 +824,14 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                         {formatCurrency((item.precioUnitario || 0) * item.cantidad)}
                       </p>
                     </div>
+
+                    {/* Precio de mercado (OC reales): va debajo de la fila, a todo el
+                        ancho, para no estirar la columna angosta de precio. */}
+                    {item.selected && (
+                      <div className="sm:col-start-2 sm:col-span-5 -mt-1">
+                        <PrecioMercadoHint nombre={item.match?.nombre || item.nombre} disabled={!item.selected} onUsar={(p) => handlePrecioChange(item.itemId, p)} />
+                      </div>
+                    )}
                   </div>
                 );
               })}

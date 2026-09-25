@@ -16,8 +16,8 @@ export function PrecioMercadoHint({ nombre, onUsar, disabled }: Props) {
   if (!data || !data.proveedores) return null;
   const objetivo = Math.round(Number(data.precio_mediano) * 0.97);
   return (
-    <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
-      <p>Mercado (12 m): mediana {formatCurrency(Number(data.precio_mediano))} · mín {formatCurrency(Number(data.precio_min))} · {data.proveedores} proveedores, {data.ordenes} OC{data.lider ? ` · líder ${data.lider}` : ''}</p>
+    <div className="mt-1 text-xs text-muted-foreground flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+      <span>Mercado (12 m): mediana {formatCurrency(Number(data.precio_mediano))} · mín {formatCurrency(Number(data.precio_min))} · {data.proveedores} proveedores, {data.ordenes} OC{data.lider ? ` · líder ${data.lider}` : ''}</span>
       <button type="button" disabled={disabled} onClick={() => onUsar(objetivo)} className="underline text-primary disabled:opacity-50">
         Usar precio del Experto: {formatCurrency(objetivo)} (mediana −3%)
       </button>
