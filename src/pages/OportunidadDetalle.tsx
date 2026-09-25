@@ -38,6 +38,7 @@ import {
   useDescartarOportunidad,
   type BuyerProfile,
 } from "@/hooks/useOportunidadesPanel";
+import { VeredictoIACard } from "@/components/oportunidades/VeredictoIACard";
 import InteligenciaMercado from "@/components/oportunidades/InteligenciaMercado";
 import { InfoHint } from "@/components/ui/info-hint";
 import { useRegistrarSenal } from "@/hooks/useSenales";
@@ -601,6 +602,8 @@ export default function OportunidadDetalle() {
               </p>
             </CardContent>
           </Card>
+
+          <VeredictoIACard tipo={oportunidad.tipo} codigo={oportunidad.codigo} />
 
           {/* Buyer Profile */}
           <BuyerSidebar buyer={oportunidad.buyer} />
