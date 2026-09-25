@@ -15,23 +15,35 @@ const MODELOS = ['gemini-embedding-001', 'text-embedding-004'];
 
 interface Pendiente { tabla: string; id: string; texto: string }
 
+const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 async function embeber(textos: string[], apiKey: string): Promise<number[][]> {
-  let ultimoError = '';
+  const errores: string[] = [];
   for (const model of MODELOS) {
     const body: Record<string, unknown> = { model, input: textos };
     if (model === 'gemini-embedding-001') body.dimensions = 768;
-    const resp = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/embeddings', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!resp.ok) { ultimoError = `${resp.status} ${(await resp.text().catch(() => '')).slice(0, 300)}`; continue; }
-    const j = await resp.json();
-    const v: number[][] = (j.data || []).map((d: { embedding: number[] }) => d.embedding);
-    if (v.length === textos.length) return v;
-    ultimoError = 'respuesta incompleta';
+    // Reintento con espera ante 429 (cuota por minuto) y 5xx; un 404 es "modelo
+    // no existe" y se pasa al siguiente de inmediato.
+    for (let intento = 0; intento < 4; intento++) {
+      const resp = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/embeddings', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (resp.ok) {
+        const j = await resp.json();
+        const v: number[][] = (j.data || []).map((d: { embedding: number[] }) => d.embedding);
+        if (v.length === textos.length) return v;
+        errores.push(`${model}: respuesta incompleta (${v.length}/${textos.length})`);
+        break;
+      }
+      const txt = (await resp.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 200);
+      errores.push(`${model}: ${resp.status} ${txt}`);
+      if (resp.status === 429 || resp.status >= 500) { await dormir(4000 * (intento + 1)); continue; }
+      break;
+    }
   }
-  throw new Error(`Gemini embeddings: ${ultimoError}`);
+  throw new Error(`Gemini embeddings: ${errores.join(' | ')}`);
 }
 
 serve(async (req: Request) => {
