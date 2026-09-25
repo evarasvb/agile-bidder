@@ -61,16 +61,24 @@ Deno.serve(async (req) => {
     const { data: cli } = await db.from('clientes').select('empresa_nombre').eq('user_id', inviter.id).maybeSingle();
     if (cli?.empresa_nombre) empresa = cli.empresa_nombre;
 
-    // ¿ya existe ese email en el equipo? La búsqueda es global (no hay
-    // constraint único de email), así que puede encontrar una fila de OTRA
-    // empresa (p. ej. un placeholder "pendiente" que otro dueño creó con
-    // "Nuevo Vendedor" para el mismo correo). Solo se reutiliza esa fila si
-    // ya es propia (invitado_por = quien invita ahora); si es de otro dueño
-    // se inserta una fila nueva en vez de robarle la suya (y cualquier
-    // asignación que ya tuviera esa fila).
-    const { data: existe } = await db.from('vendedores').select('id, estado_invitacion, invitado_por').eq('email', email).maybeSingle();
-    if (existe && existe.estado_invitacion === 'activada') return json({ error: 'Esa persona ya tiene una cuenta activa.' }, 409);
-    const reutilizable = !!existe && existe.invitado_por === inviter.id;
+    // El email ya no es único por fila (dos dueños distintos pueden tener
+    // cada uno una fila con el mismo correo — un placeholder "pendiente" de
+    // "Nuevo Vendedor" u otra invitación real). .maybeSingle() sobre un
+    // .eq('email', email) sin más filtro puede matchear más de una fila y
+    // tirar error silencioso (existe quedaba null sin chequear el error),
+    // así que se hacen dos consultas acotadas en vez de una sola global:
+    // 1) ¿ya tiene una cuenta ACTIVA con ese email (de cualquier dueño)?
+    const { data: activos, error: errActivos } = await db.from('vendedores').select('id').eq('email', email).eq('estado_invitacion', 'activada').limit(1);
+    if (errActivos) return json({ error: errActivos.message }, 500);
+    if (activos && activos.length) return json({ error: 'Esa persona ya tiene una cuenta activa.' }, 409);
+    // 2) ¿ya existe una fila PROPIA (invitado_por = quien invita ahora) para
+    // reutilizar? Si el placeholder es de otro dueño, no se toca: se inserta
+    // una fila nueva en vez de robarle la suya (y cualquier asignación que
+    // ya tuviera esa fila).
+    const { data: propios, error: errPropios } = await db.from('vendedores').select('id').eq('email', email).eq('invitado_por', inviter.id).limit(1);
+    if (errPropios) return json({ error: errPropios.message }, 500);
+    const existeId: string | null = propios && propios.length ? propios[0].id : null;
+    const reutilizable = !!existeId;
 
     const token = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '').slice(0, 8);
     const row = {
@@ -80,7 +88,7 @@ Deno.serve(async (req) => {
     };
     let vendedorId: string;
     if (reutilizable) {
-      const { data, error } = await db.from('vendedores').update(row).eq('id', existe!.id).select('id').single();
+      const { data, error } = await db.from('vendedores').update(row).eq('id', existeId!).select('id').single();
       if (error) return json({ error: error.message }, 500); vendedorId = data.id;
     } else {
       const { data, error } = await db.from('vendedores').insert(row).select('id').single();
