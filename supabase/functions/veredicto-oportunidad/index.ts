@@ -237,7 +237,16 @@ serve(async (req: Request) => {
 
     const { data: ownerId, error: errOwnerId } = await supabase.rpc('cliente_owner_id');
     if (errOwnerId) throw errOwnerId;
-    const clienteId = (ownerId as string | null) || userData.user.id;
+    // Sin fallback a userData.user.id: si cliente_owner_id() da null (cuenta
+    // recién creada, todavía sin fila en clientes — useCliente() puede tardar
+    // en crearla), guardar el veredicto bajo el UUID del usuario auth no
+    // calzaría con ningún inventario (RLS lo filtra por clientes.id) y además
+    // podría dejar dos filas visibles para el mismo usuario una vez que la
+    // fila real de clientes exista, rompiendo el .maybeSingle() del hook.
+    if (!ownerId) {
+      return new Response(JSON.stringify({ error: 'Tu cuenta todavía se está configurando, intenta de nuevo en un momento' }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    const clienteId = ownerId as string;
 
     const resumen = await armarResumen(supabase, tipo, codigo, clienteId);
     if (!resumen) {
