@@ -1,15 +1,17 @@
 import { useMemo, useState } from "react";
-import { Search, Sparkles, X, Download, Boxes, DollarSign, Users, Building2, Layers, Gavel } from "lucide-react";
+import { Search, Sparkles, X, Download, Boxes, DollarSign, Users, Building2, Layers, Gavel, FileSearch, ExternalLink } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { DataTable, type DataTableColumn, type DataTableSort } from "@/components/ui/data-table";
 import { ReportHero } from "@/components/reportes/ReportHero";
 import { formatCurrency, formatCompact, formatNumber, exportToCSV } from "@/hooks/useReportes";
 import {
-  useCuboConsulta, interpretarPregunta, DIMS_OC, DIMS_LIC, TIPOS_OC, METRICAS_OC, METRICAS_LIC,
+  useCuboConsulta, useCuboOcOrdenes, linkOficialOC, interpretarPregunta, DIMS_OC, DIMS_LIC, TIPOS_OC, METRICAS_OC, METRICAS_LIC,
   type Fuente, type Dim, type FiltrosCubo, type FilaCubo,
 } from "@/hooks/useCubo";
 
@@ -60,6 +62,7 @@ export default function ConsultaLibre() {
   const [pregunta, setPregunta] = useState("");
   const [explicacion, setExplicacion] = useState<string | null>(null);
   const [borrador, setBorrador] = useState<Partial<Record<keyof FiltrosCubo, string>>>({});
+  const [verFuente, setVerFuente] = useState(false);
 
   const metricas = fuente === "oc" ? METRICAS_OC : METRICAS_LIC;
   const orden = sort && metricas.includes(sort.id) ? sort.id : "monto";
@@ -69,6 +72,7 @@ export default function ConsultaLibre() {
     fuente, dims, filtros, desde: desde || null, hasta: hasta || null, orden, desc, limite: pageSize, offset: (page - 1) * pageSize,
   }), [fuente, dims, filtros, desde, hasta, orden, desc, page, pageSize]);
   const { data, isLoading, isFetching, error } = useCuboConsulta(consulta);
+  const { data: ordenesFuente, isLoading: fuenteLoading } = useCuboOcOrdenes(filtros, desde || null, hasta || null, verFuente && fuente === "oc");
 
   const reiniciarPagina = () => setPage(1);
 
@@ -206,7 +210,7 @@ export default function ConsultaLibre() {
     <div className="space-y-4 pb-24">
       <ReportHero
         title="Consulta libre"
-        subtitle="Cruza proveedores, instituciones, productos, precios y meses. Órdenes de compra por Convenio Marco, Compra Ágil y Trato Directo, o licitaciones adjudicadas. Haz clic en cualquier valor para profundizar."
+        subtitle="Cruza proveedores, instituciones, productos, precios y meses. Órdenes de compra por Convenio Marco, Compra Ágil y Trato Directo, o licitaciones adjudicadas. Haz clic en cualquier valor para profundizar. Todos los montos están en pesos chilenos (CLP); se excluyen líneas registradas en otra moneda (USD, UF, etc.), menos del 1% del total."
         icon={Boxes}
         accent="celeste"
         kpis={kpis}
@@ -326,11 +330,72 @@ export default function ConsultaLibre() {
           onSortChange: (s) => { if (!s || metricas.includes(s.id)) { setSort(s); setPage(1); } },
         }}
         toolbar={
-          <Button variant="outline" size="sm" onClick={() => exportToCSV(filas.map(({ __k, ...r }) => r), `consulta-${fuente}-${dims.join("-")}`)}>
-            <Download className="h-4 w-4 mr-1.5" /> CSV
-          </Button>
+          <>
+            {fuente === "oc" && (
+              <Button variant="outline" size="sm" onClick={() => setVerFuente(true)}>
+                <FileSearch className="h-4 w-4 mr-1.5" /> Ver OCs de origen
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => exportToCSV(filas.map(({ __k, ...r }) => r), `consulta-${fuente}-${dims.join("-")}`)}>
+              <Download className="h-4 w-4 mr-1.5" /> CSV
+            </Button>
+          </>
         }
       />
+
+      <Dialog open={verFuente} onOpenChange={setVerFuente}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Órdenes de compra de origen</DialogTitle>
+            <DialogDescription>
+              Las OC reales de Mercado Público detrás de los filtros activos. Ábrelas para revisar o descargar el documento oficial.
+              {filtrosActivos.length === 0 && !desde && !hasta && " Sin filtros, se muestran las de mayor monto."}
+            </DialogDescription>
+          </DialogHeader>
+          {fuenteLoading ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">Buscando OC…</p>
+          ) : !ordenesFuente?.length ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">Sin resultados para estos filtros.</p>
+          ) : (
+            <div className="rounded-lg border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead>Código OC</TableHead>
+                    <TableHead>Proveedor</TableHead>
+                    <TableHead>Institución</TableHead>
+                    <TableHead className="text-right">Monto</TableHead>
+                    <TableHead>Moneda</TableHead>
+                    <TableHead className="text-right" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {ordenesFuente.map((o) => (
+                    <TableRow key={o.codigo}>
+                      <TableCell className="font-mono text-xs">{o.codigo}</TableCell>
+                      <TableCell className="max-w-[160px] truncate text-sm">{o.proveedor ?? "—"}</TableCell>
+                      <TableCell className="max-w-[160px] truncate text-sm">{o.organismo ?? "—"}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">{pesos(o.monto)}</TableCell>
+                      <TableCell>
+                        {o.moneda && o.moneda !== "CLP" ? (
+                          <Badge variant="outline" className="text-amber-700 border-amber-300">{o.moneda}</Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">CLP</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <a href={linkOficialOC(o.codigo)} target="_blank" rel="noreferrer">
+                          <Button variant="ghost" size="sm"><ExternalLink className="h-4 w-4" /></Button>
+                        </a>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

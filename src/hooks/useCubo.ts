@@ -108,6 +108,42 @@ export function useCuboConsulta(c: ConsultaCubo, enabled = true) {
   });
 }
 
+export interface OcDrillDown {
+  codigo: string;
+  proveedor: string | null;
+  organismo: string | null;
+  tipo: string | null;
+  lineas: number;
+  monto: number;
+  moneda: string | null;
+  fecha: string | null;
+}
+
+// Link directo a la orden de compra en Mercado Público (mismo patrón que se usa
+// en el resto del sistema, p. ej. useOrdenesCompra.ts).
+export const linkOficialOC = (codigo: string) =>
+  `https://www.mercadopublico.cl/Procurement/Modules/RFB/DetailsAcquisition.aspx?idlicitacion=${codigo}`;
+
+// Fuente del dato: dado el mismo filtro que ve "Consulta libre", trae las OC
+// reales de Mercado Público detrás del número (para poder abrirlas/descargarlas).
+export function useCuboOcOrdenes(filtros: FiltrosCubo, desde: string | null, hasta: string | null, habilitado: boolean) {
+  return useQuery({
+    queryKey: ["cubo-oc-ordenes", filtros, desde, hasta],
+    queryFn: async () => {
+      const { data, error } = await db.rpc("cubo_oc_ordenes", {
+        p_filtros: filtros,
+        p_desde: desde ?? null,
+        p_hasta: hasta ?? null,
+        p_limite: 200,
+      });
+      if (error) throw error;
+      return (data ?? []) as OcDrillDown[];
+    },
+    enabled: habilitado,
+    staleTime: 60_000,
+  });
+}
+
 export function useCuboOpciones(fuente: Fuente, dim: string, texto: string, tipo?: string) {
   return useQuery({
     queryKey: ["cubo-opciones", fuente, dim, texto, tipo ?? null],

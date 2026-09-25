@@ -23,6 +23,10 @@ export interface FacturaCobrar {
   fecha_vencimiento: string | null;
   estado: EstadoCobro;
   notas: string | null;
+  factura_archivo_url: string | null;
+  factura_archivo_nombre: string | null;
+  guia_archivo_url: string | null;
+  guia_archivo_nombre: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -69,6 +73,35 @@ export function useCrearFactura() {
   });
 }
 
+// Carga masiva desde Excel: una sola inserción con todas las filas válidas.
+export function useCrearFacturasMasivo() {
+  const qc = useQueryClient();
+  const { data: cliente } = useCliente();
+  return useMutation({
+    mutationFn: async (filas: NuevaFactura[]) => {
+      if (!cliente?.id) throw new Error('No hay cliente activo');
+      if (!filas.length) return 0;
+      const { error } = await sb.from('facturas_por_cobrar').insert(filas.map((f) => ({ ...f, cliente_id: cliente.id })));
+      if (error) throw error;
+      return filas.length;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['facturas-cobrar'] }),
+  });
+}
+
+// Sube un adjunto (factura o guía) al bucket privado de la empresa. Mismo
+// patrón de carpeta por user_id y límite de 20MB que usa el formulario de
+// alta; se reutiliza acá para poder adjuntar documentos a una factura ya
+// creada (carga masiva primero, documentos después).
+export async function subirAdjuntoCobranza(userId: string, file: File, tag: 'factura' | 'guia'): Promise<{ url: string; nombre: string }> {
+  if (file.size > 20 * 1024 * 1024) throw new Error(`${tag === 'factura' ? 'La factura' : 'La guía'} supera el máximo de 20 MB`);
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'pdf';
+  const path = `${userId}/cobranza_${tag}_${Date.now()}.${ext}`;
+  const up = await supabase.storage.from('documentos-empresa').upload(path, file, { contentType: file.type || 'application/pdf' });
+  if (up.error) throw new Error(`No se pudo subir ${tag === 'factura' ? 'la factura' : 'la guía'}: ${up.error.message}`);
+  return { url: path, nombre: file.name };
+}
+
 export function useActualizarFactura() {
   const qc = useQueryClient();
   return useMutation({
@@ -88,11 +121,39 @@ export function useEliminarFactura() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      const { data: fila, error: errFila } = await sb
+        .from('facturas_por_cobrar')
+        .select('factura_archivo_url, guia_archivo_url')
+        .eq('id', id)
+        .maybeSingle();
+      if (errFila) throw errFila;
       const { error } = await sb.from('facturas_por_cobrar').delete().eq('id', id);
       if (error) throw error;
+      const archivos = [fila?.factura_archivo_url, fila?.guia_archivo_url].filter((p): p is string => !!p);
+      if (archivos.length) {
+        const { error: errStorage } = await supabase.storage.from('documentos-empresa').remove(archivos);
+        if (errStorage) throw new Error(`Factura eliminada, pero no se pudieron borrar sus adjuntos: ${errStorage.message}`);
+      }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['facturas-cobrar'] }),
   });
+}
+
+// Las fechas de una factura tienen un orden lógico: se emite, luego se recibe
+// (conforme) y recién ahí corre el plazo hasta el vencimiento. Si el cliente
+// las cruza (a mano o por un dato mal copiado), el documento de cobro saldría
+// con una cronología que no se sostiene ante el organismo.
+export function fechasConsistentes(emision: string, recepcion: string, vencimiento: string): string | null {
+  const e = emision ? new Date(emision + 'T00:00:00') : null;
+  const r = recepcion ? new Date(recepcion + 'T00:00:00') : null;
+  const v = vencimiento ? new Date(vencimiento + 'T00:00:00') : null;
+  if (e && r && e > r) return 'La fecha de emisión no puede ser posterior a la de recepción.';
+  if (r && v && r > v) return 'La fecha de recepción no puede ser posterior al vencimiento.';
+  if (e && v && e > v) return 'La fecha de emisión no puede ser posterior al vencimiento.';
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  if (e && e > hoy) return 'La fecha de emisión no puede ser futura.';
+  if (r && r > hoy) return 'La fecha de recepción no puede ser futura.';
+  return null;
 }
 
 // ----- Utilidades de cobro --------------------------------------------------
