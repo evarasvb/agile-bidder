@@ -99,7 +99,15 @@ export interface InventarioPaginaOpts {
   orderBy?: { column: InventarioOrdenColumna; asc: boolean };
 }
 
-const escapaIlike = (s: string) => s.replace(/[%_,()]/g, ' ').trim();
+// PostgREST usa coma y paréntesis como separadores dentro de .or(); si el
+// texto trae esos caracteres literalmente ("1,5 mm (zincado)", "ACME, SpA")
+// el valor del filtro debe ir entre comillas dobles para leerse como uno
+// solo (ver valorIlike). Acá solo se escapan backslash y comillas dobles del
+// propio texto, así no se pierde la puntuación real que el cliente escribió.
+export const escapaIlike = (s: string) => s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+// Arma el valor ".ilike.<valor>" para un filtro .or(), citado entre comillas
+// dobles para que comas y paréntesis del texto no corten el filtro.
+export const valorIlike = (s: string) => `"%${escapaIlike(s)}%"`;
 
 export function useInventarioPagina(opts: InventarioPaginaOpts) {
   const { user, loading: authLoading } = useAuth();
@@ -119,7 +127,7 @@ export function useInventarioPagina(opts: InventarioPaginaOpts) {
         .select('*', { count: 'exact' })
         .eq('cliente_id', ownerId);
       if (q) {
-        const t = `%${escapaIlike(q)}%`;
+        const t = valorIlike(q);
         query = query.or(`nombre_producto.ilike.${t},sku.ilike.${t},proveedor.ilike.${t}`);
       }
       if (opts.soloIncompletos) {
