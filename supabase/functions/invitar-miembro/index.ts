@@ -61,9 +61,16 @@ Deno.serve(async (req) => {
     const { data: cli } = await db.from('clientes').select('empresa_nombre').eq('user_id', inviter.id).maybeSingle();
     if (cli?.empresa_nombre) empresa = cli.empresa_nombre;
 
-    // ¿ya existe ese email en el equipo?
-    const { data: existe } = await db.from('vendedores').select('id, estado_invitacion').eq('email', email).maybeSingle();
+    // ¿ya existe ese email en el equipo? La búsqueda es global (no hay
+    // constraint único de email), así que puede encontrar una fila de OTRA
+    // empresa (p. ej. un placeholder "pendiente" que otro dueño creó con
+    // "Nuevo Vendedor" para el mismo correo). Solo se reutiliza esa fila si
+    // ya es propia (invitado_por = quien invita ahora); si es de otro dueño
+    // se inserta una fila nueva en vez de robarle la suya (y cualquier
+    // asignación que ya tuviera esa fila).
+    const { data: existe } = await db.from('vendedores').select('id, estado_invitacion, invitado_por').eq('email', email).maybeSingle();
     if (existe && existe.estado_invitacion === 'activada') return json({ error: 'Esa persona ya tiene una cuenta activa.' }, 409);
+    const reutilizable = !!existe && existe.invitado_por === inviter.id;
 
     const token = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '').slice(0, 8);
     const row = {
@@ -72,8 +79,8 @@ Deno.serve(async (req) => {
       invited_at: new Date().toISOString(),
     };
     let vendedorId: string;
-    if (existe) {
-      const { data, error } = await db.from('vendedores').update(row).eq('id', existe.id).select('id').single();
+    if (reutilizable) {
+      const { data, error } = await db.from('vendedores').update(row).eq('id', existe!.id).select('id').single();
       if (error) return json({ error: error.message }, 500); vendedorId = data.id;
     } else {
       const { data, error } = await db.from('vendedores').insert(row).select('id').single();
