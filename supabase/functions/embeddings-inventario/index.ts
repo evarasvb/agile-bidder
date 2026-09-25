@@ -17,7 +17,7 @@ const corsHeaders = {
 // a un par de cientos de productos, así que un par de llamadas alcanza.
 const LOTE = 40;
 
-interface Fila { id: string; nombre_producto: string | null; categoria: string | null; marca: string | null; descripcion: string | null }
+interface Fila { id: string; nombre_producto: string | null; categoria: string | null; marca: string | null; descripcion: string | null; updated_at: string }
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
@@ -39,7 +39,7 @@ serve(async (req: Request) => {
 
     const { data: filas, error: errSelect } = await supabase
       .from('cliente_inventario')
-      .select('id, nombre_producto, categoria, marca, descripcion')
+      .select('id, nombre_producto, categoria, marca, descripcion, updated_at')
       .is('embedding', null)
       .limit(LOTE);
     if (errSelect) throw errSelect;
@@ -76,14 +76,19 @@ serve(async (req: Request) => {
     for (let i = 0; i < filas.length; i++) {
       const vec = vectores[i];
       if (!Array.isArray(vec) || !vec.length) continue;
-      // .is('embedding', null) además del id: si el producto se editó mientras
-      // este embedding se calculaba, el trigger ya lo invalidó (lo dejó en
-      // null otra vez) y este update no debe pisarlo con un vector calculado
-      // sobre el texto viejo — se recalculará en el próximo backfill.
+      // .eq('updated_at', ...) además del id: si el producto se editó
+      // mientras este embedding se calculaba, la fila ya tiene otro
+      // updated_at (lo bumpea el trigger genérico en cada UPDATE, incluida
+      // la invalidación del embedding) y este update no debe pisarla con un
+      // vector calculado sobre el texto viejo — .is('embedding', null) no
+      // alcanza para detectarlo porque el trigger de invalidación también
+      // deja el embedding en null. Se recalculará en el próximo backfill.
+      const fila = filas[i] as Fila;
       const { error: errUpdate, count } = await supabase
         .from('cliente_inventario')
         .update({ embedding: `[${vec.join(',')}]` }, { count: 'exact' })
-        .eq('id', (filas[i] as Fila).id)
+        .eq('id', fila.id)
+        .eq('updated_at', fila.updated_at)
         .is('embedding', null);
       if (!errUpdate && count) actualizados++;
     }

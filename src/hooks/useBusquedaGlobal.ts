@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { escapaIlike } from '@/hooks/useInventory';
+import { valorIlike } from '@/hooks/useInventory';
 
 // Espera una pausa al escribir antes de disparar la búsqueda: sin esto, cada
 // tecla arma su propia queryKey y, si trae pocos resultados de inventario,
@@ -52,7 +52,7 @@ export function useBusquedaGlobal(query: string) {
     queryKey: ['busqueda-global', clienteId, q],
     enabled: habilitado,
     queryFn: async (): Promise<ResultadoBusqueda[]> => {
-      const t = `%${escapaIlike(q)}%`;
+      const t = valorIlike(q);
       const [oportunidadesRes, productosRes, facturasRes] = await Promise.all([
         supabase.rpc('busqueda_global_oportunidades', { p_termino: q, p_limite: 6 }),
         supabase.from('cliente_inventario').select('id, nombre_producto, sku').or(`nombre_producto.ilike.${t},sku.ilike.${t}`).limit(5),

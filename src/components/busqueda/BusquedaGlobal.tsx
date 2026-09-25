@@ -60,6 +60,7 @@ export function BusquedaGlobalProvider({ children }: { children: ReactNode }) {
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
   const backfillHecho = useRef(false);
+  const backfillEnCurso = useRef(false);
   const { data: resultados, isFetching } = useBusquedaGlobal(query);
 
   useEffect(() => {
@@ -80,22 +81,32 @@ export function BusquedaGlobalProvider({ children }: { children: ReactNode }) {
     // funciona igual aunque esto todavía esté corriendo). Sigue pidiendo
     // lotes mientras la función avise que quedan pendientes; el tope de 10
     // (hasta 400 productos) es solo para no quedar pegado si algo falla.
-    if (backfillHecho.current) return;
+    // backfillEnCurso evita lotes duplicados si el diálogo se cierra y
+    // reabre mientras el loop anterior todavía está esperando una llamada
+    // (backfillHecho sigue en false hasta que ese loop termine, así que sin
+    // esta guarda un segundo loop pediría los mismos productos y pagaría
+    // llamadas a Gemini de más).
+    if (backfillHecho.current || backfillEnCurso.current) return;
+    backfillEnCurso.current = true;
     (async () => {
       let agotado = false;
-      for (let i = 0; i < 10; i++) {
-        try {
-          const { data, error } = await supabase.functions.invoke<{ actualizados: number; pendientes: boolean }>('embeddings-inventario', {});
-          if (error) break;
-          if (!data?.pendientes) { agotado = true; break; }
-        } catch {
-          break;
+      try {
+        for (let i = 0; i < 10; i++) {
+          try {
+            const { data, error } = await supabase.functions.invoke<{ actualizados: number; pendientes: boolean }>('embeddings-inventario', {});
+            if (error) break;
+            if (!data?.pendientes) { agotado = true; break; }
+          } catch {
+            break;
+          }
         }
+      } finally {
+        // Solo se marca "hecho" si de verdad no quedan productos sin
+        // embedding; si se cortó por error o por el tope de 10 lotes, se
+        // reintenta la próxima vez que se abra el buscador.
+        if (agotado) backfillHecho.current = true;
+        backfillEnCurso.current = false;
       }
-      // Solo se marca "hecho" si de verdad no quedan productos sin embedding;
-      // si se cortó por error o por el tope de 10 lotes, se reintenta la
-      // próxima vez que se abra el buscador.
-      if (agotado) backfillHecho.current = true;
     })();
   }, [open]);
 
