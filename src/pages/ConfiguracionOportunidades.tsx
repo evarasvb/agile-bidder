@@ -51,7 +51,7 @@ const separarPalabras = (texto: string): string[] =>
 
 export default function ConfiguracionOportunidades() {
   const navigate = useNavigate();
-  const { filtros, isLoading, isFetched, updateFiltros, isUpdating } = useClienteFiltros();
+  const { filtros, isFetched, updateFiltros, isUpdating } = useClienteFiltros();
   const sugerir = useSugerirFiltros();
   const expandirConceptos = useExpandirConceptos();
   const { data: cliente, isFetched: clienteFetched } = useCliente();
@@ -213,7 +213,11 @@ export default function ConfiguracionOportunidades() {
     }
   };
 
-  if (isLoading) {
+  // Mismo criterio que la hidratación: mientras no esté isFetched/clienteFetched,
+  // se muestra el skeleton en vez del editor. Con isLoading (isPending && isFetching)
+  // la pantalla se pintaba vacía antes de que la hidratación corriera, dejando
+  // escribir sobre un formulario que la hidratación luego pisaba.
+  if (!isFetched || !clienteFetched) {
     return (
       <div className="container mx-auto py-6 space-y-6">
         <Skeleton className="h-10 w-64" />
