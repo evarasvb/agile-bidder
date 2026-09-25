@@ -43,6 +43,17 @@ Deno.serve(async (req) => {
     const inviter = userData?.user;
     if (!inviter) return json({ error: 'No autenticado' }, 401);
 
+    // El botón "Invitar miembro" lo puede usar cualquiera del equipo, no
+    // solo el dueño. Si se usara inviter.id tal cual como invitado_por, un
+    // miembro invitado creaba la fila nueva "propia" de ÉL (no del dueño
+    // real) — invisible para el dueño y para el resto del equipo, scopeados
+    // por vendedores_owner_auth_id(). Se resuelve el dueño EFECTIVO con la
+    // misma RPC (vía el cliente autenticado como quien invita, para que
+    // auth.uid() adentro de la función resuelva bien) y se usa ESE id.
+    const { data: ownerAuthId, error: errOwner } = await asUser.rpc('vendedores_owner_auth_id');
+    if (errOwner) return json({ error: errOwner.message }, 500);
+    const ownerId: string = (ownerAuthId as string | null) ?? inviter.id;
+
     const body = await req.json().catch(() => ({}));
     const nombre = String(body.nombre || '').trim();
     const email = String(body.email || '').trim().toLowerCase();
@@ -58,7 +69,7 @@ Deno.serve(async (req) => {
 
     // Nombre de la empresa que invita (mejor esfuerzo).
     let empresa = '';
-    const { data: cli } = await db.from('clientes').select('empresa_nombre').eq('user_id', inviter.id).maybeSingle();
+    const { data: cli } = await db.from('clientes').select('empresa_nombre').eq('user_id', ownerId).maybeSingle();
     if (cli?.empresa_nombre) empresa = cli.empresa_nombre;
 
     // El email ya no es único por fila (dos dueños distintos pueden tener
@@ -71,11 +82,11 @@ Deno.serve(async (req) => {
     const { data: activos, error: errActivos } = await db.from('vendedores').select('id').eq('email', email).eq('estado_invitacion', 'activada').limit(1);
     if (errActivos) return json({ error: errActivos.message }, 500);
     if (activos && activos.length) return json({ error: 'Esa persona ya tiene una cuenta activa.' }, 409);
-    // 2) ¿ya existe una fila PROPIA (invitado_por = quien invita ahora) para
+    // 2) ¿ya existe una fila PROPIA (invitado_por = el dueño efectivo) para
     // reutilizar? Si el placeholder es de otro dueño, no se toca: se inserta
     // una fila nueva en vez de robarle la suya (y cualquier asignación que
     // ya tuviera esa fila).
-    const { data: propios, error: errPropios } = await db.from('vendedores').select('id').eq('email', email).eq('invitado_por', inviter.id).limit(1);
+    const { data: propios, error: errPropios } = await db.from('vendedores').select('id').eq('email', email).eq('invitado_por', ownerId).limit(1);
     if (errPropios) return json({ error: errPropios.message }, 500);
     const existeId: string | null = propios && propios.length ? propios[0].id : null;
     const reutilizable = !!existeId;
@@ -83,7 +94,7 @@ Deno.serve(async (req) => {
     const token = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '').slice(0, 8);
     const row = {
       nombre, email, rol, telefono, activo: false, user_id: null,
-      invite_token: token, invitado_por: inviter.id, estado_invitacion: 'pendiente',
+      invite_token: token, invitado_por: ownerId, estado_invitacion: 'pendiente',
       invited_at: new Date().toISOString(),
     };
     let vendedorId: string;
