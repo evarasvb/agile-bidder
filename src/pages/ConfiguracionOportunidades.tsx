@@ -51,10 +51,10 @@ const separarPalabras = (texto: string): string[] =>
 
 export default function ConfiguracionOportunidades() {
   const navigate = useNavigate();
-  const { filtros, isLoading, updateFiltros, isUpdating } = useClienteFiltros();
+  const { filtros, isLoading, isFetched, updateFiltros, isUpdating } = useClienteFiltros();
   const sugerir = useSugerirFiltros();
   const expandirConceptos = useExpandirConceptos();
-  const { data: cliente } = useCliente();
+  const { data: cliente, isFetched: clienteFetched } = useCliente();
 
   const [palabrasIncluir, setPalabrasIncluir] = useState<string[]>([]);
   const [palabrasExcluir, setPalabrasExcluir] = useState<string[]>([]);
@@ -78,7 +78,13 @@ export default function ConfiguracionOportunidades() {
   // "las agrego, se suman, pero no puedo guardarlas / desaparecen".
   const hidratado = useRef(false);
   useEffect(() => {
-    if (hidratado.current || isLoading) return;
+    // isFetched (no !isLoading): mientras la sesión todavía no resuelve
+    // user?.id, ambos queries están `enabled: false` y ya reportan
+    // isLoading=false sin haber corrido ni una vez — con !isLoading el efecto
+    // hidrataba con filtros/cliente todavía undefined, marcaba
+    // hidratado=true para siempre, y nunca volvía a sincronizar con lo
+    // guardado de verdad (el usuario veía la lista vacía).
+    if (hidratado.current || !isFetched || !clienteFetched) return;
     hidratado.current = true;
     // Si alguien escribió "google , licencia" en un solo chip, se separa.
     const incluirGuardado = separarPalabras((filtros?.palabras_incluir || []).join(','));
@@ -90,7 +96,7 @@ export default function ConfiguracionOportunidades() {
       setMontoMin(filtros.monto_min?.toString() || "");
       setMontoMax(filtros.monto_max?.toString() || "");
     }
-  }, [isLoading, filtros, cliente]);
+  }, [isFetched, clienteFetched, filtros, cliente]);
 
   const handleAddPalabraIncluir = () => {
     const nuevas = separarPalabras(newPalabraIncluir).filter((w) => !palabrasIncluir.includes(w));

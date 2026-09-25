@@ -157,6 +157,13 @@ export function useClienteFiltros() {
   return {
     filtros: query.data,
     isLoading: query.isLoading,
+    // isFetched (a diferencia de !isLoading) solo pasa a true cuando el query
+    // de verdad terminó de correr al menos una vez. Mientras está `enabled:
+    // false` (por ejemplo, mientras la sesión todavía no resuelve `user?.id`),
+    // isLoading ya es false pero isFetched sigue en false — la distinción que
+    // necesita quien hidrata un formulario para no confundir "todavía no sé"
+    // con "ya sé que no hay nada".
+    isFetched: query.isFetched,
     error: query.error,
     updateFiltros: updateFiltros.mutate,
     isUpdating: updateFiltros.isPending,
