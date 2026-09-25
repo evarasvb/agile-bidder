@@ -5,6 +5,7 @@
 // y los mismos datos de organismos que ya usa Don Evaristo Experto.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { fetchClaudeComoOpenAI } from "../_shared/claudeFallback.ts";
+import { textoPanorama } from "../_shared/panorama.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -116,6 +117,7 @@ Hablas de tú, cercano, como un abogado amigo que te explica el enredo legal en 
 Reglas:
 - Responde SOLO con lo que respaldan las FUENTES y DATOS entregados. Cita [n] tras cada afirmación que venga de una fuente. Con ley o reglamento nombra el artículo; con dictámenes de Contraloría número y año (si es anterior a dic-2024 puede citar el reglamento antiguo D.250/2004, reemplazado por el D.661/2024); con sentencias del TCP, rol y fecha; con el libro, dilo como criterio práctico del autor.
 - Si hay FICHA ORGANISMO, úsala para evaluar el caso (reclamos previos contra ese organismo, conducta de pago).
+- Si hay PANORAMA COMPLETO de la licitación, es evidencia concreta de ESE caso puntual (no jurisprudencia general): úsala como tal. Antecedentes (licitaciones anteriores del mismo organismo con nombre parecido) sirven para argumentar patrones o precedentes del organismo; reclamos de proveedores contra el organismo (con proceso y fecha) son hechos que puedes citar para respaldar una queja de irregularidad; compras ágiles relacionadas en poco tiempo pueden ser indicio de fragmentación, argumentable como vicio del proceso. Si el panorama no trae nada de esto para el código que te dieron, dilo ("no encontré antecedentes/reclamos previos de este proceso") en vez de inventar.
 - Si hay DOCUMENTOS DEL USUARIO (contratos, notificaciones, actas, reclamos previos que subió), son la base de los hechos: léelos y úsalos como evidencia concreta del caso.
 - Si el usuario necesita presentar algo formal (recurso, reclamo, carta, apelación), NO redactes el documento completo en el chat: explícale qué documento le conviene y en qué plazo, y dile que lo genere con el botón "Generar documento" de este mismo módulo, donde queda con formato profesional listo para firmar y descargar en PDF.
 - Si te cuenta que le pagaron atrasado o le deben plata (mora), explícale en el chat que tiene derecho a cobrar interés corriente por el atraso [cítalo], sin calcular el monto tú mismo (no hagas la aritmética en el chat). Dile que en "Generar documento" con el tipo "Nota de débito / cobro de intereses por mora" le pides el monto adeudado, la fecha en que debía pagarse y si ya le pagaron o sigue impago, y ahí Don Evaristo Abogado hace el cálculo exacto y redacta la nota de débito lista para enviar.
@@ -211,7 +213,12 @@ Deno.serve(async (req) => {
       tareas.normOr = sb.rpc("experto_buscar_or", { consulta: qOr, cantidad: 8 }).then((r) => r.data ?? []);
       tareas.normAnd = sb.rpc("experto_buscar_texto", { consulta: kws.slice(0, 3).join(" "), cantidad: 4 }).then((r) => r.data ?? []);
     }
-    if (codigo) tareas.ficha = sb.rpc("experto_ficha_licitacion", { p_codigo: codigo }).then((r) => r.data);
+    if (codigo) {
+      tareas.ficha = sb.rpc("experto_ficha_licitacion", { p_codigo: codigo }).then((r) => r.data);
+      // Antecedentes, reclamos de ese proceso/organismo y compras ágiles relacionadas
+      // (posible fragmentación) — mismo panorama que ya usa Don Evaristo Experto.
+      tareas.panorama = sb.rpc("experto_panorama_licitacion", { p_codigo: codigo, p_user_id: userId }).then((r) => r.data);
+    }
     // Documentos que el usuario subió (contratos, notificaciones, reclamos previos): sin código = carpeta general.
     tareas.docs = sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: codigo, p_max: 10000 }).then((r) => r.data ?? []);
     // Organismo: por destinatario/institución escrita o detectado en el texto de la pregunta/hechos.
@@ -236,6 +243,7 @@ Deno.serve(async (req) => {
     const partes: string[] = [];
     if (fragmentos.length) partes.push("FUENTES:\n" + textoFragmentos(fragmentos));
     if (res.ficha) partes.push(`LICITACIÓN ${res.ficha.codigo}: ${res.ficha.nombre}\nOrganismo: ${res.ficha.institucion} | Estado: ${res.ficha.estado} | Cierre: ${res.ficha.fecha_cierre ?? "s/i"}`);
+    if (codigo && res.panorama) partes.push(textoPanorama(res.panorama, codigo));
     if (res.org) partes.push("FICHA ORGANISMO (Datos Mercado Público vía FirmaVB):\n" + textoOrganismo(res.org));
     if (res.docs?.length) partes.push("DOCUMENTOS DEL USUARIO (contratos, notificaciones, reclamos previos que subió; son evidencia de los hechos):\n" + res.docs.map((d: any) => `### ${d.nombre} (${d.tipo})\n${d.texto}`).join("\n\n"));
     if (res.perfil) partes.push(`DATOS DEL PROVEEDOR (para firmar el documento): empresa "${res.perfil.empresa_nombre ?? "s/i"}", RUT ${res.perfil.rut ?? "s/i"}, región ${res.perfil.region ?? "s/i"}.`);

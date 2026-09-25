@@ -93,7 +93,7 @@ export default function Abogado() {
     setMsgs((m) => [...m, { rol: 'yo', texto: p }, { rol: 'exp', texto: '' }]);
     setEnviando(true);
     try {
-      await pedir({ modo: 'chat', pregunta: p, historial, huella: 'abogado' }, (t, meta) =>
+      await pedir({ modo: 'chat', pregunta: p, historial, codigo: codigo || undefined, huella: 'abogado' }, (t, meta) =>
         setMsgs((m) => { const c = [...m]; c[c.length - 1] = { rol: 'exp', texto: t, fuentes: meta?.fuentes }; return c; }));
     } catch (e: any) {
       if (e.status === 402 || e.status === 401) setLimite(e.message);
@@ -158,7 +158,7 @@ export default function Abogado() {
     setSubiendo(true);
     for (const file of lista) {
       try {
-        const r = await fetch(`${SUPA}/functions/v1/experto-documentos`, { method: 'POST', headers: { ...auth, 'Content-Type': file.type || 'application/octet-stream', 'X-Codigo': '', 'X-Nombre': encodeURIComponent(file.name), 'X-Destino': 'documento' }, body: file });
+        const r = await fetch(`${SUPA}/functions/v1/experto-documentos`, { method: 'POST', headers: { ...auth, 'Content-Type': file.type || 'application/octet-stream', 'X-Codigo': codigo || '', 'X-Nombre': encodeURIComponent(file.name), 'X-Destino': 'documento' }, body: file });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) { toast.error(`${file.name}: ${j.mensaje || j.error || 'Error ' + r.status}`); continue; }
         toast.success(`Leído: ${file.name}`);
@@ -193,6 +193,10 @@ export default function Abogado() {
         </TabsList>
 
         <TabsContent value="chat" className="space-y-3">
+          <div>
+            <Label className="text-xs text-muted-foreground">ID de licitación o compra (opcional) — si es sobre un caso puntual, Don Evaristo busca antecedentes, reclamos y compras relacionadas de ese proceso</Label>
+            <Input value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="Ej: 2699-35-LE26" className="mt-1" />
+          </div>
           <Card>
             <CardContent className="p-4 space-y-3 min-h-[300px] max-h-[55vh] overflow-y-auto">
               {msgs.length === 0 && (
@@ -348,6 +352,10 @@ export default function Abogado() {
               <p className="text-sm text-muted-foreground">
                 Sube contratos, notificaciones o reclamos previos: Don Evaristo Abogado los lee para responderte y redactar con los hechos exactos.
               </p>
+              <div>
+                <Label className="text-xs text-muted-foreground">ID de licitación o compra (opcional) — liga estos documentos a ese caso puntual</Label>
+                <Input value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="Ej: 2699-35-LE26" className="mt-1 max-w-xs" />
+              </div>
               <label className="inline-flex items-center gap-2 text-sm cursor-pointer text-primary">
                 <Upload className="h-4 w-4" /> {subiendo ? 'Subiendo…' : 'Subir documento (PDF, Word, Excel, imagen)'}
                 <input type="file" className="hidden" multiple disabled={subiendo}
