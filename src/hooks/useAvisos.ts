@@ -1,8 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useClienteOwner } from '@/hooks/useCliente';
 
 // Avisos persistentes del cliente (campanita). Leen notificaciones_log, que la RLS
 // ya limita a las filas del propio usuario. La columna `leida` se agregó en la
@@ -20,8 +19,6 @@ export interface Aviso {
 
 export function useAvisos() {
   const { user } = useAuth();
-  const { data: clienteOwner } = useClienteOwner();
-  const clienteId = clienteOwner?.id;
   const qc = useQueryClient();
 
   const query = useQuery({
@@ -42,27 +39,54 @@ export function useAvisos() {
     },
   });
 
+  // cliente_owner_id() (RPC security definer) en vez de useClienteOwner():
+  // ese hook hace además un select a `clientes`, y su RLS solo deja ver la
+  // fila propia (user_id = auth.uid()) — un vendedor invitado nunca vería la
+  // fila de la empresa dueña y se quedaría sin campanita en vivo. El RPC solo
+  // devuelve el uuid, sin pasar por esa restricción.
+  const { data: clienteId } = useQuery({
+    queryKey: ['cliente-owner-id', user?.id],
+    enabled: !!user?.id,
+    staleTime: 5 * 60_000,
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await supabase.rpc('cliente_owner_id');
+      if (error) throw error;
+      return (data as string | null) ?? null;
+    },
+  });
+
   // Campanita en vivo: se suscribe a los cambios de notificaciones_log del
   // propio cliente (INSERT = aviso nuevo, UPDATE = otra pestaña/dispositivo
   // marcó leído) y refresca la lista al toque en vez de esperar el poll.
+  // Los eventos se agrupan (debounce corto) porque "Marcar leídas" puede
+  // disparar un UPDATE por cada fila no leída — sin esto, una cuenta con
+  // historial grande dispararía una ráfaga de refetch por un solo click.
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!clienteId || !user?.id) return;
     const uid = user.id;
+    const invalidar = () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        qc.invalidateQueries({ queryKey: ['avisos', uid] });
+      }, 400);
+    };
     const channel = supabase
       .channel(`notificaciones-log-${clienteId}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'notificaciones_log', filter: `cliente_id=eq.${clienteId}` },
-        () => qc.invalidateQueries({ queryKey: ['avisos', uid] }),
+        invalidar,
       )
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'notificaciones_log', filter: `cliente_id=eq.${clienteId}` },
-        () => qc.invalidateQueries({ queryKey: ['avisos', uid] }),
+        invalidar,
       )
       .subscribe();
 
     return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
       supabase.removeChannel(channel);
     };
   }, [clienteId, user?.id, qc]);
