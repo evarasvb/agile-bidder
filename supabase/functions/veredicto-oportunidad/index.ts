@@ -85,21 +85,27 @@ async function armarResumen(supabase: ReturnType<typeof createClient>, tipo: Tip
   let scorePago: number | null = null;
   let diasPromedioPago: number | null = null;
   let totalOrdenes: number | null = null;
-  const { data: institucion } = await supabase
+  // .maybeSingle() falla si el ilike matchea más de una institución (nombre
+  // ambiguo); se propaga en vez de tratarlo silenciosamente como "sin
+  // comprador" — eso dejaría un veredicto persistido con el dato del
+  // comprador vacío sin que nada avise que en realidad había varios.
+  const { data: institucion, error: errInstitucion } = await supabase
     .from('instituciones')
     .select('rut, oc_total, oc_monto_total, pago_promedio_dias')
     .ilike('nombre', `%${organismo}%`)
     .maybeSingle();
+  if (errInstitucion) throw errInstitucion;
   if (institucion) {
     totalOrdenes = (institucion as any).oc_total ?? null;
     diasPromedioPago = (institucion as any).pago_promedio_dias ?? null;
-    const { data: pago } = await supabase
+    const { data: pago, error: errPago } = await supabase
       .from('conducta_pago')
       .select('porcentaje_morosidad, dias_promedio_pago')
       .eq('rut_institucion', (institucion as any).rut)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
+    if (errPago) throw errPago;
     if (pago) {
       scorePago = (pago as any).porcentaje_morosidad != null ? Math.round(100 - (pago as any).porcentaje_morosidad) : null;
       diasPromedioPago = (pago as any).dias_promedio_pago ?? diasPromedioPago;
@@ -111,7 +117,8 @@ async function armarResumen(supabase: ReturnType<typeof createClient>, tipo: Tip
   // tasa de éxito también debe serlo; si no, el dueño y un vendedor invitado
   // calculan números distintos para el mismo veredicto. La función ya deja
   // en null si hay menos de 3 casos (muestra insuficiente).
-  const { data: tasaExitoEquipo } = await supabase.rpc('pipeline_tasa_exito_equipo');
+  const { data: tasaExitoEquipo, error: errTasaExito } = await supabase.rpc('pipeline_tasa_exito_equipo');
+  if (errTasaExito) throw errTasaExito;
   const tasaExitoPropia = (tasaExitoEquipo as number | null) ?? null;
 
   const diasRestantes = fechaCierre ? Math.ceil((new Date(fechaCierre).getTime() - Date.now()) / 86400000) : null;
