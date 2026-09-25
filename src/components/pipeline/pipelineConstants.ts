@@ -10,6 +10,8 @@ export const PIPELINE_ETAPAS = [
   // Cierre negativo: sin esta etapa las no adjudicadas quedaban vagando
   // eternamente en "evaluación" y las métricas de éxito no cuadraban.
   'perdida',
+  // Decisión de no presentarse (distinta de 'perdida': aquí no se participó).
+  'no_participaremos',
 ] as const;
 
 export type PipelineEtapa = (typeof PIPELINE_ETAPAS)[number];
@@ -85,6 +87,13 @@ export const ETAPA_CONFIG: Record<PipelineEtapa, EtapaConfig> = {
     color: 'bg-rose-500',
     textColor: 'text-rose-700',
     badgeColor: 'bg-rose-100 text-rose-700',
+  },
+  no_participaremos: {
+    key: 'no_participaremos',
+    label: 'No participaremos',
+    color: 'bg-zinc-500',
+    textColor: 'text-zinc-700',
+    badgeColor: 'bg-zinc-100 text-zinc-700',
   },
 };
 

@@ -1,22 +1,105 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Sparkles, Send, X, ImagePlus, Loader2, Bot, MessageCircle, LifeBuoy, CheckCircle2 } from "lucide-react";
+import { Sparkles, Send, X, ImagePlus, Loader2, Bot, MessageCircle, LifeBuoy, CheckCircle2, Zap, XCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { useInventoryStats } from "@/hooks/useInventory";
 import { useExtensionStatus } from "@/hooks/useExtensionStatus";
 
-interface Msg { role: "user" | "assistant"; content: string; img?: string }
+// Acción que Don Evaristo dejó en cola y la extensión de Chrome ejecuta en Mercado Público.
+interface AccionChat {
+  id: string;
+  tipo: string;
+  codigo: string | null;
+  estado: string; // confirmar | pendiente | en_curso | hecha | fallida | cancelada
+  error?: string | null;
+  resultado?: Record<string, unknown> | null;
+}
+interface Msg { role: "user" | "assistant"; content: string; img?: string; acciones?: AccionChat[] }
+
+const NOMBRE_ACCION: Record<string, string> = {
+  sincronizar_licitacion: "Sincronizar licitación y bases",
+  sincronizar_ca: "Traer documentos de la compra ágil",
+  preparar_oferta: "Dejar la oferta lista en Mercado Público",
+  publicar_cm: "Publicar productos en Convenio Marco",
+};
+const ESTADO_ACCION: Record<string, { label: string; cls: string }> = {
+  confirmar: { label: "Esperando tu confirmación", cls: "bg-amber-100 text-amber-800" },
+  pendiente: { label: "En cola · la extensión la toma en 1 min", cls: "bg-sky-100 text-sky-800" },
+  en_curso: { label: "Ejecutando en tu Chrome…", cls: "bg-sky-100 text-sky-800" },
+  hecha: { label: "Hecha", cls: "bg-emerald-100 text-emerald-800" },
+  fallida: { label: "Falló", cls: "bg-rose-100 text-rose-800" },
+  cancelada: { label: "Cancelada", cls: "bg-muted text-muted-foreground" },
+};
+const ACTIVAS = new Set(["confirmar", "pendiente", "en_curso"]);
+
+function resumenResultado(a: AccionChat): string | null {
+  const r = a.resultado || {};
+  const n = (k: string) => (typeof r[k] === "number" ? (r[k] as number) : null);
+  if (a.estado !== "hecha") return null;
+  if (a.tipo === "sincronizar_licitacion") return `Ficha sincronizada · ${n("adjuntos") ?? 0} adjunto(s) a FirmaVB${n("bases_pdf") ? ` · ${n("bases_pdf")} PDF que el Experto leerá` : ""}`;
+  if (a.tipo === "sincronizar_ca") return n("documentos") ? `${n("documentos")} documento(s) a FirmaVB` : "Sin documentos nuevos (ya estaban o no tiene)";
+  if (a.tipo === "preparar_oferta") return `Oferta abierta en Mercado Público (${n("productos") ?? 0} producto(s)). Revísala y envíala tú.`;
+  if (a.tipo === "publicar_cm") return `${n("guardados") ?? 0} publicado(s) · ${n("saltados") ?? 0} saltado(s) · ${n("sin_precio") ?? 0} sin precio`;
+  return null;
+}
+
+function AccionCard({ a, onDecidir }: { a: AccionChat; onDecidir: (id: string, confirmar: boolean) => Promise<void> }) {
+  const [ocupado, setOcupado] = useState(false);
+  const est = ESTADO_ACCION[a.estado] ?? { label: a.estado, cls: "bg-muted" };
+  const decidir = async (ok: boolean) => { setOcupado(true); try { await onDecidir(a.id, ok); } finally { setOcupado(false); } };
+  const resumen = resumenResultado(a);
+  return (
+    <div className="mt-2 rounded-xl border border-border/70 bg-background px-2.5 py-2 text-xs space-y-1.5">
+      <div className="flex items-start gap-1.5">
+        {a.estado === "hecha" ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" /> :
+         a.estado === "fallida" ? <XCircle className="h-3.5 w-3.5 text-rose-600 shrink-0 mt-0.5" /> :
+         a.estado === "en_curso" ? <Loader2 className="h-3.5 w-3.5 text-sky-600 shrink-0 mt-0.5 animate-spin" /> :
+         a.estado === "confirmar" ? <Clock className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" /> :
+         <Zap className="h-3.5 w-3.5 text-firmavb-blue shrink-0 mt-0.5" />}
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold leading-tight">{NOMBRE_ACCION[a.tipo] ?? a.tipo}{a.codigo ? <span className="font-normal text-muted-foreground"> · {a.codigo}</span> : null}</p>
+          <span className={`inline-block mt-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${est.cls}`}>{est.label}</span>
+        </div>
+      </div>
+      {resumen && <p className="text-muted-foreground">{resumen}</p>}
+      {a.estado === "fallida" && a.error && <p className="text-rose-700">{a.error}</p>}
+      {a.estado === "confirmar" && (
+        <div className="flex gap-1.5">
+          <Button size="sm" className="h-7 text-xs bg-firmavb-blue hover:bg-firmavb-blue/90" disabled={ocupado} onClick={() => decidir(true)}>
+            {ocupado ? <Loader2 className="h-3 w-3 animate-spin" /> : <><CheckCircle2 className="h-3 w-3 mr-1" /> Confirmar</>}
+          </Button>
+          <Button size="sm" variant="ghost" className="h-7 text-xs" disabled={ocupado} onClick={() => decidir(false)}>Cancelar</Button>
+        </div>
+      )}
+      {a.estado === "pendiente" && (
+        <Button size="sm" variant="ghost" className="h-7 text-xs px-2" disabled={ocupado} onClick={() => decidir(false)}>Cancelar</Button>
+      )}
+    </div>
+  );
+}
 
 const LS_MSGS = "fvb_evaristo_msgs";
 const LS_OPEN = "fvb_evaristo_open";
+const LS_CONV = "fvb_evaristo_conv";
 
 const SALUDO: Msg = {
   role: "assistant",
   content:
-    "¡Hola! 👋 Soy Don Evaristo, tu asistente de FirmaVB. Cuéntame en qué estás y te ayudo al tiro. Por ejemplo: “¿cómo bajo la extensión?” o “no me aparecen oportunidades”. Si algo te da error, mándame un print. 📸",
+    "¡Hola! 👋 Soy Don Evaristo, tu experto en Mercado Público y en FirmaVB. Cuéntame en qué estás y te ayudo al tiro. Por ejemplo: “¿cómo bajo la extensión?” o “¿me conviene esta licitación?”. Si algo te da error, mándame un print. 📸",
 };
+
+// Código de licitación o compra ágil en la URL (ej: /licitaciones/1234-56-LE26).
+const RE_CODIGO = /^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}$/i;
+const codigoEnRuta = (path: string): string | null => {
+  const hit = path.split("/").filter(Boolean).map(decodeURIComponent).find((s) => RE_CODIGO.test(s));
+  return hit ? hit.toUpperCase() : null;
+};
+
+// Tablas de memoria de Don Evaristo (aún no están en los tipos generados).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = supabase as any;
 
 // Divide una línea en: links de acción markdown [txt](/ruta) o [txt](http…),
 // **negritas** y URLs sueltas. Todo sin HTML crudo.
@@ -101,6 +184,15 @@ export function EvaristoChat() {
   const [escMensaje, setEscMensaje] = useState("");
   const [enviandoTicket, setEnviandoTicket] = useState(false);
 
+  // Memoria: id de la conversación abierta (se guarda en Supabase, sobrevive al
+  // dispositivo) y último código sobre el que Don Evaristo ya saludó.
+  const [convId, setConvId] = useState<string | null>(() => {
+    try { return localStorage.getItem(LS_CONV); } catch { return null; }
+  });
+  const historialCargado = useRef(false);
+  const ultimoSaludo = useRef<string | null>(null);
+  const codigo = codigoEnRuta(location.pathname);
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       const u = data?.user;
@@ -108,7 +200,106 @@ export function EvaristoChat() {
     }).catch(() => { /* sin sesión (landing): pediremos el correo en el form) */ });
   }, []);
 
+  // Saludo con contexto (sin IA): qué está mirando, qué le urge, qué le falta.
+  const saludar = async (codigoActual: string | null, reemplazar: boolean) => {
+    try {
+      const { data } = await supabase.functions.invoke("evaristo-soporte", { body: { modo: "contexto", contexto: { codigo: codigoActual } } });
+      const saludo = (data as any)?.saludo as string | undefined;
+      if (!saludo) return;
+      ultimoSaludo.current = codigoActual ?? "";
+      setMsgs((prev) => {
+        if (reemplazar) return [{ role: "assistant", content: saludo }];
+        const ultimo = prev[prev.length - 1];
+        return ultimo?.role === "assistant" && ultimo.content === saludo ? prev : [...prev, { role: "assistant", content: saludo }];
+      });
+    } catch { /* sin contexto: queda el saludo genérico */ }
+  };
+
+  // Al entrar con sesión: retomar la última conversación guardada; si no hay,
+  // pedir un saludo con contexto en vez del genérico.
+  useEffect(() => {
+    if (!identidad.userId || historialCargado.current) return;
+    historialCargado.current = true;
+    (async () => {
+      try {
+        let id = convId;
+        if (!id) {
+          const { data: conv } = await db.from("evaristo_conversaciones").select("id").eq("user_id", identidad.userId)
+            .order("actualizado_en", { ascending: false }).limit(1).maybeSingle();
+          id = conv?.id ?? null;
+        }
+        if (id) {
+          const { data: rows } = await db.from("evaristo_mensajes").select("rol, contenido, adjuntos, meta").eq("conversacion_id", id)
+            .order("id", { ascending: false }).limit(30);
+          const cargados: Msg[] = (rows ?? []).reverse().map((r: any) => ({
+            role: r.rol, content: r.contenido,
+            acciones: Array.isArray(r.meta?.acciones) && r.meta.acciones.length ? r.meta.acciones : undefined,
+          }));
+          // El estado guardado en el mensaje es el del momento: se refresca con el real.
+          const ids = cargados.flatMap((m) => (m.acciones ?? []).map((a) => a.id));
+          if (ids.length) {
+            const { data: vivas } = await db.from("evaristo_acciones").select("id, estado, error, resultado").in("id", ids);
+            const porId = new Map<string, AccionChat>((vivas ?? []).map((v: AccionChat) => [v.id, v]));
+            for (const m of cargados) m.acciones = m.acciones?.map((a) => ({ ...a, ...(porId.get(a.id) ?? {}) }));
+          }
+          if (cargados.length) {
+            setConvId(id);
+            setMsgs(cargados);
+            if (open && codigo && codigo !== ultimoSaludo.current) await saludar(codigo, false);
+            return;
+          }
+        }
+        await saludar(codigo, msgs.length <= 1);
+      } catch { /* sin memoria: seguimos con localStorage */ }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identidad.userId]);
+
+  // Al abrir el chat mirando una licitación/compra ágil nueva, Don Evaristo la comenta.
+  useEffect(() => {
+    if (!open || !identidad.userId || !historialCargado.current || !codigo || codigo === ultimoSaludo.current || loading) return;
+    saludar(codigo, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, codigo, identidad.userId]);
+
+  // Estado en vivo de las acciones: realtime sobre evaristo_acciones y, de respaldo,
+  // un sondeo cada 20 s mientras haya alguna en cola o en curso.
+  const actualizarAccion = (fila: Partial<AccionChat> & { id: string }) => {
+    setMsgs((prev) => prev.map((m) => m.acciones?.some((a) => a.id === fila.id)
+      ? { ...m, acciones: m.acciones!.map((a) => (a.id === fila.id ? { ...a, ...fila } : a)) }
+      : m));
+  };
+  useEffect(() => {
+    if (!identidad.userId) return;
+    const canal = db.channel("evaristo-acciones-" + identidad.userId)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "evaristo_acciones", filter: `user_id=eq.${identidad.userId}` },
+        (p: { new: AccionChat }) => { if (p?.new?.id) actualizarAccion(p.new); })
+      .subscribe();
+    return () => { db.removeChannel(canal); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identidad.userId]);
+  const activasKey = msgs.flatMap((m) => (m.acciones ?? []).filter((a) => ACTIVAS.has(a.estado)).map((a) => a.id)).join(",");
+  useEffect(() => {
+    if (!activasKey || !identidad.userId) return;
+    const ids = activasKey.split(",");
+    const t = setInterval(async () => {
+      const { data } = await db.from("evaristo_acciones").select("id, estado, error, resultado").in("id", ids);
+      (data ?? []).forEach((f: AccionChat) => actualizarAccion(f));
+    }, 20000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activasKey, identidad.userId]);
+
+  const decidirAccion = async (id: string, confirmar: boolean) => {
+    const { data, error } = await db.rpc("evaristo_accion_decidir", { p_id: id, p_confirmar: confirmar });
+    if (error) { alert("No pude actualizar la acción: " + error.message); return; }
+    if (data?.id) actualizarAccion(data as AccionChat);
+  };
+
   useEffect(() => { try { localStorage.setItem(LS_MSGS, JSON.stringify(msgs.slice(-30))); } catch { /* noop */ } }, [msgs]);
+  useEffect(() => {
+    try { if (convId) localStorage.setItem(LS_CONV, convId); else localStorage.removeItem(LS_CONV); } catch { /* noop */ }
+  }, [convId]);
   useEffect(() => { try { localStorage.setItem(LS_OPEN, open ? "1" : "0"); } catch { /* noop */ } }, [open]);
   useEffect(() => {
     if (open && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -154,16 +345,22 @@ export function EvaristoChat() {
           messages: historial.map((m) => ({ role: m.role, content: m.content })),
           contexto: {
             page: nombrePagina(location.pathname),
+            ruta: location.pathname,
+            codigo,
             tieneInventario: (invStats?.total ?? 0) > 0,
             extensionConectada: !!isConnected,
           },
           identidad,
           imagen,
+          conversacion_id: convId,
         },
       });
       if (error) throw error;
       const reply = (data as any)?.reply || "No te entendí bien 😅 ¿me lo repites?";
-      setMsgs((prev) => [...prev, { role: "assistant", content: reply }]);
+      const nuevoId = (data as any)?.conversacion_id;
+      if (typeof nuevoId === "string" && nuevoId !== convId) setConvId(nuevoId);
+      const acciones = (data as any)?.acciones as AccionChat[] | undefined;
+      setMsgs((prev) => [...prev, { role: "assistant", content: reply, acciones: acciones?.length ? acciones : undefined }]);
     } catch {
       setMsgs((prev) => [...prev, { role: "assistant", content: "Uf, no pude responderte. Reintenta en un ratito 🙏" }]);
     } finally {
@@ -171,7 +368,14 @@ export function EvaristoChat() {
     }
   };
 
-  const limpiar = () => { setMsgs([SALUDO]); setImg(null); };
+  // Nueva conversación: la anterior queda guardada en la memoria de Don Evaristo.
+  const limpiar = () => {
+    setMsgs([SALUDO]);
+    setImg(null);
+    setConvId(null);
+    ultimoSaludo.current = null;
+    if (identidad.userId) saludar(codigo, true);
+  };
 
   // Abre el formulario para dejar el caso al equipo, prellenando lo que sabemos.
   const abrirEscalar = () => {
@@ -257,7 +461,7 @@ export function EvaristoChat() {
               <div className="leading-tight">
                 <p className="font-semibold text-sm">Don Evaristo</p>
                 <p className="text-[11px] text-white/80 flex items-center gap-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-firmavb-green inline-block" /> Asistente de firmavb
+                  <span className="h-1.5 w-1.5 rounded-full bg-firmavb-green inline-block" /> Experto en Mercado Público · firmavb
                 </p>
               </div>
             </div>
@@ -271,7 +475,7 @@ export function EvaristoChat() {
               >
                 <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" /> Humano
               </a>
-              <Button variant="ghost" size="sm" onClick={limpiar} className="text-white/80 hover:text-white hover:bg-white/10 h-7 px-2 text-xs">Reiniciar</Button>
+              <Button variant="ghost" size="sm" onClick={limpiar} title="Empezar una conversación nueva (la anterior queda guardada)" className="text-white/80 hover:text-white hover:bg-white/10 h-7 px-2 text-xs">Nueva</Button>
               <Button variant="ghost" size="icon" onClick={() => setOpen(false)} className="text-white hover:bg-white/10 h-7 w-7"><X className="h-4 w-4" /></Button>
             </div>
           </div>
@@ -288,6 +492,7 @@ export function EvaristoChat() {
                 }`}>
                   {m.img && <img src={m.img} alt="captura" className="rounded-lg mb-1.5 max-h-40 w-auto" />}
                   <Rico text={m.content} onInternal={(path) => { navigate(path); if (window.innerWidth < 640) setOpen(false); }} />
+                  {m.acciones?.map((a) => <AccionCard key={a.id} a={a} onDecidir={decidirAccion} />)}
                 </div>
               </div>
             ))}

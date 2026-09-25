@@ -134,7 +134,7 @@ export function NuevaCampanaRapida({ open, onOpenChange, onCampaignCreated }: Nu
           ...(canal === 'whatsapp' && { contenido: d.mensaje }),
         };
 
-        const { data: pieza, error: piezaError } = await supabase.from('marketing_piezas').insert([piezaData]).select().single();
+        const { data: pieza, error: piezaError } = await supabase.from('marketing_piezas').insert([piezaData as never]).select().single();
         if (piezaError) throw piezaError;
 
         if (canal === 'email') {

@@ -95,7 +95,7 @@ export function PipelineCard({ item, onClick, assignedVendor }: PipelineCardProp
                   : 'bg-gray-100 text-gray-600'
               )}
             >
-              {item.match_score}% match
+              {item.match_score}% afinidad
             </Badge>
           )}
 

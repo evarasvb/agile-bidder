@@ -61,7 +61,7 @@ export function useCMStats(tipo: TipoOrigenCM = 'convenio_marco') {
     queryFn: async () => {
       const { data, error } = await supabase.rpc('cm_stats', { p_tipo: tipo });
       if (error) throw error;
-      return (data ?? { productos: 0, monto_total: 0, proveedores: 0, compradores: 0 }) as CMStats;
+      return (data ?? { productos: 0, monto_total: 0, proveedores: 0, compradores: 0 }) as unknown as CMStats;
     },
     staleTime: 5 * 60_000,
   });
@@ -79,7 +79,7 @@ export function useCMProductos(termino: string, tipo: TipoOrigenCM = 'convenio_m
         desplazamiento: 0,
       });
       if (error) throw error;
-      return (data ?? { total: 0, items: [] }) as { total: number; items: CMProducto[] };
+      return (data ?? { total: 0, items: [] }) as unknown as { total: number; items: CMProducto[] };
     },
     staleTime: 60_000,
   });
@@ -96,7 +96,7 @@ export function useCMProductoDetalle(productoKey: string | null, tipo: TipoOrige
         p_tipo: tipo,
       });
       if (error) throw error;
-      return (data ?? { resumen: null, proveedores: [], compradores: [] }) as CMDetalle;
+      return (data ?? { resumen: null, proveedores: [], compradores: [] }) as unknown as CMDetalle;
     },
     staleTime: 60_000,
   });
@@ -123,7 +123,7 @@ export function useMiCompetitividad(tipo: TipoOrigenCM = 'convenio_marco', enabl
     queryFn: async () => {
       const { data, error } = await supabase.rpc('cm_mi_competitividad', { p_tipo: tipo, umbral: 0.6 });
       if (error) throw error;
-      return (data ?? []) as CMCompetitividad[];
+      return (data ?? []) as unknown as CMCompetitividad[];
     },
     staleTime: 60_000,
   });
@@ -140,7 +140,7 @@ export function useCMProductoTendencia(productoKey: string | null, tipo: TipoOri
         p_tipo: tipo,
       });
       if (error) throw error;
-      return (data ?? []) as CMTendenciaPunto[];
+      return (data ?? []) as unknown as CMTendenciaPunto[];
     },
     staleTime: 60_000,
   });

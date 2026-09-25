@@ -84,16 +84,25 @@ function derivarTipo(codigo?: string | null): string | null {
   return m ? m[1].toUpperCase() : null;
 }
 
-// Estado de la OC viene como código numérico de Mercado Público.
-const ESTADO_OC: Record<string, string> = {
+// Estado de la OC viene como código numérico de Mercado Público (CodigoEstado).
+// Verificado contra raw_json real de ordenes_compra: 4 = Enviada a proveedor,
+// 5 = En proceso (todavía NO aceptada), 6 = Aceptada, 9 = Cancelada,
+// 11 = No aceptada, 12 = Recepción conforme.
+export const ESTADO_OC: Record<string, string> = {
   '3': 'Guardada',
-  '4': 'Enviada',
-  '5': 'Aceptada',
-  '6': 'Recepción conforme',
+  '4': 'Enviada a proveedor',
+  '5': 'En proceso',
+  '6': 'Aceptada',
   '9': 'Cancelada',
+  '11': 'No aceptada',
   '12': 'Recepción conforme',
 };
-function etiquetaEstado(estado?: string | null): string | null {
+// Códigos que cuentan como "aceptada" para efectos de cobranza: el código
+// oficial de Mercado Público (CodigoEstado) usa 5 = "En proceso" (todavía NO
+// aceptada por el proveedor), 6 = "Aceptada" y 12 = "Recepción conforme". Se
+// excluye el 5 para que el respaldo de cobranza sea real.
+export const ESTADOS_OC_ACEPTADA = ['6', '12'];
+export function etiquetaEstado(estado?: string | null): string | null {
   if (estado == null || estado === '') return null;
   return ESTADO_OC[String(estado).trim()] ?? `Estado ${estado}`;
 }
@@ -357,7 +366,7 @@ export function useUpsertOrdenCompra() {
   return useMutation({
     mutationFn: async ({ orden, items }: { orden: Partial<OrdenCompra>; items?: Partial<OrdenCompraItem>[] }) => {
       // Mapea la interfaz a columnas reales de la tabla.
-      const ordenData: RawOC = {
+      const ordenData = {
         codigo: orden.codigo!,
         numero_oc: orden.codigo!,
         nombre: orden.nombre ?? null,
@@ -457,6 +466,53 @@ export function useRutProveedor(nombre: string | null) {
       let mejor: string | null = null; let max = 0;
       for (const [rut, n] of conteo) { if (n > max) { max = n; mejor = rut; } }
       return mejor;
+    },
+    staleTime: 60000,
+  });
+}
+
+// OC propias del cliente (donde es proveedor) que ya están aceptadas/recibidas
+// por el organismo — para la cobranza: solo se puede cobrar lo que el Estado
+// ya aceptó. Opcionalmente filtradas por institución.
+export function useMisOcAceptadas(rut: string | null, nombre: string | null, institucion?: string) {
+  return useQuery({
+    queryKey: ['mis-oc-aceptadas', rut, nombre, institucion],
+    enabled: !!(rut || nombre),
+    queryFn: async () => {
+      let query = supabase
+        .from('ordenes_compra')
+        .select('codigo, organismo_comprador, rut_demandante, total, fecha_emision, link_oficial, estado')
+        .in('estado', ESTADOS_OC_ACEPTADA)
+        .order('fecha_emision', { ascending: false, nullsFirst: false })
+        .limit(60);
+      // El RUT ya identifica al proveedor sin ambigüedad; si además viene el
+      // nombre no hace falta cruzarlo con un .or() de texto crudo, que se
+      // rompe con nombres de empresa que traen coma o paréntesis (delimitadores
+      // del filtro de PostgREST).
+      if (rut) query = query.eq('rut_proveedor', rut);
+      else query = query.eq('proveedor_nombre', nombre!);
+      if (institucion) query = query.ilike('organismo_comprador', `%${institucion}%`);
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []) as { codigo: string; organismo_comprador: string | null; rut_demandante: string | null; total: number | null; fecha_emision: string | null; link_oficial: string | null; estado: string | null }[];
+    },
+    staleTime: 30000,
+  });
+}
+
+// Link oficial de Mercado Público para OC ya registradas por código — para
+// mostrar "Ver OC oficial" en las facturas de cobranza sin volver a subir nada.
+export function useOcLinksPorCodigos(codigos: string[]) {
+  const cods = Array.from(new Set(codigos.filter(Boolean))).sort();
+  return useQuery({
+    queryKey: ['oc-links', cods],
+    enabled: cods.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('ordenes_compra').select('codigo, link_oficial, estado').in('codigo', cods);
+      if (error) throw error;
+      const map = new Map<string, { link_oficial: string | null; estado: string | null }>();
+      for (const row of (data || []) as any[]) map.set(row.codigo, { link_oficial: row.link_oficial, estado: row.estado });
+      return map;
     },
     staleTime: 60000,
   });

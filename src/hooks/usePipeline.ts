@@ -113,7 +113,9 @@ export function useCreatePipelineItem() {
           institucion: item.institucion || null,
           monto_estimado: item.monto_estimado || null,
           fecha_cierre: item.fecha_cierre || null,
-          match_score: item.match_score || 0,
+          // La columna es integer; el match viene con decimales (p. ej. 28.8) y
+          // sin redondear el insert fallaba ("No se pudo agregar al pipeline").
+          match_score: Math.round(item.match_score || 0),
           etapa,
           notas: item.notas || null,
           etapa_historial: [{ etapa, fecha: now, usuario_id: user.id }],
@@ -181,11 +183,13 @@ export function useMovePipelineItem() {
 
       const { data, error } = await supabase
         .from('pipeline')
+        // as any: los tipos generados de Supabase aún no incluyen el valor de
+        // enum 'no_participaremos' recién agregado (mismo patrón que el insert).
         .update({
           etapa: nuevaEtapa,
           etapa_historial: nuevoHistorial,
           updated_at: now,
-        })
+        } as any)
         .eq('id', id)
         .select()
         .single();

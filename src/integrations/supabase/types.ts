@@ -110,6 +110,48 @@ export type Database = {
         }
         Relationships: []
       }
+      academia_pagos: {
+        Row: {
+          codigo_entregado: string | null
+          created_at: string
+          curso_slug: string
+          email: string | null
+          estado: string
+          id: string
+          monto: number
+          mp_payment_id: string | null
+          mp_preference_id: string | null
+          raw: Json | null
+          updated_at: string
+        }
+        Insert: {
+          codigo_entregado?: string | null
+          created_at?: string
+          curso_slug: string
+          email?: string | null
+          estado?: string
+          id?: string
+          monto: number
+          mp_payment_id?: string | null
+          mp_preference_id?: string | null
+          raw?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          codigo_entregado?: string | null
+          created_at?: string
+          curso_slug?: string
+          email?: string | null
+          estado?: string
+          id?: string
+          monto?: number
+          mp_payment_id?: string | null
+          mp_preference_id?: string | null
+          raw?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       agendamientos_meet: {
         Row: {
           email: string
@@ -1590,6 +1632,47 @@ export type Database = {
         }
         Relationships: []
       }
+      clientes_gestion: {
+        Row: {
+          actualizado_en: string
+          cliente_id: string
+          estado: string
+          etiquetas: string[] | null
+          notas: string | null
+          prioridad: number
+          proxima_accion: string | null
+          proxima_fecha: string | null
+        }
+        Insert: {
+          actualizado_en?: string
+          cliente_id: string
+          estado?: string
+          etiquetas?: string[] | null
+          notas?: string | null
+          prioridad?: number
+          proxima_accion?: string | null
+          proxima_fecha?: string | null
+        }
+        Update: {
+          actualizado_en?: string
+          cliente_id?: string
+          estado?: string
+          etiquetas?: string[] | null
+          notas?: string | null
+          prioridad?: number
+          proxima_accion?: string | null
+          proxima_fecha?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clientes_gestion_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: true
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cluster_metadata: {
         Row: {
           avg_purchase_value: number | null
@@ -1676,6 +1759,133 @@ export type Database = {
           tiempo_segundos?: number | null
         }
         Relationships: []
+      }
+      cm_distribuidores: {
+        Row: {
+          cliente_id: string
+          created_at: string
+          id: string
+          marca_id: string
+          notas: string | null
+          proveedor_nombre: string
+          proveedor_rut: string | null
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string
+          id?: string
+          marca_id: string
+          notas?: string | null
+          proveedor_nombre: string
+          proveedor_rut?: string | null
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string
+          id?: string
+          marca_id?: string
+          notas?: string | null
+          proveedor_nombre?: string
+          proveedor_rut?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cm_distribuidores_marca_id_fkey"
+            columns: ["marca_id"]
+            isOneToOne: false
+            referencedRelation: "cm_marcas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cm_marcas: {
+        Row: {
+          cliente_id: string
+          created_at: string
+          id: string
+          nombre: string
+          notas: string | null
+          palabras_clave: string[]
+          updated_at: string
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string
+          id?: string
+          nombre: string
+          notas?: string | null
+          palabras_clave?: string[]
+          updated_at?: string
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string
+          id?: string
+          nombre?: string
+          notas?: string | null
+          palabras_clave?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      cm_solicitudes: {
+        Row: {
+          cliente_id: string
+          created_at: string
+          estado: string
+          fecha_envio: string | null
+          id: string
+          marca_id: string | null
+          marca_nombre: string | null
+          motivo: string | null
+          producto: string | null
+          producto_key: string | null
+          proveedor_nombre: string
+          proveedor_rut: string | null
+          texto: string | null
+          updated_at: string
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string
+          estado?: string
+          fecha_envio?: string | null
+          id?: string
+          marca_id?: string | null
+          marca_nombre?: string | null
+          motivo?: string | null
+          producto?: string | null
+          producto_key?: string | null
+          proveedor_nombre: string
+          proveedor_rut?: string | null
+          texto?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string
+          estado?: string
+          fecha_envio?: string | null
+          id?: string
+          marca_id?: string | null
+          marca_nombre?: string | null
+          motivo?: string | null
+          producto?: string | null
+          producto_key?: string | null
+          proveedor_nombre?: string
+          proveedor_rut?: string | null
+          texto?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cm_solicitudes_marca_id_fkey"
+            columns: ["marca_id"]
+            isOneToOne: false
+            referencedRelation: "cm_marcas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       compras_agiles: {
         Row: {
@@ -2193,6 +2403,111 @@ export type Database = {
         }
         Relationships: []
       }
+      evaristo_acciones: {
+        Row: {
+          actualizado_en: string
+          api_key_id: string | null
+          cliente_id: string | null
+          codigo: string | null
+          conversacion_id: string | null
+          creada_por: string
+          creado_en: string
+          error: string | null
+          estado: string
+          id: string
+          iniciada_en: string | null
+          payload: Json
+          resultado: Json | null
+          terminada_en: string | null
+          tipo: string
+          user_id: string
+        }
+        Insert: {
+          actualizado_en?: string
+          api_key_id?: string | null
+          cliente_id?: string | null
+          codigo?: string | null
+          conversacion_id?: string | null
+          creada_por?: string
+          creado_en?: string
+          error?: string | null
+          estado?: string
+          id?: string
+          iniciada_en?: string | null
+          payload?: Json
+          resultado?: Json | null
+          terminada_en?: string | null
+          tipo: string
+          user_id: string
+        }
+        Update: {
+          actualizado_en?: string
+          api_key_id?: string | null
+          cliente_id?: string | null
+          codigo?: string | null
+          conversacion_id?: string | null
+          creada_por?: string
+          creado_en?: string
+          error?: string | null
+          estado?: string
+          id?: string
+          iniciada_en?: string | null
+          payload?: Json
+          resultado?: Json | null
+          terminada_en?: string | null
+          tipo?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evaristo_acciones_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evaristo_acciones_conversacion_id_fkey"
+            columns: ["conversacion_id"]
+            isOneToOne: false
+            referencedRelation: "evaristo_conversaciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      evaristo_conversaciones: {
+        Row: {
+          actualizado_en: string
+          canal: string
+          cliente_id: string | null
+          contexto: Json | null
+          creado_en: string
+          id: string
+          titulo: string | null
+          user_id: string
+        }
+        Insert: {
+          actualizado_en?: string
+          canal?: string
+          cliente_id?: string | null
+          contexto?: Json | null
+          creado_en?: string
+          id?: string
+          titulo?: string | null
+          user_id: string
+        }
+        Update: {
+          actualizado_en?: string
+          canal?: string
+          cliente_id?: string | null
+          contexto?: Json | null
+          creado_en?: string
+          id?: string
+          titulo?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       evaristo_logs: {
         Row: {
           command: string
@@ -2219,6 +2534,47 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      evaristo_mensajes: {
+        Row: {
+          adjuntos: Json | null
+          contenido: string
+          conversacion_id: string
+          creado_en: string
+          id: number
+          meta: Json | null
+          rol: string
+          user_id: string
+        }
+        Insert: {
+          adjuntos?: Json | null
+          contenido: string
+          conversacion_id: string
+          creado_en?: string
+          id?: number
+          meta?: Json | null
+          rol: string
+          user_id: string
+        }
+        Update: {
+          adjuntos?: Json | null
+          contenido?: string
+          conversacion_id?: string
+          creado_en?: string
+          id?: number
+          meta?: Json | null
+          rol?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evaristo_mensajes_conversacion_id_fkey"
+            columns: ["conversacion_id"]
+            isOneToOne: false
+            referencedRelation: "evaristo_conversaciones"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       eventos_calendario: {
         Row: {
@@ -2656,6 +3012,39 @@ export type Database = {
           total_ventas?: number
           user_id?: string
           validacion_hasta?: string | null
+        }
+        Relationships: []
+      }
+      google_drive_conexiones: {
+        Row: {
+          access_token: string | null
+          created_at: string
+          google_email: string | null
+          refresh_token: string | null
+          scope: string | null
+          token_expiry: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          created_at?: string
+          google_email?: string | null
+          refresh_token?: string | null
+          scope?: string | null
+          token_expiry?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string | null
+          created_at?: string
+          google_email?: string | null
+          refresh_token?: string | null
+          scope?: string | null
+          token_expiry?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -4246,8 +4635,12 @@ export type Database = {
       marketing_campanas: {
         Row: {
           actualizado_en: string
+          audiencia_categoria: string | null
           audiencia_estimada: number | null
           audiencia_estimada_final: number | null
+          audiencia_fuente: string | null
+          audiencia_rubro: string | null
+          audiencia_suscripcion: string | null
           canal_primario: string | null
           creado_en: string
           creado_por: string | null
@@ -4267,8 +4660,12 @@ export type Database = {
         }
         Insert: {
           actualizado_en?: string
+          audiencia_categoria?: string | null
           audiencia_estimada?: number | null
           audiencia_estimada_final?: number | null
+          audiencia_fuente?: string | null
+          audiencia_rubro?: string | null
+          audiencia_suscripcion?: string | null
           canal_primario?: string | null
           creado_en?: string
           creado_por?: string | null
@@ -4288,8 +4685,12 @@ export type Database = {
         }
         Update: {
           actualizado_en?: string
+          audiencia_categoria?: string | null
           audiencia_estimada?: number | null
           audiencia_estimada_final?: number | null
+          audiencia_fuente?: string | null
+          audiencia_rubro?: string | null
+          audiencia_suscripcion?: string | null
           canal_primario?: string | null
           creado_en?: string
           creado_por?: string | null
@@ -8018,6 +8419,77 @@ export type Database = {
         }
         Relationships: []
       }
+      cubo_lic: {
+        Row: {
+          adjudicatario: string | null
+          codigo: string | null
+          comprador: string | null
+          comprador_rut: string | null
+          fecha_adjudicacion: string | null
+          mes: string | null
+          metodo: string | null
+          monto_adjudicado: number | null
+          monto_estimado: number | null
+          num_oferentes: number | null
+          rubro: string | null
+          rut_adjudicatario: string | null
+          titulo: string | null
+        }
+        Relationships: []
+      }
+      cubo_oc: {
+        Row: {
+          cantidad: number | null
+          categoria: string | null
+          lineas: number | null
+          mes: string | null
+          monto: number | null
+          organismo: string | null
+          precio_max: number | null
+          precio_med: number | null
+          precio_min: number | null
+          producto: string | null
+          producto_key: string | null
+          proveedor: string | null
+          rut_organismo: string | null
+          rut_proveedor: string | null
+          tipo: string | null
+        }
+        Relationships: []
+      }
+      cubo_oc_1d: {
+        Row: {
+          cantidad: number | null
+          clave: string | null
+          dim: string | null
+          etiqueta: string | null
+          lineas: number | null
+          monto: number | null
+          organismos: number | null
+          precio_max: number | null
+          precio_med: number | null
+          precio_min: number | null
+          productos: number | null
+          proveedores: number | null
+          tipo: string | null
+        }
+        Relationships: []
+      }
+      cubo_oc_tot: {
+        Row: {
+          cantidad: number | null
+          lineas: number | null
+          monto: number | null
+          organismos: number | null
+          precio_max: number | null
+          precio_med: number | null
+          precio_min: number | null
+          productos: number | null
+          proveedores: number | null
+          tipo: string | null
+        }
+        Relationships: []
+      }
       dashboard_estado: {
         Row: {
           con_match: number | null
@@ -9112,6 +9584,39 @@ export type Database = {
         Returns: string
       }
       admin_campanas_resumen: { Args: never; Returns: Json }
+      admin_cliente_gestion_guardar: {
+        Args: {
+          p_cliente_id: string
+          p_estado: string
+          p_etiquetas: string[]
+          p_notas: string
+          p_prioridad: number
+          p_proxima_accion: string
+          p_proxima_fecha: string
+        }
+        Returns: undefined
+      }
+      admin_clientes_actividad: {
+        Args: { lim?: number }
+        Returns: {
+          created_at: string
+          email: string
+          empresa_nombre: string
+          estado_gestion: string
+          etiquetas: string[]
+          id: string
+          industrias: string[]
+          items_inventario: number
+          last_sign_in_at: string
+          notas: string
+          ofertas: number
+          palabras_clave_busqueda: string[]
+          plan: string
+          prioridad: number
+          proxima_accion: string
+          proxima_fecha: string
+        }[]
+      }
       admin_clientes_nuevos: {
         Args: { dias?: number; lim?: number }
         Returns: {
@@ -9136,6 +9641,46 @@ export type Database = {
           rut: string
         }[]
       }
+      admin_evaristo_conversaciones: {
+        Args: { dias?: number; lim?: number }
+        Returns: {
+          actualizado_en: string
+          canal: string
+          email: string
+          empresa_nombre: string
+          id: string
+          mensajes: number
+          titulo: string
+          ultima_pregunta: string
+          user_id: string
+        }[]
+      }
+      admin_evaristo_mensajes: {
+        Args: { p_conversacion_id: string }
+        Returns: {
+          contenido: string
+          creado_en: string
+          id: number
+          rol: string
+        }[]
+      }
+      admin_experto_consultas: {
+        Args: { buscar?: string; dias?: number; lim?: number }
+        Returns: {
+          creado_en: string
+          email: string
+          empresa_nombre: string
+          huella: string
+          id: number
+          licitacion: string
+          modo: string
+          ms: number
+          pregunta: string
+          respuesta: string
+          user_id: string
+        }[]
+      }
+      admin_experto_resumen: { Args: never; Returns: Json }
       admin_marketing_contactos_cruce: {
         Args: never
         Returns: {
@@ -9329,6 +9874,32 @@ export type Database = {
         Args: { user_id: string }
         Returns: string
       }
+      cubo_consultar: {
+        Args: {
+          p_desc?: boolean
+          p_desde?: string
+          p_dims?: string[]
+          p_filtros?: Json
+          p_fuente?: string
+          p_hasta?: string
+          p_limite?: number
+          p_offset?: number
+          p_orden?: string
+        }
+        Returns: Json
+      }
+      cubo_opciones: {
+        Args: {
+          p_dim?: string
+          p_fuente?: string
+          p_limite?: number
+          p_texto?: string
+          p_tipo?: string
+        }
+        Returns: Json
+      }
+      cubo_refrescar: { Args: never; Returns: undefined }
+      cubo_refrescar_1d: { Args: never; Returns: undefined }
       dashboard_kpis: {
         Args: never
         Returns: {
@@ -9365,6 +9936,15 @@ export type Database = {
           total_productos: number
         }[]
       }
+      evaristo_accion_decidir: {
+        Args: { p_confirmar: boolean; p_id: string }
+        Returns: Json
+      }
+      evaristo_acciones_recientes: {
+        Args: { p_limite?: number }
+        Returns: Json
+      }
+      evaristo_contexto: { Args: { p_codigo?: string }; Returns: Json }
       exec_sql: { Args: { sql_text: string }; Returns: Json }
       experto_activar_pro:
         | {
@@ -9816,6 +10396,10 @@ export type Database = {
           top_regiones: Json
         }[]
       }
+      experto_panorama_licitacion: {
+        Args: { p_codigo: string; p_user_id?: string }
+        Returns: Json
+      }
       experto_patrones_licitacion: {
         Args: { p_anos_atras?: number; p_codigo_licitacion: string }
         Returns: {
@@ -10143,6 +10727,13 @@ export type Database = {
         Returns: Database["public"]["Enums"]["app_role"]
       }
       get_user_role: { Args: never; Returns: string }
+      google_drive_estado: {
+        Args: never
+        Returns: {
+          conectado: boolean
+          email: string
+        }[]
+      }
       guardian_fix_detalle_flag: { Args: never; Returns: number }
       guardian_fix_lic_match_flag: { Args: never; Returns: number }
       guardian_fix_match_flag: { Args: never; Returns: number }
@@ -10284,15 +10875,26 @@ export type Database = {
           precio_unitario: number
         }[]
       }
-      match_sim: {
-        Args: {
-          p_inv_cod: string
-          p_inv_norm: string
-          p_item_cod: string
-          p_item_norm: string
-        }
-        Returns: number
-      }
+      match_sim:
+        | {
+            Args: {
+              p_inv_busqueda: string
+              p_inv_cod: string
+              p_inv_norm: string
+              p_item_cod: string
+              p_item_norm: string
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              p_inv_cod: string
+              p_inv_norm: string
+              p_item_cod: string
+              p_item_norm: string
+            }
+            Returns: number
+          }
       medios_norm: { Args: { p: string }; Returns: string }
       medios_organismo: {
         Args: { p_cantidad?: number; p_codigo?: string; p_organismo?: string }
@@ -10517,6 +11119,7 @@ export type Database = {
         | "oc_emitida"
         | "pagada"
         | "perdida"
+        | "no_participaremos"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -10656,8 +11259,8 @@ export const Constants = {
         "oc_emitida",
         "pagada",
         "perdida",
+        "no_participaremos",
       ],
     },
   },
 } as const
-

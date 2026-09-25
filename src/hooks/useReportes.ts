@@ -96,7 +96,7 @@ export function useMercadoReport() {
       // compras_agiles.monto (columna inexistente → error tragado → compras=0).
       const { data, error } = await supabase.rpc("bi_mercado_stats");
       if (error) throw error;
-      return data as MercadoReport;
+      return data as unknown as MercadoReport;
     },
   });
 }

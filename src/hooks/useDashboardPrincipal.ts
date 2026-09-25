@@ -291,3 +291,101 @@ export function useUltimosMatches() {
     staleTime: 30000,
   });
 }
+
+// --- Dato Curioso Hook ---
+// Compras ágiles reales, vigentes, con nombres que llaman la atención (circo,
+// desfiles, choripanes, disfraces...) para abrir el Inicio con algo que
+// impacte antes de las tablas de negocio. Nada inventado: todo sale de la
+// base tal cual la publicó el organismo.
+
+export interface DatoCurioso {
+  codigo: string;
+  nombre: string;
+  institucion: string;
+  fecha_cierre: string;
+  monto_estimado: number | null;
+}
+
+// Palabras con límite de palabra completa (evita falsos positivos como
+// "faCHADA" al buscar "hada" o "circoNIO" al buscar "circo" con substring).
+const PALABRAS_CURIOSAS = /\b(circo|desfile|payasos?|piñatas?|piniatas?|tortas?|choripanes?|disfraces?|disfraz|carnaval|comparsas?|zancos?|magos?|malabar\w*)\b/i;
+
+// Hash simple y determinístico (no cripto) de un string a un entero positivo.
+function hashCode(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return h >>> 0;
+}
+
+export function useDatoCurioso() {
+  return useQuery({
+    queryKey: ['dashboard-principal', 'dato-curioso'],
+    queryFn: async (): Promise<DatoCurioso | null> => {
+      const now = new Date().toISOString();
+      // Preselección amplia por ilike en la BD (rápido, usa el filtro de fecha
+      // primero); el filtro fino por palabra completa se hace acá para no
+      // depender de soporte de regex en PostgREST.
+      const { data, error } = await supabase
+        .from('compras_agiles')
+        .select('codigo, nombre, nombre_organismo, fecha_cierre, monto_estimado')
+        .gte('fecha_cierre', now)
+        .ilike('estado', 'public%')
+        .or('nombre.ilike.%circo%,nombre.ilike.%desfile%,nombre.ilike.%payaso%,nombre.ilike.%piñata%,nombre.ilike.%piniata%,nombre.ilike.%torta%,nombre.ilike.%choripan%,nombre.ilike.%disfraz%,nombre.ilike.%carnaval%,nombre.ilike.%comparsa%,nombre.ilike.%zanco%,nombre.ilike.%mago%,nombre.ilike.%malabar%')
+        .order('fecha_cierre', { ascending: true })
+        .limit(100);
+      if (error) throw error;
+
+      const candidatos = (data || []).filter((r) => PALABRAS_CURIOSAS.test(r.nombre || ''));
+      if (candidatos.length === 0) return null;
+
+      // Elegido estable durante el día: el hash depende del propio código de
+      // cada candidato (no de su posición ni del largo de la lista), así un
+      // refetch dentro del mismo día no lo cambia aunque entre/salga algún
+      // ítem nuevo — solo cambia si el ganador de hoy deja de calificar.
+      const semilla = new Date().toISOString().slice(0, 10);
+      const elegido = candidatos.reduce((mejor, actual) =>
+        hashCode(`${semilla}-${actual.codigo}`) < hashCode(`${semilla}-${mejor.codigo}`) ? actual : mejor
+      );
+
+      return {
+        codigo: elegido.codigo,
+        nombre: elegido.nombre,
+        institucion: (elegido as any).nombre_organismo || 'Sin organismo',
+        fecha_cierre: elegido.fecha_cierre || '',
+        monto_estimado: elegido.monto_estimado,
+      };
+    },
+    staleTime: 60 * 60 * 1000,
+  });
+}
+
+// --- Noticias de tus Instituciones Hook ---
+
+export interface NoticiaInstitucion {
+  institucion: string;
+  noticia_id: number;
+  fuente: string;
+  seccion: string | null;
+  url: string;
+  texto: string;
+  fecha: string;
+}
+
+// Noticias recientes de las instituciones donde el cliente ya postuló o tiene
+// matches activos (RPC cliente_noticias_instituciones: reutiliza la misma base
+// de noticias del Experto, acotada por institución y segura para el cliente).
+export function useNoticiasInstituciones() {
+  return useQuery({
+    queryKey: ['dashboard-principal', 'noticias-instituciones'],
+    queryFn: async (): Promise<NoticiaInstitucion[]> => {
+      // Cast: RPC nueva, aún no está en los tipos generados de Supabase.
+      const { data, error } = await (supabase as any).rpc('cliente_noticias_instituciones', {
+        p_max_instituciones: 5,
+        p_por_institucion: 3,
+      });
+      if (error) throw error;
+      return (data || []) as NoticiaInstitucion[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}

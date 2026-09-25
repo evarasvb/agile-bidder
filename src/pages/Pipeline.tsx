@@ -28,7 +28,14 @@ export default function Pipeline() {
     setDetailOpen(true);
   };
 
-  const sinFiltros = !filters.search && !filters.oportunidad_tipo && !filters.asignado_a;
+  const sinFiltros =
+    !filters.search &&
+    !filters.oportunidad_tipo &&
+    !filters.asignado_a &&
+    !filters.montoMin &&
+    !filters.montoMax &&
+    !filters.fechaCierreDesde &&
+    !filters.fechaCierreHasta;
 
   return (
     <div className="space-y-4">
@@ -67,6 +74,19 @@ export default function Pipeline() {
           </p>
           <Button asChild className="mt-4">
             <Link to="/oportunidades">Ver mis oportunidades</Link>
+          </Button>
+        </div>
+      ) : items.length === 0 ? (
+        // Hay filtros activos pero ninguna postulación coincide: antes se veían
+        // las 9 columnas vacías del kanban y parecía que no había datos.
+        <div className="rounded-2xl border border-dashed border-border p-10 text-center">
+          <Target className="h-8 w-8 mx-auto text-muted-foreground/60" />
+          <p className="mt-3 font-medium">Ninguna postulación coincide con los filtros</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Ajusta o limpia los filtros para ver tus postulaciones.
+          </p>
+          <Button variant="outline" className="mt-4" onClick={() => setFilters({})}>
+            Limpiar filtros
           </Button>
         </div>
       ) : view === 'kanban' ? (

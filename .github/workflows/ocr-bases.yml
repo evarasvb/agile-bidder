@@ -122,7 +122,9 @@ jobs:
             nombre=$(jq -r ".[$i].nombre" pendientes.json); ruta=$(jq -r ".[$i].storage_path" pendientes.json)
             ct=$(jq -r ".[$i].content_type // \"\"" pendientes.json)
             echo "== $codigo · $nombre ($ct)"
-            rm -rf in.* out.pdf small.pdf zipdir; mkdir -p zipdir
+            # Algunos ZIP traen carpetas sin permiso de escritura: devolverlo antes de borrar.
+            chmod -R u+rwX zipdir 2>/dev/null || true
+            rm -rf in.* out.pdf small.pdf zipdir 2>/dev/null || true; mkdir -p zipdir
             case "$ct" in
               application/pdf) ext=pdf ;;
               application/msword) ext=doc ;;

@@ -3,6 +3,8 @@
 // responde con Gemini en streaming (SSE). Límites por plan.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { evidenceGateLicitacion, crearEstadoDocumentacionLicitacion } from "../_shared/evidenceGateHelper.ts";
+import { textoPanorama, REGLAS_PANORAMA } from "../_shared/panorama.ts";
+import { fetchClaudeComoOpenAI } from "../_shared/claudeFallback.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -22,6 +24,9 @@ const MAX_ANON_24H = Number(Deno.env.get("EXPERTO_MAX_ANON_24H") ?? 500);
 const MODELOS_CHAT = [Deno.env.get("GEMINI_MODEL_CHAT"), "gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-3.6-flash"].filter(Boolean) as string[];
 const MODELOS_INFORME = [Deno.env.get("GEMINI_MODEL_INFORME"), "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.5-flash-lite", "gemini-flash-lite-latest"].filter(Boolean) as string[];
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+// Respaldo si Gemini falla en TODOS sus modelos (ej. cuota de la cuenta agotada): Claude.
+const CLAUDE_MODELO_CHAT = "claude-haiku-4-5-20251001";
+const CLAUDE_MODELO_INFORME = "claude-sonnet-5";
 
 const STOP = new Set("de la el los las un una unos unas y o u que en para por con sin sobre al del se su sus es son fue ser hay como cuando donde qué que cual cuál cuáles quien quién cómo cuánto cuánta cuántos cuántas mi mis me tu tus le les lo nos si no más muy este esta estos estas ese esa eso aquel puedo puede pueden podemos debo debe deben hacer tiene tienen tengo hay está están estoy ese esa alguna algun algún alguno algunos algunas alguien algo otra otro otras otros".split(" "));
 
@@ -144,29 +149,33 @@ Reglas:
 - Si hay BASES DE LA LICITACIÓN (PDF subido por un usuario), son la fuente principal para criterios de evaluación, ponderaciones, garantías, plazos, multas, anexos y cláusulas: responde con esos datos exactos, cita [n] y nombra la sección o numeral. Nunca digas "null", "JSON", "resumen estructurado" ni "texto resumen": si un dato figura como no indicado, di que las bases no lo exigen o no lo mencionan. Si el contexto dice NO HAY BASES CARGADAS y la pregunta las necesita, responde lo que sí sabes y pide que las suban con el botón "Subir bases (PDF)"; no mandes al usuario a descargarlas de Mercado Público.
 - Si hay DOCUMENTOS DE TRABAJO DEL USUARIO, son sus propios formatos (matriz, checklist, anexos): revísalos contra las bases, dile qué está bien, qué falta y cómo completarlo, campo por campo si te lo pide.
 - Si hay NOTICIAS RECIENTES, úsalas como fuente externa: di "según la prensa" o "según ChileCompra" con el medio y la fecha, cita [n], y sepáralo de lo que dicen nuestros datos ("según nuestros datos de Mercado Público"). Con ambos puedes dar tu opinión, marcándola como opinión.
+${REGLAS_PANORAMA}
 - Si las fuentes no cubren la pregunta, dilo ("No tengo fuente en mi base para eso") y señala qué documento consultar. No inventes artículos, plazos, cifras ni licitaciones.
-- Montos en pesos con separador de miles ($1.234.567). Máximo 250 palabras salvo que pidan detalle. Párrafos cortos; lista corta solo para varias licitaciones. Formato Markdown simple.`;
+- Montos en pesos con separador de miles ($1.234.567). Máximo 250 palabras salvo que pidan detalle (con panorama o bases, hasta 400). Párrafos cortos; lista corta solo para varias licitaciones. Formato Markdown simple.`;
 
 const SYS_INFORME = `Eres Don Evaristo, asesor con 17 años vendiéndole al Estado chileno. Vas a entregar a un proveedor pyme un INFORME DE TRABAJO para una licitación concreta, usando SOLO la ficha, fuentes y datos entregados. Hablas como Evaristo Varas en su libro "Véndele al Estado y No Mueras en el Intento": de tú, cercano, directo, como un amigo que ya pasó por esto y te lo cuenta sin adornos. Frases cortas. Nada de "estimado", "revisor en mano" ni saludos largos; entra al grano en la primera línea. Ejemplos concretos de la calle antes que teoría. Cuando toca, un empujón honesto ("no hay atajos", "no basta con querer ganar, hay que poder cumplir"). Si algo es riesgoso, dilo sin rodeos. Cierra siempre con el paso concreto que daría hoy. Formato Markdown con estas secciones exactas:
 
 ## 1. Resumen ejecutivo
 Qué se compra, quién, cuánto, cuándo cierra, y tu veredicto en una línea: ¿vale la pena postular? (sí / con reservas / no) y por qué.
-## 2. Fechas clave y plan de trabajo
+## 2. Panorama completo
+Antecedentes del organismo (licitaciones anteriores parecidas: código, fecha, quién ganó, oferentes), compras ágiles del mismo tema (fragmentación o compra puente), qué dice la prensa, qué reclaman los proveedores y, si hay match, qué ítems puede ofertar el usuario. Si hay documentos de otra licitación subidos aquí, dilo. Termina con lo que FALTA y pídelo: bases o anexos de la licitación anterior N° X, documentos, precio o capacidad del usuario.
+## 3. Fechas clave y plan de trabajo
 Cronograma hacia atrás desde el cierre: preguntas/aclaraciones, garantía, preparación de anexos, subida de oferta. Con días.
-## 3. Checklist de admisibilidad
+## 4. Checklist de admisibilidad
 Lista de verificación de lo que deja fuera una oferta (documentos, garantía de seriedad si aplica, inhabilidades art. 4 Ley 19.886, registro de proveedores, formato de anexos). Marca lo que la ficha permite confirmar y lo que hay que revisar en las bases.
-## 4. Cómo se ganan los puntos
+## 5. Cómo se ganan los puntos
 Qué criterios de evaluación suelen aplicarse a este tipo de compra y dónde poner el esfuerzo (precio vs. técnico vs. plazo vs. experiencia). Si la ficha no trae criterios, dilo y explica cómo leerlos en las bases.
-## 5. Riesgos y jurisprudencia aplicable
-Errores que en casos parecidos Contraloría o el TCP ya sancionaron o validaron (cita [n]). Riesgos del organismo (pago, reclamos).
-## 6. Competencia y precio de referencia
+## 6. Riesgos, multas y jurisprudencia aplicable
+Errores que en casos parecidos Contraloría o el TCP ya sancionaron o validaron (cita [n]). Riesgos del organismo (pago, reclamos). Multas cuantificadas frente al monto del contrato: cuáles se asumen como parte del negocio y cuáles son riesgo real.
+## 7. Competencia y precio de referencia
 Quién le vende esto al Estado y a qué precio mediano; quién ganó licitaciones parecidas y con qué monto respecto del presupuesto; quién le gana habitualmente a este organismo; presupuesto vs. mercado; recomendación de estrategia de precio.
-## 7. Próximos 3 pasos
+## 8. Próximos 3 pasos
 Acciones concretas para hoy.
 ## Fuentes
 Lista numerada de las fuentes citadas (norma y artículo, directiva, dictamen, sentencia, capítulo del libro, "Datos Mercado Público vía FirmaVB").
 
-Reglas: cita [n] tras cada afirmación con fuente; si hay BASES DE LA LICITACIÓN en el contexto, la sección 4 usa sus criterios y ponderaciones reales y las secciones 2 y 3 sus plazos, garantías y anexos, citando la sección; no inventes criterios ni plazos que no estén en la ficha, las bases o las fuentes (si no están, di "revisar en bases" y sugiere subirlas con el botón "Subir bases (PDF)"); montos con separador de miles; máximo 900 palabras.`;
+Reglas: cita [n] tras cada afirmación con fuente; si hay BASES DE LA LICITACIÓN en el contexto, la sección 5 usa sus criterios y ponderaciones reales y las secciones 3, 4 y 6 sus plazos, garantías, multas y anexos, citando la sección; no inventes criterios ni plazos que no estén en la ficha, las bases o las fuentes (si no están, di "revisar en bases" y sugiere subirlas con el botón "Subir bases (PDF)"); montos con separador de miles; máximo 1.100 palabras.
+${REGLAS_PANORAMA}`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -233,6 +242,8 @@ Deno.serve(async (req) => {
     if (codigo) tareas.anexos = sb.rpc("experto_anexos_texto", { p_codigo: codigo }).then((r) => r.data ?? []);
     if (codigo) tareas.fragmentacion = sb.rpc("experto_fragmentacion_organismo", { p_codigo_licitacion: codigo, p_dias_ventana: 90 }).then((r) => r.data ?? []);
     if (codigo) tareas.patrones = sb.rpc("experto_patrones_licitacion", { p_codigo_licitacion: codigo, p_anos_atras: 3 }).then((r) => r.data ?? []);
+    // Panorama completo: documentos ajenos, antecedentes, compras ágiles del tema, reclamos y match del usuario.
+    if (codigo) tareas.panorama = sb.rpc("experto_panorama_licitacion", { p_codigo: codigo, p_user_id: userId }).then((r) => r.data);
     if (codigo && userId) tareas.docs = sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: codigo, p_max: 8000 }).then((r) => r.data ?? []);
     if (modo === "chat") {
       if (kws.length) {
@@ -277,6 +288,13 @@ Deno.serve(async (req) => {
     const res: Record<string, any> = {};
     const tiempos: Record<string, number> = {};
     await Promise.all(Object.entries(tareas).map(async ([k, p]) => { const ti = Date.now(); try { res[k] = await p; } catch { res[k] = null; } tiempos[k] = Date.now() - ti; }));
+    // Con código y sin noticias aún (informe, o chat sin palabras clave): prensa sobre el tema de la licitación.
+    if (codigo && res.ficha?.nombre && !res.noticias?.length) {
+      try {
+        const q = String(res.ficha.nombre).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9ñ ]/g, " ").split(/\s+/).filter((w: string) => w.length > 4 && !GENERICAS.has(w)).slice(0, 3).join(" or ");
+        if (q) res.noticias = (await sb.rpc("experto_noticias", { consulta: q, cantidad: 3 })).data ?? [];
+      } catch { /* sin noticias */ }
+    }
 
     // Adjudicaciones: quién le gana al organismo (chat e informe) y licitaciones parecidas ya adjudicadas (informe)
     const rutOrg = res.org?.rut ?? res.ficha?.organismo?.rut ?? null;
@@ -302,6 +320,7 @@ Deno.serve(async (req) => {
     if (fragmentos.length) partes.push("FUENTES:\n" + textoFragmentos(fragmentos));
     if (res.ficha) partes.push("FICHA DE LICITACIÓN (Datos Mercado Público vía FirmaVB):\n" + textoFicha(res.ficha));
     else if (codigo) partes.push(`No encontré la licitación ${codigo} en la base (puede ser antigua o el código estar mal).`);
+    if (codigo && res.panorama) partes.push(textoPanorama(res.panorama, codigo));
     const bases: any[] = Array.isArray(res.bases) ? res.bases : [];
     let pedirBases: string | null = null;
     if (codigo && bases.length) partes.push(textoBases(bases, modo === "chat" ? pregunta : "criterios evaluacion ponderacion garantia plazo multa admisibilidad anexos pago", modo === "chat" ? 20000 : 24000, fragmentos.length, codigo));
@@ -328,23 +347,16 @@ Deno.serve(async (req) => {
     if (res.patrones?.length) partes.push("ANÁLISIS: PATRÓN RECURRENTE\nEste organismo licita esto cada cierto tiempo (compra estructural predecible):\n" + res.patrones.map((p: any) => `- ${p.codigo} (${p.estado}, ${fecha(p.fecha_publicacion)}): ${fmt(p.presupuesto_estimado)} ${p.moneda} — ${p.señal}`).join("\n") + "\n💡 Estrategia: Prepara proceso estándar, optimiza el precio de entrada, revisa cambios en criterios de adjudicación.");
     const contexto = partes.join("\n\n") || "(sin fuentes ni datos para esta pregunta)";
 
-    // Evidence Gate: valida que la documentación esté completa para postular
+    // Evidence Gate: NO bloquea la respuesta (el gate es conservador por diseño y nunca
+    // da "verde", así que cortar aquí dejaba al Experto mudo en toda licitación). Se le
+    // entrega a la IA como regla: responde con lo que hay y deja claro qué falta.
+    let notaGate = "";
     if (codigo) {
-      const estadoDoc = crearEstadoDocumentacionLicitacion(res.ficha, bases, anexos);
-      const gate = evidenceGateLicitacion(estadoDoc);
-      if (!gate.permiteBadgeVerde) {
-        return new Response(JSON.stringify({
-          error: "documentacion_incompleta",
-          veredicto: gate.veredicto,
-          razon: gate.razon,
-          faltantes: gate.faltantes,
-          permiteBadgeVerde: false,
-          mensaje: `No se puede recomendar postular: ${gate.razon}. Faltantes: ${gate.faltantes.join("; ")}.`
-        }), { status: 202, headers: { ...cors, "Content-Type": "application/json" } });
-      }
+      const gate = evidenceGateLicitacion(crearEstadoDocumentacionLicitacion(res.ficha, bases, anexos));
+      notaGate = `\n\nESTADO DOCUMENTAL (regla determinista de FirmaVB, veredicto: ${gate.veredicto}): ${gate.razon}${gate.faltantes.length ? ` Faltantes: ${gate.faltantes.join("; ")}.` : ""} Responde igual con lo que tienes (bases, anexos, ficha, fuentes), pero NUNCA recomiendes postular como algo seguro: si falta documentación dilo explícitamente y qué debe subir o revisar el usuario.`;
     }
 
-    const userMsg = modo === "chat" ? `${contexto}\n\nPREGUNTA: ${pregunta}` : `${contexto}\n\nGenera el informe de trabajo para la licitación ${codigo}.${pregunta ? " Contexto del proveedor: " + pregunta : ""}`;
+    const userMsg = modo === "chat" ? `${contexto}${notaGate}\n\nPREGUNTA: ${pregunta}` : `${contexto}${notaGate}\n\nGenera el informe de trabajo para la licitación ${codigo}.${pregunta ? " Contexto del proveedor: " + pregunta : ""}`;
     const messages = [
       { role: "system", content: modo === "chat" ? SYS_CHAT : SYS_INFORME },
       ...historial.filter((h) => h && (h.role === "user" || h.role === "assistant") && h.content).map((h) => ({ role: h.role, content: String(h.content).slice(0, 2000) })),
@@ -352,18 +364,28 @@ Deno.serve(async (req) => {
     ];
 
     const key = Deno.env.get("GEMINI_API_KEY");
-    if (!key) return new Response(JSON.stringify({ error: "sin_ia" }), { status: 500, headers: cors });
 
-    // Llamada a Gemini con streaming; probamos modelos en orden
+    // Llamada a Gemini con streaming; probamos modelos en orden. Cada intento tiene un
+    // tope de tiempo corto: si un modelo se cuelga, no puede consumir todo el tiempo que
+    // el navegador espera antes de cortar la conexión, dejando sin turno al respaldo de Claude.
     let upstream: Response | null = null; let modelo = "";
-    for (const mdl of (modo === "chat" ? MODELOS_CHAT : MODELOS_INFORME)) {
-      const r = await fetch(GEMINI_URL, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: mdl, messages, temperature: 0.3, max_tokens: modo === "chat" ? 2500 : 4000, stream: true, reasoning_effort: "low" }),
-      });
-      if (r.ok && r.body) { upstream = r; modelo = mdl; break; }
-      console.error("gemini", mdl, r.status, (await r.text()).slice(0, 200));
+    if (key) {
+      for (const mdl of (modo === "chat" ? MODELOS_CHAT : MODELOS_INFORME)) {
+        try {
+          const r = await fetch(GEMINI_URL, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ model: mdl, messages, temperature: 0.3, max_tokens: modo === "chat" ? 2500 : 4000, stream: true, reasoning_effort: "low" }),
+            signal: AbortSignal.timeout(8000),
+          });
+          if (r.ok && r.body) { upstream = r; modelo = mdl; break; }
+          console.error("gemini", mdl, r.status, (await r.text()).slice(0, 200));
+        } catch (e) { console.error("gemini fetch", mdl, String(e)); }
+      }
+    }
+    if (!upstream) {
+      const claude = await fetchClaudeComoOpenAI(messages, { modelo: modo === "chat" ? CLAUDE_MODELO_CHAT : CLAUDE_MODELO_INFORME, maxTokens: modo === "chat" ? 2500 : 4000, temperature: 0.3 });
+      if (claude) { upstream = claude.resp; modelo = claude.modelo; }
     }
     if (!upstream) return new Response(JSON.stringify({ error: "ia_no_disponible" }), { status: 502, headers: cors });
 

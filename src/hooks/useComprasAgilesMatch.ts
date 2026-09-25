@@ -75,10 +75,11 @@ export function useComprasAgilesMatch(clienteId: string | null) {
       const codigos = Array.from(porCompra.keys());
       if (codigos.length === 0) return [];
 
-      // 2) Detalles de esas compras ágiles.
+      // 2) Detalles de esas compras ágiles, con el total de productos pedidos
+      // (para calcular cobertura: cuántos de esos productos calzan).
       const { data: compras, error: comprasError } = await supabase
         .from('compras_agiles')
-        .select('id, codigo, nombre, nombre_organismo, region, monto_estimado, moneda, fecha_cierre, estado, descripcion, url_ficha')
+        .select('id, codigo, nombre, nombre_organismo, region, monto_estimado, moneda, fecha_cierre, estado, descripcion, url_ficha, compras_agiles_items(id)')
         .in('codigo', codigos);
 
       if (comprasError) throw comprasError;
@@ -88,6 +89,10 @@ export function useComprasAgilesMatch(clienteId: string | null) {
         const g = porCompra.get(cod)!;
         const c: any = byCodigo.get(cod) || {};
         const organismo = c.nombre_organismo ?? null;
+        const itemsCount = c.compras_agiles_items?.length || 0;
+        // % de match = COBERTURA (productos que calzan / productos pedidos),
+        // no el mejor score individual: 5 de 10 productos calzados es 50%.
+        const matchScore = itemsCount > 0 ? Math.round((g.items.size / itemsCount) * 100) : Math.round(g.best);
         return {
           id: c.id ?? cod,
           codigo: cod,
@@ -103,8 +108,8 @@ export function useComprasAgilesMatch(clienteId: string | null) {
           fecha_cierre: c.fecha_cierre ?? null,
           descripcion: c.descripcion ?? null,
           match_encontrado: true,
-          match_score: Math.round(g.best),
-          items_count: 0,
+          match_score: matchScore,
+          items_count: itemsCount,
           matched_items: g.items.size,
           matched_product_ids: Array.from(g.ids),
         };

@@ -77,6 +77,7 @@ interface LibroExperto {
   bases?: any[];
   documentos?: any[];
   top_adjudicatarios?: any[];
+  licitaciones_similares?: { codigo: string; titulo?: string; adjudicatario?: string; monto_adjudicado?: number | null; monto_estimado?: number | null }[];
   plan?: string;
   bajo_agua_cuota?: { plan?: string; usados?: number; maximo?: number | null; periodo?: string };
 }
@@ -126,6 +127,14 @@ export default function LibroLicitacion() {
     if (error) { toast.error('No pude archivar'); return; }
     toast.success(archivado ? 'Libro archivado (sigue guardado, lo ves en Archivados)' : 'Libro reactivado');
     qc.invalidateQueries({ queryKey: ['experto_mis_libros'] });
+  };
+  const eliminarLibro = async (c: string) => {
+    if (!window.confirm(`¿Eliminar el libro ${c}? Se borra el chat, informes y entregables de esta licitación. No se puede deshacer.`)) return;
+    const { error } = await supabase.rpc('experto_libro_eliminar', { p_codigo: c });
+    if (error) { toast.error('No pude eliminar el libro'); return; }
+    toast.success('Libro eliminado');
+    qc.invalidateQueries({ queryKey: ['experto_mis_libros'] });
+    if (cod && cod.toUpperCase() === c.toUpperCase()) navigate('/experto');
   };
 
   const [msgs, setMsgs] = useState<Msg[]>([]);
@@ -178,7 +187,10 @@ export default function LibroLicitacion() {
   // Streaming SSE del Experto (chat, informe y estudio comparten el formato).
   async function pedir(body: Record<string, unknown>, fn: 'experto-consultar' | 'experto-estudio' | 'experto-bajo-agua', onTexto: (t: string, meta?: any) => void) {
     const r = await fetch(`${SUPA}/functions/v1/${fn}`, { method: 'POST', headers: auth, body: JSON.stringify(body) });
-    if (!r.ok) { const j = await r.json().catch(() => ({})); throw Object.assign(new Error(j.mensaje || j.error || `Error ${r.status}`), { status: r.status }); }
+    // 202 = el Evidence Gate bloqueó la respuesta (documentación incompleta): no es un
+    // stream, es un JSON de una vez. Si se trata como stream, el lector nunca encuentra
+    // líneas "data:" y el chat se queda pegado en "Buscando en las fuentes…" para siempre.
+    if (!r.ok || r.status === 202) { const j = await r.json().catch(() => ({})); throw Object.assign(new Error(j.mensaje || j.error || `Error ${r.status}`), { status: r.status }); }
     const reader = r.body!.getReader(); const dec = new TextDecoder(); let buf = ''; let texto = ''; let meta: any = null;
     while (true) {
       const { done, value } = await reader.read(); if (done) break;
@@ -412,6 +424,7 @@ export default function LibroLicitacion() {
           precioUnitario: match.inventoryItem.precio_unitario,
           total: match.inventoryItem.precio_unitario * item.cantidad,
           matchScore: match.score,
+          imagenUrl: match.inventoryItem.imagen_url ?? null,
         } as ItemCotizacion;
       })
       .filter((x): x is ItemCotizacion => x !== null);
@@ -569,6 +582,7 @@ export default function LibroLicitacion() {
         )}
         <Button size="sm" variant="ghost" className="h-8" onClick={() => navigate('/experto/compartidos')}>Mis compartidos</Button>
         {cod && <Button size="sm" variant="ghost" className="h-8 text-muted-foreground" onClick={() => archivarLibro(cod, true).then(() => navigate('/experto'))}>Archivar libro</Button>}
+        {cod && <Button size="sm" variant="ghost" className="h-8 text-destructive" onClick={() => eliminarLibro(cod)}>Eliminar libro</Button>}
         {f && <Button variant="outline" size="sm" onClick={() => navigate(String(f.tipo ?? '').toLowerCase().includes('gil') ? `/compras-agiles/${cod}` : `/oportunidades/licitacion/${cod}`)}>Ver la oportunidad</Button>}
         {cod && <BookOpen className="h-5 w-5 text-primary" />}
         {cod && <h1 className="text-xl font-bold">{cod}</h1>}
@@ -613,6 +627,7 @@ export default function LibroLicitacion() {
                       <p className="text-[11px] text-muted-foreground">{l.cierre ? `cierra ${fecha(l.cierre)} · ` : ''}{l.consultas} interacciones</p>
                     </button>
                     <button className="text-[11px] text-muted-foreground underline shrink-0" onClick={() => archivarLibro(l.codigo, !l.archivado)}>{l.archivado ? 'Reactivar' : 'Archivar'}</button>
+                    <button className="text-[11px] text-destructive underline shrink-0" onClick={() => eliminarLibro(l.codigo)}>Eliminar</button>
                   </div>
                 ))}
               </CardContent>

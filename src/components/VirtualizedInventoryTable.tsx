@@ -49,14 +49,21 @@ export function VirtualizedInventoryTable({
         .range(start, end);
 
       if (search) {
-        query = query.or(`codigo.ilike.%${search}%,nombre.ilike.%${search}%`);
+        query = query.or(`sku.ilike.%${search}%,nombre.ilike.%${search}%`);
       }
 
       const { data, error, count } = await query;
 
       if (error) throw error;
 
-      setProducts(data || []);
+      setProducts((data || []).map((d) => ({
+        id: d.id,
+        codigo: d.sku,
+        nombre: d.nombre,
+        precio_base: d.precio_unitario,
+        stock: d.stock_disponible,
+        categoria: d.categoria ?? undefined,
+      })));
       setTotalCount(count || 0);
       setHasMore((data?.length || 0) === PAGE_SIZE);
     } catch (error) {
