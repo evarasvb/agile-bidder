@@ -141,6 +141,7 @@ const navItems: NavItem[] = [
       { title: "Marketing", url: "/marketing/control", icon: Rocket, adminOnly: true },
       { title: "Contactos", url: "/academia/leads", icon: Users, adminOnly: true },
       { title: "Compradores", url: "/academia/compradores", icon: CreditCard, adminOnly: true },
+      { title: "Ajustes / Avisos", url: "/fundador/ajustes", icon: Settings, adminOnly: true },
     ],
   },
   {

@@ -20,7 +20,7 @@ interface Comprador {
   institucion: string;
   rut: string;
   region: string | null;
-  sector: string | null;
+  tipo: string | null;
   n_oc: number;
   monto_total: number;
   ultima_compra: string | null;
@@ -31,27 +31,26 @@ interface Comprador {
   consentimiento: boolean;
 }
 
+const TIPOS = ["Todos", "Municipalidad", "Salud", "Educación", "Gobierno", "Otros"];
 const CLP = (v: number) => "$" + Math.round(v || 0).toLocaleString("es-CL");
 function fmtFecha(iso: string | null) {
   if (!iso) return "s/i";
-  try {
-    return new Date(iso).toLocaleDateString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric" });
-  } catch {
-    return iso;
-  }
+  try { return new Date(iso).toLocaleDateString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric" }); }
+  catch { return iso; }
 }
 
 export default function FundadorCompradores() {
   const qc = useQueryClient();
+  const [tipo, setTipo] = useState("Todos");
   const [org, setOrg] = useState<Comprador | null>(null);
   const [form, setForm] = useState({ email: "", nombre: "", cargo: "", telefono: "", consentimiento: false });
   const [importOpen, setImportOpen] = useState(false);
   const [importTexto, setImportTexto] = useState("");
 
   const { data: filas = [], isLoading } = useQuery({
-    queryKey: ["fundador-directorio-compradores"],
+    queryKey: ["fundador-directorio-compradores", tipo],
     queryFn: async (): Promise<Comprador[]> => {
-      const { data, error } = await (supabase.rpc as any)("fundador_directorio_compradores", { p_buscar: null, p_limite: 500 });
+      const { data, error } = await (supabase.rpc as any)("fundador_directorio_compradores", { p_buscar: null, p_limite: 500, p_tipo: tipo });
       if (error) throw error;
       return (data ?? []) as Comprador[];
     },
@@ -68,7 +67,6 @@ export default function FundadorCompradores() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Contactos con correo y encargados conocidos del organismo abierto.
   const { data: contactos = [] } = useQuery({
     queryKey: ["fundador-org-contactos", org?.rut],
     enabled: !!org,
@@ -105,11 +103,7 @@ export default function FundadorCompradores() {
       });
       if (error) throw error;
     },
-    onSuccess: () => {
-      toast.success("Correo guardado");
-      setForm({ email: "", nombre: "", cargo: "", telefono: "", consentimiento: false });
-      refrescar();
-    },
+    onSuccess: () => { toast.success("Correo guardado"); setForm({ email: "", nombre: "", cargo: "", telefono: "", consentimiento: false }); refrescar(); },
     onError: (e: any) => toast.error(e?.message || "No se pudo guardar"),
   });
 
@@ -144,15 +138,22 @@ export default function FundadorCompradores() {
       {
         id: "institucion",
         header: "Institución",
-        className: "min-w-[240px]",
+        className: "min-w-[220px] max-w-[320px]",
         cell: (f) => (
           <>
-            <p className="font-medium text-foreground">{f.institucion}</p>
+            <p className="font-medium text-foreground truncate">{f.institucion}</p>
             <p className="text-xs text-muted-foreground">{f.rut}{f.region ? ` · ${f.region}` : ""}</p>
           </>
         ),
         sortValue: (f) => f.institucion,
         exportValue: (f) => `${f.institucion} (${f.rut})`,
+      },
+      {
+        id: "tipo",
+        header: "Tipo",
+        cell: (f) => (f.tipo ? <Badge variant="outline" className="whitespace-nowrap">{f.tipo}</Badge> : <span className="text-muted-foreground">—</span>),
+        sortValue: (f) => f.tipo,
+        exportValue: (f) => f.tipo ?? "",
       },
       {
         id: "correos",
@@ -162,7 +163,7 @@ export default function FundadorCompradores() {
           f.n_correos > 0 ? (
             <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
               <MailCheck className="h-3.5 w-3.5" /> {f.n_correos}
-              {f.consentimiento && <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" title="con consentimiento" />}
+              {f.consentimiento && <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />}
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Mail className="h-3.5 w-3.5 opacity-50" /> 0</span>
@@ -172,13 +173,13 @@ export default function FundadorCompradores() {
       },
       {
         id: "encargados",
-        header: "Encargados conocidos (Mercado Público)",
-        className: "min-w-[280px]",
+        header: "Encargados conocidos (MP)",
+        className: "max-w-[260px]",
         cell: (f) =>
           f.n_encargados > 0 ? (
-            <span className="inline-flex items-start gap-1 text-xs text-foreground">
-              <Users className="h-3.5 w-3.5 mt-0.5 text-firmavb-blue shrink-0" />
-              <span>{f.encargados}</span>
+            <span className="flex items-center gap-1 text-xs text-foreground" title={f.encargados ?? ""}>
+              <Users className="h-3.5 w-3.5 text-firmavb-blue shrink-0" />
+              <span className="truncate">{f.encargados}</span>
             </span>
           ) : (
             <span className="text-xs text-muted-foreground">—</span>
@@ -225,8 +226,17 @@ export default function FundadorCompradores() {
 
   const cobertura = resumen ? Math.round((Number(resumen.con_contacto) / Math.max(Number(resumen.total_organismos), 1)) * 100) : 0;
 
+  const selectorTipo = (
+    <label className="flex items-center gap-2 text-sm text-muted-foreground">
+      Tipo
+      <select value={tipo} onChange={(e) => setTipo(e.target.value)} className="h-10 rounded-md border bg-background px-2 text-sm text-foreground" aria-label="Filtrar por tipo de organismo">
+        {TIPOS.map((t) => <option key={t} value={t}>{t}</option>)}
+      </select>
+    </label>
+  );
+
   return (
-    <div className="w-full max-w-[1700px] mx-auto px-4 md:px-6 py-6 space-y-6">
+    <div className="w-full min-w-0 px-4 md:px-6 py-6 space-y-6">
       {/* Encabezado */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
@@ -236,7 +246,7 @@ export default function FundadorCompradores() {
           <div>
             <h1 className="text-2xl font-bold text-foreground">Fundador — Compradores públicos</h1>
             <p className="text-sm text-muted-foreground">
-              Quién compra en Mercado Público, sus encargados conocidos y los correos para campañas. Desliza la tabla en horizontal para ver todo.
+              Filtra por tipo (ej. Municipalidades), captura correos y exporta la lista. Desliza la tabla en horizontal para ver todo.
             </p>
           </div>
         </div>
@@ -260,14 +270,14 @@ export default function FundadorCompradores() {
           <p className="mt-1 text-2xl font-bold text-foreground">{(resumen?.con_consentimiento ?? 0).toLocaleString("es-CL")}</p>
         </CardContent></Card>
         <Card className="border-border/50"><CardContent className="py-4">
-          <div className="text-xs text-muted-foreground">Monto comprado (top 500)</div>
+          <div className="text-xs text-muted-foreground">Monto en la vista</div>
           <p className="mt-1 text-2xl font-bold text-foreground">{CLP(montoTotal)}</p>
         </CardContent></Card>
       </div>
 
       {/* Tabla */}
       <Card className="border-border/50">
-        <CardContent className="pt-6">
+        <CardContent className="pt-6 min-w-0">
           <DataTable<Comprador>
             storageKey="fundador-compradores"
             rows={filas}
@@ -275,25 +285,25 @@ export default function FundadorCompradores() {
             loading={isLoading}
             itemLabel="organismos"
             columns={columnas}
+            toolbar={selectorTipo}
             searchText={(f) => `${f.institucion} ${f.rut} ${f.region ?? ""} ${f.encargados ?? ""}`}
             searchPlaceholder="Buscar por institución, RUT, región o encargado…"
             defaultSort={{ id: "monto", dir: "desc" }}
-            exportFileName="compradores-publicos"
-            emptyMessage={<span className="inline-flex flex-col items-center"><Inbox className="h-10 w-10 mb-3 opacity-40" /><span>Sin datos de compradores todavía.</span></span>}
+            exportFileName={`compradores-${tipo.toLowerCase()}`}
+            emptyMessage={<span className="inline-flex flex-col items-center"><Inbox className="h-10 w-10 mb-3 opacity-40" /><span>Sin organismos para este filtro.</span></span>}
           />
         </CardContent>
       </Card>
 
-      {/* Dialog: gestionar organismo (correos + encargados) */}
+      {/* Dialog: gestionar organismo */}
       <Dialog open={!!org} onOpenChange={(o) => !o && setOrg(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{org?.institucion}</DialogTitle>
-            <DialogDescription>{org?.rut}{org?.region ? ` · ${org.region}` : ""}</DialogDescription>
+            <DialogDescription>{org?.rut}{org?.region ? ` · ${org.region}` : ""}{org?.tipo ? ` · ${org.tipo}` : ""}</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-5 max-h-[60vh] overflow-y-auto pr-1">
-            {/* Correos cargados */}
             <div>
               <p className="text-sm font-semibold mb-2 flex items-center gap-1.5"><MailCheck className="h-4 w-4 text-emerald-600" /> Correos para campaña ({contactos.length})</p>
               {contactos.length === 0 ? (
@@ -316,7 +326,6 @@ export default function FundadorCompradores() {
               )}
             </div>
 
-            {/* Encargados conocidos (intel de MP) */}
             {encargados.length > 0 && (
               <div>
                 <p className="text-sm font-semibold mb-2 flex items-center gap-1.5"><Users className="h-4 w-4 text-firmavb-blue" /> Encargados conocidos (Mercado Público)</p>
@@ -332,7 +341,6 @@ export default function FundadorCompradores() {
               </div>
             )}
 
-            {/* Agregar correo */}
             <div className="rounded-lg border border-border/60 p-3 space-y-3">
               <p className="text-sm font-semibold flex items-center gap-1.5"><Plus className="h-4 w-4" /> Agregar correo</p>
               <div>
@@ -363,7 +371,7 @@ export default function FundadorCompradores() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog: importar lista */}
+      {/* Dialog: importar */}
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
         <DialogContent>
           <DialogHeader>
