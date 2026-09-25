@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useEquipoMembers, useUpdateVendedor, useToggleVendedorActivo, type Vendedor } from '@/hooks/useEquipo';
+import { useAuth } from '@/hooks/useAuth';
 
 const rolColors: Record<string, string> = {
   admin: 'bg-purple-100 text-purple-700 border-purple-200',
@@ -32,11 +33,20 @@ const rolLabels: Record<string, string> = {
 
 export function EquipoMemberList() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { data: members, isLoading } = useEquipoMembers();
   const updateMutation = useUpdateVendedor();
   const toggleActivoMutation = useToggleVendedorActivo();
   const [editingMember, setEditingMember] = useState<Vendedor | null>(null);
   const [editForm, setEditForm] = useState({ nombre: '', email: '', rol: '', telefono: '' });
+
+  // La RLS de `vendedores` solo deja editar/desactivar filas propias (user_id)
+  // o de quien uno invitó (invitado_por) — el roster ahora se ve completo
+  // (dueño y equipo ven a todos), pero un compañero no puede gestionar a
+  // otro: sin este chequeo, veía botones de Editar/Desactivar que siempre
+  // terminaban en error de RLS.
+  const puedeGestionar = (member: Vendedor) =>
+    !!user?.id && (member.user_id === user.id || member.invitado_por === user.id);
 
   const handleEdit = (member: Vendedor) => {
     setEditingMember(member);
@@ -120,18 +130,22 @@ export function EquipoMemberList() {
                       <Eye className="h-4 w-4 mr-2" />
                       Ver dashboard
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleEdit(member)}>
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Editar
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => handleToggleActivo(member)}
-                      className="text-destructive"
-                    >
-                      <UserX className="h-4 w-4 mr-2" />
-                      Desactivar
-                    </DropdownMenuItem>
+                    {puedeGestionar(member) && (
+                      <>
+                        <DropdownMenuItem onClick={() => handleEdit(member)}>
+                          <Pencil className="h-4 w-4 mr-2" />
+                          Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => handleToggleActivo(member)}
+                          className="text-destructive"
+                        >
+                          <UserX className="h-4 w-4 mr-2" />
+                          Desactivar
+                        </DropdownMenuItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -178,14 +192,16 @@ export function EquipoMemberList() {
                         <p className="text-xs text-muted-foreground">{member.email}</p>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleToggleActivo(member)}
-                    >
-                      <UserCheck className="h-4 w-4 mr-1" />
-                      Reactivar
-                    </Button>
+                    {puedeGestionar(member) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleToggleActivo(member)}
+                      >
+                        <UserCheck className="h-4 w-4 mr-1" />
+                        Reactivar
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>

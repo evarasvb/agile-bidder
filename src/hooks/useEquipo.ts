@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 export interface Vendedor {
   id: string;
   user_id: string | null;
+  invitado_por: string | null;
   nombre: string;
   email: string;
   rol: string;
