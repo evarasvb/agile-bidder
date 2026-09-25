@@ -2,8 +2,9 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { useNavigate } from 'react-router-dom';
 import { Search, FileText, Package, HandCoins, Gavel, Sparkles, Loader2 } from 'lucide-react';
 import {
-  CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandShortcut,
+  Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandShortcut,
 } from '@/components/ui/command';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useBusquedaGlobal, type ResultadoBusqueda, type TipoResultado } from '@/hooks/useBusquedaGlobal';
@@ -76,11 +77,21 @@ export function BusquedaGlobalProvider({ children }: { children: ReactNode }) {
     if (!open) { setQuery(''); return; }
     // Al abrir el buscador, completa en segundo plano los embeddings que
     // falten en el inventario (no bloquea la búsqueda por texto, que
-    // funciona igual aunque esto todavía esté corriendo).
-    if (!backfillHecho.current) {
-      backfillHecho.current = true;
-      supabase.functions.invoke('embeddings-inventario', {}).catch(() => {});
-    }
+    // funciona igual aunque esto todavía esté corriendo). Sigue pidiendo
+    // lotes mientras la función avise que quedan pendientes; el tope de 10
+    // (hasta 400 productos) es solo para no quedar pegado si algo falla.
+    if (backfillHecho.current) return;
+    backfillHecho.current = true;
+    (async () => {
+      for (let i = 0; i < 10; i++) {
+        try {
+          const { data, error } = await supabase.functions.invoke<{ actualizados: number; pendientes: boolean }>('embeddings-inventario', {});
+          if (error || !data?.pendientes) break;
+        } catch {
+          break;
+        }
+      }
+    })();
   }, [open]);
 
   const seleccionar = (r: ResultadoBusqueda) => {
@@ -95,7 +106,16 @@ export function BusquedaGlobalProvider({ children }: { children: ReactNode }) {
   return (
     <AbrirBusquedaContext.Provider value={() => setOpen(true)}>
       {children}
-      <CommandDialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="overflow-hidden p-0 shadow-lg">
+        {/*
+          shouldFilter=false: los resultados ya vienen filtrados del servidor
+          (texto exacto en SKU/N° factura, o similitud semántica). El filtro
+          por defecto de cmdk compara la query contra el `value` del item y
+          escondía justo esos casos (coincide por SKU o por significado, no
+          porque el título contenga literalmente lo escrito).
+        */}
+        <Command shouldFilter={false} className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
         <CommandInput
           placeholder="Busca licitaciones, compras ágiles, productos, facturas…"
           value={query}
@@ -130,7 +150,9 @@ export function BusquedaGlobalProvider({ children }: { children: ReactNode }) {
             </>
           )}
         </CommandList>
-      </CommandDialog>
+        </Command>
+        </DialogContent>
+      </Dialog>
     </AbrirBusquedaContext.Provider>
   );
 }

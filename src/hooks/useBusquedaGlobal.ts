@@ -1,5 +1,19 @@
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+
+// Espera una pausa al escribir antes de disparar la búsqueda: sin esto, cada
+// tecla arma su propia queryKey y, si trae pocos resultados de inventario,
+// cada una llama a Gemini para el embedding — "detergente" tecleado dispara
+// 10 llamadas pagadas en vez de 1.
+function useDebounce<T>(valor: T, ms: number): T {
+  const [debounced, setDebounced] = useState(valor);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(valor), ms);
+    return () => clearTimeout(t);
+  }, [valor, ms]);
+  return debounced;
+}
 
 export type TipoResultado = 'licitacion' | 'compra_agil' | 'producto' | 'producto_sugerido' | 'factura';
 
@@ -23,7 +37,8 @@ const CLP = (v: number) => '$' + Math.round(v || 0).toLocaleString('es-CL');
 // se suma solo cuando el texto trae pocos resultados de inventario, para no
 // gastar una llamada a IA en cada tecla.
 export function useBusquedaGlobal(query: string) {
-  const q = query.trim();
+  const qDebounced = useDebounce(query.trim(), 350);
+  const q = qDebounced;
   const habilitado = q.length >= 2;
 
   return useQuery({
@@ -55,7 +70,7 @@ export function useBusquedaGlobal(query: string) {
       }
 
       for (const f of ((facturasRes.data as FacturaRow[] | null) || [])) {
-        resultados.push({ tipo: 'factura', id: f.id, titulo: f.deudor_nombre, subtitulo: `${f.numero_factura ? `Factura ${f.numero_factura} · ` : ''}${CLP(f.monto)}`, ruta: '/cobranza' });
+        resultados.push({ tipo: 'factura', id: f.id, titulo: f.deudor_nombre, subtitulo: `${f.numero_factura ? `Factura ${f.numero_factura} · ` : ''}${CLP(f.monto)}`, ruta: '/experto/cobranza' });
       }
 
       // Búsqueda semántica de respaldo: solo si el texto encontró poco en el
