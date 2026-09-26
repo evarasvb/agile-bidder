@@ -1,6 +1,6 @@
 # Gate de calidad en cada Pull Request: antes de este workflow, nada bloqueaba
 # mergear a main aunque el build estuviera roto (el único CI existente,
-# evaristo-maintenance.yml, usa `--if-present || echo 'completed'`, que reporta
+# mantenimiento-diario.yml, usa `--if-present || echo 'completed'`, que reporta
 # verde incluso si el paso real falla). Este workflow sí falla de verdad.
 
 name: PR Checks

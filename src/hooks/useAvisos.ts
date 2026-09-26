@@ -32,6 +32,11 @@ export function useAvisos() {
       const { data, error } = await sb
         .from('notificaciones_log')
         .select('id, tipo, licitacion_id, datos, created_at')
+        // Los "cambios en licitaciones guardadas" (cambio_licitacion) no van a la
+        // campanita: llegan de a decenas por ajustes triviales y tapan lo que
+        // Evaristo quiere ver aquí (novedades de las instituciones seguidas y
+        // matches). Siguen en el historial y en el correo según preferencias.
+        .neq('tipo', 'cambio_licitacion')
         .order('created_at', { ascending: false })
         .limit(30);
       if (error) throw error;
