@@ -123,3 +123,58 @@ Los deployments de producción vienen con `isRollbackCandidate: true`. Desde el 
 
 Ojo con dos nombres que engañan: el proyecto `vamosle-chile` compila el repo
 `vamosle-8688c38d`, y el proyecto `vamosle-8688c38d` no tiene repo asociado.
+
+## 9. Orden seguro para publicar Academia y Mercado Pago
+
+No desplegar estas piezas parcialmente. En producción ya existen versiones
+anteriores de `crear-pago-curso` y `mp-curso-webhook`: primero hay que cerrar la
+ventana de ventas y notificaciones, y recién después cambiar la base.
+
+1. En Supabase Edge Secrets, cargar `MERCADOPAGO_WEBHOOK_SECRET` desde la clave
+   generada en *Mercado Pago → Tus integraciones → Webhooks*. No inventarla.
+2. Confirmar en Vault que existe `service_role_jwt_legacy`; el cron usa esa
+   credencial sin materializarla en `cron.job` ni en Git. Preparar también la
+   edición nueva de la planilla, sin publicarla todavía.
+3. Hacer un preflight de solo lectura: guardar la hora UTC del corte, contar
+   pagos, preferencias pendientes, accesos ligados a pagos y cualquier entrega
+   legacy. Resolver toda entrega sin vínculo antes de continuar.
+4. Activar `ACADEMIA_CHECKOUT_MAINTENANCE=true` y
+   `ACADEMIA_WEBHOOK_MAINTENANCE=true`; desplegar primero las versiones de
+   `crear-pago-curso` y `mp-curso-webhook` que entienden esos interruptores.
+   Comprobar que ambas responden 503 con `Retry-After` y que no crean pagos ni
+   entregan accesos. El 503 del webhook obliga a Mercado Pago a reintentar.
+5. Esperar a que terminen las invocaciones iniciadas antes del corte y revisar
+   en Mercado Pago todos los pagos desde la hora guardada. Registrar sus ids;
+   si aparece un pago aprobado no conciliado, no seguir hasta identificarlo.
+6. Aplicar las migraciones de Academia. Su preflight debe ejecutarse nuevamente
+   con el checkout cerrado. La primera crea el bucket privado
+   `academia-premium`; la de seguridad crea el cron de la bandeja cada 5 minutos.
+7. La planilla histórica estuvo en Git público y **no se puede vender como
+   exclusiva**. Revisar la edición nueva y subir únicamente esa versión al
+   bucket privado con la clave `planillas-programa-pro.xlsx`. El XLSX queda
+   ignorado por Git y nunca debe volver a `public/`.
+8. Desplegar `procesar-academia-mp-inbox`, `academia-premium` y la versión final
+   de `mp-curso-webhook`. Desactivar solo
+   `ACADEMIA_WEBHOOK_MAINTENANCE`, manteniendo el checkout cerrado. El worker
+   acepta únicamente el bearer `service_role`.
+9. En Mercado Pago, activar el tópico `topic_chargebacks_wh` sobre
+   `https://juiskeeutbaipwbeeezw.supabase.co/functions/v1/mp-curso-webhook` y
+   ejecutar el simulador. Confirmar HTTP 200, una sola fila firmada en
+   `academia_mp_inbox` y una ejecución correcta del cron.
+10. Reconsultar y reprocesar todos los pagos registrados desde el corte,
+    incluidos los que recibieron 503. Cada aprobación debe quedar ligada en
+    `academia_pago_accesos`; ningún acceso puede existir solo en la tabla legacy.
+11. Publicar el frontend y verificar Academia, Mis cursos y la descarga firmada
+    mientras el checkout continúa en mantenimiento. Solo entonces desactivar
+    `ACADEMIA_CHECKOUT_MAINTENANCE` y crear una preferencia controlada por el
+    precio persistido, sin efectuar una compra real. Si falla cualquier
+    comprobación, reactivar el interruptor de checkout antes de investigar.
+
+No basta con que las migraciones terminen: el corte se considera cerrado solo
+cuando la conciliación desde la hora UTC guardada arroja cero pagos sin vínculo.
+
+Si falta `MERCADOPAGO_WEBHOOK_SECRET`, las notificaciones firmadas fallan cerrado
+con 503. Todo contracargo sin firma válida se rechaza con 401 y nunca entra a la
+bandeja ni consulta la API de MP. Solo los avisos antiguos de pago pueden llegar
+sin firma: se limitan por red y pago, y antes de entregar verifican Payment y
+Merchant Order directamente en MP.

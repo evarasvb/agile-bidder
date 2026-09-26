@@ -22,14 +22,6 @@ function json(b: unknown, s = 200) {
 
 const GRAPH = 'https://graph.facebook.com/v21.0';
 
-async function getConfig(db: ReturnType<typeof createClient>) {
-  const { data, error } = await db.from('viral_agent_config').select('key, value');
-  if (error) throw new Error(`config: ${error.message}`);
-  const cfg: Record<string, string> = {};
-  for (const row of data ?? []) cfg[row.key] = row.value;
-  return cfg;
-}
-
 async function publicarFacebook(pageId: string, token: string, texto: string) {
   const resp = await fetch(`${GRAPH}/${pageId}/feed`, {
     method: 'POST',
@@ -39,6 +31,13 @@ async function publicarFacebook(pageId: string, token: string, texto: string) {
   const data = await resp.json();
   if (!resp.ok) throw new Error(`Facebook: ${JSON.stringify(data)}`);
   return data;
+}
+
+async function verificarTokenMeta(token: string) {
+  const resp = await fetch(`${GRAPH}/me?fields=id,name&access_token=${encodeURIComponent(token)}`);
+  const data = await resp.json();
+  if (!resp.ok) throw new Error(`Meta token: ${JSON.stringify(data)}`);
+  return { id: data.id, name: data.name };
 }
 
 function sleep(ms: number) {
@@ -87,7 +86,14 @@ Deno.serve(async (req) => {
     const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const db = createClient(url, service);
 
-    const cfg = await getConfig(db);
+    const { data: configRows, error: configError } = await db
+      .from('viral_agent_config')
+      .select('key, value');
+    if (configError) throw new Error(`config: ${configError.message}`);
+    const cfg: Record<string, string> = {};
+    for (const row of (configRows ?? []) as Array<{ key: string; value: string }>) {
+      cfg[row.key] = row.value;
+    }
 
     const secretEsperado = cfg.cron_shared_secret;
     const secretRecibido = req.headers.get('x-viral-agent-secret');
@@ -98,6 +104,13 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const dryRun = body.dry_run === true;
     const redFiltro: string | undefined = body.red;
+
+    // El cron de vigilancia solo valida la credencial. Nunca debe consumir una
+    // fila del calendario ni publicar contenido.
+    if (body.solo_chequear_token === true) {
+      const cuenta = await verificarTokenMeta(cfg.meta_page_access_token);
+      return json({ ok: true, modo: 'solo_chequear_token', cuenta });
+    }
 
     let query = db
       .from('viral_agent_calendario')

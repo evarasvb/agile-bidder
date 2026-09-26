@@ -52,6 +52,10 @@ jobs:
       - name: Procesar pendientes
         if: steps.lista.outputs.n != '0'
         run: |
+          # El runner invoca bash con -e. Este flujo maneja cada archivo y sus
+          # fallos de forma explícita; si un RAR/PDF está dañado, debe contarlo
+          # y continuar con el resto del lote, no perder toda la corrida.
+          set +e
           set -uo pipefail
           H=(-H "apikey: $SUPABASE_SERVICE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_KEY")
           patch() { curl -s "${H[@]}" -X PATCH -H "Content-Type: application/json" -H "Prefer: return=minimal" "$SUPABASE_URL/rest/v1/licitaciones_adjuntos?id=eq.$1" -d "$2" > /dev/null; }

@@ -65,6 +65,108 @@ export type Database = {
         }
         Relationships: []
       }
+      academia_pago_accesos: {
+        Row: {
+          acceso_id: string
+          codigo: string
+          created_at: string
+          curso_slug: string
+          pago_id: string
+        }
+        Insert: {
+          acceso_id: string
+          codigo: string
+          created_at?: string
+          curso_slug: string
+          pago_id: string
+        }
+        Update: {
+          acceso_id?: string
+          codigo?: string
+          created_at?: string
+          curso_slug?: string
+          pago_id?: string
+        }
+        Relationships: []
+      }
+      academia_eventos: {
+        Row: {
+          clave_idempotencia: string | null
+          created_at: string
+          detalle: Json
+          id: number
+          pago_id: string | null
+          severidad: string
+          tipo: string
+        }
+        Insert: {
+          clave_idempotencia?: string | null
+          created_at?: string
+          detalle?: Json
+          id?: never
+          pago_id?: string | null
+          severidad?: string
+          tipo: string
+        }
+        Update: {
+          clave_idempotencia?: string | null
+          created_at?: string
+          detalle?: Json
+          id?: never
+          pago_id?: string | null
+          severidad?: string
+          tipo?: string
+        }
+        Relationships: []
+      }
+      academia_rate_limits: {
+        Row: {
+          accion: string
+          clave_hash: string
+          created_at: string
+          intentos: number
+          updated_at: string
+          ventana_inicio: string
+        }
+        Insert: {
+          accion: string
+          clave_hash: string
+          created_at?: string
+          intentos?: number
+          updated_at?: string
+          ventana_inicio: string
+        }
+        Update: {
+          accion?: string
+          clave_hash?: string
+          created_at?: string
+          intentos?: number
+          updated_at?: string
+          ventana_inicio?: string
+        }
+        Relationships: []
+      }
+      academia_recuperaciones: {
+        Row: {
+          created_at: string
+          curso_slug: string
+          email_hash: string
+          ventana_inicio: string
+        }
+        Insert: {
+          created_at?: string
+          curso_slug: string
+          email_hash: string
+          ventana_inicio: string
+        }
+        Update: {
+          created_at?: string
+          curso_slug?: string
+          email_hash?: string
+          ventana_inicio?: string
+        }
+        Relationships: []
+      }
       academia_leads: {
         Row: {
           atendido: boolean
@@ -112,42 +214,60 @@ export type Database = {
       }
       academia_pagos: {
         Row: {
+          accesos_asignados_at: string | null
+          cantidad_accesos: number
           codigo_entregado: string | null
           created_at: string
           curso_slug: string
           email: string | null
+          entrega_completada_at: string | null
+          entrega_estado: string
           estado: string
           id: string
           monto: number
           mp_payment_id: string | null
           mp_preference_id: string | null
+          notificado_at: string | null
           raw: Json | null
+          revocado_at: string | null
           updated_at: string
         }
         Insert: {
+          accesos_asignados_at?: string | null
+          cantidad_accesos?: number
           codigo_entregado?: string | null
           created_at?: string
           curso_slug: string
           email?: string | null
+          entrega_completada_at?: string | null
+          entrega_estado?: string
           estado?: string
           id?: string
           monto: number
           mp_payment_id?: string | null
           mp_preference_id?: string | null
+          notificado_at?: string | null
           raw?: Json | null
+          revocado_at?: string | null
           updated_at?: string
         }
         Update: {
+          accesos_asignados_at?: string | null
+          cantidad_accesos?: number
           codigo_entregado?: string | null
           created_at?: string
           curso_slug?: string
           email?: string | null
+          entrega_completada_at?: string | null
+          entrega_estado?: string
           estado?: string
           id?: string
           monto?: number
           mp_payment_id?: string | null
           mp_preference_id?: string | null
+          notificado_at?: string | null
           raw?: Json | null
+          revocado_at?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -10099,6 +10219,35 @@ export type Database = {
     }
     Functions: {
       _test_norm: { Args: { txt: string }; Returns: string }
+      academia_asignar_accesos_pago: {
+        Args: {
+          p_cursos: string[]
+          p_email: string
+          p_mp_payment_id: string
+          p_pago_id: string
+        }
+        Returns: {
+          codigo: string
+          curso_slug: string
+        }[]
+      }
+      academia_consumir_rate_limit: {
+        Args: {
+          p_accion: string
+          p_clave_hash: string
+          p_limite: number
+          p_ventana_inicio: string
+        }
+        Returns: boolean
+      }
+      academia_revocar_accesos_pago: {
+        Args: {
+          p_estado: string
+          p_mp_payment_id: string
+          p_pago_id: string
+        }
+        Returns: number
+      }
       academia_x10_insertar: {
         Args: { p_nuevos: Json; p_slug: string }
         Returns: string
