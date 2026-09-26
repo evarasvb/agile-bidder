@@ -45,6 +45,7 @@ import {
   ChartSkeleton,
 } from "@/components/dashboard/DashboardSkeleton";
 import { PrimerosPasos } from "@/components/dashboard/PrimerosPasos";
+import { ActivationOnboarding } from "@/components/dashboard/ActivationOnboarding";
 import { DatoCuriosoCard } from "@/components/dashboard/DatoCuriosoCard";
 import { TutorialBienvenida } from "@/components/dashboard/TutorialBienvenida";
 import { ResumenEjecutivo } from "@/components/dashboard/ResumenEjecutivo";
@@ -126,6 +127,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Onboarding de activación: 3 pasos core para estar operativo */}
+      <ActivationOnboarding />
+
       {/* Guía de primeros pasos para clientes nuevos (se auto-oculta al completar) */}
       <PrimerosPasos />
 
