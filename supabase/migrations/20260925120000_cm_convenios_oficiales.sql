@@ -223,8 +223,12 @@ create or replace function public.cm_por_convenio(p_anio integer default extract
 returns table (convenio text, codigo text, ocs bigint, estimadas bigint, monto_total numeric, proveedores integer, organismos integer, participacion numeric)
 language sql stable security definer set search_path to 'public' as $$
   with base as (
-    select convenio, max(codigo) codigo, sum(ocs) ocs, sum(ocs) filter (where codigo is null) estimadas, sum(monto_total) monto_total
-    from public.mv_cm_por_convenio where anio = p_anio group by 1
+    -- Un mismo nombre corto puede agrupar generaciones del convenio (p. ej. 2239-9-LR22 y
+    -- 2239-8-LR25 de aseo); se muestra el código más reciente.
+    select m.convenio,
+           (select c.codigo from public.cm_convenios c where c.nombre_corto = m.convenio order by c.ultimo_periodo desc nulls last, c.codigo desc limit 1) codigo,
+           sum(ocs) ocs, sum(ocs) filter (where m.codigo is null) estimadas, sum(monto_total) monto_total
+    from public.mv_cm_por_convenio m where anio = p_anio group by 1
   ),
   distintos as (
     select convenio, count(distinct coalesce(rut_proveedor, proveedor))::int proveedores, count(distinct coalesce(rut_demandante, demandante))::int organismos
