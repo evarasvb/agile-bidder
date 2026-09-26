@@ -31,9 +31,22 @@ import {
   type Modulo,
 } from "@/data/academiaCursos";
 import { Seo } from "@/components/Seo";
+import { GraficoView, TablaView, VideoView, QuizView, HerramientaView, EjercicioView } from "@/components/academia/BloquesX10";
 
 function BloqueView({ bloque }: { bloque: Bloque }) {
   switch (bloque.tipo) {
+    case "grafico":
+      return <GraficoView bloque={bloque} />;
+    case "tabla":
+      return <TablaView bloque={bloque} />;
+    case "video":
+      return <VideoView bloque={bloque} />;
+    case "quiz":
+      return <QuizView bloque={bloque} />;
+    case "herramienta":
+      return <HerramientaView bloque={bloque} />;
+    case "ejercicio":
+      return <EjercicioView bloque={bloque} />;
     case "subtitulo":
       return (
         <h4 className="text-lg font-semibold text-foreground mt-6 mb-2">{bloque.texto}</h4>

@@ -20,7 +20,20 @@ export type Bloque =
   // Dato duro (ej. cifras reales de ChileCompra), con fuente opcional.
   | { tipo: "dato"; texto: string; fuente?: string }
   // Llamado a la acción (ej. agendar una sesión en vivo). url externa.
-  | { tipo: "cta"; texto: string; url: string };
+  | { tipo: "cta"; texto: string; url: string }
+  // --- Bloques "x10" (casos reales con datos de Mercado Público) -------------
+  // Gráfico simple (barras o líneas) con datos fijos dentro del contenido.
+  | { tipo: "grafico"; titulo: string; subtipo?: "barras" | "lineas"; unidad?: string; datos: { etiqueta: string; valor: number; valor2?: number }[]; serie?: string; serie2?: string; fuente?: string; lectura?: string }
+  // Tabla comparativa (p. ej. propuestas reales, quién ganó y a qué precio).
+  | { tipo: "tabla"; titulo?: string; columnas: string[]; filas: (string | number)[][]; fuente?: string; lectura?: string }
+  // Clase en video (YouTube/Loom). Sin url, se muestra "en producción" con la duración.
+  | { tipo: "video"; titulo: string; url?: string; minutos?: number; resumen?: string }
+  // Pregunta de repaso con retroalimentación inmediata.
+  | { tipo: "quiz"; pregunta: string; opciones: string[]; correcta: number; explicacion: string }
+  // Hazlo en FirmaVB: enlace a la herramienta de la app que aplica la lección.
+  | { tipo: "herramienta"; texto: string; ruta: string; detalle?: string }
+  // Ejercicio práctico paso a paso (tarea del alumno).
+  | { tipo: "ejercicio"; titulo: string; pasos: string[]; entregable?: string };
 
 export interface Leccion {
   titulo: string;
@@ -670,6 +683,14 @@ export const CURSOS: Curso[] = [
           { titulo: "Automatiza con FirmaVB (y con IA)", bloques: [] },
         ],
       },
+      {
+        titulo: "Casos reales 2026 · Mirar donde otros no ven",
+        lecciones: [
+          { titulo: "Cuándo compra el Estado: el calendario real", bloques: [] },
+          { titulo: "Compras repetidas, convenio marco evitado y reclamos: tres señales", bloques: [] },
+          { titulo: "Cobrar con método: nota de cobro y nota de débito", bloques: [] },
+        ],
+      },
     ],
   },
 
@@ -752,6 +773,21 @@ export const CURSOS: Curso[] = [
           { titulo: "Configura tu perfil", bloques: [] },
         ],
       },
+      {
+        titulo: "Casos reales · El Estado en números (2026)",
+        lecciones: [
+          { titulo: "Cuánto y cuándo compra el Estado, mes a mes", bloques: [] },
+          { titulo: "Por qué vía te van a comprar: compra ágil, convenio marco, licitación", bloques: [] },
+          { titulo: "El ritmo del comprador: días, semanas y fin de mes", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Casos reales · Tu primer mapa de clientes",
+        lecciones: [
+          { titulo: "Leer una institución como lo hace FirmaVB", bloques: [] },
+          { titulo: "Ejercicio guiado: tus 20 organismos objetivo", bloques: [] },
+        ],
+      },
     ],
   },
   {
@@ -786,6 +822,29 @@ export const CURSOS: Curso[] = [
         lecciones: [
           { titulo: "Participar o no: criterios de decisión", bloques: [] },
           { titulo: "Analiza la competencia y el historial", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Mirar donde otros no ven · Estacionalidad: cada rubro tiene calendario",
+        lecciones: [
+          { titulo: "Los rubros no compran parejo: cuándo sube lo tuyo", bloques: [] },
+          { titulo: "Fin de mes, fin de trimestre, fin de año", bloques: [] },
+          { titulo: "Seguir a la institución: noticias, presupuesto y señales", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Mirar donde otros no ven · Fragmentación, convenio marco y reclamos",
+        lecciones: [
+          { titulo: "Detecta compras repetidas y fragmentación", bloques: [] },
+          { titulo: "¿Por qué no compró por convenio marco?", bloques: [] },
+          { titulo: "Muchos reclamos de pago y aun así le compran: qué te dice", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Mirar donde otros no ven · La competencia real en compras ágiles",
+        lecciones: [
+          { titulo: "Cuántas ofertas recibe una compra ágil (y dónde no hay nadie)", bloques: [] },
+          { titulo: "Ejercicio guiado: tu radar semanal de oportunidades", bloques: [] },
         ],
       },
     ],
@@ -825,6 +884,21 @@ export const CURSOS: Curso[] = [
           { titulo: "Los errores que te descalifican", bloques: [] },
         ],
       },
+      {
+        titulo: "Casos reales · Quién gana y a qué precio",
+        lecciones: [
+          { titulo: "Caso: resmas de papel, 12 proveedores y un rango de precio", bloques: [] },
+          { titulo: "Construye tu precio con el mercado a la vista", bloques: [] },
+          { titulo: "Dos propuestas frente a frente: la que ganó y la que perdió", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Casos reales · El convenio marco como referencia de precio",
+        lecciones: [
+          { titulo: "Lo que se vende por convenio: quién y cuánto (2026)", bloques: [] },
+          { titulo: "Ejercicio: tu mapa de precios y competidores", bloques: [] },
+        ],
+      },
     ],
   },
   {
@@ -859,6 +933,20 @@ export const CURSOS: Curso[] = [
         lecciones: [
           { titulo: "Entender el acta de adjudicación", bloques: [] },
           { titulo: "Qué hacer si no ganas", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Casos reales · Leer al evaluador",
+        lecciones: [
+          { titulo: "Competencia real: cuántas ofertas hay en la mesa", bloques: [] },
+          { titulo: "El comprador que ya decidió: proveedor recurrente", bloques: [] },
+          { titulo: "Simula tu puntaje antes de enviar", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Casos reales · Después del resultado",
+        lecciones: [
+          { titulo: "Lee el acta, arma tu historial y vuelve", bloques: [] },
         ],
       },
     ],
@@ -897,6 +985,22 @@ export const CURSOS: Curso[] = [
           { titulo: "Modificaciones al contrato", bloques: [] },
         ],
       },
+      {
+        titulo: "Cobranza con método · Nota de cobro y nota de débito",
+        lecciones: [
+          { titulo: "El reloj de los 30 días (Ley 21.131)", bloques: [] },
+          { titulo: "Nota de cobro: la carta que cobra sin pelear", bloques: [] },
+          { titulo: "Nota de débito: intereses y la comisión del 1%", bloques: [] },
+          { titulo: "Escalar: Mercado Público, Contraloría y el cobro ejecutivo", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Casos reales · Los que pagan mal (datos 2025-2026)",
+        lecciones: [
+          { titulo: "Ranking de reclamos de pago", bloques: [] },
+          { titulo: "Decide antes de vender: el semáforo por institución", bloques: [] },
+        ],
+      },
     ],
   },
   {
@@ -933,6 +1037,21 @@ export const CURSOS: Curso[] = [
           { titulo: "Relaciones de largo plazo (con límites)", bloques: [] },
         ],
       },
+      {
+        titulo: "Casos reales · Convenio marco por convenio (2026)",
+        lecciones: [
+          { titulo: "Los convenios vigentes y su tamaño real", bloques: [] },
+          { titulo: "Quién vende y quién compra por convenio", bloques: [] },
+          { titulo: "Entrar al convenio y competir con el catálogo", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Casos reales · Planifica stock y caja con la estacionalidad",
+        lecciones: [
+          { titulo: "Rubros por mes: compra antes de que suba", bloques: [] },
+          { titulo: "Fin de mes y flujo de caja: el 42%", bloques: [] },
+        ],
+      },
     ],
   },
   {
@@ -967,6 +1086,21 @@ export const CURSOS: Curso[] = [
         lecciones: [
           { titulo: "Búsqueda, match y ofertas automáticas", bloques: [] },
           { titulo: "Postula en minutos con la extensión", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Casos reales · Tu radar automático con FirmaVB",
+        lecciones: [
+          { titulo: "Match semántico: cómo FirmaVB entiende lo que vendes", bloques: [] },
+          { titulo: "El Libro de licitación: bajo el agua, matriz e informe", bloques: [] },
+          { titulo: "Seguir instituciones y leer sus noticias", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Casos reales · Reportes que otros no tienen",
+        lecciones: [
+          { titulo: "Los reportes y para qué sirve cada uno", bloques: [] },
+          { titulo: "Cobranza y documentos con el Abogado", bloques: [] },
         ],
       },
     ],

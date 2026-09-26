@@ -1,0 +1,792 @@
+[
+ {
+  "titulo": "Mirar donde otros no ven · Estacionalidad: cada rubro tiene calendario",
+  "lecciones": [
+   {
+    "titulo": "Los rubros no compran parejo: cuándo sube lo tuyo",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "La mayoría de los proveedores mira solo la licitación que tiene enfrente. Los que ganan miran el calendario del comprador: qué rubro sube en marzo, qué se compra en julio, qué se apaga en febrero. Estos son los rubros más grandes de 2026 con su serie mensual real."
+     },
+     {
+      "tipo": "grafico",
+      "titulo": "Equipamiento médico vs. medicamentos: monto mensual 2026",
+      "subtipo": "lineas",
+      "datos": [
+       {
+        "etiqueta": "Ene",
+        "valor": 101.0,
+        "valor2": 109.1
+       },
+       {
+        "etiqueta": "Feb",
+        "valor": 91.6,
+        "valor2": 117.8
+       },
+       {
+        "etiqueta": "Mar",
+        "valor": 81.2,
+        "valor2": 231.0
+       },
+       {
+        "etiqueta": "Abr",
+        "valor": 90.8,
+        "valor2": 89.2
+       },
+       {
+        "etiqueta": "May",
+        "valor": 75.7,
+        "valor2": 130.8
+       },
+       {
+        "etiqueta": "Jun",
+        "valor": 82.2,
+        "valor2": 121.0
+       },
+       {
+        "etiqueta": "Jul",
+        "valor": 82.9,
+        "valor2": 281.0
+       },
+       {
+        "etiqueta": "Ago",
+        "valor": 89.2,
+        "valor2": 200.0
+       }
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "unidad": "Miles de millones de pesos",
+      "serie": "Equipamiento y suministros médicos",
+      "serie2": "Medicamentos",
+      "lectura": "El equipamiento médico es plano: 76 a 101 mil millones cada mes, unas 29 mil órdenes. Los medicamentos son de saltos: marzo (231) y julio (281) triplican a abril. Son las compras centralizadas grandes. Si vendes medicamentos, tus meses son marzo y julio; si vendes insumos, todos los meses son iguales y gana el que responde más rápido."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Rubros con estacionalidad clara en 2026 (órdenes por mes)",
+      "columnas": [
+       "Rubro",
+       "Ene",
+       "Mar",
+       "Jun",
+       "Ago",
+       "Lectura"
+      ],
+      "filas": [
+       [
+        "Artículos para obras y construcción",
+        3735,
+        4623,
+        5518,
+        5222,
+        "Sube 48% de enero a junio: obras de invierno"
+       ],
+       [
+        "Tecnologías de la información",
+        3751,
+        4846,
+        5000,
+        5000,
+        "Sube 33% desde marzo: proyectos del año presupuestario"
+       ],
+       [
+        "Servicios de construcción y mantenimiento",
+        3173,
+        4207,
+        3972,
+        3809,
+        "Marzo es el pico (176 mil millones)"
+       ],
+       [
+        "Servicios de transporte y correo",
+        6787,
+        7081,
+        7642,
+        8091,
+        "Crece todo el año; agosto es el máximo"
+       ],
+       [
+        "Servicios de limpieza industrial",
+        2199,
+        1950,
+        1796,
+        1673,
+        "Cae 24% en el año: contratos anuales ya firmados en enero"
+       ],
+       [
+        "Consultorías y estudios",
+        666,
+        874,
+        1046,
+        1176,
+        "Se duplica de enero a agosto; el monto grande fue en marzo (601 mil millones)"
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "Cada fila es una estrategia distinta. Limpieza se decide en enero: si no estás en esa licitación, esperas un año. Construcción y TI crecen con el año: puedes entrar tarde. Transporte crece siempre: hay espacio nuevo cada mes."
+     },
+     {
+      "tipo": "dato",
+      "texto": "Las consultorías y estudios movieron 601 mil millones de pesos solo en marzo de 2026, contra 9 a 27 mil millones en un mes normal. Un solo mes concentra el 80% del año del rubro: quien no postuló entre diciembre y febrero se quedó fuera.",
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026"
+     },
+     {
+      "tipo": "tip",
+      "texto": "Toma tu rubro y mira su serie mensual de 2026 en el reporte de productos. Si tiene un pico, ese pico se decidió dos o tres meses antes. Trabaja hacia atrás desde el pico."
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Reporte de productos con serie mensual",
+      "ruta": "/reportes/productos",
+      "detalle": "Escribe tu producto y mira cuántas órdenes y qué monto se emitió cada mes y quién lo compró."
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "Vendes servicios de limpieza. Según los datos de 2026, ¿cuándo se define tu año?",
+      "opciones": [
+       "En agosto, cuando hay más órdenes de compra en general.",
+       "En enero: los contratos anuales se emiten al inicio del año y el rubro cae el resto del año.",
+       "En julio, junto con los medicamentos."
+      ],
+      "correcta": 1,
+      "explicacion": "Limpieza parte con 2.199 órdenes en enero y baja a 1.673 en agosto. Los contratos anuales se juegan en las licitaciones de octubre a diciembre y se emiten en enero."
+     }
+    ]
+   },
+   {
+    "titulo": "Fin de mes, fin de trimestre, fin de año",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "Hay tres relojes que aceleran la compra pública: el fin de mes (metas de ejecución presupuestaria), el fin de trimestre (reportes a Hacienda) y el fin de año (el presupuesto no ejecutado se pierde). Esto mueve dinero de verdad."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Monto por tercio del mes, 2026",
+      "columnas": [
+       "Tercio del mes",
+       "Órdenes",
+       "Monto (miles de millones)",
+       "% del monto"
+      ],
+      "filas": [
+       [
+        "Días 1 a 10",
+        363444,
+        3164.0,
+        25.5
+       ],
+       [
+        "Días 11 a 20",
+        386982,
+        3991.3,
+        32.2
+       ],
+       [
+        "Días 21 a 31",
+        383145,
+        5257.6,
+        42.4
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "Mismo número de órdenes en cada tercio, pero el último tercio del mes mueve 66% más dinero que el primero. Las órdenes grandes se emiten cuando se cierra el mes."
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Fin de mes: ten stock y capacidad de despacho la última semana. Es cuando salen las órdenes grandes.",
+       "Fin de trimestre (marzo, junio, septiembre, diciembre): los organismos apuran compras planificadas para mostrar ejecución. Publica tus cotizaciones y respuestas a compras ágiles con plazo de entrega corto en esas semanas.",
+       "Fin de año: en noviembre y diciembre se gasta lo que queda del presupuesto. Los organismos compran equipamiento, mobiliario, computación y todo lo que se pueda recibir antes del 31 de diciembre. El estudio completo del año 2025 (mes a mes, rubro a rubro) se agrega en esta misma lección."
+      ]
+     },
+     {
+      "tipo": "dato",
+      "texto": "Marzo de 2026 fue el mes con mayor monto del año hasta ahora (2.984 mil millones) y coincide con el cierre del primer trimestre y la emisión de contratos anuales. Diciembre suele ser el otro gran mes del año.",
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026"
+     },
+     {
+      "tipo": "ejercicio",
+      "titulo": "Tu plan de fin de año",
+      "pasos": [
+       "Lista los productos tuyos que un organismo puede recibir en menos de 15 días.",
+       "Revisa en el reporte de compradores quién los compró en noviembre y diciembre del año anterior.",
+       "Prepara desde octubre cotizaciones listas, con stock confirmado y plazo de entrega de 5 días.",
+       "Sigue a esos organismos en FirmaVB para que sus compras ágiles de fin de año te lleguen el mismo día."
+      ],
+      "entregable": "Lista de productos de entrega rápida y 20 organismos que los compran a fin de año."
+     },
+     {
+      "tipo": "tip",
+      "texto": "A fin de año el comprador no busca el precio más bajo: busca al que entrega antes del 31 de diciembre. El plazo de entrega es tu argumento de venta más fuerte en noviembre y diciembre."
+     }
+    ]
+   },
+   {
+    "titulo": "Seguir a la institución: noticias, presupuesto y señales",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "Un organismo es una organización con problemas, presupuesto y noticias. Un hospital que sale en la prensa por listas de espera va a comprar prestaciones y equipamiento. Un municipio con nuevo alcalde cambia proveedores. Una universidad con recorte publica menos licitaciones y más compras ágiles."
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Noticias: FirmaVB revisa medios y guarda las menciones de cada organismo. Antes de ofertar, lee las últimas cinco. Si el organismo está en un problema, tu oferta debe resolverlo.",
+       "Presupuesto: la Ley de Presupuestos y los decretos de reasignación de mitad de año cambian lo que un servicio puede gastar. Un aumento en un programa aparece como compras dos o tres meses después.",
+       "Reclamos de pago: si suben, el organismo tiene problemas de caja. No dejes de venderle, pero vende con precio que aguante 60 días de espera.",
+       "Compras repetidas: si compra lo mismo todas las semanas por compra ágil, no está planificando. Ofrécele un contrato de suministro y le resuelves el problema."
+      ]
+     },
+     {
+      "tipo": "caso",
+      "titulo": "Seguir a un hospital",
+      "texto": "Sigues al Hospital de Puerto Montt. FirmaVB te avisa que publicó 566 compras ágiles en tres meses y que pidió 46 veces el mismo medicamento. En las noticias aparece que tiene una farmacia con quiebres de stock. Tu oferta ya no es una cotización más: es una propuesta de abastecimiento mensual con entrega garantizada. Ese es el vendedor que el comprador recuerda."
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Seguir instituciones y ver sus noticias",
+      "ruta": "/mercado/instituciones",
+      "detalle": "Al seguir un organismo recibes sus nuevas oportunidades y las menciones en medios que FirmaVB detecta."
+     },
+     {
+      "tipo": "video",
+      "titulo": "Cómo leer las noticias de un organismo antes de ofertar",
+      "minutos": 9,
+      "resumen": "Demostración: ficha de institución, pestaña de medios, qué señales buscar y cómo convertirlas en argumento de venta."
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "Un organismo que sigues aparece en las noticias por un recorte presupuestario. ¿Qué es lo más probable en los próximos meses?",
+      "opciones": [
+       "Que deje de comprar por completo.",
+       "Que publique menos licitaciones grandes y más compras ágiles pequeñas.",
+       "Que suba los precios que paga."
+      ],
+      "correcta": 1,
+      "explicacion": "Con menos presupuesto, los organismos fraccionan y compran lo urgente por la vía rápida. Las compras ágiles crecen y los contratos grandes se posponen."
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "titulo": "Mirar donde otros no ven · Fragmentación, convenio marco y reclamos",
+  "lecciones": [
+   {
+    "titulo": "Detecta compras repetidas y fragmentación",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "La ley obliga a licitar cuando el monto supera ciertos umbrales, y prohíbe fragmentar una compra para saltarse la licitación. Pero en la práctica muchos organismos compran lo mismo, muchas veces, por compra ágil. A veces es fragmentación; casi siempre es falta de planificación. Para ti es información de oro."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Compras ágiles repetidas del mismo producto, julio a septiembre 2026",
+      "columnas": [
+       "Organismo",
+       "Producto",
+       "Veces",
+       "Monto total (millones)",
+       "Periodo"
+      ],
+      "filas": [
+       [
+        "Universidad de Chile",
+        "Reactivos o soluciones químicos",
+        49,
+        156.1,
+        "19 ago a 24 sep"
+       ],
+       [
+        "Universidad de Chile",
+        "Servicios quirúrgicos",
+        38,
+        150.8,
+        "3 a 24 sep"
+       ],
+       [
+        "Hospital de Puerto Montt",
+        "Clorhidrato de hidralazina",
+        46,
+        104.2,
+        "2 a 25 sep"
+       ],
+       [
+        "Hospital La Serena",
+        "Cajas de medicamentos de urgencia",
+        49,
+        100.9,
+        "8 a 21 sep"
+       ],
+       [
+        "Municipalidad de Talca",
+        "Materiales educativos",
+        19,
+        83.5,
+        "3 a 22 sep"
+       ],
+       [
+        "Complejo Asistencial Víctor Ríos Ruiz",
+        "Ibuprofeno",
+        25,
+        70.1,
+        "3 a 16 sep"
+       ],
+       [
+        "Universidad de Chile",
+        "Servicios de catering",
+        34,
+        62.3,
+        "21 ago a 24 sep"
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "El Hospital La Serena hizo 49 compras ágiles del mismo producto en 13 días por 101 millones. Sumadas superan con creces las 100 UTM de una compra ágil. Cada una de esas 49 compras fue una oportunidad para un proveedor que respondiera rápido, y una señal para ofrecer un contrato de suministro."
+     },
+     {
+      "tipo": "subtitulo",
+      "texto": "Cómo se lee esta señal"
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Para vender: si un organismo compra lo mismo cada semana, arma una oferta estándar y responde todas. La mayoría de tus competidores responde una y se olvida.",
+       "Para proponer: escríbele a la unidad de compra y ofrece un convenio de suministro por 6 meses con precio fijo. Le resuelves 49 trámites.",
+       "Para cuidarte: si detectas que fraccionan para evitar una licitación en la que tú competirías, tienes derecho a reclamar en Mercado Público. Úsalo con criterio: primero pregunta, después reclama."
+      ]
+     },
+     {
+      "tipo": "dato",
+      "texto": "Entre julio y septiembre de 2026 FirmaVB detectó más de 20 combinaciones organismo-producto con 9 o más compras ágiles repetidas y sobre 55 millones de pesos cada una. Todas de hospitales, universidades y municipios.",
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026"
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Panorama de la licitación: compras ágiles de lo mismo",
+      "ruta": "/licitaciones",
+      "detalle": "Al abrir una licitación, FirmaVB muestra si el organismo tiene compras ágiles paralelas del mismo producto y su historial."
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "Un hospital publica 46 compras ágiles del mismo medicamento en un mes. ¿Cuál es la mejor jugada?",
+      "opciones": [
+       "Reclamar de inmediato por fragmentación.",
+       "Responder solo la primera y esperar.",
+       "Responder todas con una oferta estándar y proponerle un contrato de suministro."
+      ],
+      "correcta": 2,
+      "explicacion": "La compra repetida es demanda real y frecuente. Primero se vende (respondiendo todas), después se propone un contrato. El reclamo se reserva para cuando la fragmentación te excluye de una licitación."
+     }
+    ]
+   },
+   {
+    "titulo": "¿Por qué no compró por convenio marco?",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "Cuando un producto está en el catálogo del convenio marco, la regla es comprar ahí. Sin embargo, miles de compras ágiles de 2026 son de productos que están en catálogo: alimentos, artículos de escritorio, aseo, computación. ¿Por qué? Porque el catálogo no tenía stock, porque el proveedor de convenio no despacha a esa comuna, o porque el comprador encontró condiciones más ventajosas. Cada una de esas razones es una oportunidad."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Compras ágiles de julio a septiembre 2026 en categorías que tienen convenio marco",
+      "columnas": [
+       "Categoría",
+       "Compras ágiles",
+       "% del total",
+       "Monto (millones)"
+      ],
+      "filas": [
+       [
+        "Insumos médicos",
+        5915,
+        10.7,
+        12956
+       ],
+       [
+        "Ferretería y construcción",
+        3480,
+        6.3,
+        6085
+       ],
+       [
+        "Alimentos",
+        3259,
+        5.9,
+        4048
+       ],
+       [
+        "Hardware y computación",
+        2662,
+        4.8,
+        4371
+       ],
+       [
+        "Aseo e higiene",
+        1601,
+        2.9,
+        2468
+       ],
+       [
+        "Mobiliario",
+        1482,
+        2.7,
+        2262
+       ],
+       [
+        "Combustibles",
+        1023,
+        1.8,
+        1790
+       ],
+       [
+        "Artículos de escritorio",
+        972,
+        1.8,
+        983
+       ],
+       [
+        "Emergencias",
+        811,
+        1.5,
+        1555
+       ],
+       [
+        "Software",
+        636,
+        1.1,
+        1418
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "Solo en alimentos hubo 3.259 compras ágiles en tres meses por 4.048 millones, pese a que existe un convenio marco de alimentos con 24.767 órdenes en el año. La compra ágil convive con el convenio, y es la vía por la que un proveedor sin convenio le vende al mismo cliente."
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Si no estás en el convenio: compite en compra ágil con precio igual o menor al del catálogo y con despacho más rápido. El comprador puede justificar la compra fuera del convenio si es más ventajosa.",
+       "Si estás en el convenio: revisa quién te está ganando por compra ágil en tus regiones. Suele ser un proveedor local con despacho en 24 horas.",
+       "Si quieres entrar al convenio: estas cifras te dicen qué categorías tienen demanda que el catálogo no cubre. Ahí conviene postular a la próxima licitación de convenio."
+      ]
+     },
+     {
+      "tipo": "caso",
+      "titulo": "Alimentos en regiones",
+      "texto": "En el convenio marco de alimentos, la Región Metropolitana concentra 1.267 órdenes y 10.071 millones. Pero las compras ágiles de alimentos de julio a septiembre fueron 3.259 en todo Chile, muchas en comunas donde el proveedor de convenio no llega. Un distribuidor regional con camión propio gana esas compras casi sin competencia."
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Reporte de convenio marco por convenio",
+      "ruta": "/reportes/convenio-marco",
+      "detalle": "Mira cuánto se vende por cada convenio, quién vende y quién compra, mes a mes."
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "Ves una compra ágil de 300 resmas de papel, un producto que está en convenio marco. ¿Qué te dice?",
+      "opciones": [
+       "Que el comprador cometió un error y la compra será anulada.",
+       "Que el catálogo no le sirvió (stock, despacho o precio) y hay espacio para una oferta mejor.",
+       "Que no puedes participar porque no estás en el convenio."
+      ],
+      "correcta": 1,
+      "explicacion": "La compra ágil publicada es válida y cualquier proveedor hábil puede responder. Si estás fuera del convenio, esta es tu vía para venderle al mismo cliente."
+     }
+    ]
+   },
+   {
+    "titulo": "Muchos reclamos de pago y aun así le compran: qué te dice",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "Mercado Público registra los reclamos de pago que hacen los proveedores. FirmaVB los cruza con las órdenes de compra. El resultado sorprende: los organismos con más reclamos siguen comprando a miles de proveedores, y muchos les venden igual. La pregunta no es si venderle, sino cómo."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Organismos con más reclamos de pago (octubre 2025 a septiembre 2026) y sus compras 2026",
+      "columnas": [
+       "Organismo",
+       "Reclamos",
+       "Órdenes 2026",
+       "Monto (miles de millones)",
+       "Proveedores",
+       "Proveedor principal (% de órdenes)"
+      ],
+      "filas": [
+       [
+        "Universidad de Chile",
+        1992,
+        29366,
+        107.7,
+        4522,
+        "LATAM (5,5%)"
+       ],
+       [
+        "MOP Dirección General de Obras Públicas",
+        1302,
+        11767,
+        299.5,
+        2620,
+        "LATAM (13%)"
+       ],
+       [
+        "Municipalidad de El Monte",
+        1199,
+        790,
+        2.7,
+        462,
+        "Gasco (2,3%)"
+       ],
+       [
+        "Servicio de Reinserción Social Juvenil",
+        1100,
+        3129,
+        71.5,
+        946,
+        "Dimerc (2,6%)"
+       ],
+       [
+        "Dirección de Logística de Carabineros",
+        1024,
+        1391,
+        126.6,
+        557,
+        "Automotriz Cordillera (5,2%)"
+       ],
+       [
+        "Municipalidad de Talca",
+        788,
+        4117,
+        28.3,
+        1287,
+        "Indura (3,5%)"
+       ],
+       [
+        "Complejo Asistencial Sótero del Río",
+        596,
+        9828,
+        67.7,
+        825,
+        "Medtronic (3,5%)"
+       ],
+       [
+        "CENABAST",
+        587,
+        1040,
+        1524.9,
+        276,
+        "Alembic (2,5%)"
+       ],
+       [
+        "Hospital Gustavo Fricke",
+        474,
+        9707,
+        59.1,
+        773,
+        "Medtronic (3,4%)"
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "La Universidad de Chile tiene casi 2.000 reclamos y 4.522 proveedores distintos en el año: es un cliente enorme que paga lento. La Municipalidad de El Monte tiene 1.199 reclamos con solo 790 órdenes: ahí sí hay un problema serio de pago. La proporción reclamos/órdenes es la que importa."
+     },
+     {
+      "tipo": "subtitulo",
+      "texto": "Cómo usar esta información"
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Reclamos altos con muchas órdenes (Universidad de Chile, MOP): cliente grande y lento. Vende con precio que aguante 60 a 90 días y cobra con método desde el día 31.",
+       "Reclamos altos con pocas órdenes (El Monte, Rinconada, Isla de Maipo): riesgo real. Solo vende con anticipo, montos chicos o si ya te pagó bien antes.",
+       "Reclamos medios en hospitales grandes (Sótero del Río, Fricke): normal para el rubro. Los proveedores de insumos les venden todos los días; el margen ya incluye el plazo.",
+       "Proveedor principal con alto porcentaje (LATAM 13% en el MOP): compras concentradas por convenio marco de pasajes. No es competencia para ti: es la naturaleza del gasto."
+      ]
+     },
+     {
+      "tipo": "grafico",
+      "titulo": "Reclamos de pago registrados por mes",
+      "subtipo": "barras",
+      "datos": [
+       {
+        "etiqueta": "Oct 25",
+        "valor": 6719
+       },
+       {
+        "etiqueta": "Nov",
+        "valor": 5625
+       },
+       {
+        "etiqueta": "Dic",
+        "valor": 6087
+       },
+       {
+        "etiqueta": "Ene 26",
+        "valor": 6637
+       },
+       {
+        "etiqueta": "Feb",
+        "valor": 4683
+       },
+       {
+        "etiqueta": "Mar",
+        "valor": 6091
+       },
+       {
+        "etiqueta": "Abr",
+        "valor": 6228
+       },
+       {
+        "etiqueta": "May",
+        "valor": 5787
+       },
+       {
+        "etiqueta": "Jun",
+        "valor": 6388
+       },
+       {
+        "etiqueta": "Jul",
+        "valor": 6590
+       },
+       {
+        "etiqueta": "Ago",
+        "valor": 7325
+       }
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "unidad": "Cantidad de reclamos en Mercado Público",
+      "lectura": "Entre 4.700 y 7.300 reclamos cada mes en todo el Estado. Agosto de 2026 fue el peor mes del periodo. El atraso en el pago no es una excepción: es parte del negocio, y por eso la Saga 5 dedica un módulo entero a cobrar."
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Ficha de institución con reclamos y plazo de pago",
+      "ruta": "/mercado/instituciones"
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "Un municipio tiene 1.199 reclamos de pago y solo 790 órdenes de compra en el año. ¿Qué haces?",
+      "opciones": [
+       "Le vendo igual: es el Estado y siempre paga.",
+       "Le vendo solo con condiciones: montos chicos, anticipo si es posible, y cobro formal desde el día 31.",
+       "Lo descarto y reclamo en Mercado Público."
+      ],
+      "correcta": 1,
+      "explicacion": "Más reclamos que órdenes es la señal más fuerte de mal pagador. No hace falta descartar, pero sí proteger la caja: ticket chico, condiciones claras y cobranza desde el primer día de atraso."
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "titulo": "Mirar donde otros no ven · La competencia real en compras ágiles",
+  "lecciones": [
+   {
+    "titulo": "Cuántas ofertas recibe una compra ágil (y dónde no hay nadie)",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "El miedo típico: 'hay mucha competencia'. Los datos dicen otra cosa. FirmaVB registra cuántas ofertas recibió cada compra ágil cerrada entre julio y septiembre de 2026."
+     },
+     {
+      "tipo": "grafico",
+      "titulo": "Compras ágiles cerradas según ofertas recibidas (julio a septiembre 2026)",
+      "subtipo": "barras",
+      "datos": [
+       {
+        "etiqueta": "0 ofertas",
+        "valor": 13526
+       },
+       {
+        "etiqueta": "1 oferta",
+        "valor": 4865
+       },
+       {
+        "etiqueta": "2 ofertas",
+        "valor": 2487
+       },
+       {
+        "etiqueta": "3 a 5",
+        "valor": 3186
+       },
+       {
+        "etiqueta": "6 a 10",
+        "valor": 1316
+       },
+       {
+        "etiqueta": "11 o más",
+        "valor": 357
+       }
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "unidad": "Cantidad de compras ágiles con información de ofertas",
+      "lectura": "De las compras ágiles con dato, el 52% no recibió ninguna oferta y otro 19% recibió una sola. Siete de cada diez compras ágiles se ganan o se pierden con una sola oferta en la mesa. Solo el 6,5% tuvo 6 o más competidores."
+     },
+     {
+      "tipo": "dato",
+      "texto": "13.526 compras ágiles cerraron sin ninguna oferta entre julio y septiembre de 2026. Son organismos que necesitaban algo, lo publicaron, y nadie respondió. El monto promedio de esas compras fue 1,8 millones de pesos.",
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026"
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Las compras sin oferta se concentran en regiones, productos específicos y plazos cortos. Un proveedor con despacho a regiones y respuesta el mismo día tiene un océano sin competencia.",
+       "Las compras con 11 o más ofertas (0,7%) son de productos genéricos en Santiago: papel, tóner, computadores. Ahí gana el precio. Si vendes eso, tu ventaja es el convenio marco, no la compra ágil.",
+       "El monto promedio no cambia con la competencia: 1,5 a 1,8 millones en todos los tramos. No es que las compras grandes atraigan más ofertas. Es que nadie mira las chicas."
+      ]
+     },
+     {
+      "tipo": "tip",
+      "texto": "Tu radar debe incluir un filtro de 'pocas ofertas esperadas': regiones lejos de Santiago, productos con especificación técnica, cierre en menos de 3 días. Ahí una oferta correcta gana."
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Radar de compras ágiles con match a tu inventario",
+      "ruta": "/compras-agiles",
+      "detalle": "FirmaVB cruza las compras ágiles publicadas con tus productos y te muestra las que calzan, con el puntaje de match."
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "¿Qué porcentaje de las compras ágiles cerradas (con dato) recibió 0 o 1 oferta entre julio y septiembre de 2026?",
+      "opciones": [
+       "Alrededor del 20%",
+       "Alrededor del 45%",
+       "Alrededor del 70%"
+      ],
+      "correcta": 2,
+      "explicacion": "52% con cero ofertas más 19% con una: 71%. La competencia real en compra ágil es mucho menor de lo que parece."
+     }
+    ]
+   },
+   {
+    "titulo": "Ejercicio guiado: tu radar semanal de oportunidades",
+    "bloques": [
+     {
+      "tipo": "video",
+      "titulo": "Radar semanal: cómo encontrar en 20 minutos lo que otros no ven",
+      "minutos": 14,
+      "resumen": "Demostración en FirmaVB: alertas por producto, filtro por región y ofertas esperadas, seguimiento de organismos, y cómo pasar de la oportunidad a la oferta en un clic."
+     },
+     {
+      "tipo": "ejercicio",
+      "titulo": "Radar semanal",
+      "pasos": [
+       "Lunes 9:00: abre el radar de compras ágiles y ordena por match. Responde hoy las que cierran esta semana.",
+       "Revisa las alertas de los organismos que sigues: ¿hay compras repetidas de lo tuyo? Anótalas para proponer contrato.",
+       "Abre el reporte de tu producto: ¿qué organismos lo compraron el mes pasado por compra ágil? Agrégalos a tu lista de seguidos.",
+       "Viernes: mira las licitaciones nuevas de tu rubro que cierran en más de 10 días y decide ir o no ir con la matriz de FirmaVB.",
+       "Anota en una planilla: oportunidades vistas, ofertadas, ganadas. En un mes sabrás tu tasa real."
+      ],
+      "entregable": "Planilla semanal con oportunidades vistas, ofertadas y ganadas."
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Licitaciones nuevas de tu rubro",
+      "ruta": "/licitaciones-nuevas"
+     },
+     {
+      "tipo": "tip",
+      "texto": "Medir es la mitad del método. Si ofertas 20 compras ágiles al mes y ganas 3, tu tasa es 15%. Con eso sabes cuántas necesitas ofertar para llegar a tu meta de ventas."
+     }
+    ]
+   }
+  ]
+ }
+]

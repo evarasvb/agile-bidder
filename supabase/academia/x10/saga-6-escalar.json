@@ -1,0 +1,656 @@
+[
+ {
+  "titulo": "Casos reales · Convenio marco por convenio (2026)",
+  "lecciones": [
+   {
+    "titulo": "Los convenios vigentes y su tamaño real",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "Hasta ahora nadie podía responder 'cuánto se vende por el convenio de software' porque Mercado Público no publica el convenio de cada orden. FirmaVB lo reconstruyó cruzando los datos abiertos de ChileCompra con las órdenes de compra. Estas son las cifras oficiales de 2026 por convenio."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Convenios marco en 2026 (enero a septiembre)",
+      "columnas": [
+       "Convenio",
+       "Órdenes",
+       "Monto (millones, con IVA)",
+       "% del monto",
+       "Proveedores",
+       "Compradores"
+      ],
+      "filas": [
+       [
+        "Alimentos",
+        24767,
+        123348,
+        20.8,
+        263,
+        985
+       ],
+       [
+        "Insumos y dispositivos médicos",
+        21030,
+        95518,
+        16.1,
+        243,
+        772
+       ],
+       [
+        "Artículos de aseo e higiene",
+        8884,
+        50888,
+        8.6,
+        224,
+        1262
+       ],
+       [
+        "Gas licuado de petróleo",
+        13171,
+        45058,
+        7.6,
+        4,
+        1119
+       ],
+       [
+        "Emergencias y prevención",
+        3706,
+        43989,
+        7.4,
+        78,
+        224
+       ],
+       [
+        "Combustibles",
+        6298,
+        25017,
+        4.2,
+        3,
+        1014
+       ],
+       [
+        "Desarrollo y mantención de software, servicios TI",
+        386,
+        24616,
+        4.2,
+        118,
+        209
+       ],
+       [
+        "Computadoras y accesorios (venta y arriendo)",
+        2769,
+        24610,
+        4.2,
+        108,
+        750
+       ],
+       [
+        "Beneficios y tarjetas institucionales",
+        1489,
+        23693,
+        4.0,
+        1,
+        377
+       ],
+       [
+        "Artículos de escritorio y papelería",
+        6214,
+        23294,
+        3.9,
+        125,
+        1123
+       ],
+       [
+        "Ferretería y servicios",
+        3042,
+        20572,
+        3.5,
+        173,
+        575
+       ],
+       [
+        "Pasajes aéreos nacionales",
+        44314,
+        14777,
+        2.5,
+        11,
+        1061
+       ],
+       [
+        "Vehículos y maquinaria",
+        322,
+        10300,
+        1.7,
+        47,
+        205
+       ],
+       [
+        "Licencias de software de ofimática",
+        396,
+        9791,
+        1.7,
+        22,
+        280
+       ],
+       [
+        "Mobiliario general",
+        395,
+        7175,
+        1.2,
+        57,
+        202
+       ],
+       [
+        "Seguros de vida",
+        155,
+        6088,
+        1.0,
+        1,
+        57
+       ],
+       [
+        "Transporte privado y arriendo de vehículos",
+        289,
+        5399,
+        0.9,
+        66,
+        113
+       ],
+       [
+        "Endoprótesis, ortopedia y trauma",
+        384,
+        5045,
+        0.9,
+        24,
+        59
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "Alimentos e insumos médicos son el 37% del dinero. Pasajes aéreos tiene 44 mil órdenes pero poco monto: ticket chico y 11 proveedores. Software se divide en dos convenios: desarrollo y servicios TI (386 órdenes, 24.616 millones, 118 proveedores) y licencias de ofimática (396 órdenes, 9.791 millones, 22 proveedores)."
+     },
+     {
+      "tipo": "grafico",
+      "titulo": "Monto 2026 por convenio marco (los diez mayores)",
+      "subtipo": "barras",
+      "datos": [
+       {
+        "etiqueta": "Alimentos",
+        "valor": 123348
+       },
+       {
+        "etiqueta": "Insumos médicos",
+        "valor": 95518
+       },
+       {
+        "etiqueta": "Aseo",
+        "valor": 50888
+       },
+       {
+        "etiqueta": "Gas licuado",
+        "valor": 45058
+       },
+       {
+        "etiqueta": "Emergencias",
+        "valor": 43989
+       },
+       {
+        "etiqueta": "Combustibles",
+        "valor": 25017
+       },
+       {
+        "etiqueta": "Software y TI",
+        "valor": 24616
+       },
+       {
+        "etiqueta": "Computadoras",
+        "valor": 24610
+       },
+       {
+        "etiqueta": "Beneficios",
+        "valor": 23693
+       },
+       {
+        "etiqueta": "Escritorio",
+        "valor": 23294
+       }
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "unidad": "Millones de pesos con IVA",
+      "lectura": "La distancia entre el primero y el décimo es de 5 veces. Pero el décimo (escritorio) tiene 125 proveedores y 1.123 compradores: es el convenio con más puertas."
+     },
+     {
+      "tipo": "dato",
+      "texto": "El convenio de aseo e higiene tiene 1.262 organismos compradores distintos en 2026, más que alimentos (985). Es el convenio más 'ancho': muchos compradores chicos en todo Chile, ideal para un proveedor regional.",
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026"
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Reporte de convenio marco por convenio, con quién vende y quién compra",
+      "ruta": "/reportes/convenio-marco"
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "¿Cuál de estos convenios tiene más compradores distintos en 2026 y por qué importa?",
+      "opciones": [
+       "Alimentos, porque mueve más dinero.",
+       "Aseo e higiene, porque son muchos organismos comprando montos chicos: más puertas para un proveedor nuevo.",
+       "Gas licuado, porque tiene 1.119 compradores."
+      ],
+      "correcta": 1,
+      "explicacion": "Aseo tiene 1.262 compradores y 224 proveedores. Muchas puertas y competencia repartida: un buen convenio para entrar y crecer por regiones."
+     }
+    ]
+   },
+   {
+    "titulo": "Quién vende y quién compra por convenio",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "Dentro de cada convenio hay un mapa: pocos proveedores concentran, y algunos compradores enormes definen el año. Dos ejemplos reales de 2026."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Convenio de alimentos 2026",
+      "columnas": [
+       "",
+       "Nombre",
+       "Órdenes",
+       "Monto (millones)"
+      ],
+      "filas": [
+       [
+        "Vende",
+        "Sidapt",
+        2376,
+        10846
+       ],
+       [
+        "Vende",
+        "Comercializadora S&F",
+        534,
+        4372
+       ],
+       [
+        "Vende",
+        "Agrosuper",
+        1169,
+        4155
+       ],
+       [
+        "Vende",
+        "Alimentos San Mateo",
+        421,
+        3474
+       ],
+       [
+        "Vende",
+        "Edenred",
+        229,
+        3411
+       ],
+       [
+        "Compra",
+        "Unidades de la Región Metropolitana",
+        1267,
+        10071
+       ],
+       [
+        "Compra",
+        "Unidades de la Región de Valparaíso",
+        721,
+        3831
+       ],
+       [
+        "Compra",
+        "Dirección de Abastecimiento de la Armada",
+        390,
+        3398
+       ],
+       [
+        "Compra",
+        "Unidades de La Araucanía",
+        1107,
+        2625
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "Sidapt tiene el 9% del convenio con 2.376 órdenes. Pero hay 263 proveedores y 985 compradores: el 91% restante se reparte. La Armada compra 3.398 millones: un cliente para conocer por nombre."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Convenio de licencias de software de ofimática 2026",
+      "columnas": [
+       "",
+       "Nombre",
+       "Órdenes",
+       "Monto (millones)"
+      ],
+      "filas": [
+       [
+        "Vende",
+        "Tecnología BS",
+        120,
+        2994
+       ],
+       [
+        "Vende",
+        "CloudLatam",
+        18,
+        1777
+       ],
+       [
+        "Vende",
+        "Telenet",
+        60,
+        1358
+       ],
+       [
+        "Vende",
+        "MSLI Latam",
+        8,
+        1034
+       ],
+       [
+        "Vende",
+        "Intercity",
+        39,
+        569
+       ],
+       [
+        "Compra",
+        "MOP Subsecretaría",
+        3,
+        633
+       ],
+       [
+        "Compra",
+        "Conaf",
+        1,
+        488
+       ],
+       [
+        "Compra",
+        "Municipalidad de Huechuraba",
+        1,
+        360
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "Software es un convenio de pocas órdenes grandes: el MOP compra 633 millones en 3 órdenes. Aquí no se vende respondiendo rápido: se vende conociendo al comprador meses antes de que emita."
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Convenios anchos (aseo, escritorio, alimentos, ferretería): muchos compradores, muchas órdenes chicas. Gana la cobertura y el despacho.",
+       "Convenios angostos (software, seguros, beneficios): pocos compradores, órdenes grandes. Gana la relación y la especificación técnica.",
+       "Convenios cerrados (gas, combustibles, pasajes): 3 a 11 proveedores. No es tu mercado salvo que seas uno de ellos."
+      ]
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Detalle por convenio: quién vende, quién compra, mes a mes",
+      "ruta": "/reportes/convenio-marco"
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "Quieres vender licencias de software al Estado. Según los datos, ¿qué estrategia tiene más sentido?",
+      "opciones": [
+       "Responder muchas compras ágiles de software.",
+       "Identificar a los 20 organismos que compran por el convenio de ofimática y trabajar la relación antes de la renovación de licencias.",
+       "Bajar el precio del catálogo."
+      ],
+      "correcta": 1,
+      "explicacion": "El convenio de software es de pocas órdenes grandes. La venta se construye con el comprador antes de la emisión, no en el portal."
+     }
+    ]
+   },
+   {
+    "titulo": "Entrar al convenio y competir con el catálogo",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "Entrar a un convenio marco se hace postulando a la licitación del convenio cuando ChileCompra la publica (cada convenio se renueva cada 2 a 4 años; los códigos como 2239-9-LR24 indican el año). Mientras tanto se compite desde fuera."
+     },
+     {
+      "tipo": "subtitulo",
+      "texto": "Desde fuera del convenio"
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Compra ágil con precio bajo el catálogo: el comprador puede justificar comprar fuera del convenio si es más ventajoso. Entre julio y septiembre de 2026 hubo 3.259 compras ágiles de alimentos y 972 de escritorio pese a los convenios.",
+       "Regiones donde el proveedor de convenio no despacha rápido: el comprador prefiere la compra ágil local.",
+       "Productos que el catálogo no tiene: especificaciones técnicas particulares, marcas, formatos."
+      ]
+     },
+     {
+      "tipo": "subtitulo",
+      "texto": "Desde dentro"
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Precio competitivo en catálogo, stock real y despacho a todo Chile. Las órdenes llegan solas, pero solo si tu ficha está completa y actualizada.",
+       "Grandes compras: cuando un organismo necesita volumen, hace una gran compra dentro del convenio. Ahí compiten solo los del convenio.",
+       "Mantente hábil todos los meses: un proveedor inhábil sale del catálogo automáticamente."
+      ]
+     },
+     {
+      "tipo": "video",
+      "titulo": "Cómo se lee el reporte de convenio marco y qué hacer con él",
+      "minutos": 12,
+      "resumen": "Demostración: por convenio, por mes, quién vende y quién compra, y cómo usarlo para decidir a qué convenio postular y a qué organismos seguir."
+     },
+     {
+      "tipo": "ejercicio",
+      "titulo": "Tu plan de convenio",
+      "pasos": [
+       "Identifica el convenio de tu rubro en el reporte y anota: monto, proveedores, compradores, proveedor líder.",
+       "Anota la fecha estimada de la próxima licitación del convenio (el código dice el año de la última).",
+       "Si estás fuera: lista las compras ágiles del rubro en tu región de los últimos 3 meses y responde las próximas con precio bajo catálogo.",
+       "Si estás dentro: revisa tu ficha del catálogo y actualiza stock y precios este mes."
+      ],
+      "entregable": "Plan de convenio de una página con fechas y acciones."
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "Un producto tuyo está en catálogo de convenio marco pero tú no estás en el convenio. ¿Puedes venderlo al Estado?",
+      "opciones": [
+       "No, hasta la próxima licitación del convenio.",
+       "Sí, por compra ágil o licitación, sobre todo si tu precio es menor al del catálogo o tu despacho es mejor.",
+       "Solo por trato directo."
+      ],
+      "correcta": 1,
+      "explicacion": "El convenio es la regla general para el comprador, pero puede comprar fuera si lo justifica. Precio bajo catálogo y despacho local son las dos justificaciones más frecuentes."
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "titulo": "Casos reales · Planifica stock y caja con la estacionalidad",
+  "lecciones": [
+   {
+    "titulo": "Rubros por mes: compra antes de que suba",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "Escalar significa tener stock cuando el Estado compra y caja cuando el Estado se demora. Las series mensuales de 2026 te dicen ambas cosas."
+     },
+     {
+      "tipo": "grafico",
+      "titulo": "Órdenes de compra por mes en construcción y en tecnología (2026)",
+      "subtipo": "lineas",
+      "datos": [
+       {
+        "etiqueta": "Ene",
+        "valor": 3735,
+        "valor2": 3751
+       },
+       {
+        "etiqueta": "Feb",
+        "valor": 4034,
+        "valor2": 3766
+       },
+       {
+        "etiqueta": "Mar",
+        "valor": 4623,
+        "valor2": 4846
+       },
+       {
+        "etiqueta": "Abr",
+        "valor": 5096,
+        "valor2": 4870
+       },
+       {
+        "etiqueta": "May",
+        "valor": 4873,
+        "valor2": 4432
+       },
+       {
+        "etiqueta": "Jun",
+        "valor": 5518,
+        "valor2": 5000
+       },
+       {
+        "etiqueta": "Jul",
+        "valor": 5343,
+        "valor2": 4948
+       },
+       {
+        "etiqueta": "Ago",
+        "valor": 5222,
+        "valor2": 5000
+       }
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "unidad": "Cantidad de órdenes",
+      "serie": "Artículos para obras y construcción",
+      "serie2": "Tecnologías de la información",
+      "lectura": "Construcción sube 48% de enero a junio. Tecnología salta 29% en marzo y se mantiene. Si vendes materiales, tu stock debe estar comprado en abril; si vendes tecnología, en febrero."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Regla de stock por comportamiento del rubro",
+      "columnas": [
+       "Comportamiento",
+       "Rubros 2026",
+       "Qué hacer con el stock"
+      ],
+      "filas": [
+       [
+        "Pico de inicio de año",
+        "Limpieza, consultorías, contratos anuales",
+        "Capacidad lista en diciembre; después del pico, no acumules"
+       ],
+       [
+        "Crecimiento con el año",
+        "Construcción, tecnología, transporte",
+        "Compra escalonada: 30% en marzo, 40% en mayo, 30% en agosto"
+       ],
+       [
+        "Plano todo el año",
+        "Equipamiento médico, laboratorio",
+        "Stock de rotación constante; gana el que despacha en 24 horas"
+       ],
+       [
+        "Saltos por compras centralizadas",
+        "Medicamentos (marzo y julio)",
+        "Capacidad de volumen dos veces al año; el resto, rotación normal"
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026"
+     },
+     {
+      "tipo": "dato",
+      "texto": "Los medicamentos movieron 281 mil millones en julio de 2026 contra 89 mil en abril: tres veces más en el mismo rubro. Quien no tenía stock o capacidad financiera en julio se perdió el mes más grande del año.",
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026"
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Reporte de productos con serie mensual",
+      "ruta": "/reportes/productos"
+     }
+    ]
+   },
+   {
+    "titulo": "Fin de mes y flujo de caja: el 42%",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "El último tercio del mes concentra el 42% del monto de órdenes. Si tus ventas grandes salen entre el 21 y el 31, tus facturas se reciben a principios del mes siguiente y se pagan (en el mejor caso) a principios del subsiguiente. Ese desfase de 45 a 70 días es lo que hay que financiar para escalar."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Caja necesaria para crecer (ejemplo de un proveedor que vende 20 millones al mes)",
+      "columnas": [
+       "Escenario",
+       "Plazo real de pago",
+       "Capital inmovilizado",
+       "Costo del capital al 1,5% mensual"
+      ],
+      "filas": [
+       [
+        "Clientes verdes",
+        "35 días",
+        "23 millones",
+        "350 mil al mes"
+       ],
+       [
+        "Mezcla típica",
+        "55 días",
+        "37 millones",
+        "550 mil al mes"
+       ],
+       [
+        "Clientes rojos",
+        "90 días",
+        "60 millones",
+        "900 mil al mes"
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "Crecer de 20 a 40 millones al mes con clientes rojos exige 120 millones de capital. Con clientes verdes, 46. La selección de clientes (Saga 5) es la decisión financiera más importante del proveedor."
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Factoring: la factura al Estado con recepción conforme es de las más aceptadas; cuesta 1 a 2% mensual. Úsalo para los meses pico, no como rutina.",
+       "Cobranza con método: cada 10 días que reduces el plazo real de pago liberan un 20% de capital.",
+       "Mezcla de clientes: por cada cliente rojo, dos verdes. El promedio de plazo es lo que define tu caja."
+      ]
+     },
+     {
+      "tipo": "video",
+      "titulo": "Planificar caja y stock con los reportes de FirmaVB",
+      "minutos": 11,
+      "resumen": "Demostración: series mensuales por producto, semáforo de pago por cliente y cómo armar el calendario de compras y caja del semestre."
+     },
+     {
+      "tipo": "ejercicio",
+      "titulo": "Tu plan de caja del semestre",
+      "pasos": [
+       "Anota tus ventas esperadas por mes según la estacionalidad de tu rubro.",
+       "Asigna a cada cliente su plazo real de pago (semáforo).",
+       "Calcula el capital inmovilizado por mes y compáralo con tu caja.",
+       "Decide: factoring en los meses pico, o cambiar mezcla de clientes."
+      ],
+      "entregable": "Planilla de caja del semestre con capital necesario por mes."
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "Vendes 20 millones al mes y tus clientes pagan en promedio a 90 días. ¿Cuánto capital tienes inmovilizado?",
+      "opciones": [
+       "Unos 20 millones",
+       "Unos 60 millones",
+       "Unos 6 millones"
+      ],
+      "correcta": 1,
+      "explicacion": "90 días son tres meses de ventas: 60 millones esperando. Por eso el plazo real de pago es la variable que más limita el crecimiento."
+     }
+    ]
+   }
+  ]
+ }
+]
