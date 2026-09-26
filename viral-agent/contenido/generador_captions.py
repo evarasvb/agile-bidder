@@ -45,16 +45,6 @@ POOL_POR_PILAR = {
     "cta_directo": [f"variantes/cta-{i:02d}.jpg" for i in range(1, 17)],
 }
 
-CITAS_LECTOR_EJEMPLO = [
-    "Ojalá lo hubiera leído antes de mi primera postulación",
-    "Por fin alguien explica esto en simple",
-    "Lo recomendé a todo mi equipo de ventas",
-    "Nos ahorró varias reuniones de discutir qué anexo faltaba",
-    "Es el manual que le hubiera pasado a mi yo de hace 5 años",
-    "Lo tengo marcado como guía interna para las nuevas postulaciones",
-]
-
-
 def armar_hashtags(rng):
     seleccion = (
         rng.sample(TODOS["nicho"], k=min(4, len(TODOS["nicho"])))
@@ -93,10 +83,7 @@ def armar_calendario(dias, seed=42):
 
         usados_por_pilar[pilar["clave"]] += 1
 
-        caption = caption_tpl.format(
-            titulo=BOOK_TITLE,
-            cita_lector=rng.choice(CITAS_LECTOR_EJEMPLO),
-        )
+        caption = caption_tpl.format(titulo=BOOK_TITLE)
         formato = rng.choice(pilar["formatos"])
 
         # Facebook Page aún no existe: primeros 14 días solo Instagram,

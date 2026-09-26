@@ -98,6 +98,9 @@ export default function Landing() {
             />
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            <Button variant="ghost" asChild className="hidden md:inline-flex hover:bg-muted/50 transition-colors">
+              <Link to="/planes">Planes</Link>
+            </Button>
             <Button
               variant="outline"
               asChild
@@ -272,14 +275,14 @@ Validar Admisibilidad Gratis
               <div className="text-center md:text-left">
                 <Badge className="mb-2 bg-firmavb-blue/10 text-firmavb-blue border-firmavb-blue/20">
                   <GraduationCap className="h-3 w-3 mr-1" />
-                  Nuevo · 100% gratis
+                  Cursos gratis y programas premium
                 </Badge>
                 <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
                   Academia FirmaVB
                 </h2>
                 <p className="text-muted-foreground mb-5 max-w-xl">
-                  Cursos gratuitos paso a paso, videos, mi libro y una comunidad para
-                  aprender a venderle al Estado. Todo en un solo lugar.
+                  Empieza con cursos gratuitos y avanza con programas especializados,
+                  la Saga Véndele al Estado, el libro y una comunidad de proveedores.
                 </p>
                 <Button
                   asChild
@@ -451,6 +454,7 @@ Validar Admisibilidad Gratis
               </a>
             </div>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <Link to="/planes" className="hover:text-foreground transition-colors">Planes</Link>
               <Link to="/academia" className="hover:text-foreground transition-colors">Academia</Link>
               <Link to="/terminos" className="hover:text-foreground transition-colors">Términos</Link>
               <Link to="/privacidad" className="hover:text-foreground transition-colors">Privacidad</Link>
@@ -542,4 +546,3 @@ function FeatureCard({
     </Card>
   );
 }
-

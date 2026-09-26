@@ -1,80 +1,173 @@
-// Crea una preferencia de Mercado Pago (Checkout Pro) para comprar un curso de
-// la Academia. Pública: la Academia es pública y el comprador puede no tener
-// cuenta. El precio se define en el servidor (no lo manda el cliente).
-// Molde: crear-pago-experto. El webhook mp-curso-webhook confirma el pago.
+// Checkout público de Academia. Precio, referencia y destinos se
+// determinan en servidor; nunca se confía en montos o URLs del navegador.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import {
+  buildAcademyPreference,
+  normalizeAcademyOrigin,
+  resolveAcademyProduct,
+} from './logic.ts';
+import {
+  academyMaintenanceEnabled,
+  consumeAcademyRateLimit,
+  rateLimitWindowStart,
+  requestRateLimitHash,
+} from '../_shared/academia-security.ts';
 
-const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
-function json(b: unknown, s = 200) { return new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } }); }
-
-// Precio (CLP entero) por curso, autoritativo en el servidor.
-const PRECIOS: Record<string, { titulo: string; monto: number }> = {
-  'programa-pro-adjudica-al-estado': { titulo: 'Programa Pro: Estudia y Gana Licitaciones', monto: 45000 },
-  'iniciar-en-mercado-publico': { titulo: 'Inicia en Mercado Público (Express)', monto: 5000 },
-  'saga-1-fundamentos': { titulo: 'Saga 1 · Fundamentos del Sistema', monto: 45000 },
-  'saga-2-oportunidades': { titulo: 'Saga 2 · Oportunidades', monto: 45000 },
-  'saga-3-ofertas': { titulo: 'Saga 3 · Ofertas', monto: 45000 },
-  'saga-4-ganar': { titulo: 'Saga 4 · Ganar', monto: 45000 },
-  'saga-5-ejecutar': { titulo: 'Saga 5 · Ejecutar', monto: 45000 },
-  'saga-6-escalar': { titulo: 'Saga 6 · Escalar', monto: 45000 },
-  'saga-7-automatizacion': { titulo: 'Saga 7 · Automatización', monto: 45000 },
+const cors = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...cors, 'Content-Type': 'application/json' },
+  });
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
+  if (req.method !== 'POST') return json({ error: 'Método no permitido.' }, 405);
+
+  if (academyMaintenanceEnabled(Deno.env.get('ACADEMIA_CHECKOUT_MAINTENANCE'))) {
+    return new Response(JSON.stringify({
+      error: 'Las compras están en mantenimiento. Intenta nuevamente en unos minutos.',
+    }), {
+      status: 503,
+      headers: {
+        ...cors,
+        'Content-Type': 'application/json',
+        'Retry-After': '300',
+      },
+    });
+  }
+
   try {
-    const url = Deno.env.get('SUPABASE_URL')!;
-    const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const db = createClient(url, service);
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!supabaseUrl || !serviceRole) return json({ error: 'Servicio no disponible.' }, 503);
 
-    const body = await req.json().catch(() => ({}));
-    const slug = String(body.slug || '').trim();
+    const db = createClient(supabaseUrl, serviceRole);
+    const body = await req.json().catch(() => ({} as Record<string, unknown>));
+    const product = resolveAcademyProduct(body.slug);
+    if (!product) return json({ error: 'Curso no disponible para compra.' }, 400);
+
     const email = body.email ? String(body.email).trim().toLowerCase() : null;
-    const backUrl = String(body.back_url || '').replace(/\/$/, '') || 'https://firmavb.cl';
+    if (email && (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
+      return json({ error: 'Correo no válido.' }, 400);
+    }
+    const backOrigin = normalizeAcademyOrigin(body.back_url);
 
-    const curso = PRECIOS[slug];
-    if (!curso) return json({ error: 'Curso no disponible para compra.' }, 400);
+    const rateKey = await requestRateLimitHash(req.headers, serviceRole, 'crear_checkout');
+    const allowed = await consumeAcademyRateLimit(
+      (args) => db.rpc('academia_consumir_rate_limit', args),
+      {
+        action: 'crear_checkout',
+        keyHash: rateKey,
+        windowStart: rateLimitWindowStart(new Date(), 10 * 60 * 1_000),
+        limit: 5,
+      },
+    ).catch(() => null);
+    if (allowed === null) return json({ error: 'Servicio no disponible.' }, 503);
+    if (!allowed) return json({ error: 'Demasiados intentos. Espera unos minutos.' }, 429);
 
-    // Token de Mercado Pago: env o tabla app_secrets (mismo patrón del repo).
     let mpToken = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN');
     if (!mpToken) {
-      const { data } = await db.from('app_secrets').select('value').eq('key', 'MERCADOPAGO_ACCESS_TOKEN').maybeSingle();
+      const { data } = await db.from('app_secrets').select('value')
+        .eq('key', 'MERCADOPAGO_ACCESS_TOKEN').maybeSingle();
       mpToken = data?.value;
     }
-    if (!mpToken) return json({ error: 'Mercado Pago no está configurado.' }, 500);
+    if (!mpToken) return json({ error: 'Mercado Pago no está configurado.' }, 503);
 
-    // Registro del pago (pendiente) → su id es el external_reference.
-    const { data: pago, error: pagoErr } = await db.from('academia_pagos')
-      .insert({ curso_slug: slug, email, monto: curso.monto, estado: 'pendiente' })
-      .select('id').single();
-    if (pagoErr || !pago) return json({ error: 'No se pudo iniciar el pago.' }, 500);
+    const { data: payment, error: paymentError } = await db.from('academia_pagos')
+      .insert({
+        curso_slug: product.slug,
+        email,
+        monto: product.amount,
+        estado: 'iniciando',
+      })
+      .select('id')
+      .single();
+    if (paymentError || !payment) return json({ error: 'No se pudo iniciar el pago.' }, 500);
 
-    const base = `${backUrl}/academia/curso/${slug}`;
-    const pref: Record<string, unknown> = {
-      items: [{ id: slug, title: curso.titulo, quantity: 1, unit_price: curso.monto, currency_id: 'CLP' }],
-      external_reference: pago.id,
-      metadata: { pago_id: pago.id, slug },
-      notification_url: `${url}/functions/v1/mp-curso-webhook`,
-      back_urls: { success: `${base}?pago=ok`, pending: `${base}?pago=pendiente`, failure: `${base}?pago=error` },
-      auto_return: 'approved',
-      statement_descriptor: 'FIRMAVB ACADEMIA',
-    };
-    if (email) pref.payer = { email };
-
-    const r = await fetch('https://api.mercadopago.com/checkout/preferences', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${mpToken}`, 'Content-Type': 'application/json', 'X-Idempotency-Key': String(pago.id) },
-      body: JSON.stringify(pref),
+    const preference = buildAcademyPreference({
+      paymentId: payment.id,
+      product,
+      supabaseUrl,
+      backOrigin,
+      email,
     });
-    const d = await r.json();
-    if (!r.ok || !d.init_point) {
-      await db.from('academia_pagos').update({ estado: 'error', raw: d, updated_at: new Date().toISOString() }).eq('id', pago.id);
-      return json({ error: 'Mercado Pago rechazó la preferencia.', detalle: (typeof d?.message === 'string' ? d.message : '').slice(0, 160) }, 502);
-    }
-    await db.from('academia_pagos').update({ mp_preference_id: d.id, updated_at: new Date().toISOString() }).eq('id', pago.id);
 
-    return json({ ok: true, pago_id: pago.id, url: d.init_point, monto: curso.monto });
-  } catch (e) {
-    return json({ error: e instanceof Error ? e.message : String(e) }, 500);
+    const mercadoPagoResponse = await fetch(
+      'https://api.mercadopago.com/checkout/preferences',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${mpToken}`,
+          'Content-Type': 'application/json',
+          'X-Idempotency-Key': String(payment.id),
+        },
+        body: JSON.stringify(preference),
+      },
+    );
+    const responseBody = await mercadoPagoResponse.json().catch(() => ({})) as Record<string, unknown>;
+    const preferenceId = typeof responseBody.id === 'string' ? responseBody.id : null;
+    const checkoutUrl = typeof responseBody.init_point === 'string' ? responseBody.init_point : null;
+    if (!mercadoPagoResponse.ok || !preferenceId || !checkoutUrl) {
+      await db.from('academia_pagos').update({
+        estado: 'error_preferencia',
+        raw: responseBody,
+        updated_at: new Date().toISOString(),
+      }).eq('id', payment.id);
+      await db.from('academia_eventos').upsert({
+        pago_id: payment.id,
+        clave_idempotencia: `preferencia-error:${payment.id}`,
+        tipo: 'preferencia_mp_error',
+        severidad: 'error',
+        detalle: { status_http: mercadoPagoResponse.status },
+      }, { onConflict: 'clave_idempotencia', ignoreDuplicates: true });
+      return json({ error: 'Mercado Pago rechazó la preferencia.' }, 502);
+    }
+
+    const { data: persisted, error: persistError } = await db.from('academia_pagos')
+      .update({
+        mp_preference_id: preferenceId,
+        estado: 'pendiente',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', payment.id)
+      .eq('estado', 'iniciando')
+      .select('id, mp_preference_id')
+      .maybeSingle();
+
+    let persistedPreferenceId = persisted?.mp_preference_id || null;
+    if (persistError || persistedPreferenceId !== preferenceId) {
+      const { data: readBack, error: readBackError } = await db.from('academia_pagos')
+        .select('mp_preference_id')
+        .eq('id', payment.id)
+        .maybeSingle();
+      if (!readBackError) persistedPreferenceId = readBack?.mp_preference_id || null;
+    }
+
+    if (persistedPreferenceId !== preferenceId) {
+      await db.from('academia_eventos').upsert({
+        pago_id: payment.id,
+        clave_idempotencia: `preferencia-no-persistida:${payment.id}`,
+        tipo: 'preferencia_mp_no_persistida',
+        severidad: 'critical',
+        detalle: {},
+      }, { onConflict: 'clave_idempotencia', ignoreDuplicates: true });
+      return json({ error: 'No pudimos confirmar el inicio del pago. Intenta nuevamente.' }, 503);
+    }
+
+    return json({
+      ok: true,
+      pago_id: payment.id,
+      url: checkoutUrl,
+      monto: product.amount,
+    });
+  } catch {
+    return json({ error: 'No se pudo iniciar el pago.' }, 500);
   }
 });

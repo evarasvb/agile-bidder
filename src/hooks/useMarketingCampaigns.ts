@@ -36,7 +36,7 @@ export interface MarketingPieza {
   contenido: string;
   url_tracking?: string;
   programado_para?: string;
-  estado: 'draft' | 'ejecutando' | 'pendiente' | 'programado' | 'ejecutado' | 'enviado' | 'fallido';
+  estado: 'draft' | 'procesando' | 'ejecutando' | 'pendiente' | 'programado' | 'ejecutado' | 'enviado' | 'fallido';
   cantidad_objetivo?: number;
   creado_en: string;
 }
