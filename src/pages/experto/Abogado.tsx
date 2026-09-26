@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -93,7 +93,7 @@ export default function Abogado() {
     setMsgs((m) => [...m, { rol: 'yo', texto: p }, { rol: 'exp', texto: '' }]);
     setEnviando(true);
     try {
-      await pedir({ modo: 'chat', pregunta: p, historial, huella: 'abogado' }, (t, meta) =>
+      await pedir({ modo: 'chat', pregunta: p, historial, codigo: codigo || undefined, huella: 'abogado' }, (t, meta) =>
         setMsgs((m) => { const c = [...m]; c[c.length - 1] = { rol: 'exp', texto: t, fuentes: meta?.fuentes }; return c; }));
     } catch (e: any) {
       if (e.status === 402 || e.status === 401) setLimite(e.message);
@@ -145,20 +145,46 @@ export default function Abogado() {
     });
   };
 
+  // Si hay código, lista SOLO los documentos ligados a ese caso (si no, el
+  // endpoint devuelve la carpeta general): antes siempre listaba general y
+  // el documento recién subido a un código desaparecía de "Mis documentos".
+  // "Armada" apenas se abre la pestaña (no cuando la primera respuesta
+  // llega): si el usuario cambia el código mientras esa primera petición
+  // sigue en vuelo, igual queda armado el reintento por el efecto de abajo,
+  // en vez de perder la respuesta y quedar sin recargar hasta la próxima vez.
+  const documentosArmados = useRef(false);
+  // Sigue el código más reciente: si una respuesta llega después de que el
+  // usuario ya cambió el código (p. ej. tecleando rápido), se descarta en vez
+  // de pisar la lista con datos de un código que ya no es el actual.
+  const codigoRef = useRef('');
+  codigoRef.current = codigo;
   const listarDocumentos = async () => {
+    const codigoAlPedir = codigo;
     try {
-      const r = await fetch(`${SUPA}/functions/v1/experto-documentos`, { headers: auth });
+      const qs = codigoAlPedir ? `?codigo=${encodeURIComponent(codigoAlPedir)}` : '';
+      const r = await fetch(`${SUPA}/functions/v1/experto-documentos${qs}`, { headers: auth });
       const j = await r.json().catch(() => ({}));
+      if (codigoAlPedir !== codigoRef.current) return;
       setDocumentos(j.documentos ?? []);
     } catch { /* silencioso */ }
   };
+
+  // Si el usuario cambia el código estando en la pestaña "Mis documentos",
+  // recarga la lista para ese código (con un pequeño debounce para no
+  // disparar una petición por cada tecla, solo después de abrir la pestaña).
+  useEffect(() => {
+    if (!documentosArmados.current) return;
+    const t = setTimeout(() => listarDocumentos(), 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [codigo]);
 
   const subirDocumento = async (files: FileList | File[]) => {
     const lista = Array.from(files); if (!lista.length) return;
     setSubiendo(true);
     for (const file of lista) {
       try {
-        const r = await fetch(`${SUPA}/functions/v1/experto-documentos`, { method: 'POST', headers: { ...auth, 'Content-Type': file.type || 'application/octet-stream', 'X-Codigo': '', 'X-Nombre': encodeURIComponent(file.name), 'X-Destino': 'documento' }, body: file });
+        const r = await fetch(`${SUPA}/functions/v1/experto-documentos`, { method: 'POST', headers: { ...auth, 'Content-Type': file.type || 'application/octet-stream', 'X-Codigo': codigo || '', 'X-Nombre': encodeURIComponent(file.name), 'X-Destino': 'documento' }, body: file });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) { toast.error(`${file.name}: ${j.mensaje || j.error || 'Error ' + r.status}`); continue; }
         toast.success(`Leído: ${file.name}`);
@@ -189,10 +215,14 @@ export default function Abogado() {
         <TabsList>
           <TabsTrigger value="chat">Chat</TabsTrigger>
           <TabsTrigger value="documento">Generar documento</TabsTrigger>
-          <TabsTrigger value="documentos" onClick={listarDocumentos}>Mis documentos</TabsTrigger>
+          <TabsTrigger value="documentos" onClick={() => { documentosArmados.current = true; listarDocumentos(); }}>Mis documentos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="chat" className="space-y-3">
+          <div>
+            <Label className="text-xs text-muted-foreground">ID de licitación o compra (opcional) — si es sobre un caso puntual, Don Evaristo busca antecedentes, reclamos y compras relacionadas de ese proceso</Label>
+            <Input value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="Ej: 2699-35-LE26" className="mt-1" />
+          </div>
           <Card>
             <CardContent className="p-4 space-y-3 min-h-[300px] max-h-[55vh] overflow-y-auto">
               {msgs.length === 0 && (
@@ -348,6 +378,10 @@ export default function Abogado() {
               <p className="text-sm text-muted-foreground">
                 Sube contratos, notificaciones o reclamos previos: Don Evaristo Abogado los lee para responderte y redactar con los hechos exactos.
               </p>
+              <div>
+                <Label className="text-xs text-muted-foreground">ID de licitación o compra (opcional) — liga estos documentos a ese caso puntual</Label>
+                <Input value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="Ej: 2699-35-LE26" className="mt-1 max-w-xs" />
+              </div>
               <label className="inline-flex items-center gap-2 text-sm cursor-pointer text-primary">
                 <Upload className="h-4 w-4" /> {subiendo ? 'Subiendo…' : 'Subir documento (PDF, Word, Excel, imagen)'}
                 <input type="file" className="hidden" multiple disabled={subiendo}
