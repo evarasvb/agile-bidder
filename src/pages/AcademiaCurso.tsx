@@ -266,7 +266,7 @@ export default function AcademiaCurso() {
     }
     setCargando(true);
     const { data, error } = await supabase.functions.invoke("academia-premium", {
-      body: { action: "validar", slug: curso.slug, codigo: codigo.trim() },
+      body: { action: "validar", slug: curso.slug, codigo: codigo.trim(), x10: true },
     });
     setCargando(false);
     if (error || !data?.ok) {
@@ -285,7 +285,7 @@ export default function AcademiaCurso() {
     }
     setRecuperando(true);
     const { data, error } = await supabase.functions.invoke("academia-premium", {
-      body: { action: "recuperar", slug: curso.slug, email: email.trim() },
+      body: { action: "recuperar", slug: curso.slug, email: email.trim(), x10: true },
     });
     setRecuperando(false);
     if (error || !data?.ok) {

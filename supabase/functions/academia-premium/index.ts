@@ -121,12 +121,22 @@ function json(body: unknown, status = 200) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   try {
-    const { action, slug, codigo, email } = await req.json();
+    const { action, slug, codigo, email, x10 } = await req.json();
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
     // Primero la tabla (editable sin redeploy); el respaldo en código solo si no hay fila.
     const { data: fila } = await admin.from('academia_contenido').select('modulos').eq('slug', slug).maybeSingle();
-    const contenido: unknown = fila?.modulos ?? CONTENIDO[slug as string];
+    let contenido: unknown = fila?.modulos ?? CONTENIDO[slug as string];
     if (!contenido) return json({ ok: false, error: 'Curso no encontrado' }, 404);
+    // Los bloques "x10" (gráfico, tabla, video, quiz, herramienta, ejercicio) solo se
+    // entregan a la app que sabe dibujarlos (envía x10: true); una app antigua recibe
+    // el contenido clásico en vez de espacios en blanco.
+    if (x10 !== true && Array.isArray(contenido)) {
+      const clasicos = new Set(['parrafo', 'subtitulo', 'lista', 'tip', 'descarga', 'caso', 'dato', 'cta']);
+      contenido = (contenido as { titulo: string; lecciones: { titulo: string; bloques: { tipo: string }[] }[] }[]).map((m) => ({
+        ...m,
+        lecciones: m.lecciones.map((l) => ({ ...l, bloques: (l.bloques || []).filter((b) => clasicos.has(b.tipo)) })),
+      }));
+    }
 
     if (action === 'validar') {
       const code = String(codigo || '').trim().toUpperCase();
