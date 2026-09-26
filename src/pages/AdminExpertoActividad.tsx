@@ -101,22 +101,21 @@ function TabExperto() {
           </SelectContent>
         </Select>
       </div>
-      {isLoading ? <Skeleton className="h-64 w-full" /> : (
-        <DataTable<ExpertoConsulta>
-          storageKey="admin-experto-consultas"
-          rows={consultas ?? []}
-          rowKey={(c) => c.id}
-          itemLabel="consultas"
-          columns={columnas}
-          searchText={(c) => `${c.pregunta} ${c.respuesta} ${c.empresa_nombre ?? ''} ${c.email ?? ''} ${c.licitacion ?? ''}`}
-          onSearchChange={setBuscar}
-          searchPlaceholder="Buscar por pregunta, respuesta, cliente o licitación…"
-          defaultSort={{ id: 'fecha', dir: 'desc' }}
-          exportFileName="experto-consultas"
-          onRowClick={(c) => setAbierta(c)}
-          emptyMessage={<span className="inline-flex flex-col items-center gap-2"><MessageSquare className="h-10 w-10 opacity-40" />Sin consultas en este período.</span>}
-        />
-      )}
+      <DataTable<ExpertoConsulta>
+        storageKey="admin-experto-consultas"
+        rows={consultas ?? []}
+        rowKey={(c) => c.id}
+        itemLabel="consultas"
+        columns={columnas}
+        loading={isLoading}
+        searchText={(c) => `${c.pregunta} ${c.respuesta} ${c.empresa_nombre ?? ''} ${c.email ?? ''} ${c.licitacion ?? ''}`}
+        onSearchChange={setBuscar}
+        searchPlaceholder="Buscar por pregunta, respuesta, cliente o licitación…"
+        defaultSort={{ id: 'fecha', dir: 'desc' }}
+        exportFileName="experto-consultas"
+        onRowClick={(c) => setAbierta(c)}
+        emptyMessage={<span className="inline-flex flex-col items-center gap-2"><MessageSquare className="h-10 w-10 opacity-40" />Sin consultas en este período.</span>}
+      />
 
       <Dialog open={!!abierta} onOpenChange={(o) => !o && setAbierta(null)}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
@@ -146,7 +145,8 @@ function TabExperto() {
 
 function TabEvaristo() {
   const [dias, setDias] = useState('7');
-  const { data: conversaciones, isLoading } = useEvaristoConversaciones(Number(dias));
+  const [buscar, setBuscar] = useState('');
+  const { data: conversaciones, isLoading } = useEvaristoConversaciones(Number(dias), buscar);
   const [abierta, setAbierta] = useState<EvaristoConversacion | null>(null);
   const { data: mensajes, isLoading: cargandoMensajes } = useEvaristoMensajes(abierta?.id ?? null);
 
@@ -187,21 +187,21 @@ function TabEvaristo() {
           </SelectContent>
         </Select>
       </div>
-      {isLoading ? <Skeleton className="h-64 w-full" /> : (
-        <DataTable<EvaristoConversacion>
-          storageKey="admin-evaristo-conversaciones"
-          rows={conversaciones ?? []}
-          rowKey={(c) => c.id}
-          itemLabel="conversaciones"
-          columns={columnas}
-          searchText={(c) => `${c.empresa_nombre ?? ''} ${c.email ?? ''} ${c.ultima_pregunta ?? ''} ${c.titulo ?? ''}`}
-          searchPlaceholder="Buscar por cliente o pregunta…"
-          defaultSort={{ id: 'fecha', dir: 'desc' }}
-          exportFileName="evaristo-conversaciones"
-          onRowClick={(c) => setAbierta(c)}
-          emptyMessage={<span className="inline-flex flex-col items-center gap-2"><MessageSquare className="h-10 w-10 opacity-40" />Sin conversaciones en este período.</span>}
-        />
-      )}
+      <DataTable<EvaristoConversacion>
+        storageKey="admin-evaristo-conversaciones"
+        rows={conversaciones ?? []}
+        rowKey={(c) => c.id}
+        itemLabel="conversaciones"
+        columns={columnas}
+        loading={isLoading}
+        searchText={(c) => `${c.empresa_nombre ?? ''} ${c.email ?? ''} ${c.ultima_pregunta ?? ''} ${c.titulo ?? ''}`}
+        onSearchChange={setBuscar}
+        searchPlaceholder="Buscar por cliente o pregunta…"
+        defaultSort={{ id: 'fecha', dir: 'desc' }}
+        exportFileName="evaristo-conversaciones"
+        onRowClick={(c) => setAbierta(c)}
+        emptyMessage={<span className="inline-flex flex-col items-center gap-2"><MessageSquare className="h-10 w-10 opacity-40" />Sin conversaciones en este período.</span>}
+      />
 
       <Dialog open={!!abierta} onOpenChange={(o) => !o && setAbierta(null)}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">

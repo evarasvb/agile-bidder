@@ -64,11 +64,11 @@ export function useExpertoConsultas(dias: number, buscar: string) {
   });
 }
 
-export function useEvaristoConversaciones(dias: number) {
+export function useEvaristoConversaciones(dias: number, buscar: string) {
   return useQuery({
-    queryKey: ['admin_evaristo_conversaciones', dias],
+    queryKey: ['admin_evaristo_conversaciones', dias, buscar],
     queryFn: async () => {
-      const { data, error } = await (supabase as any).rpc('admin_evaristo_conversaciones', { dias, lim: 200 });
+      const { data, error } = await (supabase as any).rpc('admin_evaristo_conversaciones', { dias, lim: 200, buscar: buscar || null });
       if (error) throw error;
       return (data ?? []) as EvaristoConversacion[];
     },
