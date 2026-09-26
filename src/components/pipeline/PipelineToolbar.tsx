@@ -46,16 +46,20 @@ export function PipelineToolbar({
 
   return (
     <div className="flex flex-wrap items-center gap-3">
-      {/* Search */}
-      <div className="relative flex-1 min-w-[200px] max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <Input
-          placeholder="Buscar oportunidades..."
-          value={filters.search || ''}
-          onChange={(e) => onFiltersChange({ ...filters, search: e.target.value })}
-          className="pl-9 h-9"
-        />
-      </div>
+      {/* Search: solo en kanban. La tabla trae su propio buscador (DataTable),
+          y dos cajas encimadas confundían. */}
+      {view === 'kanban' && (
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Buscar oportunidades..."
+            value={filters.search || ''}
+            onChange={(e) => onFiltersChange({ ...filters, search: e.target.value })}
+            className="pl-9 h-9"
+            aria-label="Buscar oportunidades en el pipeline"
+          />
+        </div>
+      )}
 
       {/* Filters popover */}
       <Popover>
@@ -94,7 +98,7 @@ export function PipelineToolbar({
                 onFiltersChange({ ...filters, oportunidad_tipo: v === 'todos' ? undefined : v })
               }
             >
-              <SelectTrigger className="h-8 text-xs">
+              <SelectTrigger className="h-8 text-xs" aria-label="Filtrar por tipo de oportunidad">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -111,6 +115,7 @@ export function PipelineToolbar({
             <Label className="text-xs">Rango de monto (CLP)</Label>
             <div className="flex items-center gap-2">
               <Input
+                id="monto-min"
                 type="number"
                 placeholder="Mín"
                 value={filters.montoMin || ''}
@@ -121,9 +126,11 @@ export function PipelineToolbar({
                   })
                 }
                 className="h-8 text-xs"
+                aria-label="Monto mínimo"
               />
               <span className="text-xs text-gray-400">—</span>
               <Input
+                id="monto-max"
                 type="number"
                 placeholder="Máx"
                 value={filters.montoMax || ''}
@@ -134,6 +141,7 @@ export function PipelineToolbar({
                   })
                 }
                 className="h-8 text-xs"
+                aria-label="Monto máximo"
               />
             </div>
           </div>
@@ -143,21 +151,25 @@ export function PipelineToolbar({
             <Label className="text-xs">Fecha cierre</Label>
             <div className="flex items-center gap-2">
               <Input
+                id="fecha-desde"
                 type="date"
                 value={filters.fechaCierreDesde || ''}
                 onChange={(e) =>
                   onFiltersChange({ ...filters, fechaCierreDesde: e.target.value || undefined })
                 }
                 className="h-8 text-xs"
+                aria-label="Fecha cierre mínima"
               />
               <span className="text-xs text-gray-400">—</span>
               <Input
+                id="fecha-hasta"
                 type="date"
                 value={filters.fechaCierreHasta || ''}
                 onChange={(e) =>
                   onFiltersChange({ ...filters, fechaCierreHasta: e.target.value || undefined })
                 }
                 className="h-8 text-xs"
+                aria-label="Fecha cierre máxima"
               />
             </div>
           </div>

@@ -83,7 +83,7 @@ export function DemoModal({ open, onOpenChange }: DemoModalProps) {
           <div className="bg-gradient-to-br from-firmavb-blue/10 to-firmavb-red/5 rounded-xl p-6 mb-6">
             <div className="flex items-start gap-4">
               <div className="rounded-lg bg-firmavb-blue p-3">
-                <Icon className="h-8 w-8 text-white" />
+                <Icon className="h-8 w-8 text-white" aria-hidden="true" />
               </div>
               <div className="flex-1">
                 <h3 className="text-lg font-bold text-foreground mb-2">{slide.title}</h3>

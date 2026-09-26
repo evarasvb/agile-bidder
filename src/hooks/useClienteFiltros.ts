@@ -104,7 +104,7 @@ export function useClienteFiltros() {
       const clienteId = await resolverClienteId(user.id);
       if (!clienteId) return null;
 
-      const { data, error } = await (supabaseClient as any)
+      const { data, error } = await supabaseClient
         .from('cliente_filtros_oportunidades')
         .select('*')
         .eq('cliente_id', clienteId)
@@ -132,7 +132,7 @@ export function useClienteFiltros() {
         ...filtros,
         updated_at: new Date().toISOString(),
       };
-      const { data, error } = await (supabaseClient as any)
+      const { data, error } = await supabaseClient
         .from('cliente_filtros_oportunidades')
         .upsert(payload, { onConflict: 'cliente_id' })
         .select()
@@ -157,6 +157,13 @@ export function useClienteFiltros() {
   return {
     filtros: query.data,
     isLoading: query.isLoading,
+    // isFetched (a diferencia de !isLoading) solo pasa a true cuando el query
+    // de verdad terminó de correr al menos una vez. Mientras está `enabled:
+    // false` (por ejemplo, mientras la sesión todavía no resuelve `user?.id`),
+    // isLoading ya es false pero isFetched sigue en false — la distinción que
+    // necesita quien hidrata un formulario para no confundir "todavía no sé"
+    // con "ya sé que no hay nada".
+    isFetched: query.isFetched,
     error: query.error,
     updateFiltros: updateFiltros.mutate,
     isUpdating: updateFiltros.isPending,

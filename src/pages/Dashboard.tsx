@@ -1,14 +1,10 @@
 import { useState } from "react";
 import {
   Target,
-  Zap,
   DollarSign,
   TrendingUp,
   TrendingDown,
   ArrowRight,
-  Clock,
-  Eye,
-  Plus,
   Loader2,
   Sparkles,
   RefreshCw,
@@ -16,24 +12,17 @@ import {
   AlertTriangle,
   Info,
   BarChart3,
+  Newspaper,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   useDashboardKPIs,
   usePipelineByStage,
   useOportunidadesPorTipo,
-  useCierresProximos,
-  useUltimosMatches,
+  useNoticiasInstituciones,
 } from "@/hooks/useDashboardPrincipal";
 import {
   BarChart,
@@ -57,15 +46,12 @@ import {
 } from "@/components/dashboard/DashboardSkeleton";
 import { PrimerosPasos } from "@/components/dashboard/PrimerosPasos";
 import { ActivationOnboarding } from "@/components/dashboard/ActivationOnboarding";
+import { DatoCuriosoCard } from "@/components/dashboard/DatoCuriosoCard";
 import { TutorialBienvenida } from "@/components/dashboard/TutorialBienvenida";
 import { ResumenEjecutivo } from "@/components/dashboard/ResumenEjecutivo";
+import { PanelProveedorCard } from "@/components/dashboard/PanelProveedorCard";
 import { FirmaVBHeader } from "@/components/layout/FirmaVBHeader";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import {
   Dialog,
   DialogContent,
@@ -106,10 +92,8 @@ export default function Dashboard() {
     usePipelineByStage();
   const { data: porTipoData, isLoading: porTipoLoading } =
     useOportunidadesPorTipo();
-  const { data: cierresData, isLoading: cierresLoading } =
-    useCierresProximos();
-  const { data: matchesData, isLoading: matchesLoading } =
-    useUltimosMatches();
+  const { data: noticiasData, isLoading: noticiasLoading } =
+    useNoticiasInstituciones();
   // "Buscar oportunidades para mí": corre el match del PROPIO cliente y lleva a
   // la bandeja. Antes era "Ejecutar Matching IA" con un diálogo que contaba
   // oportunidades de TODO el sistema (jerga + números ajenos al cliente).
@@ -117,7 +101,7 @@ export default function Dashboard() {
   const handleBuscarParaMi = async () => {
     setIsMatching(true);
     try {
-      await (supabase as any).rpc("generar_matches_ca_para_mi");
+      await supabase.rpc("generar_matches_ca_para_mi");
       toast({
         title: "¡Listo!",
         description: "Buscamos coincidencias nuevas con tu inventario.",
@@ -210,6 +194,9 @@ export default function Dashboard() {
       {/* Resumen ejecutivo del negocio (datos reales del pipeline) */}
       <ResumenEjecutivo />
 
+      {/* Panel del proveedor: qué vende según sus OC, keywords sugeridas y clientes a seguir */}
+      <PanelProveedorCard />
+
       {/* Error Banner */}
       {kpisError && (
         <div className="bg-firmavb-red/10 border border-firmavb-red/20 rounded-lg px-4 py-3 flex items-center justify-between">
@@ -247,6 +234,9 @@ export default function Dashboard() {
                 <BarChart3 className="h-4 w-4 text-firmavb-blue" />
                 Pipeline por Etapa
               </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Cuántas oportunidades tienes en cada estado del proceso.
+              </p>
             </CardHeader>
             <CardContent>
               {!pipelineData?.length ? (
@@ -255,48 +245,55 @@ export default function Dashboard() {
                   <p className="text-sm">Sin datos de pipeline</p>
                 </div>
               ) : (
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={pipelineData} barCategoryGap="20%">
+                <ResponsiveContainer
+                  width="100%"
+                  height={Math.max(280, pipelineData.length * 34)}
+                >
+                  {/* Barras horizontales: con muchas etapas, los nombres se leen
+                      completos a la izquierda en vez de encimarse abajo. */}
+                  <BarChart
+                    data={pipelineData}
+                    layout="vertical"
+                    margin={{ left: 8, right: 16, top: 4, bottom: 4 }}
+                    barCategoryGap="25%"
+                  >
                     <CartesianGrid
                       strokeDasharray="3 3"
                       className="stroke-muted"
-                      vertical={false}
+                      horizontal={false}
                     />
                     <XAxis
-                      dataKey="etapa"
-                      tick={{ fontSize: 11 }}
-                      className="text-muted-foreground"
-                      axisLine={false}
-                      tickLine={false}
-                      interval={0}
-                      angle={-20}
-                      textAnchor="end"
-                      height={50}
-                    />
-                    <YAxis
+                      type="number"
                       tick={{ fontSize: 12 }}
                       className="text-muted-foreground"
                       axisLine={false}
                       tickLine={false}
+                      allowDecimals={false}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="etapa"
+                      tick={{ fontSize: 12 }}
+                      className="text-muted-foreground"
+                      axisLine={false}
+                      tickLine={false}
+                      width={130}
+                      interval={0}
                     />
                     <RechartsTooltip
+                      cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }}
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
                         border: "1px solid hsl(var(--border))",
                         borderRadius: "8px",
                       }}
-                      formatter={(value: number, name: string) => {
-                        if (name === "monto")
-                          return [formatCompact(value), "Monto"];
-                        return [value, "Cantidad"];
-                      }}
+                      formatter={(value: number) => [value, "Oportunidades"]}
                     />
-                    <Legend />
                     <Bar
                       dataKey="count"
-                      name="Cantidad"
+                      name="Oportunidades"
                       fill="hsl(var(--firmavb-blue))"
-                      radius={[4, 4, 0, 0]}
+                      radius={[0, 4, 4, 0]}
                     />
                   </BarChart>
                 </ResponsiveContainer>
@@ -324,6 +321,9 @@ export default function Dashboard() {
                 <Target className="h-4 w-4 text-firmavb-green" />
                 Oportunidades abiertas por tipo
               </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Reparto entre Compras Ágiles y Licitaciones.
+              </p>
             </CardHeader>
             <CardContent>
               {!porTipoData?.length ||
@@ -344,8 +344,6 @@ export default function Dashboard() {
                       paddingAngle={4}
                       dataKey="count"
                       nameKey="tipo"
-                      label={({ tipo, count }) => `${tipo}: ${count}`}
-                      labelLine={false}
                     >
                       {porTipoData.map((_, index) => (
                         <Cell
@@ -361,7 +359,11 @@ export default function Dashboard() {
                         borderRadius: "8px",
                       }}
                     />
-                    <Legend />
+                    <Legend
+                      formatter={(value: string, entry: any) =>
+                        `${value} (${entry?.payload?.count ?? 0})`
+                      }
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               )}
@@ -370,228 +372,58 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Row 3: Cierres Próximos + Últimos Matches */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        {/* Cierres Próximos */}
-        <Card className="border-border/50 shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-heading font-semibold flex items-center gap-2">
-              <Clock className="h-4 w-4 text-firmavb-amber" />
-              Cierres Próximos (7 días)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {cierresLoading ? (
-              <div className="space-y-3">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-14 w-full" />
-                ))}
-              </div>
-            ) : !cierresData?.length ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Inbox className="h-10 w-10 mx-auto mb-3 opacity-50" />
-                <p className="text-sm">
-                  Sin oportunidades por cerrar esta semana
-                </p>
-              </div>
-            ) : (
-              <div className="rounded-lg border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="font-semibold">Título</TableHead>
-                      <TableHead className="font-semibold">
-                        Institución
-                      </TableHead>
-                      <TableHead className="font-semibold">Cierre</TableHead>
-                      <TableHead className="font-semibold">Match</TableHead>
-                      <TableHead className="font-semibold">Etapa</TableHead>
-                      <TableHead className="text-right" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {cierresData.map((item) => (
-                      <TableRow key={item.codigo} className="data-row">
-                        <TableCell>
-                          <p className="font-medium text-sm line-clamp-1 max-w-[200px]">
-                            {item.nombre}
-                          </p>
-                        </TableCell>
-                        <TableCell>
-                          <p className="text-sm text-muted-foreground line-clamp-1 max-w-[150px]">
-                            {item.institucion}
-                          </p>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={
-                              item.diasRestantes <= 2
-                                ? "border-firmavb-red text-firmavb-red"
-                                : "border-firmavb-amber text-firmavb-amber"
-                            }
-                          >
-                            {item.diasRestantes === 0
-                              ? "¡Hoy!"
-                              : item.diasRestantes === 1
-                                ? "Mañana"
-                                : `${item.diasRestantes}d`}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {item.match_score ? (
-                            <span className="font-mono text-sm font-medium">
-                              {item.match_score}%
-                            </span>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">
-                              —
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className="text-xs">
-                            {item.etapa}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Link
-                            to={
-                              item.tipo === "Compra Ágil"
-                                ? `/compras-agiles/${item.codigo}`
-                                : `/licitaciones/${item.codigo}`
-                            }
-                          >
-                            <Button variant="ghost" size="sm">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </Link>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      <DatoCuriosoCard />
 
-        {/* Últimos Matches */}
-        <Card className="border-border/50 shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-heading font-semibold flex items-center gap-2">
-              <Zap className="h-4 w-4 text-firmavb-green" />
-              Últimos Matches
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {matchesLoading ? (
-              <div className="space-y-3">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-14 w-full" />
-                ))}
-              </div>
-            ) : !matchesData?.length ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Inbox className="h-10 w-10 mx-auto mb-3 opacity-50" />
-                <p className="text-sm">Sin matches recientes</p>
-                <p className="text-xs mt-1">
-                  Ejecuta el Matching IA para encontrar oportunidades
-                </p>
-              </div>
-            ) : (
-              <div className="rounded-lg border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="font-semibold">Título</TableHead>
-                      <TableHead className="font-semibold">Match</TableHead>
-                      <TableHead className="font-semibold">
-                        Institución
-                      </TableHead>
-                      <TableHead className="font-semibold">Tipo</TableHead>
-                      <TableHead className="text-right" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {matchesData.map((item) => (
-                      <TableRow key={item.codigo} className="data-row">
-                        <TableCell>
-                          <p className="font-medium text-sm line-clamp-1 max-w-[200px]">
-                            {item.nombre}
-                          </p>
-                        </TableCell>
-                        <TableCell>
-                          {item.match_score ? (
-                            <div className="flex items-center gap-2">
-                              <div className="w-12 h-2 bg-muted rounded-full overflow-hidden">
-                                <div
-                                  className="h-full rounded-full bg-firmavb-green"
-                                  style={{
-                                    width: `${item.match_score}%`,
-                                  }}
-                                />
-                              </div>
-                              <span className="text-sm font-mono font-medium">
-                                {item.match_score}%
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">
-                              —
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <p className="text-sm text-muted-foreground line-clamp-1 max-w-[140px]">
-                            {item.institucion}
-                          </p>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            className={
-                              item.tipo === "Compra Ágil"
-                                ? "bg-firmavb-blue text-white"
-                                : "bg-firmavb-green text-white"
-                            }
-                          >
-                            {item.tipo}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Link
-                              to={
-                                item.tipo === "Compra Ágil"
-                                  ? `/compras-agiles/${item.codigo}`
-                                  : `/licitaciones/${item.codigo}`
-                              }
-                            >
-                              <Button variant="ghost" size="sm">
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </Link>
-                            <Link to="/oportunidades">
-                              <Button variant="ghost" size="sm">
-                                <Plus className="h-4 w-4" />
-                              </Button>
-                            </Link>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Row 4: Activity Feed */}
-      {/* (ActivityFeed eliminado: era un log técnico global tipo consola —
-          "[12:03] Scraper…" — con un botón "Forzar Escaneo" que no escaneaba.
-          Pantalla de desarrollador, no de cliente.) */}
+      {/* Row 4: Noticias de tus instituciones */}
+      <Card className="border-border/50 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-heading font-semibold flex items-center gap-2">
+            <Newspaper className="h-4 w-4 text-firmavb-blue" />
+            Noticias de tus instituciones
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Lo último de las instituciones donde ya postulaste o tienes match. Para saber qué pasa con ellas antes de tu próxima oferta.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {noticiasLoading ? (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-20 w-full" />
+              ))}
+            </div>
+          ) : !noticiasData?.length ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Inbox className="h-10 w-10 mx-auto mb-3 opacity-50" />
+              <p className="text-sm">Todavía no hay noticias para mostrar</p>
+              <p className="text-xs mt-1">
+                Aparecen apenas postules o tengas match con alguna institución
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {noticiasData.map((n) => (
+                <a
+                  key={n.noticia_id}
+                  href={n.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block rounded-lg border p-3 hover:bg-muted/50 transition-colors"
+                >
+                  <p className="text-xs font-semibold text-firmavb-blue truncate mb-1">
+                    {n.institucion}
+                  </p>
+                  <p className="text-sm line-clamp-2">{n.texto}</p>
+                  <p className="text-xs text-muted-foreground mt-1.5">
+                    {n.fuente.replace(/^Noticia:\s*/, "")}
+                    {n.fecha && ` · ${new Date(n.fecha).toLocaleDateString("es-CL", { day: "2-digit", month: "short" })}`}
+                  </p>
+                </a>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

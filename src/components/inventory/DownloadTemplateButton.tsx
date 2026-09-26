@@ -1,46 +1,26 @@
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { generateInventoryTemplateData, generateInventoryInstructions } from '@/hooks/useInventoryBulk';
 import { toast } from 'sonner';
+import { downloadSpreadsheetWorkbook, recordsToSpreadsheetRows } from '@/lib/excelFiles';
 
 export function DownloadTemplateButton() {
-  const handleDownload = () => {
+  const handleDownload = async () => {
     try {
-      // Create workbook
-      const wb = XLSX.utils.book_new();
-      
-      // Products sheet with template data
       const templateData = generateInventoryTemplateData();
-      const wsProducts = XLSX.utils.json_to_sheet(templateData);
-      
-      // Set column widths for products sheet - Updated for new fields
-      wsProducts['!cols'] = [
-        { wch: 15 },  // Código
-        { wch: 40 },  // Descripción
-        { wch: 12 },  // Precio Neto
-        { wch: 10 },  // Unidad
-        { wch: 20 },  // Categoría
-        { wch: 10 },  // Stock
-        { wch: 15 },  // Margen Mínimo
-        { wch: 15 },  // Margen Objetivo
-        { wch: 18 },  // Tiempo Entrega
-        { wch: 20 },  // Proveedor
-        { wch: 40 },  // Keywords
-        { wch: 50 },  // URL Imagen
-      ];
-      
-      XLSX.utils.book_append_sheet(wb, wsProducts, 'Productos');
-      
-      // Instructions sheet
       const instructionsData = generateInventoryInstructions();
-      const wsInstructions = XLSX.utils.json_to_sheet(instructionsData);
-      wsInstructions['!cols'] = [{ wch: 80 }];
-      
-      XLSX.utils.book_append_sheet(wb, wsInstructions, 'Instrucciones');
-      
-      // Download file
-      XLSX.writeFile(wb, 'plantilla_inventario.xlsx');
+      await downloadSpreadsheetWorkbook('plantilla_inventario.xlsx', [
+        {
+          name: 'Productos',
+          rows: recordsToSpreadsheetRows(templateData),
+          columnWidths: [15, 40, 12, 10, 20, 10, 15, 15, 18, 20, 40, 50],
+        },
+        {
+          name: 'Instrucciones',
+          rows: recordsToSpreadsheetRows(instructionsData),
+          columnWidths: [80],
+        },
+      ]);
       
       toast.success('📥 Plantilla descargada correctamente');
     } catch (error) {

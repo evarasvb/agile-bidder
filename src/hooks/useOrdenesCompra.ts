@@ -84,16 +84,25 @@ function derivarTipo(codigo?: string | null): string | null {
   return m ? m[1].toUpperCase() : null;
 }
 
-// Estado de la OC viene como código numérico de Mercado Público.
-const ESTADO_OC: Record<string, string> = {
+// Estado de la OC viene como código numérico de Mercado Público (CodigoEstado).
+// Verificado contra raw_json real de ordenes_compra: 4 = Enviada a proveedor,
+// 5 = En proceso (todavía NO aceptada), 6 = Aceptada, 9 = Cancelada,
+// 11 = No aceptada, 12 = Recepción conforme.
+export const ESTADO_OC: Record<string, string> = {
   '3': 'Guardada',
-  '4': 'Enviada',
-  '5': 'Aceptada',
-  '6': 'Recepción conforme',
+  '4': 'Enviada a proveedor',
+  '5': 'En proceso',
+  '6': 'Aceptada',
   '9': 'Cancelada',
+  '11': 'No aceptada',
   '12': 'Recepción conforme',
 };
-function etiquetaEstado(estado?: string | null): string | null {
+// Códigos que cuentan como "aceptada" para efectos de cobranza: el código
+// oficial de Mercado Público (CodigoEstado) usa 5 = "En proceso" (todavía NO
+// aceptada por el proveedor), 6 = "Aceptada" y 12 = "Recepción conforme". Se
+// excluye el 5 para que el respaldo de cobranza sea real.
+export const ESTADOS_OC_ACEPTADA = ['6', '12'];
+export function etiquetaEstado(estado?: string | null): string | null {
   if (estado == null || estado === '') return null;
   return ESTADO_OC[String(estado).trim()] ?? `Estado ${estado}`;
 }
@@ -142,6 +151,15 @@ function mapItem(i: RawOC): OrdenCompraItem {
   };
 }
 
+// Datos Abiertos manda "NA" (o "N/A") cuando no clasificó la línea. Eso NO es
+// una categoría: se devuelve null para que el reporte la clasifique por el
+// nombre del producto (antes "NA" concentraba el 60% del monto del cubo).
+function limpiarCategoria(v: string | null | undefined): string | null {
+  const s = (v ?? '').trim();
+  if (!s || /^(n\/?a|null|none|sin categor[ií]a|-)$/i.test(s)) return null;
+  return s;
+}
+
 // Línea de producto desde `oc_lineas` (Datos Abiertos, detalle completo del
 // mercado) mapeada a la misma interfaz de ítem que usa la UI.
 function mapLinea(l: RawOC): OrdenCompraItem {
@@ -156,7 +174,10 @@ function mapLinea(l: RawOC): OrdenCompraItem {
     unidad: null,
     precio_unitario_neto: l.precio_neto ?? null,
     total_neto: l.monto_linea ?? null,
-    categoria: l.rubro_n1 ?? l.categoria ?? null,
+    // "NA" / "N/A" vienen así desde Datos Abiertos: se tratan como vacío para que
+    // el reporte clasifique el rubro por el nombre del producto en vez de mostrar
+    // una categoría "NA" que se comía el 60% del monto.
+    categoria: limpiarCategoria(l.rubro_n1) ?? limpiarCategoria(l.categoria) ?? null,
     created_at: '',
   };
 }
@@ -169,7 +190,7 @@ async function fetchItemsPorCodigos(codigos: string[]): Promise<Map<string, Orde
   const cods = codigos.filter(Boolean);
   if (!cods.length) return map;
 
-  const { data: lineas, error: lErr } = await (supabase as any)
+  const { data: lineas, error: lErr } = await supabase
     .from('oc_lineas')
     .select('linea_id, codigo, correlativo, producto, categoria, rubro_n1, cantidad, precio_neto, monto_linea')
     .in('codigo', cods)
@@ -183,7 +204,7 @@ async function fetchItemsPorCodigos(codigos: string[]): Promise<Map<string, Orde
 
   const faltan = cods.filter((c) => !map.has(c));
   if (faltan.length) {
-    const { data: items, error: iErr } = await (supabase as any)
+    const { data: items, error: iErr } = await supabase
       .from('ordenes_compra_items')
       .select('*')
       .in('numero_oc', faltan);
@@ -207,7 +228,7 @@ export function useOrdenesCompra(
     queryKey: ['ordenes_compra', filters, includeItems],
     enabled: options?.enabled ?? true,
     queryFn: async (): Promise<OrdenCompra[]> => {
-      let query = (supabase as any)
+      let query = supabase
         .from('ordenes_compra')
         .select(
           'id, codigo, nombre, estado, fecha_emision, fecha_envio_oc, monto_total, total, neto, ' +
@@ -291,7 +312,7 @@ export function useOrdenCompra(codigo: string | null, includeItems = true) {
     queryFn: async (): Promise<OrdenCompra | null> => {
       if (!codigo) return null;
 
-      const { data: orden, error: ordenError } = await (supabase as any)
+      const { data: orden, error: ordenError } = await supabase
         .from('ordenes_compra')
         .select('*')
         .eq('codigo', codigo)
@@ -323,7 +344,7 @@ export function useOrdenCompraItems(numeroOc: string | null) {
     queryKey: ['orden_compra_items', numeroOc],
     queryFn: async (): Promise<OrdenCompraItem[]> => {
       if (!numeroOc) return [];
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('ordenes_compra_items')
         .select('*')
         .eq('numero_oc', numeroOc);
@@ -345,7 +366,7 @@ export function useUpsertOrdenCompra() {
   return useMutation({
     mutationFn: async ({ orden, items }: { orden: Partial<OrdenCompra>; items?: Partial<OrdenCompraItem>[] }) => {
       // Mapea la interfaz a columnas reales de la tabla.
-      const ordenData: RawOC = {
+      const ordenData = {
         codigo: orden.codigo!,
         numero_oc: orden.codigo!,
         nombre: orden.nombre ?? null,
@@ -360,7 +381,7 @@ export function useUpsertOrdenCompra() {
         estado: orden.estado ?? null,
       };
 
-      const { data: savedOrden, error: ordenError } = await (supabase as any)
+      const { data: savedOrden, error: ordenError } = await supabase
         .from('ordenes_compra')
         .upsert(ordenData, { onConflict: 'codigo' })
         .select()
@@ -383,7 +404,7 @@ export function useUpsertOrdenCompra() {
           valor_total: item.total_neto ?? null,
         }));
 
-        const { error: itemsError } = await (supabase as any)
+        const { error: itemsError } = await supabase
           .from('ordenes_compra_items')
           .insert(itemsData);
         if (itemsError) console.error('Error insertando items:', itemsError);
@@ -409,7 +430,7 @@ export function useOpcionesOC(campo: 'proveedor_nombre' | 'organismo_comprador',
   return useQuery({
     queryKey: ['opciones-oc', campo, term],
     queryFn: async (): Promise<string[]> => {
-      let query = (supabase as any)
+      let query = supabase
         .from('ordenes_compra')
         .select(campo)
         .not(campo, 'is', null)
@@ -433,7 +454,7 @@ export function useRutProveedor(nombre: string | null) {
     enabled: !!nombre,
     queryFn: async (): Promise<string | null> => {
       if (!nombre) return null;
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('ordenes_compra')
         .select('rut_proveedor')
         .eq('proveedor_nombre', nombre)
@@ -450,13 +471,60 @@ export function useRutProveedor(nombre: string | null) {
   });
 }
 
+// OC propias del cliente (donde es proveedor) que ya están aceptadas/recibidas
+// por el organismo — para la cobranza: solo se puede cobrar lo que el Estado
+// ya aceptó. Opcionalmente filtradas por institución.
+export function useMisOcAceptadas(rut: string | null, nombre: string | null, institucion?: string) {
+  return useQuery({
+    queryKey: ['mis-oc-aceptadas', rut, nombre, institucion],
+    enabled: !!(rut || nombre),
+    queryFn: async () => {
+      let query = supabase
+        .from('ordenes_compra')
+        .select('codigo, organismo_comprador, rut_demandante, total, fecha_emision, link_oficial, estado')
+        .in('estado', ESTADOS_OC_ACEPTADA)
+        .order('fecha_emision', { ascending: false, nullsFirst: false })
+        .limit(60);
+      // El RUT ya identifica al proveedor sin ambigüedad; si además viene el
+      // nombre no hace falta cruzarlo con un .or() de texto crudo, que se
+      // rompe con nombres de empresa que traen coma o paréntesis (delimitadores
+      // del filtro de PostgREST).
+      if (rut) query = query.eq('rut_proveedor', rut);
+      else query = query.eq('proveedor_nombre', nombre!);
+      if (institucion) query = query.ilike('organismo_comprador', `%${institucion}%`);
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []) as { codigo: string; organismo_comprador: string | null; rut_demandante: string | null; total: number | null; fecha_emision: string | null; link_oficial: string | null; estado: string | null }[];
+    },
+    staleTime: 30000,
+  });
+}
+
+// Link oficial de Mercado Público para OC ya registradas por código — para
+// mostrar "Ver OC oficial" en las facturas de cobranza sin volver a subir nada.
+export function useOcLinksPorCodigos(codigos: string[]) {
+  const cods = Array.from(new Set(codigos.filter(Boolean))).sort();
+  return useQuery({
+    queryKey: ['oc-links', cods],
+    enabled: cods.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('ordenes_compra').select('codigo, link_oficial, estado').in('codigo', cods);
+      if (error) throw error;
+      const map = new Map<string, { link_oficial: string | null; estado: string | null }>();
+      for (const row of (data || []) as any[]) map.set(row.codigo, { link_oficial: row.link_oficial, estado: row.estado });
+      return map;
+    },
+    staleTime: 60000,
+  });
+}
+
 export function useSyncMisOC() {
   const queryClient = useQueryClient();
   return useMutation({
     // clienteId → trae las OC del cliente logueado; rut → trae las de CUALQUIER
     // proveedor (modo Mercado, bajo demanda). Uno de los dos.
     mutationFn: async ({ clienteId, rut, anio }: { clienteId?: string; rut?: string; anio?: number }) => {
-      const { data, error } = await (supabase as any).functions.invoke('sync-mis-oc', {
+      const { data, error } = await supabase.functions.invoke('sync-mis-oc', {
         body: { cliente_id: clienteId, rut, anio },
       });
       if (error) throw error;
@@ -474,13 +542,13 @@ export function useOrdenesCompraStats() {
   return useQuery({
     queryKey: ['ordenes_compra_stats'],
     queryFn: async () => {
-      const { count: total, error: countError } = await (supabase as any)
+      const { count: total, error: countError } = await supabase
         .from('ordenes_compra')
         .select('*', { count: 'exact', head: true });
       if (countError) throw countError;
 
       // Suma de montos (columna real `total`).
-      const { data: montoData } = await (supabase as any)
+      const { data: montoData } = await supabase
         .from('ordenes_compra')
         .select('total')
         .limit(20000);

@@ -26,8 +26,9 @@ function huella(): string {
 
 // Markdown mínimo (mismo que experto.html): títulos, listas, negrita, links.
 function md(t: string): string {
-  const esc = (x: string) => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const inline = (x: string) => esc(x).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="underline">$1</a>');
+  const esc = (x: string) => x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const escAttr = (x: string) => x.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const inline = (x: string) => esc(x).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, (m, label, url) => `<a href="${url}" target="_blank" rel="noopener noreferrer" class="underline" aria-label="${label} (abre en nueva pestaña)">${label}</a>`);
   let out = "", lista: string | null = null;
   const cierra = () => { if (lista) { out += `</${lista}>`; lista = null; } };
   for (const ln of t.split("\n")) {
@@ -42,7 +43,7 @@ function md(t: string): string {
 }
 
 /**
- * "Comodín telefónico": una pregunta gratis al Experto FirmaVB respondida aquí mismo, en la portada.
+ * "Comodín telefónico": una pregunta gratis a Don Evaristo respondida aquí mismo, en la portada.
  * Con sesión se va a /experto (dentro de la app). Sin sesión, el servidor limita a 1 pregunta por
  * navegador y 3 por IP al día; al agotarse invita a crear la cuenta gratis (3 preguntas al mes).
  */
@@ -100,7 +101,7 @@ export function ExpertoComodin() {
               <PhoneCall className="h-6 w-6" />
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="text-2xl font-bold">¿Dudas de Mercado Público? Pregúntale a Evaristo, tu experto</h2>
+              <h2 className="text-2xl font-bold">¿Dudas de Mercado Público? Pregúntale a Don Evaristo, tu experto</h2>
               <p className="mt-2 text-muted-foreground">
                 17 años vendiéndole al Estado, la Ley 19.886, 3.148 dictámenes de Contraloría y los datos vivos de Mercado Público
                 (quién gana, cómo paga cada organismo). Tu primera pregunta es gratis y se responde aquí mismo.

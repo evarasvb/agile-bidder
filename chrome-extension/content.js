@@ -420,7 +420,7 @@
       const productos = oferta.productos || oferta.productos_ofertados || [];
       if (!productos.length) {
         showMessage('error', 'La oferta no tiene productos con precio.');
-        return;
+        return { ok: false, error: 'La oferta no tiene productos con precio.' };
       }
 
       // Los inputs de MUI son controlados por React: asignar .value directo NO
@@ -537,9 +537,13 @@
       // Nota: NO se marca la oferta como "enviada" automáticamente. El formulario
       // tiene reCAPTCHA y adjunto obligatorio, así que el envío final lo realiza la
       // persona; de este modo el estado de la oferta refleja la realidad.
+      return filledFields > 0
+        ? { ok: true, filled: filledFields, extras }
+        : { ok: false, filled: 0, extras, error: 'No encontré las casillas de "Valor unitario" para completar el formulario.' };
     } catch (error) {
       console.error('Autofill error:', error);
       showMessage('error', 'Error al completar el formulario');
+      return { ok: false, error: 'Error al completar el formulario: ' + (error && error.message) };
     }
   }
 
@@ -670,15 +674,169 @@
         action: 'SYNC_LICITACION',
         data: { licitacion, items }
       });
-      
+
       if (response?.success) {
         console.log('FirmaVB: Licitación sincronizada exitosamente');
       } else {
         console.warn('FirmaVB: Error sincronizando:', response?.error);
       }
+      return { ok: !!response?.success, items: items.length, error: response?.error };
     } catch (error) {
       console.error('FirmaVB: Error en sync:', error);
+      return { ok: false, items: items.length, error: String(error && error.message) };
     }
+  }
+
+  // ==========================================================================
+  // ACCIONES DE DON EVARISTO
+  // El asistente de FirmaVB deja acciones en cola; el background abre la página que
+  // corresponde en una pestaña y aquí, con la sesión del usuario, se ejecutan solas.
+  // ==========================================================================
+  async function accionParaCodigo(codigo, ...tipos) {
+    try {
+      const r = await chrome.runtime.sendMessage({ action: 'ACCION_ACTIVA' });
+      const a = r && r.accion;
+      if (!a || !a.codigo || !codigo) return null;
+      if (String(a.codigo).toUpperCase() !== String(codigo).toUpperCase()) return null;
+      if (tipos.length && !tipos.includes(a.tipo)) return null;
+      return a;
+    } catch (_) { return null; }
+  }
+
+  function reportarAccion(id, data) {
+    return chrome.runtime.sendMessage({ action: 'ACCION_RESULTADO', data: { accion_id: id, ...data } }).catch(() => null);
+  }
+
+  function esperar(cond, ms, cada = 500) {
+    return new Promise((resolve) => {
+      const t0 = Date.now();
+      const tick = () => {
+        let v = null;
+        try { v = cond(); } catch (_) {}
+        if (v || Date.now() - t0 > ms) resolve(v || null);
+        else setTimeout(tick, cada);
+      };
+      tick();
+    });
+  }
+
+  // La ficha de licitación de verdad (no la página intermedia que redirige a ?qs=).
+  function fichaCargada(codigo) {
+    const txt = document.body ? document.body.textContent : '';
+    return txt.includes(codigo) && !!(document.getElementById('imgAdjuntos') || document.querySelector('table'));
+  }
+
+  // URL de la ventana de adjuntos: el ícono la abre con window.open (bloqueado sin clic),
+  // así que se lee del onclick y la abre el background en una pestaña.
+  function urlAdjuntos() {
+    const img = document.getElementById('imgAdjuntos');
+    if (!img) return null;
+    const fuentes = [img.getAttribute('onclick'), img.closest('a') && img.closest('a').getAttribute('href'), img.parentElement && img.parentElement.getAttribute('onclick')];
+    for (const f of fuentes) {
+      const m = f && f.match(/([^'"()\s]*ViewAttachment\.aspx[^'"()\s]*)/i);
+      if (m) { try { return new URL(m[1], location.href).href; } catch (_) {} }
+    }
+    return 'click';
+  }
+
+  // sincronizar_licitacion: ficha + ítems a FirmaVB y, si hay adjuntos, se abren para que
+  // flujoAdjuntos los suba y cierre la acción.
+  async function ejecutarSincronizarLicitacion(codigo, accion) {
+    mostrarBanner({ texto: `Don Evaristo: sincronizando la licitación ${codigo} con FirmaVB…`, acciones: [] });
+    if (!(await esperar(() => fichaCargada(codigo), 12000))) {
+      reportarAccion(accion.id, { success: false, error: `No pude abrir la ficha de ${codigo} en Mercado Público (¿código correcto? ¿sesión iniciada?).` });
+      return;
+    }
+    const sync = await syncLicitacion();
+    const destino = urlAdjuntos();
+    if (!destino) {
+      reportarAccion(accion.id, { success: sync.ok, resultado: { ficha: sync.ok, items: sync.items, adjuntos: 0 }, error: sync.ok ? null : sync.error, resumen: `${codigo}: ficha sincronizada, sin adjuntos`, cerrarPestanas: true });
+      return;
+    }
+    // fichaOk viaja con el pedido: la página de adjuntos (otra navegación, otro turno de
+    // content.js) necesita saber si la ficha realmente se sincronizó para no reportar éxito
+    // si falló, aunque los adjuntos sí se hayan subido.
+    await chrome.storage.local.set({ firmavbExtraer: { codigo, ts: Date.now(), fichaOk: sync.ok, fichaError: sync.ok ? null : sync.error } }).catch(() => {});
+    reportarAccion(accion.id, { parcial: true, resultado: { paso: 'adjuntos', ficha: sync.ok, items: sync.items } });
+    if (destino === 'click') {
+      document.getElementById('imgAdjuntos').click();
+      actualizarBanner(`Ficha de ${codigo} sincronizada. Abriendo la ventana de adjuntos (si el navegador la bloqueó, permítela).`, []);
+    } else {
+      await chrome.runtime.sendMessage({ action: 'ABRIR_TAB', data: { url: destino, active: false } }).catch(() => {});
+      actualizarBanner(`Ficha de ${codigo} sincronizada. Subiendo adjuntos en otra pestaña…`, []);
+    }
+  }
+
+  // sincronizar_ca: documentos de la compra ágil (términos de referencia, fotos) a FirmaVB.
+  async function ejecutarSincronizarCA(codigo, accion) {
+    mostrarBanner({ texto: `Don Evaristo: trayendo los documentos de la compra ágil ${codigo}…`, acciones: [] });
+    const info = await chrome.runtime.sendMessage({ action: 'CA_DOCUMENTOS', data: { codigo } }).catch(() => null);
+    const conocidos = (info && info.success && info.documentos) || [];
+    const faltan = conocidos.filter((d) => !d.bajado);
+    const enlaces = enlacesAdjuntosCA().filter((e) => !conocidos.some((d) => d.nombre === e.nombre));
+    const docs = faltan.concat(enlaces);
+    if (!docs.length) {
+      reportarAccion(accion.id, { success: true, resultado: { documentos: 0, ya_en_firmavb: conocidos.length }, resumen: `${codigo}: ${conocidos.length ? 'sus documentos ya estaban en FirmaVB' : 'sin documentos adjuntos'}`, cerrarPestanas: true });
+      return;
+    }
+    const token = tokenCompraAgil();
+    if (!token && !enlaces.length) {
+      reportarAccion(accion.id, { success: false, error: 'Necesito tu sesión de Mercado Público iniciada en este Chrome para bajar los documentos de compra ágil.' });
+      return;
+    }
+    const res = await enviarDocumentosCA(codigo, docs, token, (i, n, nombre) => actualizarBanner(`Enviando ${i} de ${n} a FirmaVB: ${nombre}`, []));
+    if (res.sesion) {
+      reportarAccion(accion.id, { success: false, error: 'La sesión de Mercado Público no está iniciada (o venció). Inicia sesión y vuelve a pedírmelo.' });
+      return;
+    }
+    reportarAccion(accion.id, {
+      success: res.ok > 0 || !res.errores,
+      resultado: { documentos: res.ok, errores: res.errores, bases_pdf: res.bases },
+      error: res.ok === 0 && res.errores ? 'No pude subir ningún documento.' : null,
+      resumen: `${codigo}: ${res.ok} documento${res.ok === 1 ? '' : 's'} a FirmaVB`,
+      cerrarPestanas: true,
+    });
+  }
+
+  // preparar_oferta: abre la ficha con la oferta de FirmaVB cargada, lista para revisar y enviar.
+  async function ejecutarPrepararOferta(codigo, accion, esCA) {
+    if (!esCA && !(await esperar(() => fichaCargada(codigo), 12000))) {
+      reportarAccion(accion.id, { success: false, error: `No pude abrir la ficha de ${codigo} en Mercado Público.` });
+      return;
+    }
+    if (!document.getElementById(BUTTON_ID)) injectButton(codigo);
+    const r = await chrome.runtime.sendMessage({ action: 'GET_OFFER', data: { licitacionId: codigo } }).catch(() => null);
+    if (!(r && r.success && r.oferta)) {
+      reportarAccion(accion.id, { success: false, error: (r && r.error) || `No hay una oferta armada en FirmaVB para ${codigo}. Genérala primero desde la app.` });
+      return;
+    }
+    // Se pidió explícitamente desde el chat: se completa directo, sin el diálogo de
+    // confirmación (ese es para cuando el cliente aprieta el botón manual en la página).
+    // Si solo abriéramos el modal, el resultado se reportaría "hecho" antes de que el
+    // formulario tuviera un solo campo lleno.
+    const relleno = performAutofill(r.oferta);
+    if (!relleno || !relleno.ok) {
+      reportarAccion(accion.id, { success: false, error: (relleno && relleno.error) || 'No pude completar el formulario: revísalo a mano.' });
+      return;
+    }
+    const productos = (r.oferta.productos || r.oferta.productos_ofertados || []).length;
+    reportarAccion(accion.id, {
+      success: true,
+      resultado: { oferta_id: r.oferta.id || null, productos, campos_completados: relleno.filled, revisar: true },
+      resumen: `${codigo}: oferta completada en Mercado Público (${relleno.filled} precio${relleno.filled === 1 ? '' : 's'}) para que la revises y envíes`,
+    });
+  }
+
+  // Punto de entrada: ¿esta página corresponde a una acción en curso?
+  async function atenderAccion(pageInfo) {
+    const codigo = pageInfo.codigoLicitacion;
+    if (!codigo) return false;
+    const a = await accionParaCodigo(codigo);
+    if (!a) return false;
+    if (a.tipo === 'sincronizar_licitacion' && !pageInfo.isFichaCompraAgil) { ejecutarSincronizarLicitacion(codigo, a); return true; }
+    if (a.tipo === 'sincronizar_ca' && pageInfo.isFichaCompraAgil) { ejecutarSincronizarCA(codigo, a); return true; }
+    if (a.tipo === 'preparar_oferta') { ejecutarPrepararOferta(codigo, a, pageInfo.isFichaCompraAgil); return true; }
+    return false;
   }
 
   // ==========================================================================
@@ -871,6 +1029,7 @@
       (bases ? `; ${bases} PDF de bases que el Experto leerá en minutos` : '') +
       (errores ? ` · ${errores} con error` : '') + '.';
     actualizarBanner(resumen, [{ label: 'Cerrar', onClick: cerrarBanner }]);
+    return { ok, errores, bases, resumen };
   }
 
   // ==========================================================================
@@ -1058,18 +1217,43 @@
   async function flujoAdjuntos() {
     if (!(await extensionConectada())) return;
     const filas = await esperarAdjuntos(25000);
-    if (!filas.length) return;
     let pedido = null;
     try { pedido = (await chrome.storage.local.get('firmavbExtraer')).firmavbExtraer || null; } catch (_) {}
     const auto = !!(pedido && pedido.codigo && Date.now() - pedido.ts < 30 * 60 * 1000);
     const codigo = (auto && pedido.codigo) || (document.body.textContent.match(RE_CODIGO_LIC) || [])[0] || null;
+    // Si esta ventana la abrió una acción de Don Evaristo, al terminar se le reporta.
+    const accion = codigo ? await accionParaCodigo(codigo, 'sincronizar_licitacion') : null;
+    // Resultado real de la sincronización de la ficha (turno anterior, antes de llegar acá).
+    // Sin pedido o auto=false no viene de una acción, así que se asume ok (flujo manual).
+    const fichaOk = !(auto && pedido && pedido.fichaOk === false);
+    const fichaError = auto && pedido ? pedido.fichaError : null;
+    if (!filas.length) {
+      if (accion) reportarAccion(accion.id, {
+        success: fichaOk,
+        resultado: { ficha: fichaOk, adjuntos: 0 },
+        error: fichaOk ? null : (fichaError || 'La ficha no se pudo sincronizar.'),
+        resumen: `${codigo}: ${fichaOk ? 'ficha sincronizada' : 'la ficha tuvo un error'}, sin adjuntos`,
+        cerrarPestanas: true,
+      });
+      return;
+    }
     if (!codigo) {
       mostrarBanner({ texto: 'No pude identificar a qué licitación pertenecen estos adjuntos. Ábrelos desde la ficha de la licitación.', acciones: [{ label: 'Cerrar', onClick: cerrarBanner }] });
       return;
     }
-    const enviar = () => {
+    const enviar = async () => {
       chrome.storage.local.remove('firmavbExtraer').catch(() => {});
-      enviarAdjuntos(codigo, filas);
+      const res = await enviarAdjuntos(codigo, filas);
+      if (accion) {
+        const huboAdjuntos = res.errores < filas.length;
+        reportarAccion(accion.id, {
+          success: fichaOk && huboAdjuntos,
+          resultado: { ficha: fichaOk, adjuntos: res.ok, errores: res.errores, bases_pdf: res.bases },
+          error: !fichaOk ? (fichaError || 'La ficha no se pudo sincronizar.') : (huboAdjuntos ? null : 'No pude subir ningún adjunto.'),
+          resumen: `${codigo}: ${res.ok} adjunto${res.ok === 1 ? '' : 's'} a FirmaVB${fichaOk ? '' : ' (la ficha tuvo un error)'}`,
+          cerrarPestanas: true,
+        });
+      }
     };
     if (auto) {
       mostrarBanner({ texto: `Enviando ${filas.length} adjunto${filas.length === 1 ? '' : 's'} de ${codigo} a FirmaVB…`, acciones: [] });
@@ -1114,6 +1298,17 @@
         });
       }
       
+      // ¿Esta pestaña la abrió una acción de Don Evaristo? Entonces se ejecuta sola y no se
+      // ofrecen los flujos manuales (evita banners encima y sincronizaciones dobles).
+      atenderAccion(pageInfo).then((atendida) => {
+        if (atendida) { showConnectionIndicator(); return; }
+        initFlujosManuales(pageInfo);
+      });
+    }
+  }
+
+  function initFlujosManuales(pageInfo) {
+    {
       // Ficha de compra ágil: botón de postulación + oferta de extraer adjuntos. La ficha en sí
       // ya la trae el robot de FirmaVB, así que no se sincroniza desde aquí.
       if (pageInfo.isFichaCompraAgil) {

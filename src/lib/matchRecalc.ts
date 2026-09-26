@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 // Es fire-and-forget seguro: si la RPC falla, el cron igual recalcula más tarde.
 export async function recalcularMatchInventario(queryClient?: QueryClient) {
   try {
-    await (supabase as any).rpc("generar_matches_ca_para_mi");
+    await supabase.rpc("generar_matches_ca_para_mi");
   } catch (e) {
     // Silencioso a propósito: no bloquea la carga de inventario.
     console.warn("[recalcularMatchInventario] no se pudo recalcular ahora:", e);

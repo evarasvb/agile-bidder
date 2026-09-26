@@ -19,6 +19,10 @@ export function StatusBar() {
   const { user } = useAuth();
   const esAdmin = (user?.email || "").toLowerCase() === "evaras@firmavb.cl";
   const sinInstalar = !isLoading && !isConnected && (activeKeysCount ?? 0) === 0;
+  // Instalada y con actividad registrada, pero sin heartbeat en los últimos
+  // minutos: NO es "desconectada" (eso contradecía el "última actividad hace 22
+  // min" del tooltip). Se reactiva sola al abrir Mercado Público en Chrome.
+  const inactiva = !isLoading && !isConnected && !sinInstalar && !!lastActivity;
 
   const formatLastActivity = () => {
     if (!lastActivity) return "Sin actividad";
@@ -59,7 +63,7 @@ export function StatusBar() {
                 "hidden sm:inline text-sm font-medium",
                 isConnected ? "text-online" : "text-offline"
               )}>
-                {isLoading ? "Verificando..." : isConnected ? "Conectada" : sinInstalar ? "No instalada" : "Desconectada"}
+                {isLoading ? "Verificando..." : isConnected ? "Conectada" : sinInstalar ? "No instalada" : inactiva ? "Inactiva" : "Desconectada"}
               </span>
               <Button
                 variant="ghost"
@@ -75,7 +79,11 @@ export function StatusBar() {
             <div className="space-y-1 text-xs">
               <p><strong>Última actividad:</strong> {formatLastActivity()}</p>
               {lastAction && <p><strong>Acción:</strong> {lastAction.replace(/-/g, ' ')}</p>}
-              <p className="text-muted-foreground">Toca para ver cómo conectarla</p>
+              <p className="text-muted-foreground">
+                {inactiva
+                  ? "Está instalada, pero sin actividad reciente. Abre Mercado Público en Chrome y se reactiva sola."
+                  : "Toca para ver cómo conectarla"}
+              </p>
             </div>
           </TooltipContent>
         </Tooltip>

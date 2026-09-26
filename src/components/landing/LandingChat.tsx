@@ -15,7 +15,7 @@ interface Message {
 
 const BOT_RESPONSES: Record<string, string[]> = {
   "hola": [
-    "¡Hola! 👋 Bienvenido a FirmaVB. Soy tu asistente virtual. ¿En qué puedo ayudarte?",
+    "¡Hola! 👋 Bienvenido a FirmaVB. Soy Don Evaristo, el experto de FirmaVB. ¿En qué puedo ayudarte?",
     "Hola, ¿cómo estás? Estoy aquí para ayudarte con cualquier pregunta sobre FirmaVB.",
   ],
   "precio": [
@@ -80,7 +80,7 @@ export function LandingChat({ open, onClose }: LandingChatProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      text: "¡Hola! 👋 Soy Evaristo, tu experto en Mercado Público. ¿En qué te ayudo hoy?",
+      text: "¡Hola! 👋 Soy Don Evaristo, tu experto en Mercado Público. ¿En qué te ayudo hoy?",
       isBot: true,
       timestamp: new Date(),
     },
@@ -162,7 +162,7 @@ export function LandingChat({ open, onClose }: LandingChatProps) {
             <Bot className="h-4 w-4 text-white" />
           </div>
           <div>
-            <p className="font-medium text-white text-sm">Evaristo</p>
+            <p className="font-medium text-white text-sm">Don Evaristo</p>
             <p className="text-xs text-white/70">Tu experto en Mercado Público</p>
           </div>
         </div>
@@ -235,6 +235,7 @@ export function LandingChat({ open, onClose }: LandingChatProps) {
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-foreground transition-colors"
+            aria-label="+56 9 9425 9157 por WhatsApp (abre en nueva ventana)"
           >
             💬 +56 9 9425 9157
           </a>

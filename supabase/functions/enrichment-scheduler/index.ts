@@ -4,11 +4,20 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 
 Deno.serve(async (req) => {
+  if (req.method !== 'POST') {
+    return new Response('Method not allowed', { status: 405, headers: { 'Allow': 'POST' } })
+  }
+
   // Verificar que sea una solicitud válida (de Vercel cron, webhook o API)
   const authHeader = req.headers.get('authorization')
   const expectedToken = Deno.env.get('ENRICHMENT_SCHEDULER_TOKEN')
 
-  if (expectedToken && authHeader !== `Bearer ${expectedToken}`) {
+  if (!expectedToken) {
+    console.error('[Scheduler] ENRICHMENT_SCHEDULER_TOKEN no está configurado')
+    return new Response('Scheduler unavailable', { status: 503 })
+  }
+
+  if (authHeader !== `Bearer ${expectedToken}`) {
     return new Response('Unauthorized', { status: 401 })
   }
 

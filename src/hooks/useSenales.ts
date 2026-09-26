@@ -28,7 +28,7 @@ export function useRegistrarSenal() {
     (s: SenalInput) => {
       if (!clienteId) return;
       // Best-effort: no interrumpe la acción del usuario si falla.
-      (supabase as any)
+      supabase
         .from('cliente_senales')
         .insert({
           cliente_id: clienteId,
@@ -36,7 +36,7 @@ export function useRegistrarSenal() {
           oportunidad_tipo: s.oportunidad_tipo ?? null,
           codigo: s.codigo ?? null,
           titulo: s.titulo ?? null,
-          meta: s.meta ?? null,
+          meta: s.meta as any,
         })
         .then(
           () => {},
@@ -64,9 +64,9 @@ export function useAprendizaje() {
   return useQuery({
     queryKey: ['aprendizaje', clienteId],
     queryFn: async (): Promise<Aprendizaje> => {
-      const { data, error } = await (supabase as any).rpc('cliente_aprendizaje', { p_cliente: clienteId });
+      const { data, error } = await supabase.rpc('cliente_aprendizaje', { p_cliente: clienteId });
       if (error) throw error;
-      return (data as Aprendizaje) ?? {
+      return (data as unknown as Aprendizaje) ?? {
         total_senales: 0, descartadas: 0, cotizadas: 0, excluir_sugeridas: [], incluir_sugeridas: [],
       };
     },

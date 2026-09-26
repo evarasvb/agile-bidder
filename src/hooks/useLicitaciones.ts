@@ -17,10 +17,9 @@ export interface Licitacion {
 
 export interface LicitacionItem {
   id: number;
-  licitacion_id: string;
   nombre_producto: string;
   descripcion: string | null;
-  cantidad: number | null;
+  cantidad: string | null;
   unidad: string | null;
 }
 
@@ -45,14 +44,11 @@ function validateLicitacionId(id: unknown): string {
 interface CompraAgilRow {
   codigo: string;
   nombre: string;
-  organismo: string;
-  monto: number | null;
+  nombre_organismo: string;
+  monto_estimado: number | null;
   fecha_cierre: string | null;
   estado: string | null;
-  // Opcional: el archivo de tipos generado de Supabase está desactualizado y
-  // no siempre declara esta columna real, aunque sí exista en la fila.
   url_ficha?: string | null;
-  link_oficial: string | null;
   created_at: string;
   match_encontrado: boolean | null;
   match_score: number | null;
@@ -62,12 +58,12 @@ function mapCompraAgilToLicitacion(compra: CompraAgilRow): Licitacion {
   return {
     id_licitacion: compra.codigo || '',
     titulo: compra.nombre || 'Sin título',
-    organismo: compra.organismo || '',
-    presupuesto: compra.monto ?? null,
+    organismo: compra.nombre_organismo || '',
+    presupuesto: compra.monto_estimado ?? null,
     fecha_cierre: compra.fecha_cierre,
     estado: compra.estado,
-    // Columna real es `url_ficha` (compras_agiles no tiene `link_oficial`).
-    link_oficial: compra.url_ficha || compra.link_oficial || null,
+    // compras_agiles no tiene `link_oficial`, solo `url_ficha`.
+    link_oficial: compra.url_ficha || null,
     created_at: compra.created_at,
     procesada: compra.match_encontrado ?? false,
     match_encontrado: compra.match_encontrado ?? false,
@@ -168,7 +164,7 @@ export function useAnalizarMatch() {
         
         const { data: compra, error: fetchError } = await supabase
           .from('compras_agiles')
-          .select('id, nombre, descripcion, organismo, monto')
+          .select('id, nombre, descripcion, nombre_organismo, monto_estimado')
           .eq('codigo', validId)
           .single();
 
@@ -208,8 +204,8 @@ export function useAnalizarMatch() {
               id_licitacion: validId,
               titulo,
               descripcion,
-              organismo: compra.organismo,
-              presupuesto: compra.monto,
+              organismo: compra.nombre_organismo,
+              presupuesto: compra.monto_estimado,
               items: (itemsCA || []).map((i: any) => ({
                 nombre_producto: i.nombre_producto,
                 descripcion: i.descripcion,
@@ -321,15 +317,15 @@ export function useLicitacionItemsById(licitacionId: string | null) {
         
         const { data, error } = await supabase
           .from('licitacion_items')
-          .select('*')
-          .eq('licitacion_id', validId);
-        
+          .select('id, nombre, descripcion, cantidad, unidad')
+          .eq('licitacion_codigo', validId);
+
         if (error) {
           console.error('Error obteniendo items:', error);
           throw new Error(`Error al obtener items: ${error.message}`);
         }
-        
-        return (data || []) as LicitacionItem[];
+
+        return (data || []).map((i) => ({ id: i.id, nombre_producto: i.nombre, descripcion: i.descripcion, cantidad: i.cantidad, unidad: i.unidad })) as LicitacionItem[];
       } catch (error) {
         console.error('Error en useLicitacionItemsById:', error);
         if (error instanceof Error) {

@@ -117,7 +117,7 @@ export function BuscarFotosDialog({ open, onOpenChange, producto }: BuscarFotosD
                   className="group relative aspect-square rounded-lg overflow-hidden border hover:border-primary focus:border-primary transition-colors"
                   title={c.autor ? `Foto: ${c.autor} (${c.fuente})` : c.fuente}
                 >
-                  <img src={c.thumb} alt="" className="h-full w-full object-cover" loading="lazy" />
+                  <img src={c.thumb} alt={`Sugerencia de foto${c.autor ? ` por ${c.autor}` : ''} (${c.fuente})`} className="h-full w-full object-cover" loading="lazy" />
                   <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/20 transition-colors flex items-center justify-center">
                     {guardando === c.url ? (
                       <Loader2 className="h-6 w-6 text-white animate-spin" />

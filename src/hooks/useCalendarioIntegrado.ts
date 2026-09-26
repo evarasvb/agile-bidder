@@ -100,67 +100,13 @@ export function useCalendarioIntegrado() {
 
       const events: CalendarioEvent[] = [];
 
-      // 1. Licitaciones deadlines
-      const { data: licitaciones } = await supabase
-        .from('licitaciones_bi')
-        .select('id, codigo, nombre, fecha_cierre, institucion_nombre, presupuesto_estimado, estado')
-        .not('fecha_cierre', 'is', null);
-
-      if (licitaciones) {
-        for (const l of licitaciones) {
-          if (!l.fecha_cierre) continue;
-          const type = classifyDeadline(l.fecha_cierre);
-          const colors = getEventColors(type);
-          events.push({
-            id: `lic-${l.id}`,
-            title: `${l.codigo} - ${l.nombre}`,
-            start: l.fecha_cierre,
-            end: null,
-            allDay: true,
-            type,
-            sourceType: 'licitacion',
-            sourceId: l.id,
-            tipoBadge: 'Cierre Licitación',
-            monto: l.presupuesto_estimado,
-            institucion: l.institucion_nombre,
-            descripcion: l.nombre,
-            asignado: null,
-            ...colors,
-          });
-        }
-      }
-
-      // 2. Compras Ágiles deadlines
-      const { data: compras } = await supabase
-        .from('compras_agiles')
-        .select('id, codigo, nombre, fecha_cierre, organismo, monto')
-        .not('fecha_cierre', 'is', null);
-
-      if (compras) {
-        for (const c of compras) {
-          if (!c.fecha_cierre) continue;
-          const type = classifyDeadline(c.fecha_cierre);
-          const colors = getEventColors(type);
-          events.push({
-            id: `ca-${c.id}`,
-            title: `${c.codigo} - ${c.nombre}`,
-            start: c.fecha_cierre,
-            end: null,
-            allDay: true,
-            type,
-            sourceType: 'compra_agil',
-            sourceId: c.id,
-            tipoBadge: 'Cierre Compra Ágil',
-            monto: c.monto,
-            institucion: c.organismo,
-            descripcion: c.nombre,
-            asignado: null,
-            ...colors,
-          });
-        }
-      }
-
-      // 3. Pipeline milestones
+      // Cierres en el calendario: SOLO lo que el cliente decidió trabajar (lo
+      // agregó a su pipeline), no todas las licitaciones/compras ágiles del
+      // país. Antes acá se traían TODAS las licitaciones y compras ágiles
+      // abiertas de Mercado Público sin filtrar por cliente — inundaba el
+      // calendario con cientos de cierres ajenos. Es lo mismo que pasa al
+      // sincronizar con Google Calendar: solo se manda lo que el cliente
+      // asignó, y si ya no le interesa lo quita (ver "Quitar del calendario").
       const { data: pipelineItems } = await supabase
         .from('pipeline')
         .select('id, titulo, etapa, fecha_cierre, institucion, monto_estimado, asignado_a, oportunidad_id, oportunidad_tipo')
@@ -170,12 +116,18 @@ export function useCalendarioIntegrado() {
         for (const p of pipelineItems) {
           if (!p.fecha_cierre) continue;
           const isWon = p.etapa === 'adjudicada' || p.etapa === 'oc_emitida' || p.etapa === 'pagada';
-          const type = isWon ? 'won' as const : 'pipeline' as const;
+          // Perdida/no_participaremos: el cliente ya decidió que no sigue —
+          // no tiene sentido seguir mostrándola como un cierre pendiente.
+          if (p.etapa === 'perdida' || p.etapa === 'no_participaremos') continue;
+          // Cierre vencido: no lo mostramos (ya pasó, no aporta).
+          if (differenceInDays(parseISO(p.fecha_cierre), new Date()) < 0 && !isWon) continue;
+          const type = isWon ? 'won' as const : classifyDeadline(p.fecha_cierre);
           const colors = getEventColors(type);
           const etapaLabel = {
             descubierta: 'Descubierta', seguimiento: 'Seguimiento', preparacion: 'Preparación',
             postulada: 'Postulada', evaluacion: 'Evaluación', adjudicada: 'Adjudicada',
-            oc_emitida: 'OC Emitida', pagada: 'Pagada',
+            oc_emitida: 'OC Emitida', pagada: 'Pagada', perdida: 'Perdida',
+            no_participaremos: 'No participaremos',
           }[p.etapa] || p.etapa;
           events.push({
             id: `pipe-${p.id}`,
@@ -199,17 +151,26 @@ export function useCalendarioIntegrado() {
       // 4. Custom events (eventos_calendario)
       try {
         const { data: customEvents } = await supabase
-          .from('eventos_calendario' as any)
+          .from('eventos_calendario')
           .select('*')
           .eq('user_id', user.id);
 
         if (customEvents) {
-          for (const e of customEvents as unknown as EventoCalendarioRow[]) {
+          for (const e of customEvents as EventoCalendarioRow[]) {
             const tipoBadgeMap: Record<TipoEventoCalendario, string> = {
               cierre: 'Cierre', adjudicacion: 'Adjudicación', tarea: 'Tarea',
               recordatorio: 'Recordatorio', otro: 'Otro',
             };
-            const type = e.tipo === 'tarea' ? 'team' as const : 'custom' as const;
+            // El tipo elegido al crear debe caer en el filtro/leyenda correcto:
+            // antes 'Adjudicación' y 'Cierre' terminaban en gris "Eventos Manuales".
+            const typePorTipo: Record<TipoEventoCalendario, CalendarioEvent['type']> = {
+              cierre: 'deadline_yellow',
+              adjudicacion: 'won',
+              tarea: 'team',
+              recordatorio: 'custom',
+              otro: 'custom',
+            };
+            const type = typePorTipo[e.tipo];
             const colors = e.color
               ? { color: e.color, textColor: '#ffffff', borderColor: e.color }
               : getEventColors(type);
@@ -245,7 +206,7 @@ export function useCalendarioIntegrado() {
     mutationFn: async (input: CreateEventInput) => {
       if (!user?.id) throw new Error('Not authenticated');
       const { data, error } = await supabase
-        .from('eventos_calendario' as any)
+        .from('eventos_calendario')
         .insert({
           user_id: user.id,
           titulo: input.titulo,
@@ -260,7 +221,7 @@ export function useCalendarioIntegrado() {
           repetir: input.repetir,
           recordatorio_minutos: input.recordatorio_minutos || null,
           color: input.color || null,
-        } as any)
+        })
         .select()
         .single();
       if (error) throw error;
@@ -275,7 +236,7 @@ export function useCalendarioIntegrado() {
   const deleteEvent = useMutation({
     mutationFn: async (eventId: string) => {
       const { error } = await supabase
-        .from('eventos_calendario' as any)
+        .from('eventos_calendario')
         .delete()
         .eq('id', eventId);
       if (error) throw error;

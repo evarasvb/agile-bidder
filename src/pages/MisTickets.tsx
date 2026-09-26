@@ -27,6 +27,8 @@ function TicketCard({ t }: { t: SoporteTicket }) {
     <div className="rounded-xl border border-border bg-card">
       <button
         onClick={() => setAbierto((v) => !v)}
+        aria-expanded={abierto}
+        aria-controls={`ticket-content-${t.id}`}
         className="w-full flex items-start gap-3 p-4 text-left"
       >
         <div className="flex-1 min-w-0">
@@ -44,7 +46,7 @@ function TicketCard({ t }: { t: SoporteTicket }) {
       </button>
 
       {abierto && conv.length > 0 && (
-        <div className="border-t border-border/60 px-4 py-3 space-y-2 bg-muted/20">
+        <div id={`ticket-content-${t.id}`} className="border-t border-border/60 px-4 py-3 space-y-2 bg-muted/20">
           <p className="text-xs font-semibold text-muted-foreground">Conversación</p>
           {conv.filter((m) => m.content).map((m, i) => (
             <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -72,7 +74,7 @@ export default function MisTickets() {
   const [abierto, setAbierto] = useState(false);
   const [mensaje, setMensaje] = useState("");
   const [enviando, setEnviando] = useState(false);
-  // Nueva consulta directa (mismo canal que el asistente Evaristo): queda como caso con seguimiento.
+  // Nueva consulta directa (mismo canal que el asistente Don Evaristo): queda como caso con seguimiento.
   const enviar = async () => {
     if (mensaje.trim().length < 10) { toast.error("Cuéntanos un poco más (mínimo 10 caracteres)"); return; }
     setEnviando(true);
@@ -119,7 +121,7 @@ export default function MisTickets() {
           <MessageCircle className="h-8 w-8 mx-auto text-muted-foreground/60" />
           <p className="mt-3 text-sm font-medium">Aún no has dejado ninguna consulta</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Usa el botón <span className="font-medium text-firmavb-blue">Nueva consulta</span> o el asistente Evaristo (abajo a la derecha). Aquí verás el estado de cada caso.
+            Usa el botón <span className="font-medium text-firmavb-blue">Nueva consulta</span> o el asistente Don Evaristo (abajo a la derecha). Aquí verás el estado de cada caso.
           </p>
         </div>
       ) : (

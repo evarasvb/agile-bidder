@@ -32,6 +32,13 @@ import {
 
 import { updateBadge } from './modules/notifications.js';
 
+import {
+  procesarAcciones,
+  reportarResultado,
+  accionActiva,
+  abrirTab
+} from './modules/acciones.js';
+
 // ============================================
 // EXTENSION LIFECYCLE
 // ============================================
@@ -77,6 +84,8 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
   if (alarm.name === PENDING_SYNC_ALARM_NAME) {
     await checkPendingTasks();
+    // Acciones que Don Evaristo dejó en cola (sincronizar, traer documentos, preparar oferta, publicar CM).
+    await procesarAcciones();
   }
 });
 
@@ -110,6 +119,10 @@ async function handleMessage(message, sender) {
     case 'DESCARGAR_URL':           return descargarUrl(data);
     case 'CA_DOCUMENTOS':           return caDocumentos(data);
     case 'CA_PENDIENTES':           return caPendientes(data);
+    case 'PROCESAR_ACCIONES':       return procesarAcciones();
+    case 'ACCION_ACTIVA':           return accionActiva();
+    case 'ACCION_RESULTADO':        return reportarResultado(data, sender);
+    case 'ABRIR_TAB':               return abrirTab(data);
     default:
       throw new Error(`Unknown action: ${action}`);
   }

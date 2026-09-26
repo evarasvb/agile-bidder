@@ -23,6 +23,7 @@ function producto(overrides: Partial<InventoryItem> = {}): InventoryItem {
     margen_objetivo: 20,
     stock_disponible: 100,
     unidad_medida: 'UN',
+    marca: null,
     tiempo_entrega_dias: 2,
     proveedor: 'Proveedor X',
     activo: true,

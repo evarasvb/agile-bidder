@@ -1,8 +1,10 @@
-// Experto FirmaVB — ESTUDIO PROFUNDO (plan Pro). Para una licitación, mira hacia atrás todo lo
+// Don Evaristo — ESTUDIO PROFUNDO (plan Pro). Para una licitación, mira hacia atrás todo lo
 // parecido que compró ese organismo: quién ganó, a qué precio respecto del presupuesto, cuántos
 // compitieron, quién es el incumbente, cómo paga, y (si están) las bases. Misma salida SSE que
 // experto-consultar para reutilizar la interfaz.
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { evidenceGateLicitacion, crearEstadoDocumentacionLicitacion } from "../_shared/evidenceGateHelper.ts";
+import { textoPanorama, REGLAS_PANORAMA } from "../_shared/panorama.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
@@ -25,10 +27,10 @@ function ipCliente(req: Request): string | null {
   return ip ? ip.slice(0, 64) : null;
 }
 
-const SYS = `Eres el Experto FirmaVB, asesor con 17 años vendiéndole al Estado chileno. Entregas a un proveedor pyme un ESTUDIO PROFUNDO de una licitación: no solo esta compra, sino el historial de compras parecidas del mismo organismo. Usa SOLO los datos y fuentes entregados. Hablas como Evaristo Varas en su libro "Véndele al Estado y No Mueras en el Intento": de tú, cercano, directo, como un amigo que ya pasó por esto y te lo cuenta sin adornos. Frases cortas. Nada de "estimado", "revisor en mano" ni saludos largos; entra al grano en la primera línea. Ejemplos concretos de la calle antes que teoría. Cuando toca, un empujón honesto ("no hay atajos", "no basta con querer ganar, hay que poder cumplir"). Si algo es riesgoso, dilo sin rodeos. Cierra siempre con el paso concreto que daría hoy. Siempre con cifras. Formato Markdown con estas secciones exactas:
+const SYS = `Eres Don Evaristo, asesor con 17 años vendiéndole al Estado chileno. Entregas a un proveedor pyme un ESTUDIO PROFUNDO de una licitación: no solo esta compra, sino el historial de compras parecidas del mismo organismo. Usa SOLO los datos y fuentes entregados. Hablas como Evaristo Varas en su libro "Véndele al Estado y No Mueras en el Intento": de tú, cercano, directo, como un amigo que ya pasó por esto y te lo cuenta sin adornos. Frases cortas. Nada de "estimado", "revisor en mano" ni saludos largos; entra al grano en la primera línea. Ejemplos concretos de la calle antes que teoría. Cuando toca, un empujón honesto ("no hay atajos", "no basta con querer ganar, hay que poder cumplir"). Si algo es riesgoso, dilo sin rodeos. Cierra siempre con el paso concreto que daría hoy. Siempre con cifras. Formato Markdown con estas secciones exactas:
 
 ## 1. Qué compra este organismo y cada cuánto
-Historial de procesos parecidos (código, fecha, estado, presupuesto). Si se repite cada año, dilo con las fechas.
+Historial de procesos parecidos (código, fecha, estado, presupuesto). Si se repite cada año, dilo con las fechas. Suma el PANORAMA COMPLETO: antecedentes con quién ganó, compras ágiles del mismo tema (fragmentación o compra puente), qué dice la prensa y qué reclaman los proveedores. Si hay documentos de otra licitación subidos aquí, dilo. Cierra la sección con lo que FALTA y pídelo (bases o anexos de la licitación anterior N° X, precio o capacidad del usuario).
 ## 2. Quién ha ganado y a qué precio
 Tabla Markdown: Proceso | Fecha | Ganador | Monto adjudicado | % del presupuesto | N° oferentes. Luego el promedio del % adjudicado/presupuesto.
 ## 3. Incumbente y competencia
@@ -41,8 +43,8 @@ Reclamos por pago no oportuno por cada 100 procesos, plazo declarado, conducta h
 Descompón la pauta en puntos ponderados y nombra la PALANCA MAYOR (el criterio que más mueve la aguja, con sus puntos: p. ej. soporte 24/7 vale 30 puntos contra 15). Fórmula de precio en texto (precio mínimo / precio ofertado × 100) y cómo se resuelven los empates y el umbral de conveniencia si las bases lo fijan.
 ## 7. Precio: tres escenarios
 Tabla Markdown: Escenario | % del tope | Neto | Con IVA (×1,19) | Riesgo. Filas: conservador (98% del tope), recomendado (96%), agresivo (93%), más el piso de referencia del historial (promedio adjudicado/presupuesto). El tope es el presupuesto; si no está informado, usa el tramo del código (L1 hasta 100 UTM, LE 100 a 1.000, LP 1.000 a 2.000, LQ 2.000 a 5.000, LR más de 5.000) con la UTM de hoy y dilo. Si el producto se cotiza en dólares, muestra el cálculo (USD × unidades × años × dólar de hoy). Riesgos a nombrar cuando apliquen: moneda CLP sin reajuste, pago único tras recepción conforme, multas, oferta temeraria.
-## 8. Garantías y compromisos
-Seriedad de la oferta y fiel cumplimiento: tipo, monto o %, beneficiario, glosa, vigencia, cuándo se devuelve (según bases; si no lo dicen, dilo). Recuerda que la garantía de seriedad solo se exige sobre 1.000 UTM. Qué compromisos de servicio conviene NO prometer si no se pueden cumplir.
+## 8. Garantías, multas y compromisos
+Seriedad de la oferta y fiel cumplimiento: tipo, monto o %, beneficiario, glosa, vigencia, cuándo se devuelve (según bases; si no lo dicen, dilo). Recuerda que la garantía de seriedad solo se exige sobre 1.000 UTM. Multas cuantificadas frente al monto del contrato: cuáles se asumen como parte del negocio y cuáles son riesgo real. Qué compromisos de servicio conviene NO prometer si no se pueden cumplir.
 ## 9. Estrategia para postular
 A quién hay que ganarle y con qué, dónde poner el esfuerzo técnico según los criterios, si conviene ir solo o en UTP, y los errores que en casos parecidos dejaron fuera a otros (dictámenes o sentencias de las FUENTES).
 ## 10. Plan de trabajo hasta el cierre
@@ -52,7 +54,8 @@ Lista numerada de lo que el Experto NO decide ni inventa: precio final, líneas 
 ## Fuentes
 Lista numerada de lo citado.
 
-Reglas: cita [n] tras cada afirmación con fuente; "Datos Mercado Público vía FirmaVB (OCDS)" para historial y adjudicaciones; no inventes procesos, montos, criterios, certificaciones ni datos de la empresa; si las bases traen resoluciones modificatorias o aclaraciones, manda lo modificado y dilo; si el historial es corto, dilo (la base OCDS parte en julio de 2026 y crece a diario); montos con separador de miles; máximo 2.300 palabras. Nunca escribas fórmulas en LaTeX ni digas "null" o "JSON": escribe las fórmulas en texto (precio mínimo / precio ofertado × 100) y si un dato no está, di que las bases no lo indican.`;
+Reglas: cita [n] tras cada afirmación con fuente; "Datos Mercado Público vía FirmaVB (OCDS)" para historial y adjudicaciones; no inventes procesos, montos, criterios, certificaciones ni datos de la empresa; si las bases traen resoluciones modificatorias o aclaraciones, manda lo modificado y dilo; si el historial es corto, dilo (la base OCDS parte en julio de 2026 y crece a diario); montos con separador de miles; máximo 2.600 palabras. Nunca escribas fórmulas en LaTeX ni digas "null" o "JSON": escribe las fórmulas en texto (precio mínimo / precio ofertado × 100) y si un dato no está, di que las bases no lo indican. Si hay MATCH con el inventario del usuario, en la sección 9 parte por los ítems que puede ofertar.
+${REGLAS_PANORAMA}`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -94,17 +97,28 @@ Deno.serve(async (req) => {
       ind: fetch("https://mindicador.cl/api", { signal: AbortSignal.timeout(4000) }).then((r) => r.json()).then((j: any) => ({ utm: j?.utm?.valor ?? null, dolar: j?.dolar?.valor ?? null })),
       n3: sb.rpc("experto_buscar_texto", { consulta: nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9ñ ]/g, " ").split(/\s+/).filter((w: string) => w.length > 4).slice(0, 3).join(" "), cantidad: 3 }).then((r) => r.data ?? []),
     };
+    // Panorama completo (documentos ajenos, antecedentes, compras ágiles del tema, reclamos, match) y prensa.
+    const palabrasNombre = nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9ñ ]/g, " ").split(/\s+/).filter((w: string) => w.length > 4).slice(0, 3);
+    t.panorama = sb.rpc("experto_panorama_licitacion", { p_codigo: codigo, p_user_id: userId }).then((r) => r.data);
+    t.noticias = palabrasNombre.length ? sb.rpc("experto_noticias", { consulta: palabrasNombre.join(" or "), cantidad: 3 }).then((r) => r.data ?? []) : Promise.resolve([]);
     const res: Record<string, any> = {};
     await Promise.all(Object.entries(t).map(async ([k, p]) => { try { res[k] = await p; } catch { res[k] = null; } }));
+
+    // Evidence Gate: no bloquea el estudio (nunca da "verde" por diseño); va como regla
+    // para la IA: analiza con lo que hay y deja explícito qué documentación falta.
+    const bases: any[] = res.bases ?? [];
+    const gate = evidenceGateLicitacion(crearEstadoDocumentacionLicitacion(ficha, bases, []));
 
     // Fuentes normativas [1..n], luego bases
     const vistos = new Set<number>();
     const frag: any[] = [...(res.n1 ?? []), ...(res.n2 ?? []), ...(res.n3 ?? [])].filter((f) => !vistos.has(f.id) && vistos.add(f.id));
-    const bases: any[] = res.bases ?? [];
     const partes: string[] = [];
+    partes.push(`ESTADO DOCUMENTAL (regla determinista de FirmaVB, veredicto: ${gate.veredicto}): ${gate.razon}${gate.faltantes.length ? ` Faltantes: ${gate.faltantes.join("; ")}.` : ""} Haz el estudio con lo que tienes, pero nunca recomiendes postular como algo seguro: señala qué falta y qué debe subir o revisar el usuario.`);
     if (frag.length) partes.push("FUENTES:\n" + frag.map((f, i) => `[${i + 1}] ${f.fuente}${f.seccion ? " — " + f.seccion : ""}\n${String(f.texto).slice(0, 1200)}`).join("\n\n"));
     const o = ficha.organismo ?? {};
     partes.push(`FICHA DE LA LICITACIÓN ${codigo} (Datos Mercado Público vía FirmaVB):\n${nombre}\nOrganismo: ${ficha.institucion} (RUT ${rut ?? "s/i"}) — ${ficha.comuna ?? ""}, ${ficha.region ?? ""}\nEstado: ${ficha.estado} | Tipo: ${ficha.tipo ?? "s/i"} | Presupuesto: ${fmt(ficha.presupuesto)} | Modalidad: ${ficha.modalidad ?? "s/i"} | Pago: ${ficha.tipo_pago ?? "s/i"} | Contrato: ${ficha.duracion_contrato ?? "s/i"}\nPublicada ${fecha(ficha.fecha_publicacion)} | Cierre ${fecha(ficha.fecha_cierre)} | Adjudicación estimada ${fecha(ficha.fecha_adjudicacion)}\nDescripción: ${String(ficha.descripcion ?? "").slice(0, 1200)}\nÍtems: ${(ficha.items ?? []).slice(0, 20).map((i: any) => `${i.producto}${i.cantidad ? ` (${i.cantidad} ${i.unidad ?? ""})` : ""}`).join("; ") || "s/i"}\nLink: ${ficha.url}`);
+    if (res.panorama) partes.push(textoPanorama(res.panorama, codigo));
+    if (res.noticias?.length) partes.push("NOTICIAS RECIENTES (prensa y ChileCompra; distingue lo que dice la prensa de nuestros datos):\n" + res.noticias.map((n: any) => `${n.fuente} — ${n.seccion ?? ""} (${fecha(n.fecha)})\n${String(n.texto).slice(0, 600)}`).join("\n\n"));
     if (res.ind?.utm || res.ind?.dolar) partes.push(`INDICADORES DE HOY (mindicador.cl, ${fecha(new Date())}): UTM ${fmt(res.ind.utm)} · dólar observado ${fmt(res.ind.dolar)}. Úsalos para el tramo en UTM y para precios en dólares.`);
     const hist: any[] = res.hist ?? [];
     if (hist.length) {

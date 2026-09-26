@@ -34,6 +34,7 @@ import {
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useInventory } from '@/hooks/useInventory';
+import { useCliente } from '@/hooks/useCliente';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Licitacion } from '@/hooks/useLicitaciones';
@@ -69,6 +70,7 @@ export function GenerarCotizacionModal({
   licitacion 
 }: GenerarCotizacionModalProps) {
   const { data: inventario, isLoading: inventarioLoading } = useInventory();
+  const { data: cliente } = useCliente();
   const [productosOfertados, setProductosOfertados] = useState<ProductoOfertado[]>([]);
   const [observaciones, setObservaciones] = useState('');
   const [plazoEntrega, setPlazoEntrega] = useState(5);
@@ -148,24 +150,27 @@ export function GenerarCotizacionModal({
       return;
     }
 
+    if (!cliente) {
+      toast.error('No se pudo identificar tu cuenta. Vuelve a intentar en unos segundos.');
+      return;
+    }
+
     setIsGenerating(true);
     try {
       // Create offer record in database
-      const { data: { user } } = await supabase.auth.getUser();
-      
       const ofertaData = {
+        cliente_id: cliente.id,
         licitacion_id: licitacion.id_licitacion,
         productos_ofertados: JSON.parse(JSON.stringify(productosOfertados)),
-        valor_total_oferta: totalOferta,
+        valor_total: totalOferta,
         margen_total: margenPromedio,
         match_score: licitacion.match_score,
         estado: 'borrador',
-        notas_internas: observaciones,
-        created_by: user?.id,
+        notas: observaciones,
       };
 
       const { data: oferta, error } = await supabase
-        .from('ofertas')
+        .from('cliente_ofertas')
         .insert(ofertaData)
         .select()
         .single();
@@ -211,24 +216,27 @@ export function GenerarCotizacionModal({
       return;
     }
 
+    if (!cliente) {
+      toast.error('No se pudo identificar tu cuenta. Vuelve a intentar en unos segundos.');
+      return;
+    }
+
     setIsSending(true);
     try {
       // First generate the offer if not already done
-      const { data: { user } } = await supabase.auth.getUser();
-      
       const ofertaData = {
+        cliente_id: cliente.id,
         licitacion_id: licitacion.id_licitacion,
         productos_ofertados: JSON.parse(JSON.stringify(productosOfertados)),
-        valor_total_oferta: totalOferta,
+        valor_total: totalOferta,
         margen_total: margenPromedio,
         match_score: licitacion.match_score,
-        estado: 'lista_envio',
-        notas_internas: observaciones,
-        created_by: user?.id,
+        estado: 'revision',
+        notas: observaciones,
       };
 
       const { data: oferta, error } = await supabase
-        .from('ofertas')
+        .from('cliente_ofertas')
         .insert(ofertaData)
         .select()
         .single();
@@ -385,7 +393,7 @@ export function GenerarCotizacionModal({
                         >
                           <div className="flex items-center gap-2">
                             {producto.imagen_url ? (
-                              <img src={producto.imagen_url} alt="" className="w-8 h-8 rounded object-cover" />
+                              <img src={producto.imagen_url} alt={`Imagen de ${producto.nombre_producto}`} className="w-8 h-8 rounded object-cover" />
                             ) : (
                               <div className="w-8 h-8 rounded bg-muted flex items-center justify-center">
                                 <Package className="h-4 w-4 text-muted-foreground" />
@@ -422,7 +430,7 @@ export function GenerarCotizacionModal({
                       <CardContent className="p-4">
                         <div className="flex items-center gap-4">
                           {producto.imagen_url ? (
-                            <img src={producto.imagen_url} alt="" className="w-12 h-12 rounded object-cover" />
+                            <img src={producto.imagen_url} alt={`Imagen de ${producto.nombre}`} className="w-12 h-12 rounded object-cover" />
                           ) : (
                             <div className="w-12 h-12 rounded bg-muted flex items-center justify-center">
                               <Image className="h-5 w-5 text-muted-foreground" />

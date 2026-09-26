@@ -1,31 +1,74 @@
-import { useState } from "react";
-import { Building2, Download, Search, Package, Users, DollarSign, FileText, Crown, Landmark } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { Building2, Package, Users, DollarSign, FileText, Crown, Landmark } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { ReportHero } from "@/components/reportes/ReportHero";
-import { formatCompact, formatNumber, exportToCSV } from "@/hooks/useReportes";
+import { formatCompact, formatNumber } from "@/hooks/useReportes";
 import { useBIStats, useTopCompradores, useCompradorDetalle, rangoDePreset, type BIComprador, type PeriodoPreset } from "@/hooks/useBI";
 import { PeriodoSelector } from "@/components/reportes/PeriodoSelector";
 
+/** Fila del ranking: la institución más su posición por monto (fija aunque se reordene la tabla). */
+type FilaComprador = BIComprador & { posicion: number };
+
+const COLUMNAS_COMPRADORES: DataTableColumn<FilaComprador>[] = [
+  {
+    id: "posicion",
+    header: "#",
+    headerClassName: "w-8",
+    className: "text-muted-foreground",
+    sortValue: (c) => c.posicion,
+    cell: (c) => (c.posicion === 1 ? <Crown className="h-4 w-4 text-amber-500" /> : c.posicion),
+  },
+  {
+    id: "comprador",
+    header: "Institución",
+    className: "font-medium max-w-[240px] truncate",
+    sortValue: (c) => c.comprador,
+    cell: (c) => c.comprador,
+  },
+  { id: "ordenes", header: "Órdenes", align: "right", sortValue: (c) => c.ordenes, cell: (c) => formatNumber(c.ordenes) },
+  { id: "proveedores", header: "Proveedores", align: "right", sortValue: (c) => c.proveedores, cell: (c) => formatNumber(c.proveedores) },
+  {
+    id: "monto",
+    header: "Monto",
+    align: "right",
+    className: "font-mono text-sm",
+    sortValue: (c) => c.monto_total,
+    exportValue: (c) => Math.round(c.monto_total),
+    cell: (c) => formatCompact(c.monto_total),
+  },
+  {
+    id: "share",
+    header: "Mercado",
+    headerClassName: "w-[130px]",
+    sortValue: (c) => c.share,
+    exportValue: (c) => (c.share == null ? "" : `${c.share.toFixed(1)}%`),
+    cell: (c) => (
+      <div className="flex items-center gap-2">
+        <Progress value={Math.min(100, c.share ?? 0)} className="h-1.5 w-16" />
+        <span className="text-xs text-muted-foreground w-10">{(c.share ?? 0).toFixed(1)}%</span>
+      </div>
+    ),
+  },
+];
+
 export default function ReporteCompradores() {
-  const [search, setSearch] = useState("");
   const [sel, setSel] = useState<BIComprador | null>(null);
   const [preset, setPreset] = useState<PeriodoPreset>("total");
   const periodo = rangoDePreset(preset);
 
+  // La búsqueda va al servidor (busca en TODAS las instituciones antes del
+  // top 200); la tabla solo ordena/pagina lo que llega.
+  const [q, setQ] = useState("");
+  const termino = useDebouncedValue(q.trim(), 400);
   const { data: stats } = useBIStats(periodo);
-  const { data, isLoading } = useTopCompradores(search, 80, periodo);
-  const items = data?.items ?? [];
+  const { data, isLoading } = useTopCompradores(termino, 200, periodo);
+  const filas = useMemo<FilaComprador[]>(() => (data?.items ?? []).map((c, i) => ({ ...c, posicion: i + 1 })), [data]);
   const { data: detalle, isLoading: detalleLoading } = useCompradorDetalle(sel?.comprador ?? null);
-
-  const handleExport = () => exportToCSV(items.map((c) => ({
-    Institución: c.comprador, Órdenes: c.ordenes, Proveedores: c.proveedores,
-    "Monto total": c.monto_total, "Participación %": c.share ?? "",
-  })), "reporte_compradores");
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -43,16 +86,6 @@ export default function ReporteCompradores() {
         right={<PeriodoSelector value={preset} onChange={setPreset} />}
       />
 
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="relative max-w-md w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar institución…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-10" />
-        </div>
-        <Button variant="outline" size="sm" onClick={handleExport} disabled={!items.length}>
-          <Download className="h-4 w-4 mr-2" /> CSV
-        </Button>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <Card className="lg:col-span-3 border-border/50 shadow-sm">
           <CardHeader className="pb-2">
@@ -60,42 +93,29 @@ export default function ReporteCompradores() {
             <CardDescription>Instituciones por monto comprado. Haz clic para el detalle.</CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
-              <div className="space-y-2">{[...Array(8)].map((_, i) => <Skeleton key={i} className="h-11 w-full" />)}</div>
-            ) : items.length === 0 ? (
-              <p className="py-8 text-center text-muted-foreground text-sm">{search ? `Sin instituciones para “${search}”.` : "Aún no hay datos para mostrar."}</p>
-            ) : (
-              <div className="rounded-lg border overflow-auto max-h-[68vh]">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-muted/60 backdrop-blur">
-                    <TableRow>
-                      <TableHead className="w-8">#</TableHead>
-                      <TableHead>Institución</TableHead>
-                      <TableHead className="text-right">Monto</TableHead>
-                      <TableHead className="w-[130px]">Mercado</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {items.map((c, i) => {
-                      const active = sel?.comprador === c.comprador;
-                      return (
-                        <TableRow key={c.comprador} onClick={() => setSel(c)} className={`cursor-pointer ${active ? "bg-primary/5" : ""}`}>
-                          <TableCell className="text-muted-foreground">{i === 0 ? <Crown className="h-4 w-4 text-amber-500" /> : i + 1}</TableCell>
-                          <TableCell className="font-medium max-w-[240px] truncate">{c.comprador}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{formatCompact(c.monto_total)}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Progress value={Math.min(100, c.share ?? 0)} className="h-1.5 w-16" />
-                              <span className="text-xs text-muted-foreground w-10">{(c.share ?? 0).toFixed(1)}%</span>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+            <DataTable<FilaComprador>
+              storageKey="reporte-compradores"
+              rows={filas}
+              rowKey={(c) => c.comprador}
+              columns={COLUMNAS_COMPRADORES}
+              loading={isLoading}
+              itemLabel="instituciones"
+              toolbar={
+                <Input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Buscar institución en todo el mercado…"
+                  aria-label="Buscar institución"
+                  className="h-10 w-full sm:w-72"
+                />
+              }
+              defaultSort={{ id: "monto", dir: "desc" }}
+              exportFileName="reporte_compradores"
+              emptyMessage={termino ? `Ninguna institución coincide con “${termino}”.` : "Aún no hay datos para mostrar."}
+              maxHeight="68vh"
+              onRowClick={(c) => setSel(c)}
+              rowClassName={(c) => (sel?.comprador === c.comprador ? "bg-primary/5" : undefined)}
+            />
           </CardContent>
         </Card>
 

@@ -94,9 +94,9 @@ export function useMercadoReport() {
       // 130k+ licitaciones y 79k compras al navegador: el tope de 1.000 filas de
       // la API subcontaba las licitaciones (~1.000 en vez de 130.665) y se leía
       // compras_agiles.monto (columna inexistente → error tragado → compras=0).
-      const { data, error } = await (supabase as any).rpc("bi_mercado_stats");
+      const { data, error } = await supabase.rpc("bi_mercado_stats");
       if (error) throw error;
-      return data as MercadoReport;
+      return data as unknown as MercadoReport;
     },
   });
 }

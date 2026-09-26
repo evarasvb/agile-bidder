@@ -1,0 +1,290 @@
+[
+ {
+  "titulo": "Casos reales · Tu radar automático con FirmaVB",
+  "lecciones": [
+   {
+    "titulo": "Match semántico: cómo FirmaVB entiende lo que vendes",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "Mercado Público publica más de 6.000 órdenes al día y miles de compras ágiles por semana. Nadie puede leerlas. FirmaVB lo hace por ti con dos motores: el texto (nombres, códigos ONU, sinónimos) y el significado (vectores semánticos). Por eso encuentra 'resma carta 75 gramos' cuando tu producto se llama 'papel fotocopia A4', y descarta 'papel mural' aunque comparta palabras."
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Sube tu inventario con nombre, descripción y código ONU si lo tienes. Mientras mejor la descripción, mejor el match.",
+       "FirmaVB vectoriza cada producto tuyo y cada ítem de compra ágil y licitación, y compara significado, no solo palabras.",
+       "El puntaje de match va de 0 a 100. Sobre 45 es un calce fuerte; entre 30 y 45 vale una mirada; bajo 30 se descarta.",
+       "Cada vez que confirmas o rechazas un match, el sistema aprende sinónimos de tu rubro."
+      ]
+     },
+     {
+      "tipo": "dato",
+      "texto": "En septiembre de 2026 el motor semántico de FirmaVB procesa los ítems de todas las compras ágiles abiertas cada dos minutos, y los cruza con el inventario de cada cliente. Un proveedor promedio recibe entre 15 y 60 oportunidades con match fuerte por semana.",
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026"
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Radar de compras ágiles con match",
+      "ruta": "/compras-agiles",
+      "detalle": "Ordena por puntaje de match y abre la ficha: FirmaVB te muestra el ítem, tu producto sugerido y el precio de mercado."
+     },
+     {
+      "tipo": "video",
+      "titulo": "Configurar tu inventario para que el match funcione",
+      "minutos": 9,
+      "resumen": "Demostración: carga de inventario, descripciones que funcionan, códigos ONU, y cómo confirmar o rechazar matches para entrenar el radar."
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "Tu producto se llama 'papel fotocopia A4 75 g' y una compra ágil pide 'resma carta 75 gramos'. ¿Qué hace el match semántico?",
+      "opciones": [
+       "No lo encuentra porque no comparten palabras.",
+       "Lo encuentra porque compara significado, y te lo muestra con su puntaje.",
+       "Lo encuentra solo si agregas 'resma' al nombre de tu producto."
+      ],
+      "correcta": 1,
+      "explicacion": "El motor semántico compara el significado de los textos. Aun así, una buena descripción del producto mejora el puntaje."
+     }
+    ]
+   },
+   {
+    "titulo": "El Libro de licitación: bajo el agua, matriz e informe",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "Cuando una licitación vale la pena, FirmaVB abre un Libro: trae las bases desde Mercado Público, las lee y deja al Experto disponible para conversar. Desde el Libro pides, cuando los necesitas, los entregables que hacen el trabajo de un consultor."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Entregables del Libro de licitación",
+      "columnas": [
+       "Entregable",
+       "Qué hace",
+       "Cuándo pedirlo"
+      ],
+      "filas": [
+       [
+        "Informe de trabajo",
+        "Resumen ejecutivo, requisitos, riesgos y veredicto postular / con reservas / descartar",
+        "Al abrir el Libro, antes de invertir tiempo"
+       ],
+       [
+        "Bajo el Agua",
+        "Historial del organismo, proveedor recurrente, compras ágiles paralelas, reclamos, lobby, noticias",
+        "Cuando el informe dice postular"
+       ],
+       [
+        "Matriz de postulación",
+        "Criterios y pesos desde las bases, con simulación de tu puntaje y del rival",
+        "Antes de fijar el precio"
+       ],
+       [
+        "Estudio profundo",
+        "Análisis completo de bases y anexos, con las trampas y los puntos de puntaje",
+        "Licitaciones sobre 1.000 UTM"
+       ],
+       [
+        "Anexos completados",
+        "Los anexos administrativos y técnicos rellenados con tus datos, en Word",
+        "El día que armas la oferta"
+       ],
+       [
+        "Mapa conceptual e infografía",
+        "Para explicar la licitación a tu equipo o compartir por WhatsApp",
+        "Cuando trabajas con otros"
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "Nada se genera solo: cada entregable se pide con un clic y queda guardado. Pide primero el informe; si dice descartar, ahorraste todo lo demás."
+     },
+     {
+      "tipo": "caso",
+      "titulo": "Bajo el Agua en una licitación de insumos",
+      "texto": "El informe decía postular. Bajo el Agua mostró que el organismo llevaba 46 compras ágiles del mismo producto en un mes, 209 reclamos de pago y un proveedor recurrente que había fallado dos veces. La decisión cambió: postular con precio 5% sobre la mediana, plazo de entrega de 3 días como argumento, y cobranza desde el día 31. Adjudicó."
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Abrir un Libro de licitación",
+      "ruta": "/experto",
+      "detalle": "Pega el código de la licitación y FirmaVB trae las bases. Desde ahí pides los entregables."
+     },
+     {
+      "tipo": "video",
+      "titulo": "Demostración completa del Libro de licitación",
+      "minutos": 18,
+      "resumen": "De la búsqueda a la oferta: abrir el Libro, informe de trabajo, Bajo el Agua, matriz con simulación, anexos completados y exportación a Word y PDF."
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "¿Cuál es el orden más eficiente para usar los entregables del Libro?",
+      "opciones": [
+       "Todos a la vez, para tener la información completa.",
+       "Informe de trabajo primero; Bajo el Agua y matriz solo si el informe dice postular.",
+       "Anexos completados primero, para ganar tiempo."
+      ],
+      "correcta": 1,
+      "explicacion": "El informe cuesta poco y decide si vale la pena seguir. Generar todo de una vez gasta tiempo y créditos en licitaciones que se van a descartar."
+     }
+    ]
+   },
+   {
+    "titulo": "Seguir instituciones y leer sus noticias",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "Seguir a un organismo en FirmaVB hace tres cosas: te avisa de sus nuevas oportunidades, te muestra sus menciones en medios y te deja su ficha de compras y reclamos a un clic. Es el equivalente a tener un ejecutivo de cuentas por cada cliente, sin contratarlo."
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Sigue a tus 20 organismos objetivo de la Saga 1.",
+       "Cada mañana revisa las alertas: nuevas compras ágiles, licitaciones y noticias.",
+       "Cuando aparece una noticia relevante (nuevo director, recorte, emergencia, proyecto), anota qué va a comprar y prepárate antes de que publique.",
+       "Cada mes revisa la ficha: ¿subieron los reclamos? ¿cambió el proveedor principal? ¿aumentaron las compras ágiles de lo tuyo?"
+      ]
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Seguir instituciones",
+      "ruta": "/mercado/instituciones"
+     },
+     {
+      "tipo": "ejercicio",
+      "titulo": "Tu lista de seguidos",
+      "pasos": [
+       "Sigue hoy a 10 organismos de tu lista.",
+       "Durante una semana, anota cada alerta recibida y qué hiciste con ella.",
+       "Al final de la semana, decide cuáles siguen en la lista y agrega 5 más."
+      ],
+      "entregable": "Lista de seguidos depurada y registro de alertas de la semana."
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "titulo": "Casos reales · Reportes que otros no tienen",
+  "lecciones": [
+   {
+    "titulo": "Los reportes y para qué sirve cada uno",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "FirmaVB convierte 1,3 millones de órdenes de compra, 3,5 millones de líneas de producto y 78 mil reclamos en reportes que responden preguntas de negocio. Este es el mapa."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Reportes de FirmaVB",
+      "columnas": [
+       "Reporte",
+       "Pregunta que responde",
+       "Úsalo para"
+      ],
+      "filas": [
+       [
+        "Productos",
+        "¿Quién compra mi producto, a qué precio y en qué mes?",
+        "Fijar precio y estacionalidad"
+       ],
+       [
+        "Compradores",
+        "¿Qué organismos compran lo mío y cuánto?",
+        "Armar la lista de clientes objetivo"
+       ],
+       [
+        "Competidores",
+        "¿Quién le vende a mis clientes y con qué?",
+        "Encontrar tu nicho"
+       ],
+       [
+        "Proveedores",
+        "¿Cuánto vende cada proveedor y a quién?",
+        "Medir tu posición en el rubro"
+       ],
+       [
+        "Convenio marco",
+        "¿Cuánto se vende por cada convenio, quién vende y quién compra?",
+        "Decidir a qué convenio postular"
+       ],
+       [
+        "Órdenes de compra",
+        "¿Qué se compró, cuándo y por qué vía?",
+        "Seguir clientes y detectar compras repetidas"
+       ],
+       [
+        "Mercado",
+        "¿Cómo se mueve el gasto por región y mes?",
+        "Planificar stock y caja"
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026"
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Reportes",
+      "ruta": "/reportes"
+     },
+     {
+      "tipo": "ejercicio",
+      "titulo": "Rutina mensual de reportes (30 minutos)",
+      "pasos": [
+       "Productos: ¿cambió el rango de precio de mis 5 productos?",
+       "Compradores: ¿apareció un organismo nuevo comprando lo mío?",
+       "Competidores: ¿quién ganó las compras que perdí?",
+       "Convenio marco: ¿cómo va mi convenio y quién sube?",
+       "Anota tres decisiones que salen de los reportes y ejecútalas esa semana."
+      ],
+      "entregable": "Tres decisiones por mes, escritas y ejecutadas."
+     },
+     {
+      "tipo": "video",
+      "titulo": "Rutina mensual con los reportes de FirmaVB",
+      "minutos": 12,
+      "resumen": "Recorrido por los siete reportes con un caso real: un proveedor de artículos de aseo decidiendo precio, clientes y convenio."
+     }
+    ]
+   },
+   {
+    "titulo": "Cobranza y documentos con el Abogado",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "El Abogado de FirmaVB redacta documentos legales con tus hechos: cartas de cobro, requerimientos prejudiciales, reclamos, respuestas a multas. En cobranza, se conecta con tu cartera de facturas: registras la factura, FirmaVB calcula el atraso y el interés, y el Abogado escribe la nota de cobro con el fundamento de la Ley 21.131."
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Registra facturas con fecha de recepción conforme; puedes cargarlas en masa desde una planilla.",
+       "Cada lunes revisa la cartera: pendientes, recordadas, requeridas, pagadas.",
+       "Genera la nota de cobro el día 31 y el requerimiento el día 60 con un clic.",
+       "Guarda los adjuntos (guía firmada, correos) en la misma factura: son tu prueba si escalas."
+      ]
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Cobranza de facturas",
+      "ruta": "/experto/cobranza"
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Abogado de FirmaVB",
+      "ruta": "/experto/abogado",
+      "detalle": "Para otros documentos: respuestas a multas, reclamos de adjudicación, cartas al organismo."
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "¿Qué necesita FirmaVB para calcular correctamente el atraso de una factura al Estado?",
+      "opciones": [
+       "La fecha de emisión de la factura.",
+       "La fecha de recepción conforme, porque desde ahí corren los 30 días.",
+       "El número de la orden de compra."
+      ],
+      "correcta": 1,
+      "explicacion": "El plazo legal corre desde la recepción. Registrar esa fecha es lo que hace que el cálculo de atraso e interés sea exacto."
+     }
+    ]
+   }
+  ]
+ }
+]

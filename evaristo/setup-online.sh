@@ -1,6 +1,9 @@
 #!/bin/bash
 # Script de configuración rápida para Evaristo Online
 # ====================================================
+# OBSOLETO: la función evaristo-api que este script instruye desplegar fue
+# eliminada (código muerto, sin uso real). El panel /admin/evaristo ahora
+# consulta directamente la RPC evaristo_admin_resumen() de Supabase.
 
 echo "🤖 Configuración de Evaristo para Trabajo en Línea"
 echo "=================================================="

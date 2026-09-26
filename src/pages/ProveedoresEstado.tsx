@@ -2,7 +2,8 @@
 // cuánto y a quién, agregada desde las órdenes de compra. Solo la ve el admin
 // (ruta AdminOnlyRoute + RPC security-definer). No trae correos (Mercado Público no
 // los expone); sirve para saber a quién conviene contactar y priorizar.
-import { Fragment, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useProveedoresEstado, useProveedorEstadoDetalle, useRubrosEstado, type ProveedorEstado } from "@/hooks/useProveedoresEstado";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,8 +11,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Building2, Search, Store, Tags, TrendingUp } from "lucide-react";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { Building2, Store, Tags, TrendingUp, X } from "lucide-react";
+
+// Cuántos proveedores trae el RPC (ordenados por monto 2026). La búsqueda por
+// nombre/RUT, el orden y la paginación se hacen en la tabla sobre este set.
+// El RPC proveedores_estado corta en 200; la búsqueda por nombre/RUT (q) se
+// hace en el servidor sobre TODOS los proveedores antes de ese corte.
+const LIMITE_PROVEEDORES = 200;
 
 function clp(n: number | null | undefined): string {
   const v = Number(n || 0);
@@ -20,6 +27,37 @@ function clp(n: number | null | undefined): string {
 function num(n: number | null | undefined): string {
   return new Intl.NumberFormat("es-CL").format(Number(n || 0));
 }
+
+const COLUMNAS_PROVEEDORES: DataTableColumn<ProveedorEstado>[] = [
+  {
+    id: "proveedor",
+    header: "Proveedor",
+    cell: (p) => <span className="font-medium truncate block max-w-[280px]" title={p.proveedor_nombre || ""}>{p.proveedor_nombre || "—"}</span>,
+    sortValue: (p) => p.proveedor_nombre,
+    exportValue: (p) => p.proveedor_nombre ?? "",
+  },
+  {
+    id: "rut",
+    header: "RUT",
+    cell: (p) => <span className="font-mono text-xs whitespace-nowrap">{p.rut_proveedor}</span>,
+    sortValue: (p) => p.rut_proveedor,
+  },
+  { id: "ocs_2026", header: "OC 2026", align: "right", cell: (p) => <span className="tabular-nums">{num(p.n_ocs_2026)}</span>, sortValue: (p) => Number(p.n_ocs_2026 || 0) },
+  {
+    id: "monto_2026",
+    header: "Monto 2026",
+    align: "right",
+    cell: (p) => <span className="tabular-nums font-medium">{clp(p.monto_2026)}</span>,
+    sortValue: (p) => Number(p.monto_2026 || 0),
+  },
+  {
+    id: "monto_total",
+    header: "Monto total",
+    align: "right",
+    cell: (p) => <span className="tabular-nums text-muted-foreground">{clp(p.monto_total)}</span>,
+    sortValue: (p) => Number(p.monto_total || 0),
+  },
+];
 
 function DetalleProveedor({ rut }: { rut: string }) {
   const { data, isLoading } = useProveedorEstadoDetalle(rut);
@@ -53,10 +91,11 @@ export default function ProveedoresEstado() {
   const [q, setQ] = useState("");
   const [rubro, setRubro] = useState("");
   const [institucion, setInstitucion] = useState("");
+  const qServidor = useDebouncedValue(q.trim(), 400);
   const { data: rubros = [] } = useRubrosEstado();
-  const { data: proveedores = [], isLoading } = useProveedoresEstado(q, rubro, institucion, 50);
-  const [abierto, setAbierto] = useState<string | null>(null);
-  const hayFiltro = !!(q.trim() || rubro || institucion.trim());
+  const { data: proveedores = [], isLoading } = useProveedoresEstado(qServidor, rubro, institucion, LIMITE_PROVEEDORES);
+  const [abierto, setAbierto] = useState<ProveedorEstado | null>(null);
+  const hayFiltro = !!(rubro || institucion.trim() || q.trim());
 
   const totales = useMemo(() => {
     const monto = proveedores.reduce((s, p) => s + Number(p.monto_2026 || 0), 0);
@@ -76,15 +115,12 @@ export default function ProveedoresEstado() {
       <Card>
         <CardContent className="pt-6 space-y-3">
           <div className="grid gap-3 md:grid-cols-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Proveedor por nombre o RUT…"
-                className="pl-9"
-              />
-            </div>
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Proveedor por nombre o RUT (busca en todos)…"
+              aria-label="Buscar proveedor"
+            />
             <Select value={rubro || "__all__"} onValueChange={(v) => setRubro(v === "__all__" ? "" : v)}>
               <SelectTrigger><SelectValue placeholder="Todos los rubros" /></SelectTrigger>
               <SelectContent>
@@ -101,7 +137,7 @@ export default function ProveedoresEstado() {
           <div className="flex items-center gap-3">
             {hayFiltro
               ? <Button variant="ghost" size="sm" onClick={() => { setQ(""); setRubro(""); setInstitucion(""); }}>Limpiar filtros</Button>
-              : <p className="text-xs text-muted-foreground">Mostrando el top por monto 2026. Filtra por nombre, rubro o institución.</p>}
+              : <p className="text-xs text-muted-foreground">Mostrando el top {num(LIMITE_PROVEEDORES)} por monto 2026. Busca por nombre o RUT, o filtra por rubro o institución.</p>}
           </div>
         </CardContent>
       </Card>
@@ -114,45 +150,29 @@ export default function ProveedoresEstado() {
             <span className="ml-auto text-sm font-normal text-muted-foreground">Monto 2026 (visible): {clp(totales.monto)}</span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="p-6 space-y-2">{[...Array(6)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
-          ) : proveedores.length === 0 ? (
-            <p className="text-sm text-muted-foreground p-6 text-center">Sin resultados. Prueba otro nombre o RUT.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead>Proveedor</TableHead>
-                    <TableHead className="whitespace-nowrap">RUT</TableHead>
-                    <TableHead className="text-right whitespace-nowrap">OC 2026</TableHead>
-                    <TableHead className="text-right whitespace-nowrap">Monto 2026</TableHead>
-                    <TableHead className="text-right whitespace-nowrap">Monto total</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {proveedores.map((p: ProveedorEstado) => (
-                    <Fragment key={p.rut_proveedor}>
-                      <TableRow
-                        className="cursor-pointer hover:bg-firmavb-blue/5"
-                        onClick={() => setAbierto(abierto === p.rut_proveedor ? null : p.rut_proveedor)}
-                      >
-                        <TableCell className="font-medium max-w-[280px]"><span className="truncate block" title={p.proveedor_nombre || ""}>{p.proveedor_nombre || "—"}</span></TableCell>
-                        <TableCell className="font-mono text-xs whitespace-nowrap">{p.rut_proveedor}</TableCell>
-                        <TableCell className="text-right tabular-nums">{num(p.n_ocs_2026)}</TableCell>
-                        <TableCell className="text-right tabular-nums font-medium">{clp(p.monto_2026)}</TableCell>
-                        <TableCell className="text-right tabular-nums text-muted-foreground">{clp(p.monto_total)}</TableCell>
-                      </TableRow>
-                      {abierto === p.rut_proveedor && (
-                        <TableRow>
-                          <TableCell colSpan={5} className="p-0"><DetalleProveedor rut={p.rut_proveedor} /></TableCell>
-                        </TableRow>
-                      )}
-                    </Fragment>
-                  ))}
-                </TableBody>
-              </Table>
+        <CardContent className="space-y-3">
+          <DataTable<ProveedorEstado>
+            storageKey="proveedores-estado"
+            rows={proveedores}
+            rowKey={(p) => p.rut_proveedor}
+            loading={isLoading}
+            itemLabel="proveedores"
+            columns={COLUMNAS_PROVEEDORES}
+            defaultSort={{ id: "monto_2026", dir: "desc" }}
+            exportFileName="proveedores-estado"
+            emptyMessage="Sin resultados. Prueba otro nombre, rubro o institución."
+            onRowClick={(p) => setAbierto((prev) => (prev?.rut_proveedor === p.rut_proveedor ? null : p))}
+            rowClassName={(p) => (abierto?.rut_proveedor === p.rut_proveedor ? "bg-firmavb-blue/5" : "hover:bg-firmavb-blue/5")}
+          />
+          {abierto && (
+            <div className="rounded-lg border overflow-hidden">
+              <div className="flex items-center justify-between gap-3 px-4 py-2 border-b bg-muted/50">
+                <p className="text-sm font-medium truncate">
+                  {abierto.proveedor_nombre || "—"} <span className="font-mono text-xs text-muted-foreground">{abierto.rut_proveedor}</span>
+                </p>
+                <Button variant="ghost" size="sm" onClick={() => setAbierto(null)} aria-label="Cerrar detalle"><X className="h-4 w-4" /></Button>
+              </div>
+              <DetalleProveedor rut={abierto.rut_proveedor} />
             </div>
           )}
         </CardContent>

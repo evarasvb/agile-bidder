@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,6 @@ import {
   CheckCircle2,
   ClipboardList,
   ShoppingCart,
-  Lock,
   Check,
   KeyRound,
   Loader2,
@@ -24,6 +23,7 @@ import {
 } from "lucide-react";
 import logoFirmavbOriginal from "@/assets/logo-firmavb-original.png";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import {
   getCursoBySlug,
@@ -32,9 +32,25 @@ import {
   type Modulo,
 } from "@/data/academiaCursos";
 import { Seo } from "@/components/Seo";
+import { GraficoView, TablaView, VideoView, QuizView, HerramientaView, EjercicioView } from "@/components/academia/BloquesX10";
+
+// Cuentas que ven los cursos premium sin código (para revisarlos y probarlos).
+const FUNDADORES = ["evaras@firmavb.cl"];
 
 function BloqueView({ bloque }: { bloque: Bloque }) {
   switch (bloque.tipo) {
+    case "grafico":
+      return <GraficoView bloque={bloque} />;
+    case "tabla":
+      return <TablaView bloque={bloque} />;
+    case "video":
+      return <VideoView bloque={bloque} />;
+    case "quiz":
+      return <QuizView bloque={bloque} />;
+    case "herramienta":
+      return <HerramientaView bloque={bloque} />;
+    case "ejercicio":
+      return <EjercicioView bloque={bloque} />;
     case "subtitulo":
       return (
         <h4 className="text-lg font-semibold text-foreground mt-6 mb-2">{bloque.texto}</h4>
@@ -67,8 +83,9 @@ function BloqueView({ bloque }: { bloque: Bloque }) {
           target="_blank"
           rel="noopener noreferrer"
           className="my-4 inline-flex items-center gap-2 rounded-xl border border-[hsl(var(--success))]/30 bg-[hsl(var(--success))]/10 px-4 py-3 text-sm font-semibold text-[hsl(var(--success))] hover:bg-[hsl(var(--success))]/20 transition-colors"
+          aria-label={`${bloque.texto} (abre en nueva pestaña)`}
         >
-          <Download className="h-4 w-4" />
+          <Download className="h-4 w-4" aria-hidden="true" />
           {bloque.texto}
         </a>
       );
@@ -106,8 +123,9 @@ function BloqueView({ bloque }: { bloque: Bloque }) {
           target="_blank"
           rel="noopener noreferrer"
           className="my-4 inline-flex items-center gap-2 rounded-xl bg-firmavb-blue px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-firmavb-blue/90 transition-colors"
+          aria-label={`${bloque.texto} (abre en nueva pestaña)`}
         >
-          <Calendar className="h-4 w-4" />
+          <Calendar className="h-4 w-4" aria-hidden="true" />
           {bloque.texto}
         </a>
       );
@@ -117,13 +135,68 @@ function BloqueView({ bloque }: { bloque: Bloque }) {
   }
 }
 
-// Render de los módulos con lecciones numeradas (cursos gratis y premium ya desbloqueados)
-function ModulosContenido({ modulos }: { modulos: Modulo[] }) {
+// Progreso de lectura de un curso, guardado en este navegador (localStorage).
+// No es un sistema de cuentas: es solo para que quien vuelve a entrar vea por
+// dónde iba. Clave por slug del curso, así cada curso lleva su propio avance.
+function useProgresoCurso(slug: string) {
+  const key = `academia-progreso-${slug}`;
+  const [leidas, setLeidas] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(key, JSON.stringify([...leidas]));
+    } catch {
+      // localStorage puede fallar (modo privado, cuota); el progreso solo se
+      // pierde al recargar, no bloquea la lectura del curso.
+    }
+  }, [leidas, key]);
+  const marcar = (id: string) =>
+    setLeidas((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  return { leidas, marcar };
+}
+
+// Render de los módulos con lecciones numeradas (cursos gratis y premium ya desbloqueados).
+// Cada módulo tiene un ancla (#modulo-N) para el índice, y cada lección se puede
+// marcar como leída: así quien vuelve ve cuánto le falta.
+function ModulosContenido({ modulos, slug }: { modulos: Modulo[]; slug: string }) {
+  const { leidas, marcar } = useProgresoCurso(slug);
+  const totalLecciones = useMemo(
+    () => modulos.reduce((n, m) => n + m.lecciones.length, 0),
+    [modulos]
+  );
+  const leidasEnCurso = leidas.size;
   let leccionNum = 0;
   return (
     <>
+      <div className="rounded-xl border border-border/50 bg-card p-4 flex items-center gap-4">
+        <div className="flex-1">
+          <div className="flex items-center justify-between text-sm mb-1.5">
+            <span className="font-medium text-foreground">Tu avance</span>
+            <span className="text-muted-foreground">
+              {leidasEnCurso} de {totalLecciones} lecciones leídas
+            </span>
+          </div>
+          <div className="h-2 rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full rounded-full bg-firmavb-blue transition-all"
+              style={{ width: `${totalLecciones ? (leidasEnCurso / totalLecciones) * 100 : 0}%` }}
+            />
+          </div>
+        </div>
+      </div>
       {modulos.map((modulo, mi) => (
-        <Card key={mi} className="border-border/50">
+        <Card key={mi} id={`modulo-${mi}`} className="border-border/50 scroll-mt-24">
           <CardContent className="py-6">
             <h2 className="text-xl font-bold text-firmavb-blue mb-4 pb-3 border-b border-border/50">
               {modulo.titulo}
@@ -131,13 +204,24 @@ function ModulosContenido({ modulos }: { modulos: Modulo[] }) {
             <div className="space-y-8">
               {modulo.lecciones.map((leccion, li) => {
                 leccionNum += 1;
+                const id = `l-${mi}-${li}`;
+                const leida = leidas.has(id);
                 return (
                   <article key={li}>
                     <h3 className="text-lg font-semibold text-foreground flex items-center gap-3">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-firmavb-blue text-white text-sm font-bold">
-                        {leccionNum}
-                      </span>
-                      {leccion.titulo}
+                      <button
+                        type="button"
+                        onClick={() => marcar(id)}
+                        title={leida ? "Marcar como no leída" : "Marcar como leída"}
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-colors ${
+                          leida
+                            ? "bg-[hsl(var(--success))] text-white"
+                            : "bg-firmavb-blue text-white hover:opacity-80"
+                        }`}
+                      >
+                        {leida ? <CheckCircle2 className="h-4 w-4" /> : leccionNum}
+                      </button>
+                      <span className={leida ? "text-muted-foreground" : ""}>{leccion.titulo}</span>
                     </h3>
                     <div className="mt-2 sm:pl-10">
                       {leccion.bloques.map((bloque, bi) => (
@@ -164,6 +248,29 @@ export default function AcademiaCurso() {
   const [desbloqueado, setDesbloqueado] = useState<Modulo[] | null>(null);
   const [email, setEmail] = useState("");
   const [recuperando, setRecuperando] = useState(false);
+  const [comprando, setComprando] = useState(false);
+
+  // Aviso al volver de Mercado Pago (?pago=ok|pendiente|error).
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get("pago");
+    if (p === "ok") toast.success("¡Pago recibido! Te enviamos el código por correo. Desbloquéalo abajo con tu correo o código.");
+    else if (p === "pendiente") toast.info("Tu pago quedó pendiente. Cuando se apruebe te llega el código por correo.");
+    else if (p === "error") toast.error("El pago no se completó. Puedes intentar de nuevo.");
+    if (p) window.history.replaceState({}, "", window.location.pathname);
+  }, []);
+
+  // El fundador entra a todos los cursos premium sin código: el servidor verifica su sesión.
+  const { user } = useAuth();
+  const esFundador = !!user?.email && FUNDADORES.includes(user.email.toLowerCase());
+  useEffect(() => {
+    if (!curso?.premium || !esFundador || desbloqueado) return;
+    let vivo = true;
+    supabase.functions.invoke("academia-premium", { body: { action: "fundador", slug: curso.slug, x10: true } })
+      .then(({ data }) => { if (vivo && data?.ok && Array.isArray(data.modulos)) setDesbloqueado(data.modulos as Modulo[]); })
+      .catch(() => { /* sin acceso de fundador: queda la página de venta */ });
+    return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curso?.slug, esFundador]);
 
   if (!curso) {
     return <Navigate to="/academia" replace />;
@@ -176,7 +283,7 @@ export default function AcademiaCurso() {
     }
     setCargando(true);
     const { data, error } = await supabase.functions.invoke("academia-premium", {
-      body: { action: "validar", slug: curso.slug, codigo: codigo.trim() },
+      body: { action: "validar", slug: curso.slug, codigo: codigo.trim(), x10: true },
     });
     setCargando(false);
     if (error || !data?.ok) {
@@ -195,7 +302,7 @@ export default function AcademiaCurso() {
     }
     setRecuperando(true);
     const { data, error } = await supabase.functions.invoke("academia-premium", {
-      body: { action: "recuperar", slug: curso.slug, email: email.trim() },
+      body: { action: "recuperar", slug: curso.slug, email: email.trim(), x10: true },
     });
     setRecuperando(false);
     if (error || !data?.ok) {
@@ -205,6 +312,21 @@ export default function AcademiaCurso() {
     setDesbloqueado(data.modulos as Modulo[]);
     toast.success("¡Acceso recuperado! 🎉");
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Compra dinámica con Mercado Pago (Checkout Pro): crea la preferencia en el
+  // servidor y redirige. Reemplaza el link estático mpago.la.
+  const comprarConMP = async () => {
+    setComprando(true);
+    const { data, error } = await supabase.functions.invoke("crear-pago-curso", {
+      body: { slug: curso.slug, back_url: window.location.origin },
+    });
+    if (error || !data?.url) {
+      setComprando(false);
+      toast.error(data?.error || "No pudimos iniciar el pago. Intenta de nuevo.");
+      return;
+    }
+    window.location.href = data.url;
   };
 
   const esPremiumBloqueado = curso.premium && !desbloqueado;
@@ -246,7 +368,7 @@ export default function AcademiaCurso() {
         <div className="max-w-4xl mx-auto">
           <div className={`${ACENTO[curso.acento].portada} rounded-2xl p-8 md:p-10 text-white shadow-lg`}>
             <Badge className="mb-4 bg-white/20 text-white border-white/30 hover:bg-white/30">
-              Academia FirmaVB · {curso.premium ? "Programa premium" : "Curso gratuito"}
+              Academia FirmaVB · {curso.premium ? "Programa premium" : "Curso gratuito"}{esFundador && desbloqueado ? " · Vista del fundador" : ""}
             </Badge>
             <div className="flex items-start gap-4">
               <span className="text-5xl leading-none">{curso.emoji}</span>
@@ -267,16 +389,30 @@ export default function AcademiaCurso() {
             </div>
           </div>
 
-          {/* Índice del curso */}
+          {/* Índice del curso. En el curso gratis salta al módulo (mismo contenido
+              que se lee abajo); en el premium es solo el temario de venta, porque
+              el contenido real (server-side) puede traer más módulos que este. */}
           <div className="mt-6 rounded-xl border border-border/50 bg-card p-5">
             <p className="text-sm font-semibold text-foreground mb-3">En este curso verás:</p>
             <ol className="space-y-2">
-              {curso.modulos.map((m, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <span className={`font-bold ${ACENTO[curso.acento].texto}`}>{i + 1}.</span>
-                  {m.titulo}
-                </li>
-              ))}
+              {curso.modulos.map((m, i) =>
+                curso.premium ? (
+                  <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <span className={`font-bold ${ACENTO[curso.acento].texto}`}>{i + 1}.</span>
+                    {m.titulo}
+                  </li>
+                ) : (
+                  <li key={i}>
+                    <a
+                      href={`#modulo-${i}`}
+                      className="flex items-start gap-2 text-sm text-muted-foreground hover:text-firmavb-blue transition-colors"
+                    >
+                      <span className={`font-bold ${ACENTO[curso.acento].texto}`}>{i + 1}.</span>
+                      {m.titulo}
+                    </a>
+                  </li>
+                )
+              )}
             </ol>
           </div>
         </div>
@@ -286,7 +422,7 @@ export default function AcademiaCurso() {
       <section className="px-6 pb-12">
         <div className="max-w-4xl mx-auto space-y-8">
           {/* Curso gratis: contenido completo */}
-          {!curso.premium && <ModulosContenido modulos={curso.modulos} />}
+          {!curso.premium && <ModulosContenido modulos={curso.modulos} slug={curso.slug} />}
 
           {/* Curso premium ya desbloqueado */}
           {curso.premium && desbloqueado && (
@@ -315,8 +451,8 @@ export default function AcademiaCurso() {
                       asChild
                       className="mt-4 md:mt-0 bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2 shrink-0"
                     >
-                      <a href={agendarUrl} target="_blank" rel="noopener noreferrer">
-                        <Video className="h-4 w-4" />
+                      <a href={agendarUrl} target="_blank" rel="noopener noreferrer" aria-label="Agendar sesión de video (abre en nueva pestaña)">
+                        <Video className="h-4 w-4" aria-hidden="true" />
                         Agendar mi sesión
                       </a>
                     </Button>
@@ -324,7 +460,7 @@ export default function AcademiaCurso() {
                 </Card>
               )}
 
-              <ModulosContenido modulos={desbloqueado} />
+              <ModulosContenido modulos={desbloqueado} slug={curso.slug} />
             </>
           )}
 
@@ -360,23 +496,16 @@ export default function AcademiaCurso() {
                       </ul>
                     </div>
                   )}
-                  {curso.pagoUrl ? (
-                    <Button
-                      asChild
-                      size="lg"
-                      className="bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2"
-                    >
-                      <a href={curso.pagoUrl} target="_blank" rel="noopener noreferrer">
-                        <ShoppingCart className="h-5 w-5" />
-                        Comprar con Mercado Pago
-                      </a>
-                    </Button>
-                  ) : (
-                    <Button size="lg" disabled className="gap-2">
-                      <Lock className="h-5 w-5" />
-                      Disponible muy pronto
-                    </Button>
-                  )}
+                  <Button
+                    size="lg"
+                    onClick={comprarConMP}
+                    disabled={comprando}
+                    className="bg-firmavb-blue hover:bg-firmavb-blue/90 gap-2"
+                    aria-label="Comprar curso con Mercado Pago"
+                  >
+                    {comprando ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <ShoppingCart className="h-5 w-5" aria-hidden="true" />}
+                    {curso.precio ? `Comprar con Mercado Pago · ${curso.precio}` : "Comprar con Mercado Pago"}
+                  </Button>
                 </CardContent>
               </Card>
 

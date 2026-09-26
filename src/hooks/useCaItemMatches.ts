@@ -22,7 +22,7 @@ export function useCaItemMatches(codigo: string | null | undefined) {
     queryKey: ['ca-item-matches', codigo],
     enabled: !!codigo,
     queryFn: async (): Promise<CaItemMatch[]> => {
-      const { data, error } = await (supabaseClient as any)
+      const { data, error } = await supabaseClient
         .from('ca_item_matches')
         .select('*')
         .eq('compra_agil_codigo', codigo);
@@ -44,7 +44,7 @@ export function useCaItemMatchCounts(codigos: string[]) {
     queryKey: ['ca-item-match-counts', codigosKey],
     enabled: codigos.length > 0,
     queryFn: async (): Promise<Record<string, number>> => {
-      const { data, error } = await (supabaseClient as any)
+      const { data, error } = await supabaseClient
         .from('ca_item_matches')
         .select('compra_agil_codigo')
         .in('compra_agil_codigo', codigos);

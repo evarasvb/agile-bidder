@@ -26,7 +26,7 @@ export function useOrganismoRiesgo(codigo?: string | null, organismo?: string | 
   return useQuery({
     queryKey: ['organismo-riesgo', codigo ?? '', organismo ?? ''],
     queryFn: async (): Promise<OrganismoRiesgo | null> => {
-      const { data, error } = await (supabase as any).rpc('organismo_riesgo', {
+      const { data, error } = await supabase.rpc('organismo_riesgo', {
         p_codigo: codigo ?? null,
         p_nombre: organismo ?? null,
       });

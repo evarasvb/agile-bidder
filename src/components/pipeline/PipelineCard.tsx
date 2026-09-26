@@ -95,7 +95,7 @@ export function PipelineCard({ item, onClick, assignedVendor }: PipelineCardProp
                   : 'bg-gray-100 text-gray-600'
               )}
             >
-              {item.match_score}% match
+              {item.match_score}% afinidad
             </Badge>
           )}
 
@@ -120,7 +120,7 @@ export function PipelineCard({ item, onClick, assignedVendor }: PipelineCardProp
             {assignedVendor ? (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Avatar className="h-5 w-5 cursor-default">
+                  <Avatar className="h-5 w-5 cursor-default" aria-label={`Vendedor asignado: ${assignedVendor.nombre}`}>
                     <AvatarFallback className="text-[9px] bg-primary/15 text-primary font-medium">
                       {assignedVendor.nombre
                         .split(' ')

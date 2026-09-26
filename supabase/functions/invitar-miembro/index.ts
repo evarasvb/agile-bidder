@@ -6,7 +6,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 function json(b: unknown, s = 200) { return new Response(JSON.stringify(b), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } }); }
 
-const FROM = 'FirmaVB <notificaciones@notifications.firmavb.cl>';
+const FROM = 'FirmaVB <notificaciones@firmavb.cl>';
 
 function emailHtml(nombre: string, empresa: string, rol: string, url: string) {
   const rolLabel = rol === 'admin' ? 'Administrador' : rol === 'visor' ? 'Visor (solo lectura)' : 'Vendedor';
@@ -43,6 +43,21 @@ Deno.serve(async (req) => {
     const inviter = userData?.user;
     if (!inviter) return json({ error: 'No autenticado' }, 401);
 
+    // Solo el dueño invita (mismo criterio que "Nuevo Vendedor", gateado en
+    // el cliente con useEsDuenoEquipo()). Esto es la verificación real: sin
+    // ella, cualquier miembro activo del equipo —incluido un 'visor' de solo
+    // lectura— podía usar este endpoint para sumar gente nueva a la empresa
+    // ajena, porque la función no validaba nada más que estar autenticado.
+    // Se resuelve el dueño EFECTIVO con vendedores_owner_auth_id() (vía el
+    // cliente autenticado como quien invita, para que auth.uid() adentro de
+    // la función resuelva bien) y se exige que sea el propio invitador.
+    const { data: ownerAuthId, error: errOwner } = await asUser.rpc('vendedores_owner_auth_id');
+    if (errOwner) return json({ error: errOwner.message }, 500);
+    const ownerId: string = (ownerAuthId as string | null) ?? inviter.id;
+    if (ownerId !== inviter.id) {
+      return json({ error: 'Solo el dueño del equipo puede invitar miembros.' }, 403);
+    }
+
     const body = await req.json().catch(() => ({}));
     const nombre = String(body.nombre || '').trim();
     const email = String(body.email || '').trim().toLowerCase();
@@ -58,22 +73,37 @@ Deno.serve(async (req) => {
 
     // Nombre de la empresa que invita (mejor esfuerzo).
     let empresa = '';
-    const { data: cli } = await db.from('clientes').select('empresa_nombre').eq('user_id', inviter.id).maybeSingle();
+    const { data: cli } = await db.from('clientes').select('empresa_nombre').eq('user_id', ownerId).maybeSingle();
     if (cli?.empresa_nombre) empresa = cli.empresa_nombre;
 
-    // ¿ya existe ese email en el equipo?
-    const { data: existe } = await db.from('vendedores').select('id, estado_invitacion').eq('email', email).maybeSingle();
-    if (existe && existe.estado_invitacion === 'activada') return json({ error: 'Esa persona ya tiene una cuenta activa.' }, 409);
+    // El email ya no es único por fila (dos dueños distintos pueden tener
+    // cada uno una fila con el mismo correo — un placeholder "pendiente" de
+    // "Nuevo Vendedor" u otra invitación real). .maybeSingle() sobre un
+    // .eq('email', email) sin más filtro puede matchear más de una fila y
+    // tirar error silencioso (existe quedaba null sin chequear el error),
+    // así que se hacen dos consultas acotadas en vez de una sola global:
+    // 1) ¿ya tiene una cuenta ACTIVA con ese email (de cualquier dueño)?
+    const { data: activos, error: errActivos } = await db.from('vendedores').select('id').eq('email', email).eq('estado_invitacion', 'activada').limit(1);
+    if (errActivos) return json({ error: errActivos.message }, 500);
+    if (activos && activos.length) return json({ error: 'Esa persona ya tiene una cuenta activa.' }, 409);
+    // 2) ¿ya existe una fila PROPIA (invitado_por = el dueño efectivo) para
+    // reutilizar? Si el placeholder es de otro dueño, no se toca: se inserta
+    // una fila nueva en vez de robarle la suya (y cualquier asignación que
+    // ya tuviera esa fila).
+    const { data: propios, error: errPropios } = await db.from('vendedores').select('id').eq('email', email).eq('invitado_por', ownerId).limit(1);
+    if (errPropios) return json({ error: errPropios.message }, 500);
+    const existeId: string | null = propios && propios.length ? propios[0].id : null;
+    const reutilizable = !!existeId;
 
     const token = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '').slice(0, 8);
     const row = {
       nombre, email, rol, telefono, activo: false, user_id: null,
-      invite_token: token, invitado_por: inviter.id, estado_invitacion: 'pendiente',
+      invite_token: token, invitado_por: ownerId, estado_invitacion: 'pendiente',
       invited_at: new Date().toISOString(),
     };
     let vendedorId: string;
-    if (existe) {
-      const { data, error } = await db.from('vendedores').update(row).eq('id', existe.id).select('id').single();
+    if (reutilizable) {
+      const { data, error } = await db.from('vendedores').update(row).eq('id', existeId!).select('id').single();
       if (error) return json({ error: error.message }, 500); vendedorId = data.id;
     } else {
       const { data, error } = await db.from('vendedores').insert(row).select('id').single();

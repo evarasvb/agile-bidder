@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabaseClient as supabase } from '@/lib/supabaseClient';
 
@@ -20,6 +21,7 @@ export function useAuth(): AuthState & AuthActions {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -68,7 +70,13 @@ export function useAuth(): AuthState & AuthActions {
       console.error('SignOut error:', error);
       throw error;
     }
-  }, []);
+    // Sin esto, cualquier query cacheada por React Query (roster del equipo,
+    // avisos, cliente_owner_id...) sobrevive al logout en el QueryClient
+    // global (que no tiene TTL de sesión) y la siguiente cuenta que se loguee
+    // en la misma pestaña puede ver por un instante datos de la cuenta anterior
+    // hasta que cada query individual refetchee.
+    queryClient.clear();
+  }, [queryClient]);
 
   const resetPassword = useCallback(async (email: string) => {
     // Enviamos el correo de recuperación vía Resend (edge function) para entrega

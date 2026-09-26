@@ -6,12 +6,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2, X, FileUp, ImageIcon, Download, ImageOff } from 'lucide-react';
-import { useInventoryBulk, BulkProductRow, ImportProgress, generateInventoryTemplateData, generateInventoryInstructions } from '@/hooks/useInventoryBulk';
+import { useInventoryBulk, esSkuFecha, BulkProductRow, ImportProgress, generateInventoryTemplateData, generateInventoryInstructions } from '@/hooks/useInventoryBulk';
 import { useCreateImportHistory } from '@/hooks/useImportHistory';
 import { validateImageUrl } from '@/hooks/useProductImageUpload';
-import * as XLSX from 'xlsx';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { downloadSpreadsheetWorkbook, readFirstSpreadsheetSheet, recordsToSpreadsheetRows, SpreadsheetReadError } from '@/lib/excelFiles';
+import { validateInventoryImportTextLengths } from '@/lib/inventoryImportValidation';
 
 interface BulkUploadDialogProps {
   open: boolean;
@@ -45,9 +46,9 @@ function ImageThumbnail({ url }: { url: string }) {
           <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
         </div>
       )}
-      <img 
-        src={url} 
-        alt="" 
+      <img
+        src={url}
+        alt="Miniatura de imagen del producto"
         className={cn("w-full h-full object-cover transition-opacity", loaded ? "opacity-100" : "opacity-0")}
         onLoad={() => setLoaded(true)}
         onError={() => setError(true)}
@@ -82,40 +83,22 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
     onOpenChange(false);
   };
 
-  const handleDownloadTemplate = () => {
+  const handleDownloadTemplate = async () => {
     try {
-      const wb = XLSX.utils.book_new();
-      
-      // Products sheet with template data
       const templateData = generateInventoryTemplateData();
-      const wsProducts = XLSX.utils.json_to_sheet(templateData);
-      
-      // Set column widths
-      wsProducts['!cols'] = [
-        { wch: 15 },  // Código
-        { wch: 40 },  // Descripción
-        { wch: 12 },  // Precio de Venta
-        { wch: 10 },  // Unidad
-        { wch: 20 },  // Categoría
-        { wch: 10 },  // Stock
-        { wch: 15 },  // Margen Mínimo
-        { wch: 15 },  // Margen Objetivo
-        { wch: 18 },  // Tiempo Entrega
-        { wch: 20 },  // Proveedor
-        { wch: 40 },  // Keywords
-        { wch: 50 },  // URL Imagen
-      ];
-      
-      XLSX.utils.book_append_sheet(wb, wsProducts, 'Productos');
-      
-      // Instructions sheet
       const instructionsData = generateInventoryInstructions();
-      const wsInstructions = XLSX.utils.json_to_sheet(instructionsData);
-      wsInstructions['!cols'] = [{ wch: 80 }];
-      
-      XLSX.utils.book_append_sheet(wb, wsInstructions, 'Instrucciones');
-      
-      XLSX.writeFile(wb, 'plantilla_inventario.xlsx');
+      await downloadSpreadsheetWorkbook('plantilla_inventario.xlsx', [
+        {
+          name: 'Productos',
+          rows: recordsToSpreadsheetRows(templateData),
+          columnWidths: [15, 40, 15, 12, 10, 20, 10, 15, 15, 18, 20, 40, 50],
+        },
+        {
+          name: 'Instrucciones',
+          rows: recordsToSpreadsheetRows(instructionsData),
+          columnWidths: [80],
+        },
+      ]);
       toast.success('📥 Plantilla descargada');
     } catch (error) {
       console.error('Error downloading template:', error);
@@ -127,17 +110,15 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
     resetState();
     
     const extension = file.name.split('.').pop()?.toLowerCase();
-    if (!['xlsx', 'xls', 'csv'].includes(extension || '')) {
-      setParseErrors(['Formato no soportado. Use archivos .xlsx, .xls o .csv']);
+    if (!['xlsx', 'csv'].includes(extension || '')) {
+      setParseErrors([extension === 'xls'
+        ? 'El formato .xls antiguo no es compatible. Ábrelo en Excel y guárdalo como .xlsx.'
+        : 'Formato no soportado. Use archivos .xlsx o .csv']);
       return;
     }
 
     try {
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data, { type: 'array' });
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+      const jsonData = await readFirstSpreadsheetSheet(file);
 
       if (jsonData.length === 0) {
         setParseErrors(['El archivo está vacío o no tiene datos válidos']);
@@ -154,19 +135,21 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
         const descCol = String(row['Descripción'] || row['Descripcion'] || row['descripcion'] || '').trim();
         const detalleCol = String(row['Detalle'] || row['detalle'] || '').trim();
         return {
-        sku: row['Código'] || row['Codigo'] || row['SKU'] || row['sku'] || row['Sku'] || '',
+        // String(): si Excel entregó un número o una fecha, no explota el .trim().
+        sku: String(row['Código'] ?? row['Codigo'] ?? row['SKU'] ?? row['sku'] ?? row['Sku'] ?? '').trim(),
         nombre: nombreCol || descCol,
         descripcion: detalleCol || (nombreCol ? descCol : ''),
-        categoria: row['Categoría'] || row['Categoria'] || row['categoria'] || '',
+        categoria: String(row['Categoría'] || row['Categoria'] || row['categoria'] || '').trim(),
         precio_unitario: Number(row['Precio de Venta'] || row['Precio Neto'] || row['Precio'] || row['Precio Unitario'] || row['precio'] || row['precio_unitario'] || 0),
-        unidad_medida: row['Unidad'] || row['Unidad de Medida'] || row['unidad'] || row['unidad_medida'] || '',
+        unidad_medida: String(row['Unidad'] || row['Unidad de Medida'] || row['unidad'] || row['unidad_medida'] || '').trim(),
+        marca: String(row['Marca'] || row['marca'] || row['MARCA'] || '').trim(),
         stock: Number(row['Stock'] || row['stock'] || row['Stock Disponible'] || 0),
         margen_minimo: Number(row['Margen Mínimo (%)'] || row['Margen Minimo'] || row['margen_minimo'] || 10),
         margen_objetivo: Number(row['Margen Objetivo (%)'] || row['Margen Objetivo'] || row['margen_objetivo'] || 15),
         tiempo_entrega_dias: Number(row['Tiempo Entrega (días)'] || row['Tiempo Entrega'] || row['tiempo_entrega'] || 5),
-        proveedor: row['Proveedor'] || row['proveedor'] || '',
-        keywords: row['Keywords'] || row['keywords'] || row['Palabras Clave'] || row['palabras_clave'] || '',
-        imagen_url: row['URL Imagen'] || row['Imagen'] || row['imagen_url'] || row['Image URL'] || '',
+        proveedor: String(row['Proveedor'] || row['proveedor'] || '').trim(),
+        keywords: String(row['Keywords'] || row['keywords'] || row['Palabras Clave'] || row['palabras_clave'] || '').trim(),
+        imagen_url: String(row['URL Imagen'] || row['Imagen'] || row['imagen_url'] || row['Image URL'] || '').trim(),
         };
       });
 
@@ -176,10 +159,16 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
       
       rows.forEach((row, index) => {
         const rowNum = index + 2;
+
+        validateInventoryImportTextLengths(row).forEach((error) => {
+          errors.push(`Fila ${rowNum}: ${error.message}`);
+        });
         
         // Required: Código
         if (!row.sku || row.sku.trim() === '') {
           errors.push(`Fila ${rowNum}: Código es obligatorio`);
+        } else if (esSkuFecha(row.sku)) {
+          errors.push(`Fila ${rowNum}: el código "${row.sku}" parece una fecha. En Excel pon la columna Código en formato Texto y vuelve a cargar`);
         } else if (skuSet.has(row.sku.toLowerCase())) {
           errors.push(`Fila ${rowNum}: Código "${row.sku}" duplicado en el archivo`);
         } else {
@@ -217,7 +206,9 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
       });
     } catch (error) {
       console.error('Error parsing file:', error);
-      setParseErrors(['Error al leer el archivo. Verifique que sea un archivo Excel/CSV válido.']);
+      setParseErrors([error instanceof SpreadsheetReadError
+        ? error.message
+        : 'Error al leer el archivo. Verifique que sea un archivo Excel/CSV válido.']);
     }
   };
 
@@ -370,14 +361,23 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onClick={handleFileInputClick}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleFileInputClick();
+                  }
+                }}
+                aria-label="Arrastra archivo Excel o CSV aquí, o haz clic para seleccionar"
                 className={cn(
                   "border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer",
-                  isDragging 
-                    ? "border-primary bg-primary/5" 
+                  isDragging
+                    ? "border-primary bg-primary/5"
                     : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50"
                 )}
               >
-                <FileUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <FileUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground" aria-hidden="true" />
                 <p className="text-lg font-medium mb-2">
                   Arrastra tu archivo aquí
                 </p>
@@ -387,30 +387,27 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".xlsx,.xls,.csv"
+                  accept=".xlsx,.csv"
                   onChange={handleFileSelect}
                   className="hidden"
                 />
                 <Button variant="outline" className="pointer-events-none">
-                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  <FileSpreadsheet className="h-4 w-4 mr-2" aria-hidden="true" />
                   Seleccionar Archivo
                 </Button>
                 <p className="text-xs text-muted-foreground mt-4">
-                  {/* El "máximo 10.000" nunca se aplicó en el código y ya vimos
-                      catálogos reales de más de 16.000 productos (se suben en
-                      lotes de 500, sin tope real). No prometer un número falso. */}
-                  Formatos soportados: .xlsx, .xls, .csv — cualquier tamaño de catálogo
+                  Formatos: .xlsx y .csv · máximo 20 MB y 50.000 filas
                 </p>
               </div>
               
               {/* Download Template Button */}
               <div className="flex justify-center">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="gap-2"
                   onClick={handleDownloadTemplate}
                 >
-                  <Download className="h-4 w-4" />
+                  <Download className="h-4 w-4" aria-hidden="true" />
                   Descargar Plantilla de Ejemplo
                 </Button>
               </div>
@@ -513,6 +510,7 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
                       <TableHead className="w-10">Img</TableHead>
                       <TableHead>Código</TableHead>
                       <TableHead>Descripción</TableHead>
+                      <TableHead>Marca</TableHead>
                       <TableHead className="text-right">Precio</TableHead>
                       <TableHead>Unidad</TableHead>
                       <TableHead>Categoría</TableHead>
@@ -540,6 +538,7 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
                         </TableCell>
                         <TableCell className="font-mono text-sm">{row.sku || '-'}</TableCell>
                         <TableCell className="max-w-[200px] truncate">{row.nombre || '-'}</TableCell>
+                        <TableCell className="max-w-[120px] truncate">{row.marca || '-'}</TableCell>
                         <TableCell className="text-right font-mono">
                           {row.precio_unitario ? `$${row.precio_unitario.toLocaleString()}` : '-'}
                         </TableCell>
