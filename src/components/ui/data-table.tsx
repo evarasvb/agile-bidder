@@ -217,8 +217,12 @@ export function DataTable<T>({
     if (!manual) setPageLocal(1);
   }, [busqueda, sort, pageSize, rows.length, manual]);
 
+  // Con debounce: sin esto, cada tecla dispara una consulta al servidor (una
+  // RPC con ILIKE de comodín inicial, sin cancelar la anterior), así que
+  // escribir un término de 10 caracteres lanzaría 10 búsquedas simultáneas.
   useEffect(() => {
-    onSearchChange?.(busqueda);
+    const t = setTimeout(() => onSearchChange?.(busqueda), 400);
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [busqueda]);
 

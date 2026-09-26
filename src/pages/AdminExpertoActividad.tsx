@@ -47,7 +47,7 @@ function Cliente({ empresa, email, huella }: { empresa: string | null; email: st
 }
 
 const DIAS_OPCIONES = [
-  { v: '1', l: 'Hoy' }, { v: '7', l: '7 días' }, { v: '30', l: '30 días' }, { v: '90', l: '90 días' },
+  { v: '1', l: 'Últimas 24h' }, { v: '7', l: '7 días' }, { v: '30', l: '30 días' }, { v: '90', l: '90 días' },
 ];
 
 function TabExperto() {
@@ -245,7 +245,7 @@ export default function AdminExpertoActividad() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {[
           { k: 'Total histórico', v: resumen?.consultas_total, icon: BookOpen },
-          { k: 'Hoy', v: resumen?.consultas_hoy, icon: Clock },
+          { k: 'Últimas 24h', v: resumen?.consultas_hoy, icon: Clock },
           { k: 'Últimos 7 días', v: resumen?.consultas_7d, icon: MessageSquare },
           { k: 'Anónimas (7d)', v: resumen?.anonimas_7d, icon: UserX },
           { k: 'Mensajes Don Evaristo (7d)', v: resumen?.evaristo_mensajes_7d, icon: User },
