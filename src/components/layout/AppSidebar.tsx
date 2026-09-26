@@ -137,10 +137,12 @@ const navItems: NavItem[] = [
     children: [
       { title: "Resumen", url: "/fundador", icon: BarChart3, adminOnly: true },
       { title: "Compradores públicos", url: "/fundador/compradores", icon: Building2, adminOnly: true },
+      { title: "Contactos del Estado", url: "/fundador/contactos-estado", icon: Users, adminOnly: true },
       { title: "Tracción", url: "/admin/traccion", icon: TrendingUp, adminOnly: true },
       { title: "Marketing", url: "/marketing/control", icon: Rocket, adminOnly: true },
       { title: "Contactos", url: "/academia/leads", icon: Users, adminOnly: true },
       { title: "Compradores", url: "/academia/compradores", icon: CreditCard, adminOnly: true },
+      { title: "Ajustes / Avisos", url: "/fundador/ajustes", icon: Settings, adminOnly: true },
     ],
   },
   {

@@ -39,12 +39,6 @@ function palabrasClave(t: string): string[] {
 function palabrasDatos(t: string): string[] {
   return palabrasClave(t).filter((w) => !GENERICAS.has(w)).slice(0, 4);
 }
-function rolYSub(auth: string): { role: string; sub: string | null } {
-  try {
-    const p = JSON.parse(atob(auth.replace(/^Bearer\s+/i, "").split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-    return { role: p.role ?? "", sub: p.sub ?? null };
-  } catch { return { role: "", sub: null }; }
-}
 function ipCliente(req: Request): string | null {
   // X-Forwarded-For puede traer valores forjados por el cliente al inicio; el gateway
   // agrega la IP real AL FINAL. Se toma la ultima para que el tope por IP no se pueda esquivar.
@@ -188,11 +182,20 @@ Deno.serve(async (req) => {
     const historial: { role: string; content: string }[] = Array.isArray(body.historial) ? body.historial.slice(-6) : [];
     let codigo: string | null = body.codigo ? String(body.codigo).trim().toUpperCase() : null;
 
-    const { role, sub } = rolYSub(req.headers.get("Authorization") ?? "");
-    // Con service_role se puede actuar en nombre de un usuario (body.user_id): automatizaciones y soporte.
-    const userId = role === "authenticated" ? sub : (role === "service_role" && body.user_id ? String(body.user_id) : null);
     const ip = ipCliente(req);
-    const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const sb = createClient(Deno.env.get("SUPABASE_URL")!, serviceRoleKey);
+    const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+    let userId: string | null = null;
+
+    // La clave de servicio solo puede actuar en nombre de un usuario si coincide exactamente.
+    if (token && token === serviceRoleKey && body.user_id) {
+      userId = String(body.user_id);
+    } else if (token) {
+      // getUser valida firma, expiración y revocación. Un token forjado queda como anónimo.
+      const { data: { user } } = await sb.auth.getUser(token);
+      userId = user?.id ?? null;
+    }
 
     // Límites
     const { data: uso } = await sb.rpc("experto_uso_mes", { p_user_id: userId, p_huella: huella || "anon" });

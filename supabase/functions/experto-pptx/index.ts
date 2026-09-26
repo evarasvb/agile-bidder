@@ -14,10 +14,6 @@ const cors = {
 };
 const BUCKET = "documentos-trabajo";
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...cors, "Content-Type": "application/json" } });
-function rolYSub(auth: string): { role: string; sub: string | null } {
-  try { const p = JSON.parse(atob(auth.replace(/^Bearer\s+/i, "").split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))); return { role: p.role ?? "", sub: p.sub ?? null }; }
-  catch { return { role: "", sub: null }; }
-}
 const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 // ---------------------------------------------------------------------------------------------
@@ -232,18 +228,28 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
     const auth = req.headers.get("Authorization") ?? "";
-    const { role, sub } = rolYSub(auth);
     const body = await req.json().catch(() => ({}));
-    const userId = role === "authenticated" ? sub : role === "service_role" ? (body.user_id ?? null) : null;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const sb = createClient(Deno.env.get("SUPABASE_URL")!, serviceRoleKey);
+    const token = auth.replace(/^Bearer\s+/i, "").trim();
+    const isServiceRole = Boolean(token && token === serviceRoleKey);
+    let userId: string | null = null;
+
+    if (isServiceRole && body.user_id) {
+      userId = String(body.user_id);
+    } else if (token) {
+      const { data: { user } } = await sb.auth.getUser(token);
+      userId = user?.id ?? null;
+    }
+
     if (!userId) return json({ error: "login", mensaje: "Inicia sesión en FirmaVB." }, 401);
     const codigo = String(body.codigo ?? "").trim().toUpperCase();
     if (!/^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}$/.test(codigo)) return json({ error: "codigo", mensaje: "Indica el ID de la licitación (ej. 2699-35-LE26)." }, 400);
-    const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     // 1. Matriz de postulación: reutiliza experto-matriz (mismo motor, mismo gate de plan Pro),
     // reenviando el Authorization que llegó (la clave de servicio nueva no es un JWT válido para
     // otra función — mismo gotcha ya resuelto en experto-extraer-anexos).
-    const innerBody = role === "authenticated" ? { codigo } : { codigo, user_id: userId };
+    const innerBody = isServiceRole ? { codigo, user_id: userId } : { codigo };
     const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/experto-matriz`, {
       method: "POST",
       headers: { Authorization: auth, "Content-Type": "application/json" },

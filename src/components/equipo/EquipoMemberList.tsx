@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useEquipoMembers, useUpdateVendedor, useToggleVendedorActivo, type Vendedor } from '@/hooks/useEquipo';
+import { useAuth } from '@/hooks/useAuth';
 
 const rolColors: Record<string, string> = {
   admin: 'bg-purple-100 text-purple-700 border-purple-200',
@@ -32,11 +33,21 @@ const rolLabels: Record<string, string> = {
 
 export function EquipoMemberList() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { data: members, isLoading } = useEquipoMembers();
   const updateMutation = useUpdateVendedor();
   const toggleActivoMutation = useToggleVendedorActivo();
   const [editingMember, setEditingMember] = useState<Vendedor | null>(null);
   const [editForm, setEditForm] = useState({ nombre: '', email: '', rol: '', telefono: '' });
+
+  // Gestionar (editar / activar / desactivar) es solo del dueño que invitó
+  // esa fila (invitado_por = mi auth.uid()) — no basta con que sea mi propia
+  // fila: un trigger en la base ya deja fijo `activo` para cualquiera que no
+  // sea el dueño o service_role (así un miembro no puede reactivarse a sí
+  // mismo tras ser desactivado), así que tampoco se muestra ese control para
+  // la propia fila.
+  const puedeGestionar = (member: Vendedor) =>
+    !!user?.id && member.invitado_por === user.id;
 
   const handleEdit = (member: Vendedor) => {
     setEditingMember(member);
@@ -120,18 +131,22 @@ export function EquipoMemberList() {
                       <Eye className="h-4 w-4 mr-2" />
                       Ver dashboard
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleEdit(member)}>
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Editar
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => handleToggleActivo(member)}
-                      className="text-destructive"
-                    >
-                      <UserX className="h-4 w-4 mr-2" />
-                      Desactivar
-                    </DropdownMenuItem>
+                    {puedeGestionar(member) && (
+                      <>
+                        <DropdownMenuItem onClick={() => handleEdit(member)}>
+                          <Pencil className="h-4 w-4 mr-2" />
+                          Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => handleToggleActivo(member)}
+                          className="text-destructive"
+                        >
+                          <UserX className="h-4 w-4 mr-2" />
+                          Desactivar
+                        </DropdownMenuItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -178,14 +193,16 @@ export function EquipoMemberList() {
                         <p className="text-xs text-muted-foreground">{member.email}</p>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleToggleActivo(member)}
-                    >
-                      <UserCheck className="h-4 w-4 mr-1" />
-                      Reactivar
-                    </Button>
+                    {puedeGestionar(member) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleToggleActivo(member)}
+                      >
+                        <UserCheck className="h-4 w-4 mr-1" />
+                        Reactivar
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
