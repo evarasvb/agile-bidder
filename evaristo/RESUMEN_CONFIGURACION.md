@@ -1,5 +1,7 @@
 # ✅ Resumen de Configuración de Evaristo Online
 
+> ⚠️ **Obsoleto**: la función `evaristo-api` que describe este documento fue eliminada (código muerto, sin uso real). El panel de administración (`/admin/evaristo`) ahora consulta directamente la RPC `evaristo_admin_resumen()` de Supabase — no requiere desplegar ninguna Edge Function de este directorio. Esta guía queda solo como referencia histórica.
+
 ## 🎯 Lo que se ha creado
 
 ### 1. Edge Function de Supabase
