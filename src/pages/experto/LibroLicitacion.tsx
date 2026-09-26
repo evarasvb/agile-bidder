@@ -130,18 +130,21 @@ export default function LibroLicitacion() {
   const [verArchivados, setVerArchivados] = useState(false);
   const { data: libros = [] } = useQuery({ queryKey: ['experto_mis_libros', verArchivados, buscarLibro], enabled: !!token, queryFn: async () => ((await supabase.rpc('experto_mis_libros', { p_archivados: verArchivados, p_buscar: buscarLibro || null })).data ?? []) as any[] });
 
-  // Leyes de compras públicas relevantes para la licitación actual
+  // Leyes de compras públicas relevantes para la licitación actual.
+  // Espera a que cargue `libro` para buscar por su tipo; el término va en la clave de caché.
+  const consultaLeyes = libro?.ficha?.tipo || 'compras públicas';
   const { data: leyes = [] } = useQuery({
-    queryKey: ['experto_leyes', cod],
-    enabled: !!cod && !!token,
-    queryFn: async () => ((await (supabase as any).rpc('experto_leyes', { consulta: libro?.ficha?.tipo || 'compras públicas', cantidad: 5 })).data ?? []) as any[],
+    queryKey: ['experto_leyes', cod, consultaLeyes],
+    enabled: !!cod && !!token && !!libro,
+    queryFn: async () => ((await (supabase as any).rpc('experto_leyes', { consulta: consultaLeyes, cantidad: 5 })).data ?? []) as any[],
   });
 
-  // Demandas (Tribunal de Contratación Pública) y causas (Contraloría) relevantes
+  // Demandas (Tribunal de Contratación Pública) y causas (Contraloría) relevantes.
+  const consultaJuris = libro?.ficha?.tipo || 'impugnación licitación adjudicación';
   const { data: jurisprudencia = [] } = useQuery({
-    queryKey: ['experto_jurisprudencia', cod],
-    enabled: !!cod && !!token,
-    queryFn: async () => ((await (supabase as any).rpc('experto_jurisprudencia', { consulta: libro?.ficha?.tipo || 'impugnación licitación adjudicación', cantidad: 6 })).data ?? []) as any[],
+    queryKey: ['experto_jurisprudencia', cod, consultaJuris],
+    enabled: !!cod && !!token && !!libro,
+    queryFn: async () => ((await (supabase as any).rpc('experto_jurisprudencia', { consulta: consultaJuris, cantidad: 6 })).data ?? []) as any[],
   });
   const archivarLibro = async (c: string, archivado: boolean) => {
     const { error } = await supabase.rpc('experto_libro_archivar', { p_codigo: c, p_archivado: archivado });
