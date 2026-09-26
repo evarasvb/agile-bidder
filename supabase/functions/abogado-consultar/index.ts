@@ -334,6 +334,14 @@ Si hay más de un tramo, menciona en el documento que el interés se calculó po
         ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ done: true, ms: Date.now() - t0 })}\n\n`));
         ctrl.close();
         try { await sb.rpc("experto_registrar_uso", { p_user_id: userId, p_huella: huella || "anon", p_modo: cuotaModo, p_pregunta: `[Abogado${modo === "documento" ? ":" + tipoDocumento : ""}] ${modo === "chat" ? pregunta : hechos.slice(0, 200)}`, p_respuesta: respuesta, p_fuentes: fuentesMeta, p_licitacion: codigo, p_ms: Date.now() - t0, p_ip: ip }); } catch { /* no bloquear */ }
+        // Medidor de costo real de IA (estimado desde tokens ~ chars/4), para calibrar créditos.
+        try {
+          const tin = Math.ceil(userMsg.length / 4), tout = Math.ceil(respuesta.length / 4);
+          const rin = /claude-sonnet/.test(modelo) ? 3e-6 : /claude-haiku/.test(modelo) ? 1e-6 : 1.5e-7;
+          const rout = /claude-sonnet/.test(modelo) ? 15e-6 : /claude-haiku/.test(modelo) ? 5e-6 : 6e-7;
+          const costo = Number((tin * rin + tout * rout).toFixed(6));
+          await sb.rpc("registrar_uso_ia", { p_funcion: `abogado-${modo}`, p_modelo: modelo, p_tokens_in: tin, p_tokens_out: tout, p_costo_usd: costo, p_user_id: userId, p_creditos_cobrados: null, p_referencia: codigo });
+        } catch { /* no bloquear */ }
       },
     });
     return new Response(stream, { headers: { ...cors, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
