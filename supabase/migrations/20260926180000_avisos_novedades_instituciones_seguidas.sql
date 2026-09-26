@@ -54,7 +54,8 @@ begin
            'pago', x.pago, 'proceso', x.proceso)
   from (
     select s.cliente_id, s.rut_institucion as rut, s.nombre_institucion as institucion,
-           'reclamos:' || s.rut_institucion || ':' || current_date as clave,
+           -- Clave por día de ingesta del reclamo: cada tanda se avisa una sola vez, aunque la corrida sea dos veces al día.
+           'reclamos:' || s.rut_institucion || ':' || r.created_at::date as clave,
            count(*) as n,
            count(*) filter (where r.tipo = 1) as pago,
            count(*) filter (where r.tipo = 2) as proceso,
@@ -62,7 +63,7 @@ begin
     from public.cliente_instituciones_seguidas s
     join public.reclamos_mp r on r.organismo_rut = s.rut_institucion
     where r.created_at >= p_desde
-    group by s.cliente_id, s.rut_institucion, s.nombre_institucion
+    group by s.cliente_id, s.rut_institucion, s.nombre_institucion, r.created_at::date
   ) x
   where not exists (select 1 from public.notificaciones_log l
                     where l.cliente_id = x.cliente_id and l.datos->>'clave' = x.clave);
@@ -99,17 +100,21 @@ begin
            'ocs', x.n, 'total', x.total)
   from (
     select s.cliente_id, s.rut_institucion as rut, s.nombre_institucion as institucion,
-           'oc:' || s.rut_institucion || ':' || current_date as clave,
+           -- Clave por fecha de emisión: cada día de compras se avisa una sola vez.
+           'oc:' || s.rut_institucion || ':' || o.fecha_emision::date as clave,
            count(*) as n, coalesce(sum(o.total), 0)::bigint as total,
            (array_agg(o.proveedor order by o.total desc nulls last))[1] as mayor_proveedor,
            (array_agg(o.total order by o.total desc nulls last))[1]::bigint as mayor_total,
            (array_agg(o.nombre order by o.total desc nulls last))[1] as mayor_nombre
     from public.cliente_instituciones_seguidas s
+    -- El identificador seguido puede venir del panel (copiado de ordenes_compra.rut_demandante,
+    -- que ahí es el código de organismo) o de licitaciones_bi (RUT real): se aceptan los dos.
     join public.ordenes_compra o
-      on o.rut_demandante in (select distinct b.institucion_codigo from public.licitaciones_bi b
-                              where b.institucion_rut = s.rut_institucion and b.institucion_codigo is not null)
-    where o.fecha_emision >= p_desde
-    group by s.cliente_id, s.rut_institucion, s.nombre_institucion
+      on o.fecha_emision >= p_desde
+     and (o.rut_demandante = s.rut_institucion
+          or o.rut_demandante in (select distinct b.institucion_codigo from public.licitaciones_bi b
+                                  where b.institucion_rut = s.rut_institucion and b.institucion_codigo is not null))
+    group by s.cliente_id, s.rut_institucion, s.nombre_institucion, o.fecha_emision::date
   ) x
   where not exists (select 1 from public.notificaciones_log l
                     where l.cliente_id = x.cliente_id and l.datos->>'clave' = x.clave);

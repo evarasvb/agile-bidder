@@ -518,7 +518,8 @@ serve(async (req) => {
     // de FirmaVB (novedad_saas). Todo lo demás (matches, cierres, cambios de
     // licitaciones o compras ágiles, licitaciones nuevas, resúmenes) queda solo en
     // la campanita (notificaciones_log) y en la plataforma.
-    const conCorreo = TIPOS_CON_CORREO.has(tipo);
+    // Adjudicación: correo solo si el cliente GANÓ (resultado 'ganada'); perdida o desierta, solo campanita.
+    const conCorreo = tipo === 'adjudicacion' ? data?.resultado === 'ganada' : TIPOS_CON_CORREO.has(tipo);
 
     // Service client for database operations
     const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
@@ -544,19 +545,6 @@ serve(async (req) => {
 
       recipientEmail = recipientEmail || clienteData.email;
       empresaNombre = clienteData.empresa_nombre;
-      if (!conCorreo) {
-        await serviceClient.from('notificaciones_log').insert({
-          cliente_id,
-          tipo,
-          licitacion_id: data.licitacion_id || null,
-          email_enviado: false,
-          datos: data as any,
-        });
-        return new Response(
-          JSON.stringify({ success: true, emailSent: false, reason: 'Solo campanita: este tipo no se manda por correo' }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
 
       // Check notification preferences
       const { data: prefsData } = await serviceClient
@@ -581,7 +569,8 @@ serve(async (req) => {
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
-        if (prefs.email_instantaneo === false) {
+        // Apagar el correo instantáneo no apaga la campanita: solo aplica a los tipos con correo.
+        if (conCorreo && prefs.email_instantaneo === false) {
           return new Response(
             JSON.stringify({ success: false, reason: 'Email notifications disabled' }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -604,9 +593,19 @@ serve(async (req) => {
       }
     }
 
+    // Tipos sin correo: ya pasaron las preferencias y umbrales del cliente; quedan solo en la campanita.
     if (!conCorreo) {
+      if (cliente_id) {
+        await serviceClient.from('notificaciones_log').insert({
+          cliente_id,
+          tipo,
+          licitacion_id: data.licitacion_id || null,
+          email_enviado: false,
+          datos: data as any,
+        });
+      }
       return new Response(
-        JSON.stringify({ success: false, reason: 'Este tipo no se manda por correo' }),
+        JSON.stringify({ success: true, emailSent: false, reason: 'Solo campanita: este tipo no se manda por correo' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
