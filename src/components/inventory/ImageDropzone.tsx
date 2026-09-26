@@ -69,10 +69,19 @@ export function ImageDropzone({
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            document.getElementById('image-upload-dropzone')?.click();
+          }
+        }}
+        aria-label="Arrastra imágenes aquí o haz clic para seleccionar"
         className={cn(
           "border-2 border-dashed rounded-lg p-6 text-center transition-all cursor-pointer",
-          isDragging 
-            ? "border-primary bg-primary/5 scale-[1.02]" 
+          isDragging
+            ? "border-primary bg-primary/5 scale-[1.02]"
             : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/30",
           isUploading && "opacity-50 pointer-events-none"
         )}
@@ -88,9 +97,9 @@ export function ImageDropzone({
         />
         <label htmlFor="image-upload-dropzone" className="cursor-pointer block">
           {isUploading ? (
-            <Loader2 className="h-8 w-8 mx-auto mb-2 text-primary animate-spin" />
+            <Loader2 className="h-8 w-8 mx-auto mb-2 text-primary animate-spin" aria-hidden="true" />
           ) : (
-            <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+            <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" aria-hidden="true" />
           )}
           <p className="text-sm font-medium">
             {isUploading ? 'Subiendo...' : 'Arrastra imágenes aquí'}
@@ -162,8 +171,9 @@ export function ImagePreview({
           <button
             onClick={onSetPrincipal}
             disabled={isLoading}
+            title="Establecer como imagen principal"
             className="p-1.5 rounded-full bg-white/20 hover:bg-white/40 text-white text-xs"
-            title="Establecer como principal"
+            aria-label="Establecer como imagen principal"
           >
             ★
           </button>
@@ -173,9 +183,9 @@ export function ImagePreview({
             onClick={onRemove}
             disabled={isLoading}
             className="p-1.5 rounded-full bg-white/20 hover:bg-destructive text-white"
-            title="Eliminar"
+            aria-label="Eliminar imagen"
           >
-            <X className="h-3 w-3" />
+            <X className="h-3 w-3" aria-hidden="true" />
           </button>
         )}
       </div>

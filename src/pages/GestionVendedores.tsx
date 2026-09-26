@@ -1,6 +1,6 @@
 import { EquipoTabs } from "@/components/equipo/EquipoTabs";
 import { useState } from 'react';
-import { Users, CalendarDays, BarChart3, UserPlus, Loader2, Trophy, Target, TrendingUp, DollarSign, CheckCircle2 } from 'lucide-react';
+import { Users, CalendarDays, BarChart3, UserPlus, Loader2, Trophy, Target, TrendingUp, DollarSign } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,18 +8,20 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { 
-  useVendedores, 
-  useReporteEquipo, 
-  useCalendarioVendedor, 
+import {
+  useVendedores,
+  useReporteEquipo,
+  useCalendarioVendedor,
   useAsignacionesDetalle,
-  useCreateVendedor 
+  useCreateVendedor,
+  useEsDuenoEquipo,
+  type ReporteEquipo as ReporteVendedor,
 } from '@/hooks/useVendedores';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday, addMonths, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -210,16 +212,65 @@ function CalendarioVendedores() {
   );
 }
 
+const formatMontoCompacto = (value: number) =>
+  new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', notation: 'compact' }).format(value);
+
+const COLUMNAS_VENDEDORES: DataTableColumn<ReporteVendedor>[] = [
+  {
+    id: 'vendedor',
+    header: 'Vendedor',
+    sortValue: (v) => v.nombre,
+    exportValue: (v) => `${v.nombre} <${v.email}>`,
+    cell: (v) => (
+      <div className="flex items-center gap-3">
+        <Avatar className="h-8 w-8">
+          <AvatarFallback className="bg-primary/10 text-primary text-xs">
+            {v.nombre.split(' ').map((n) => n[0]).join('')}
+          </AvatarFallback>
+        </Avatar>
+        <div>
+          <div className="font-medium">{v.nombre}</div>
+          <div className="text-xs text-muted-foreground">{v.email}</div>
+        </div>
+      </div>
+    ),
+  },
+  { id: 'negocios', header: 'Negocios', align: 'center', sortValue: (v) => v.total_negocios, cell: (v) => <Badge variant="outline">{v.total_negocios}</Badge> },
+  { id: 'postulados', header: 'Postulados', align: 'center', sortValue: (v) => v.postulados, cell: (v) => <Badge variant="secondary">{v.postulados}</Badge> },
+  {
+    id: 'adjudicados',
+    header: 'Adjudicados',
+    align: 'center',
+    sortValue: (v) => v.adjudicados,
+    cell: (v) => <Badge className="bg-green-500/10 text-green-600 border-green-500/30">{v.adjudicados}</Badge>,
+  },
+  {
+    id: 'tasa',
+    header: 'Tasa',
+    align: 'center',
+    sortValue: (v) => v.tasa_adjudicacion,
+    exportValue: (v) => `${v.tasa_adjudicacion}%`,
+    cell: (v) => (
+      <div className="flex flex-col items-center gap-1">
+        <span className="font-mono text-sm font-medium">{v.tasa_adjudicacion}%</span>
+        <Progress value={v.tasa_adjudicacion} className="h-1.5 w-16" />
+      </div>
+    ),
+  },
+  {
+    id: 'monto',
+    header: 'Monto Adjudicado',
+    align: 'right',
+    sortValue: (v) => v.monto_adjudicado,
+    exportValue: (v) => v.monto_adjudicado,
+    className: 'font-mono font-medium',
+    cell: (v) => formatMontoCompacto(v.monto_adjudicado),
+  },
+];
+
 function ReporteEquipo() {
   const { data: reporte, isLoading } = useReporteEquipo();
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-CL', {
-      style: 'currency',
-      currency: 'CLP',
-      notation: 'compact',
-    }).format(value);
-  };
+  const formatCurrency = formatMontoCompacto;
 
   // Calcular totales
   const totales = reporte?.reduce((acc, v) => ({
@@ -304,69 +355,18 @@ function ReporteEquipo() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Vendedor</TableHead>
-                <TableHead className="text-center">Negocios</TableHead>
-                <TableHead className="text-center">Postulados</TableHead>
-                <TableHead className="text-center">Adjudicados</TableHead>
-                <TableHead className="text-center">Tasa</TableHead>
-                <TableHead className="text-right">Monto Adjudicado</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {reporte?.map((vendedor) => (
-                <TableRow key={vendedor.vendedor_id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                          {vendedor.nombre.split(' ').map(n => n[0]).join('')}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="font-medium">{vendedor.nombre}</div>
-                        <div className="text-xs text-muted-foreground">{vendedor.email}</div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge variant="outline">{vendedor.total_negocios}</Badge>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge variant="secondary">{vendedor.postulados}</Badge>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge className="bg-green-500/10 text-green-600 border-green-500/30">
-                      {vendedor.adjudicados}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <div className="flex flex-col items-center gap-1">
-                      <span className="font-mono text-sm font-medium">
-                        {vendedor.tasa_adjudicacion}%
-                      </span>
-                      <Progress 
-                        value={vendedor.tasa_adjudicacion} 
-                        className="h-1.5 w-16"
-                      />
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right font-mono font-medium">
-                    {formatCurrency(vendedor.monto_adjudicado)}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {(!reporte || reporte.length === 0) && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    No hay vendedores con asignaciones
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          <DataTable<ReporteVendedor>
+            storageKey="equipo-rendimiento"
+            rows={reporte ?? []}
+            rowKey={(v) => v.vendedor_id}
+            columns={COLUMNAS_VENDEDORES}
+            itemLabel="vendedores"
+            searchText={(v) => `${v.nombre} ${v.email}`}
+            searchPlaceholder="Buscar vendedor…"
+            defaultSort={{ id: 'monto', dir: 'desc' }}
+            exportFileName="rendimiento-vendedores"
+            emptyMessage="No hay vendedores con asignaciones"
+          />
         </CardContent>
       </Card>
     </div>
@@ -380,6 +380,11 @@ function ListaVendedores() {
   const { data: vendedores, isLoading } = useVendedores();
   const { data: reporte } = useReporteEquipo();
   const createMutation = useCreateVendedor();
+  // Solo el dueño puede crear vendedores: la fila quedaría con invitado_por =
+  // el propio auth.uid() de quien la crea (única opción que el trigger de la
+  // tabla permite), y el roster la scopea por el dueño efectivo — si la crea
+  // un miembro invitado, nadie (ni el dueño ni ese mismo miembro) la vuelve a ver.
+  const { data: esDueno } = useEsDuenoEquipo();
 
   const handleCreate = () => {
     if (!newVendedor.nombre || !newVendedor.email) {
@@ -407,12 +412,14 @@ function ListaVendedores() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <Button onClick={() => setShowNewDialog(true)}>
-          <UserPlus className="h-4 w-4 mr-2" />
-          Nuevo Vendedor
-        </Button>
-      </div>
+      {esDueno && (
+        <div className="flex justify-end">
+          <Button onClick={() => setShowNewDialog(true)}>
+            <UserPlus className="h-4 w-4 mr-2" />
+            Nuevo Vendedor
+          </Button>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12">

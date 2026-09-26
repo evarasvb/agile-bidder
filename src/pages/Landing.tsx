@@ -1,32 +1,18 @@
-import { 
-  ArrowRight, 
-  Zap, 
-  Target, 
-  Clock, 
-  Shield, 
-  BarChart3, 
+import {
+  ArrowRight,
+  Target,
+  Shield,
   CheckCircle2,
   FileText,
-  TrendingUp,
-  Building2,
-  Star,
   Search,
   Brain,
-  DollarSign,
-  PieChart,
   Users,
   Sparkles,
-  LineChart,
-  Calculator,
-  FileSearch,
-  Lightbulb,
-  Repeat,
   Scale,
   LogOut,
   Play,
   Bot,
   GraduationCap,
-  MonitorPlay
 } from "lucide-react";
 import { Seo } from "@/components/Seo";
 import { EstadisticasReales } from "@/components/landing/EstadisticasReales";
@@ -93,8 +79,8 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-firmavb-gray">
       <Seo
-        title="FirmaVB — Vende a Mercado Público con IA | PYMEs de Chile"
-        description="La plataforma para PYMEs chilenas que quieren vender al Estado: IA que encuentra licitaciones y compras ágiles que calzan con tu inventario, arma tu oferta y te avisa antes que cierren."
+        title="FirmaVB — Don Evaristo, tu experto para venderle al Estado | PYMEs de Chile"
+        description="Don Evaristo es tu experto, tu abogado y tu equipo de postulación en Mercado Público: encuentra licitaciones y compras ágiles que calzan con tu inventario, te asesora en compras públicas y te ayuda a cobrar cuando el Estado paga tarde."
         path="/"
       />
       {/* Demo Modal */}
@@ -112,19 +98,6 @@ export default function Landing() {
             />
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <Button
-              variant="outline"
-              asChild
-              className="gap-1.5 border-firmavb-green/40 text-firmavb-green hover:bg-firmavb-green/10 transition-colors px-2.5 sm:px-4 hidden sm:inline-flex"
-            >
-              <Link to="/webinar/vendele-al-estado">
-                <span className="relative flex h-2 w-2 mr-0.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-firmavb-green opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-firmavb-green" />
-                </span>
-                En vivo · martes
-              </Link>
-            </Button>
             <Button
               variant="outline"
               asChild
@@ -169,22 +142,8 @@ export default function Landing() {
         </div>
       </header>
 
-      {/* Banner: conversación semanal en vivo (todos los martes) */}
-      <div className="pt-20 px-6">
-        <Link
-          to="/webinar/vendele-al-estado"
-          className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-2 rounded-xl bg-firmavb-green/10 border border-firmavb-green/20 px-4 py-2.5 text-sm text-firmavb-green hover:bg-firmavb-green/15 transition-colors"
-        >
-          <MonitorPlay className="h-4 w-4 shrink-0" />
-          <span>
-            <b>En vivo, gratis · todos los martes 19:00 hrs:</b> Véndele al Estado y no mueras en el intento — inscríbete y te llega la cita al calendario
-          </span>
-          <ArrowRight className="h-4 w-4 shrink-0" />
-        </Link>
-      </div>
-
       {/* Hero Section with Smart Search */}
-      <section className="pt-8 pb-16 px-6">
+      <section className="pt-28 pb-16 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center max-w-4xl mx-auto">
             <Badge className="mb-6 bg-firmavb-blue/10 text-firmavb-blue border-firmavb-blue/20 hover:bg-firmavb-blue/20 px-4 py-2">
@@ -204,9 +163,9 @@ export default function Landing() {
             </p>
 
             <p className="text-xl text-muted-foreground font-light mb-8 max-w-3xl mx-auto">
-              FirmaVB maximiza tu <span className="text-success font-medium">flujo de caja</span> y 
-              <span className="text-firmavb-blue font-medium"> rentabilidad</span> con inteligencia 
-              artificial que transforma cómo compites en Mercado Público.
+              FirmaVB pone a <span className="text-firmavb-blue font-medium">Don Evaristo</span> a trabajar para ti:
+              tu experto, tu abogado y tu equipo de postulación en un solo lugar — para que venderle
+              al Estado sea constante, no una vez al año.
             </p>
 
             {/* Smart Search Bar */}
@@ -249,10 +208,10 @@ export default function Landing() {
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
               </Button>
-              <Button 
-                size="lg" 
-                variant="outline" 
-                className="text-base h-12 px-8 gap-2 border-2 hover:bg-muted/50 transition-all hover:scale-105 active:scale-95"
+              <Button
+                size="lg"
+                variant="ghost"
+                className="text-base h-12 px-8 gap-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all"
                 onClick={() => setDemoOpen(true)}
               >
                 <Play className="h-4 w-4" />
@@ -278,9 +237,9 @@ export default function Landing() {
 <Shield className="h-3 w-3 mr-1" />
 Convenio Marco CM 2239-2-LR26
 </Badge>
-<h3 className="text-xl md:text-2xl font-bold text-foreground mb-2">
+<h2 className="text-xl md:text-2xl font-bold text-foreground mb-2">
 Puedes postular al Convenio Marco de Software y Servicios TI?
-</h3>
+</h2>
 <p className="text-muted-foreground">
 Valida en 2 minutos si tu empresa cumple los requisitos de admisibilidad y que puntaje tecnico podrias alcanzar.
 </p>
@@ -338,53 +297,54 @@ Validar Admisibilidad Gratis
         </div>
       </section>
 
-{/* Inteligencia Generativa - 3 Pilares */}
+{/* Don Evaristo - propuesta de valor real: un experto a tu lado, no solo un buscador */}
       <section className="py-20 px-6 bg-gradient-to-b from-muted/30 to-background">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
             <Badge className="mb-4 bg-[hsl(var(--success))]/10 text-[hsl(var(--success))] border-[hsl(var(--success))]/20">
-              <Brain className="h-3 w-3 mr-1" />
-              Powered by AI
+              <Sparkles className="h-3 w-3 mr-1" />
+              Don Evaristo, con IA
             </Badge>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Inteligencia Generativa para tu Negocio
+              No estás solo vendiéndole al Estado
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-              Tres pilares fundamentales que trabajan juntos para maximizar tus resultados
+              17 años vendiéndole al Estado, convertidos en un experto, un abogado y un equipo de
+              postulación que trabajan para ti dentro de FirmaVB.
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
             <PillarCard
-              icon={DollarSign}
-              title="Flujo de Caja Optimizado"
-              description="Priorizamos licitaciones con mejores condiciones de pago para mantener tu empresa líquida"
+              icon={Brain}
+              title="Un experto que ve lo que otros no ven"
+              description="No es un buscador: es un asesor cercano que revisa cada licitación y te dice qué conviene, qué riesgo tiene el organismo y qué se te puede estar escapando."
               features={[
-                "Análisis de términos de pago",
-                "Predicción de fechas de cobro",
-                "Scoring de riesgo financiero"
+                "Analiza más allá de lo evidente",
+                "Te acompaña en el chat, no solo lista resultados",
+                "Conoce tu rubro y tu inventario"
               ]}
               color="success"
             />
             <PillarCard
-              icon={PieChart}
-              title="Rentabilidad Protegida"
-              description="Nunca comprometas tus márgenes. La IA calcula precios óptimos automáticamente"
+              icon={Scale}
+              title="Un abogado experto en compras públicas"
+              description="Te apoya en el día a día: redacta tus reclamos y apelaciones citando la ley, y te ayuda a cobrar los intereses cuando el Estado te paga tarde."
               features={[
-                "Cálculo automático de márgenes",
-                "Alertas de rentabilidad mínima",
-                "Análisis de competencia"
+                "Reclamos y apelaciones con fundamento legal",
+                "Gestión de cobranza y cálculo de intereses por mora",
+                "Te dice si el caso tiene mérito, sin rodeos"
               ]}
               color="blue"
             />
             <PillarCard
-              icon={Repeat}
-              title="Crecimiento Sostenido"
-              description="Más adjudicaciones con menos esfuerzo. Escala tu participación en licitaciones"
+              icon={Users}
+              title="Postula más y mejor, sin perder tiempo"
+              description="Cruza tu inventario con las compras ágiles abiertas, arma el libro de cada licitación y ordena la gestión de tu equipo comercial en un solo lugar."
               features={[
-                "Matching inteligente 24/7",
-                "Ofertas automáticas",
-                "Historial de éxito"
+                "Matching automático inventario ↔ compras ágiles",
+                "Libro de licitación con revisión de postulaciones",
+                "Gestión de tu equipo comercial"
               ]}
               color="warning"
             />
@@ -480,11 +440,12 @@ Validar Admisibilidad Gratis
               >
                 📧 contacto@firmavb.cl
               </a>
-              <a 
-                href="https://wa.me/56994259157" 
+              <a
+                href="https://wa.me/56994259157"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2"
+                aria-label="+56 9 9425 9157 por WhatsApp (abre en nueva ventana)"
               >
                 💬 +56 9 9425 9157
               </a>

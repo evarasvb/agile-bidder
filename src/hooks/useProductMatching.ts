@@ -50,7 +50,7 @@ function useProductosFirmaVB() {
   return useQuery({
     queryKey: ['productos-firmavb-para-matching'],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('lista_precios_firmavb')
         .select('*')
         .eq('activo', true);

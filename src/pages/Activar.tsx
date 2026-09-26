@@ -17,6 +17,23 @@ interface Invite {
   ya_activada: boolean;
 }
 
+// supabase.functions.invoke convierte toda respuesta no-2xx (400/404/409/500)
+// en `error` con `data` nulo, así que el mensaje real de la función (p. ej.
+// "Ya existe una cuenta con ese correo") se perdía y el usuario veía siempre el
+// genérico. Aquí recuperamos el mensaje real desde el cuerpo de la respuesta.
+async function mensajeError(res: { error: unknown; data: any }): Promise<string | null> {
+  if (res.data?.error) return res.data.error as string;
+  const ctx = (res.error as { context?: Response } | null)?.context;
+  if (ctx && typeof ctx.json === 'function') {
+    try {
+      const body = await ctx.json();
+      if (body?.error) return body.error as string;
+    } catch { /* cuerpo no-JSON: seguimos */ }
+  }
+  const msg = (res.error as { message?: string } | null)?.message;
+  return msg || null;
+}
+
 export default function Activar() {
   const [params] = useSearchParams();
   const token = params.get("token") || "";
@@ -39,7 +56,8 @@ export default function Activar() {
         });
         if (!vivo) return;
         if (error || data?.error || !data?.ok) {
-          setErrorCarga(data?.error || "No pudimos encontrar esta invitación.");
+          const msg = await mensajeError({ error, data });
+          setErrorCarga(msg || "No pudimos encontrar esta invitación.");
         } else {
           setInvite(data as Invite);
         }
@@ -69,7 +87,8 @@ export default function Activar() {
     }
     if (error || data?.error || !data?.ok) {
       setActivando(false);
-      toast.error(data?.error || "No se pudo activar la cuenta.");
+      const msg = await mensajeError({ error, data });
+      toast.error(msg || "No se pudo activar la cuenta.");
       return;
     }
     // Iniciar sesión automáticamente.

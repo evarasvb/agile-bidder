@@ -75,13 +75,17 @@ export default function OnboardingResultados({ cliente }: { cliente: Cliente }) 
     (async () => {
       try {
         const [lic, res] = await Promise.all([
-          (supabase.rpc as any)('buscar_licitaciones_keywords', { terminos: keywords, limite: 6 }),
-          (supabase.rpc as any)('onboarding_resumen', { p_incluidas: keywords, p_candidatas: candidatas }),
+          supabase.rpc('buscar_licitaciones_keywords', { terminos: keywords, limite: 6 }),
+          supabase.rpc('onboarding_resumen', { p_incluidas: keywords, p_candidatas: candidatas }),
         ]);
         if (cancelado) return;
         if (lic.error) setError(true);
-        else { setTotal((lic.data?.total as number) ?? 0); setItems((lic.data?.items as Item[]) ?? []); }
-        if (!res.error) setResumen(res.data as Resumen);
+        else {
+          const licData = lic.data as unknown as { total?: number; items?: Item[] } | null;
+          setTotal(licData?.total ?? 0);
+          setItems(licData?.items ?? []);
+        }
+        if (!res.error) setResumen(res.data as unknown as Resumen);
       } catch {
         if (!cancelado) setError(true);
       } finally {

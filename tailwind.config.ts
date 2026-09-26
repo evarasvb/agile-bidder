@@ -143,6 +143,9 @@ export default {
         "fade-in": "fade-in 0.2s ease-out",
         "count-up": "count-up 0.4s ease-out",
       },
+      transitionDuration: {
+        "default": "300ms",
+      },
     },
   },
   plugins: [tailwindcssAnimate],

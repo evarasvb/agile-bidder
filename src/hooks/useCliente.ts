@@ -41,10 +41,11 @@ export interface ClienteInventario {
   categoria?: string;
   precio_unitario: number;
   margen_minimo: number;
-  stock: number;
-  tiempo_entrega_dias: number;
+  // Columnas reales de cliente_inventario: no hay "activo" (todos los
+  // productos del inventario se tratan como activos).
+  stock_disponible: number;
+  tiempo_entrega: number;
   palabras_clave?: string[];
-  activo: boolean;
   imagen_url?: string;
   created_at: string;
   updated_at: string;
@@ -63,7 +64,7 @@ export interface ClienteNotificaciones {
   email_instantaneo: boolean;
   resumen_diario: boolean;
   resumen_semanal: boolean;
-  push_notifications: boolean;
+  push_notificaciones: boolean;
   webhook_url?: string;
   presupuesto_minimo: number;
   created_at: string;
@@ -119,13 +120,11 @@ export function useCliente() {
       // (y el resto de la app) tengan un cliente con el que trabajar.
       const { data: creado, error: insError } = await supabase
         .from('clientes')
-        // Cast: los tipos generados exigen rut/region/nombre_responsable, pero en
-        // la BD son nulos; sólo sembramos lo mínimo del usuario nuevo.
         .insert({
           user_id: user.id,
           email: user.email ?? '',
           empresa_nombre: user.email?.split('@')[0] || 'Mi empresa',
-        } as any)
+        })
         .select()
         .single();
 
@@ -158,7 +157,7 @@ export function useClienteOwner() {
     queryKey: ['cliente-owner', user?.id],
     queryFn: async () => {
       if (!user) return null;
-      const { data: ownerId, error } = await (supabase as any).rpc('cliente_owner_id');
+      const { data: ownerId, error } = await supabase.rpc('cliente_owner_id');
       if (error || !ownerId) return null;
       const { data } = await supabase
         .from('clientes')
@@ -386,9 +385,7 @@ export function useClienteExclusiones() {
     queryFn: async () => {
       if (!cliente?.id) return [];
 
-      // Cast a any: los tipos generados aún traen la columna antigua
-      // `tipo_exclusion`; la real es `producto_excluido`.
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('cliente_exclusiones')
         .select('*')
         .eq('cliente_id', cliente.id);
@@ -411,9 +408,8 @@ export function useToggleExclusion() {
     mutationFn: async (tipoExclusion: string) => {
       if (!cliente?.id) throw new Error('No hay cliente');
 
-      // Verificar si existe (maybeSingle: 0 filas no es error). Cast a any: los
-      // tipos generados aún traen la columna antigua `tipo_exclusion`.
-      const { data: existing } = await (supabase as any)
+      // Verificar si existe (maybeSingle: 0 filas no es error).
+      const { data: existing } = await supabase
         .from('cliente_exclusiones')
         .select('id')
         .eq('cliente_id', cliente.id)
@@ -421,13 +417,13 @@ export function useToggleExclusion() {
         .maybeSingle();
 
       if (existing) {
-        const { error } = await (supabase as any)
+        const { error } = await supabase
           .from('cliente_exclusiones')
           .delete()
           .eq('id', existing.id);
         if (error) throw error;
       } else {
-        const { error } = await (supabase as any)
+        const { error } = await supabase
           .from('cliente_exclusiones')
           .insert({ cliente_id: cliente.id, producto_excluido: tipoExclusion });
         if (error) throw error;

@@ -40,7 +40,7 @@ export interface BIActorLinea {
 }
 
 async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
-  const { data, error } = await (supabase.rpc as any)(fn, args);
+  const { data, error } = await supabase.rpc(fn as any, args as any);
   if (error) throw error;
   return data as T;
 }

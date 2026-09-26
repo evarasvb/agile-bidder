@@ -61,7 +61,7 @@ export async function crearPdfExperto(d: DatosPdfExperto): Promise<Blob> {
   const cabecera = () => {
     doc.setFillColor(...NAVY); doc.rect(0, 0, W, 24, 'F');
     if (logo) { try { doc.addImage(logo, 'PNG', M, 5, 30, 14); } catch { /* sin logo */ } }
-    doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.text('Experto FirmaVB', W - M, 11, { align: 'right' });
+    doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.text('Don Evaristo', W - M, 11, { align: 'right' });
     doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.text('Ley 19.886 · dictámenes CGR · datos vivos de Mercado Público', W - M, 17, { align: 'right' });
     y = 33;
   };
@@ -69,7 +69,7 @@ export async function crearPdfExperto(d: DatosPdfExperto): Promise<Blob> {
     if (conPie.has(pagina)) return; conPie.add(pagina);
     doc.setDrawColor(225); doc.line(M, PIE - 5, W - M, PIE - 5);
     doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...GRIS);
-    doc.text(`firmavb.cl · Hecho por ${empresa} con el Experto FirmaVB`, M, PIE);
+    doc.text(`firmavb.cl · Hecho por ${empresa} con Don Evaristo`, M, PIE);
     doc.text(`${pagina}`, W - M, PIE, { align: 'right' });
     doc.setFontSize(6.5); doc.text('Generado con fuentes públicas y datos de Mercado Público; no reemplaza la lectura de las bases.', M, PIE + 4);
   };
@@ -98,7 +98,7 @@ export async function crearPdfExperto(d: DatosPdfExperto): Promise<Blob> {
   for (const t of doc.splitTextToSize(ascii(sinNegrita(d.titulo)), ANCHO) as string[]) { doc.text(t, M, y); y += 7.5; }
   if (d.subtitulo) { doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5); doc.setTextColor(...GRIS); for (const t of doc.splitTextToSize(ascii(d.subtitulo), ANCHO) as string[]) { doc.text(t, M, y); y += 5; } }
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...GRIS);
-  doc.text(`Hecho por ${empresa} con el Experto FirmaVB · ${new Date(d.fecha ?? Date.now()).toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' })}`, M, y); y += 7;
+  doc.text(`Hecho por ${empresa} con Don Evaristo · ${new Date(d.fecha ?? Date.now()).toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' })}`, M, y); y += 7;
   const tiles = [...(d.kpis ?? [])].slice(0, 4);
   if (d.veredicto) tiles.unshift({ k: 'Veredicto', v: d.veredicto.t });
   if (tiles.length) {
@@ -163,7 +163,7 @@ export async function crearPdfExperto(d: DatosPdfExperto): Promise<Blob> {
   espacio(26); y += 4;
   doc.setFillColor(...NAVY); doc.roundedRect(M, y, ANCHO, 20, 2, 2, 'F');
   doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(255, 255, 255); doc.text('¿Tienes una licitación entre manos?', M + 5, y + 8);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.text('Pregúntale al Experto FirmaVB: 17 años vendiéndole al Estado, la ley y los datos de quién gana y cómo paga cada organismo. Tu primera pregunta es gratis en www.firmavb.cl', M + 5, y + 13.5, { maxWidth: ANCHO - 10 });
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.text('Pregúntale a Don Evaristo: 17 años vendiéndole al Estado, la ley y los datos de quién gana y cómo paga cada organismo. Tu primera pregunta es gratis en www.firmavb.cl', M + 5, y + 13.5, { maxWidth: ANCHO - 10 });
   y += 26;
   if (d.url) { doc.setFontSize(7.5); doc.setTextColor(...GRIS); doc.text(`Versión en línea: ${d.url}`, M, y); }
   pie();

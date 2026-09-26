@@ -1,0 +1,467 @@
+[
+ {
+  "titulo": "Casos reales · Quién gana y a qué precio",
+  "lecciones": [
+   {
+    "titulo": "Caso: resmas de papel, 12 proveedores y un rango de precio",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "El producto más comparable del Estado: la resma de papel. Estos son los proveedores que más resmas vendieron en 2026 y el precio unitario neto al que las vendieron, según las órdenes de compra reales. Fíjate que el líder no es el más barato."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Resmas de papel vendidas al Estado en 2026: precio neto por unidad",
+      "columnas": [
+       "Proveedor",
+       "Órdenes",
+       "Organismos",
+       "Precio mediano",
+       "Mínimo",
+       "Máximo",
+       "Unidades"
+      ],
+      "filas": [
+       [
+        "Prisa",
+        1010,
+        319,
+        2952,
+        2179,
+        5186,
+        837695
+       ],
+       [
+        "Dimerc",
+        794,
+        270,
+        2863,
+        2178,
+        4862,
+        576917
+       ],
+       [
+        "Soluciones Integrales",
+        343,
+        162,
+        3222,
+        2351,
+        4377,
+        359408
+       ],
+       [
+        "Red Office",
+        176,
+        92,
+        3468,
+        2263,
+        4834,
+        130139
+       ],
+       [
+        "Distribuidora Vergio",
+        167,
+        85,
+        3337,
+        2257,
+        4360,
+        94546
+       ],
+       [
+        "Distribuidora Colon",
+        93,
+        27,
+        3670,
+        2382,
+        4381,
+        41967
+       ],
+       [
+        "Papeles Industriales",
+        87,
+        45,
+        2690,
+        2200,
+        4548,
+        209664
+       ],
+       [
+        "Sidapt",
+        82,
+        43,
+        3300,
+        2380,
+        4155,
+        76535
+       ],
+       [
+        "Antalis",
+        67,
+        51,
+        2750,
+        2280,
+        4040,
+        76316
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "El rango de mercado va de 2.700 a 3.700 pesos la resma. Prisa vende a 319 organismos con precio mediano de 2.952: no es el más barato (Papeles Industriales vende a 2.690) pero es el que más despacha. Distribuidora Colon vende 27% más caro que Prisa y aun así coloca 42 mil resmas: vende a 27 organismos que valoran otra cosa (cercanía, crédito, entrega)."
+     },
+     {
+      "tipo": "grafico",
+      "titulo": "Precio mediano por resma según proveedor (2026)",
+      "subtipo": "barras",
+      "datos": [
+       {
+        "etiqueta": "Papeles Ind.",
+        "valor": 2690
+       },
+       {
+        "etiqueta": "Antalis",
+        "valor": 2750
+       },
+       {
+        "etiqueta": "Dimerc",
+        "valor": 2863
+       },
+       {
+        "etiqueta": "Prisa",
+        "valor": 2952
+       },
+       {
+        "etiqueta": "Soluc. Integrales",
+        "valor": 3222
+       },
+       {
+        "etiqueta": "Sidapt",
+        "valor": 3300
+       },
+       {
+        "etiqueta": "Vergio",
+        "valor": 3337
+       },
+       {
+        "etiqueta": "Red Office",
+        "valor": 3468
+       },
+       {
+        "etiqueta": "Colon",
+        "valor": 3670
+       }
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "unidad": "Pesos netos por resma",
+      "lectura": "Una diferencia de 980 pesos entre el más barato y el más caro (36%). Y todos venden. El precio no es una cifra: es un rango, y tu lugar en el rango depende de a quién le vendes y cómo entregas."
+     },
+     {
+      "tipo": "subtitulo",
+      "texto": "Las tres lecciones del caso"
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Existe un piso de mercado (2.200 pesos) por debajo del cual nadie vende sostenidamente. Si cotizas bajo el piso, o pierdes plata o el comprador desconfía.",
+       "El líder gana por cobertura, no por precio: 319 organismos, despacho en todo Chile, catálogo completo. Compite en servicio antes que en precio.",
+       "Los proveedores regionales venden más caro y colocan. Su ventaja es la cercanía: entrega en 24 horas y una persona que contesta el teléfono."
+      ]
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Reporte de productos: precios reales por proveedor y organismo",
+      "ruta": "/reportes/productos",
+      "detalle": "Escribe tu producto y mira a qué precio lo vendió cada competidor y quién lo compró."
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "Según el caso de las resmas, ¿cuál es la mejor estrategia para un proveedor nuevo de regiones?",
+      "opciones": [
+       "Cotizar bajo los 2.200 pesos para ganar por precio.",
+       "Cotizar en el rango 3.000 a 3.400 con entrega en 24 horas a los organismos de su región.",
+       "Esperar a entrar al convenio marco antes de vender."
+      ],
+      "correcta": 1,
+      "explicacion": "Los proveedores regionales venden dentro del rango de mercado, no bajo el piso, y ganan por cercanía y entrega. Bajo el piso no hay margen ni credibilidad."
+     }
+    ]
+   },
+   {
+    "titulo": "Construye tu precio con el mercado a la vista",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "Tu precio tiene tres capas: tu costo (lo que no puedes bajar), el rango de mercado (lo que el comprador ya vio) y tu posición (por qué te pagarían más o menos que la mediana). El error clásico es partir de la capa 1 y olvidar las otras dos."
+     },
+     {
+      "tipo": "subtitulo",
+      "texto": "Método en cinco pasos"
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Costo completo: producto, flete a la comuna del comprador, garantía si aplica, horas de tu equipo, y el costo de esperar el pago (30 a 60 días de capital).",
+       "Rango de mercado: busca tu producto en el reporte de FirmaVB y anota el precio mínimo, la mediana y el máximo de los últimos 3 meses.",
+       "Posición: si entregas más rápido, tienes stock o das crédito, ubícate entre la mediana y el máximo. Si eres nuevo y sin historial, entre el mínimo y la mediana.",
+       "Prueba de margen: precio menos costo completo. Si el margen es menor a 12%, no ofertes: una multa o un atraso de pago te deja en pérdida.",
+       "Precio final con IVA y en el formato exigido (unitario, total, moneda, decimales). Un formato mal puesto descalifica."
+      ]
+     },
+     {
+      "tipo": "caso",
+      "titulo": "Cotizar resmas a un municipio del sur",
+      "texto": "Costo puesto en bodega 2.350, flete a la comuna 180, capital 45 días al 1,5% mensual 55: costo completo 2.585. Mediana de mercado 2.952. Posición: proveedor local con entrega en 24 horas. Precio neto 3.150 (margen 18%). Gana contra Prisa no por precio sino porque el municipio recibe mañana."
+     },
+     {
+      "tipo": "ejercicio",
+      "titulo": "Tu precio para una compra ágil real",
+      "pasos": [
+       "Elige una compra ágil abierta de tu producto en FirmaVB.",
+       "Calcula tu costo completo con los cinco componentes.",
+       "Anota el mínimo, la mediana y el máximo del reporte de productos.",
+       "Decide tu posición y escribe una frase que la justifique para el comprador.",
+       "Calcula el margen y decide ir o no ir."
+      ],
+      "entregable": "Una hoja con tu cálculo y la oferta enviada (o la razón para no enviarla)."
+     },
+     {
+      "tipo": "tip",
+      "texto": "Escribe en la oferta lo que justifica tu precio: 'entrega en 24 horas en su comuna', 'stock disponible', 'garantía 12 meses'. El comprador puede elegir una oferta más cara si está justificada en la ficha."
+     }
+    ]
+   },
+   {
+    "titulo": "Dos propuestas frente a frente: la que ganó y la que perdió",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "Este es un caso reconstruido a partir de compras ágiles reales de mobiliario de 2026 (nombres omitidos). Dos proveedores, mismo producto, mismo comprador. Mira dónde se decidió."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Compra ágil de 25 sillas ergonómicas para un servicio público (caso reconstruido)",
+      "columnas": [
+       "Criterio",
+       "Oferta A (perdió)",
+       "Oferta B (ganó)"
+      ],
+      "filas": [
+       [
+        "Precio unitario neto",
+        "89.900",
+        "96.500"
+       ],
+       [
+        "Total con IVA",
+        "2.674.525",
+        "2.870.875"
+       ],
+       [
+        "Plazo de entrega",
+        "15 días hábiles",
+        "5 días hábiles"
+       ],
+       [
+        "Ficha técnica adjunta",
+        "No (solo foto)",
+        "Sí, con certificación"
+       ],
+       [
+        "Garantía",
+        "6 meses",
+        "24 meses"
+       ],
+       [
+        "Despacho e instalación",
+        "Despacho a bodega",
+        "Armado en puesto de trabajo"
+       ],
+       [
+        "Referencias",
+        "Ninguna",
+        "3 órdenes anteriores al mismo organismo"
+       ],
+       [
+        "Redacción de la oferta",
+        "Una línea",
+        "Media página: plazo, garantía, contacto directo"
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "La oferta B costó 7% más y ganó. El comprador de una compra ágil no está obligado a elegir el precio más bajo: elige la oferta más conveniente y lo justifica. B le dio motivos concretos para justificarlo."
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Precio: A fue más barata, pero no lo suficiente para compensar 10 días más de espera y sin garantía real.",
+       "Ficha técnica: sin ficha, el comprador no puede verificar que cumple. En una compra ágil eso equivale a no ofertar.",
+       "Historial: B ya le había vendido tres veces. El comprador conoce su cumplimiento. Por eso los primeros contratos chicos valen tanto.",
+       "Redacción: la oferta se lee en 30 segundos. B escribió lo que el comprador necesita para justificar la elección."
+      ]
+     },
+     {
+      "tipo": "video",
+      "titulo": "Cómo redactar una oferta de compra ágil que se justifique sola",
+      "minutos": 11,
+      "resumen": "Plantilla de oferta en tres bloques (qué entrego, cuándo, por qué conviene) y errores que hacen perder aunque el precio sea el mejor."
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "En una compra ágil, ¿puede el comprador elegir una oferta más cara?",
+      "opciones": [
+       "No, siempre debe elegir el precio más bajo.",
+       "Sí, si la considera más conveniente y lo fundamenta (plazo, garantía, calidad).",
+       "Solo si la oferta más barata está incompleta."
+      ],
+      "correcta": 1,
+      "explicacion": "La compra ágil se adjudica a la oferta más conveniente, no necesariamente a la más barata. Por eso escribir los motivos en tu oferta es tan importante como el precio."
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "titulo": "Casos reales · El convenio marco como referencia de precio",
+  "lecciones": [
+   {
+    "titulo": "Lo que se vende por convenio: quién y cuánto (2026)",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "El convenio marco es un catálogo con precios públicos. Aunque no estés en él, sus precios son la referencia del comprador. Y sus cifras te dicen quién domina cada categoría."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Convenio marco de artículos de escritorio y papelería, 2026",
+      "columnas": [
+       "Proveedor",
+       "Órdenes",
+       "Monto (millones)"
+      ],
+      "filas": [
+       [
+        "Prisa",
+        1257,
+        4724
+       ],
+       [
+        "Dimerc",
+        1110,
+        3457
+       ],
+       [
+        "Soluciones Integrales",
+        346,
+        1423
+       ],
+       [
+        "Red Office",
+        262,
+        1189
+       ],
+       [
+        "Distribuidora Vergio",
+        280,
+        805
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "Los mismos nombres del caso de las resmas. Quien domina el convenio domina también la compra ágil del rubro, porque el comprador lo conoce. Para competir contra ellos no sirve el precio: sirve el nicho (región, producto especial, servicio)."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Convenio marco de alimentos, 2026: quién vende y quién compra",
+      "columnas": [
+       "",
+       "Nombre",
+       "Órdenes",
+       "Monto (millones)"
+      ],
+      "filas": [
+       [
+        "Vende",
+        "Sidapt",
+        2376,
+        10846
+       ],
+       [
+        "Vende",
+        "Comercializadora S&F",
+        534,
+        4372
+       ],
+       [
+        "Vende",
+        "Agrosuper",
+        1169,
+        4155
+       ],
+       [
+        "Vende",
+        "Alimentos San Mateo",
+        421,
+        3474
+       ],
+       [
+        "Compra",
+        "Unidades de la Región Metropolitana",
+        1267,
+        10071
+       ],
+       [
+        "Compra",
+        "Unidades de la Región de Valparaíso",
+        721,
+        3831
+       ],
+       [
+        "Compra",
+        "Dirección de Abastecimiento de la Armada",
+        390,
+        3398
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "El convenio de alimentos movió 123 mil millones en 2026 con 263 proveedores. Un solo proveedor (Sidapt) tiene 2.376 órdenes. La Armada compra 3.398 millones por un solo convenio: ese es un cliente para seguir."
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Reporte de convenio marco: quién vende y quién compra por convenio",
+      "ruta": "/reportes/convenio-marco"
+     },
+     {
+      "tipo": "tip",
+      "texto": "Usa el precio del catálogo como techo cuando ofertas por compra ágil el mismo producto: el comprador tiene que justificar comprar fuera del convenio, y tu precio bajo el catálogo es la justificación."
+     }
+    ]
+   },
+   {
+    "titulo": "Ejercicio: tu mapa de precios y competidores",
+    "bloques": [
+     {
+      "tipo": "video",
+      "titulo": "Mapa de precios en 15 minutos con FirmaVB",
+      "minutos": 10,
+      "resumen": "Demostración: reporte de productos, reporte de competidores y reporte de convenio marco para fijar tu rango de precio y tu nicho."
+     },
+     {
+      "tipo": "ejercicio",
+      "titulo": "Mapa de precios",
+      "pasos": [
+       "Elige tus 5 productos más vendidos.",
+       "Para cada uno, anota mínimo, mediana y máximo del reporte de productos (últimos 3 meses).",
+       "Anota el proveedor líder y a cuántos organismos le vende.",
+       "Anota si el producto está en convenio marco y el proveedor principal del convenio.",
+       "Define tu posición y tu argumento por producto en una frase."
+      ],
+      "entregable": "Tabla de 5 productos con rango de precio, líder, convenio y tu posición."
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Reporte de competidores",
+      "ruta": "/reportes/competidores",
+      "detalle": "Mira a quién le ganan tus competidores, en qué regiones y con qué productos."
+     }
+    ]
+   }
+  ]
+ }
+]

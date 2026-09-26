@@ -101,7 +101,7 @@ export function BIFiltersPanel({ filters, onFiltersChange }: BIFiltersPanelProps
           {/* Fecha Desde */}
           <div className="space-y-2">
             <Label className="flex items-center gap-1">
-              <CalendarIcon className="h-3 w-3" />
+              <CalendarIcon className="h-3 w-3" aria-hidden="true" />
               Desde
             </Label>
             <Popover>
@@ -134,7 +134,7 @@ export function BIFiltersPanel({ filters, onFiltersChange }: BIFiltersPanelProps
           {/* Fecha Hasta */}
           <div className="space-y-2">
             <Label className="flex items-center gap-1">
-              <CalendarIcon className="h-3 w-3" />
+              <CalendarIcon className="h-3 w-3" aria-hidden="true" />
               Hasta
             </Label>
             <Popover>
@@ -204,13 +204,14 @@ export function BIFiltersPanel({ filters, onFiltersChange }: BIFiltersPanelProps
 
           {/* Proveedor */}
           <div className="space-y-2 relative">
-            <Label className="flex items-center gap-1">
+            <Label htmlFor="proveedor-search" className="flex items-center gap-1">
               <User className="h-3 w-3" />
               Proveedor
             </Label>
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
+                id="proveedor-search"
                 placeholder="Buscar por nombre o RUT"
                 value={proveedorSearch}
                 onChange={(e) => {
@@ -255,13 +256,14 @@ export function BIFiltersPanel({ filters, onFiltersChange }: BIFiltersPanelProps
 
           {/* Institución */}
           <div className="space-y-2 relative">
-            <Label className="flex items-center gap-1">
+            <Label htmlFor="institucion-search" className="flex items-center gap-1">
               <Building2 className="h-3 w-3" />
               Institución
             </Label>
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
+                id="institucion-search"
                 placeholder="Buscar por nombre o RUT"
                 value={institucionSearch}
                 onChange={(e) => {
@@ -306,13 +308,14 @@ export function BIFiltersPanel({ filters, onFiltersChange }: BIFiltersPanelProps
 
           {/* Producto */}
           <div className="space-y-2 lg:col-span-2">
-            <Label className="flex items-center gap-1">
+            <Label htmlFor="producto-search" className="flex items-center gap-1">
               <Package className="h-3 w-3" />
               Producto
             </Label>
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
+                id="producto-search"
                 placeholder="Buscar producto por nombre"
                 value={filters.producto || ''}
                 onChange={(e) => onFiltersChange({ ...filters, producto: e.target.value || undefined })}
@@ -338,13 +341,13 @@ export function BIFiltersPanel({ filters, onFiltersChange }: BIFiltersPanelProps
             {filters.fechaDesde && (
               <Badge variant="outline" className="flex items-center gap-1">
                 Desde: {format(new Date(filters.fechaDesde), "dd/MM/yyyy")}
-                <X className="h-3 w-3 cursor-pointer" onClick={() => onFiltersChange({ ...filters, fechaDesde: undefined })} />
+                <button onClick={() => onFiltersChange({ ...filters, fechaDesde: undefined })} aria-label="Limpiar filtro de fecha desde" className="hover:opacity-70 transition-opacity"><X className="h-3 w-3" /></button>
               </Badge>
             )}
             {filters.fechaHasta && (
               <Badge variant="outline" className="flex items-center gap-1">
                 Hasta: {format(new Date(filters.fechaHasta), "dd/MM/yyyy")}
-                <X className="h-3 w-3 cursor-pointer" onClick={() => onFiltersChange({ ...filters, fechaHasta: undefined })} />
+                <button onClick={() => onFiltersChange({ ...filters, fechaHasta: undefined })} aria-label="Limpiar filtro de fecha hasta" className="hover:opacity-70 transition-opacity"><X className="h-3 w-3" /></button>
               </Badge>
             )}
             {filters.proveedorNombre && (

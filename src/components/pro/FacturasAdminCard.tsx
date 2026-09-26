@@ -15,13 +15,13 @@ export function FacturasAdminCard() {
   const { session } = useAuth();
   const qc = useQueryClient();
   const esAdmin = session?.user?.email === 'evaras@firmavb.cl';
-  const { data: filas = [] } = useQuery({ queryKey: ['facturas_admin'], enabled: esAdmin, queryFn: async () => ((await (supabase as any).rpc('facturas_admin')).data ?? []) as any[] });
+  const { data: filas = [] } = useQuery({ queryKey: ['facturas_admin'], enabled: esAdmin, queryFn: async () => ((await supabase.rpc('facturas_admin')).data ?? []) as any[] });
   const [num, setNum] = useState<Record<string, string>>({});
   const [url, setUrl] = useState<Record<string, string>>({});
   if (!esAdmin) return null;
   const emitir = async (id: string) => {
     if (!num[id]) { toast.error('Ingresa el número de factura'); return; }
-    const { error } = await (supabase as any).rpc('facturas_marcar_emitida', { p_id: id, p_numero: num[id], p_url: url[id] || null });
+    const { error } = await supabase.rpc('facturas_marcar_emitida', { p_id: id, p_numero: num[id], p_url: url[id] || null });
     if (error) toast.error(error.message); else { toast.success('Factura marcada como emitida'); qc.invalidateQueries({ queryKey: ['facturas_admin'] }); }
   };
   return (

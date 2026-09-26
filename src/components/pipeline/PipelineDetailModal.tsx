@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
@@ -12,6 +12,7 @@ import {
   Clock,
   FileText,
   ChevronRight,
+  HardDrive,
 } from 'lucide-react';
 import {
   Dialog,
@@ -20,6 +21,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -39,6 +51,8 @@ import {
 } from './pipelineConstants';
 import { useUpdatePipelineItem, useMovePipelineItem, useDeletePipelineItem } from '@/hooks/usePipeline';
 import { supabaseClient as supabase } from '@/lib/supabaseClient';
+import { useDriveEstado, type DriveFile } from '@/hooks/useGoogleDrive';
+import { DriveFilePicker } from '@/components/drive/DriveFilePicker';
 import { toast } from 'sonner';
 
 // Link real a la ficha en Mercado Público (scrapeado), buscado por código. Antes
@@ -47,14 +61,12 @@ function useLinkOficialOportunidad(tipo: string | undefined, codigo: string | un
   return useQuery({
     queryKey: ['pipeline-link-oficial', tipo, codigo],
     queryFn: async () => {
-      // Cast a `any`: estas columnas son reales en la base pero el archivo de
-      // tipos generado de Supabase está desactualizado y no las conoce.
       if (tipo === 'compra_agil') {
-        const { data } = await (supabase as any).from('compras_agiles').select('url_ficha').eq('codigo', codigo).maybeSingle();
+        const { data } = await supabase.from('compras_agiles').select('url_ficha').eq('codigo', codigo).maybeSingle();
         return data?.url_ficha ?? null;
       }
       if (tipo === 'licitacion') {
-        const { data } = await (supabase as any).from('licitaciones').select('link_detalle').eq('id_licitacion', codigo).maybeSingle();
+        const { data } = await supabase.from('licitaciones').select('link_detalle').eq('codigo', codigo).maybeSingle();
         return data?.link_detalle ?? null;
       }
       return null;
@@ -85,12 +97,20 @@ export function PipelineDetailModal({
 }: PipelineDetailModalProps) {
   const [notas, setNotas] = useState('');
   const [notasEdited, setNotasEdited] = useState(false);
+  const [driveOpen, setDriveOpen] = useState(false);
+  const { data: driveEstado } = useDriveEstado();
   const updateItem = useUpdatePipelineItem();
   const moveItem = useMovePipelineItem();
   const deleteItem = useDeletePipelineItem();
   const { data: linkOficial } = useLinkOficialOportunidad(item?.oportunidad_tipo, item?.oportunidad_id, open);
 
-  // Sync notas when item changes
+  // Al abrir otra postulación, descartar la edición en curso para que las notas
+  // no se arrastren de una tarjeta a otra.
+  useEffect(() => {
+    setNotas('');
+    setNotasEdited(false);
+  }, [item?.id]);
+
   const displayNotas = notasEdited ? notas : (item?.notas || '');
 
   if (!item) return null;
@@ -134,6 +154,17 @@ export function PipelineDetailModal({
     });
   };
 
+  const handleAttachDrive = (file: DriveFile) => {
+    const nuevos = [
+      ...(item.archivos || []),
+      { nombre: file.name, url: file.webViewLink || '', fecha: new Date().toISOString() },
+    ];
+    updateItem.mutate(
+      { id: item.id, archivos: nuevos },
+      { onError: () => toast.error('No se pudo guardar el adjunto') },
+    );
+  };
+
   const detailUrl =
     item.oportunidad_tipo === 'compra_agil'
       ? `/compras-agiles/${item.oportunidad_id}`
@@ -173,7 +204,7 @@ export function PipelineDetailModal({
               {currentConfig.label}
             </Badge>
             <Select value={item.etapa} onValueChange={handleStageChange}>
-              <SelectTrigger className="w-[180px] h-8 text-xs">
+              <SelectTrigger className="w-[180px] h-8 text-xs" aria-label="Cambiar etapa de la oportunidad">
                 <SelectValue placeholder="Mover a..." />
               </SelectTrigger>
               <SelectContent>
@@ -211,7 +242,7 @@ export function PipelineDetailModal({
             )}
             {item.match_score > 0 && (
               <div className="flex items-center gap-2 text-gray-600">
-                <span className="font-medium">{item.match_score}%</span> match
+                <span className="font-medium">{item.match_score}%</span> afinidad
               </div>
             )}
           </div>
@@ -222,8 +253,8 @@ export function PipelineDetailModal({
           {mpUrl && prePostulacion && (
             <div className="flex flex-wrap gap-2">
               <Button asChild size="sm" className="gap-1.5">
-                <a href={mpUrl} target="_blank" rel="noreferrer">
-                  <ExternalLink className="h-3.5 w-3.5" />
+                <a href={mpUrl} target="_blank" rel="noreferrer" aria-label="Postular en Mercado Público (abre en nueva pestaña)">
+                  <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
                   Postular en Mercado Público
                 </a>
               </Button>
@@ -238,8 +269,9 @@ export function PipelineDetailModal({
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+              aria-label="Ver en Mercado Público (abre en nueva pestaña)"
             >
-              <ExternalLink className="h-3.5 w-3.5" />
+              <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
               Ver en Mercado Público
             </a>
           )}
@@ -315,43 +347,80 @@ export function PipelineDetailModal({
             )}
           </div>
 
-          {/* Attachments placeholder */}
-          {item.archivos && item.archivos.length > 0 && (
-            <>
-              <Separator />
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-2">Archivos</h4>
-                <div className="space-y-1">
-                  {item.archivos.map((archivo, idx) => (
-                    <a
-                      key={idx}
-                      href={archivo.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-xs text-primary hover:underline"
-                    >
-                      <FileText className="h-3 w-3" />
-                      {archivo.nombre}
-                    </a>
-                  ))}
-                </div>
+          {/* Archivos: adjuntos de la postulación + adjuntar desde Google Drive */}
+          <Separator />
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-semibold text-gray-900">Archivos</h4>
+              {driveEstado?.conectado ? (
+                <Button size="sm" variant="outline" className="h-7 gap-1.5" onClick={() => setDriveOpen(true)}>
+                  <HardDrive className="h-3.5 w-3.5" />
+                  Adjuntar desde Drive
+                </Button>
+              ) : (
+                <Link to="/configuracion/integraciones" className="text-xs text-primary hover:underline">
+                  Conectar Google Drive
+                </Link>
+              )}
+            </div>
+            {item.archivos && item.archivos.length > 0 ? (
+              <div className="space-y-1">
+                {item.archivos.map((archivo, idx) => (
+                  <a
+                    key={idx}
+                    href={archivo.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-xs text-primary hover:underline"
+                  >
+                    <FileText className="h-3 w-3" />
+                    {archivo.nombre}
+                  </a>
+                ))}
               </div>
-            </>
-          )}
+            ) : (
+              <p className="text-xs text-gray-400">Sin archivos adjuntos</p>
+            )}
+          </div>
+
+          <DriveFilePicker
+            open={driveOpen}
+            onOpenChange={setDriveOpen}
+            onAttach={handleAttachDrive}
+            codigo={item.oportunidad_tipo === 'licitacion' ? item.oportunidad_id : null}
+          />
 
           <Separator />
 
-          {/* Delete action */}
+          {/* Delete action: con confirmación, porque borrar era irreversible y
+              con un solo clic se perdía la postulación y su historial. */}
           <div className="flex justify-end">
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleDelete}
-              disabled={deleteItem.isPending}
-            >
-              <Trash2 className="h-4 w-4 mr-1" />
-              Eliminar del pipeline
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" disabled={deleteItem.isPending}>
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Eliminar del pipeline
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Eliminar esta postulación?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Se quitará «{item.titulo}» del seguimiento junto con su historial de
+                    etapas y notas. Esta acción no se puede deshacer.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Eliminar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
       </DialogContent>

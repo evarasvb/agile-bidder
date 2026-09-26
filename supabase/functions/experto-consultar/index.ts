@@ -1,7 +1,11 @@
-// Experto FirmaVB — chat y análisis de licitaciones con fuentes reales.
+// Don Evaristo — chat y análisis de licitaciones con fuentes reales.
 // Busca en Postgres (normativa, jurisprudencia, datos de Mercado Público) y
 // responde con Gemini en streaming (SSE). Límites por plan.
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { evidenceGateLicitacion, crearEstadoDocumentacionLicitacion } from "../_shared/evidenceGateHelper.ts";
+import { textoPanorama, REGLAS_PANORAMA } from "../_shared/panorama.ts";
+import { fetchClaudeComoOpenAI } from "../_shared/claudeFallback.ts";
+import { guardarTurnoEvaristo } from "../_shared/evaristoMemoria.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -21,6 +25,9 @@ const MAX_ANON_24H = Number(Deno.env.get("EXPERTO_MAX_ANON_24H") ?? 500);
 const MODELOS_CHAT = [Deno.env.get("GEMINI_MODEL_CHAT"), "gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-3.6-flash"].filter(Boolean) as string[];
 const MODELOS_INFORME = [Deno.env.get("GEMINI_MODEL_INFORME"), "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.5-flash-lite", "gemini-flash-lite-latest"].filter(Boolean) as string[];
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+// Respaldo si Gemini falla en TODOS sus modelos (ej. cuota de la cuenta agotada): Claude.
+const CLAUDE_MODELO_CHAT = "claude-haiku-4-5-20251001";
+const CLAUDE_MODELO_INFORME = "claude-sonnet-5";
 
 const STOP = new Set("de la el los las un una unos unas y o u que en para por con sin sobre al del se su sus es son fue ser hay como cuando donde qué que cual cuál cuáles quien quién cómo cuánto cuánta cuántos cuántas mi mis me tu tus le les lo nos si no más muy este esta estos estas ese esa eso aquel puedo puede pueden podemos debo debe deben hacer tiene tienen tengo hay está están estoy ese esa alguna algun algún alguno algunos algunas alguien algo otra otro otras otros".split(" "));
 
@@ -32,12 +39,6 @@ function palabrasClave(t: string): string[] {
 // Palabras de contenido (sin genéricas) para consultar datos de mercado
 function palabrasDatos(t: string): string[] {
   return palabrasClave(t).filter((w) => !GENERICAS.has(w)).slice(0, 4);
-}
-function rolYSub(auth: string): { role: string; sub: string | null } {
-  try {
-    const p = JSON.parse(atob(auth.replace(/^Bearer\s+/i, "").split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-    return { role: p.role ?? "", sub: p.sub ?? null };
-  } catch { return { role: "", sub: null }; }
 }
 function ipCliente(req: Request): string | null {
   // X-Forwarded-For puede traer valores forjados por el cliente al inicio; el gateway
@@ -133,7 +134,7 @@ ${elegidas.map((c) => `## ${c.s.titulo}\n${c.s.texto}`).join("\n\n") || "(sin co
   return out.join("\n\n");
 }
 
-const SYS_CHAT = `Eres el Experto FirmaVB, asesor con 17 años vendiéndole al Estado chileno por Mercado Público / ChileCompra.
+const SYS_CHAT = `Eres Don Evaristo, asesor con 17 años vendiéndole al Estado chileno por Mercado Público / ChileCompra.
 Hablas como Evaristo Varas en su libro "Véndele al Estado y No Mueras en el Intento": de tú, cercano, directo, como un amigo que ya pasó por esto y te lo cuenta sin adornos. Frases cortas. Nada de "estimado", "revisor en mano" ni saludos largos; entra al grano en la primera línea. Ejemplos concretos de la calle antes que teoría. Cuando toca, un empujón honesto ("no hay atajos", "no basta con querer ganar, hay que poder cumplir"). Si algo es riesgoso, dilo sin rodeos. Cierra siempre con el paso concreto que daría hoy.
 Reglas:
 - Responde SOLO con lo que respaldan las FUENTES y DATOS entregados. Cita entre corchetes [n] la fuente usada después de cada afirmación que provenga de ella. Con ley o reglamento nombra el artículo en la frase; con directivas su número; con dictámenes de Contraloría número y año (advierte si es anterior a dic-2024: puede citar el reglamento antiguo D.250/2004, reemplazado por el D.661/2024); con sentencias del TCP rol y fecha; con el libro, dilo como criterio práctico del autor.
@@ -143,29 +144,33 @@ Reglas:
 - Si hay BASES DE LA LICITACIÓN (PDF subido por un usuario), son la fuente principal para criterios de evaluación, ponderaciones, garantías, plazos, multas, anexos y cláusulas: responde con esos datos exactos, cita [n] y nombra la sección o numeral. Nunca digas "null", "JSON", "resumen estructurado" ni "texto resumen": si un dato figura como no indicado, di que las bases no lo exigen o no lo mencionan. Si el contexto dice NO HAY BASES CARGADAS y la pregunta las necesita, responde lo que sí sabes y pide que las suban con el botón "Subir bases (PDF)"; no mandes al usuario a descargarlas de Mercado Público.
 - Si hay DOCUMENTOS DE TRABAJO DEL USUARIO, son sus propios formatos (matriz, checklist, anexos): revísalos contra las bases, dile qué está bien, qué falta y cómo completarlo, campo por campo si te lo pide.
 - Si hay NOTICIAS RECIENTES, úsalas como fuente externa: di "según la prensa" o "según ChileCompra" con el medio y la fecha, cita [n], y sepáralo de lo que dicen nuestros datos ("según nuestros datos de Mercado Público"). Con ambos puedes dar tu opinión, marcándola como opinión.
+${REGLAS_PANORAMA}
 - Si las fuentes no cubren la pregunta, dilo ("No tengo fuente en mi base para eso") y señala qué documento consultar. No inventes artículos, plazos, cifras ni licitaciones.
-- Montos en pesos con separador de miles ($1.234.567). Máximo 250 palabras salvo que pidan detalle. Párrafos cortos; lista corta solo para varias licitaciones. Formato Markdown simple.`;
+- Montos en pesos con separador de miles ($1.234.567). Máximo 250 palabras salvo que pidan detalle (con panorama o bases, hasta 400). Párrafos cortos; lista corta solo para varias licitaciones. Formato Markdown simple.`;
 
-const SYS_INFORME = `Eres el Experto FirmaVB, asesor con 17 años vendiéndole al Estado chileno. Vas a entregar a un proveedor pyme un INFORME DE TRABAJO para una licitación concreta, usando SOLO la ficha, fuentes y datos entregados. Hablas como Evaristo Varas en su libro "Véndele al Estado y No Mueras en el Intento": de tú, cercano, directo, como un amigo que ya pasó por esto y te lo cuenta sin adornos. Frases cortas. Nada de "estimado", "revisor en mano" ni saludos largos; entra al grano en la primera línea. Ejemplos concretos de la calle antes que teoría. Cuando toca, un empujón honesto ("no hay atajos", "no basta con querer ganar, hay que poder cumplir"). Si algo es riesgoso, dilo sin rodeos. Cierra siempre con el paso concreto que daría hoy. Formato Markdown con estas secciones exactas:
+const SYS_INFORME = `Eres Don Evaristo, asesor con 17 años vendiéndole al Estado chileno. Vas a entregar a un proveedor pyme un INFORME DE TRABAJO para una licitación concreta, usando SOLO la ficha, fuentes y datos entregados. Hablas como Evaristo Varas en su libro "Véndele al Estado y No Mueras en el Intento": de tú, cercano, directo, como un amigo que ya pasó por esto y te lo cuenta sin adornos. Frases cortas. Nada de "estimado", "revisor en mano" ni saludos largos; entra al grano en la primera línea. Ejemplos concretos de la calle antes que teoría. Cuando toca, un empujón honesto ("no hay atajos", "no basta con querer ganar, hay que poder cumplir"). Si algo es riesgoso, dilo sin rodeos. Cierra siempre con el paso concreto que daría hoy. Formato Markdown con estas secciones exactas:
 
 ## 1. Resumen ejecutivo
 Qué se compra, quién, cuánto, cuándo cierra, y tu veredicto en una línea: ¿vale la pena postular? (sí / con reservas / no) y por qué.
-## 2. Fechas clave y plan de trabajo
+## 2. Panorama completo
+Antecedentes del organismo (licitaciones anteriores parecidas: código, fecha, quién ganó, oferentes), compras ágiles del mismo tema (fragmentación o compra puente), qué dice la prensa, qué reclaman los proveedores y, si hay match, qué ítems puede ofertar el usuario. Si hay documentos de otra licitación subidos aquí, dilo. Termina con lo que FALTA y pídelo: bases o anexos de la licitación anterior N° X, documentos, precio o capacidad del usuario.
+## 3. Fechas clave y plan de trabajo
 Cronograma hacia atrás desde el cierre: preguntas/aclaraciones, garantía, preparación de anexos, subida de oferta. Con días.
-## 3. Checklist de admisibilidad
+## 4. Checklist de admisibilidad
 Lista de verificación de lo que deja fuera una oferta (documentos, garantía de seriedad si aplica, inhabilidades art. 4 Ley 19.886, registro de proveedores, formato de anexos). Marca lo que la ficha permite confirmar y lo que hay que revisar en las bases.
-## 4. Cómo se ganan los puntos
+## 5. Cómo se ganan los puntos
 Qué criterios de evaluación suelen aplicarse a este tipo de compra y dónde poner el esfuerzo (precio vs. técnico vs. plazo vs. experiencia). Si la ficha no trae criterios, dilo y explica cómo leerlos en las bases.
-## 5. Riesgos y jurisprudencia aplicable
-Errores que en casos parecidos Contraloría o el TCP ya sancionaron o validaron (cita [n]). Riesgos del organismo (pago, reclamos).
-## 6. Competencia y precio de referencia
+## 6. Riesgos, multas y jurisprudencia aplicable
+Errores que en casos parecidos Contraloría o el TCP ya sancionaron o validaron (cita [n]). Riesgos del organismo (pago, reclamos). Multas cuantificadas frente al monto del contrato: cuáles se asumen como parte del negocio y cuáles son riesgo real.
+## 7. Competencia y precio de referencia
 Quién le vende esto al Estado y a qué precio mediano; quién ganó licitaciones parecidas y con qué monto respecto del presupuesto; quién le gana habitualmente a este organismo; presupuesto vs. mercado; recomendación de estrategia de precio.
-## 7. Próximos 3 pasos
+## 8. Próximos 3 pasos
 Acciones concretas para hoy.
 ## Fuentes
 Lista numerada de las fuentes citadas (norma y artículo, directiva, dictamen, sentencia, capítulo del libro, "Datos Mercado Público vía FirmaVB").
 
-Reglas: cita [n] tras cada afirmación con fuente; si hay BASES DE LA LICITACIÓN en el contexto, la sección 4 usa sus criterios y ponderaciones reales y las secciones 2 y 3 sus plazos, garantías y anexos, citando la sección; no inventes criterios ni plazos que no estén en la ficha, las bases o las fuentes (si no están, di "revisar en bases" y sugiere subirlas con el botón "Subir bases (PDF)"); montos con separador de miles; máximo 900 palabras.`;
+Reglas: cita [n] tras cada afirmación con fuente; si hay BASES DE LA LICITACIÓN en el contexto, la sección 5 usa sus criterios y ponderaciones reales y las secciones 3, 4 y 6 sus plazos, garantías, multas y anexos, citando la sección; no inventes criterios ni plazos que no estén en la ficha, las bases o las fuentes (si no están, di "revisar en bases" y sugiere subirlas con el botón "Subir bases (PDF)"); montos con separador de miles; máximo 1.100 palabras.
+${REGLAS_PANORAMA}`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -178,11 +183,27 @@ Deno.serve(async (req) => {
     const historial: { role: string; content: string }[] = Array.isArray(body.historial) ? body.historial.slice(-6) : [];
     let codigo: string | null = body.codigo ? String(body.codigo).trim().toUpperCase() : null;
 
-    const { role, sub } = rolYSub(req.headers.get("Authorization") ?? "");
-    // Con service_role se puede actuar en nombre de un usuario (body.user_id): automatizaciones y soporte.
-    const userId = role === "authenticated" ? sub : (role === "service_role" && body.user_id ? String(body.user_id) : null);
     const ip = ipCliente(req);
-    const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const sb = createClient(Deno.env.get("SUPABASE_URL")!, serviceRoleKey);
+    const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+    let userId: string | null = null;
+
+    // La clave de servicio solo puede actuar en nombre de un usuario si coincide exactamente.
+    if (token && token === serviceRoleKey && body.user_id) {
+      userId = String(body.user_id);
+    } else if (token) {
+      // getUser valida firma, expiración y revocación. Un token forjado queda como anónimo.
+      const { data: { user } } = await sb.auth.getUser(token);
+      userId = user?.id ?? null;
+    }
+
+    // Cliente con el JWT del usuario (cuando lo hay): permite leer/escribir la
+    // memoria compartida de Don Evaristo (evaristo_contexto, evaristo_conversaciones)
+    // respetando su RLS, igual que hace evaristo-soporte (chat).
+    const sbUser = token && token !== serviceRoleKey
+      ? createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: `Bearer ${token}` } } })
+      : null;
 
     // Límites
     const { data: uso } = await sb.rpc("experto_uso_mes", { p_user_id: userId, p_huella: huella || "anon" });
@@ -230,6 +251,10 @@ Deno.serve(async (req) => {
     if (codigo) tareas.ficha = sb.rpc("experto_ficha_licitacion", { p_codigo: codigo }).then((r) => r.data);
     if (codigo) tareas.bases = sb.rpc("experto_bases_texto", { p_codigo: codigo }).then((r) => r.data ?? []);
     if (codigo) tareas.anexos = sb.rpc("experto_anexos_texto", { p_codigo: codigo }).then((r) => r.data ?? []);
+    if (codigo) tareas.fragmentacion = sb.rpc("experto_fragmentacion_organismo", { p_codigo_licitacion: codigo, p_dias_ventana: 90 }).then((r) => r.data ?? []);
+    if (codigo) tareas.patrones = sb.rpc("experto_patrones_licitacion", { p_codigo_licitacion: codigo, p_anos_atras: 3 }).then((r) => r.data ?? []);
+    // Panorama completo: documentos ajenos, antecedentes, compras ágiles del tema, reclamos y match del usuario.
+    if (codigo) tareas.panorama = sb.rpc("experto_panorama_licitacion", { p_codigo: codigo, p_user_id: userId }).then((r) => r.data);
     if (codigo && userId) tareas.docs = sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: codigo, p_max: 8000 }).then((r) => r.data ?? []);
     if (modo === "chat") {
       if (kws.length) {
@@ -271,9 +296,19 @@ Deno.serve(async (req) => {
     // Perfil del usuario (qué vende, rubro, región) y memoria (lo que pidió mejorar antes): personalizan la respuesta.
     if (userId) tareas.perfil = sb.from("clientes").select("empresa_nombre, categoria_negocio, industrias, palabras_clave_busqueda, region").eq("user_id", userId).maybeSingle().then((r) => r.data);
     tareas.memoria = sb.rpc("experto_memoria", { p_user_id: userId, p_huella: huella || "anon" }).then((r) => r.data ?? []);
+    // Memoria compartida entre los 3 Evaristos: lo último que este cliente
+    // conversó en cualquier modo (chat/abogado/experto), últimas 48h.
+    if (sbUser) tareas.memoriaEvaristo = sbUser.rpc("evaristo_contexto", { p_codigo: codigo ?? null }).then((r) => r.data?.conversaciones_recientes ?? []);
     const res: Record<string, any> = {};
     const tiempos: Record<string, number> = {};
     await Promise.all(Object.entries(tareas).map(async ([k, p]) => { const ti = Date.now(); try { res[k] = await p; } catch { res[k] = null; } tiempos[k] = Date.now() - ti; }));
+    // Con código y sin noticias aún (informe, o chat sin palabras clave): prensa sobre el tema de la licitación.
+    if (codigo && res.ficha?.nombre && !res.noticias?.length) {
+      try {
+        const q = String(res.ficha.nombre).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9ñ ]/g, " ").split(/\s+/).filter((w: string) => w.length > 4 && !GENERICAS.has(w)).slice(0, 3).join(" or ");
+        if (q) res.noticias = (await sb.rpc("experto_noticias", { consulta: q, cantidad: 3 })).data ?? [];
+      } catch { /* sin noticias */ }
+    }
 
     // Adjudicaciones: quién le gana al organismo (chat e informe) y licitaciones parecidas ya adjudicadas (informe)
     const rutOrg = res.org?.rut ?? res.ficha?.organismo?.rut ?? null;
@@ -299,6 +334,7 @@ Deno.serve(async (req) => {
     if (fragmentos.length) partes.push("FUENTES:\n" + textoFragmentos(fragmentos));
     if (res.ficha) partes.push("FICHA DE LICITACIÓN (Datos Mercado Público vía FirmaVB):\n" + textoFicha(res.ficha));
     else if (codigo) partes.push(`No encontré la licitación ${codigo} en la base (puede ser antigua o el código estar mal).`);
+    if (codigo && res.panorama) partes.push(textoPanorama(res.panorama, codigo));
     const bases: any[] = Array.isArray(res.bases) ? res.bases : [];
     let pedirBases: string | null = null;
     if (codigo && bases.length) partes.push(textoBases(bases, modo === "chat" ? pregunta : "criterios evaluacion ponderacion garantia plazo multa admisibilidad anexos pago", modo === "chat" ? 20000 : 24000, fragmentos.length, codigo));
@@ -313,6 +349,10 @@ Deno.serve(async (req) => {
     if (noticias.length) partes.push("NOTICIAS RECIENTES (fuente externa, prensa y ChileCompra; distingue lo que dice la prensa de nuestros datos):\n" + noticias.map((n, i) => `[${fragmentos.length + bases.length + anexos.length + i + 1}] ${n.fuente} — ${n.seccion}\n${String(n.texto).slice(0, 700)}`).join("\n\n"));
     if (res.perfil) partes.push(`PERFIL DEL USUARIO (personaliza con esto, sin repetirlo): empresa ${res.perfil.empresa_nombre ?? "s/i"}; rubro ${res.perfil.categoria_negocio ?? "s/i"}; industrias ${(res.perfil.industrias ?? []).join(", ") || "s/i"}; vende/busca: ${(res.perfil.palabras_clave_busqueda ?? []).slice(0, 12).join(", ") || "s/i"}; región ${res.perfil.region ?? "s/i"}.`);
     if (res.memoria?.length) partes.push("LO QUE ESTE USUARIO PIDIÓ MEJORAR EN RESPUESTAS ANTERIORES (tenlo en cuenta):\n" + res.memoria.map((m: any) => `- ${m.util === false ? "No le sirvió" : "Comentó"} en "${String(m.pregunta ?? "").slice(0, 80)}": ${m.comentario}`).join("\n"));
+    if (Array.isArray(res.memoriaEvaristo) && res.memoriaEvaristo.length && modo === "chat") {
+      partes.push("MEMORIA (lo último que este cliente conversó con Don Evaristo en otros modos, últimas 48h — úsalo solo si es relevante, no lo repitas si no viene al caso):\n" +
+        res.memoriaEvaristo.map((m: any) => `[${m.canal}, ${m.rol === "user" ? "preguntó" : "Evaristo respondió"}] ${m.texto}`).join("\n"));
+    }
     if (tareas.lic && !res.lic?.length) partes.push(`BÚSQUEDA DE LICITACIONES ABIERTAS para "${qDatos}": sin resultados en títulos, descripciones ni ítems de los últimos 180 días (Datos Mercado Público vía FirmaVB). Dilo así (no digas que no tienes fuente) y sugiere otras palabras o el rubro.`);
     if (res.lic?.length) partes.push("LICITACIONES ABIERTAS (Datos Mercado Público vía FirmaVB):\n" + res.lic.map((l: any) => `${l.codigo} | ${l.nombre} | ${l.institucion} | ${l.region ?? ""} | ${fmt(l.presupuesto)} | cierra ${fecha(l.cierra)} | ${l.url}${l.coincidencia ? " | coincide en el ítem: " + l.coincidencia : ""}`).join("\n"));
     if (res.ca?.length) partes.push("COMPRAS ÁGILES ABIERTAS:\n" + res.ca.map((l: any) => `${l.codigo} | ${l.nombre} | ${l.organismo} | ${fmt(l.monto)} | cierra ${fecha(l.cierra)} | pago: ${l.conducta_pago ?? "s/i"} ${l.pago_dias ? l.pago_dias + " días" : ""} | ${l.url ?? ""}`).join("\n"));
@@ -321,9 +361,20 @@ Deno.serve(async (req) => {
     if (res.adj?.length) partes.push("LICITACIONES PARECIDAS YA ADJUDICADAS (API OCDS de Mercado Público, 12 meses; quién ganó y con cuánto):\n" + res.adj.map((a: any) => `${a.codigo} | ${a.titulo} | ${a.comprador} | adjudicada ${fecha(a.fecha_adjudicacion)} a ${a.adjudicatario ?? "s/i"} por ${fmt(a.monto_adjudicado)} (presupuesto ${fmt(a.monto_estimado)}) | ${a.num_oferentes ?? "s/i"} oferentes: ${a.oferentes ?? "s/i"}`).join("\n"));
     if (res.topadj?.length) partes.push("QUIÉN LE GANA A ESTE ORGANISMO (API OCDS, 12 meses):\n" + res.topadj.map((t: any) => `${t.adjudicatario} (${t.rut ?? "s/i"}): ${t.licitaciones} licitaciones ganadas por ${fmt(t.monto)}, participó en ${t.participaciones}`).join("\n"));
     if (res.org) partes.push("FICHA ORGANISMO (Datos Mercado Público vía FirmaVB):\n" + textoOrganismo(res.org));
+    if (res.fragmentacion?.length) partes.push("ANÁLISIS: FRAGMENTACIÓN DETECTADA\nEste organismo está licitando múltiples compras del mismo rubro en corto plazo. Señales:\n" + res.fragmentacion.map((f: any) => `- ${f.codigo} (${f.estado}, ${fecha(f.fecha_publicacion)}): ${fmt(f.presupuesto_estimado)} ${f.moneda} — ${f.señal}`).join("\n") + "\n💡 Oportunidad: Negocia volumen directo o espera consolidación; competencia fragmentada = precios altos.");
+    if (res.patrones?.length) partes.push("ANÁLISIS: PATRÓN RECURRENTE\nEste organismo licita esto cada cierto tiempo (compra estructural predecible):\n" + res.patrones.map((p: any) => `- ${p.codigo} (${p.estado}, ${fecha(p.fecha_publicacion)}): ${fmt(p.presupuesto_estimado)} ${p.moneda} — ${p.señal}`).join("\n") + "\n💡 Estrategia: Prepara proceso estándar, optimiza el precio de entrada, revisa cambios en criterios de adjudicación.");
     const contexto = partes.join("\n\n") || "(sin fuentes ni datos para esta pregunta)";
 
-    const userMsg = modo === "chat" ? `${contexto}\n\nPREGUNTA: ${pregunta}` : `${contexto}\n\nGenera el informe de trabajo para la licitación ${codigo}.${pregunta ? " Contexto del proveedor: " + pregunta : ""}`;
+    // Evidence Gate: NO bloquea la respuesta (el gate es conservador por diseño y nunca
+    // da "verde", así que cortar aquí dejaba al Experto mudo en toda licitación). Se le
+    // entrega a la IA como regla: responde con lo que hay y deja claro qué falta.
+    let notaGate = "";
+    if (codigo) {
+      const gate = evidenceGateLicitacion(crearEstadoDocumentacionLicitacion(res.ficha, bases, anexos));
+      notaGate = `\n\nESTADO DOCUMENTAL (regla determinista de FirmaVB, veredicto: ${gate.veredicto}): ${gate.razon}${gate.faltantes.length ? ` Faltantes: ${gate.faltantes.join("; ")}.` : ""} Responde igual con lo que tienes (bases, anexos, ficha, fuentes), pero NUNCA recomiendes postular como algo seguro: si falta documentación dilo explícitamente y qué debe subir o revisar el usuario.`;
+    }
+
+    const userMsg = modo === "chat" ? `${contexto}${notaGate}\n\nPREGUNTA: ${pregunta}` : `${contexto}${notaGate}\n\nGenera el informe de trabajo para la licitación ${codigo}.${pregunta ? " Contexto del proveedor: " + pregunta : ""}`;
     const messages = [
       { role: "system", content: modo === "chat" ? SYS_CHAT : SYS_INFORME },
       ...historial.filter((h) => h && (h.role === "user" || h.role === "assistant") && h.content).map((h) => ({ role: h.role, content: String(h.content).slice(0, 2000) })),
@@ -331,18 +382,28 @@ Deno.serve(async (req) => {
     ];
 
     const key = Deno.env.get("GEMINI_API_KEY");
-    if (!key) return new Response(JSON.stringify({ error: "sin_ia" }), { status: 500, headers: cors });
 
-    // Llamada a Gemini con streaming; probamos modelos en orden
+    // Llamada a Gemini con streaming; probamos modelos en orden. Cada intento tiene un
+    // tope de tiempo corto: si un modelo se cuelga, no puede consumir todo el tiempo que
+    // el navegador espera antes de cortar la conexión, dejando sin turno al respaldo de Claude.
     let upstream: Response | null = null; let modelo = "";
-    for (const mdl of (modo === "chat" ? MODELOS_CHAT : MODELOS_INFORME)) {
-      const r = await fetch(GEMINI_URL, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: mdl, messages, temperature: 0.3, max_tokens: modo === "chat" ? 2500 : 4000, stream: true, reasoning_effort: "low" }),
-      });
-      if (r.ok && r.body) { upstream = r; modelo = mdl; break; }
-      console.error("gemini", mdl, r.status, (await r.text()).slice(0, 200));
+    if (key) {
+      for (const mdl of (modo === "chat" ? MODELOS_CHAT : MODELOS_INFORME)) {
+        try {
+          const r = await fetch(GEMINI_URL, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ model: mdl, messages, temperature: 0.3, max_tokens: modo === "chat" ? 2500 : 4000, stream: true, reasoning_effort: "low" }),
+            signal: AbortSignal.timeout(8000),
+          });
+          if (r.ok && r.body) { upstream = r; modelo = mdl; break; }
+          console.error("gemini", mdl, r.status, (await r.text()).slice(0, 200));
+        } catch (e) { console.error("gemini fetch", mdl, String(e)); }
+      }
+    }
+    if (!upstream) {
+      const claude = await fetchClaudeComoOpenAI(messages, { modelo: modo === "chat" ? CLAUDE_MODELO_CHAT : CLAUDE_MODELO_INFORME, maxTokens: modo === "chat" ? 2500 : 4000, temperature: 0.3 });
+      if (claude) { upstream = claude.resp; modelo = claude.modelo; }
     }
     if (!upstream) return new Response(JSON.stringify({ error: "ia_no_disponible" }), { status: 502, headers: cors });
 
@@ -378,6 +439,23 @@ Deno.serve(async (req) => {
         ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ done: true, ms: Date.now() - t0 })}\n\n`));
         ctrl.close();
         try { await sb.rpc("experto_registrar_uso", { p_user_id: userId, p_huella: huella || "anon", p_modo: modo, p_pregunta: pregunta || `informe ${codigo}`, p_respuesta: respuesta, p_fuentes: fuentesMeta, p_licitacion: codigo, p_ms: Date.now() - t0, p_ip: ip }); } catch { /* no bloquear */ }
+        if (userId) {
+          await guardarTurnoEvaristo(sbUser ?? sb, {
+            userId,
+            canal: "experto",
+            pregunta: pregunta || `[Informe] ${codigo}`,
+            respuesta,
+            meta: { modo, codigo, modelo },
+          });
+        }
+        // Medidor de costo real de IA (estimado desde tokens ~ chars/4), para calibrar créditos.
+        try {
+          const tin = Math.ceil(userMsg.length / 4), tout = Math.ceil(respuesta.length / 4);
+          const rin = /claude-sonnet/.test(modelo) ? 3e-6 : /claude-haiku/.test(modelo) ? 1e-6 : 1.5e-7;
+          const rout = /claude-sonnet/.test(modelo) ? 15e-6 : /claude-haiku/.test(modelo) ? 5e-6 : 6e-7;
+          const costo = Number((tin * rin + tout * rout).toFixed(6));
+          await sb.rpc("registrar_uso_ia", { p_funcion: `experto-${modo}`, p_modelo: modelo, p_tokens_in: tin, p_tokens_out: tout, p_costo_usd: costo, p_user_id: userId, p_creditos_cobrados: null, p_referencia: codigo });
+        } catch { /* no bloquear */ }
       },
     });
     return new Response(stream, { headers: { ...cors, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });

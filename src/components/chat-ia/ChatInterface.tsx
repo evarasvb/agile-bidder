@@ -121,7 +121,7 @@ export function ChatInterface({ licitacionId, chat, hasDocuments }: ChatInterfac
           Sube las bases de licitación para comenzar a chatear
         </p>
         <p className="text-xs text-muted-foreground mt-1">
-          El asistente IA responderá preguntas basándose en los documentos
+          Don Evaristo responderá preguntas basándose en los documentos
         </p>
       </div>
     );
@@ -135,7 +135,7 @@ export function ChatInterface({ licitacionId, chat, hasDocuments }: ChatInterfac
           {messages.length === 0 && (
             <div className="text-center py-8">
               <Bot className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
-              <p className="text-sm font-medium mb-1">Asistente IA de Licitaciones</p>
+              <p className="text-sm font-medium mb-1">Don Evaristo · Experto en licitaciones</p>
               <p className="text-xs text-muted-foreground mb-4">
                 Pregúntame sobre requisitos, plazos, garantías o cualquier detalle de las bases
               </p>

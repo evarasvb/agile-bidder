@@ -65,7 +65,7 @@ export function useInteligenciaOC(
       const empty: InteligenciaOC = { lines: [], total: 0, precio: null, competidores: [], compradores: [], muestra: [] };
       if (!codigo || !tipo) return empty;
 
-      const { data, error } = await (supabase as any).rpc('inteligencia_oc_oportunidad', {
+      const { data, error } = await supabase.rpc('inteligencia_oc_oportunidad', {
         p_codigo: codigo,
         p_tipo: tipo,
         p_limit: 80,

@@ -49,6 +49,9 @@ CITAS_LECTOR_EJEMPLO = [
     "Ojalá lo hubiera leído antes de mi primera postulación",
     "Por fin alguien explica esto en simple",
     "Lo recomendé a todo mi equipo de ventas",
+    "Nos ahorró varias reuniones de discutir qué anexo faltaba",
+    "Es el manual que le hubiera pasado a mi yo de hace 5 años",
+    "Lo tengo marcado como guía interna para las nuevas postulaciones",
 ]
 
 

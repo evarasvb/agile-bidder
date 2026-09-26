@@ -171,6 +171,16 @@ export default function CompraAgilDetalle() {
       ? { inventarioId: m.inventario_id, nombre: m.nombre_producto, sku: m.sku, precio: m.precio_unitario, score: Math.round(Number(m.score) || 0) }
       : null;
     const { match, estado, override } = resolverMatch(String(it.id), matchAuto);
+    const subtotal = (match?.precio || 0) * cantidad;
+    const score = match?.score ?? 0;
+    // Sugerencia automática que el cliente aún no confirmó y que tiene poca
+    // confianza (<60%) o confianza media (<80%) pero cuyo solo ítem ya supera
+    // TODO el presupuesto de la compra (señal clara de producto equivocado):
+    // se muestra marcada como dudosa y NO se suma al total ni va precargada a
+    // la propuesta. Caso real: "opalina" → "cordel de papel" al 77% entraba
+    // solo y la oferta salía 7x sobre el presupuesto.
+    const superaPresupuesto = !!compra.monto && subtotal > compra.monto;
+    const dudoso = estado === 'auto' && !!match && (score < 60 || (score < 80 && superaPresupuesto));
     return {
       idx,
       id: it.id,
@@ -182,7 +192,8 @@ export default function CompraAgilDetalle() {
       estado,
       override,
       manual: false,
-      match: match ? { ...match, subtotal: (match.precio || 0) * cantidad } : null,
+      match: match ? { ...match, subtotal } : null,
+      dudoso,
     };
   });
 
@@ -204,6 +215,7 @@ export default function CompraAgilDetalle() {
         estado: (descartado ? 'descartado' : 'reasignado') as const,
         override: ov,
         manual: true,
+        dudoso: false,
         match: prod
           ? { inventarioId: prod.id, nombre: prod.nombre_producto, sku: prod.sku, precio: prod.precio_unitario, score: 100, subtotal: prod.precio_unitario }
           : null,
@@ -227,8 +239,15 @@ export default function CompraAgilDetalle() {
     propuestaIncompleta
   } = coverageMetrics;
 
-  // Total de oferta: incluir manuales agregados pero mostrar advertencia si faltan items
-  const totalOferta = filasTotal.reduce((s, f) => s + (f.match?.subtotal || 0), 0);
+  // itemsDudosos (fix ya en main): matches con poca confianza (<60%) o
+  // confianza media (<80%) que por sí solos ya superan el presupuesto de la
+  // compra. NO se suman al total hasta que el cliente los confirme.
+  const itemsDudosos = filasItems.filter((f) => f.dudoso).length;
+
+  // Total de oferta: excluye matches dudosos (más seguro no sobre-declarar
+  // certeza en la plata) y además se muestra advertencia si la propuesta
+  // está incompleta (ítems sin match o con match débil).
+  const totalOferta = filasTotal.reduce((s, f) => s + (!f.dudoso && f.match ? f.match.subtotal || 0 : 0), 0);
   const dentroPresupuesto = compra.monto ? totalOferta <= compra.monto : null;
 
   // Ítems en el formato del modal de propuesta, PRECARGADOS con el match para que
@@ -245,7 +264,7 @@ export default function CompraAgilDetalle() {
         descripcion: f.descripcion,
         cantidadSolicitada: f.cantidad,
         unidadMedida: f.unidad,
-        match: f.match
+        match: f.match && !f.dudoso
           ? { id: f.match.inventarioId, sku: f.match.sku, nombre: f.match.nombre, precio_unitario: f.match.precio || 0, stock: null, matchScore: f.match.score, margen_estimado: 0 }
           : null,
       })),
@@ -270,8 +289,8 @@ export default function CompraAgilDetalle() {
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/compras-agiles')}>
-          <ArrowLeft className="h-5 w-5" />
+        <Button variant="ghost" size="icon" onClick={() => navigate('/compras-agiles')} aria-label="Volver a compras ágiles">
+          <ArrowLeft className="h-5 w-5" aria-hidden="true" />
         </Button>
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold">{compra.nombre}</h1>
@@ -291,14 +310,25 @@ export default function CompraAgilDetalle() {
             (daba 404). */}
         {compra.link_oficial ? (
           <Button asChild variant="outline" className="gap-2 shrink-0">
-            <a href={compra.link_oficial} target="_blank" rel="noreferrer">
-              <ExternalLink className="h-4 w-4" />
+            <a
+              href={compra.link_oficial}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Postular en Mercado Público (abre en nueva pestaña)"
+            >
+              <ExternalLink className="h-4 w-4" aria-hidden="true" />
               Postular en Mercado Público
             </a>
           </Button>
         ) : (
-          <Button variant="outline" className="gap-2 shrink-0" disabled title="Aún no tenemos el enlace oficial de esta compra">
-            <ExternalLink className="h-4 w-4" />
+          <Button
+            variant="outline"
+            className="gap-2 shrink-0"
+            disabled
+            title="Aún no tenemos el enlace oficial de esta compra"
+            aria-label="Postular en Mercado Público - enlace no disponible"
+          >
+            <ExternalLink className="h-4 w-4" aria-hidden="true" />
             Postular en Mercado Público
           </Button>
         )}
@@ -420,8 +450,8 @@ export default function CompraAgilDetalle() {
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         {f.match && (
-                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${matchBadge(f.match.score)}`}>
-                            {f.match.score}%
+                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${f.dudoso ? 'bg-amber-100 text-amber-800 border-amber-300' : matchBadge(f.match.score)}`}>
+                            {f.match.score}%{f.dudoso ? ' · dudoso' : ''}
                           </span>
                         )}
                         <MatchItemActions
@@ -496,8 +526,11 @@ export default function CompraAgilDetalle() {
                       <TableCell className="text-center align-top">
                         {f.match ? (
                           <div className="flex flex-col items-center gap-1">
-                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${matchBadge(f.match.score)}`}>
-                              {f.match.score}%
+                            <span
+                              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${f.dudoso ? 'bg-amber-100 text-amber-800 border-amber-300' : matchBadge(f.match.score)}`}
+                              title={f.dudoso ? 'Coincidencia con poca confianza: confírmala o cámbiala. No se suma al total hasta que la confirmes.' : undefined}
+                            >
+                              {f.match.score}%{f.dudoso ? ' · dudoso' : ''}
                             </span>
                             {evaluarConfianzaMatch(f.match).confianza === 'baja' && (
                               <span className="text-xs font-semibold px-1.5 py-0.5 bg-red-100 text-red-700 rounded whitespace-nowrap" title={evaluarConfianzaMatch(f.match).tooltip}>
@@ -527,7 +560,7 @@ export default function CompraAgilDetalle() {
               </Table>
               </div>
 
-              {/* Resumen: total de tu oferta vs presupuesto + advertencia si incompleta */}
+              {/* Resumen: total de tu oferta vs presupuesto + advertencia si incompleta o con matches dudosos */}
               <div className="mt-4 space-y-3">
                 {propuestaIncompleta && (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
@@ -545,6 +578,11 @@ export default function CompraAgilDetalle() {
                       Tu oferta {propuestaIncompleta ? `(${itemsConMatchValidado}/${totalItems} validados)` : '(completa)'}
                     </p>
                     <p className="text-2xl font-bold text-firmavb-blue">{clp(totalOferta)}</p>
+                    {itemsDudosos > 0 && (
+                      <p className="text-xs text-amber-700 mt-1">
+                        {itemsDudosos} coincidencia{itemsDudosos === 1 ? '' : 's'} dudosa{itemsDudosos === 1 ? '' : 's'} (poca confianza o precio fuera del presupuesto) no se suma{itemsDudosos === 1 ? '' : 'n'} hasta que la{itemsDudosos === 1 ? '' : 's'} confirmes.
+                      </p>
+                    )}
                   </div>
                   {compra.monto ? (
                     <div className="text-sm">

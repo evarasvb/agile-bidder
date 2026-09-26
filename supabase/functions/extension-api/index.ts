@@ -815,9 +815,175 @@ Deno.serve(async (req) => {
         );
       }
 
+      // ------------------------------------------------------------------
+      // Acciones de Don Evaristo: la extensión las reclama (pendiente -> en_curso),
+      // las ejecuta en el navegador del usuario y reporta el resultado.
+      // ------------------------------------------------------------------
+      case 'acciones-pendientes': {
+        if (!clienteId) {
+          return new Response(
+            JSON.stringify({ error: 'API key requerida' }),
+            { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        // Una acción en curso que lleva más de 15 min sin reporte se da por perdida
+        // (pestaña cerrada, sesión caída): así el chat no la muestra "en curso" para siempre.
+        await supabase
+          .from('evaristo_acciones')
+          .update({ estado: 'fallida', error: 'La extensión no reportó resultado en 15 minutos (¿se cerró la pestaña o la sesión de Mercado Público?).', terminada_en: new Date().toISOString() })
+          .eq('cliente_id', clienteId)
+          .eq('estado', 'en_curso')
+          .lt('iniciada_en', new Date(Date.now() - 15 * 60_000).toISOString());
+
+        const { data: pendientes } = await supabase
+          .from('evaristo_acciones')
+          .select('id, tipo, codigo, payload, creado_en')
+          .eq('cliente_id', clienteId)
+          .eq('estado', 'pendiente')
+          .order('creado_en', { ascending: true })
+          .limit(1); // la extensión ejecuta una a la vez; las demás esperan su turno
+
+        const reclamadas: any[] = [];
+        for (const a of pendientes || []) {
+          // Reclamo atómico: solo una extensión (o un ciclo) se queda con la acción.
+          const { data: tomada } = await supabase
+            .from('evaristo_acciones')
+            .update({ estado: 'en_curso', iniciada_en: new Date().toISOString(), api_key_id: apiKeyId })
+            .eq('id', a.id)
+            .eq('estado', 'pendiente')
+            .select('id, tipo, codigo, payload')
+            .maybeSingle();
+          if (tomada) reclamadas.push(tomada);
+        }
+
+        // Se registra SIEMPRE, incluso con la cola vacía: la extensión llama esto cada minuto y
+        // es la única señal de "sigue viva y consultando" que le llega a evaristo_contexto
+        // (que mide ultima_actividad por el máximo de extension_activity_log). Sin este registro,
+        // tras ~10 minutos sin acciones Don Evaristo la daría por desconectada y dejaría de
+        // programar acciones nuevas aunque la extensión siga funcionando.
+        await logActivity(supabase, apiKeyId, clienteId, 'acciones-pendientes', null, null, {
+          acciones: reclamadas.map((a) => ({ id: a.id, tipo: a.tipo, codigo: a.codigo }))
+        }, req);
+
+        return new Response(
+          JSON.stringify({ success: true, acciones: reclamadas }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'accion-resultado': {
+        if (!clienteId) {
+          return new Response(
+            JSON.stringify({ error: 'API key requerida' }),
+            { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        let body: any;
+        try { body = await req.json(); } catch {
+          return new Response(
+            JSON.stringify({ error: 'JSON inválido en el cuerpo de la solicitud' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        const { accion_id, success, resultado, error: errorTxt, parcial } = body || {};
+        if (!accion_id || typeof accion_id !== 'string') {
+          return new Response(
+            JSON.stringify({ error: 'accion_id requerido' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        const cambios: Record<string, any> = {
+          resultado: resultado && typeof resultado === 'object' ? resultado : null,
+        };
+        if (parcial) {
+          // Avance intermedio: sigue en curso, solo se refresca el resultado parcial.
+          cambios.iniciada_en = new Date().toISOString();
+        } else {
+          cambios.estado = success ? 'hecha' : 'fallida';
+          cambios.error = success ? null : String(errorTxt || 'Error desconocido').slice(0, 500);
+          cambios.terminada_en = new Date().toISOString();
+        }
+        const { data: fila } = await supabase
+          .from('evaristo_acciones')
+          .update(cambios)
+          .eq('id', accion_id)
+          .eq('cliente_id', clienteId)
+          .eq('estado', 'en_curso')
+          .select('id, estado')
+          .maybeSingle();
+        if (!fila) {
+          return new Response(
+            JSON.stringify({ error: 'Acción no encontrada o ya cerrada' }),
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        await logActivity(supabase, apiKeyId, clienteId, 'accion-resultado', null, null, { accion_id, success: !!success, parcial: !!parcial, error: errorTxt }, req);
+        return new Response(
+          JSON.stringify({ success: true, estado: fila.estado }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // ------------------------------------------------------------------
+      // Asistente Convenio Marco (carga de ofertas): cobra créditos por producto.
+      // El script en la consola de Mercado Público llama 'cm-verificar' al iniciar
+      // (para mostrar el saldo) y 'cm-cobrar' antes de subir cada producto. Si no
+      // hay saldo, devuelve ok:false y el script se frena (muro de pago).
+      // El cobro es server-side a propósito: no se puede saltar desde el navegador.
+      // ------------------------------------------------------------------
+      case 'cm-verificar': {
+        if (!clienteId) {
+          return new Response(JSON.stringify({ error: 'API key requerida' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        const { data: cli } = await supabase.from('clientes').select('user_id, empresa_nombre, plan').eq('id', clienteId).single();
+        if (!cli?.user_id) {
+          return new Response(JSON.stringify({ error: 'Cliente sin usuario asociado' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        await supabase.rpc('creditos_asegurar_cuenta', { p_user_id: cli.user_id });
+        const { data: cuenta } = await supabase.from('creditos_cuenta').select('saldo, plan').eq('user_id', cli.user_id).single();
+        const { data: plan } = await supabase.from('planes').select('nombre, recarga_creditos').eq('id', cuenta?.plan || 'free').single();
+        return new Response(
+          JSON.stringify({
+            success: true,
+            empresa: cli.empresa_nombre,
+            plan: cuenta?.plan || 'free',
+            plan_nombre: plan?.nombre || 'Free',
+            ilimitado: plan?.recarga_creditos === 'ilimitado',
+            saldo: cuenta?.saldo ?? 0,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'cm-cobrar': {
+        if (!clienteId) {
+          return new Response(JSON.stringify({ error: 'API key requerida' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        const body = await req.json().catch(() => ({}));
+        const cantidad = Math.min(Math.max(Number(body.cantidad) || 1, 1), 500);
+        const referencia = typeof body.referencia === 'string' ? body.referencia.slice(0, 200) : null;
+        const { data: cli } = await supabase.from('clientes').select('user_id').eq('id', clienteId).single();
+        if (!cli?.user_id) {
+          return new Response(JSON.stringify({ error: 'Cliente sin usuario asociado' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        const { data: res, error: cobroError } = await supabase.rpc('consumir_creditos', {
+          p_accion: 'cm_producto', p_cantidad: cantidad, p_referencia: referencia, p_user_id: cli.user_id,
+        });
+        if (cobroError) {
+          console.error('Error consumir_creditos:', cobroError);
+          return new Response(JSON.stringify({ error: 'Error cobrando créditos' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        await logActivity(supabase, apiKeyId, clienteId, 'cm-cobrar', null, null, { cantidad, referencia, resultado: res }, req);
+        // res = { ok, saldo, cobrado, motivo, requiere? }
+        return new Response(
+          JSON.stringify({ success: true, ...(res as Record<string, unknown>) }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       default:
         return new Response(
-          JSON.stringify({ error: 'Acción no válida. Acciones: verify, get-matches, get-offer, submit-result, sync-licitacion, get-licitaciones, ca-documentos, ca-pendientes' }),
+          JSON.stringify({ error: 'Acción no válida. Acciones: verify, get-matches, get-offer, submit-result, sync-licitacion, get-licitaciones, ca-documentos, ca-pendientes, acciones-pendientes, accion-resultado, cm-verificar, cm-cobrar' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
     }

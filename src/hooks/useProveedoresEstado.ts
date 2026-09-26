@@ -18,7 +18,7 @@ export function useProveedoresEstado(q: string, rubro = '', institucion = '', li
   return useQuery({
     queryKey: ['proveedores-estado', term, rubro, institucion.trim(), limit],
     queryFn: async (): Promise<ProveedorEstado[]> => {
-      const { data, error } = await (supabase as any).rpc('proveedores_estado', {
+      const { data, error } = await supabase.rpc('proveedores_estado', {
         q: term || null,
         rubro: rubro || null,
         institucion: institucion.trim() || null,
@@ -37,7 +37,7 @@ export function useRubrosEstado() {
   return useQuery({
     queryKey: ['rubros-estado'],
     queryFn: async (): Promise<string[]> => {
-      const { data, error } = await (supabase as any).rpc('rubros_estado');
+      const { data, error } = await supabase.rpc('rubros_estado');
       if (error) throw error;
       return ((data || []) as { rubro: string }[]).map((r) => r.rubro).filter(Boolean);
     },
@@ -56,9 +56,9 @@ export function useProveedorEstadoDetalle(rut: string | null) {
     enabled: !!rut,
     queryFn: async (): Promise<ProveedorDetalle | null> => {
       if (!rut) return null;
-      const { data, error } = await (supabase as any).rpc('proveedor_estado_detalle', { p_rut: rut });
+      const { data, error } = await supabase.rpc('proveedor_estado_detalle', { p_rut: rut });
       if (error) throw error;
-      return (data || { rubros: [], instituciones: [] }) as ProveedorDetalle;
+      return (data || { rubros: [], instituciones: [] }) as unknown as ProveedorDetalle;
     },
     staleTime: 60000,
   });

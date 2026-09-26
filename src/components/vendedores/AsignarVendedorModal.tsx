@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Loader2, UserPlus, User, Mail, Building2, Calendar, DollarSign } from 'lucide-react';
-import { useVendedores, useAsignarLicitacion, useLicitacionAsignacion, useCreateVendedor } from '@/hooks/useVendedores';
+import { useVendedores, useAsignarLicitacion, useLicitacionAsignacion, useCreateVendedor, useEsDuenoEquipo } from '@/hooks/useVendedores';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -34,6 +34,8 @@ export function AsignarVendedorModal({ open, onOpenChange, licitacion }: Asignar
   const { data: asignacionActual, isLoading: loadingAsignacion } = useLicitacionAsignacion(licitacion.id_licitacion);
   const asignarMutation = useAsignarLicitacion();
   const createVendedorMutation = useCreateVendedor();
+  // Solo el dueño puede crear vendedores (ver GestionVendedores.tsx).
+  const { data: esDueno } = useEsDuenoEquipo();
 
   const handleAsignar = () => {
     if (!selectedVendedor) return;
@@ -172,31 +174,36 @@ export function AsignarVendedorModal({ open, onOpenChange, licitacion }: Asignar
               </Select>
             )}
 
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowNewVendedor(!showNewVendedor)}
-              className="text-xs"
-            >
-              <UserPlus className="h-3 w-3 mr-1" />
-              {showNewVendedor ? 'Cancelar' : 'Agregar nuevo vendedor'}
-            </Button>
+            {esDueno && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowNewVendedor(!showNewVendedor)}
+                className="text-xs"
+              >
+                <UserPlus className="h-3 w-3 mr-1" />
+                {showNewVendedor ? 'Cancelar' : 'Agregar nuevo vendedor'}
+              </Button>
+            )}
           </div>
 
           {/* Form nuevo vendedor */}
-          {showNewVendedor && (
+          {esDueno && showNewVendedor && (
             <div className="p-3 rounded-lg border space-y-3">
               <div className="space-y-2">
-                <Label>Nombre</Label>
+                <Label htmlFor="new-vendedor-nombre">Nombre</Label>
                 <Input
+                  id="new-vendedor-nombre"
                   value={newVendedor.nombre}
                   onChange={(e) => setNewVendedor({ ...newVendedor, nombre: e.target.value })}
                   placeholder="Nombre completo"
+                  autoFocus
                 />
               </div>
               <div className="space-y-2">
-                <Label>Email</Label>
+                <Label htmlFor="new-vendedor-email">Email</Label>
                 <Input
+                  id="new-vendedor-email"
                   type="email"
                   value={newVendedor.email}
                   onChange={(e) => setNewVendedor({ ...newVendedor, email: e.target.value })}

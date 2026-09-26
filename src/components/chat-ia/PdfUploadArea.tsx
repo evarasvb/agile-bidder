@@ -100,6 +100,15 @@ export function PdfUploadArea({ licitacionId, documents, compact }: PdfUploadAre
           }
         `}
         onClick={() => document.getElementById('pdf-upload-input')?.click()}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            document.getElementById('pdf-upload-input')?.click();
+          }
+        }}
+        aria-label="Subir archivos PDF - arrastra o haz clic para seleccionar"
       >
         <input
           id="pdf-upload-input"
@@ -110,7 +119,7 @@ export function PdfUploadArea({ licitacionId, documents, compact }: PdfUploadAre
           onChange={handleFileInput}
         />
         <div className={`flex ${compact ? 'flex-row items-center gap-3' : 'flex-col items-center gap-2'}`}>
-          <Upload className={`${compact ? 'h-5 w-5' : 'h-8 w-8'} text-muted-foreground`} />
+          <Upload className={`${compact ? 'h-5 w-5' : 'h-8 w-8'} text-muted-foreground`} aria-hidden="true" />
           <div className={compact ? '' : 'text-center'}>
             <p className={`font-medium ${compact ? 'text-sm' : ''}`}>
               {compact ? 'Subir bases de licitación (PDF)' : 'Arrastra PDFs aquí o haz clic para seleccionar'}
@@ -123,9 +132,9 @@ export function PdfUploadArea({ licitacionId, documents, compact }: PdfUploadAre
           </div>
         </div>
         {uploadMutation.isPending && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-lg">
+          <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-lg" aria-label="Cargando archivo">
             <div className="flex items-center gap-2">
-              <Loader2 className="h-5 w-5 animate-spin" />
+              <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
               <span className="text-sm">Subiendo...</span>
             </div>
           </div>

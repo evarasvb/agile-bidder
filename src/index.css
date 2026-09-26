@@ -32,7 +32,7 @@
 
     /* Muted */
     --muted: 240 6% 90%;
-    --muted-foreground: 0 0% 40%;
+    --muted-foreground: 0 0% 32%;
 
     /* Accent - Rojo #D85066 - HSL(351, 62%, 59%) */
     --accent: 351 62% 59%;
@@ -123,7 +123,7 @@
     --secondary-foreground: 240 10% 90%;
 
     --muted: 229 20% 18%;
-    --muted-foreground: 240 10% 60%;
+    --muted-foreground: 240 10% 65%;
 
     --accent: 351 62% 55%;
     --accent-foreground: 0 0% 100%;
@@ -360,6 +360,33 @@
     border-radius: 3px;
   }
 
+  /* Barra horizontal bien visible para tablas anchas (DataTable): la de
+     scrollbar-thin es demasiado sutil para notar que hay más columnas. */
+  .scrollbar-x-visible {
+    scrollbar-width: auto;
+    scrollbar-color: hsl(var(--primary) / 0.45) hsl(var(--muted));
+  }
+
+  .scrollbar-x-visible::-webkit-scrollbar {
+    height: 12px;
+    width: 12px;
+  }
+
+  .scrollbar-x-visible::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+    border-radius: 6px;
+  }
+
+  .scrollbar-x-visible::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--primary) / 0.45);
+    border-radius: 6px;
+    border: 2px solid hsl(var(--muted));
+  }
+
+  .scrollbar-x-visible::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--primary) / 0.7);
+  }
+
   /* Glow effects */
   .glow-success {
     box-shadow: var(--shadow-glow-success);
@@ -380,5 +407,15 @@
   
   .font-bold {
     font-weight: 700;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

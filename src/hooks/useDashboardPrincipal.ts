@@ -56,7 +56,7 @@ export function useDashboardKPIs() {
       // Todo el cálculo se hace en la BD (RPC dashboard_kpis): antes se bajaban
       // TODAS las filas de compras_agiles y licitaciones al navegador cada 30s
       // sólo para contar/sumar. Ahora es una sola llamada sin transferir filas.
-      const { data, error } = await (supabase as any).rpc('dashboard_kpis');
+      const { data, error } = await supabase.rpc('dashboard_kpis');
       if (error) throw error;
       const row = Array.isArray(data) ? data[0] : data;
 
@@ -85,7 +85,7 @@ export function usePipelineByStage() {
     queryFn: async (): Promise<PipelineStage[]> => {
       // Agregación en la BD (RPC): antes bajaba todas las filas para agrupar en
       // el navegador. La RPC ya devuelve estado (en minúscula), cantidad y monto.
-      const { data, error } = await (supabase as any).rpc('dashboard_pipeline_por_estado');
+      const { data, error } = await supabase.rpc('dashboard_pipeline_por_estado');
       if (error) throw error;
 
       const stageMap: Record<string, { count: number; monto: number }> = {};
@@ -157,7 +157,7 @@ export function useOportunidadesPorTipo() {
       // (congelada) — mismo criterio que useCierresProximos/useUltimosMatches
       // más abajo. Antes esta tarjeta mostraba un conteo desactualizado
       // mientras el resto del dashboard ya usaba la tabla correcta.
-      const { count: licCount, error: licError } = await (supabase as any)
+      const { count: licCount, error: licError } = await supabase
         .from('licitaciones_bi')
         .select('*', { count: 'exact', head: true })
         .or('estado.is.null,estado.ilike.publicada,estado.ilike.activa')
@@ -184,7 +184,7 @@ export function useCierresProximos() {
 
       // Compras Ágiles que cierran pronto. La columna del organismo es
       // `nombre_organismo` (no `organismo`, que no existe y hacía fallar la query).
-      const { data: caData, error: caError } = await (supabase as any)
+      const { data: caData, error: caError } = await supabase
         .from('compras_agiles')
         .select('codigo, nombre, nombre_organismo, fecha_cierre, match_score, estado')
         .gte('fecha_cierre', now.toISOString())
@@ -196,8 +196,8 @@ export function useCierresProximos() {
       // Licitaciones que cierran pronto: desde `licitaciones_bi` (tabla fresca del
       // sync oficial). La antigua `licitaciones` está congelada (0 activas) y no
       // tiene `id_licitacion`, por eso la query lanzaba error y el widget de
-      // cierres próximos quedaba vacío. No está en los tipos generados => any.
-      const { data: licData, error: licError } = await (supabase as any)
+      // cierres próximos quedaba vacío.
+      const { data: licData, error: licError } = await supabase
         .from('licitaciones_bi')
         .select('codigo, nombre, institucion_nombre, fecha_cierre, match_score, estado')
         .gte('fecha_cierre', now.toISOString())
@@ -245,7 +245,7 @@ export function useUltimosMatches() {
     queryKey: ['dashboard-principal', 'ultimos-matches'],
     queryFn: async (): Promise<UltimoMatch[]> => {
       // Compras Ágiles con match. Organismo = `nombre_organismo`.
-      const { data: caData, error: caError } = await (supabase as any)
+      const { data: caData, error: caError } = await supabase
         .from('compras_agiles')
         .select('codigo, nombre, nombre_organismo, match_score, created_at')
         .eq('match_encontrado', true)
@@ -256,7 +256,7 @@ export function useUltimosMatches() {
 
       // Licitaciones con match desde `licitaciones_bi` (fresca). La antigua
       // `licitaciones` no tiene `id_licitacion` => la query fallaba. any por tipos.
-      const { data: licData, error: licError } = await (supabase as any)
+      const { data: licData, error: licError } = await supabase
         .from('licitaciones_bi')
         .select('codigo, nombre, institucion_nombre, match_score, created_at')
         .eq('match_encontrado', true)
@@ -289,5 +289,103 @@ export function useUltimosMatches() {
       return results.slice(0, 8);
     },
     staleTime: 30000,
+  });
+}
+
+// --- Dato Curioso Hook ---
+// Compras ágiles reales, vigentes, con nombres que llaman la atención (circo,
+// desfiles, choripanes, disfraces...) para abrir el Inicio con algo que
+// impacte antes de las tablas de negocio. Nada inventado: todo sale de la
+// base tal cual la publicó el organismo.
+
+export interface DatoCurioso {
+  codigo: string;
+  nombre: string;
+  institucion: string;
+  fecha_cierre: string;
+  monto_estimado: number | null;
+}
+
+// Palabras con límite de palabra completa (evita falsos positivos como
+// "faCHADA" al buscar "hada" o "circoNIO" al buscar "circo" con substring).
+const PALABRAS_CURIOSAS = /\b(circo|desfile|payasos?|piñatas?|piniatas?|tortas?|choripanes?|disfraces?|disfraz|carnaval|comparsas?|zancos?|magos?|malabar\w*)\b/i;
+
+// Hash simple y determinístico (no cripto) de un string a un entero positivo.
+function hashCode(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return h >>> 0;
+}
+
+export function useDatoCurioso() {
+  return useQuery({
+    queryKey: ['dashboard-principal', 'dato-curioso'],
+    queryFn: async (): Promise<DatoCurioso | null> => {
+      const now = new Date().toISOString();
+      // Preselección amplia por ilike en la BD (rápido, usa el filtro de fecha
+      // primero); el filtro fino por palabra completa se hace acá para no
+      // depender de soporte de regex en PostgREST.
+      const { data, error } = await supabase
+        .from('compras_agiles')
+        .select('codigo, nombre, nombre_organismo, fecha_cierre, monto_estimado')
+        .gte('fecha_cierre', now)
+        .ilike('estado', 'public%')
+        .or('nombre.ilike.%circo%,nombre.ilike.%desfile%,nombre.ilike.%payaso%,nombre.ilike.%piñata%,nombre.ilike.%piniata%,nombre.ilike.%torta%,nombre.ilike.%choripan%,nombre.ilike.%disfraz%,nombre.ilike.%carnaval%,nombre.ilike.%comparsa%,nombre.ilike.%zanco%,nombre.ilike.%mago%,nombre.ilike.%malabar%')
+        .order('fecha_cierre', { ascending: true })
+        .limit(100);
+      if (error) throw error;
+
+      const candidatos = (data || []).filter((r) => PALABRAS_CURIOSAS.test(r.nombre || ''));
+      if (candidatos.length === 0) return null;
+
+      // Elegido estable durante el día: el hash depende del propio código de
+      // cada candidato (no de su posición ni del largo de la lista), así un
+      // refetch dentro del mismo día no lo cambia aunque entre/salga algún
+      // ítem nuevo — solo cambia si el ganador de hoy deja de calificar.
+      const semilla = new Date().toISOString().slice(0, 10);
+      const elegido = candidatos.reduce((mejor, actual) =>
+        hashCode(`${semilla}-${actual.codigo}`) < hashCode(`${semilla}-${mejor.codigo}`) ? actual : mejor
+      );
+
+      return {
+        codigo: elegido.codigo,
+        nombre: elegido.nombre,
+        institucion: (elegido as any).nombre_organismo || 'Sin organismo',
+        fecha_cierre: elegido.fecha_cierre || '',
+        monto_estimado: elegido.monto_estimado,
+      };
+    },
+    staleTime: 60 * 60 * 1000,
+  });
+}
+
+// --- Noticias de tus Instituciones Hook ---
+
+export interface NoticiaInstitucion {
+  institucion: string;
+  noticia_id: number;
+  fuente: string;
+  seccion: string | null;
+  url: string;
+  texto: string;
+  fecha: string;
+}
+
+// Noticias recientes de las instituciones donde el cliente ya postuló o tiene
+// matches activos (RPC cliente_noticias_instituciones: reutiliza la misma base
+// de noticias del Experto, acotada por institución y segura para el cliente).
+export function useNoticiasInstituciones() {
+  return useQuery({
+    queryKey: ['dashboard-principal', 'noticias-instituciones'],
+    queryFn: async (): Promise<NoticiaInstitucion[]> => {
+      // Cast: RPC nueva, aún no está en los tipos generados de Supabase.
+      const { data, error } = await (supabase as any).rpc('cliente_noticias_instituciones', {
+        p_max_instituciones: 5,
+        p_por_institucion: 3,
+      });
+      if (error) throw error;
+      return (data || []) as NoticiaInstitucion[];
+    },
+    staleTime: 5 * 60 * 1000,
   });
 }

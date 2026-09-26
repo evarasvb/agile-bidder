@@ -1,63 +1,77 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.90.1";
+import {
+  claimEmailPiece,
+  executeMarketingCampaign,
+  getMarketingContactsPage,
+  type AtomicClaimQuery,
+  type EmailSendResult,
+  type MarketingContactsTable,
+  type MarketingExecutionRow,
+} from "./logic.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface ExecuteRequest {
-  pieza_id: string;
-  contactos_ids?: string[]; // Si no se envía, usa todos los de la categoría
-  categoria_filtro?: string; // lead, contacto, webinar_asistente, etc.
-}
+const jsonHeaders = { ...corsHeaders, 'Content-Type': 'application/json' };
 
-interface ExecutionResult {
-  pieza_id: string;
-  total_enviados: number;
-  total_exitosos: number;
-  total_errores: number;
-  detalle: Array<{
-    contacto_id?: string;
-    email: string;
-    estado: string;
-    error?: string;
-  }>;
+function jsonResponse(body: unknown, status: number): Response {
+  return new Response(JSON.stringify(body), { status, headers: jsonHeaders });
 }
 
 async function sendEmailViaResend(
   resendKey: string,
-  to: string,
-  subject: string,
-  html: string
-): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  input: {
+    to: string;
+    subject: string;
+    html: string;
+    idempotencyKey: string;
+  },
+): Promise<EmailSendResult> {
   try {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${resendKey}`,
         "Content-Type": "application/json",
+        "Idempotency-Key": input.idempotencyKey,
       },
       body: JSON.stringify({
         from: "FirmaVB <notificaciones@firmavb.cl>",
-        to: [to],
-        subject,
-        html,
+        to: [input.to],
+        subject: input.subject,
+        html: input.html,
       }),
     });
 
     const responseText = await response.text();
-
     if (!response.ok) {
-      console.error("Resend API error:", response.status, responseText);
-      return { success: false, error: `Resend error: ${response.status}` };
+      console.error("Resend rechazó el envío:", response.status);
+      return {
+        success: false,
+        error: `Proveedor rechazó el envío (${response.status})`,
+        statusCode: response.status,
+      };
     }
 
-    const result = JSON.parse(responseText);
-    return { success: true, messageId: result.id };
-  } catch (error) {
-    console.error("Resend error:", error);
-    return { success: false, error: String(error) };
+    let messageId: string | undefined;
+    try {
+      const parsed = JSON.parse(responseText) as { id?: unknown };
+      if (typeof parsed.id === 'string') messageId = parsed.id;
+    } catch {
+      console.warn('Resend aceptó el envío, pero devolvió una respuesta no JSON');
+    }
+
+    return { success: true, messageId, statusCode: response.status };
+  } catch {
+    console.error('No se pudo confirmar la respuesta de Resend');
+    return {
+      success: false,
+      uncertain: true,
+      error: 'No se pudo confirmar la respuesta del proveedor',
+    };
   }
 }
 
@@ -66,189 +80,127 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const resendApiKey = Deno.env.get("RESEND_API_KEY");
+  if (req.method !== 'POST') {
+    return jsonResponse({ error: 'Método no permitido' }, 405);
+  }
 
-    if (!resendApiKey) {
-      return new Response(
-        JSON.stringify({ error: 'RESEND_API_KEY not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+
+    if (!supabaseUrl || !supabaseServiceKey || !resendApiKey) {
+      console.error('Faltan variables requeridas para marketing-ejecutar');
+      return jsonResponse({ error: 'Servicio no configurado' }, 500);
     }
 
     const authHeader = req.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return new Response(
-        JSON.stringify({ error: 'Missing authorization' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return jsonResponse({ error: 'Missing authorization' }, 401);
     }
 
     const sb = createClient(supabaseUrl, supabaseServiceKey);
-    const { data: { user }, error: authError } = await sb.auth.getUser(authHeader.replace('Bearer ', ''));
+    const token = authHeader.slice('Bearer '.length);
+    const { data: { user }, error: authError } = await sb.auth.getUser(token);
 
     if (authError || !user || user.email !== 'evaras@firmavb.cl') {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return jsonResponse({ error: 'Unauthorized' }, 403);
     }
 
-    const body: ExecuteRequest = await req.json();
-    const { pieza_id, contactos_ids, categoria_filtro } = body;
-
-    // Obtener y atomically claim pieza (idempotency)
-    const { data: pieza, error: piezaError } = await sb
-      .from('marketing_piezas')
-      .select('id, campana_id, contenido, asunto, tipo, canal, estado')
-      .eq('id', pieza_id)
-      .eq('estado', 'draft')
-      .single();
-
-    if (piezaError || !pieza) {
-      return new Response(
-        JSON.stringify({ error: 'Pieza no encontrada o ya fue ejecutada' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    const contentLength = Number(req.headers.get('content-length') || '0');
+    if (Number.isFinite(contentLength) && contentLength > 100_000) {
+      return jsonResponse({ error: 'Solicitud demasiado grande' }, 413);
     }
 
-    // Mark as executing to prevent concurrent executions
-    const { error: claimError } = await sb
-      .from('marketing_piezas')
-      .update({ estado: 'ejecutando' })
-      .eq('id', pieza_id)
-      .eq('estado', 'draft');
-
-    if (claimError || !claimError) {
-      // Check if update succeeded
-      const { data: updated } = await sb
-        .from('marketing_piezas')
-        .select('estado')
-        .eq('id', pieza_id)
-        .single();
-
-      if (updated?.estado !== 'ejecutando') {
-        return new Response(
-          JSON.stringify({ error: 'Pieza está siendo ejecutada por otro request' }),
-          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+    let body: unknown;
+    try {
+      const rawBody = await req.text();
+      if (new TextEncoder().encode(rawBody).byteLength > 100_000) {
+        return jsonResponse({ error: 'Solicitud demasiado grande' }, 413);
       }
+      body = JSON.parse(rawBody);
+    } catch {
+      return jsonResponse({ error: 'JSON inválido' }, 400);
     }
 
-    // Obtener contactos objetivo
-    let query = sb
-      .from('marketing_contactos')
-      .select('id, email, nombre')
-      .eq('estado_suscripcion', 'suscrito');
+    const outcome = await executeMarketingCampaign(body, {
+      store: {
+        claimPiece: (pieceId) => {
+          const query = sb.from('marketing_piezas') as unknown as AtomicClaimQuery;
+          return claimEmailPiece(query, pieceId);
+        },
+        releasePieceClaim: async (pieceId) => {
+          const { data, error } = await sb
+            .from('marketing_piezas')
+            .update({ estado: 'draft' })
+            .eq('id', pieceId)
+            .eq('estado', 'ejecutando')
+            .select('id')
+            .maybeSingle();
 
-    if (contactos_ids && contactos_ids.length > 0) {
-      query = query.in('id', contactos_ids);
-    } else if (categoria_filtro) {
-      query = query.eq('categoria', categoria_filtro);
-    }
+          if (error) console.error('No se pudo liberar la pieza:', error.code);
+          return !error && Boolean(data);
+        },
+        getContactsPage: (filters) => {
+          const table = sb.from('marketing_contactos') as unknown as MarketingContactsTable;
+          return getMarketingContactsPage(table, filters);
+        },
+        persistExecutions: async (rows: MarketingExecutionRow[]) => {
+          const { error } = await sb.from('marketing_ejecucion').insert(rows);
+          if (error) {
+            console.error('No se pudieron registrar resultados:', error.code);
+            throw new Error('execution_persistence_failed');
+          }
+        },
+        markPieceExecuted: async (pieceId) => {
+          const { data, error } = await sb
+            .from('marketing_piezas')
+            .update({ estado: 'ejecutado' })
+            .eq('id', pieceId)
+            .eq('estado', 'ejecutando')
+            .select('id')
+            .maybeSingle();
 
-    const { data: contactos, error: contactosError } = await query;
+          if (error || !data) {
+            console.error('No se pudo cerrar la pieza:', error?.code || 'no_row');
+            throw new Error('piece_finalize_failed');
+          }
+        },
+        markCampaignExecuting: async (campaignId, updatedAt) => {
+          const { error } = await sb
+            .from('marketing_campanas')
+            .update({ estado: 'ejecutando', actualizado_en: updatedAt })
+            .eq('id', campaignId);
 
-    if (contactosError || !contactos) {
-      return new Response(
-        JSON.stringify({ error: 'Error al obtener contactos' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+          if (error) {
+            console.error('No se pudo actualizar la campaña:', error.code);
+            throw new Error('campaign_update_failed');
+          }
+        },
+        calculateMetrics: async (campaignId, date) => {
+          const { error } = await sb.rpc('marketing_calcular_metricas', {
+            campana_id_in: campaignId,
+            fecha_in: date,
+          });
 
-    // Ejecutar envíos
-    const resultado: ExecutionResult = {
-      pieza_id,
-      total_enviados: contactos.length,
-      total_exitosos: 0,
-      total_errores: 0,
-      detalle: [],
-    };
-
-    const ejecuciones: any[] = [];
-
-    for (const contacto of contactos) {
-      const emailResult = await sendEmailViaResend(
-        resendApiKey,
-        contacto.email,
-        pieza.asunto || 'FirmaVB',
-        pieza.contenido
-      );
-
-      const estado = emailResult.success ? 'enviado' : 'fallido';
-      resultado.detalle.push({
-        contacto_id: contacto.id,
-        email: contacto.email,
-        estado,
-        error: emailResult.error,
-      });
-
-      if (emailResult.success) {
-        resultado.total_exitosos++;
-      } else {
-        resultado.total_errores++;
-      }
-
-      // Registrar en ejecución
-      ejecuciones.push({
-        pieza_id,
-        contacto_id: contacto.id,
-        email: contacto.email,
-        estado,
-        id_externo: emailResult.messageId,
-        respuesta_codigo: emailResult.success ? 200 : 400,
-        respuesta_mensaje: emailResult.error || 'Enviado',
-        fecha_envio: new Date().toISOString(),
-      });
-    }
-
-    // Guardar ejecuciones en lote
-    if (ejecuciones.length > 0) {
-      const { error: insertError } = await sb
-        .from('marketing_ejecucion')
-        .insert(ejecuciones);
-
-      if (insertError) {
-        console.error('Error al registrar ejecuciones:', insertError);
-      }
-    }
-
-    // Actualizar estado de pieza
-    await sb
-      .from('marketing_piezas')
-      .update({ estado: 'ejecutado' })
-      .eq('id', pieza_id);
-
-    // Actualizar campaña a "ejecutando" si no está
-    await sb
-      .from('marketing_campanas')
-      .update({
-        estado: 'ejecutando',
-        actualizado_en: new Date().toISOString(),
-      })
-      .eq('id', pieza.campana_id);
-
-    // Calcular métricas
-    const hoy = new Date().toISOString().split('T')[0];
-    await sb.rpc('marketing_calcular_metricas', {
-      campana_id_in: pieza.campana_id,
-      fecha_in: hoy,
+          if (error) {
+            console.error('No se pudieron calcular métricas:', error.code);
+            throw new Error('metrics_calculation_failed');
+          }
+        },
+      },
+      sendEmail: (input) => sendEmailViaResend(resendApiKey, input),
     });
 
-    console.log(`Ejecución completada: ${resultado.total_exitosos}/${resultado.total_enviados} exitosos`);
+    if ('total_procesados' in outcome.body) {
+      console.log(
+        `Ejecución procesada: ${outcome.body.total_enviados}/${outcome.body.total_objetivo} confirmados`,
+      );
+    }
 
-    return new Response(
-      JSON.stringify(resultado),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
-  } catch (error) {
-    console.error('Error en marketing-ejecutar:', error);
-    return new Response(
-      JSON.stringify({ error: String(error) }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return jsonResponse(outcome.body, outcome.status);
+  } catch {
+    console.error('Error inesperado en marketing-ejecutar');
+    return jsonResponse({ error: 'Error interno' }, 500);
   }
 });

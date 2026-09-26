@@ -51,10 +51,10 @@ const separarPalabras = (texto: string): string[] =>
 
 export default function ConfiguracionOportunidades() {
   const navigate = useNavigate();
-  const { filtros, isLoading, updateFiltros, isUpdating } = useClienteFiltros();
+  const { filtros, isFetched, updateFiltros, isUpdating } = useClienteFiltros();
   const sugerir = useSugerirFiltros();
   const expandirConceptos = useExpandirConceptos();
-  const { data: cliente } = useCliente();
+  const { data: cliente, isFetched: clienteFetched } = useCliente();
 
   const [palabrasIncluir, setPalabrasIncluir] = useState<string[]>([]);
   const [palabrasExcluir, setPalabrasExcluir] = useState<string[]>([]);
@@ -78,7 +78,13 @@ export default function ConfiguracionOportunidades() {
   // "las agrego, se suman, pero no puedo guardarlas / desaparecen".
   const hidratado = useRef(false);
   useEffect(() => {
-    if (hidratado.current || isLoading) return;
+    // isFetched (no !isLoading): mientras la sesión todavía no resuelve
+    // user?.id, ambos queries están `enabled: false` y ya reportan
+    // isLoading=false sin haber corrido ni una vez — con !isLoading el efecto
+    // hidrataba con filtros/cliente todavía undefined, marcaba
+    // hidratado=true para siempre, y nunca volvía a sincronizar con lo
+    // guardado de verdad (el usuario veía la lista vacía).
+    if (hidratado.current || !isFetched || !clienteFetched) return;
     hidratado.current = true;
     // Si alguien escribió "google , licencia" en un solo chip, se separa.
     const incluirGuardado = separarPalabras((filtros?.palabras_incluir || []).join(','));
@@ -90,7 +96,7 @@ export default function ConfiguracionOportunidades() {
       setMontoMin(filtros.monto_min?.toString() || "");
       setMontoMax(filtros.monto_max?.toString() || "");
     }
-  }, [isLoading, filtros, cliente]);
+  }, [isFetched, clienteFetched, filtros, cliente]);
 
   const handleAddPalabraIncluir = () => {
     const nuevas = separarPalabras(newPalabraIncluir).filter((w) => !palabrasIncluir.includes(w));
@@ -207,7 +213,11 @@ export default function ConfiguracionOportunidades() {
     }
   };
 
-  if (isLoading) {
+  // Mismo criterio que la hidratación: mientras no esté isFetched/clienteFetched,
+  // se muestra el skeleton en vez del editor. Con isLoading (isPending && isFetching)
+  // la pantalla se pintaba vacía antes de que la hidratación corriera, dejando
+  // escribir sobre un formulario que la hidratación luego pisaba.
+  if (!isFetched || !clienteFetched) {
     return (
       <div className="container mx-auto py-6 space-y-6">
         <Skeleton className="h-10 w-64" />
@@ -412,7 +422,7 @@ export default function ConfiguracionOportunidades() {
               Regiones Activas
             </CardTitle>
             <CardDescription>
-              Solo verás oportunidades de las regiones seleccionadas
+              Marca las regiones donde puedes despachar. Si no marcas ninguna, verás oportunidades de todas las regiones.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -424,25 +434,30 @@ export default function ConfiguracionOportunidades() {
                 Limpiar
               </Button>
               <Badge variant="secondary" className="ml-auto">
-                {regionesActivas.length} seleccionadas
+                {regionesActivas.length === 0 ? "Todas (sin filtro)" : `${regionesActivas.length} seleccionadas`}
               </Badge>
             </div>
             <div className="grid grid-cols-2 gap-2 max-h-[250px] overflow-y-auto p-2 border rounded-md">
-              {REGIONES_CHILE.map((region) => (
-                <div key={region} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={region}
-                    checked={regionesActivas.includes(region)}
-                    onCheckedChange={() => handleToggleRegion(region)}
-                  />
-                  <label
-                    htmlFor={region}
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
-                    {region}
-                  </label>
-                </div>
-              ))}
+              {REGIONES_CHILE.map((region) => {
+                // El id no puede llevar espacios ni apóstrofos (p.ej. "O'Higgins"):
+                // se convierte a un slug para que el clic en el texto marque la casilla.
+                const rid = `region-${region.replace(/[^a-zA-Z0-9]+/g, "-")}`;
+                return (
+                  <div key={region} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={rid}
+                      checked={regionesActivas.includes(region)}
+                      onCheckedChange={() => handleToggleRegion(region)}
+                    />
+                    <label
+                      htmlFor={rid}
+                      className="text-sm font-medium leading-none cursor-pointer"
+                    >
+                      {region}
+                    </label>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>

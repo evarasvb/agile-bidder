@@ -1,5 +1,5 @@
 // FirmaVB — confirma una inscripción al webinar y envía la invitación con el evento (.ics +
-// enlace a Google Calendar), más una invitación a probar el Experto FirmaVB.
+// enlace a Google Calendar), más una invitación a probar Don Evaristo.
 // Se llama sola: la dispara un trigger en `webinar_inscripciones` al insertar una fila.
 //   POST {id} (service_role) -> envía el correo y marca notificado=true
 // Multi-evento: cada `evento_slug` tiene su ficha (fecha/recurrencia, enlace, copy).
@@ -131,9 +131,9 @@ function construirHtml(nombre: string, ev: Evento, linkGoogleCalendar: string): 
         </p>
         <hr style="border:none; border-top:1px solid #e2e8f0; margin:24px 0;" />
         <p style="font-size:14px; color:#1e293b; font-weight:600;">¿No quieres esperar al martes?</p>
-        <p style="font-size:14px; color:#475569;">El Experto FirmaVB lee las bases, arma tu matriz de postulación y completa tus anexos con los datos de tu empresa. Pruébalo ahora:</p>
+        <p style="font-size:14px; color:#475569;">Don Evaristo lee las bases, arma tu matriz de postulación y completa tus anexos con los datos de tu empresa. Pruébalo ahora:</p>
         <p style="text-align:center; margin:16px 0;">
-          <a href="https://firmavb.cl/auth" style="background:#10B981; color:#fff; padding:12px 20px; border-radius:8px; text-decoration:none; font-size:14px; font-weight:600;">Probar el Experto FirmaVB</a>
+          <a href="https://firmavb.cl/auth" style="background:#10B981; color:#fff; padding:12px 20px; border-radius:8px; text-decoration:none; font-size:14px; font-weight:600;">Probar a Don Evaristo</a>
         </p>
         <p style="font-size:12px; color:#94a3b8; margin-top:24px;">FirmaVB · firmavb.cl</p>
       </div>
@@ -161,7 +161,7 @@ Deno.serve(async (req) => {
       action: "TEMPLATE",
       text: ev.titulo,
       dates: `${ev.inicioUtc}/${ev.finUtc}`,
-      details: ev.descripcion + (ev.meetUrl ? `\n\nUnirse: ${ev.meetUrl}` : "") + "\n\nPrueba el Experto FirmaVB: https://firmavb.cl/auth",
+      details: ev.descripcion + (ev.meetUrl ? `\n\nUnirse: ${ev.meetUrl}` : "") + "\n\nPrueba a Don Evaristo: https://firmavb.cl/auth",
       location: ev.lugarTexto,
     });
     if (ev.rrule) gcalParams.set("recur", `RRULE:${ev.rrule}`);

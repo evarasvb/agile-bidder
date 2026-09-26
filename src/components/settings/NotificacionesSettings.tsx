@@ -146,7 +146,7 @@ export default function NotificacionesSettings({ clienteId }: NotificacionesSett
                 value={formData.horas_antes_cierre.toString()}
                 onValueChange={(value) => setFormData({ ...formData, horas_antes_cierre: parseInt(value) })}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full" aria-label="Seleccionar cuándo alertar antes del cierre">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

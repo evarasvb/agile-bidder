@@ -19,12 +19,6 @@ verify_jwt = true
 [functions.create-user]
 verify_jwt = true
 
-[functions.evaristo-api]
-verify_jwt = true
-
-[functions.evaristo-autonomo]
-verify_jwt = true
-
 # extension-api uses x-api-key header from Chrome extension (not Supabase JWT)
 [functions.extension-api]
 verify_jwt = false
@@ -40,6 +34,22 @@ verify_jwt = true
 
 # mercadopublico-api is a public proxy for MercadoPublico data
 [functions.mercadopublico-api]
+verify_jwt = false
+
+# google-drive: acciones autenticadas (start/listar/descargar/desconectar)
+[functions.google-drive]
+verify_jwt = true
+
+# google-drive-callback: Google redirige aquí sin JWT (verifica un state firmado)
+[functions.google-drive-callback]
+verify_jwt = false
+
+# crear-pago-curso: la Academia es pública; el comprador puede no tener cuenta
+[functions.crear-pago-curso]
+verify_jwt = false
+
+# mp-curso-webhook: Mercado Pago notifica sin JWT (se verifica el pago contra la API de MP)
+[functions.mp-curso-webhook]
 verify_jwt = false
 
 [functions.resumir-bases]
@@ -62,6 +72,10 @@ verify_jwt = false
 [functions.sync-health]
 verify_jwt = false
 
+# Scheduled syncs use the legacy service_role JWT in Authorization.
+[functions.sync-licitaciones-bi]
+verify_jwt = true
+
 [functions.youtube-sync]
 verify_jwt = true
 
@@ -71,6 +85,20 @@ verify_jwt = true
 [functions.enrichment-scheduler]
 verify_jwt = false
 
+[functions.marketing-ejecutar]
+verify_jwt = true
+
+# experto-consultar allows anonymous use; authenticated users are validated in the handler.
+[functions.experto-consultar]
+verify_jwt = false
+
+# These functions validate the user JWT (or the exact service-role key) in the handler.
+[functions.abogado-consultar]
+verify_jwt = false
+
+[functions.experto-pptx]
+verify_jwt = false
+
 # extract-proveedores-instituciones is called by cron job (public access)
 [functions.extract-proveedores-instituciones]
 verify_jwt = false
@@ -78,3 +106,6 @@ verify_jwt = false
 # cluster-customers is called by cron job (public access)
 [functions.cluster-customers]
 verify_jwt = false
+
+[functions.sii-contribuyente]
+verify_jwt = true

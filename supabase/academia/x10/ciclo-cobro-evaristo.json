@@ -1,0 +1,158 @@
+[
+  {
+    "titulo": "Método Evaristo · El ciclo completo del cobro: del foro a la caja",
+    "lecciones": [
+      {
+        "titulo": "Regla de oro: si no hay pago, no hay negocio",
+        "bloques": [
+          { "tipo": "parrafo", "texto": "El Estado es un mal pagador. Eso lo sabe todo proveedor. Lo que casi nadie admite es la otra mitad: el proveedor tampoco sabe cobrar. Factura cuando se acuerda, al correo que se le ocurre, sin guía firmada, sin protocolo, y después le pasa la factura a un factoring y se olvida. Seis meses más tarde descubre que la factura nunca entró al sistema del organismo." },
+          { "tipo": "parrafo", "texto": "En FirmaVB el cobro no empieza cuando vence la factura: empieza antes de postular. Este módulo es el ciclo completo tal como lo hacemos nosotros, etapa por etapa, con el documento que viaja en cada una y quién es responsable. Si sigues el ciclo, cobras. Si te saltas una etapa, la vas a pagar en la última." },
+          { "tipo": "tabla", "titulo": "El ciclo del cobro en 8 etapas", "columnas": ["Etapa", "Cuándo", "Documento que viaja", "Responsable"], "filas": [
+            ["0. Elegir a quién venderle", "Antes de postular", "Semáforo de pago de la institución", "Comercial"],
+            ["1. Preguntas al foro", "Periodo de consultas", "Lista de preguntas por área", "Comercial + técnico"],
+            ["2. Postular completo", "Antes del cierre", "Oferta con todos los espacios y puntos", "Comercial"],
+            ["3. Entrega", "Recepción de la mercadería", "Guía + protocolo de revisión + proceso de factura y cobranza", "Operaciones"],
+            ["4. Facturación", "Guía firmada + OC aceptada", "Factura con protocolo de cobro e interés (Ley 21.131), en el formato que pide la OC", "Facturación"],
+            ["5. Radar de cobranza", "Mismo día de facturar", "Contactos del organismo entregados a cobranza", "Operaciones + comercial"],
+            ["6. Recordatorio y visita", "Días 20 a 35", "Correos, llamada y visita presencial", "Cobranza"],
+            ["7. Pago tarde", "Desde el día 31", "Nota de débito por intereses y nota de cobro", "Cobranza + Abogado"]
+          ], "lectura": "Cada etapa deja un documento. Ese documento es lo que te permite cobrar en la siguiente. Sin guía firmada no hay factura; sin factura bien enviada no hay plazo corriendo; sin plazo corriendo no hay interés que reclamar." },
+          { "tipo": "tip", "texto": "Regla de FirmaVB: si no hay pago, no hay negocio. Una venta que no se cobra no es una venta, es un préstamo al Estado sin interés y con tu capital de trabajo." },
+          { "tipo": "video", "titulo": "El ciclo completo del cobro según Evaristo", "minutos": 18, "resumen": "Evaristo recorre las 8 etapas con los documentos reales de FirmaVB: preguntas al foro, guía con protocolo, factura con protocolo de cobro, radar de cobranza, la visita presencial y las notas de débito y cobro." }
+        ]
+      },
+      {
+        "titulo": "Etapa 1 · Preguntas al foro: lo que no aclaras hoy es tu disputa de mañana",
+        "bloques": [
+          { "tipo": "parrafo", "texto": "El foro de preguntas no es un trámite. Es tu única oportunidad de dejar por escrito, con respuesta oficial del organismo, todo lo que después va a definir si te pagan o no. Cada respuesta del foro pasa a formar parte de las bases: lo que el organismo responde ahí, lo tiene que cumplir." },
+          { "tipo": "parrafo", "texto": "En FirmaVB, antes de postular, generamos con el Libro de la licitación una batería de preguntas ordenadas por área. No se trata de preguntar por preguntar: se trata de cubrir cada punto donde una ambigüedad te puede costar la recepción, la factura o el pago." },
+          { "tipo": "subtitulo", "texto": "Las 9 áreas que siempre cubrimos" },
+          { "tipo": "lista", "items": [
+            "Técnicas: especificaciones, equivalencias, marcas de referencia, certificaciones exigidas.",
+            "Operativas: lugar y horario de entrega, quién recibe, parcialidades, plazos desde la OC.",
+            "Financieras: forma de pago, plazo de pago, si hay anticipo, a qué casilla y en qué formato va la factura, si exigen recepción conforme previa.",
+            "Garantía de seriedad y fiel cumplimiento: monto, vigencia, cuándo se devuelve, si aceptan póliza o certificado de fianza.",
+            "Postventa y garantía del producto: plazo, quién asume traslados, tiempos de respuesta.",
+            "Seguridad: exigencias de prevención de riesgos, ingreso a recintos, seguros.",
+            "Problemas y cosas no resueltas: contradicciones entre bases, anexos y formularios; plazos que no cuadran; criterios que no suman 100.",
+            "Cosas que no están claras: cualquier frase que dos personas leerían distinto. Si dudas, pregunta.",
+            "Legales: multas, causales de término, cesión de la factura (factoring), tribunales, reajustes."
+          ] },
+          { "tipo": "caso", "titulo": "Método Evaristo: la pregunta que cobra", "texto": "Una pregunta que siempre hacemos: \"¿A qué casilla de correo y en qué formato debe enviarse la factura, y desde qué hito corre el plazo de 30 días de la Ley 21.131?\". La respuesta queda en el foro, es parte de las bases y es la primera línea de nuestra nota de cobro cuando se atrasan." },
+          { "tipo": "herramienta", "texto": "Preguntas al foro desde el Libro de la licitación", "ruta": "/experto", "detalle": "Abre el Libro de la licitación en el Experto y pide las preguntas al foro: las ordena por área y te deja las que faltan por cubrir." },
+          { "tipo": "quiz", "pregunta": "¿Por qué las preguntas del foro importan para cobrar, y no solo para ofertar?", "opciones": ["Porque el organismo evalúa mejor a quien pregunta.", "Porque las respuestas oficiales pasan a formar parte de las bases y fijan cómo y cuándo te pagan.", "Porque sin preguntas no se puede subir la oferta."], "correcta": 1, "explicacion": "Lo que el organismo responde en el foro lo obliga. Si respondió que la factura va a una casilla y que el plazo corre desde la recepción, eso es lo que vas a invocar cuando cobres." }
+        ]
+      },
+      {
+        "titulo": "Etapa 2 · Postular considerando todos los espacios y todos los puntos",
+        "bloques": [
+          { "tipo": "parrafo", "texto": "Postular es llenar todo. No solo los anexos obligatorios: cada espacio del formulario, cada criterio de evaluación, cada punto donde el organismo puede darte o quitarte puntaje. Un espacio vacío es un punto regalado al competidor o, peor, una causal de inadmisibilidad." },
+          { "tipo": "lista", "items": [
+            "Recorre la pauta de evaluación criterio por criterio y anota qué documento o párrafo responde a cada uno. Si un criterio no tiene respuesta en tu oferta, todavía no estás listo.",
+            "Considera los puntos chicos: plazo de entrega, garantía extendida, servicio postventa, cumplimiento de requisitos formales. Suelen decidir empates.",
+            "Deja escrito en la oferta el proceso de entrega, recepción, facturación y cobranza que vas a aplicar. Si el organismo lo acepta al adjudicar, ya tienes la mitad del cobro ganada.",
+            "Adjunta lo que las respuestas del foro te permitieron aclarar: equivalencias, formatos, casillas. Cita la pregunta y la respuesta."
+          ] },
+          { "tipo": "tip", "texto": "En FirmaVB la matriz de adjudicación del Libro te muestra cada criterio con su peso y con lo que hoy tienes para responderlo. Los vacíos se ven en rojo antes de subir la oferta, no después del acta." },
+          { "tipo": "ejercicio", "titulo": "Tu oferta sin espacios vacíos", "pasos": ["Toma una licitación abierta de tu rubro y abre su Libro en FirmaVB.", "Genera la matriz de adjudicación y marca cada criterio con lo que hoy tienes para responderlo.", "Escribe un párrafo con tu proceso de entrega, recepción, factura y cobranza para incluirlo en la oferta técnica.", "Lista las preguntas al foro que faltan para cerrar cada vacío."], "entregable": "Matriz sin criterios en rojo y párrafo de proceso listo para pegar en la oferta." }
+        ]
+      },
+      {
+        "titulo": "Etapa 3 · La entrega: la guía viaja con el protocolo de revisión y el proceso de cobro",
+        "bloques": [
+          { "tipo": "parrafo", "texto": "Cuando el organismo confirma la recepción, la guía de despacho no viaja sola. En FirmaVB va acompañada de dos documentos: el protocolo de revisión de mercadería y la descripción del proceso de factura y cobranza. El objetivo es que el funcionario que recibe sepa exactamente qué revisar, en cuánto plazo, y qué viene después." },
+          { "tipo": "tabla", "titulo": "Qué contiene el protocolo de revisión de mercadería", "columnas": ["Punto", "Qué dice", "Para qué sirve"], "filas": [
+            ["Qué se entrega", "Ítems, cantidades y OC de referencia", "Cruza con la orden sin ambigüedad"],
+            ["Quién revisa y en qué plazo", "Nombre o cargo y días para observar", "Evita el \"todavía no lo hemos revisado\" a los 40 días"],
+            ["Qué es recepción conforme", "Guía firmada con fecha, nombre y cargo", "Es el hito desde el que corre el plazo de pago"],
+            ["Canal de observaciones", "Correo y teléfono para reclamos", "Los problemas se resuelven en días, no en la cobranza"],
+            ["Proceso de factura y cobranza", "Cuándo se emite, a qué casilla, en qué formato, plazo legal e intereses", "Nadie se sorprende cuando llega la factura ni cuando llega la nota de cobro"]
+          ], "lectura": "El protocolo no es un documento legal: es una hoja clara que ahorra discusiones. El cliente que sabe qué viene después paga mejor." },
+          { "tipo": "caso", "titulo": "Método Evaristo: la guía que explica", "texto": "Nuestra guía lleva un pie de página fijo: \"Recepción conforme al firmar esta guía. Factura electrónica se emite con la OC aceptada y se envía al formato y casilla indicados en la orden. Plazo de pago 30 días (Ley 21.131); vencido el plazo se emite nota de débito por intereses.\" Una frase, cero sorpresas." },
+          { "tipo": "quiz", "pregunta": "¿Desde qué hito corre en la práctica el plazo de pago cuando entregas mercadería?", "opciones": ["Desde la fecha de la orden de compra.", "Desde la recepción conforme documentada (guía firmada) y la factura recibida por el organismo.", "Desde que el factoring compra la factura."], "correcta": 1, "explicacion": "Sin recepción conforme documentada el organismo puede rechazar la factura. Por eso la guía firmada con fecha es el documento más importante del ciclo." }
+        ]
+      },
+      {
+        "titulo": "Etapa 4 · Facturación: guía firmada + OC aceptada = factura con protocolo, en el formato que pide la OC",
+        "bloques": [
+          { "tipo": "parrafo", "texto": "El área de facturación no factura por iniciativa propia. Factura cuando recibe dos cosas: la guía firmada por el organismo y la orden de compra aceptada en Mercado Público. Con eso emite la factura y la envía acompañada del protocolo de cobro y del protocolo de interés según la Ley de pago oportuno." },
+          { "tipo": "lista", "items": [
+            "Referencia obligatoria: número de OC en la factura. Sin OC, el sistema del organismo la rechaza.",
+            "Formato que indica la OC: muchas instituciones exigen el XML del DTE a una casilla específica de recepción, además del PDF. Si la OC dice XML a una casilla, va XML a esa casilla. No a la casilla del funcionario que te atendió.",
+            "Adjuntos: guía firmada, OC aceptada, y el protocolo de cobro con el plazo legal y el interés que se aplicará si se atrasan.",
+            "Registro: fecha y hora de envío, casilla, acuse de recibo. Es tu prueba de que el plazo empezó a correr.",
+            "Cesión (factoring): si cedes la factura, notifica la cesión según la ley; el pago lo recibirá el factoring, pero el seguimiento de la factura sigue siendo tuyo (siguiente etapa)."
+          ] },
+          { "tipo": "subtitulo", "texto": "Protocolo de interés según la Ley de pago oportuno (Ley 21.131)" },
+          { "tipo": "parrafo", "texto": "El protocolo que acompaña la factura dice, en pocas líneas: plazo máximo de pago de 30 días corridos desde la recepción de la factura; vencido el plazo se devengan intereses moratorios a la tasa de interés corriente para operaciones no reajustables; y el proveedor tiene derecho a una comisión fija por recuperación de costos de cobranza del 1% del saldo insoluto. Lo dice antes de que pase, con tono de información, no de amenaza." },
+          { "tipo": "tip", "texto": "Error más caro de todos: enviar la factura al correo equivocado. La factura queda \"emitida\" en tu contabilidad y \"nunca recibida\" en el organismo. Meses después nadie sabe de qué hablas. El formato y la casilla los define la OC, y si la OC no lo dice, lo preguntaste en el foro (Etapa 1)." },
+          { "tipo": "herramienta", "texto": "Registra la factura en Cobranza de FirmaVB", "ruta": "/experto/cobranza", "detalle": "Ingresa la factura con su fecha de recepción: FirmaVB calcula el vencimiento a 30 días, los días de atraso y el interés estimado para la nota de débito." }
+        ]
+      },
+      {
+        "titulo": "Etapa 5 · El radar de cobranza: el factoring financia, el seguimiento no se delega",
+        "bloques": [
+          { "tipo": "parrafo", "texto": "El mismo día que sale la factura, el área que coordinó la operación y el comercial que vendió entregan a cobranza los datos de contacto del organismo: quién recibió, quién aprueba, quién paga en finanzas, teléfonos y correos. Con eso la factura entra al radar de cobranza. Sin eso, la factura es un número más en una planilla." },
+          { "tipo": "parrafo", "texto": "Justo aquí es donde entra normalmente el factoring, y aquí está el error que más facturas al Estado pierde. Hay que distinguir dos situaciones. Si usas el factoring solo como financiamiento sin ceder la factura, el cobro sigue siendo tuyo por completo. Si cedes la factura, el factoring pasa a ser el acreedor: el organismo le paga a él y cualquier cobro formal se coordina con él según el contrato de cesión. Pero en los dos casos el seguimiento no se delega: el ejecutivo del factoring tiene cientos de facturas, no conoce a tu cliente ni sabe qué se entregó. Si el organismo rechaza la factura o la deja dormida, el factoring te la devuelve con intereses y tú recién te enteras del problema meses después." },
+          { "tipo": "caso", "titulo": "Método Evaristo: no dejes la cobranza en manos del factoring", "texto": "Lo repetimos porque es lo más importante del módulo: no dejes la cobranza en manos del factoring. Usa el factoring para caja si lo necesitas; si cediste la factura, él recibe el pago y con él coordinas cualquier cobro formal, pero la factura sigue en tu radar: tu gente confirmando que entró al sistema, resolviendo observaciones, con los contactos al día y la visita cuando nadie contesta. Es clave para que el negocio completo resulte: si no hay pago, no hay negocio." },
+          { "tipo": "tabla", "titulo": "Factoring: qué hace y qué no hace", "columnas": ["Tema", "Factoring", "Tu seguimiento"], "filas": [
+            ["Adelantar caja", "Sí, con descuento", "No"],
+            ["Saber si la factura entró al sistema del organismo", "No", "Sí, con el acuse de recibo"],
+            ["Conocer al funcionario que aprueba el pago", "No", "Sí, lo entregó el comercial"],
+            ["Resolver una observación a la entrega", "No", "Sí, con el protocolo de la guía"],
+            ["Recibir el pago de una factura cedida", "Sí: con la cesión es el acreedor", "No: el cobro formal se coordina con él según el contrato"],
+            ["Intereses y comisión del 1% por atraso", "Según lo pactado en la cesión", "Sí en facturas no cedidas, con nota de débito; en las cedidas, según el contrato"],
+            ["Responder si la factura se rechaza", "Te la devuelve con intereses", "Corrige y reenvía el mismo día"]
+          ] },
+          { "tipo": "quiz", "pregunta": "Cediste una factura al factoring. ¿Qué pasa con el seguimiento?", "opciones": ["El factoring se encarga de todo: tú te olvidas de la factura.", "Nadie: el organismo paga solo cuando corresponde.", "El factoring recibe el pago y con él coordinas el cobro formal, pero tu área sigue confirmando ingreso, observaciones y contactos."], "correcta": 2, "explicacion": "Con la cesión el factoring pasa a ser el acreedor y a él le paga el organismo. Pero si la factura se traba, te la devuelve con intereses. Quien conoce al cliente, la entrega y los contactos eres tú: el seguimiento no se delega y el cobro formal se coordina con el factoring según el contrato." }
+        ]
+      },
+      {
+        "titulo": "Etapa 6 · Recordatorios, visita presencial y, si pagan tarde, nota de débito y nota de cobro",
+        "bloques": [
+          { "tipo": "parrafo", "texto": "La cobranza es una escalera con fechas fijas. Cada peldaño tiene un canal y un documento. Lo que no puede pasar es esperar \"a ver si pagan\"." },
+          { "tipo": "tabla", "titulo": "Escalera de cobranza FirmaVB", "columnas": ["Día", "Acción", "Canal", "Documento"], "filas": [
+            ["0", "Factura enviada con protocolo; contactos al radar", "Casilla de la OC", "Factura + protocolo + acuse"],
+            ["7", "Confirmar que la factura está ingresada y sin observaciones", "Correo y llamada a finanzas", "Registro en Cobranza"],
+            ["20", "Recordatorio de vencimiento próximo", "Correo al que aprueba y a finanzas", "Correo de recordatorio"],
+            ["31", "Vencida: nota de cobro con el interés a la fecha", "Correo formal + llamada", "Nota de cobro"],
+            ["35 a 40", "Si no contestan los correos: visita presencial", "En terreno", "Acta de visita (qué dijeron, quién, cuándo)"],
+            ["45", "Segunda nota de cobro y nota de débito por intereses y comisión del 1%", "Correo formal", "Nota de débito + nota de cobro"],
+            ["60+", "Escalar: reclamo en Mercado Público, Contraloría o requerimiento con el Abogado", "Formal", "Requerimiento prejudicial"]
+          ], "lectura": "La visita presencial no es un castigo: es la única forma de saber qué está pasando cuando nadie contesta. Ahí descubres si la factura se perdió, si falta una firma, si el funcionario está de vacaciones o si simplemente no hay caja." },
+          { "tipo": "subtitulo", "texto": "Si pagan tarde: nota de débito y nota de cobro según la ley de pago a 30 días" },
+          { "tipo": "parrafo", "texto": "Cuando el organismo paga después del día 30, no se cierra la carpeta. Se emite la nota de débito (documento tributario exento, desde tu propio sistema de facturación o el SII) por los intereses moratorios devengados y la comisión del 1% por costos de cobranza, y se envía con una nota de cobro que explica el cálculo: días de atraso, tasa aplicada, base y total. El Abogado de FirmaVB calcula el interés y redacta la nota de cobro con los datos de la factura registrada en Cobranza; la nota de débito la emites tú en tu facturador." },
+          { "tipo": "tip", "texto": "Tono siempre firme y respetuoso. Quien paga es una persona en finanzas con cientos de facturas. Ponle fácil encontrar la tuya: OC, número de factura, fecha de recepción y monto en la primera línea de cada correo." },
+          { "tipo": "herramienta", "texto": "Cálculo de intereses y nota de cobro con el Abogado", "ruta": "/experto/abogado", "detalle": "Con la factura registrada en Cobranza, el Abogado calcula los intereses y la comisión, redacta la nota de cobro y, si hace falta, el requerimiento prejudicial. La nota de débito la emites en tu sistema de facturación con ese cálculo." },
+          { "tipo": "ejercicio", "titulo": "Tu escalera con fechas reales", "pasos": ["Registra en Cobranza de FirmaVB tus facturas al Estado pendientes con su fecha de recepción.", "Para cada una, anota en qué peldaño de la escalera está hoy y qué acción corresponde.", "Envía hoy los recordatorios de las que están entre el día 20 y el 30 y las notas de cobro de las vencidas.", "Agenda la visita presencial de las que llevan más de 35 días sin respuesta."], "entregable": "Cartera de cobro con peldaño, próxima acción y fecha para cada factura." }
+        ]
+      },
+      {
+        "titulo": "Etapa 0 · Elegir a quién venderle: noticias, fragmentación, reclamos y el calendario de la caja",
+        "bloques": [
+          { "tipo": "parrafo", "texto": "La mejor cobranza es la que no hay que hacer. Por eso el ciclo en realidad empieza antes de postular: eligiendo instituciones que no tengan tantos problemas. En www.firmavb.cl monitoreamos las noticias de cada organismo para saber en qué anda metido, revisamos si fragmenta compras, cuántos reclamos de no pago acumula y cuánto se demora en pagar." },
+          { "tipo": "lista", "items": [
+            "Noticias: un organismo con sumario, cambio de director o recorte presupuestario paga peor durante meses. Seguirlo en FirmaVB te avisa antes de postular.",
+            "Fragmentación: si divide una compra grande en muchas compras ágiles para evitar licitar, es señal de desorden administrativo; el desorden también llega a la unidad de pagos.",
+            "Reclamos de no pago: cuántos tiene y si van subiendo. Un organismo con muchos reclamos y al que igual le siguen vendiendo es un mal cliente con proveedores que no saben cobrar.",
+            "Promedio de pago: en la experiencia de FirmaVB, los hospitales promedian unos 75 días. Es la referencia con la que hay que planificar la caja, no los 30 de la ley."
+          ] },
+          { "tipo": "subtitulo", "texto": "El calendario de la caja del Estado" },
+          { "tipo": "parrafo", "texto": "El plazo cambia según el mes. A fin de año, cuando se acaban las remesas, las instituciones ya no tienen presupuesto en caja, pero igual compran: necesitan gastar el presupuesto de papel para que el próximo año les asignen lo mismo. Compran con ganas y pagan cuando llega la remesa del año siguiente. Y en enero y febrero las universidades prácticamente no trabajan: no hay nadie habilitado para aprobar ni para pagar. La factura de diciembre se cobra en marzo." },
+          { "tipo": "tabla", "titulo": "Riesgo de pago según mes y tipo de institución (experiencia FirmaVB)", "columnas": ["Periodo", "Qué pasa", "Cómo lo manejas"], "filas": [
+            ["Marzo a septiembre", "Remesas al día; el plazo se acerca al promedio del organismo", "Escalera normal de cobranza"],
+            ["Octubre y noviembre", "Compran fuerte para ejecutar presupuesto; la caja empieza a apretar", "Factura el mismo día de la recepción; radar desde el día 0"],
+            ["Diciembre", "Presupuesto de papel: compran para conservar la asignación, sin caja para pagar", "Vende solo si tu caja aguanta 90 días o más; cotiza con ese costo"],
+            ["Enero y febrero", "Universidades y varios servicios sin personal habilitado para aprobar ni pagar", "No cuentes con esos pagos hasta marzo; agenda la visita para la primera semana de marzo"],
+            ["Hospitales, todo el año", "Promedio cercano a 75 días, con picos a fin de año", "Precio y condiciones con ese plazo incorporado; nota de débito sin excepción"]
+          ], "lectura": "No es que el Estado no pague: paga cuando tiene caja. Si sabes cuándo la tiene, vendes cuando conviene y cobras cuando toca." },
+          { "tipo": "caso", "titulo": "Método Evaristo: el semáforo antes de la oferta", "texto": "Antes de postular a un organismo nuevo miramos tres cosas en FirmaVB: sus reclamos de pago del último año, sus noticias del último trimestre y en qué mes estamos. Con reclamos altos y noticias malas, no postulamos aunque el margen se vea bien. Con reclamos bajos y caja de mitad de año, postulamos y seguimos a la institución para enterarnos de lo que venga." },
+          { "tipo": "herramienta", "texto": "Seguir a la institución desde tu panel", "ruta": "/dashboard", "detalle": "Con el botón Seguir de tus mejores compradores, FirmaVB te avisa de sus licitaciones, compras ágiles y noticias para saber en qué está metida cada institución antes de venderle." },
+          { "tipo": "herramienta", "texto": "Reporte de compradores: reclamos y conducta de pago", "ruta": "/reportes/compradores", "detalle": "Revisa los reclamos de pago y el comportamiento de compra de cada organismo antes de decidir si postulas." },
+          { "tipo": "quiz", "pregunta": "Un hospital publica una compra ágil atractiva el 15 de diciembre. ¿Qué haces según el método FirmaVB?", "opciones": ["Postulas igual: a fin de año compran mucho y hay que aprovechar.", "Revisas sus reclamos y noticias, y postulas solo si tu caja aguanta 90 días o más, con ese costo en el precio.", "No postulas nunca a hospitales."], "correcta": 1, "explicacion": "En diciembre compran con presupuesto de papel y pagan con la remesa del año siguiente. Los hospitales además promedian unos 75 días. Se puede vender, pero con la caja y el precio preparados para eso." },
+          { "tipo": "ejercicio", "titulo": "Tu semáforo de clientes", "pasos": ["Lista las 10 instituciones a las que más vendes o quieres venderles.", "Para cada una revisa en FirmaVB reclamos de pago, noticias del trimestre y en qué meses te compraron.", "Márcalas en verde, amarillo o rojo y anota el plazo real de pago que vas a asumir en tus precios.", "Sigue en FirmaVB a las verdes y amarillas para enterarte de lo que venga."], "entregable": "Semáforo de 10 instituciones con plazo real de pago asumido para cotizar." }
+        ]
+      }
+    ]
+  }
+]
