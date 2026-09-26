@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 // Escritorio: tres paneles ajustables (arrastra el separador). Celular/tablet: pestañas Fuentes · Chat · Entregables.
 function useEscritorio() {
@@ -31,7 +31,7 @@ import { AccionesCompartir } from '@/components/oportunidades/AccionesCompartir'
 import { mailtoOportunidad } from '@/lib/compartir';
 import { LicitacionItemsMatch } from '@/components/licitaciones/LicitacionItemsMatch';
 import { useLicitacionItemsReal } from '@/hooks/useLicitacionItemsReal';
-import { useProductMatching } from '@/hooks/useProductMatching';
+import { useLicitacionItemsConMatch } from '@/hooks/useLicitacionItemsConMatch';
 import { useMatchOverrides } from '@/hooks/useMatchOverrides';
 import { useInventoryActivo } from '@/hooks/useInventory';
 import { useCliente } from '@/hooks/useCliente';
@@ -114,7 +114,14 @@ export default function LibroLicitacion() {
     queryFn: async () => (await supabase.from('licitaciones_bi').select('id').eq('codigo', cod).maybeSingle()).data,
   });
   const { data: licItems = [] } = useLicitacionItemsReal(licRow?.id);
-  const { procesarCompra } = useProductMatching();
+  const licItemsMapeados = useMemo(() => licItems.map((it: any, idx: number) => ({
+    id: String(it.id ?? `idx-${idx}`),
+    nombre: it.nombre_producto || '',
+    descripcion: it.descripcion || '',
+    cantidad: it.cantidad ?? 1,
+    unidad: it.unidad || 'unidad',
+  })), [licItems]);
+  const { itemsConMatch: licItemsConMatch } = useLicitacionItemsConMatch(cod, licItemsMapeados);
   const { data: matchOverrides = {} } = useMatchOverrides(cod, 'licitacion');
   const { data: inventarioActivo = [] } = useInventoryActivo();
   const { data: cliente } = useCliente();
@@ -396,16 +403,9 @@ export default function LibroLicitacion() {
   // (mismo criterio que la sección "Productos Solicitados" de más arriba): se
   // excluyen los descartados por el usuario y se respeta la reasignación manual.
   const itemsParaCotizar = (): ItemCotizacion[] => {
-    if (!licItems.length) return [];
-    const mapped = licItems.map((it: any, idx: number) => ({
-      id: String(it.id ?? `idx-${idx}`),
-      nombre: it.nombre_producto || '',
-      descripcion: it.descripcion || '',
-      cantidad: it.cantidad ?? 1,
-      unidad: it.unidad || 'unidad',
-    }));
+    if (!licItemsConMatch.length) return [];
     const inventarioById = new Map((inventarioActivo as any[]).map((p: any) => [p.id, p]));
-    return procesarCompra(mapped)
+    return licItemsConMatch
       .map((item: any) => {
         const ov = (matchOverrides as any)[String(item.id)];
         if (ov?.accion === 'descartado') return null;

@@ -3,7 +3,7 @@ import { Package, TrendingUp, CheckCircle, Repeat2, Ban, PackageSearch } from "l
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useProductMatching } from "@/hooks/useProductMatching";
+import { useLicitacionItemsConMatch } from "@/hooks/useLicitacionItemsConMatch";
 import { useInventoryActivo, type InventoryItem } from "@/hooks/useInventory";
 import { useMatchOverrides } from "@/hooks/useMatchOverrides";
 import { MatchItemActions } from "@/components/compras-agiles/MatchItemActions";
@@ -25,7 +25,6 @@ function badgeColor(score: number) {
  *  inventario del cliente y la posibilidad de corregir el match por ítem
  *  (confirmar / reasignar / descartar / editar), persistido en match_overrides. */
 export function LicitacionItemsMatch({ codigo, items }: Props) {
-  const { procesarCompra, isLoading: invLoading } = useProductMatching();
   const { data: overrides = {} } = useMatchOverrides(codigo, 'licitacion');
   const { data: inventarioActivo = [] } = useInventoryActivo();
 
@@ -35,17 +34,17 @@ export function LicitacionItemsMatch({ codigo, items }: Props) {
     return m;
   }, [inventarioActivo]);
 
-  const itemsConMatch = useMemo(() => {
+  const mapped = useMemo(() => {
     if (!items || items.length === 0) return [];
-    const mapped = items.map((it, idx) => ({
+    return items.map((it, idx) => ({
       id: String(it.id ?? `idx-${idx}`),
       nombre: it.nombre_producto || it.nombre || "",
       descripcion: it.descripcion || "",
       cantidad: it.cantidad ?? 1,
       unidad: it.unidad || "unidad",
     }));
-    return procesarCompra(mapped);
-  }, [items, procesarCompra]);
+  }, [items]);
+  const { itemsConMatch, isLoading: invLoading } = useLicitacionItemsConMatch(codigo, mapped);
 
   const resolver = (item: any) => {
     const ov = overrides[String(item.id)];
