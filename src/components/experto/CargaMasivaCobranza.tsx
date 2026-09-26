@@ -1,11 +1,11 @@
 import { useRef, useState } from 'react';
-import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Upload, FileSpreadsheet, Download, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useCrearFacturasMasivo, fechasConsistentes, type NuevaFactura, type DeudorTipo } from '@/hooks/useCobranza';
+import { downloadSpreadsheetWorkbook, readFirstSpreadsheetSheet, recordsToSpreadsheetRows, SpreadsheetReadError } from '@/lib/excelFiles';
 
 // Columnas de la plantilla, en el mismo orden en que se leen de vuelta.
 const COL_TIPO = 'Tipo (Estado/Privado)';
@@ -26,7 +26,7 @@ interface FilaParseada {
   resumen: string;
 }
 
-function descargarPlantilla() {
+async function descargarPlantilla() {
   const ejemplo: Record<string, string | number> = {
     [COL_TIPO]: 'Estado',
     [COL_NOMBRE]: 'I MUNICIPALIDAD DE MAIPÚ',
@@ -38,11 +38,11 @@ function descargarPlantilla() {
     [COL_VENCIMIENTO]: '',
     [COL_NOTAS]: 'Opcional',
   };
-  const ws = XLSX.utils.json_to_sheet([ejemplo], { header: COLUMNAS });
-  ws['!cols'] = COLUMNAS.map(() => ({ wch: 24 }));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Facturas');
-  XLSX.writeFile(wb, 'plantilla_cobranza.xlsx');
+  await downloadSpreadsheetWorkbook('plantilla_cobranza.xlsx', [{
+    name: 'Facturas',
+    rows: recordsToSpreadsheetRows([ejemplo], COLUMNAS),
+    columnWidths: COLUMNAS.map(() => 24),
+  }]);
 }
 
 // Acepta fecha como texto (AAAA-MM-DD o DD-MM-AAAA / DD/MM/AAAA) o como
@@ -105,6 +105,10 @@ function parsearFila(row: Record<string, unknown>, numeroFila: number): FilaPars
   const notas = String(row[COL_NOTAS] ?? '').trim();
 
   if (!nombre) return { fila: numeroFila, factura: null, error: 'Falta institución o cliente', resumen: '—' };
+  if (nombre.length > 500) return { fila: numeroFila, factura: null, error: 'Institución o cliente supera 500 caracteres', resumen: nombre.slice(0, 80) };
+  if (rut.length > 20) return { fila: numeroFila, factura: null, error: 'RUT supera 20 caracteres', resumen: nombre };
+  if (numero.length > 100) return { fila: numeroFila, factura: null, error: 'N° de factura supera 100 caracteres', resumen: nombre };
+  if (notas.length > 5_000) return { fila: numeroFila, factura: null, error: 'Notas supera 5.000 caracteres', resumen: nombre };
   if (monto == null || monto <= 0) return { fila: numeroFila, factura: null, error: 'Monto inválido', resumen: nombre };
   if (emisionP.invalida || recepcionP.invalida || vencimientoP.invalida) {
     return { fila: numeroFila, factura: null, error: 'Fecha inválida (usa AAAA-MM-DD)', resumen: nombre };
@@ -145,14 +149,13 @@ export function CargaMasivaCobranzaDialog() {
   const onArchivo = async (file: File) => {
     setArchivo(file.name);
     try {
-      const data = await file.arrayBuffer();
-      const wb = XLSX.read(data, { type: 'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws);
+      const json = await readFirstSpreadsheetSheet(file);
       if (!json.length) { toast.error('El archivo está vacío'); setFilas([]); return; }
       setFilas(json.map((r, i) => parsearFila(r, i + 2))); // fila 1 = encabezado
-    } catch {
-      toast.error('No se pudo leer el archivo. Usa la plantilla de Excel (.xlsx).');
+    } catch (error) {
+      toast.error(error instanceof SpreadsheetReadError
+        ? error.message
+        : 'No se pudo leer el archivo. Usa la plantilla de Excel (.xlsx).');
       setFilas([]);
     }
   };
@@ -190,7 +193,7 @@ export function CargaMasivaCobranzaDialog() {
           <Button type="button" variant="outline" size="sm" onClick={descargarPlantilla}>
             <Download className="mr-1 h-4 w-4" /> Descargar plantilla
           </Button>
-          <input ref={inputRef} type="file" accept=".xlsx,.xls" className="hidden"
+          <input ref={inputRef} type="file" accept=".xlsx" className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) onArchivo(f); }} />
           <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
             <Upload className="mr-1 h-4 w-4" /> {archivo ? 'Cambiar archivo' : 'Subir Excel completado'}
