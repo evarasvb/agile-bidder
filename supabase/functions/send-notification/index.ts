@@ -384,6 +384,41 @@ function getEmailTemplate(tipo: string, data: NotificationRequest['data'], empre
         `
       };
 
+    case 'cambio_licitacion':
+      return {
+        subject: `📌 Cambios en ${data.licitacion_codigo || 'una licitación'} que sigues`,
+        html: `
+          <!DOCTYPE html>
+          <html>
+          <head>${baseStyles}</head>
+          <body>
+            <div class="container">
+              ${headerHtml.replace('linear-gradient(135deg, ' + FIRMAVB_COLORS.primaryLight, 'linear-gradient(135deg, #F59E0B')}
+                <h1>📌 Hubo cambios</h1>
+                <p>Don Evaristo revisó el impacto para ti</p>
+              </div>
+              <div class="content">
+                <div class="info-card" style="border-left-color: #F59E0B;">
+                  <h3>${data.licitacion_titulo || 'Sin título'}</h3>
+                  ${data.licitacion_codigo ? `<p><strong>Código:</strong> ${data.licitacion_codigo}</p>` : ''}
+                  <p><strong>Organismo:</strong> ${data.organismo || 'No especificado'}</p>
+                </div>
+
+                <div style="background: #fffbeb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                  <p style="margin: 0; color: ${FIRMAVB_COLORS.text}; white-space: pre-line;">${data.resumen || 'Revisa el proceso: hubo cambios recientes.'}</p>
+                </div>
+
+                <div style="text-align: center;">
+                  <a href="${FIRMAVB_URL}/licitaciones/${data.licitacion_id || ''}" class="cta-button" style="background: linear-gradient(135deg, #F59E0B, #D97706);">Ver Licitación</a>
+                </div>
+              </div>
+              ${footerHtml}
+            </div>
+          </body>
+          </html>
+        `
+      };
+
     case 'resumen_diario':
       return {
         subject: '📊 Tu resumen diario de licitaciones - FirmaVB',
@@ -558,6 +593,12 @@ serve(async (req) => {
         
         // Check if we should send based on preferences
         if (tipo === 'nuevo_match' && prefs.alerta_nuevos_matches === false) {
+          return new Response(
+            JSON.stringify({ success: false, reason: 'Notification disabled by preferences' }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        if (tipo === 'cambio_licitacion' && prefs.alerta_cambios_guardadas === false) {
           return new Response(
             JSON.stringify({ success: false, reason: 'Notification disabled by preferences' }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
