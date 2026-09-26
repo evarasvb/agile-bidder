@@ -114,6 +114,8 @@ function resumirContexto(c: Ctx, extra: Ctx): string {
   if (lb.length) L.push(`Libros del Experto abiertos: ${lb.slice(0, 4).map((l: Ctx) => l.codigo).join(", ")}`);
   const tk = Array.isArray(c.tickets_abiertos) ? c.tickets_abiertos : [];
   if (tk.length) L.push(`Tickets abiertos con el equipo: ${tk.map((t: Ctx) => `#${t.numero} ${t.asunto} (${t.estado})`).join(" · ")}`);
+  const fv = c.facturas_vencidas;
+  if (fv?.total_vencidas > 0) L.push(`MODO COBRANZA — Facturas vencidas: ${fv.total_vencidas} por ${fmtCLP(fv.monto_total) ?? "un monto"} en total. Detalle: ${(fv.detalle ?? []).slice(0, 3).map((f: Ctx) => `${f.deudor} ${fmtCLP(f.monto) ?? "s/i"} (${f.dias_atraso} días de atraso)`).join(" · ")}. Si viene al caso, ofrécele redactar la carta de cobro con Don Evaristo Abogado (/experto/cobranza).`);
   // Memoria compartida: lo que este cliente conversó en Don Evaristo Abogado o Experto
   // (otros módulos), para no obligarlo a repetir contexto si sigue la conversación aquí.
   const conv = (Array.isArray(c.conversaciones_recientes) ? c.conversaciones_recientes : []).filter((m: Ctx) => m.canal !== "app");
@@ -137,6 +139,11 @@ function saludoProactivo(c: Ctx): string {
     const bases = p.tipo === "licitacion" ? (p.bases_leidas > 0 ? " Ya leí las bases." : p.adjuntos_solo_captcha ? " Las bases están en la sección con captcha: con la extensión se suben solas." : "") : "";
     const accion = p.tipo === "compra_agil" ? "¿Armamos la cotización?" : `¿Revisamos las bases en el [Libro del Experto](/experto/libro/${p.codigo})?`;
     return `Hola${nombre} 👋 Veo que estás en ${tipo} de ${p.organismo}${cierra ? `, cierra **${cierra}**` : ""}. ${match}${bases} ${accion}`;
+  }
+  const fv = c.facturas_vencidas;
+  if (fv?.total_vencidas > 0) {
+    const u = (fv.detalle ?? [])[0];
+    return `Hola${nombre} 👋 Ojo con la plata: tienes ${fv.total_vencidas} factura${fv.total_vencidas === 1 ? "" : "s"} vencida${fv.total_vencidas === 1 ? "" : "s"} por ${fmtCLP(fv.monto_total) ?? "cobrar"}${u ? ` (la más atrasada, de ${u.deudor}, lleva ${u.dias_atraso} días)` : ""}. ¿Te preparo la carta de cobro? 👉 [Ir a Cobranza](/experto/cobranza)`;
   }
   if ((c.inventario?.total ?? 0) === 0) return `Hola${nombre} 👋 Soy Don Evaristo. Veo que aún no cargas tu inventario: sin eso no puedo buscarte oportunidades. Partamos por ahí 👉 [Ir a Inventario](/inventario)`;
   const ca = Array.isArray(c.compras_agiles_con_match) ? c.compras_agiles_con_match : [];
