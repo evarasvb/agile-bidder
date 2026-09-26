@@ -4,8 +4,6 @@ import { AppSidebar } from "./AppSidebar";
 import { StatusBar } from "./StatusBar";
 import { EvaristoChat } from "@/components/soporte/EvaristoChat";
 import { AvisosBell } from "@/components/notifications/AvisosBell";
-import { CreditosProvider } from "@/components/creditos/CreditosProvider";
-import { CreditosBar } from "@/components/creditos/CreditosBar";
 import { BusquedaGlobalProvider, BusquedaGlobalTrigger } from "@/components/busqueda/BusquedaGlobal";
 import { cn } from "@/lib/utils";
 import logoFirmavbBlanco from "@/assets/logo-firmavb-blanco.png";
@@ -41,7 +39,6 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <BusquedaGlobalProvider>
-      <CreditosProvider>
       <div className="min-h-screen bg-background">
         <AppSidebar
           open={sidebarOpen}
@@ -66,8 +63,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               alt="FirmaVB"
               className="h-7 w-auto object-contain"
             />
-            <div className="ml-auto flex items-center gap-2">
-              <CreditosBar />
+            <div className="ml-auto flex items-center gap-1">
               <BusquedaGlobalTrigger variant="icono" className="text-sidebar-foreground hover:text-sidebar-foreground" />
               <AvisosBell className="text-sidebar-foreground hover:text-sidebar-foreground" />
             </div>
@@ -76,10 +72,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           {/* Barra superior escritorio: buscador a la izquierda, campana a la derecha */}
           <div className="hidden lg:flex sticky top-0 z-30 items-center justify-between h-12 px-6 bg-background/95 backdrop-blur border-b">
             <BusquedaGlobalTrigger variant="barra" />
-            <div className="flex items-center gap-3">
-              <CreditosBar />
-              <AvisosBell />
-            </div>
+            <AvisosBell />
           </div>
 
           <StatusBar />
@@ -91,7 +84,6 @@ export function AppLayout({ children }: AppLayoutProps) {
         {/* Asistente de soporte con IA, disponible en toda la app */}
         <EvaristoChat />
       </div>
-      </CreditosProvider>
     </BusquedaGlobalProvider>
   );
 }

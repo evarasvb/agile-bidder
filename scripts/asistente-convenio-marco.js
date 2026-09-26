@@ -65,7 +65,7 @@
   const st = { cat: 0, cats: 0, revisados: 0, ok: 0, documento: 0, ya: 0, sinRef: 0, error: 0 };
   const log = [];
   const pintar = msg => {
-    const saldoTxt = ilimitado ? 'Ilimitado' : (saldo === null ? '—' : `${saldo} créditos`);
+    const saldoTxt = ilimitado ? 'Ilimitado' : (saldo === null ? '—' : `${saldo} cargas de tu plan`);
     box.innerHTML = `<b>${CFG.DRY_RUN ? 'SIMULACIÓN' : 'ASISTENTE CONVENIO MARCO'}</b> · FirmaVB<br>
       Saldo: <b>${saldoTxt}</b> · Categoría ${st.cat}/${st.cats}<br>${msg}<br>
       Revisados: ${st.revisados} · <b>Subidos: ${st.ok}</b><br>
@@ -75,9 +75,9 @@
     const csv = box.querySelector('#cm-csv'); if (csv) csv.onclick = descargar;
   };
   const pintarMuro = () => {
-    box.innerHTML = `<b>Se te acabaron los créditos</b><br>
+    box.innerHTML = `<b>Llegaste al límite de tu plan</b><br>
       El Asistente Convenio Marco se detuvo. Alcanzaste a subir <b>${st.ok}</b> productos.<br>
-      Pasa a Pro y sigue cargando sin frenar 👉 ingresa a FirmaVB.<br>
+      Sube a FirmaVB ERP y sigue cargando sin frenar 👉 ingresa a FirmaVB.<br>
       <button id="cm-csv" style="margin-top:6px">Descargar informe</button>`;
     const csv = box.querySelector('#cm-csv'); if (csv) csv.onclick = descargar;
   };
@@ -121,7 +121,7 @@
       // ── COBRO DE CRÉDITO (antes de guardar) ──────────────────────────
       const cobro = await cobrarCredito(prod.id);
       if (!cobro.ok && cobro.motivo === 'sin_creditos') {
-        reg.estado = 'DETENIDO: sin créditos';
+        reg.estado = 'DETENIDO: límite del plan';
         log.push(reg);
         saldo = cobro.saldo ?? 0;
         detener = true;
@@ -148,7 +148,7 @@
       return;
     }
     if (!CFG.DRY_RUN) {
-      pintar('Verificando tus créditos FirmaVB…');
+      pintar('Verificando tu plan FirmaVB…');
       const chk = await verificarCreditos();
       if (!chk.success) {
         box.innerHTML = `<b>No pude validar tu cuenta FirmaVB</b><br>${chk.error || 'API key inválida o desactivada.'}`;
