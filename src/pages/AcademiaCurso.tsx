@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import logoFirmavbOriginal from "@/assets/logo-firmavb-original.png";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import {
   getCursoBySlug,
@@ -32,6 +33,9 @@ import {
 } from "@/data/academiaCursos";
 import { Seo } from "@/components/Seo";
 import { GraficoView, TablaView, VideoView, QuizView, HerramientaView, EjercicioView } from "@/components/academia/BloquesX10";
+
+// Cuentas que ven los cursos premium sin código (para revisarlos y probarlos).
+const FUNDADORES = ["evaras@firmavb.cl"];
 
 function BloqueView({ bloque }: { bloque: Bloque }) {
   switch (bloque.tipo) {
@@ -255,6 +259,19 @@ export default function AcademiaCurso() {
     if (p) window.history.replaceState({}, "", window.location.pathname);
   }, []);
 
+  // El fundador entra a todos los cursos premium sin código: el servidor verifica su sesión.
+  const { user } = useAuth();
+  const esFundador = !!user?.email && FUNDADORES.includes(user.email.toLowerCase());
+  useEffect(() => {
+    if (!curso?.premium || !esFundador || desbloqueado) return;
+    let vivo = true;
+    supabase.functions.invoke("academia-premium", { body: { action: "fundador", slug: curso.slug, x10: true } })
+      .then(({ data }) => { if (vivo && data?.ok && Array.isArray(data.modulos)) setDesbloqueado(data.modulos as Modulo[]); })
+      .catch(() => { /* sin acceso de fundador: queda la página de venta */ });
+    return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curso?.slug, esFundador]);
+
   if (!curso) {
     return <Navigate to="/academia" replace />;
   }
@@ -351,7 +368,7 @@ export default function AcademiaCurso() {
         <div className="max-w-4xl mx-auto">
           <div className={`${ACENTO[curso.acento].portada} rounded-2xl p-8 md:p-10 text-white shadow-lg`}>
             <Badge className="mb-4 bg-white/20 text-white border-white/30 hover:bg-white/30">
-              Academia FirmaVB · {curso.premium ? "Programa premium" : "Curso gratuito"}
+              Academia FirmaVB · {curso.premium ? "Programa premium" : "Curso gratuito"}{esFundador && desbloqueado ? " · Vista del fundador" : ""}
             </Badge>
             <div className="flex items-start gap-4">
               <span className="text-5xl leading-none">{curso.emoji}</span>

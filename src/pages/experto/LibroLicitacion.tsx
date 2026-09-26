@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
-import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink, Trash2, Paperclip, Printer, Mail, Map as MapIcon, Image as ImageIcon, Presentation, Waves, Download, Receipt, X } from 'lucide-react';
+import { BookOpen, FileText, Upload, Loader2, Send, Sparkles, ClipboardList, ThumbsUp, ThumbsDown, ArrowLeft, Copy, Share2, MessageCircle, ExternalLink, Trash2, Paperclip, Printer, Mail, Map as MapIcon, Image as ImageIcon, Presentation, Waves, Download, Receipt, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useTraerAdjuntos, useAdjuntosLicitacion } from '@/hooks/useAdjuntosLicitacion';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -160,6 +160,8 @@ export default function LibroLicitacion() {
   const algunWord = [...ocupados].some((k) => k.startsWith('word:'));
   const [modalLibroAbierto, setModalLibroAbierto] = useState(false);
   const [tab, setTab] = useState<Entregable>('sala');
+  // Las herramientas de decisión van plegadas por defecto: son clave, pero se piden cuando corresponde.
+  const [herramientasAbiertas, setHerramientasAbiertas] = useState(false);
   const [entregables, setEntregables] = useState<Record<Entregable, string>>({ sala: 'ok', informe: '', matriz: '', estudio: '', bajo_agua: '', anexos: '', mapa: '', infografia: '' });
   const [faltantes, setFaltantes] = useState<string[]>([]);
   const chatRef = useRef<HTMLDivElement>(null);
@@ -212,7 +214,7 @@ export default function LibroLicitacion() {
     setPregunta('');
     // Sin libro abierto, un ID de licitación solo abre su libro.
     if (!cod && RE_ID.test(p.toUpperCase()) && p.length < 20) { navigate(`/experto/libro/${idEn(p)}`); return; }
-    const historial = msgs.slice(-6).map((m) => ({ role: m.rol === 'yo' ? 'user' : 'assistant', content: m.texto }));
+    const historial = [...(cod ? [{ role: 'assistant', content: guiaLibro() }] : []), ...msgs.slice(cod ? -5 : -6).map((m) => ({ role: m.rol === 'yo' ? 'user' : 'assistant', content: m.texto }))];
     setMsgs((m) => [...m, { rol: 'yo', texto: p }, { rol: 'exp', texto: '' }]);
     empezar('chat');
     try {
@@ -527,6 +529,21 @@ export default function LibroLicitacion() {
     competencia: (f?.competencia ?? []).slice(0, 4).map((c: any) => ({ proveedor: c.proveedor, ordenes: c.ordenes, precio: c.precio_unit_mediano })),
     items: (f?.items ?? []).slice(0, 6).map((i: any) => i.producto),
   });
+  // Cómo lo hacemos en FirmaVB: cuándo se pide cada herramienta. Se muestra al pasar el mouse y se le entrega al Experto para que guíe.
+  const GUIA_EVARISTO: Record<Entregable, string> = {
+    sala: 'Tu tablero: bases, veredicto, requisitos, anexos y aprobación. Es el camino guiado; si sigues sus pasos no te saltas nada.',
+    informe: 'Primero. Informe de trabajo con veredicto: postular, con reservas o descartar. Si dice descartar, no gastes nada más.',
+    matriz: 'Cuando el informe dice postular. Criterios y pesos sacados de las bases, con simulación de tu puntaje y del rival. Se usa antes de fijar el precio.',
+    estudio: 'Solo licitaciones grandes (sobre 1.000 UTM) o con bases enredadas. Análisis completo de bases y anexos, trampas y puntos de puntaje.',
+    bajo_agua: 'Cuando vas en serio. Historial del organismo, proveedor recurrente, compras ágiles paralelas, reclamos de pago, lobby y noticias. Cambia precio y plazo.',
+    anexos: 'El día que armas la oferta. Anexos administrativos y técnicos con tus datos, en Word, para revisar y firmar.',
+    mapa: 'Para explicarle la licitación a tu equipo o pedirle a Evaristo que profundice en un nodo.',
+    infografia: 'Para compartir por WhatsApp o LinkedIn. No usa IA; se arma con lo que ya generaste.',
+  };
+  const generadas = ENTREGABLES.filter((k) => k !== 'sala' && entregables[k]);
+  const siguiente: Entregable | null = !entregables.informe ? 'informe' : !entregables.matriz ? 'matriz' : !entregables.bajo_agua ? 'bajo_agua' : !entregables.anexos ? 'anexos' : null;
+  // Texto que se le pasa al Experto como primer turno para que recomiende la herramienta correcta.
+  const guiaLibro = () => `Guía del Libro de licitación de FirmaVB (cómo lo hacemos): ${ENTREGABLES.map((k) => `${nombresEntregable[k]}: ${GUIA_EVARISTO[k]}`).join(' | ')}. Estado del Libro ${cod}: ${ENTREGABLES.map((k) => `${nombresEntregable[k]} ${k === 'sala' || entregables[k] ? 'lista' : 'sin generar'}`).join(', ')}. Bases cargadas: ${bases.length ? 'sí' : 'no'}. Si te preguntan qué herramienta usar, recomienda la siguiente del camino y explica por qué, como lo haría Evaristo.`;
   const nombresEntregable: Record<Entregable, string> = { sala: 'Sala de postulación', informe: 'Informe de trabajo', matriz: 'Matriz de postulación', estudio: 'Estudio profundo', bajo_agua: 'Bajo el Agua', anexos: 'Anexos', mapa: 'Mapa conceptual', infografia: 'Infografía' };
   const compartirEntregable = async () => {
     const nombres = nombresEntregable;
@@ -757,7 +774,7 @@ export default function LibroLicitacion() {
               {msgs.length === 0 && (
                 <div className="text-sm text-muted-foreground space-y-2">
                   <p>{cod ? 'Pregúntame sobre esta licitación con las fuentes de la izquierda. Ejemplos:' : 'Pregúntame lo que quieras sobre vender al Estado: ley, garantías, un organismo, qué se está licitando, noticias. Si me das un ID de licitación, abro su libro con fuentes y entregables. Ejemplos:'}</p>
-                  {(cod ? ['¿Vale la pena postular? ¿Qué me juega en contra?', '¿Cuáles son los criterios de evaluación y cómo gano puntos?', '¿Qué garantías y multas tiene y qué riesgo veo?', '¿A qué precio debería ofertar según lo que se ha pagado?']
+                  {(cod ? ['¿Qué herramienta del Libro me conviene ahora?', '¿Vale la pena postular? ¿Qué me juega en contra?', '¿Cuáles son los criterios de evaluación y cómo gano puntos?', '¿Qué garantías y multas tiene y qué riesgo veo?', '¿A qué precio debería ofertar según lo que se ha pagado?']
                     : ['¿Cómo funciona una compra ágil y cómo la gano?', '¿Es riesgoso venderle a la Municipalidad de Puerto Montt? ¿Cómo paga?', '¿Hay licitaciones abiertas de servicios de aseo?', '¿Qué garantía de seriedad me pueden pedir y cuándo?']).map((e) => (
                     <button key={e} className="block text-left rounded-full border px-3 py-1 hover:border-primary" onClick={() => setPregunta(e)}>{e}</button>
                   ))}
@@ -837,9 +854,19 @@ export default function LibroLicitacion() {
       const panelEntregables = cod ? (
         <Card className="flex flex-col h-full overflow-y-auto">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Entregables</CardTitle>
-            {/* Tarjetas estilo "Studio" (NotebookLM): ícono de color + nombre, en vez de una fila de botones. */}
-            <div className="grid grid-cols-2 gap-2 pt-1">
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Herramientas de decisión</CardTitle>
+              <button type="button" onClick={() => setHerramientasAbiertas((v) => !v)} aria-expanded={herramientasAbiertas} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                {herramientasAbiertas ? <><ChevronUp className="h-3.5 w-3.5" aria-hidden="true" />Ocultar</> : <><ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />Ver las {ENTREGABLES.length}</>}
+              </button>
+            </div>
+            {/* Discretas por diseño: son clave para decidir, pero no todos saben usarlas. Evaristo guía cuál pedir y cuándo. */}
+            <p className="text-xs text-muted-foreground">
+              {generadas.length ? `${generadas.length} generada${generadas.length > 1 ? 's' : ''}: ${generadas.map((k) => nombresEntregable[k]).join(', ')}. ` : 'Ninguna generada todavía. '}
+              {siguiente && <>Evaristo sugiere ahora: <button type="button" className="font-medium text-firmavb-blue hover:underline" disabled={generandoEntregable} onClick={() => entregables[siguiente] ? setTab(siguiente) : generar(siguiente)}>{nombresEntregable[siguiente]}</button>. </>}
+              <button type="button" className="underline" onClick={() => { setPregunta('¿Qué herramienta del Libro me conviene ahora y cómo la usarías tú?'); if (!escritorio) setVista('chat'); }}>Preguntarle a Evaristo</button>
+            </p>
+            {herramientasAbiertas && <div className="grid grid-cols-2 gap-2 pt-1">
               {([
                 ['sala', 'Sala de postulación', '', BookOpen, 'bg-indigo-100 text-indigo-700'],
                 ['informe', 'Informe de trabajo', '', FileText, 'bg-blue-100 text-blue-700'],
@@ -852,6 +879,7 @@ export default function LibroLicitacion() {
               ] as [Entregable, string, string, typeof FileText, string][]).map(([k, n, tag, Icono, color]) => (
                 <button
                   key={k}
+                  title={GUIA_EVARISTO[k]}
                   onClick={() => entregables[k] ? setTab(k) : generar(k)}
                   disabled={generandoEntregable && !ocupados.has(k)}
                   className={`flex items-center gap-2 rounded-xl border p-2.5 text-left transition-colors disabled:opacity-50 ${tab === k ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/60'}`}
@@ -865,7 +893,7 @@ export default function LibroLicitacion() {
                   </span>
                 </button>
               ))}
-            </div>
+            </div>}
           </CardHeader>
           <CardContent className="text-sm flex-1">
             {tab === 'sala' ? (

@@ -7,6 +7,8 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 // después de validar el código de acceso o el correo de la compra.
 
 const PLANILLAS = '/media/academia/planillas-programa-pro.xlsx';
+// Cuentas que abren cualquier curso premium sin código (revisar y probar). Se verifica la sesión, no el correo enviado.
+const FUNDADORES = ['evaras@firmavb.cl'];
 
 const CONTENIDO: Record<string, unknown> = {
   'programa-pro-adjudica-al-estado': [
@@ -136,6 +138,14 @@ Deno.serve(async (req) => {
         ...m,
         lecciones: m.lecciones.map((l) => ({ ...l, bloques: (l.bloques || []).filter((b) => clasicos.has(b.tipo)) })),
       }));
+    }
+
+    if (action === 'fundador') {
+      const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
+      const { data: sesion } = jwt ? await admin.auth.getUser(jwt) : { data: { user: null } };
+      const mail = String(sesion?.user?.email || '').toLowerCase();
+      if (!mail || !FUNDADORES.includes(mail)) return json({ ok: false, error: 'Solo el fundador abre los cursos sin código.' }, 403);
+      return json({ ok: true, modulos: contenido });
     }
 
     if (action === 'validar') {
