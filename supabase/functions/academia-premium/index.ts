@@ -19,21 +19,24 @@ import {
 } from './logic.ts';
 
 const PLANILLAS = PRIVATE_PLANILLAS_PLACEHOLDER;
+// Cuentas que abren cualquier curso premium sin código (revisar y probar). Se verifica la sesión, no el correo enviado.
+const FUNDADORES = ['evaras@firmavb.cl'];
 
 // Contenido de cursos premium. Los cursos base viven aquí; los nuevos pueden
-// vivir en la tabla academia_contenido (fallback). Todo SOLO en el servidor.
+// vivir en la tabla academia_contenido (fuente de verdad, editable sin
+// redeploy). Todo SOLO en el servidor.
 const CONTENIDO: Record<string, unknown> = {
   'programa-pro-adjudica-al-estado': [
     { titulo: 'Módulo 1 · El terreno de juego (y cómo pensar)', lecciones: [
       { titulo: 'Los 3 mitos que matan al proveedor nuevo', bloques: [
         { tipo: 'parrafo', texto: 'Antes de lo técnico: tu mentalidad determina tu éxito. Hay 3 mitos que destruyen a los nuevos proveedores. Derríbalos.' },
-        { tipo: 'lista', items: ['Mito \"el Estado paga tarde y mal\": FALSO. El Estado paga en plazos definidos por ley (30 días). Es más predecible que muchos clientes privados.','Mito \"solo ganan los que tienen pituto\": FALSO. ChileCompra es de los sistemas más transparentes del mundo. Todo queda registrado. Gana quien hace la mejor oferta.','Mito \"necesitas ser grande\": FALSO. El 70% de las compras del Estado son de menos de 100 UTM. Ahí está tu oportunidad.'] },
+        { tipo: 'lista', items: ['Mito "el Estado paga tarde y mal": FALSO. El Estado paga en plazos definidos por ley (30 días). Es más predecible que muchos clientes privados.','Mito "solo ganan los que tienen pituto": FALSO. ChileCompra es de los sistemas más transparentes del mundo. Todo queda registrado. Gana quien hace la mejor oferta.','Mito "necesitas ser grande": FALSO. El 70% de las compras del Estado son de menos de 100 UTM. Ahí está tu oportunidad.'] },
         { tipo: 'tip', texto: 'Mentalidad de Surfista de Licitaciones: persistencia (no ganas la primera ni la segunda, pero aprendes), profesionalismo (cumple siempre) y visión de largo plazo (es un negocio, no un golpe de suerte).' } ] },
       { titulo: 'Compra Ágil, Licitación, Convenio Marco y Trato Directo', bloques: [
         { tipo: 'parrafo', texto: 'Según el monto (en UTM) y la urgencia, el Estado usa distintos mecanismos. Elegir bien dónde competir es media adjudicación. Base legal: Ley 19.886 y sus principios: libre concurrencia, igualdad, transparencia y probidad.' },
         { tipo: 'subtitulo', texto: 'Umbrales por monto (UTM ≈ $65.000; verifica el valor vigente)' },
         { tipo: 'lista', items: ['Menos de 3 UTM: compra directa, sin cotizar.','3 a 10 UTM: mínimo 3 cotizaciones.','10 a 100 UTM: licitación privada o convenio (aquí vive la Compra Ágil, hasta 100 UTM ≈ $6,5 millones).','100 a 1.000 UTM: licitación pública.','Más de 1.000 UTM: licitación pública con más requisitos y garantías.'] },
-        { tipo: 'lista', items: ['Compra Ágil: rápida, sin garantías. Tu puerta de entrada y tu fábrica de flujo de caja.','Licitación pública: bases formales, criterios de evaluación, a veces garantías.','Convenio Marco: el \"santo grial\" — catálogo donde te compran directo, sin licitar cada vez.','Trato Directo: excepcional, solo con causal justificada por ley.'] },
+        { tipo: 'lista', items: ['Compra Ágil: rápida, sin garantías. Tu puerta de entrada y tu fábrica de flujo de caja.','Licitación pública: bases formales, criterios de evaluación, a veces garantías.','Convenio Marco: el "santo grial" — catálogo donde te compran directo, sin licitar cada vez.','Trato Directo: excepcional, solo con causal justificada por ley.'] },
         { tipo: 'tip', texto: 'Si estás partiendo, la Compra Ágil es tu mejor cancha: menos fricción, ciclos cortos, aprendes rápido.' },
         { tipo: 'descarga', texto: 'Descarga el Kit de Planillas de Control (Excel)', url: PLANILLAS } ] },
       { titulo: 'Empieza donde hay menos pelea', bloques: [
@@ -47,14 +50,14 @@ const CONTENIDO: Record<string, unknown> = {
         { tipo: 'subtitulo', texto: 'Checklist antes de decidir' },
         { tipo: 'lista', items: ['¿Tengo todos los documentos que piden?','¿Cumplo los requisitos técnicos?','¿El plazo de entrega es realista para mí?','¿Las multas son razonables?','¿El precio me deja margen?','¿Entiendo los criterios de evaluación?'] },
         { tipo: 'subtitulo', texto: 'El foro de preguntas: tu arma secreta' },
-        { tipo: 'lista', items: ['Pregunta aclaraciones técnicas (\"¿se acepta certificación en trámite?\").','Pide flexibilidades (\"¿se aceptan productos equivalentes que cumplan las especificaciones?\").','Lee TODAS las preguntas de otros: las respuestas son públicas y a veces revelan oro.','Si algo está mal redactado en las bases, pregunta: a veces corrigen a tu favor.'] },
+        { tipo: 'lista', items: ['Pregunta aclaraciones técnicas ("¿se acepta certificación en trámite?").','Pide flexibilidades ("¿se aceptan productos equivalentes que cumplan las especificaciones?").','Lee TODAS las preguntas de otros: las respuestas son públicas y a veces revelan oro.','Si algo está mal redactado en las bases, pregunta: a veces corrigen a tu favor.'] },
         { tipo: 'tip', texto: 'Marca cada requisito en las bases y respóndelo punto por punto. La mayoría pierde por no responder algo que sí pedían.' },
-        { tipo: 'descarga', texto: 'Usa la planilla \"4. Admisibilidad\" del Kit', url: PLANILLAS } ] },
+        { tipo: 'descarga', texto: 'Usa la planilla "4. Admisibilidad" del Kit', url: PLANILLAS } ] },
       { titulo: 'Estudia el pasado: adjudicados y ofertas técnicas', bloques: [
         { tipo: 'parrafo', texto: 'El pasado te dice el futuro. Mercado Público guarda el historial de adjudicaciones: úsalo. Antes de ofertar, revisa procesos anteriores de la misma institución por el mismo producto.' },
-        { tipo: 'lista', items: ['Quién ganó y hace cuánto (identifica al incumbente).','Precio ganador y precio unitario (divide por la cantidad).','Qué presentó en la oferta técnica y qué valoró el comprador.','Banderas rojas: especificaciones \"a la medida\" de alguien, plazos muy cortos, o el mismo proveedor ganando siempre.'] },
+        { tipo: 'lista', items: ['Quién ganó y hace cuánto (identifica al incumbente).','Precio ganador y precio unitario (divide por la cantidad).','Qué presentó en la oferta técnica y qué valoró el comprador.','Banderas rojas: especificaciones "a la medida" de alguien, plazos muy cortos, o el mismo proveedor ganando siempre.'] },
         { tipo: 'tip', texto: 'Si el año pasado adjudicaron a X precio, ya sabes el rango para competir. No adivines: oferta con datos.' },
-        { tipo: 'descarga', texto: 'Usa la planilla \"2. Adjudicados\" del Kit', url: PLANILLAS } ] },
+        { tipo: 'descarga', texto: 'Usa la planilla "2. Adjudicados" del Kit', url: PLANILLAS } ] },
       { titulo: 'Investiga a la institución', bloques: [
         { tipo: 'parrafo', texto: 'Detrás de cada compra hay una institución con contexto. Conocerla te ayuda a anticipar cómo decide y qué le importa hoy.' },
         { tipo: 'lista', items: ['Situación pública actual: noticias, presupuesto, prioridades del momento.','LinkedIn: quiénes deciden las compras y qué publican.','Su historial en Mercado Público: qué compra, cada cuánto y a quién.','Comentarios y señales en redes sobre la institución.'] } ] } ] },
@@ -64,7 +67,7 @@ const CONTENIDO: Record<string, unknown> = {
         { tipo: 'subtitulo', texto: 'Semáforo de conducta de pago' },
         { tipo: 'lista', items: ['🟢 Bueno: paga en 30 días o menos.','🟡 Regular: entre 31 y 60 días.','🔴 Lento: más de 60 días — ajusta tu precio o evita.'] },
         { tipo: 'tip', texto: 'Un buen margen con pago lento puede quebrarte. Prioriza a los 🟢 para cuidar tu flujo de caja.' },
-        { tipo: 'descarga', texto: 'Usa la planilla \"5. Conductas de Pago\" del Kit', url: PLANILLAS } ] },
+        { tipo: 'descarga', texto: 'Usa la planilla "5. Conductas de Pago" del Kit', url: PLANILLAS } ] },
       { titulo: 'Detecta fragmentación: ¿hay una compra ágil de lo mismo?', bloques: [
         { tipo: 'parrafo', texto: 'Señal clave: revisa si la misma institución tiene, en paralelo, una Compra Ágil por lo mismo que está licitando. Puede indicar fragmentación, urgencia, o una vía más rápida para entrar.' },
         { tipo: 'lista', items: ['Cruza la licitación con las Compras Ágiles recientes de la misma institución.','Compara fechas y montos: si compran lo mismo por varias vías, algo dice.','Úsalo a tu favor: a veces la Compra Ágil es la puerta más rápida al mismo cliente.'] },
@@ -75,14 +78,14 @@ const CONTENIDO: Record<string, unknown> = {
         { tipo: 'subtitulo', texto: 'Errores que te eliminan' },
         { tipo: 'lista', items: ['Subir un archivo en el sobre equivocado.','Documento sin firmar o archivo que no abre.','Precio en formato incorrecto.','Enviar pasada la hora límite (ni un minuto). Envía con 2+ horas de anticipación: los servidores colapsan cerca del cierre.'] },
         { tipo: 'tip', texto: 'Ponte nota tú mismo contra cada criterio de evaluación. Si no llegas al puntaje ganador, ajusta antes de enviar.' },
-        { tipo: 'descarga', texto: 'Usa las planillas \"1. Ir o No Ir\" y \"6. Seguimiento\" del Kit', url: PLANILLAS } ] } ] },
+        { tipo: 'descarga', texto: 'Usa las planillas "1. Ir o No Ir" y "6. Seguimiento" del Kit', url: PLANILLAS } ] } ] },
     { titulo: 'Módulo 4 · Precio ganador, garantías y automatización', lecciones: [
       { titulo: 'Estrategia de precio (sin regalar tu margen)', bloques: [
         { tipo: 'parrafo', texto: 'El precio importa, pero NO es todo: muchas licitaciones dan 40-60% al precio y el resto a calidad. Calcula con método y compite con datos, no con corazonadas.' },
         { tipo: 'subtitulo', texto: 'Fórmula' },
         { tipo: 'lista', items: ['Costo total = producto + flete + garantías + tiempo de tu equipo.','Precio neto = Costo total × (1 + margen mínimo).','Precio final = Precio neto + IVA (19%).','Investiga la competencia: mira quién ganó antes y a qué precio (historial en MP).'] },
         { tipo: 'tip', texto: 'Nunca bajes tanto que no puedas cumplir. Rematar precios te hace ganar ventas que te cuestan plata.' },
-        { tipo: 'descarga', texto: 'Usa la planilla \"3. Precio y Margen\" del Kit', url: PLANILLAS } ] },
+        { tipo: 'descarga', texto: 'Usa la planilla "3. Precio y Margen" del Kit', url: PLANILLAS } ] },
       { titulo: 'Garantías, adjudicación y ejecución sin morir', bloques: [
         { tipo: 'parrafo', texto: 'Ganar es fácil; cumplir es lo difícil. Aquí es donde muchos proveedores mueren. Conoce las garantías y ejecuta impecable.' },
         { tipo: 'lista', items: ['Garantía de fiel cumplimiento: normalmente 5-10% del monto; puede ser boleta bancaria, póliza o vale vista (la póliza suele ser más barata).','Firma el contrato dentro del plazo (10-15 días); si no firmas, pierdes y arriesgas inhabilidad.','Cumple los plazos: las multas son automáticas y se descuentan del pago; una multa se come tu margen.','Entrega exactamente lo ofertado; documenta todo (guías, actas) y comunica los problemas antes, nunca después.'] },
@@ -101,12 +104,12 @@ const CONTENIDO: Record<string, unknown> = {
         { tipo: 'tip', texto: 'Registrarte no cuesta nada. El costo es no estar: si no estás, no te pueden comprar.' } ] },
       { titulo: 'Inscríbete y queda HÁBIL (el pasaporte para cotizar)', bloques: [
         { tipo: 'parrafo', texto: 'ChileProveedores es el registro oficial. Pero estar inscrito no basta: necesitas estar en ESTADO HÁBIL, con tus documentos al día.' },
-        { tipo: 'lista', items: ['Certificado de antecedentes laborales y previsionales (F30-1) en previred.com — gratis, vence cada mes.','Certificado de deuda fiscal (TGR) en tesoreria.cl — si debes impuestos, no puedes cotizar.','Certificado de quiebras en boletinconcursal.cl.','Rubros: agrega TODOS los que apliquen (no solo \"lápices\": papel, archivadores, tintas...).'] },
+        { tipo: 'lista', items: ['Certificado de antecedentes laborales y previsionales (F30-1) en previred.com — gratis, vence cada mes.','Certificado de deuda fiscal (TGR) en tesoreria.cl — si debes impuestos, no puedes cotizar.','Certificado de quiebras en boletinconcursal.cl.','Rubros: agrega TODOS los que apliquen (no solo "lápices": papel, archivadores, tintas...).'] },
         { tipo: 'tip', texto: 'Crea un recordatorio mensual para renovar el F30-1. Si se te vence un viernes y hay licitación el lunes, perdiste.' } ] } ] },
     { titulo: 'Módulo 2 · Tu primera venta', lecciones: [
       { titulo: 'Encuentra tu primera oportunidad (Compra Ágil)', bloques: [
         { tipo: 'parrafo', texto: 'La Compra Ágil (hasta 100 UTM) es la puerta de entrada perfecta: rápida y sin trámites pesados. El 70% de las compras del Estado son bajo 100 UTM: ahí está tu oportunidad.' },
-        { tipo: 'lista', items: ['Define 2 o 3 palabras clave de lo que vendes y activa alertas por rubro.','Filtra por región y monto (estado \"Publicada\") para no perder tiempo.','Prioriza las que alcanzas a preparar bien antes del cierre.'] },
+        { tipo: 'lista', items: ['Define 2 o 3 palabras clave de lo que vendes y activa alertas por rubro.','Filtra por región y monto (estado "Publicada") para no perder tiempo.','Prioriza las que alcanzas a preparar bien antes del cierre.'] },
         { tipo: 'tip', texto: 'FirmaVB puede buscar por ti y mostrarte las que calzan con tu inventario, con un puntaje de match.' } ] },
       { titulo: 'Cotiza y postula sin miedo', bloques: [
         { tipo: 'parrafo', texto: 'Ofertar por primera vez asusta, pero es simple si respondes exactamente lo que piden.' },
@@ -147,11 +150,22 @@ async function getCourseContent(
   admin: SupabaseClient,
   slug: string,
 ) {
-  const embedded = CONTENIDO[slug];
-  if (embedded) return embedded;
+  // Primero la tabla (editable sin redeploy); el respaldo en código solo si no hay fila.
   const { data } = await admin.from('academia_contenido')
     .select('modulos').eq('slug', slug).maybeSingle();
-  return data?.modulos ?? undefined;
+  return data?.modulos ?? CONTENIDO[slug];
+}
+
+// Los bloques "x10" (gráfico, tabla, video, quiz, herramienta, ejercicio) solo se
+// entregan a la app que sabe dibujarlos (envía x10: true); una app antigua recibe
+// el contenido clásico en vez de espacios en blanco.
+function filtrarBloquesClasicos(contenido: unknown) {
+  if (!Array.isArray(contenido)) return contenido;
+  const clasicos = new Set(['parrafo', 'subtitulo', 'lista', 'tip', 'descarga', 'caso', 'dato', 'cta']);
+  return (contenido as { titulo: string; lecciones: { titulo: string; bloques: { tipo: string }[] }[] }[]).map((m) => ({
+    ...m,
+    lecciones: m.lecciones.map((l) => ({ ...l, bloques: (l.bloques || []).filter((b) => clasicos.has(b.tipo)) })),
+  }));
 }
 
 async function sendRecoveryEmail(
@@ -181,11 +195,22 @@ async function sendRecoveryEmail(
   if (!response.ok) throw new Error('recovery_email_failed');
 }
 
+async function authorizedContent(admin: SupabaseClient, contenido: unknown) {
+  if (!containsPrivatePlanillasDownload(contenido)) return contenido;
+  const { data: signedDownload, error: signedDownloadError } = await admin.storage
+    .from(PRIVATE_ACADEMY_BUCKET)
+    .createSignedUrl(PRIVATE_PLANILLAS_OBJECT_PATH, 5 * 60);
+  if (signedDownloadError || !signedDownload?.signedUrl) {
+    return null;
+  }
+  return attachPrivatePlanillasUrl(contenido, signedDownload.signedUrl);
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') return json({ ok: false, error: 'Método no permitido' }, 405);
   try {
-    const { action, slug: rawSlug, codigo, email } = await req.json();
+    const { action, slug: rawSlug, codigo, email, x10 } = await req.json();
     const slug = normalizeCourseSlug(rawSlug);
     if (!slug) return json({ ok: false, error: 'Curso no válido' }, 400);
 
@@ -193,6 +218,20 @@ Deno.serve(async (req) => {
     const serviceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     if (!supabaseUrl || !serviceRole) return json({ ok: false, error: 'Servicio no disponible' }, 503);
     const admin = createClient(supabaseUrl, serviceRole);
+
+    const contenidoCrudo = await getCourseContent(admin, slug);
+    if (!contenidoCrudo) return json({ ok: false, error: 'Curso no encontrado' }, 404);
+    const contenido = x10 === true ? contenidoCrudo : filtrarBloquesClasicos(contenidoCrudo);
+
+    if (action === 'fundador') {
+      const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
+      const { data: sesion } = jwt ? await admin.auth.getUser(jwt) : { data: { user: null } };
+      const mail = String(sesion?.user?.email || '').toLowerCase();
+      if (!mail || !FUNDADORES.includes(mail)) return json({ ok: false, error: 'Solo el fundador abre los cursos sin código.' }, 403);
+      const contenidoAutorizado = await authorizedContent(admin, contenido);
+      if (!contenidoAutorizado) return json({ ok: false, error: 'Material temporalmente no disponible.' }, 503);
+      return json({ ok: true, modulos: contenidoAutorizado });
+    }
 
     if (action === 'validar') {
       const code = String(codigo || '').trim().toUpperCase();
@@ -218,24 +257,12 @@ Deno.serve(async (req) => {
       if (error) return json({ ok: false, error: 'Error validando el código.' }, 500);
       if (!data || data.estado === 'revocado') return json({ ok: false, error: 'Código inválido. Revísalo o escríbenos.' }, 200);
 
-      const contenido = await getCourseContent(admin, slug);
-      if (!contenido) return json({ ok: false, error: 'Curso no encontrado' }, 404);
-      let contenidoAutorizado = contenido;
-      if (containsPrivatePlanillasDownload(contenido)) {
-        const { data: signedDownload, error: signedDownloadError } = await admin.storage
-          .from(PRIVATE_ACADEMY_BUCKET)
-          .createSignedUrl(PRIVATE_PLANILLAS_OBJECT_PATH, 5 * 60);
-        if (signedDownloadError || !signedDownload?.signedUrl) {
-          return json({ ok: false, error: 'Material temporalmente no disponible.' }, 503);
-        }
-        contenidoAutorizado = attachPrivatePlanillasUrl(
-          contenido,
-          signedDownload.signedUrl,
-        );
-      }
+      const contenidoAutorizado = await authorizedContent(admin, contenido);
+      if (!contenidoAutorizado) return json({ ok: false, error: 'Material temporalmente no disponible.' }, 503);
       if (data.estado === 'disponible') {
         const { error: updateError } = await admin.from('academia_accesos')
-          .update({ estado: 'usado' }).eq('id', data.id).neq('estado', 'revocado');
+          .update({ estado: 'usado', asignado_at: new Date().toISOString(), email: email || null })
+          .eq('id', data.id).neq('estado', 'revocado');
         if (updateError) return json({ ok: false, error: 'Error validando el código.' }, 500);
       }
       return json({ ok: true, modulos: contenidoAutorizado });

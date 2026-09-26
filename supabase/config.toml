@@ -19,12 +19,6 @@ verify_jwt = true
 [functions.create-user]
 verify_jwt = true
 
-[functions.evaristo-api]
-verify_jwt = true
-
-[functions.evaristo-autonomo]
-verify_jwt = true
-
 # extension-api uses x-api-key header from Chrome extension (not Supabase JWT)
 [functions.extension-api]
 verify_jwt = false

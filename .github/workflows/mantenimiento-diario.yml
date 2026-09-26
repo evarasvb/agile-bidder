@@ -1,7 +1,9 @@
-# Evaristo - Sistema de Mantenimiento Automatico
+# Mantenimiento diario automático: build, lint, tests y un chequeo de salud
+# cosmético del repo. El nombre anterior ("Evaristo Maintenance") sugería que
+# tocaba el asistente Don Evaristo — no lo hace, es CI genérico.
 # Ejecuta cada 24 horas para mantener www.firmavb.cl operativo
 
-name: Evaristo Maintenance
+name: Mantenimiento diario
 
 on:
   schedule:
