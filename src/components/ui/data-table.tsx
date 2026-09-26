@@ -221,7 +221,11 @@ export function DataTable<T>({
   // RPC con ILIKE de comodín inicial, sin cancelar la anterior), así que
   // escribir un término de 10 caracteres lanzaría 10 búsquedas simultáneas.
   useEffect(() => {
-    const t = setTimeout(() => onSearchChange?.(busqueda), 400);
+    // El servidor solo trata NULL/'' como "sin filtro"; un término con
+    // espacios de sobra (al final, o solo espacios) viaja tal cual dentro
+    // del ILIKE y puede no matchear nada aunque el texto exista. El input
+    // conserva lo que el usuario escribió tal cual.
+    const t = setTimeout(() => onSearchChange?.(busqueda.trim()), 400);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [busqueda]);
