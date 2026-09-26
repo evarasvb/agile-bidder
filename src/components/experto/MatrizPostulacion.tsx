@@ -3,11 +3,11 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { FileSpreadsheet, FileText, Printer } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { compartirPdfExperto } from '@/services/expertoPdf';
 import { matrizAExcelPro } from '@/services/matrizExcel';
 import { ESTADO_LABEL, colorEstadoRequisito } from '@/lib/estadoRequisito';
+import { downloadSpreadsheetWorkbook, type SpreadsheetSheet } from '@/lib/excelFiles';
 
 export interface Matriz { titulo?: string; resumen?: string; codigo?: string; generada_en?: string; umbral_adjudicacion?: any; admisibilidad?: any[]; evaluacion?: any[]; anexos?: any[]; reglas_especiales?: any[]; tareas?: any[]; fechas?: any[]; garantias?: any[]; secuencia_carga?: any[]; pendientes_humanos?: any[] }
 // Misma lógica que las fórmulas del Excel: la entrada del usuario define el estado.
@@ -39,16 +39,20 @@ const colorEstado = colorEstadoRequisito;
 const filas = (m: Matriz, k: keyof Matriz) => (Array.isArray(m[k]) ? (m[k] as any[]).map((r) => (typeof r === 'string' ? { texto: r } : r)) : []);
 const txt = (v: any) => v == null ? '' : typeof v === 'boolean' ? (v ? 'Sí' : 'No') : String(v);
 
-export function matrizAExcel(m: Matriz) {
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[m.titulo ?? 'Matriz de postulación'], [m.resumen ?? ''], ['Generada con Don Evaristo · firmavb.cl', m.generada_en ?? '']]), 'Resumen');
+export async function matrizAExcel(m: Matriz) {
+  const sheets: SpreadsheetSheet[] = [{
+    name: 'Resumen',
+    rows: [[m.titulo ?? 'Matriz de postulación'], [m.resumen ?? ''], ['Generada con Don Evaristo · firmavb.cl', m.generada_en ?? '']],
+  }];
   for (const s of SECCIONES) {
     const f = filas(m, s.clave); if (!f.length) continue;
-    const ws = XLSX.utils.aoa_to_sheet([s.cols.map((c) => c[1]), ...f.map((r) => s.cols.map((c) => c[0] === 'estado' ? ESTADOS[r[c[0]]] ?? txt(r[c[0]]) : txt(r[c[0]])))]);
-    ws['!cols'] = s.cols.map((c) => ({ wch: c[0] === 'estado' ? 12 : c[0] === 'fuente' || c[0] === 'plazo' || c[0] === 'ponderacion' ? 18 : 42 }));
-    XLSX.utils.book_append_sheet(wb, ws, s.titulo.slice(0, 28).replace(/[\\/?*[\]:]/g, ' '));
+    sheets.push({
+      name: s.titulo.slice(0, 28).replace(/[\\/?*[\]:]/g, ' '),
+      rows: [s.cols.map((c) => c[1]), ...f.map((r) => s.cols.map((c) => c[0] === 'estado' ? ESTADOS[r[c[0]]] ?? txt(r[c[0]]) : txt(r[c[0]])))],
+      columnWidths: s.cols.map((c) => c[0] === 'estado' ? 12 : c[0] === 'fuente' || c[0] === 'plazo' || c[0] === 'ponderacion' ? 18 : 42),
+    });
   }
-  XLSX.writeFile(wb, `${m.codigo ?? 'licitacion'}-matriz-postulacion.xlsx`);
+  await downloadSpreadsheetWorkbook(`${m.codigo ?? 'licitacion'}-matriz-postulacion.xlsx`, sheets);
 }
 export function matrizAMarkdown(m: Matriz): string {
   const out: string[] = [];

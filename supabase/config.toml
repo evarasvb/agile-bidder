@@ -19,12 +19,6 @@ verify_jwt = true
 [functions.create-user]
 verify_jwt = true
 
-[functions.evaristo-api]
-verify_jwt = true
-
-[functions.evaristo-autonomo]
-verify_jwt = true
-
 # extension-api uses x-api-key header from Chrome extension (not Supabase JWT)
 [functions.extension-api]
 verify_jwt = false
@@ -93,6 +87,17 @@ verify_jwt = false
 
 [functions.marketing-ejecutar]
 verify_jwt = true
+
+# experto-consultar allows anonymous use; authenticated users are validated in the handler.
+[functions.experto-consultar]
+verify_jwt = false
+
+# These functions validate the user JWT (or the exact service-role key) in the handler.
+[functions.abogado-consultar]
+verify_jwt = false
+
+[functions.experto-pptx]
+verify_jwt = false
 
 # extract-proveedores-instituciones is called by cron job (public access)
 [functions.extract-proveedores-instituciones]

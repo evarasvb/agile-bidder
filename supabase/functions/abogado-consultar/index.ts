@@ -5,6 +5,8 @@
 // y los mismos datos de organismos que ya usa Don Evaristo Experto.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { fetchClaudeComoOpenAI } from "../_shared/claudeFallback.ts";
+import { textoPanorama } from "../_shared/panorama.ts";
+import { guardarTurnoEvaristo } from "../_shared/evaristoMemoria.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -24,12 +26,6 @@ const STOP = new Set("de la el los las un una unos unas y o u que en para por co
 function palabrasClave(t: string): string[] {
   return [...new Set(t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9ñ\- ]/g, " ").split(/\s+/)
     .filter((w) => w.length > 3 && !STOP.has(w)))].slice(0, 10);
-}
-function rolYSub(auth: string): { role: string; sub: string | null } {
-  try {
-    const p = JSON.parse(atob(auth.replace(/^Bearer\s+/i, "").split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-    return { role: p.role ?? "", sub: p.sub ?? null };
-  } catch { return { role: "", sub: null }; }
 }
 function ipCliente(req: Request): string | null {
   const xff = (req.headers.get("x-forwarded-for") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
@@ -116,6 +112,7 @@ Hablas de tú, cercano, como un abogado amigo que te explica el enredo legal en 
 Reglas:
 - Responde SOLO con lo que respaldan las FUENTES y DATOS entregados. Cita [n] tras cada afirmación que venga de una fuente. Con ley o reglamento nombra el artículo; con dictámenes de Contraloría número y año (si es anterior a dic-2024 puede citar el reglamento antiguo D.250/2004, reemplazado por el D.661/2024); con sentencias del TCP, rol y fecha; con el libro, dilo como criterio práctico del autor.
 - Si hay FICHA ORGANISMO, úsala para evaluar el caso (reclamos previos contra ese organismo, conducta de pago).
+- Si hay PANORAMA COMPLETO de la licitación, es evidencia concreta de ESE caso puntual (no jurisprudencia general): úsala como tal. Antecedentes (licitaciones anteriores del mismo organismo con nombre parecido) sirven para argumentar patrones o precedentes del organismo; reclamos de proveedores contra el organismo (con proceso y fecha) son hechos que puedes citar para respaldar una queja de irregularidad; compras ágiles relacionadas en poco tiempo pueden ser indicio de fragmentación, argumentable como vicio del proceso. Si el panorama no trae nada de esto para el código que te dieron, dilo ("no encontré antecedentes/reclamos previos de este proceso") en vez de inventar.
 - Si hay DOCUMENTOS DEL USUARIO (contratos, notificaciones, actas, reclamos previos que subió), son la base de los hechos: léelos y úsalos como evidencia concreta del caso.
 - Si el usuario necesita presentar algo formal (recurso, reclamo, carta, apelación), NO redactes el documento completo en el chat: explícale qué documento le conviene y en qué plazo, y dile que lo genere con el botón "Generar documento" de este mismo módulo, donde queda con formato profesional listo para firmar y descargar en PDF.
 - Si te cuenta que le pagaron atrasado o le deben plata (mora), explícale en el chat que tiene derecho a cobrar interés corriente por el atraso [cítalo], sin calcular el monto tú mismo (no hagas la aritmética en el chat). Dile que en "Generar documento" con el tipo "Nota de débito / cobro de intereses por mora" le pides el monto adeudado, la fecha en que debía pagarse y si ya le pagaron o sigue impago, y ahí Don Evaristo Abogado hace el cálculo exacto y redacta la nota de débito lista para enviar.
@@ -179,11 +176,27 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { role, sub } = rolYSub(req.headers.get("Authorization") ?? "");
-    const userId = role === "authenticated" ? sub : (role === "service_role" && body.user_id ? String(body.user_id) : null);
-    if (!userId) return new Response(JSON.stringify({ error: "login", mensaje: "Inicia sesión en FirmaVB para usar a Don Evaristo Abogado." }), { status: 401, headers: { ...cors, "Content-Type": "application/json" } });
     const ip = ipCliente(req);
-    const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const sb = createClient(Deno.env.get("SUPABASE_URL")!, serviceRoleKey);
+    const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+    let userId: string | null = null;
+
+    if (token && token === serviceRoleKey && body.user_id) {
+      userId = String(body.user_id);
+    } else if (token) {
+      const { data: { user } } = await sb.auth.getUser(token);
+      userId = user?.id ?? null;
+    }
+
+    if (!userId) return new Response(JSON.stringify({ error: "login", mensaje: "Inicia sesión en FirmaVB para usar a Don Evaristo Abogado." }), { status: 401, headers: { ...cors, "Content-Type": "application/json" } });
+
+    // Cliente con el JWT del usuario (cuando lo hay): permite leer/escribir la
+    // memoria compartida de Don Evaristo (evaristo_contexto, evaristo_conversaciones)
+    // respetando su RLS, igual que hace evaristo-soporte (chat).
+    const sbUser = token && token !== serviceRoleKey
+      ? createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: `Bearer ${token}` } } })
+      : null;
 
     if (modo === "documento" && !hechos) {
       return new Response(JSON.stringify({ error: "faltan_hechos", mensaje: "Cuéntame qué pasó (los hechos) para redactar el documento." }), { status: 400, headers: { ...cors, "Content-Type": "application/json" } });
@@ -211,7 +224,12 @@ Deno.serve(async (req) => {
       tareas.normOr = sb.rpc("experto_buscar_or", { consulta: qOr, cantidad: 8 }).then((r) => r.data ?? []);
       tareas.normAnd = sb.rpc("experto_buscar_texto", { consulta: kws.slice(0, 3).join(" "), cantidad: 4 }).then((r) => r.data ?? []);
     }
-    if (codigo) tareas.ficha = sb.rpc("experto_ficha_licitacion", { p_codigo: codigo }).then((r) => r.data);
+    if (codigo) {
+      tareas.ficha = sb.rpc("experto_ficha_licitacion", { p_codigo: codigo }).then((r) => r.data);
+      // Antecedentes, reclamos de ese proceso/organismo y compras ágiles relacionadas
+      // (posible fragmentación) — mismo panorama que ya usa Don Evaristo Experto.
+      tareas.panorama = sb.rpc("experto_panorama_licitacion", { p_codigo: codigo, p_user_id: userId }).then((r) => r.data);
+    }
     // Documentos que el usuario subió (contratos, notificaciones, reclamos previos): sin código = carpeta general.
     tareas.docs = sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: codigo, p_max: 10000 }).then((r) => r.data ?? []);
     // Organismo: por destinatario/institución escrita o detectado en el texto de la pregunta/hechos.
@@ -219,6 +237,9 @@ Deno.serve(async (req) => {
     const busquedaOrg = destinatario || org?.[0];
     if (busquedaOrg) tareas.org = sb.rpc("experto_buscar_organismo", { p_texto: busquedaOrg.replace(/[?¿.,]/g, "").trim().slice(0, 60) }).then(async (r) => r.data ? (await sb.rpc("experto_organismo", { nombre_o_rut: r.data })).data?.[0] : null);
     if (userId) tareas.perfil = sb.from("clientes").select("empresa_nombre, rut, region").eq("user_id", userId).maybeSingle().then((r) => r.data);
+    // Memoria compartida: lo último que este cliente conversó con Don Evaristo en
+    // cualquier modo (chat/abogado/experto), para no obligarlo a repetir contexto.
+    if (sbUser) tareas.memoria = sbUser.rpc("evaristo_contexto", { p_codigo: codigo ?? null }).then((r) => r.data?.conversaciones_recientes ?? []);
     // Cálculo determinístico de intereses por mora (nunca lo hace la IA): se pasa el resultado ya calculado.
     if (tipoDocumento === "cobro_intereses_mora" && montoAdeudado && fechaVencimiento) {
       tareas.calculo = sb.rpc("calcular_interes_mora", { p_monto: montoAdeudado, p_fecha_vencimiento: fechaVencimiento, p_fecha_pago: fechaPago }).then((r) => r.data?.[0] ?? null);
@@ -236,9 +257,15 @@ Deno.serve(async (req) => {
     const partes: string[] = [];
     if (fragmentos.length) partes.push("FUENTES:\n" + textoFragmentos(fragmentos));
     if (res.ficha) partes.push(`LICITACIÓN ${res.ficha.codigo}: ${res.ficha.nombre}\nOrganismo: ${res.ficha.institucion} | Estado: ${res.ficha.estado} | Cierre: ${res.ficha.fecha_cierre ?? "s/i"}`);
+    else if (codigo) partes.push(`No encontré la licitación o compra ${codigo} en la base (puede ser antigua, una compra ágil, o el código estar mal escrito).`);
+    if (codigo && res.panorama) partes.push(textoPanorama(res.panorama, codigo));
     if (res.org) partes.push("FICHA ORGANISMO (Datos Mercado Público vía FirmaVB):\n" + textoOrganismo(res.org));
     if (res.docs?.length) partes.push("DOCUMENTOS DEL USUARIO (contratos, notificaciones, reclamos previos que subió; son evidencia de los hechos):\n" + res.docs.map((d: any) => `### ${d.nombre} (${d.tipo})\n${d.texto}`).join("\n\n"));
     if (res.perfil) partes.push(`DATOS DEL PROVEEDOR (para firmar el documento): empresa "${res.perfil.empresa_nombre ?? "s/i"}", RUT ${res.perfil.rut ?? "s/i"}, región ${res.perfil.region ?? "s/i"}.`);
+    if (Array.isArray(res.memoria) && res.memoria.length && modo === "chat") {
+      partes.push("MEMORIA (lo último que este cliente conversó con Don Evaristo en otros modos, últimas 48h — úsalo solo si es relevante, no lo repitas si no viene al caso):\n" +
+        res.memoria.map((m: any) => `[${m.canal}, ${m.rol === "user" ? "preguntó" : "Evaristo respondió"}] ${m.texto}`).join("\n"));
+    }
     if (modo === "documento") {
       partes.push(`DATOS DEL DOCUMENTO A REDACTAR:\nDestinatario/institución: ${destinatario || "[completar: destinatario]"}\nCiudad y fecha: ${ciudadFecha || "[completar: fecha]"}\nHECHOS que cuenta el usuario:\n${hechos}\n${peticion ? "Lo que pide el usuario: " + peticion : ""}`);
     }
@@ -322,6 +349,21 @@ Si hay más de un tramo, menciona en el documento que el interés se calculó po
         ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ done: true, ms: Date.now() - t0 })}\n\n`));
         ctrl.close();
         try { await sb.rpc("experto_registrar_uso", { p_user_id: userId, p_huella: huella || "anon", p_modo: cuotaModo, p_pregunta: `[Abogado${modo === "documento" ? ":" + tipoDocumento : ""}] ${modo === "chat" ? pregunta : hechos.slice(0, 200)}`, p_respuesta: respuesta, p_fuentes: fuentesMeta, p_licitacion: codigo, p_ms: Date.now() - t0, p_ip: ip }); } catch { /* no bloquear */ }
+        await guardarTurnoEvaristo(sbUser ?? sb, {
+          userId: userId!,
+          canal: "abogado",
+          pregunta: modo === "chat" ? pregunta : `[${TIPOS_DOC[tipoDocumento]?.titulo ?? tipoDocumento}] ${hechos.slice(0, 300)}`,
+          respuesta,
+          meta: { modo, tipo_documento: modo === "documento" ? tipoDocumento : undefined, codigo, modelo },
+        });
+        // Medidor de costo real de IA (estimado desde tokens ~ chars/4), para calibrar créditos.
+        try {
+          const tin = Math.ceil(userMsg.length / 4), tout = Math.ceil(respuesta.length / 4);
+          const rin = /claude-sonnet/.test(modelo) ? 3e-6 : /claude-haiku/.test(modelo) ? 1e-6 : 1.5e-7;
+          const rout = /claude-sonnet/.test(modelo) ? 15e-6 : /claude-haiku/.test(modelo) ? 5e-6 : 6e-7;
+          const costo = Number((tin * rin + tout * rout).toFixed(6));
+          await sb.rpc("registrar_uso_ia", { p_funcion: `abogado-${modo}`, p_modelo: modelo, p_tokens_in: tin, p_tokens_out: tout, p_costo_usd: costo, p_user_id: userId, p_creditos_cobrados: null, p_referencia: codigo });
+        } catch { /* no bloquear */ }
       },
     });
     return new Response(stream, { headers: { ...cors, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });

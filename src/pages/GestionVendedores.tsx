@@ -18,6 +18,7 @@ import {
   useCalendarioVendedor,
   useAsignacionesDetalle,
   useCreateVendedor,
+  useEsDuenoEquipo,
   type ReporteEquipo as ReporteVendedor,
 } from '@/hooks/useVendedores';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday, addMonths, subMonths } from 'date-fns';
@@ -379,6 +380,11 @@ function ListaVendedores() {
   const { data: vendedores, isLoading } = useVendedores();
   const { data: reporte } = useReporteEquipo();
   const createMutation = useCreateVendedor();
+  // Solo el dueño puede crear vendedores: la fila quedaría con invitado_por =
+  // el propio auth.uid() de quien la crea (única opción que el trigger de la
+  // tabla permite), y el roster la scopea por el dueño efectivo — si la crea
+  // un miembro invitado, nadie (ni el dueño ni ese mismo miembro) la vuelve a ver.
+  const { data: esDueno } = useEsDuenoEquipo();
 
   const handleCreate = () => {
     if (!newVendedor.nombre || !newVendedor.email) {
@@ -406,12 +412,14 @@ function ListaVendedores() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <Button onClick={() => setShowNewDialog(true)}>
-          <UserPlus className="h-4 w-4 mr-2" />
-          Nuevo Vendedor
-        </Button>
-      </div>
+      {esDueno && (
+        <div className="flex justify-end">
+          <Button onClick={() => setShowNewDialog(true)}>
+            <UserPlus className="h-4 w-4 mr-2" />
+            Nuevo Vendedor
+          </Button>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12">

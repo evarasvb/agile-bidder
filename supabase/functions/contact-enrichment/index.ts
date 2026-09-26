@@ -1068,9 +1068,26 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Allow': 'POST' }
+    })
+  }
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '').trim()
+
+    // Proceso administrativo: solo una llamada interna con la clave exacta de servicio.
+    // Un JWT público/anónimo válido no debe poder iniciar este trabajo costoso.
+    if (!supabaseKey || token !== supabaseKey) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
 
     const supabase = createClient(supabaseUrl, supabaseKey)
 

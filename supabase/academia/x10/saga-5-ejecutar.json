@@ -1,0 +1,529 @@
+[
+ {
+  "titulo": "Cobranza con método · Nota de cobro y nota de débito",
+  "lecciones": [
+   {
+    "titulo": "El reloj de los 30 días (Ley 21.131)",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "Vender al Estado es fácil; cobrar es un oficio. La Ley 21.131 fija el plazo máximo de pago en 30 días corridos desde la recepción de la factura, y da al proveedor dos derechos que casi nadie usa: intereses moratorios y una comisión fija por costos de cobranza. FirmaVB aplica este método en su módulo de cobranza; aquí está el método completo."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Línea de tiempo de una factura al Estado",
+      "columnas": [
+       "Día",
+       "Qué pasa",
+       "Qué haces tú"
+      ],
+      "filas": [
+       [
+        "0",
+        "Entregas y el organismo recibe conforme (guía firmada o acta).",
+        "Emite la factura el mismo día y súbela al portal del organismo si lo exige."
+       ],
+       [
+        "0 a 8",
+        "Plazo del comprador para reclamar la factura (Ley 19.983).",
+        "Confirma por correo la recepción conforme. Si no reclaman, la factura queda firme."
+       ],
+       [
+        "30",
+        "Vence el plazo legal de pago.",
+        "Si no hay pago, la factura entra en mora. Desde aquí corren intereses."
+       ],
+       [
+        "31",
+        "Primer día de atraso.",
+        "Nota de cobro: correo formal y llamada a la unidad de finanzas."
+       ],
+       [
+        "45",
+        "Dos semanas de atraso.",
+        "Segunda nota de cobro con cálculo de intereses. Reclamo de pago en Mercado Público."
+       ],
+       [
+        "60",
+        "Un mes de atraso.",
+        "Nota de débito por intereses y comisión. Requerimiento prejudicial."
+       ],
+       [
+        "90",
+        "Tres meses.",
+        "Contraloría y, si el monto lo justifica, cobro ejecutivo con la copia cedible."
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "El error más común es esperar. Cada semana sin gestión es una semana más de espera: las unidades de finanzas pagan primero a quien cobra con método."
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Recepción conforme: sin ella no corre el plazo. Pide siempre la guía firmada o el acta de recepción con fecha.",
+       "Factura correcta: orden de compra en la referencia, monto exacto, receptor correcto. Una factura con error se rechaza y el reloj vuelve a cero.",
+       "Registro: anota la fecha de recepción de cada factura. Es la fecha que manda, no la de emisión."
+      ]
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Módulo de cobranza de FirmaVB",
+      "ruta": "/experto/cobranza",
+      "detalle": "Registra la factura con su fecha de recepción y FirmaVB calcula el vencimiento, los días de atraso y el interés estimado."
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "¿Desde cuándo corre el plazo de 30 días para que el Estado pague una factura?",
+      "opciones": [
+       "Desde la emisión de la factura.",
+       "Desde la recepción conforme de la factura por el organismo.",
+       "Desde la fecha de la orden de compra."
+      ],
+      "correcta": 1,
+      "explicacion": "El plazo corre desde la recepción de la factura, por eso conviene documentar la recepción conforme el mismo día de la entrega."
+     }
+    ]
+   },
+   {
+    "titulo": "Nota de cobro: la carta que cobra sin pelear",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "La nota de cobro (carta de cobro) es un documento formal, cordial y preciso. No amenaza: informa que la factura está vencida, cuánto se debe, desde cuándo, y qué dice la ley. Se envía el día 31, al correo de finanzas y al de la unidad que compró, con copia al responsable de pago que aparece en la orden de compra."
+     },
+     {
+      "tipo": "subtitulo",
+      "texto": "Estructura de la nota de cobro"
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Encabezado: organismo, RUT, unidad de compra, número de orden de compra y de factura.",
+       "Hechos: fecha de entrega y recepción conforme, monto, fecha de vencimiento (recepción + 30 días), días de atraso a la fecha.",
+       "Fundamento: Ley 21.131 (pago a 30 días; el atraso devenga intereses y comisión de cobranza) y Ley 19.983 (la factura no reclamada en 8 días tiene mérito ejecutivo).",
+       "Petición: pago íntegro dentro de 5 días hábiles, con los datos bancarios.",
+       "Cierre cordial: disposición a aclarar cualquier antecedente y un teléfono directo."
+      ]
+     },
+     {
+      "tipo": "caso",
+      "titulo": "Método Evaristo: dos notas y una llamada",
+      "texto": "Día 31: nota de cobro por correo y llamada a finanzas para confirmar que la factura está en proceso. Día 45: segunda nota con el interés calculado a la fecha y aviso de que se emitirá nota de débito. Día 60: nota de débito y requerimiento. En la práctica, la mayoría de las facturas se paga entre la primera y la segunda nota: la unidad de finanzas prioriza al proveedor que documenta."
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Redactar la nota de cobro con el Abogado de FirmaVB",
+      "ruta": "/experto/cobranza",
+      "detalle": "Desde la factura registrada, un clic genera la carta de cobro con los hechos y el fundamento legal, lista para enviar."
+     },
+     {
+      "tipo": "tip",
+      "texto": "Tono: firme y respetuoso. Quien te va a pagar es una persona en una unidad de finanzas con 300 facturas. Ayúdala a encontrar la tuya: orden de compra, número de factura y fecha de recepción en la primera línea."
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "¿Cuál es el mejor momento para enviar la primera nota de cobro?",
+      "opciones": [
+       "El día 15, para adelantarse.",
+       "El día 31, el primer día de atraso, con los hechos y el fundamento legal.",
+       "Después de 60 días, cuando ya es evidente que no van a pagar."
+      ],
+      "correcta": 1,
+      "explicacion": "Antes del día 30 no hay atraso y la nota pierde fuerza. Después del día 45 ya regalaste dos semanas. El día 31 es el momento."
+     }
+    ]
+   },
+   {
+    "titulo": "Nota de débito: intereses y la comisión del 1%",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "La Ley 21.131 establece que, vencido el plazo, el deudor debe pagar interés corriente por el atraso y una comisión fija por recuperación de costos de cobranza equivalente al 1% del saldo insoluto. Para cobrarlos se emite una nota de débito electrónica (SII) asociada a la factura original. Casi ningún proveedor la emite. Emitirla cambia la conversación."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Ejemplo: factura de 5.000.000 con 45 días de atraso",
+      "columnas": [
+       "Concepto",
+       "Cálculo",
+       "Monto"
+      ],
+      "filas": [
+       [
+        "Interés moratorio (referencial 1,5% mensual)",
+        "5.000.000 × 1,5% × 45 / 30",
+        "112.500"
+       ],
+       [
+        "Comisión fija por cobranza",
+        "1% del saldo insoluto",
+        "50.000"
+       ],
+       [
+        "Total nota de débito",
+        "",
+        "162.500"
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "La tasa de interés legal es el interés corriente vigente (varía); 1,5% mensual es una referencia conservadora. Verifica la tasa del mes en la Comisión para el Mercado Financiero antes de emitir."
+     },
+     {
+      "tipo": "subtitulo",
+      "texto": "Cómo emitir la nota de débito"
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "En el SII, emite una nota de débito electrónica referenciando la factura original (tipo de referencia: factura, número y fecha).",
+       "Detalle: dos líneas, interés moratorio Ley 21.131 con el periodo y la tasa, y comisión de cobranza 1% Ley 21.131.",
+       "Envíala con la segunda nota de cobro y registra la fecha. El organismo debe pagarla o reclamarla en 8 días.",
+       "Si el organismo paga la factura pero no la nota de débito, insiste: es un derecho legal, no una cortesía."
+      ]
+     },
+     {
+      "tipo": "caso",
+      "titulo": "Un proveedor de insumos y un hospital que pagaba a 90 días",
+      "texto": "Facturaba 8 millones al mes al hospital y cobraba a 90 días. Empezó a emitir notas de débito por los intereses. En dos meses el hospital lo pasó a la lista de pago a 30 días: para finanzas era más barato pagarle a tiempo que aprobar notas de débito. El método no es para ganar 100 mil pesos de interés: es para cambiar tu lugar en la fila."
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Interés estimado por factura en FirmaVB",
+      "ruta": "/experto/cobranza"
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "¿Qué establece la Ley 21.131 para una factura pagada con atraso?",
+      "opciones": [
+       "Solo el pago del capital, sin recargos.",
+       "Intereses moratorios y una comisión fija por costos de cobranza del 1% del saldo.",
+       "Una multa al funcionario responsable."
+      ],
+      "correcta": 1,
+      "explicacion": "La ley da al proveedor interés corriente por el atraso más una comisión fija del 1% del saldo insoluto. Se cobran con nota de débito."
+     }
+    ]
+   },
+   {
+    "titulo": "Escalar: Mercado Público, Contraloría y el cobro ejecutivo",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "Si las notas no funcionan, hay tres escalones más, en orden. Cada uno tiene un costo de relación con el cliente; por eso el orden importa."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Escalera de cobranza",
+      "columnas": [
+       "Escalón",
+       "Cuándo",
+       "Qué es",
+       "Efecto"
+      ],
+      "filas": [
+       [
+        "Reclamo de pago en Mercado Público",
+        "Día 45",
+        "Reclamo formal en el portal contra el organismo",
+        "Queda registrado públicamente; la Dirección ChileCompra gestiona con el organismo"
+       ],
+       [
+        "Requerimiento prejudicial",
+        "Día 60",
+        "Carta formal, última gestión antes de demandar, con plazo de 5 días",
+        "Suele destrabar el pago; FirmaVB lo redacta con el Abogado"
+       ],
+       [
+        "Contraloría General de la República",
+        "Día 90",
+        "Presentación por incumplimiento del deber de pago oportuno",
+        "Genera un oficio al organismo; efectivo en municipios"
+       ],
+       [
+        "Cobro ejecutivo",
+        "Cuando el monto lo justifica",
+        "Demanda ejecutiva con la copia cedible de la factura (Ley 19.983)",
+        "Embargo posible; requiere abogado y costo"
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "El reclamo en Mercado Público es gratis, público y efectivo. Es también el dato que FirmaVB muestra a los demás proveedores como 'reclamos de pago' del organismo. Úsalo."
+     },
+     {
+      "tipo": "video",
+      "titulo": "Cobranza completa en FirmaVB: de la factura al requerimiento",
+      "minutos": 15,
+      "resumen": "Demostración: registrar facturas, ver días de atraso e interés, generar nota de cobro y requerimiento prejudicial con el Abogado, y llevar el estado de cada factura."
+     },
+     {
+      "tipo": "ejercicio",
+      "titulo": "Tu cartera de cobro",
+      "pasos": [
+       "Registra en FirmaVB todas tus facturas al Estado con fecha de recepción.",
+       "Marca las vencidas y envía hoy la nota de cobro a cada una.",
+       "Para las de más de 45 días, calcula el interés y prepara la nota de débito.",
+       "Para las de más de 60 días, genera el requerimiento prejudicial.",
+       "Revisa la cartera todos los lunes: es un ritual de 15 minutos que vale meses de caja."
+      ],
+      "entregable": "Cartera de cobro al día con estado y próxima acción por factura."
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "Una factura lleva 50 días de atraso y ya enviaste dos notas de cobro. ¿Cuál es el siguiente paso correcto?",
+      "opciones": [
+       "Demanda ejecutiva de inmediato.",
+       "Nota de débito por intereses y comisión, reclamo de pago en Mercado Público y requerimiento prejudicial.",
+       "Esperar al cierre del mes."
+      ],
+      "correcta": 1,
+      "explicacion": "El orden protege la relación y la caja: primero los derechos de la Ley 21.131 y el reclamo público, después el requerimiento, y solo al final la vía judicial."
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "titulo": "Casos reales · Los que pagan mal (datos 2025-2026)",
+  "lecciones": [
+   {
+    "titulo": "Ranking de reclamos de pago",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "Estos son los organismos con más reclamos de pago registrados en Mercado Público entre octubre de 2025 y septiembre de 2026, cruzados con sus compras de 2026. La proporción entre reclamos y órdenes es la que dice si el problema es tamaño o conducta."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Reclamos de pago y compras por organismo",
+      "columnas": [
+       "Organismo",
+       "Reclamos 12 meses",
+       "Órdenes 2026",
+       "Reclamos por cada 100 órdenes",
+       "Lectura"
+      ],
+      "filas": [
+       [
+        "Universidad de Chile",
+        1992,
+        29366,
+        6.8,
+        "Grande y lento"
+       ],
+       [
+        "MOP Dirección General de Obras Públicas",
+        1302,
+        11767,
+        11.1,
+        "Grande y lento"
+       ],
+       [
+        "Municipalidad de El Monte",
+        1199,
+        790,
+        151.8,
+        "Conducta de pago crítica"
+       ],
+       [
+        "Servicio de Reinserción Social Juvenil",
+        1100,
+        3129,
+        35.2,
+        "Lento"
+       ],
+       [
+        "Dirección de Logística de Carabineros",
+        1024,
+        1391,
+        73.6,
+        "Muy lento"
+       ],
+       [
+        "Municipalidad de Talca",
+        788,
+        4117,
+        19.1,
+        "Lento"
+       ],
+       [
+        "Corporación Municipal de Isla de Maipo",
+        689,
+        604,
+        114.1,
+        "Conducta de pago crítica"
+       ],
+       [
+        "Municipalidad de Rinconada",
+        656,
+        309,
+        212.3,
+        "Conducta de pago crítica"
+       ],
+       [
+        "Hospital Padre Hurtado",
+        609,
+        4840,
+        12.6,
+        "Normal para hospital"
+       ],
+       [
+        "Complejo Asistencial Sótero del Río",
+        596,
+        9828,
+        6.1,
+        "Normal para hospital"
+       ],
+       [
+        "CENABAST",
+        587,
+        1040,
+        56.4,
+        "Lento, montos enormes"
+       ],
+       [
+        "Dirección de Abastecimiento de la Armada",
+        547,
+        743,
+        73.6,
+        "Muy lento"
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "Más de 100 reclamos por cada 100 órdenes (El Monte, Isla de Maipo, Rinconada) significa que los proveedores reclaman más de una vez por orden. Menos de 15 es el rango normal de un comprador grande. Entre 30 y 75 exige condiciones."
+     },
+     {
+      "tipo": "grafico",
+      "titulo": "Reclamos de pago por mes en todo el Estado",
+      "subtipo": "barras",
+      "datos": [
+       {
+        "etiqueta": "Oct 25",
+        "valor": 6719
+       },
+       {
+        "etiqueta": "Nov",
+        "valor": 5625
+       },
+       {
+        "etiqueta": "Dic",
+        "valor": 6087
+       },
+       {
+        "etiqueta": "Ene 26",
+        "valor": 6637
+       },
+       {
+        "etiqueta": "Feb",
+        "valor": 4683
+       },
+       {
+        "etiqueta": "Mar",
+        "valor": 6091
+       },
+       {
+        "etiqueta": "Abr",
+        "valor": 6228
+       },
+       {
+        "etiqueta": "May",
+        "valor": 5787
+       },
+       {
+        "etiqueta": "Jun",
+        "valor": 6388
+       },
+       {
+        "etiqueta": "Jul",
+        "valor": 6590
+       },
+       {
+        "etiqueta": "Ago",
+        "valor": 7325
+       }
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "unidad": "Reclamos registrados en Mercado Público",
+      "lectura": "Unos 6.000 reclamos al mes. Agosto de 2026 marcó el máximo (7.325). Febrero es el mínimo porque también se compra menos en enero. El atraso es estructural: tu método de cobranza no es opcional."
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Ficha de institución con reclamos y plazo de pago",
+      "ruta": "/mercado/instituciones"
+     }
+    ]
+   },
+   {
+    "titulo": "Decide antes de vender: el semáforo por institución",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "La decisión de venderle a un organismo se toma antes de ofertar, con tres datos: reclamos por cada 100 órdenes, plazo de pago informado y tu margen. FirmaVB muestra los dos primeros en la ficha de cada institución."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Semáforo de pago",
+      "columnas": [
+       "Color",
+       "Reclamos por 100 órdenes",
+       "Cómo vender"
+      ],
+      "filas": [
+       [
+        "Verde",
+        "Menos de 15",
+        "Normal. Cobra con método desde el día 31."
+       ],
+       [
+        "Amarillo",
+        "15 a 50",
+        "Precio con 2 a 3 puntos extra por el costo de espera. Ticket que puedas financiar 60 días."
+       ],
+       [
+        "Rojo",
+        "Más de 50",
+        "Solo montos chicos, entrega contra recepción conforme documentada y cobranza el día 31 sin excepción. Evalúa no vender."
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026"
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Una venta a un organismo rojo con 10% de margen y 120 días de espera es una venta con pérdida: el costo de capital y de gestión se come el margen.",
+       "Un organismo amarillo con margen de 25% es un buen negocio si tienes caja para esperar.",
+       "Un organismo verde con 8% de margen puede ser mejor que un rojo con 20%."
+      ]
+     },
+     {
+      "tipo": "video",
+      "titulo": "Semáforo de pago y decisión de venta en 5 minutos",
+      "minutos": 8,
+      "resumen": "Cómo leer la ficha de una institución en FirmaVB y decidir condiciones antes de ofertar."
+     },
+     {
+      "tipo": "ejercicio",
+      "titulo": "Semáforo de tus clientes",
+      "pasos": [
+       "Toma tus 15 organismos objetivo (Saga 1).",
+       "Anota reclamos 12 meses y órdenes del año desde su ficha en FirmaVB.",
+       "Calcula reclamos por cada 100 órdenes y asigna color.",
+       "Define condiciones de venta por color y anótalas en tu planilla de precios."
+      ],
+      "entregable": "Lista de clientes con semáforo y condiciones de venta."
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "Un organismo tiene 25 reclamos por cada 100 órdenes y te deja un margen de 22%. ¿Qué haces?",
+      "opciones": [
+       "No le vendo: cualquier reclamo es mala señal.",
+       "Le vendo con 2 a 3 puntos extra en el precio y ticket que pueda financiar 60 días.",
+       "Le vendo solo con anticipo."
+      ],
+      "correcta": 1,
+      "explicacion": "Amarillo con buen margen es un buen negocio si la caja aguanta. El precio debe incluir el costo de la espera."
+     }
+    ]
+   }
+  ]
+ }
+]

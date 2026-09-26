@@ -6,6 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Tipos que sí van por correo; el resto solo a la campanita (ver política más abajo).
+const TIPOS_CON_CORREO = new Set(['adjudicacion', 'novedad_saas']);
+
 // FirmaVB Branding
 const FIRMAVB_COLORS = {
   primary: '#1E40AF',    // Azul FirmaVB
@@ -28,7 +31,7 @@ const FIRMAVB_URL = 'https://firmavb.cl';
 interface NotificationRequest {
   cliente_id?: string;
   to?: string;
-  tipo: 'nuevo_match' | 'cierre_proximo' | 'cambio_licitacion' | 'nueva_licitacion' | 'oferta_enviada' | 'adjudicacion' | 'recordatorio' | 'resumen_diario';
+  tipo: 'nuevo_match' | 'cierre_proximo' | 'cambio_licitacion' | 'nueva_licitacion' | 'oferta_enviada' | 'adjudicacion' | 'recordatorio' | 'resumen_diario' | 'novedad_saas';
   data: {
     licitacion_id?: string;
     licitacion_codigo?: string;
@@ -381,6 +384,41 @@ function getEmailTemplate(tipo: string, data: NotificationRequest['data'], empre
         `
       };
 
+    case 'cambio_licitacion':
+      return {
+        subject: `📌 Cambios en ${data.licitacion_codigo || 'una licitación'} que sigues`,
+        html: `
+          <!DOCTYPE html>
+          <html>
+          <head>${baseStyles}</head>
+          <body>
+            <div class="container">
+              ${headerHtml.replace('linear-gradient(135deg, ' + FIRMAVB_COLORS.primaryLight, 'linear-gradient(135deg, #F59E0B')}
+                <h1>📌 Hubo cambios</h1>
+                <p>Don Evaristo revisó el impacto para ti</p>
+              </div>
+              <div class="content">
+                <div class="info-card" style="border-left-color: #F59E0B;">
+                  <h3>${data.licitacion_titulo || 'Sin título'}</h3>
+                  ${data.licitacion_codigo ? `<p><strong>Código:</strong> ${data.licitacion_codigo}</p>` : ''}
+                  <p><strong>Organismo:</strong> ${data.organismo || 'No especificado'}</p>
+                </div>
+
+                <div style="background: #fffbeb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                  <p style="margin: 0; color: ${FIRMAVB_COLORS.text}; white-space: pre-line;">${data.resumen || 'Revisa el proceso: hubo cambios recientes.'}</p>
+                </div>
+
+                <div style="text-align: center;">
+                  <a href="${FIRMAVB_URL}/licitaciones/${data.licitacion_id || ''}" class="cta-button" style="background: linear-gradient(135deg, #F59E0B, #D97706);">Ver Licitación</a>
+                </div>
+              </div>
+              ${footerHtml}
+            </div>
+          </body>
+          </html>
+        `
+      };
+
     case 'resumen_diario':
       return {
         subject: '📊 Tu resumen diario de licitaciones - FirmaVB',
@@ -510,6 +548,13 @@ serve(async (req) => {
 
     const body: NotificationRequest = await req.json();
     const { cliente_id, to, tipo, data } = body;
+    // Política de correo (Evaristo, 26-09-2026): al cliente no se le llena el buzón.
+    // Solo se manda correo cuando gana un negocio (adjudicacion) o hay una novedad
+    // de FirmaVB (novedad_saas). Todo lo demás (matches, cierres, cambios de
+    // licitaciones o compras ágiles, licitaciones nuevas, resúmenes) queda solo en
+    // la campanita (notificaciones_log) y en la plataforma.
+    // Adjudicación: correo solo si el cliente GANÓ (resultado 'ganada'); perdida o desierta, solo campanita.
+    const conCorreo = tipo === 'adjudicacion' ? data?.resultado === 'ganada' : TIPOS_CON_CORREO.has(tipo);
 
     // Service client for database operations
     const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
@@ -553,13 +598,20 @@ serve(async (req) => {
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
+        if (tipo === 'cambio_licitacion' && prefs.alerta_cambios_guardadas === false) {
+          return new Response(
+            JSON.stringify({ success: false, reason: 'Notification disabled by preferences' }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
         if (tipo === 'cierre_proximo' && prefs.alerta_cierre_proximo === false) {
           return new Response(
             JSON.stringify({ success: false, reason: 'Notification disabled by preferences' }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
-        if (prefs.email_instantaneo === false) {
+        // Apagar el correo instantáneo no apaga la campanita: solo aplica a los tipos con correo.
+        if (conCorreo && prefs.email_instantaneo === false) {
           return new Response(
             JSON.stringify({ success: false, reason: 'Email notifications disabled' }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -582,6 +634,22 @@ serve(async (req) => {
       }
     }
 
+    // Tipos sin correo: ya pasaron las preferencias y umbrales del cliente; quedan solo en la campanita.
+    if (!conCorreo) {
+      if (cliente_id) {
+        await serviceClient.from('notificaciones_log').insert({
+          cliente_id,
+          tipo,
+          licitacion_id: data.licitacion_id || null,
+          email_enviado: false,
+          datos: data as any,
+        });
+      }
+      return new Response(
+        JSON.stringify({ success: true, emailSent: false, reason: 'Solo campanita: este tipo no se manda por correo' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     if (!recipientEmail) {
       return new Response(
         JSON.stringify({ error: 'No recipient email provided' }),

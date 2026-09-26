@@ -363,28 +363,33 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       // códigos: URLs enormes y dos idas y vueltas extra que hacían lento el panel.
       const bestMatchByCodigo: Record<string, { score: number; producto: string | null; count: number }> = {};
       const itemMatchCountByCodigo: Record<string, number> = {};
-      {
-        // Si el RPC de empresa dueña no resolvió (p. ej. caché de esquema o un
-        // usuario sin fila en clientes), NO dejamos el panel sin matches: caemos
-        // al comportamiento anterior (matches por código, mejor score).
-        let matchQuery = supabase
+      let itemMatchesFallaron = false;
+      // Si el RPC de empresa dueña no resolvió (p. ej. un usuario recién
+      // registrado que todavía no tiene fila en `clientes`), NO se muestran
+      // matches. Antes se caía a leer ca_matches/ca_item_matches de TODOS los
+      // clientes sin filtro por cliente_id ("matches por código, mejor score"),
+      // lo que le mostraba a un cliente el match calculado con el INVENTARIO DE
+      // OTRO cliente como si fuera el suyo (bug reportado: "me sale 100% de
+      // match y no tengo esos productos en mi inventario").
+      if (clienteIdPanel) {
+        const matchQuery = supabase
           .from('ca_matches')
           .select('compra_agil_codigo, score, nombre_producto')
+          .eq('cliente_id', clienteIdPanel)
           .gte('fecha_cierre', nowIso);
-        let itemQuery = supabase
+        const itemQuery = supabase
           .from('ca_item_matches')
           .select('compra_agil_codigo')
-          .gte('fecha_cierre', nowIso);
-        if (clienteIdPanel) {
-          matchQuery = matchQuery.eq('cliente_id', clienteIdPanel);
-          itemQuery = itemQuery.eq('cliente_id', clienteIdPanel);
-        }
+          .eq('cliente_id', clienteIdPanel)
+          .gte('fecha_cierre', nowIso)
+          .gte('score', PISO_MATCH);
         const [matchesRes, itemMatchesRes] = await Promise.all([matchQuery, itemQuery]);
         if ((matchesRes as any)?.error) {
           console.error('[OportunidadesPanel] Error fetching ca_matches:', (matchesRes as any).error);
         }
         if ((itemMatchesRes as any)?.error) {
           console.error('[OportunidadesPanel] Error fetching ca_item_matches:', (itemMatchesRes as any).error);
+          itemMatchesFallaron = true;
         }
         for (const m of (((matchesRes as any)?.data) || []) as any[]) {
           const k = m.compra_agil_codigo as string;
@@ -409,32 +414,46 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       }
 
       // Map compras_agiles
-      const compras: OportunidadPanel[] = (comprasRaw || []).map((c: any) => ({
-        id: c.id,
-        codigo: c.codigo,
-        nombre: c.nombre || 'Sin título',
-        descripcion: c.descripcion,
-        organismo: c.nombre_organismo || c.organismo || 'Sin organismo',
-        region: c.region,
-        monto: c.monto_estimado ?? c.monto ?? null,
-        fecha_cierre: c.fecha_cierre,
-        fecha_publicacion: c.created_at,
-        estado: c.estado,
-        tipo: 'compra_agil' as const,
-        link_oficial: c.url_ficha || c.link_oficial || null,
-        match_score: bestMatchByCodigo[c.codigo]?.score ?? (c.match_score >= PISO_MATCH ? c.match_score : null),
-        match_encontrado: (itemMatchCountByCodigo[c.codigo] > 0) || bestMatchByCodigo[c.codigo] ? true : ((c.match_encontrado && c.match_score >= PISO_MATCH) || false),
-        items_count: c.compras_agiles_items?.length || 0,
-        // Ítems que calzan producto-a-producto (ca_item_matches). Antes era el
-        // conteo de filas de ca_matches (match a nivel de compra), poco útil.
-        items_matched: itemMatchCountByCodigo[c.codigo] ?? 0,
-        created_at: c.created_at,
-        items_text: (c.compras_agiles_items || [])
-          .map((i: any) => `${i.nombre_producto || ''} ${i.descripcion_producto || ''}`)
-          .join(' '),
-        items_detalle: (c.compras_agiles_items || []).map((i: any) => detalleItem(i)).filter(Boolean),
-        coincidencia: coincidenciaPorCodigo[c.codigo] ?? null,
-      }));
+      const compras: OportunidadPanel[] = (comprasRaw || []).map((c: any) => {
+        const itemsCount = c.compras_agiles_items?.length || 0;
+        const itemsMatched = itemMatchCountByCodigo[c.codigo] ?? 0;
+        // El % que se muestra es COBERTURA (cuántos de los productos pedidos
+        // calzan con tu inventario), no el mejor score individual: si la
+        // compra pide 10 productos y calzan 5, es 50% de match, no el 100%
+        // del ítem que mejor calzó. Si aún no hay desglose por ítem para ESTA
+        // compra en particular (0 matches: puede ser que de verdad no calce
+        // nada, o que el cron todavía no la procesó) — o si la consulta de
+        // ca_item_matches falló para todo el panel — se cae al mejor score a
+        // nivel de compra (ca_matches) como respaldo, en vez de forzar 0%.
+        const coverageScore = !itemMatchesFallaron && itemsCount > 0 && itemsMatched > 0 ? Math.round((itemsMatched / itemsCount) * 100) : null;
+        const fallbackScore = bestMatchByCodigo[c.codigo]?.score ?? (c.match_score >= PISO_MATCH ? c.match_score : null);
+        return {
+          id: c.id,
+          codigo: c.codigo,
+          nombre: c.nombre || 'Sin título',
+          descripcion: c.descripcion,
+          organismo: c.nombre_organismo || c.organismo || 'Sin organismo',
+          region: c.region,
+          monto: c.monto_estimado ?? c.monto ?? null,
+          fecha_cierre: c.fecha_cierre,
+          fecha_publicacion: c.created_at,
+          estado: c.estado,
+          tipo: 'compra_agil' as const,
+          link_oficial: c.url_ficha || c.link_oficial || null,
+          match_score: coverageScore ?? fallbackScore,
+          match_encontrado: (itemsMatched > 0) || !!bestMatchByCodigo[c.codigo] ? true : ((c.match_encontrado && c.match_score >= PISO_MATCH) || false),
+          items_count: itemsCount,
+          // Ítems que calzan producto-a-producto (ca_item_matches). Antes era el
+          // conteo de filas de ca_matches (match a nivel de compra), poco útil.
+          items_matched: itemsMatched,
+          created_at: c.created_at,
+          items_text: (c.compras_agiles_items || [])
+            .map((i: any) => `${i.nombre_producto || ''} ${i.descripcion_producto || ''}`)
+            .join(' '),
+          items_detalle: (c.compras_agiles_items || []).map((i: any) => detalleItem(i)).filter(Boolean),
+          coincidencia: coincidenciaPorCodigo[c.codigo] ?? null,
+        };
+      });
 
       // Map licitaciones (columnas de licitaciones_bi)
       const licitaciones: OportunidadPanel[] = (licitacionesRaw || []).map((l: any) => ({

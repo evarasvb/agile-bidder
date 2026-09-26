@@ -30,6 +30,12 @@ const WebinarConvenioMarcoSaas = lazy(() => import("./pages/WebinarConvenioMarco
 const WebinarVendeleAlEstado = lazy(() => import("./pages/WebinarVendeleAlEstado"));
 const AcademiaCurso = lazy(() => import("./pages/AcademiaCurso"));
 const AcademiaLeads = lazy(() => import("./pages/AcademiaLeads"));
+const AcademiaCompradores = lazy(() => import("./pages/AcademiaCompradores"));
+const FundadorPanel = lazy(() => import("./pages/FundadorPanel"));
+const FundadorCompradores = lazy(() => import("./pages/FundadorCompradores"));
+const FundadorContactosEstado = lazy(() => import("./pages/FundadorContactosEstado"));
+const FundadorAjustes = lazy(() => import("./pages/FundadorAjustes"));
+const FundadorCreditos = lazy(() => import("./pages/FundadorCreditos"));
 const MisCursos = lazy(() => import("./pages/MisCursos"));
 const ProveedoresEstado = lazy(() => import("./pages/ProveedoresEstado"));
 const Auth = lazy(() => import("./pages/Auth"));
@@ -89,6 +95,7 @@ const ConvenioMarcoGestion = lazy(() => import("./pages/ConvenioMarcoGestion"));
 const AdminTraccion = lazy(() => import("./pages/AdminTraccion"));
 const AdminEvaristo = lazy(() => import("./pages/AdminEvaristo"));
 const AdminSoporte = lazy(() => import("./pages/AdminSoporte"));
+const AdminExpertoActividad = lazy(() => import("./pages/AdminExpertoActividad"));
 const MisTickets = lazy(() => import("./pages/MisTickets"));
 
 const MarketingControlCenter = lazy(() => import("./pages/MarketingControlCenter"));
@@ -184,6 +191,7 @@ const App = () => (
           {/* Admin oculto */}
           <Route path="/admin/evaristo" element={<AdminOnlyRoute><AdminEvaristo /></AdminOnlyRoute>} />
           <Route path="/admin/soporte" element={<AdminOnlyRoute><AdminSoporte /></AdminOnlyRoute>} />
+          <Route path="/admin/experto-actividad" element={<AdminOnlyRoute><AdminExpertoActividad /></AdminOnlyRoute>} />
 
           {/* ========== RUTAS PROTEGIDAS CON LAYOUT ========== */}
           <Route element={<ProtectedLayoutWrapper />}>
@@ -224,6 +232,12 @@ const App = () => (
             {/* ----- ACADEMIA ----- */}
             <Route path="/academia/cursos" element={<MisCursos />} />
             <Route path="/academia/leads" element={<AdminOnlyRoute><AcademiaLeads /></AdminOnlyRoute>} />
+            <Route path="/academia/compradores" element={<AdminOnlyRoute><AcademiaCompradores /></AdminOnlyRoute>} />
+            <Route path="/fundador" element={<AdminOnlyRoute><FundadorPanel /></AdminOnlyRoute>} />
+            <Route path="/fundador/compradores" element={<AdminOnlyRoute><FundadorCompradores /></AdminOnlyRoute>} />
+            <Route path="/fundador/contactos-estado" element={<AdminOnlyRoute><FundadorContactosEstado /></AdminOnlyRoute>} />
+            <Route path="/fundador/ajustes" element={<AdminOnlyRoute><FundadorAjustes /></AdminOnlyRoute>} />
+            <Route path="/fundador/creditos" element={<AdminOnlyRoute><FundadorCreditos /></AdminOnlyRoute>} />
             <Route path="/proveedores-estado" element={<AdminOnlyRoute><ProveedoresEstado /></AdminOnlyRoute>} />
             <Route path="/admin/traccion" element={<AdminOnlyRoute><AdminTraccion /></AdminOnlyRoute>} />
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Loader2, HardDrive, CheckCircle2, Link2, Unlink } from 'lucide-react';
+import { Loader2, HardDrive, CheckCircle2, Link2, Unlink, FolderOpen, Paperclip, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -62,6 +62,7 @@ export default function Integraciones() {
               <Loader2 className="h-4 w-4 animate-spin" /> Cargando…
             </div>
           ) : estado?.conectado ? (
+            <>
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/30 p-3">
               <div className="flex items-center gap-2 text-sm">
                 <CheckCircle2 className="h-5 w-5 text-[hsl(var(--success))]" />
@@ -97,6 +98,34 @@ export default function Integraciones() {
                 </AlertDialogContent>
               </AlertDialog>
             </div>
+
+            {/* Qué hacer ahora que está conectado: hasta aquí la conexión quedaba "muda". */}
+            <div className="rounded-lg border border-primary/20 bg-primary/[0.03] p-4 space-y-3">
+              <p className="text-sm font-medium flex items-center gap-2">
+                <FolderOpen className="h-4 w-4 text-primary" /> ¿Cómo lo uso ahora?
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Al abrir una <strong>postulación</strong>, verás el botón{' '}
+                <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs font-medium">
+                  <FolderOpen className="h-3 w-3" /> Elegir de Drive
+                </span>. Desde ahí navegas tus carpetas y, por cada archivo, puedes:
+              </p>
+              <ul className="space-y-1.5 text-sm text-muted-foreground">
+                <li className="flex items-start gap-2">
+                  <Paperclip className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
+                  <span><strong className="text-foreground">Adjuntar</strong>: guarda el enlace del documento en la postulación, sin descargarlo ni volverlo a subir (gratis).</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Sparkles className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+                  <span><strong className="text-foreground">Experto</strong>: FirmaVB lo lee y lo analiza para ayudarte con esa licitación (plan Pro).</span>
+                </li>
+              </ul>
+              <p className="text-xs text-muted-foreground">
+                Elige tú qué archivo usar, uno a la vez. FirmaVB no copia tu Drive ni sincroniza carpetas:
+                solo lee el documento que seleccionas.
+              </p>
+            </div>
+            </>
           ) : (
             <Button onClick={conectar} disabled={conectando} className="gap-2">
               {conectando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
