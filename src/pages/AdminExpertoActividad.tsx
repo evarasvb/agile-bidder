@@ -196,6 +196,7 @@ function TabEvaristo() {
         loading={isLoading}
         searchText={(c) => `${c.empresa_nombre ?? ''} ${c.email ?? ''} ${c.ultima_pregunta ?? ''} ${c.titulo ?? ''}`}
         onSearchChange={setBuscar}
+        serverSearch
         searchPlaceholder="Buscar por cliente o pregunta…"
         defaultSort={{ id: 'fecha', dir: 'desc' }}
         exportFileName="evaristo-conversaciones"

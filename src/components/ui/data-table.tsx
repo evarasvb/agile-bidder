@@ -67,6 +67,13 @@ export interface DataTableProps<T> {
    *  por `searchText`). Útil cuando `rows` viene truncado por el servidor (un
    *  `limit` en la RPC) y hay que reconsultar con ese mismo término. */
   onSearchChange?: (value: string) => void;
+  /** `rows` ya viene filtrado por el servidor con el mismo término de búsqueda
+   *  (vía `onSearchChange`): desactiva el filtrado local adicional por
+   *  `searchText`, que puede buscar sobre menos campos que la consulta del
+   *  servidor y ocultar filas que sí coinciden (p. ej. si el término solo
+   *  aparece en un dato que no viaja en `rows`). El buscador se sigue
+   *  mostrando igual. */
+  serverSearch?: boolean;
   searchPlaceholder?: string;
   defaultSort?: DataTableSort;
   pageSizeOptions?: number[];
@@ -157,6 +164,7 @@ export function DataTable<T>({
   rowKey,
   searchText,
   onSearchChange,
+  serverSearch = false,
   searchPlaceholder = 'Buscar…',
   defaultSort,
   pageSizeOptions = [25, 50, 100, 200],
@@ -184,9 +192,9 @@ export function DataTable<T>({
 
   const filtradas = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
-    if (manual || !q || !searchText) return rows;
+    if (manual || serverSearch || !q || !searchText) return rows;
     return rows.filter((r) => searchText(r).toLowerCase().includes(q));
-  }, [rows, busqueda, searchText, manual]);
+  }, [rows, busqueda, searchText, manual, serverSearch]);
 
   const ordenadas = useMemo(() => {
     if (manual || !sort) return filtradas;
