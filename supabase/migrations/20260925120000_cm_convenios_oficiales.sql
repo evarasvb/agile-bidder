@@ -212,7 +212,8 @@ select extract(year from fecha_emision)::int as anio,
        count(distinct coalesce(rut_proveedor, proveedor))::int as proveedores,
        count(distinct coalesce(rut_demandante, demandante))::int as organismos
 from public.ordenes_compra
-where convenio is not null and fecha_emision is not null and codigo like '%-CM%'
+-- Incluye las OC de convenio emitidas con sufijo -SE o -CC (vienen con convenio oficial en el archivo).
+where convenio is not null and fecha_emision is not null and (codigo like '%-CM%' or convenio_codigo is not null)
 group by 1, 2, 3, 4;
 -- "nulls not distinct" para que el refresh concurrente acepte el índice (solo columnas).
 create unique index ux_mv_cm_por_convenio on public.mv_cm_por_convenio (anio, mes, convenio, codigo) nulls not distinct;
@@ -232,7 +233,7 @@ language sql stable security definer set search_path to 'public' as $$
   ),
   distintos as (
     select convenio, count(distinct coalesce(rut_proveedor, proveedor))::int proveedores, count(distinct coalesce(rut_demandante, demandante))::int organismos
-    from public.ordenes_compra where convenio is not null and codigo like '%-CM%'
+    from public.ordenes_compra where convenio is not null and (codigo like '%-CM%' or convenio_codigo is not null)
       and fecha_emision >= make_date(p_anio, 1, 1) and fecha_emision < make_date(p_anio + 1, 1, 1)
     group by 1
   ),
@@ -243,12 +244,29 @@ language sql stable security definer set search_path to 'public' as $$
   order by b.monto_total desc;
 $$;
 grant execute on function public.cm_por_convenio(integer) to authenticated, service_role;
+-- Al recrearla, Postgres vuelve a dar EXECUTE a public: se retira otra vez a anónimos.
+revoke execute on function public.cm_por_convenio(integer) from public, anon;
 
 create or replace function public.cm_convenio_meses(p_convenio text, p_anio integer default extract(year from now())::int)
 returns table (mes date, ocs integer, monto_total numeric)
 language sql stable security definer set search_path to 'public' as $$
   select mes, sum(ocs)::int, sum(monto_total) from public.mv_cm_por_convenio
   where convenio = p_convenio and anio = p_anio group by mes order by mes;
+$$;
+
+-- Quién vende y quién compra: mismo criterio (sufijo -CM o convenio oficial).
+create or replace function public.cm_convenio_top(p_convenio text, p_anio integer default extract(year from now())::int, p_limite integer default 10)
+returns table (tipo text, nombre text, rut text, ocs bigint, monto_total numeric)
+language sql stable security definer set search_path to 'public' as $$
+  (select 'proveedor'::text, coalesce(proveedor, proveedor_nombre), rut_proveedor, count(*), sum(coalesce(total,0))
+   from public.ordenes_compra where convenio = p_convenio and (codigo like '%-CM%' or convenio_codigo is not null)
+     and fecha_emision >= make_date(p_anio,1,1) and fecha_emision < make_date(p_anio+1,1,1)
+   group by 2, 3 order by 5 desc limit greatest(1, least(p_limite, 50)))
+  union all
+  (select 'comprador'::text, coalesce(demandante, organismo_comprador), rut_demandante, count(*), sum(coalesce(total,0))
+   from public.ordenes_compra where convenio = p_convenio and (codigo like '%-CM%' or convenio_codigo is not null)
+     and fecha_emision >= make_date(p_anio,1,1) and fecha_emision < make_date(p_anio+1,1,1)
+   group by 2, 3 order by 5 desc limit greatest(1, least(p_limite, 50)));
 $$;
 
 -- Cron diario: carga el mes anterior cuando ChileCompra lo publica (idempotente).

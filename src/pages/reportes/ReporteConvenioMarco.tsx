@@ -317,6 +317,8 @@ export default function ReporteConvenioMarco() {
           <Button variant={modo === "convenios" ? "default" : "ghost"} size="sm" className="h-8" onClick={() => setModo("convenios")}>Por convenio</Button>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {/* El selector de tipo y el CSV del encabezado son de las vistas por producto; "Por convenio" tiene su propio CSV. */}
+          {modo !== "convenios" && (<>
           <Select value={tipoSel} onValueChange={(v) => { setTipoSel(v); seleccionar(null); }}>
             <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -326,6 +328,7 @@ export default function ReporteConvenioMarco() {
           <Button variant="outline" size="sm" onClick={handleExport} disabled={!productos.length}>
             <Download className="h-4 w-4 mr-2" /> CSV
           </Button>
+          </>)}
         </div>
       </div>
 
