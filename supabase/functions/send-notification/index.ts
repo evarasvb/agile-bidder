@@ -6,6 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Tipos que sí van por correo; el resto solo a la campanita (ver política más abajo).
+const TIPOS_CON_CORREO = new Set(['adjudicacion', 'novedad_saas']);
+
 // FirmaVB Branding
 const FIRMAVB_COLORS = {
   primary: '#1E40AF',    // Azul FirmaVB
@@ -28,7 +31,7 @@ const FIRMAVB_URL = 'https://firmavb.cl';
 interface NotificationRequest {
   cliente_id?: string;
   to?: string;
-  tipo: 'nuevo_match' | 'cierre_proximo' | 'cambio_licitacion' | 'nueva_licitacion' | 'oferta_enviada' | 'adjudicacion' | 'recordatorio' | 'resumen_diario';
+  tipo: 'nuevo_match' | 'cierre_proximo' | 'cambio_licitacion' | 'nueva_licitacion' | 'oferta_enviada' | 'adjudicacion' | 'recordatorio' | 'resumen_diario' | 'novedad_saas';
   data: {
     licitacion_id?: string;
     licitacion_codigo?: string;
@@ -510,6 +513,12 @@ serve(async (req) => {
 
     const body: NotificationRequest = await req.json();
     const { cliente_id, to, tipo, data } = body;
+    // Política de correo (Evaristo, 26-09-2026): al cliente no se le llena el buzón.
+    // Solo se manda correo cuando gana un negocio (adjudicacion) o hay una novedad
+    // de FirmaVB (novedad_saas). Todo lo demás (matches, cierres, cambios de
+    // licitaciones o compras ágiles, licitaciones nuevas, resúmenes) queda solo en
+    // la campanita (notificaciones_log) y en la plataforma.
+    const conCorreo = TIPOS_CON_CORREO.has(tipo);
 
     // Service client for database operations
     const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
@@ -535,6 +544,19 @@ serve(async (req) => {
 
       recipientEmail = recipientEmail || clienteData.email;
       empresaNombre = clienteData.empresa_nombre;
+      if (!conCorreo) {
+        await serviceClient.from('notificaciones_log').insert({
+          cliente_id,
+          tipo,
+          licitacion_id: data.licitacion_id || null,
+          email_enviado: false,
+          datos: data as any,
+        });
+        return new Response(
+          JSON.stringify({ success: true, emailSent: false, reason: 'Solo campanita: este tipo no se manda por correo' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
       // Check notification preferences
       const { data: prefsData } = await serviceClient
@@ -582,6 +604,12 @@ serve(async (req) => {
       }
     }
 
+    if (!conCorreo) {
+      return new Response(
+        JSON.stringify({ success: false, reason: 'Este tipo no se manda por correo' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     if (!recipientEmail) {
       return new Response(
         JSON.stringify({ error: 'No recipient email provided' }),
