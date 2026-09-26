@@ -328,4 +328,57 @@ describe('marketing-ejecutar', () => {
     );
     expect(markPieceExecuted).not.toHaveBeenCalled();
   });
+
+  it('con maxPerRun manda solo un lote y deja la pieza abierta para que el cron la retome', async () => {
+    const contacts = [
+      { id: contactId, email: 'one@example.com', nombre: 'One' },
+      { id: '44444444-4444-4444-8444-444444444444', email: 'two@example.com', nombre: 'Two' },
+      { id: '55555555-5555-4555-8555-555555555555', email: 'three@example.com', nombre: 'Three' },
+    ];
+    const sendEmail = vi.fn(async () => ({ success: true, statusCode: 200 }));
+    const markPieceExecuted = vi.fn(async () => undefined);
+    const store = createStore({
+      getContactsPage: async () => ({ contacts, total: contacts.length }),
+      markPieceExecuted,
+    });
+
+    const outcome = await executeMarketingCampaign(
+      { pieza_id: pieceId, contactos_ids: contacts.map(({ id }) => id) },
+      { store, sendEmail, maxPerRun: 2 },
+    );
+
+    expect(sendEmail).toHaveBeenCalledTimes(2);
+    expect(outcome.status).toBe(200);
+    expect(outcome.body as ExecutionResult).toMatchObject({
+      total_objetivo: 3,
+      total_procesados: 2,
+      pendiente_continuacion: true,
+      restantes: 1,
+    });
+    expect(markPieceExecuted).not.toHaveBeenCalled();
+  });
+
+  it('en una continuación no le reenvía a quien ya figura enviado', async () => {
+    const contacts = [
+      { id: contactId, email: 'one@example.com', nombre: 'One' },
+      { id: '44444444-4444-4444-8444-444444444444', email: 'two@example.com', nombre: 'Two' },
+    ];
+    const sendEmail = vi.fn(async () => ({ success: true, statusCode: 200 }));
+    const markPieceExecuted = vi.fn(async () => undefined);
+    const store = createStore({
+      getContactsPage: async () => ({ contacts, total: contacts.length }),
+      getSentContactIds: async () => new Set([contactId]),
+      markPieceExecuted,
+    });
+
+    const outcome = await executeMarketingCampaign(
+      { pieza_id: pieceId, contactos_ids: contacts.map(({ id }) => id) },
+      { store, sendEmail },
+    );
+
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: 'two@example.com' }));
+    expect(outcome.status).toBe(200);
+    expect(markPieceExecuted).toHaveBeenCalledWith(pieceId);
+  });
 });

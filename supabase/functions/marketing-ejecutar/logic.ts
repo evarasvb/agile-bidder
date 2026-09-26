@@ -54,6 +54,11 @@ export interface ExecutionResult {
     estado: 'enviado' | 'fallo' | 'incierto';
     error?: string;
   }>;
+  // true cuando quedan contactos por enviar porque esta corrida topó con
+  // maxPerRun: la pieza queda en 'ejecutando' y el cron de continuación
+  // la retoma solo, no hace falta volver a apretar enviar.
+  pendiente_continuacion?: boolean;
+  restantes?: number;
 }
 
 export interface ExecutionError {
@@ -74,7 +79,7 @@ export interface ClaimResult {
 }
 
 export interface AtomicClaimQuery {
-  update(values: { estado: string }): AtomicClaimQuery;
+  update(values: { estado: string; contactos_ids?: string[] }): AtomicClaimQuery;
   eq(column: string, value: string): AtomicClaimQuery;
   select(columns: string): {
     maybeSingle(): Promise<{
@@ -103,13 +108,18 @@ export interface MarketingContactsTable {
 }
 
 export interface MarketingExecutionStore {
-  claimPiece(piezaId: string): Promise<ClaimResult>;
+  claimPiece(piezaId: string, contactosIds: string[]): Promise<ClaimResult>;
   releasePieceClaim(piezaId: string): Promise<boolean>;
   getContactsPage(filters: {
     contactIds: string[];
     from: number;
     to: number;
   }): Promise<{ contacts: MarketingContact[]; total: number }>;
+  // Contactos de esta pieza que ya quedaron 'enviado' en corridas anteriores
+  // (mismo pieza_id, distinta invocación) — así una corrida de continuación
+  // no le vuelve a mandar a quien ya recibió el correo. Opcional: si no se
+  // provee, se asume que no hay envíos previos (comportamiento de antes).
+  getSentContactIds?(piezaId: string): Promise<Set<string>>;
   persistExecutions(rows: MarketingExecutionRow[]): Promise<void>;
   markPieceExecuted(piezaId: string): Promise<void>;
   markCampaignExecuting(campaignId: string, updatedAt: string): Promise<void>;
@@ -126,6 +136,13 @@ export interface MarketingExecutionDependencies {
   }): Promise<EmailSendResult>;
   now?: () => Date;
   contactPageSize?: number;
+  // Tope de correos que se mandan en ESTA invocación (para no mandar cientos
+  // de golpe). Lo que sobra queda pendiente y el cron de continuación lo
+  // retoma. Sin límite por defecto (mantiene el comportamiento de antes).
+  maxPerRun?: number;
+  // Pausa entre un envío y el siguiente dentro de esta misma corrida, para
+  // no mandar todo en ráfaga. Sin pausa por defecto.
+  sendDelayMs?: number;
 }
 
 const UUID_PATTERN =
@@ -134,9 +151,13 @@ const UUID_PATTERN =
 export async function claimEmailPiece(
   query: AtomicClaimQuery,
   pieceId: string,
+  contactosIds: string[] = [],
 ): Promise<ClaimResult> {
+  // Guarda la audiencia objetivo en la propia pieza: si esta corrida no
+  // alcanza a mandarle a todos (maxPerRun), el cron de continuación sabe a
+  // quién le falta sin depender de que el navegador vuelva a mandarla.
   const { data, error } = await query
-    .update({ estado: 'ejecutando' })
+    .update({ estado: 'ejecutando', contactos_ids: contactosIds })
     .eq('id', pieceId)
     .eq('estado', 'draft')
     .eq('canal', 'email')
@@ -209,7 +230,7 @@ export async function executeMarketingCampaign(
 
   let claim: ClaimResult;
   try {
-    claim = await dependencies.store.claimPiece(request.pieza_id);
+    claim = await dependencies.store.claimPiece(request.pieza_id, request.contactos_ids);
   } catch {
     claim = { piece: null, failed: true };
   }
@@ -291,6 +312,18 @@ export async function executeMarketingCampaign(
     };
   }
 
+  // Salta a quien ya se le mandó en una corrida anterior de esta misma
+  // pieza (continuación del cron) y limita cuántos se mandan AHORA.
+  let pendientes = contacts;
+  if (dependencies.store.getSentContactIds) {
+    const yaEnviados = await dependencies.store.getSentContactIds(request.pieza_id);
+    pendientes = contacts.filter((c) => !yaEnviados.has(c.id));
+  }
+  const maxPerRun = dependencies.maxPerRun ?? Infinity;
+  const batch = pendientes.slice(0, Math.max(0, maxPerRun));
+  const restantes = pendientes.length - batch.length;
+  const delayMs = dependencies.sendDelayMs ?? 0;
+
   const now = dependencies.now ?? (() => new Date());
   const result: ExecutionResult = {
     pieza_id: request.pieza_id,
@@ -306,7 +339,11 @@ export async function executeMarketingCampaign(
   };
   const executionRows: MarketingExecutionRow[] = [];
 
-  for (const contact of contacts) {
+  for (let i = 0; i < batch.length; i++) {
+    const contact = batch[i];
+    if (delayMs > 0 && i > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
     let emailResult: EmailSendResult;
     try {
       emailResult = await dependencies.sendEmail({
@@ -374,6 +411,15 @@ export async function executeMarketingCampaign(
         resultado: result,
       },
     };
+  }
+
+  if (restantes > 0) {
+    // Quedan contactos por mandar: la pieza sigue 'ejecutando' (no se cierra
+    // ni se recalculan métricas todavía) y el cron de continuación retoma
+    // desde acá solo, sin que Evaristo tenga que volver a apretar enviar.
+    result.pendiente_continuacion = true;
+    result.restantes = restantes;
+    return { status: result.total_inciertos > 0 ? 202 : 200, body: result };
   }
 
   if (result.total_inciertos > 0) {
