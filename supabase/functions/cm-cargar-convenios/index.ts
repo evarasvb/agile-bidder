@@ -149,11 +149,17 @@ serve(async (req: Request) => {
     const lista = [...ocs.entries()].map(([oc, cm]) => ({ oc, cm }));
     let actualizadas = 0, guardadas = 0;
     for (let i = 0; i < lista.length; i += LOTE) {
-      const { data, error } = await supabase.rpc("cm_cargar_convenios", {
-        p_periodo: periodo,
-        p_convenios: i === 0 ? [...convenios.values()] : [],
-        p_ocs: lista.slice(i, i + LOTE),
-      });
+      let data: { actualizadas?: number; ocs?: number } | null = null, error: { message: string; code?: string } | null = null;
+      for (let intento = 0; intento < 4; intento++) {
+        ({ data, error } = await supabase.rpc("cm_cargar_convenios", {
+          p_periodo: periodo,
+          p_convenios: i === 0 ? [...convenios.values()] : [],
+          p_ocs: lista.slice(i, i + LOTE),
+        }));
+        // Deadlock o timeout por otra carga en paralelo: esperar y reintentar el lote.
+        if (!error || !/deadlock|timeout/i.test(error.message)) break;
+        await new Promise((r) => setTimeout(r, 1500 * (intento + 1)));
+      }
       if (error) { await anotar("error", { detalle: error.message.slice(0, 300) }); return json({ ok: false, motivo: "rpc", detalle: error.message }, 500); }
       actualizadas += Number(data?.actualizadas || 0); guardadas += Number(data?.ocs || 0);
     }

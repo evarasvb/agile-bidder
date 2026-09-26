@@ -65,6 +65,25 @@ begin
   return upper(left(t, 1)) || substr(t, 2);
 end $$;
 
+-- Categoría del clasificador por texto que corresponde a cada convenio oficial
+-- (para sumar las OC estimadas del mes en curso a la fila correcta). Los convenios
+-- antiguos o ambiguos quedan sin categoría y no reciben estimadas.
+create or replace function public.cm_categoria_convenio(p_codigo text, p_nombre text)
+returns text language sql immutable as $$
+  select case upper(p_codigo)
+    when '2239-21-LR23' then 'Insumos médicos'
+    when '2239-12-LR25' then 'Transporte de pasajeros'
+    when '2239-16-LR23' then 'Pasajes aéreos'
+    when '2239-9-LR24'  then 'Alimentos'
+    when '2239-23-LP10' then null
+    when '2239-1-LR26'  then null
+    when '2239-2-LR21'  then null
+    when '2239-13-LR23' then null
+    when '2239-4-LR22'  then null
+    when '2239-15-LR25' then null
+    else nullif(public.cm_convenio_de(p_nombre), 'Sin clasificar') end;
+$$;
+
 -- Si una categoría deducida corresponde a un solo convenio vigente, usar su nombre oficial
 -- para que las OC estimadas (mes en curso) se sumen a la misma fila del reporte.
 create or replace function public.cm_convenio_etiqueta(p_categoria text)
@@ -117,14 +136,15 @@ begin
   if p_periodo !~ '^\d{4}-\d{2}$' then raise exception 'periodo inválido: %', p_periodo; end if;
 
   insert into public.cm_convenios (codigo, id_cm, nombre, nombre_corto, categoria, ultimo_periodo)
-  select x.codigo, nullif(x.id_cm, ''), x.nombre, public.cm_nombre_corto(x.nombre), public.cm_convenio_de(x.nombre), p_periodo
+  select x.codigo, nullif(x.id_cm, ''), x.nombre, public.cm_nombre_corto(x.nombre), public.cm_categoria_convenio(x.codigo, x.nombre), p_periodo
     from jsonb_to_recordset(coalesce(p_convenios, '[]'::jsonb)) as x(codigo text, id_cm text, nombre text)
    where x.codigo is not null and x.codigo <> '' and x.codigo <> 'NA' and coalesce(x.nombre, '') <> ''
+   order by x.codigo -- orden fijo: evita deadlocks entre cargas de meses en paralelo
   on conflict (codigo) do update
      set id_cm = coalesce(excluded.id_cm, public.cm_convenios.id_cm),
          nombre = excluded.nombre,
          nombre_corto = public.cm_nombre_corto(excluded.nombre),
-         categoria = coalesce(public.cm_convenios.categoria, excluded.categoria),
+         categoria = excluded.categoria,
          ultimo_periodo = greatest(coalesce(public.cm_convenios.ultimo_periodo, ''), excluded.ultimo_periodo),
          actualizado_en = now();
   get diagnostics n_conv = row_count;
@@ -134,6 +154,7 @@ begin
     from jsonb_to_recordset(coalesce(p_ocs, '[]'::jsonb)) as x(oc text, cm text)
     join public.cm_convenios c on c.codigo = x.cm
    where x.oc is not null and x.oc <> ''
+   order by x.oc
   on conflict (codigo_oc) do update set convenio_codigo = excluded.convenio_codigo, periodo = excluded.periodo;
   get diagnostics n_ocs = row_count;
 
@@ -143,6 +164,7 @@ begin
     select x.oc, x.cm, c.nombre_corto
       from jsonb_to_recordset(coalesce(p_ocs, '[]'::jsonb)) as x(oc text, cm text)
       join public.cm_convenios c on c.codigo = x.cm
+     order by x.oc
   loop
     update public.ordenes_compra o set convenio_codigo = r.cm, convenio = r.nombre_corto
      where o.codigo = r.oc and (o.convenio_codigo is distinct from r.cm or o.convenio is distinct from r.nombre_corto);
