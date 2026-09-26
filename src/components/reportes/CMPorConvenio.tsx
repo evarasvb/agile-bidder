@@ -11,8 +11,10 @@ import { useCMPorConvenio, useCMConvenioDetalle, type CMConvenioFila } from "@/h
 
 // Vista "Por convenio" del reporte Convenio Marco: cuánto se compra por cada
 // convenio (Software, Alimentos, Pasajes…) en el año, quién vende y quién compra.
-// El convenio se deduce del nombre de los productos de cada OC, porque Mercado
-// Público no entrega el ID del convenio; por eso existe la fila "Sin clasificar".
+// El convenio oficial viene de los datos abiertos de ChileCompra (archivo mensual
+// de transacciones de convenio marco, publicado ~día 11 del mes siguiente). Para el
+// mes en curso, mientras no exista el archivo, se deduce del nombre de los productos
+// ("estimado"); las que no calzan quedan en "Sin clasificar".
 
 const ANIO_ACTUAL = new Date().getFullYear();
 const ANIOS = [ANIO_ACTUAL, ANIO_ACTUAL - 1];
@@ -29,7 +31,14 @@ export function CMPorConvenio() {
 
   const columnas: DataTableColumn<CMConvenioFila>[] = [
     { id: "convenio", header: "Convenio", sortValue: (f) => f.convenio, cell: (f) => (
-      <button type="button" className={`text-left font-medium hover:underline ${f.convenio === sel ? "text-primary" : ""}`} onClick={() => setSel(f.convenio)}>{f.convenio}</button>
+      <div className="flex flex-col">
+        <button type="button" className={`text-left font-medium hover:underline ${f.convenio === sel ? "text-primary" : ""}`} onClick={() => setSel(f.convenio)}>{f.convenio}</button>
+        <span className="text-[11px] text-muted-foreground">
+          {f.codigo ? <>Convenio {f.codigo}</> : null}
+          {f.codigo && f.estimadas > 0 ? " · " : null}
+          {f.estimadas > 0 ? <span title="Órdenes del mes en curso clasificadas por el nombre de sus productos; se corrigen cuando ChileCompra publica el archivo oficial.">{f.codigo ? `${formatNumber(f.estimadas)} estimadas` : "estimado"}</span> : null}
+        </span>
+      </div>
     ) },
     { id: "ocs", header: "Órdenes", align: "right", className: "font-mono text-sm", sortValue: (f) => f.ocs, cell: (f) => formatNumber(f.ocs) },
     { id: "monto", header: "Monto (con IVA)", align: "right", className: "font-mono text-sm", sortValue: (f) => f.monto_total, cell: (f) => formatCompact(Number(f.monto_total)) },
@@ -39,7 +48,7 @@ export function CMPorConvenio() {
   ];
 
   const exportar = () => exportToCSV(
-    filas.map((f) => ({ Convenio: f.convenio, Ordenes: f.ocs, "Monto con IVA": Math.round(Number(f.monto_total)), "% del total": f.participacion ?? "", Proveedores: f.proveedores ?? "", Compradores: f.organismos ?? "" })),
+    filas.map((f) => ({ Convenio: f.convenio, Codigo: f.codigo ?? "", Ordenes: f.ocs, Estimadas: f.estimadas, "Monto con IVA": Math.round(Number(f.monto_total)), "% del total": f.participacion ?? "", Proveedores: f.proveedores ?? "", Compradores: f.organismos ?? "" })),
     `convenio_marco_por_convenio_${anio}`,
   );
 
@@ -70,7 +79,7 @@ export function CMPorConvenio() {
             <DataTable<CMConvenioFila> columns={columnas} rows={filas} rowKey={(f) => f.convenio} emptyMessage="Sin datos para este año." />
           )}
           <p className="text-xs text-muted-foreground mt-3">
-            El convenio se deduce del nombre de los productos de cada orden (Mercado Público no publica el ID del convenio). "Sin clasificar" agrupa las órdenes cuyo texto no calza con ningún convenio conocido.
+            Convenio oficial según los datos abiertos de ChileCompra (archivo mensual que se publica alrededor del día 11 del mes siguiente). Las órdenes del mes en curso se clasifican por el nombre de sus productos y se marcan como estimadas; "Sin clasificar" agrupa las que no calzan con ningún convenio conocido.
           </p>
         </CardContent>
       </Card>

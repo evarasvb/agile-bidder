@@ -149,7 +149,7 @@ export function useCMProductoTendencia(productoKey: string | null, tipo: TipoOri
 // ---- Por convenio (clasificación por nombre de producto; ver migración 20260925070000) ----
 // Las RPC nuevas aún no están en types.ts (patrón del repo: (supabase as any).rpc).
 /* eslint-disable @typescript-eslint/no-explicit-any */
-export interface CMConvenioFila { convenio: string; ocs: number; monto_total: number; proveedores: number | null; organismos: number | null; participacion: number | null }
+export interface CMConvenioFila { convenio: string; codigo: string | null; ocs: number; estimadas: number; monto_total: number; proveedores: number | null; organismos: number | null; participacion: number | null }
 export interface CMConvenioMes { mes: string; ocs: number; monto_total: number }
 export interface CMConvenioTop { tipo: 'proveedor' | 'comprador'; nombre: string | null; rut: string | null; ocs: number; monto_total: number }
 
