@@ -114,6 +114,10 @@ function resumirContexto(c: Ctx, extra: Ctx): string {
   if (lb.length) L.push(`Libros del Experto abiertos: ${lb.slice(0, 4).map((l: Ctx) => l.codigo).join(", ")}`);
   const tk = Array.isArray(c.tickets_abiertos) ? c.tickets_abiertos : [];
   if (tk.length) L.push(`Tickets abiertos con el equipo: ${tk.map((t: Ctx) => `#${t.numero} ${t.asunto} (${t.estado})`).join(" · ")}`);
+  // Memoria compartida: lo que este cliente conversó en Don Evaristo Abogado o Experto
+  // (otros módulos), para no obligarlo a repetir contexto si sigue la conversación aquí.
+  const conv = (Array.isArray(c.conversaciones_recientes) ? c.conversaciones_recientes : []).filter((m: Ctx) => m.canal !== "app");
+  if (conv.length) L.push(`Conversó hace poco en otros módulos de Don Evaristo (últimas 48 h): ${conv.slice(0, 4).map((m: Ctx) => `[${m.canal}] ${m.rol === "user" ? "preguntó" : "respondió"}: "${String(m.texto).slice(0, 90)}"`).join(" · ")}`);
   if (typeof extra.tieneInventario === "boolean" && !inv) L.push(`Tiene inventario cargado: ${extra.tieneInventario ? "sí" : "no"}`);
   if (typeof extra.extensionConectada === "boolean" && !ex) L.push(`Extensión conectada: ${extra.extensionConectada ? "sí" : "no"}`);
   if (extra.whatsapp) L.push(`WhatsApp de contacto a usar: ${extra.whatsapp}`);
