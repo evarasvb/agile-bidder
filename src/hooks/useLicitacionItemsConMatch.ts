@@ -4,6 +4,12 @@ import type { ItemRequerido } from '@/services/fuzzyMatching';
 import { useLicItemMatches } from './useLicItemMatches';
 import { useInventoryActivo, type InventoryItem } from './useInventory';
 
+// Mismo umbral que usa OportunidadDetalle.tsx para considerar visible un match
+// de lic_item_matches (score >= 40). El generador guarda filas desde 30, así
+// que sin este filtro acá se podía auto-seleccionar y cotizar un producto que
+// en el detalle de la oportunidad se ve como "Sin match".
+const UMBRAL_MATCH_VISIBLE = 40;
+
 // Combina el match "bueno" calculado en el servidor (lic_item_matches: sinónimos,
 // código ONU, semántica) con el motor fuzzy del navegador (useProductMatching)
 // como respaldo. Es necesario un respaldo porque generar_matches_lic_items_cliente
@@ -48,7 +54,7 @@ export function useLicitacionItemsConMatch(
     const fuzzy = procesarCompra(items);
     return fuzzy.map((item): ItemConMatch => {
       const dbRow = dbByItemId.get(item.id);
-      if (!dbRow || !dbRow.inventario_id) return item;
+      if (!dbRow || !dbRow.inventario_id || Number(dbRow.score) < UMBRAL_MATCH_VISIBLE) return item;
       // cliente_inventario no tiene columna "activo" (useInventoryActivo trae
       // TODOS los productos del cliente); si el id no aparece ahí es porque el
       // producto se borró de verdad. Mostrar ese SKU/precio viejo dejaría
