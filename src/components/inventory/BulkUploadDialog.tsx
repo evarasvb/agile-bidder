@@ -12,6 +12,7 @@ import { validateImageUrl } from '@/hooks/useProductImageUpload';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { downloadSpreadsheetWorkbook, readFirstSpreadsheetSheet, recordsToSpreadsheetRows, SpreadsheetReadError } from '@/lib/excelFiles';
+import { validateInventoryImportTextLengths } from '@/lib/inventoryImportValidation';
 
 interface BulkUploadDialogProps {
   open: boolean;
@@ -138,17 +139,17 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
         sku: String(row['Código'] ?? row['Codigo'] ?? row['SKU'] ?? row['sku'] ?? row['Sku'] ?? '').trim(),
         nombre: nombreCol || descCol,
         descripcion: detalleCol || (nombreCol ? descCol : ''),
-        categoria: row['Categoría'] || row['Categoria'] || row['categoria'] || '',
+        categoria: String(row['Categoría'] || row['Categoria'] || row['categoria'] || '').trim(),
         precio_unitario: Number(row['Precio de Venta'] || row['Precio Neto'] || row['Precio'] || row['Precio Unitario'] || row['precio'] || row['precio_unitario'] || 0),
-        unidad_medida: row['Unidad'] || row['Unidad de Medida'] || row['unidad'] || row['unidad_medida'] || '',
+        unidad_medida: String(row['Unidad'] || row['Unidad de Medida'] || row['unidad'] || row['unidad_medida'] || '').trim(),
         marca: String(row['Marca'] || row['marca'] || row['MARCA'] || '').trim(),
         stock: Number(row['Stock'] || row['stock'] || row['Stock Disponible'] || 0),
         margen_minimo: Number(row['Margen Mínimo (%)'] || row['Margen Minimo'] || row['margen_minimo'] || 10),
         margen_objetivo: Number(row['Margen Objetivo (%)'] || row['Margen Objetivo'] || row['margen_objetivo'] || 15),
         tiempo_entrega_dias: Number(row['Tiempo Entrega (días)'] || row['Tiempo Entrega'] || row['tiempo_entrega'] || 5),
-        proveedor: row['Proveedor'] || row['proveedor'] || '',
-        keywords: row['Keywords'] || row['keywords'] || row['Palabras Clave'] || row['palabras_clave'] || '',
-        imagen_url: row['URL Imagen'] || row['Imagen'] || row['imagen_url'] || row['Image URL'] || '',
+        proveedor: String(row['Proveedor'] || row['proveedor'] || '').trim(),
+        keywords: String(row['Keywords'] || row['keywords'] || row['Palabras Clave'] || row['palabras_clave'] || '').trim(),
+        imagen_url: String(row['URL Imagen'] || row['Imagen'] || row['imagen_url'] || row['Image URL'] || '').trim(),
         };
       });
 
@@ -158,6 +159,10 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
       
       rows.forEach((row, index) => {
         const rowNum = index + 2;
+
+        validateInventoryImportTextLengths(row).forEach((error) => {
+          errors.push(`Fila ${rowNum}: ${error.message}`);
+        });
         
         // Required: Código
         if (!row.sku || row.sku.trim() === '') {
