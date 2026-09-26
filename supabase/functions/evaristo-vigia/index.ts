@@ -83,6 +83,16 @@ Deno.serve(async (req) => {
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Solo el cron (que llama con la service-role key, ver vault.decrypted_secrets en
+    // la migración) puede disparar este escaneo: revisa todo el sistema, gasta cuota
+    // de IA y manda notificaciones a clientes ajenos al llamador — ningún cliente
+    // autenticado normal debe poder ejecutarlo por su cuenta.
+    const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+    if (!token || token !== SERVICE_KEY) {
+      return new Response(JSON.stringify({ error: "no_autorizado" }), { status: 401, headers: { ...cors, "Content-Type": "application/json" } });
+    }
+
     const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 
     const { data: pendientes, error } = await sb
@@ -107,6 +117,9 @@ Deno.serve(async (req) => {
     let avisos = 0;
     for (const [codigo, cambios] of porCodigo) {
       const idsProcesados = cambios.map((c) => c.id);
+      // Si algo del bloque falla (RPC, ficha, IA), el catch de abajo deja procesado=false
+      // para que el próximo cron reintente este código en vez de perder el aviso.
+      let ok = true;
       try {
         const { data: interesados } = await sb.rpc("vigia_clientes_interesados", { p_codigo: codigo });
         if (!interesados?.length) {
@@ -160,8 +173,11 @@ Deno.serve(async (req) => {
         }
       } catch (e) {
         console.error("evaristo-vigia codigo", codigo, String(e).slice(0, 160));
+        ok = false;
       }
-      await sb.from("licitaciones_cambios").update({ procesado: true }).in("id", idsProcesados);
+      if (ok) {
+        await sb.from("licitaciones_cambios").update({ procesado: true }).in("id", idsProcesados);
+      }
     }
 
     return new Response(JSON.stringify({ ok: true, codigos: porCodigo.size, avisos, ms: Date.now() - t0 }), { headers: { ...cors, "Content-Type": "application/json" } });
