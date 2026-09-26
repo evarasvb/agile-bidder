@@ -63,6 +63,17 @@ export interface DataTableProps<T> {
   rowKey: (row: T) => string;
   /** Texto por fila para la búsqueda. Si se entrega, aparece el buscador. */
   searchText?: (row: T) => string;
+  /** Se llama con el texto de búsqueda en cada cambio (además del filtrado local
+   *  por `searchText`). Útil cuando `rows` viene truncado por el servidor (un
+   *  `limit` en la RPC) y hay que reconsultar con ese mismo término. */
+  onSearchChange?: (value: string) => void;
+  /** `rows` ya viene filtrado por el servidor con el mismo término de búsqueda
+   *  (vía `onSearchChange`): desactiva el filtrado local adicional por
+   *  `searchText`, que puede buscar sobre menos campos que la consulta del
+   *  servidor y ocultar filas que sí coinciden (p. ej. si el término solo
+   *  aparece en un dato que no viaja en `rows`). El buscador se sigue
+   *  mostrando igual. */
+  serverSearch?: boolean;
   searchPlaceholder?: string;
   defaultSort?: DataTableSort;
   pageSizeOptions?: number[];
@@ -152,6 +163,8 @@ export function DataTable<T>({
   rows,
   rowKey,
   searchText,
+  onSearchChange,
+  serverSearch = false,
   searchPlaceholder = 'Buscar…',
   defaultSort,
   pageSizeOptions = [25, 50, 100, 200],
@@ -179,9 +192,9 @@ export function DataTable<T>({
 
   const filtradas = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
-    if (manual || !q || !searchText) return rows;
+    if (manual || serverSearch || !q || !searchText) return rows;
     return rows.filter((r) => searchText(r).toLowerCase().includes(q));
-  }, [rows, busqueda, searchText, manual]);
+  }, [rows, busqueda, searchText, manual, serverSearch]);
 
   const ordenadas = useMemo(() => {
     if (manual || !sort) return filtradas;
@@ -203,6 +216,19 @@ export function DataTable<T>({
   useEffect(() => {
     if (!manual) setPageLocal(1);
   }, [busqueda, sort, pageSize, rows.length, manual]);
+
+  // Con debounce: sin esto, cada tecla dispara una consulta al servidor (una
+  // RPC con ILIKE de comodín inicial, sin cancelar la anterior), así que
+  // escribir un término de 10 caracteres lanzaría 10 búsquedas simultáneas.
+  useEffect(() => {
+    // El servidor solo trata NULL/'' como "sin filtro"; un término con
+    // espacios de sobra (al final, o solo espacios) viaja tal cual dentro
+    // del ILIKE y puede no matchear nada aunque el texto exista. El input
+    // conserva lo que el usuario escribió tal cual.
+    const t = setTimeout(() => onSearchChange?.(busqueda.trim()), 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busqueda]);
 
   const irA = (n: number) => {
     const destino = Math.min(Math.max(1, n), totalPaginas);

@@ -145,3 +145,39 @@ export function useCMProductoTendencia(productoKey: string | null, tipo: TipoOri
     staleTime: 60_000,
   });
 }
+
+// ---- Por convenio (clasificación por nombre de producto; ver migración 20260925070000) ----
+// Las RPC nuevas aún no están en types.ts (patrón del repo: (supabase as any).rpc).
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export interface CMConvenioFila { convenio: string; codigo: string | null; ocs: number; estimadas: number; monto_total: number; proveedores: number | null; organismos: number | null; participacion: number | null }
+export interface CMConvenioMes { mes: string; ocs: number; monto_total: number }
+export interface CMConvenioTop { tipo: 'proveedor' | 'comprador'; nombre: string | null; rut: string | null; ocs: number; monto_total: number }
+
+export function useCMPorConvenio(anio: number) {
+  return useQuery({
+    queryKey: ['cm-por-convenio', anio],
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc('cm_por_convenio', { p_anio: anio });
+      if (error) throw error;
+      return (data || []) as CMConvenioFila[];
+    },
+  });
+}
+
+export function useCMConvenioDetalle(convenio: string | null, anio: number) {
+  return useQuery({
+    queryKey: ['cm-convenio-detalle', convenio, anio],
+    enabled: !!convenio,
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => {
+      const [m, t] = await Promise.all([
+        (supabase as any).rpc('cm_convenio_meses', { p_convenio: convenio, p_anio: anio }),
+        (supabase as any).rpc('cm_convenio_top', { p_convenio: convenio, p_anio: anio, p_limite: 10 }),
+      ]);
+      if (m.error) throw m.error;
+      if (t.error) throw t.error;
+      return { meses: (m.data || []) as CMConvenioMes[], top: (t.data || []) as CMConvenioTop[] };
+    },
+  });
+}

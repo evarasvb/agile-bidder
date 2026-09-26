@@ -95,6 +95,7 @@ const ConvenioMarcoGestion = lazy(() => import("./pages/ConvenioMarcoGestion"));
 const AdminTraccion = lazy(() => import("./pages/AdminTraccion"));
 const AdminEvaristo = lazy(() => import("./pages/AdminEvaristo"));
 const AdminSoporte = lazy(() => import("./pages/AdminSoporte"));
+const AdminExpertoActividad = lazy(() => import("./pages/AdminExpertoActividad"));
 const MisTickets = lazy(() => import("./pages/MisTickets"));
 
 const MarketingControlCenter = lazy(() => import("./pages/MarketingControlCenter"));
@@ -190,6 +191,7 @@ const App = () => (
           {/* Admin oculto */}
           <Route path="/admin/evaristo" element={<AdminOnlyRoute><AdminEvaristo /></AdminOnlyRoute>} />
           <Route path="/admin/soporte" element={<AdminOnlyRoute><AdminSoporte /></AdminOnlyRoute>} />
+          <Route path="/admin/experto-actividad" element={<AdminOnlyRoute><AdminExpertoActividad /></AdminOnlyRoute>} />
 
           {/* ========== RUTAS PROTEGIDAS CON LAYOUT ========== */}
           <Route element={<ProtectedLayoutWrapper />}>
