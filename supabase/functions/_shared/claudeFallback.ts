@@ -2,6 +2,11 @@
 // modelos): reintenta con Claude (Anthropic). Devuelve el stream ya traducido al formato
 // OpenAI-delta que usa el resto del código (choices[0].delta.content), así el llamador no
 // necesita parsear dos formatos de streaming distintos.
+//
+// El system prompt de los dos llamadores (abogado-consultar, experto-consultar) es un texto
+// fijo (SYS_CHAT / SYS_INFORME / sysDocumento(tipo), sin datos del cliente interpolados) —
+// va con cache_control para que Anthropic lo cachee: mismo resultado, ~90% más barato en
+// cada lectura de caché durante una racha de fallback (ej. Gemini caído por horas).
 export async function fetchClaudeComoOpenAI(
   messages: { role: string; content: string }[],
   opts: { modelo: string; maxTokens: number; temperature?: number }
@@ -17,7 +22,14 @@ export async function fetchClaudeComoOpenAI(
     r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: opts.modelo, max_tokens: opts.maxTokens, temperature: opts.temperature ?? 0.3, system: sys || undefined, messages: resto, stream: true }),
+      body: JSON.stringify({
+        model: opts.modelo,
+        max_tokens: opts.maxTokens,
+        temperature: opts.temperature ?? 0.3,
+        system: sys ? [{ type: "text", text: sys, cache_control: { type: "ephemeral" } }] : undefined,
+        messages: resto,
+        stream: true,
+      }),
       signal: AbortSignal.timeout(15000),
     });
   } catch (e) { console.error("claude fetch", String(e)); return null; }
