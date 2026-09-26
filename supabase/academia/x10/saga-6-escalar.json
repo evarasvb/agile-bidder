@@ -652,5 +652,212 @@
     ]
    }
   ]
+ },
+ {
+  "titulo": "Casos reales · El calendario de licitaciones (2025 completo)",
+  "lecciones": [
+   {
+    "titulo": "Cuándo se publican las licitaciones y cuántos compiten",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "Para escalar de la compra ágil a la licitación hay que conocer el calendario de publicación y la competencia real. Datos de las 100.532 licitaciones publicadas en 2025."
+     },
+     {
+      "tipo": "grafico",
+      "titulo": "Licitaciones publicadas por mes, 2025",
+      "subtipo": "barras",
+      "datos": [
+       {
+        "etiqueta": "Ene",
+        "valor": 7000
+       },
+       {
+        "etiqueta": "Feb",
+        "valor": 7534
+       },
+       {
+        "etiqueta": "Mar",
+        "valor": 8484
+       },
+       {
+        "etiqueta": "Abr",
+        "valor": 9383
+       },
+       {
+        "etiqueta": "May",
+        "valor": 8725
+       },
+       {
+        "etiqueta": "Jun",
+        "valor": 8711
+       },
+       {
+        "etiqueta": "Jul",
+        "valor": 9354
+       },
+       {
+        "etiqueta": "Ago",
+        "valor": 8722
+       },
+       {
+        "etiqueta": "Sep",
+        "valor": 7879
+       },
+       {
+        "etiqueta": "Oct",
+        "valor": 9043
+       },
+       {
+        "etiqueta": "Nov",
+        "valor": 8627
+       },
+       {
+        "etiqueta": "Dic",
+        "valor": 7070
+       }
+      ],
+      "fuente": "FirmaVB con datos abiertos de ChileCompra, órdenes de compra y licitaciones de todo 2025",
+      "unidad": "Cantidad de licitaciones",
+      "lectura": "Tres picos: abril, julio y octubre, coincidiendo con el inicio de cada trimestre después del cierre presupuestario. Diciembre y enero son los valles. Tu equipo de propuestas debe estar libre en abril, julio y octubre."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Licitaciones 2025 por tipo",
+      "columnas": [
+       "Tipo",
+       "Cantidad",
+       "% del total",
+       "Tramo"
+      ],
+      "filas": [
+       [
+        "LE",
+        57578,
+        57.3,
+        "100 a 1.000 UTM"
+       ],
+       [
+        "LP",
+        14885,
+        14.8,
+        "1.000 a 2.000 UTM"
+       ],
+       [
+        "L1",
+        11801,
+        11.7,
+        "Hasta 100 UTM"
+       ],
+       [
+        "LQ",
+        6579,
+        6.5,
+        "2.000 a 5.000 UTM"
+       ],
+       [
+        "LR",
+        6236,
+        6.2,
+        "Más de 5.000 UTM"
+       ]
+      ],
+      "fuente": "FirmaVB con datos abiertos de ChileCompra, órdenes de compra y licitaciones de todo 2025",
+      "lectura": "Seis de cada diez licitaciones son LE: el tramo medio donde vive la pyme. Las LR (contratos grandes) son solo el 6%, pero mueven la mayor parte del dinero."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Competencia y resultado por mes (2025)",
+      "columnas": [
+       "Mes",
+       "Oferentes promedio",
+       "% desiertas",
+       "% adjudicadas"
+      ],
+      "filas": [
+       [
+        "Enero",
+        "4,7",
+        "11,2%",
+        "85,4%"
+       ],
+       [
+        "Abril",
+        "4,5",
+        "13,3%",
+        "82,8%"
+       ],
+       [
+        "Julio",
+        "4,6",
+        "14,1%",
+        "81,5%"
+       ],
+       [
+        "Octubre",
+        "4,3",
+        "12,7%",
+        "81,6%"
+       ],
+       [
+        "Noviembre",
+        "4,2",
+        "12,0%",
+        "81,5%"
+       ],
+       [
+        "Diciembre",
+        "3,9",
+        "12,4%",
+        "77,3%"
+       ]
+      ],
+      "fuente": "FirmaVB con datos abiertos de ChileCompra, órdenes de compra y licitaciones de todo 2025",
+      "lectura": "La competencia baja a lo largo del año: de 4,7 oferentes en enero a 3,9 en diciembre. Y una de cada ocho licitaciones queda desierta: el comprador la vuelve a publicar, muchas veces en enero. Las desiertas de diciembre son las oportunidades de enero."
+     },
+     {
+      "tipo": "dato",
+      "texto": "Las licitaciones de septiembre de 2025 sumaron 4.214 mil millones de pesos de monto estimado, más del doble de un mes normal: son los contratos grandes del año siguiente que se publican antes del cierre presupuestario. Para contratos anuales, septiembre y octubre son los meses de postular.",
+      "fuente": "FirmaVB con datos abiertos de ChileCompra, órdenes de compra y licitaciones de todo 2025"
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Abril, julio y octubre: prepara capacidad de propuestas. Son los meses de más publicaciones.",
+       "Septiembre y octubre: contratos anuales grandes. Si tu producto es de suministro continuo, aquí se juega tu año siguiente.",
+       "Diciembre: menos competencia (3,9 oferentes) y más desiertas. Postula lo que otros dejaron.",
+       "Enero: republicación de las desiertas de diciembre. Revisa las licitaciones desiertas de tu rubro y prepárate para la segunda vuelta."
+      ]
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Licitaciones nuevas y Libro de licitación",
+      "ruta": "/licitaciones-nuevas"
+     },
+     {
+      "tipo": "ejercicio",
+      "titulo": "Tu calendario de licitaciones",
+      "pasos": [
+       "Anota los tres picos de publicación de tu rubro (revisa 2025 en el reporte de mercado).",
+       "Reserva capacidad de tu equipo para esos meses.",
+       "Lista las licitaciones desiertas de tu rubro del último trimestre y sigue a esos organismos: van a republicar.",
+       "Define qué contratos anuales vas a postular en septiembre y octubre."
+      ],
+      "entregable": "Calendario anual con picos, contratos anuales y desiertas a seguir."
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "Una licitación de tu rubro quedó desierta en diciembre. ¿Qué haces?",
+      "opciones": [
+       "Nada: si quedó desierta es porque no era buen negocio.",
+       "Seguir al organismo: lo más probable es que la republique en enero con menos competencia.",
+       "Reclamar por qué quedó desierta."
+      ],
+      "correcta": 1,
+      "explicacion": "El 12,7% de las licitaciones de 2025 quedó desierta y los compradores republican, con frecuencia en enero. Seguir al organismo te deja listo para la segunda vuelta."
+     }
+    ]
+   }
+  ]
  }
 ]

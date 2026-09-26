@@ -847,6 +847,14 @@ export const CURSOS: Curso[] = [
           { titulo: "Ejercicio guiado: tu radar semanal de oportunidades", bloques: [] },
         ],
       },
+      {
+        titulo: "Mirar donde otros no ven · Fin de año 2025: el año completo",
+        lecciones: [
+          { titulo: "Los doce meses de 2025: cantidad y dinero", bloques: [] },
+          { titulo: "Qué sube en noviembre y diciembre (y qué se apaga)", bloques: [] },
+          { titulo: "Quién gasta en diciembre: organismos, sectores y regiones", bloques: [] },
+        ],
+      },
     ],
   },
   {
@@ -1050,6 +1058,12 @@ export const CURSOS: Curso[] = [
         lecciones: [
           { titulo: "Rubros por mes: compra antes de que suba", bloques: [] },
           { titulo: "Fin de mes y flujo de caja: el 42%", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Casos reales · El calendario de licitaciones (2025 completo)",
+        lecciones: [
+          { titulo: "Cuándo se publican las licitaciones y cuántos compiten", bloques: [] },
         ],
       },
     ],

@@ -104,3 +104,11 @@ FirmaVB, una decisión concreta que el alumno toma hoy, cierre con el ejercicio 
 
 ## Programa Pro · Cobranza completa en FirmaVB (15 min)
 Mismo guion que Saga 5, versión resumida para el Programa Pro.
+
+## Saga 2 · Fin de año 2025: leer el estudio y armar tu plan de noviembre (13 min)
+1. Gancho: "Noviembre de 2025: 77.346 compras ágiles, el récord del año. Y el mobiliario subió 87%."
+2. El año completo: órdenes por mes (octubre y noviembre arriba), monto por mes (enero y febrero arriba). Dos calendarios.
+3. Qué sube: rubros ×1,3 a ×1,6 (deportes, imprenta, muebles, juguetes, tecnología); productos ×2 (decoraciones, diplomas, mochilas, agendas, ventiladores, protector solar). Qué cae: salud, medicamentos, insumos, limpieza.
+4. Quién gasta en diciembre: SERVIU Magallanes 73% del año, Temuco, Ovalle, CONAF, MOP; sectores (obras públicas 2,3; judicial 2,8); regiones extremas con más de un tercio del año en el cuarto trimestre.
+5. Licitaciones: picos abril, julio, octubre; diciembre con 3,9 oferentes; 12,7% desiertas que se republican en enero.
+6. Plan: stock en septiembre, seguir organismos desde octubre, compras ágiles con entrega en 3 a 5 días desde el 1 de noviembre, postular las desiertas en enero. Cierre con el ejercicio del catálogo de fin de año.
