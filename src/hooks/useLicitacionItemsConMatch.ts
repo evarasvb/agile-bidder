@@ -21,9 +21,15 @@ export function useLicitacionItemsConMatch(
   codigo: string | null | undefined,
   items: ItemRequerido[],
 ): { itemsConMatch: ItemConMatch[]; isLoading: boolean } {
-  const { procesarCompra, isLoading } = useProductMatching();
-  const { data: dbMatches = [] } = useLicItemMatches(codigo);
+  const { procesarCompra, isLoading: isLoadingFuzzy } = useProductMatching();
+  // Mientras esta consulta todavía está en curso, dbMatches queda en [] por el
+  // valor por defecto — indistinguible de "sin match en el servidor". Sin su
+  // isLoading acá, se exponía el resultado fuzzy como si fuera definitivo un
+  // instante antes de que llegara el de verdad, recreando el mismo bug que
+  // este hook vino a cerrar (hallazgo de Codex en esta misma PR).
+  const { data: dbMatches = [], isLoading: isLoadingDb } = useLicItemMatches(codigo);
   const { data: inventarioActivo = [] } = useInventoryActivo();
+  const isLoading = isLoadingFuzzy || isLoadingDb;
 
   const inventarioById = useMemo(() => {
     const m = new Map<string, InventoryItem>();
