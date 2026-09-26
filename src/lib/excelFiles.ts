@@ -1,9 +1,18 @@
 import type { CellValue, Worksheet } from 'exceljs';
+import {
+  MAX_SPREADSHEET_ARCHIVE_ENTRIES,
+  MAX_SPREADSHEET_UNCOMPRESSED_BYTES,
+  measureSpreadsheetArchiveUncompressedBytes,
+  SpreadsheetArchiveValidationError,
+} from './excelArchiveValidation';
+
+export { MAX_SPREADSHEET_UNCOMPRESSED_BYTES, measureSpreadsheetArchiveUncompressedBytes } from './excelArchiveValidation';
 
 export const MAX_SPREADSHEET_FILE_BYTES = 20 * 1024 * 1024;
-export const MAX_SPREADSHEET_UNCOMPRESSED_BYTES = 100 * 1024 * 1024;
 export const MAX_SPREADSHEET_ROWS = 50_000;
 export const MAX_SPREADSHEET_COLUMNS = 100;
+export const MAX_SPREADSHEET_CELL_CHARACTERS = 10_000;
+export const MAX_SPREADSHEET_HEADER_CHARACTERS = 200;
 
 const EXCEL_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
@@ -28,6 +37,7 @@ export class SpreadsheetReadError extends Error {
       | 'file_too_large'
       | 'archive_too_large'
       | 'sheet_too_large'
+      | 'cell_too_large'
       | 'unsupported_format'
       | 'invalid_file',
   ) {
@@ -87,8 +97,15 @@ function normalizedCellValue(value: CellValue): unknown {
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   if (typeof value !== 'object') return value;
   if ('result' in value) return normalizedCellValue(value.result as CellValue);
-  if ('richText' in value) return value.richText.map((part) => part.text).join('');
-  if ('text' in value) return value.text;
+  if ('richText' in value) {
+    let text = '';
+    for (const part of value.richText) {
+      text += part.text;
+      assertSafeImportedCell(text);
+    }
+    return text;
+  }
+  if ('text' in value) return assertSafeImportedCell(value.text);
   if ('error' in value) return value.error;
   return String(value);
 }
@@ -97,10 +114,26 @@ function isPresent(value: unknown): boolean {
   return value !== undefined && value !== null && value !== '';
 }
 
+function assertSafeImportedCell(value: unknown): unknown {
+  if (typeof value === 'string' && value.length > MAX_SPREADSHEET_CELL_CHARACTERS) {
+    throw new SpreadsheetReadError(
+      `Una celda supera el máximo seguro de ${MAX_SPREADSHEET_CELL_CHARACTERS.toLocaleString('es-CL')} caracteres.`,
+      'cell_too_large',
+    );
+  }
+  return value;
+}
+
 function uniqueHeaders(values: readonly unknown[]): string[] {
   const seen = new Map<string, number>();
   return values.map((value) => {
     const base = isPresent(value) ? String(value).trim() : '__EMPTY';
+    if (base.length > MAX_SPREADSHEET_HEADER_CHARACTERS) {
+      throw new SpreadsheetReadError(
+        `Un encabezado supera el máximo seguro de ${MAX_SPREADSHEET_HEADER_CHARACTERS} caracteres.`,
+        'cell_too_large',
+      );
+    }
     const count = seen.get(base) ?? 0;
     seen.set(base, count + 1);
     return count === 0 ? base : `${base}_${count}`;
@@ -126,7 +159,7 @@ function tableToObjects(table: readonly unknown[][]): SpreadsheetRow[] {
     const target: SpreadsheetRow = {};
     let hasValue = false;
     headers.forEach((header, columnIndex) => {
-      const value = source[columnIndex];
+      const value = assertSafeImportedCell(source[columnIndex]);
       if (isPresent(value)) {
         target[header] = value;
         hasValue = true;
@@ -180,12 +213,21 @@ function detectDelimiter(text: string): ',' | ';' | '\t' {
 }
 
 function parseDelimitedText(text: string): unknown[][] {
-  const input = text.replace(/^\uFEFF/, '');
-  const delimiter = detectDelimiter(input);
+  let input = text.replace(/^\uFEFF/, '');
+  const separatorDeclaration = input.match(/^sep=(,|;|\t)\r?\n/i);
+  const delimiter = separatorDeclaration
+    ? separatorDeclaration[1] as ',' | ';' | '\t'
+    : detectDelimiter(input);
+  if (separatorDeclaration) input = input.slice(separatorDeclaration[0].length);
   const rows: string[][] = [];
   let row: string[] = [];
   let value = '';
   let quoted = false;
+
+  const appendValue = (fragment: string) => {
+    value += fragment;
+    assertSafeImportedCell(value);
+  };
 
   const pushValue = () => {
     row.push(value);
@@ -213,7 +255,7 @@ function parseDelimitedText(text: string): unknown[][] {
     const char = input[index];
     if (char === '"') {
       if (quoted && input[index + 1] === '"') {
-        value += '"';
+        appendValue('"');
         index += 1;
       } else {
         quoted = !quoted;
@@ -224,7 +266,7 @@ function parseDelimitedText(text: string): unknown[][] {
       if (char === '\r' && input[index + 1] === '\n') index += 1;
       pushRow();
     } else {
-      value += char;
+      appendValue(char);
     }
   }
   if (quoted) throw new SpreadsheetReadError('El archivo CSV tiene comillas sin cerrar.', 'invalid_file');
@@ -250,7 +292,7 @@ function assertSafeZipArchive(buffer: ArrayBuffer): void {
   if (entryCount === 0xffff || directorySize === 0xffffffff || directoryOffset === 0xffffffff) {
     throw new SpreadsheetReadError('El archivo .xlsx usa un formato ZIP no compatible.', 'invalid_file');
   }
-  if (directoryOffset + directorySize > endOffset || entryCount > 5_000) {
+  if (directoryOffset + directorySize > endOffset || entryCount > MAX_SPREADSHEET_ARCHIVE_ENTRIES) {
     throw new SpreadsheetReadError('El archivo .xlsx no es válido.', 'invalid_file');
   }
 
@@ -278,6 +320,57 @@ function assertSafeZipArchive(buffer: ArrayBuffer): void {
   }
 }
 
+export async function validateSpreadsheetArchive(buffer: ArrayBuffer): Promise<ArrayBuffer> {
+  if (typeof Worker === 'undefined') {
+    try {
+      measureSpreadsheetArchiveUncompressedBytes(buffer);
+      return buffer;
+    } catch (error) {
+      if (error instanceof SpreadsheetArchiveValidationError) {
+        throw new SpreadsheetReadError(error.message, error.code);
+      }
+      throw error;
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('./excelArchive.worker.ts', import.meta.url), { type: 'module' });
+    const timeout = globalThis.setTimeout(() => {
+      worker.terminate();
+      reject(new SpreadsheetReadError(
+        'La validación del archivo excedió el tiempo seguro de 8 segundos.',
+        'invalid_file',
+      ));
+    }, 8_000);
+    const cleanup = () => {
+      globalThis.clearTimeout(timeout);
+      worker.terminate();
+    };
+
+    worker.onmessage = ({ data }: MessageEvent<
+      | { ok: true; buffer: ArrayBuffer }
+      | { ok: false; code: 'archive_too_large' | 'invalid_file'; message: string }
+    >) => {
+      cleanup();
+      if (data.ok) resolve(data.buffer);
+      else reject(new SpreadsheetReadError(data.message, data.code));
+    };
+    worker.onerror = () => {
+      cleanup();
+      reject(new SpreadsheetReadError('No se pudo validar el archivo .xlsx.', 'invalid_file'));
+    };
+    worker.postMessage({ buffer }, [buffer]);
+  });
+}
+
+function decodeDelimitedBuffer(buffer: ArrayBuffer): string {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+  } catch {
+    return new TextDecoder('windows-1252').decode(buffer);
+  }
+}
+
 export async function readFirstSpreadsheetSheet(file: SpreadsheetFile): Promise<SpreadsheetRow[]> {
   if (file.size > MAX_SPREADSHEET_FILE_BYTES) {
     throw new SpreadsheetReadError('El archivo supera el máximo seguro de 20 MB.', 'file_too_large');
@@ -296,13 +389,14 @@ export async function readFirstSpreadsheetSheet(file: SpreadsheetFile): Promise<
 
   const buffer = await file.arrayBuffer();
   if (extension === 'csv') {
-    return tableToObjects(parseDelimitedText(new TextDecoder().decode(buffer)));
+    return tableToObjects(parseDelimitedText(decodeDelimitedBuffer(buffer)));
   }
 
   assertSafeZipArchive(buffer);
+  const validatedBuffer = await validateSpreadsheetArchive(buffer);
   const ExcelJS = (await import('exceljs')).default;
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  await workbook.xlsx.load(validatedBuffer);
   const worksheet = workbook.worksheets[0];
   return worksheet ? worksheetToObjects(worksheet) : [];
 }

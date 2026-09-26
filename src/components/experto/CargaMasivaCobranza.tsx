@@ -105,6 +105,10 @@ function parsearFila(row: Record<string, unknown>, numeroFila: number): FilaPars
   const notas = String(row[COL_NOTAS] ?? '').trim();
 
   if (!nombre) return { fila: numeroFila, factura: null, error: 'Falta institución o cliente', resumen: '—' };
+  if (nombre.length > 500) return { fila: numeroFila, factura: null, error: 'Institución o cliente supera 500 caracteres', resumen: nombre.slice(0, 80) };
+  if (rut.length > 20) return { fila: numeroFila, factura: null, error: 'RUT supera 20 caracteres', resumen: nombre };
+  if (numero.length > 100) return { fila: numeroFila, factura: null, error: 'N° de factura supera 100 caracteres', resumen: nombre };
+  if (notas.length > 5_000) return { fila: numeroFila, factura: null, error: 'Notas supera 5.000 caracteres', resumen: nombre };
   if (monto == null || monto <= 0) return { fila: numeroFila, factura: null, error: 'Monto inválido', resumen: nombre };
   if (emisionP.invalida || recepcionP.invalida || vencimientoP.invalida) {
     return { fila: numeroFila, factura: null, error: 'Fecha inválida (usa AAAA-MM-DD)', resumen: nombre };
