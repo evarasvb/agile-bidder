@@ -5,8 +5,12 @@
 //
 // El system prompt de los dos llamadores (abogado-consultar, experto-consultar) es un texto
 // fijo (SYS_CHAT / SYS_INFORME / sysDocumento(tipo), sin datos del cliente interpolados) —
-// va con cache_control para que Anthropic lo cachee: mismo resultado, ~90% más barato en
-// cada lectura de caché durante una racha de fallback (ej. Gemini caído por horas).
+// va con cache_control para que Anthropic lo cachee cuando el prompt alcanza el mínimo de
+// tokens que exige cada modelo (Anthropic no cachea bloques más cortos que eso, sin avisar).
+// En la práctica solo beneficia a la generación de documentos (claude-sonnet-5, prompt largo);
+// el modo chat (claude-haiku-4-5, SYS_CHAT corto) queda bajo ese mínimo y no se cachea — no es
+// un error, solo no hay ahorro ahí. Marcar cache_control en un bloque corto es inofensivo: la
+// API lo ignora y responde igual, sin cobrar de más.
 export async function fetchClaudeComoOpenAI(
   messages: { role: string; content: string }[],
   opts: { modelo: string; maxTokens: number; temperature?: number }
