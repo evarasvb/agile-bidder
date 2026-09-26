@@ -16,6 +16,7 @@ interface Oportunidad {
   organismo: string | null;
   presupuesto: number | null;
   fecha_cierre: string | null;
+  tipo: "licitacion" | "compra_agil";
 }
 
 Deno.serve(async (req) => {
@@ -61,6 +62,7 @@ Deno.serve(async (req) => {
         organismo: l.institucion_nombre,
         presupuesto: l.presupuesto_estimado,
         fecha_cierre: l.fecha_cierre,
+        tipo: "licitacion",
       });
     }
 
@@ -76,6 +78,7 @@ Deno.serve(async (req) => {
         organismo: c.nombre_organismo,
         presupuesto: c.monto_estimado,
         fecha_cierre: c.fecha_cierre,
+        tipo: "compra_agil",
       });
     }
 
@@ -117,6 +120,10 @@ Deno.serve(async (req) => {
                 organismo: o.organismo ?? s.nombre_institucion,
                 presupuesto: o.presupuesto ?? undefined,
                 fecha_cierre: o.fecha_cierre ?? undefined,
+                // Para que la campanita sepa a qué ruta llevar: licitaciones_bi
+                // y compras_agiles comparten esta misma tabla de avisos, pero
+                // /oportunidades/:tipo/:id necesita distinguir cuál es cuál.
+                tipo_oportunidad: o.tipo,
               },
             }),
           });
