@@ -924,9 +924,66 @@ Deno.serve(async (req) => {
         );
       }
 
+      // ------------------------------------------------------------------
+      // Asistente Convenio Marco (carga de ofertas): cobra créditos por producto.
+      // El script en la consola de Mercado Público llama 'cm-verificar' al iniciar
+      // (para mostrar el saldo) y 'cm-cobrar' antes de subir cada producto. Si no
+      // hay saldo, devuelve ok:false y el script se frena (muro de pago).
+      // El cobro es server-side a propósito: no se puede saltar desde el navegador.
+      // ------------------------------------------------------------------
+      case 'cm-verificar': {
+        if (!clienteId) {
+          return new Response(JSON.stringify({ error: 'API key requerida' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        const { data: cli } = await supabase.from('clientes').select('user_id, empresa_nombre, plan').eq('id', clienteId).single();
+        if (!cli?.user_id) {
+          return new Response(JSON.stringify({ error: 'Cliente sin usuario asociado' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        await supabase.rpc('creditos_asegurar_cuenta', { p_user_id: cli.user_id });
+        const { data: cuenta } = await supabase.from('creditos_cuenta').select('saldo, plan').eq('user_id', cli.user_id).single();
+        const { data: plan } = await supabase.from('planes').select('nombre, recarga_creditos').eq('id', cuenta?.plan || 'free').single();
+        return new Response(
+          JSON.stringify({
+            success: true,
+            empresa: cli.empresa_nombre,
+            plan: cuenta?.plan || 'free',
+            plan_nombre: plan?.nombre || 'Free',
+            ilimitado: plan?.recarga_creditos === 'ilimitado',
+            saldo: cuenta?.saldo ?? 0,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'cm-cobrar': {
+        if (!clienteId) {
+          return new Response(JSON.stringify({ error: 'API key requerida' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        const body = await req.json().catch(() => ({}));
+        const cantidad = Math.min(Math.max(Number(body.cantidad) || 1, 1), 500);
+        const referencia = typeof body.referencia === 'string' ? body.referencia.slice(0, 200) : null;
+        const { data: cli } = await supabase.from('clientes').select('user_id').eq('id', clienteId).single();
+        if (!cli?.user_id) {
+          return new Response(JSON.stringify({ error: 'Cliente sin usuario asociado' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        const { data: res, error: cobroError } = await supabase.rpc('consumir_creditos', {
+          p_accion: 'cm_producto', p_cantidad: cantidad, p_referencia: referencia, p_user_id: cli.user_id,
+        });
+        if (cobroError) {
+          console.error('Error consumir_creditos:', cobroError);
+          return new Response(JSON.stringify({ error: 'Error cobrando créditos' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        await logActivity(supabase, apiKeyId, clienteId, 'cm-cobrar', null, null, { cantidad, referencia, resultado: res }, req);
+        // res = { ok, saldo, cobrado, motivo, requiere? }
+        return new Response(
+          JSON.stringify({ success: true, ...(res as Record<string, unknown>) }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       default:
         return new Response(
-          JSON.stringify({ error: 'Acción no válida. Acciones: verify, get-matches, get-offer, submit-result, sync-licitacion, get-licitaciones, ca-documentos, ca-pendientes, acciones-pendientes, accion-resultado' }),
+          JSON.stringify({ error: 'Acción no válida. Acciones: verify, get-matches, get-offer, submit-result, sync-licitacion, get-licitaciones, ca-documentos, ca-pendientes, acciones-pendientes, accion-resultado, cm-verificar, cm-cobrar' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
     }
