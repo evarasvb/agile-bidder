@@ -33,7 +33,7 @@ import { useAuthUser, useCliente } from "@/hooks/useCliente";
 import { useComprasAgilesMatch } from "@/hooks/useComprasAgilesMatch";
 import { Link } from "react-router-dom";
 import { Gavel } from "lucide-react";
-import * as XLSX from 'xlsx';
+import { downloadSpreadsheetWorkbook, recordsToSpreadsheetRows } from '@/lib/excelFiles';
 
 const COLUMNAS_ORDENABLES: InventarioOrdenColumna[] = ['sku', 'nombre_producto', 'categoria', 'precio_unitario', 'margen_minimo', 'stock_disponible', 'created_at'];
 
@@ -255,30 +255,14 @@ export default function Inventory() {
     }
 
     const exportData = await getExportData();
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
-    
-    // Set column widths
-    ws['!cols'] = [
-      { wch: 15 }, // SKU
-      { wch: 30 }, // Producto
-      { wch: 40 }, // Descripción
-      { wch: 15 }, // Marca
-      { wch: 15 }, // Categoría
-      { wch: 20 }, // Proveedor
-      { wch: 12 }, // Precio
-      { wch: 12 }, // Margen Min
-      { wch: 12 }, // Margen Obj
-      { wch: 10 }, // Stock
-      { wch: 10 }, // Unidad
-      { wch: 15 }, // Tiempo
-      { wch: 30 }, // Keywords
-      { wch: 8 },  // Activo
-      { wch: 50 }, // URL Imagen
-    ];
-
-    XLSX.writeFile(wb, `inventario_firmavb_${new Date().toISOString().split('T')[0]}.xlsx`);
+    await downloadSpreadsheetWorkbook(
+      `inventario_firmavb_${new Date().toISOString().split('T')[0]}.xlsx`,
+      [{
+        name: 'Inventario',
+        rows: recordsToSpreadsheetRows(exportData),
+        columnWidths: [15, 30, 40, 15, 15, 20, 12, 12, 12, 10, 10, 15, 30, 8, 50],
+      }],
+    );
     toast.success('Inventario exportado a Excel');
   };
 
