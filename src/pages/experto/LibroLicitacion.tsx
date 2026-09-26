@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 // Escritorio: tres paneles ajustables (arrastra el separador). Celular/tablet: pestañas Fuentes · Chat · Entregables.
 function useEscritorio() {
@@ -31,7 +31,7 @@ import { AccionesCompartir } from '@/components/oportunidades/AccionesCompartir'
 import { mailtoOportunidad } from '@/lib/compartir';
 import { LicitacionItemsMatch } from '@/components/licitaciones/LicitacionItemsMatch';
 import { useLicitacionItemsReal } from '@/hooks/useLicitacionItemsReal';
-import { useProductMatching } from '@/hooks/useProductMatching';
+import { useLicitacionItemsConMatch } from '@/hooks/useLicitacionItemsConMatch';
 import { useMatchOverrides } from '@/hooks/useMatchOverrides';
 import { useInventoryActivo } from '@/hooks/useInventory';
 import { useCliente } from '@/hooks/useCliente';
@@ -114,7 +114,14 @@ export default function LibroLicitacion() {
     queryFn: async () => (await supabase.from('licitaciones_bi').select('id').eq('codigo', cod).maybeSingle()).data,
   });
   const { data: licItems = [] } = useLicitacionItemsReal(licRow?.id);
-  const { procesarCompra } = useProductMatching();
+  const licItemsMapeados = useMemo(() => licItems.map((it: any, idx: number) => ({
+    id: String(it.id ?? `idx-${idx}`),
+    nombre: it.nombre_producto || '',
+    descripcion: it.descripcion || '',
+    cantidad: it.cantidad ?? 1,
+    unidad: it.unidad || 'unidad',
+  })), [licItems]);
+  const { itemsConMatch: licItemsConMatch, isLoading: licMatchLoading } = useLicitacionItemsConMatch(cod, licItemsMapeados);
   const { data: matchOverrides = {} } = useMatchOverrides(cod, 'licitacion');
   const { data: inventarioActivo = [] } = useInventoryActivo();
   const { data: cliente } = useCliente();
@@ -396,16 +403,9 @@ export default function LibroLicitacion() {
   // (mismo criterio que la sección "Productos Solicitados" de más arriba): se
   // excluyen los descartados por el usuario y se respeta la reasignación manual.
   const itemsParaCotizar = (): ItemCotizacion[] => {
-    if (!licItems.length) return [];
-    const mapped = licItems.map((it: any, idx: number) => ({
-      id: String(it.id ?? `idx-${idx}`),
-      nombre: it.nombre_producto || '',
-      descripcion: it.descripcion || '',
-      cantidad: it.cantidad ?? 1,
-      unidad: it.unidad || 'unidad',
-    }));
+    if (!licItemsConMatch.length) return [];
     const inventarioById = new Map((inventarioActivo as any[]).map((p: any) => [p.id, p]));
-    return procesarCompra(mapped)
+    return licItemsConMatch
       .map((item: any) => {
         const ov = (matchOverrides as any)[String(item.id)];
         if (ov?.accion === 'descartado') return null;
@@ -433,6 +433,11 @@ export default function LibroLicitacion() {
   // los productos ofertados: útil cuando la licitación pide subir una oferta
   // comercial además de los anexos (típico en artículos de oficina y similares).
   const generarCotizacion = async () => {
+    // Si se genera mientras el match del servidor (lic_item_matches) todavía
+    // está cargando, itemsParaCotizar() solo tendría el resultado fuzzy —
+    // distinto del que "Productos Solicitados" termina mostrando un instante
+    // después. Se espera a que asiente en vez de cotizar con datos parciales.
+    if (licMatchLoading) { toast.error('Esperando el match con tu inventario, intenta de nuevo en un segundo.'); return; }
     const items = itemsParaCotizar();
     if (!items.length) { toast.error('No hay productos con match para cotizar. Revisa "Productos Solicitados" más arriba y corrige el match si hace falta.', { duration: 7000 }); return; }
     empezar('cotizacion');
@@ -678,7 +683,7 @@ export default function LibroLicitacion() {
                 <Button size="sm" variant="outline" className="mt-1 mb-1 mr-2 w-full sm:w-auto" onClick={generarPptx} disabled={ocupado('pptx')} title="Portada, resumen, admisibilidad, evaluación, tareas por fase, garantías y pendientes en un PowerPoint">
                   {ocupado('pptx') ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Presentation className="h-4 w-4 mr-1" />}Generar PowerPoint de la matriz
                 </Button>
-                <Button size="sm" variant="outline" className="mt-1 mb-1 w-full sm:w-auto" onClick={generarCotizacion} disabled={ocupado('cotizacion')} title="Cotización en PDF con los productos de tu inventario que hacen match, lista para subir como oferta comercial">
+                <Button size="sm" variant="outline" className="mt-1 mb-1 w-full sm:w-auto" onClick={generarCotizacion} disabled={ocupado('cotizacion') || licMatchLoading} title="Cotización en PDF con los productos de tu inventario que hacen match, lista para subir como oferta comercial">
                   {ocupado('cotizacion') ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Receipt className="h-4 w-4 mr-1" />}Generar cotización comercial
                 </Button>
                 {documentos.map((d: any) => (
