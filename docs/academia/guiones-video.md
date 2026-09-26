@@ -112,3 +112,23 @@ Mismo guion que Saga 5, versión resumida para el Programa Pro.
 4. Quién gasta en diciembre: SERVIU Magallanes 73% del año, Temuco, Ovalle, CONAF, MOP; sectores (obras públicas 2,3; judicial 2,8); regiones extremas con más de un tercio del año en el cuarto trimestre.
 5. Licitaciones: picos abril, julio, octubre; diciembre con 3,9 oferentes; 12,7% desiertas que se republican en enero.
 6. Plan: stock en septiembre, seguir organismos desde octubre, compras ágiles con entrega en 3 a 5 días desde el 1 de noviembre, postular las desiertas en enero. Cierre con el ejercicio del catálogo de fin de año.
+
+## 16. El ciclo completo del cobro según Evaristo (18 min) · Saga 5 y Programa Pro
+
+**Gancho (0:00–0:40).** "El Estado es mal pagador. Pero hay una parte que nadie dice: el proveedor tampoco sabe cobrar. Hoy les muestro las 8 etapas con las que en FirmaVB cobramos, con los documentos reales."
+
+**Etapa 0 (0:40–3:00).** Semáforo antes de postular: reclamos de pago, noticias del organismo, mes del año. Hospitales ~75 días. Diciembre: presupuesto de papel sin caja. Enero y febrero: universidades sin nadie habilitado para pagar. Mostrar el botón Seguir y el reporte de compradores.
+
+**Etapa 1 (3:00–5:30).** Preguntas al foro con el Libro: las 9 áreas (técnicas, operativas, financieras, garantías, postventa, seguridad, no resuelto, no claro, legales). La pregunta que cobra: casilla, formato y desde cuándo corre el plazo.
+
+**Etapa 2 (5:30–7:00).** Postular con todos los espacios y puntos llenos: la matriz de adjudicación sin rojos y el párrafo del proceso de entrega, factura y cobranza dentro de la oferta.
+
+**Etapa 3 (7:00–9:00).** La guía viaja con el protocolo de revisión de mercadería y el proceso de factura y cobranza. Mostrar el pie de página fijo de la guía de FirmaVB.
+
+**Etapa 4 (9:00–11:30).** Facturación: guía firmada + OC aceptada. Factura con protocolo de cobro e interés (Ley 21.131), en el formato que pide la OC (XML a la casilla indicada). Error más caro: casilla equivocada.
+
+**Etapa 5 (11:30–13:30).** Radar de cobranza: operaciones y comercial entregan contactos. "No dejen la cobranza en manos del factoring": el factoring financia, no cobra. Si no hay pago, no hay negocio.
+
+**Etapa 6 y 7 (13:30–17:00).** Escalera con días: confirmación día 7, recordatorio día 20, nota de cobro día 31, visita presencial si no contestan, nota de débito y segunda nota de cobro día 45, escalar día 60. Mostrar Cobranza y el Abogado generando las notas.
+
+**Cierre (17:00–18:00).** Ejercicio: cartera de cobro con peldaño y próxima acción, y semáforo de 10 instituciones. "Cobrar es un oficio. Se aprende con método."
