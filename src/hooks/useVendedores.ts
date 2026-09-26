@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
 export interface Vendedor {
@@ -90,9 +91,20 @@ export function useCreateVendedor() {
   
   return useMutation({
     mutationFn: async (vendedor: Omit<Vendedor, 'id' | 'created_at' | 'updated_at'>) => {
+      // La política de INSERT exige user_id = auth.uid() o invitado_por = auth.uid():
+      // una fila "pendiente" (user_id null, como la que crea "Nuevo Vendedor") solo
+      // pasa por la segunda vía. El trigger de la tabla solo deja fijar invitado_por
+      // al propio auth.uid() del que inserta (nunca a otra persona), así que esto no
+      // reabre el hueco de seguridad que ese trigger cierra.
+      const { data: { user } } = await supabase.auth.getUser();
+      // estado_invitacion por defecto en la tabla es 'activada' — sin esto,
+      // esta fila placeholder (user_id null) quedaba marcada como si ya
+      // tuviera cuenta activa, y si el dueño después la invitaba de verdad
+      // con "Invitar miembro" (mismo email), invitar-miembro la rechazaba
+      // como "ya tiene una cuenta activa" antes de generar el token real.
       const { data, error } = await supabase
         .from('vendedores')
-        .insert(vendedor)
+        .insert({ ...vendedor, invitado_por: user?.id ?? null, estado_invitacion: 'pendiente' })
         .select()
         .single();
       
@@ -106,6 +118,36 @@ export function useCreateVendedor() {
     onError: (error) => {
       console.error('crear vendedor:', error.message);
       toast.error(error.message?.includes('duplicate') ? 'Ese correo ya está en tu equipo.' : 'No se pudo agregar al miembro. Intenta de nuevo.');
+    },
+  });
+}
+
+// Un vendedor invitado que use "Nuevo Vendedor" crearía una fila con
+// invitado_por = su propio auth.uid() (el trigger solo permite fijarlo así),
+// pero el SELECT de vendedores la scopea por vendedores_owner_auth_id() del
+// dueño real — la fila quedaría invisible para todos, dueño incluido. Este
+// hook resuelve si el usuario actual ES el dueño efectivo (para mostrar la
+// acción solo ahí; ver el hallazgo de Codex en la migración de RLS de
+// vendedores del 25-09).
+export function useEsDuenoEquipo() {
+  // La queryKey lleva el user.id: sin esto, cambiar de cuenta dentro de la
+  // misma sesión de la SPA (sin recarga completa) podía servir el resultado
+  // cacheado de la cuenta anterior mientras el refetch corre en segundo
+  // plano — un miembro invitado heredaba el "true" de un dueño recién
+  // deslogueado y veía la acción de crear vendedores.
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['equipo', 'es-dueno', user?.id],
+    enabled: !!user?.id,
+    // Revalida cada 5 min: si el dueño desactiva/reactiva a este usuario
+    // mientras sigue logueado, vendedores_owner_auth_id() cambia — sin esto
+    // (y sin refetch por foco de ventana, deshabilitado a nivel global) el
+    // resultado quedaba pegado al de antes del cambio por el resto de la sesión.
+    refetchInterval: 5 * 60_000,
+    queryFn: async (): Promise<boolean> => {
+      const { data, error } = await supabase.rpc('vendedores_owner_auth_id');
+      if (error) throw error;
+      return data === user!.id;
     },
   });
 }

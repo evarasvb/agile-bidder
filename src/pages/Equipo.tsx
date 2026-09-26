@@ -6,9 +6,14 @@ import { EquipoMemberList } from '@/components/equipo/EquipoMemberList';
 import { EquipoLeaderboard } from '@/components/equipo/EquipoLeaderboard';
 import { InvitarMiembroDialog } from '@/components/equipo/InvitarMiembroDialog';
 import { Button } from '@/components/ui/button';
+import { useEsDuenoEquipo } from '@/hooks/useVendedores';
 
 export default function Equipo() {
   const [inviteOpen, setInviteOpen] = useState(false);
+  // Igual que "Nuevo Vendedor": invitar es una acción del dueño. El servidor
+  // (invitar-miembro) también la rechaza si no lo es, esto solo evita
+  // mostrar el botón a quien igual lo va a recibir con error.
+  const { data: esDueno } = useEsDuenoEquipo();
 
   return (
     <div className="space-y-6">
@@ -23,10 +28,12 @@ export default function Equipo() {
             Gestiona tu equipo de vendedores, asignaciones y rendimiento
           </p>
         </div>
-        <Button onClick={() => setInviteOpen(true)}>
-          <UserPlus className="h-4 w-4 mr-2" />
-          Invitar Miembro
-        </Button>
+        {esDueno && (
+          <Button onClick={() => setInviteOpen(true)}>
+            <UserPlus className="h-4 w-4 mr-2" />
+            Invitar Miembro
+          </Button>
+        )}
       </div>
 
       <Tabs defaultValue="miembros" className="w-full">
