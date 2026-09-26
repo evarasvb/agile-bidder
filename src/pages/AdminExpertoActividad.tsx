@@ -110,6 +110,7 @@ function TabExperto() {
         loading={isLoading}
         searchText={(c) => `${c.pregunta} ${c.respuesta} ${c.empresa_nombre ?? ''} ${c.email ?? ''} ${c.licitacion ?? ''}`}
         onSearchChange={setBuscar}
+        serverSearch
         searchPlaceholder="Buscar por pregunta, respuesta, cliente o licitación…"
         defaultSort={{ id: 'fecha', dir: 'desc' }}
         exportFileName="experto-consultas"
