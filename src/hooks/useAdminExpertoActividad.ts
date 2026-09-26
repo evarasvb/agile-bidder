@@ -57,7 +57,7 @@ export function useExpertoConsultas(dias: number, buscar: string) {
   return useQuery({
     queryKey: ['admin_experto_consultas', dias, buscar],
     queryFn: async () => {
-      const { data, error } = await (supabase as any).rpc('admin_experto_consultas', { dias, lim: 300, buscar: buscar || null });
+      const { data, error } = await (supabase as any).rpc('admin_experto_consultas', { dias, lim: 3000, buscar: buscar || null });
       if (error) throw error;
       return (data ?? []) as ExpertoConsulta[];
     },
@@ -68,7 +68,7 @@ export function useEvaristoConversaciones(dias: number, buscar: string) {
   return useQuery({
     queryKey: ['admin_evaristo_conversaciones', dias, buscar],
     queryFn: async () => {
-      const { data, error } = await (supabase as any).rpc('admin_evaristo_conversaciones', { dias, lim: 200, buscar: buscar || null });
+      const { data, error } = await (supabase as any).rpc('admin_evaristo_conversaciones', { dias, lim: 2000, buscar: buscar || null });
       if (error) throw error;
       return (data ?? []) as EvaristoConversacion[];
     },
