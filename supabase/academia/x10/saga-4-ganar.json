@@ -1,0 +1,344 @@
+[
+ {
+  "titulo": "Casos reales · Leer al evaluador",
+  "lecciones": [
+   {
+    "titulo": "Competencia real: cuántas ofertas hay en la mesa",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "Antes de estudiar cómo evalúan, hay que saber contra cuántos compites. Estos son los datos de compras ágiles cerradas entre julio y septiembre de 2026, y lo que implican para tu estrategia."
+     },
+     {
+      "tipo": "grafico",
+      "titulo": "Compras ágiles cerradas según ofertas recibidas (julio a septiembre 2026)",
+      "subtipo": "barras",
+      "datos": [
+       {
+        "etiqueta": "0 ofertas",
+        "valor": 13526
+       },
+       {
+        "etiqueta": "1 oferta",
+        "valor": 4865
+       },
+       {
+        "etiqueta": "2 ofertas",
+        "valor": 2487
+       },
+       {
+        "etiqueta": "3 a 5",
+        "valor": 3186
+       },
+       {
+        "etiqueta": "6 a 10",
+        "valor": 1316
+       },
+       {
+        "etiqueta": "11 o más",
+        "valor": 357
+       }
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "unidad": "Cantidad de compras ágiles con dato",
+      "lectura": "Siete de cada diez compras ágiles se resuelven con una oferta o ninguna. Solo el 6,5% tiene más de cinco competidores. La evaluación dura cuando hay competencia: la mayoría de las veces, el evaluador solo comprueba que tu oferta cumple."
+     },
+     {
+      "tipo": "subtitulo",
+      "texto": "Tres escenarios, tres estrategias"
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Sin competencia (0 o 1 oferta): tu oferta compite contra la posibilidad de que el comprador declare desierto. Cumple exacto lo pedido, adjunta ficha, entrega rápido. No necesitas el precio mínimo: necesitas no dar motivo para rechazarte.",
+       "Poca competencia (2 a 5): gana la oferta más conveniente. Justifica tu precio con plazo, garantía y referencia. El evaluador busca argumentos para elegir; dáselos.",
+       "Mucha competencia (6 o más): productos genéricos en Santiago. Aquí decide el precio y el cumplimiento formal. Si no puedes estar en el 20% más barato, no gastes tiempo: busca la misma compra en regiones."
+      ]
+     },
+     {
+      "tipo": "dato",
+      "texto": "13.526 compras ágiles cerraron sin oferta en el trimestre. Cada una es un comprador que tuvo que volver a publicar. Si respondes a las que nadie responde, construyes historial con el evaluador que después te va a evaluar en una licitación.",
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026"
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Radar de compras ágiles",
+      "ruta": "/compras-agiles"
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "Una compra ágil de un hospital de regiones cierra mañana y no tiene ofertas visibles. ¿Cuál es el riesgo principal de tu oferta?",
+      "opciones": [
+       "Que otro proveedor la gane por precio.",
+       "Que el comprador la rechace por no cumplir exactamente lo pedido o por falta de ficha técnica.",
+       "Que la compra se anule por falta de competencia."
+      ],
+      "correcta": 1,
+      "explicacion": "Sin competencia, tu único rival es el rechazo formal. Cumplir exactamente lo pedido y adjuntar la ficha vale más que bajar el precio."
+     }
+    ]
+   },
+   {
+    "titulo": "El comprador que ya decidió: proveedor recurrente",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "En muchos organismos hay un proveedor que gana casi siempre. No es corrupción: es historial. El evaluador conoce su cumplimiento y su precio. Estos son casos reales de 2026 y cómo se entra igual."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Proveedor principal en organismos grandes (2026)",
+      "columnas": [
+       "Organismo",
+       "Órdenes 2026",
+       "Proveedor principal",
+       "Órdenes del principal",
+       "% del total"
+      ],
+      "filas": [
+       [
+        "MOP Dirección General de Obras Públicas",
+        11767,
+        "LATAM Airlines",
+        1531,
+        13.0
+       ],
+       [
+        "Universidad de Chile",
+        29366,
+        "LATAM Airlines",
+        1610,
+        5.5
+       ],
+       [
+        "Complejo Asistencial Sótero del Río",
+        9828,
+        "Medtronic",
+        342,
+        3.5
+       ],
+       [
+        "Hospital Gustavo Fricke",
+        9707,
+        "Medtronic",
+        334,
+        3.4
+       ],
+       [
+        "Dirección de Abastecimiento de la Armada",
+        743,
+        "Mavesa (vestuario)",
+        69,
+        9.3
+       ],
+       [
+        "Hospital Padre Hurtado",
+        4840,
+        "Johnson & Johnson",
+        134,
+        2.8
+       ],
+       [
+        "Municipalidad de Talca",
+        4117,
+        "Indura",
+        143,
+        3.5
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "Incluso el proveedor dominante rara vez pasa del 5% de las órdenes. El 95% restante se reparte entre cientos de proveedores. La Universidad de Chile compró a 4.522 proveedores distintos en 2026. Siempre hay espacio."
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Los proveedores dominantes son de categorías concentradas: pasajes (convenio marco), insumos médicos de marca, vestuario militar. Si no vendes eso, el dominante no es tu competidor.",
+       "Para entrar donde hay un recurrente: empieza por compras ágiles pequeñas del mismo organismo. Tres órdenes cumplidas y ya tienes historial con ese evaluador.",
+       "Cuando el recurrente falla (atraso, quiebre de stock), el comprador necesita alternativa ese mismo día. Si ya te conoce, te llama. Por eso conviene seguir al organismo aunque hoy no te compre."
+      ]
+     },
+     {
+      "tipo": "caso",
+      "titulo": "Entrar en un hospital con proveedor recurrente",
+      "texto": "Un proveedor de insumos de curación quería vender en un hospital donde Medtronic y Johnson & Johnson dominan. Empezó respondiendo compras ágiles de 300 a 800 mil pesos de productos que los grandes no despachan en menos de una semana. En seis meses tenía 14 órdenes cumplidas. Cuando el hospital licitó suministro anual, su historial de cumplimiento le dio el puntaje de experiencia que antes no tenía."
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Ficha de institución: sus proveedores y sus compras",
+      "ruta": "/mercado/instituciones"
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "Un organismo le compra el 13% de sus órdenes a un solo proveedor. ¿Qué concluyes?",
+      "opciones": [
+       "Que está cerrado a proveedores nuevos.",
+       "Que el 87% restante se reparte entre muchos y hay espacio; y que el 13% suele ser una categoría concentrada (pasajes, marcas).",
+       "Que debo reclamar por falta de competencia."
+      ],
+      "correcta": 1,
+      "explicacion": "Ni el organismo más concentrado pasa del 13% en un proveedor. La mayoría del gasto sigue abierto, y el proveedor dominante casi siempre es de una categoría específica."
+     }
+    ]
+   },
+   {
+    "titulo": "Simula tu puntaje antes de enviar",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "En una licitación, la evaluación es una tabla con criterios y pesos. La puedes reproducir antes de ofertar. Si tu puntaje simulado no llega, no ofertes o cambia la oferta. Este es un ejemplo con pesos típicos de una licitación LE de suministro."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Simulación de puntaje (licitación de suministro, pesos típicos)",
+      "columnas": [
+       "Criterio",
+       "Peso",
+       "Cómo se calcula",
+       "Tu oferta",
+       "Oferta rival estimada"
+      ],
+      "filas": [
+       [
+        "Precio",
+        50,
+        "Menor precio / tu precio × 50",
+        "45,8 (precio 9% sobre el mínimo)",
+        "50,0"
+       ],
+       [
+        "Plazo de entrega",
+        20,
+        "Menor plazo / tu plazo × 20",
+        "20,0 (5 días)",
+        "10,0 (10 días)"
+       ],
+       [
+        "Experiencia",
+        15,
+        "Órdenes o contratos similares acreditados",
+        "12,0 (8 contratos)",
+        "15,0 (12 contratos)"
+       ],
+       [
+        "Garantía",
+        10,
+        "Meses de garantía sobre el máximo",
+        "10,0 (24 meses)",
+        "5,0 (12 meses)"
+       ],
+       [
+        "Cumplimiento formal",
+        5,
+        "Todos los anexos correctos",
+        "5,0",
+        "5,0"
+       ],
+       [
+        "Total",
+        100,
+        "",
+        "92,8",
+        "85,0"
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "Pierdes 4,2 puntos por precio y ganas 15 por plazo y garantía. Con un precio 9% más alto ganas la licitación. Esto solo se ve cuando simulas: si mirabas solo el precio, habrías bajado 9% y regalado margen."
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Copia la tabla de criterios de las bases con sus pesos exactos.",
+       "Estima la oferta rival con el historial del organismo: el último precio adjudicado y el plazo habitual.",
+       "Calcula tu puntaje por criterio con la fórmula de las bases (casi siempre es proporcional al mejor).",
+       "Mueve una variable a la vez: ¿qué pasa si bajo 3% el precio? ¿Si subo la garantía? Elige la combinación con mejor puntaje y mejor margen.",
+       "Verifica que cada puntaje esté respaldado por un documento en la oferta. Puntaje sin documento es cero."
+      ]
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Matriz de postulación del Libro de licitación",
+      "ruta": "/experto",
+      "detalle": "FirmaVB arma la matriz de criterios desde las bases y te deja simular tu puntaje contra el rival."
+     },
+     {
+      "tipo": "video",
+      "titulo": "Simular la evaluación con la matriz de FirmaVB",
+      "minutos": 13,
+      "resumen": "Demostración completa: desde las bases hasta la matriz, simulación de escenarios y decisión ir o no ir."
+     },
+     {
+      "tipo": "ejercicio",
+      "titulo": "Simula una licitación real",
+      "pasos": [
+       "Elige una licitación abierta de tu rubro con cierre en más de 7 días.",
+       "Genera la matriz en el Libro de licitación de FirmaVB.",
+       "Completa tu oferta y una oferta rival estimada.",
+       "Prueba tres escenarios de precio y anota el puntaje y el margen de cada uno.",
+       "Decide y escribe en una línea por qué."
+      ],
+      "entregable": "Matriz con tres escenarios y decisión fundamentada."
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "Tu precio es 9% más alto que el mínimo esperado, pero tu plazo es la mitad y tu garantía el doble. Con los pesos del ejemplo, ¿qué haces?",
+      "opciones": [
+       "Bajo el precio 9% para asegurar el puntaje de precio.",
+       "Mantengo el precio: el puntaje simulado ya gana y el margen queda intacto.",
+       "No participo porque no tengo el precio más bajo."
+      ],
+      "correcta": 1,
+      "explicacion": "La simulación muestra 92,8 contra 85,0. Bajar el precio regalaría margen sin necesidad. La evaluación es multicriterio: el precio es la mitad, no el todo."
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "titulo": "Casos reales · Después del resultado",
+  "lecciones": [
+   {
+    "titulo": "Lee el acta, arma tu historial y vuelve",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "Perder una licitación con un acta en la mano es ganar información. El acta de evaluación dice el puntaje de cada oferente por criterio, el precio de todos y las causas de inadmisibilidad. Es el único lugar donde ves la oferta completa de tu competencia."
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Descarga el acta y anota, por criterio, tu puntaje y el del ganador. La diferencia es tu tarea para la próxima.",
+       "Si perdiste por precio: anota el precio ganador por unidad. Es tu nueva referencia de mercado para ese organismo.",
+       "Si perdiste por experiencia: anota qué acreditó el ganador (cantidad y tipo de contratos). Construye eso con compras ágiles.",
+       "Si quedaste inadmisible: anota el documento exacto. Ese error no puede repetirse; agrégalo a tu checklist.",
+       "Si ganaste: anota también. Saber por qué ganaste te dice qué no cambiar."
+      ]
+     },
+     {
+      "tipo": "dato",
+      "texto": "Los organismos con más reclamos de pago suelen ser también los que más readjudican: proveedores que ganan y desisten por las condiciones de pago. Una readjudicación es una segunda oportunidad para el segundo lugar. Si quedaste segundo, mantén la oferta vigente y contacta a la unidad de compra.",
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026"
+     },
+     {
+      "tipo": "ejercicio",
+      "titulo": "Tu registro de resultados",
+      "pasos": [
+       "Crea una planilla con: licitación, organismo, resultado, tu puntaje, puntaje ganador, precio ganador, causa.",
+       "Registra todas las ofertas del último trimestre.",
+       "Cada mes revisa: ¿cuál es la causa que más se repite? Esa es tu prioridad de mejora."
+      ],
+      "entregable": "Planilla de resultados con la causa principal identificada."
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Libro de licitación: informe de trabajo y seguimiento",
+      "ruta": "/experto"
+     },
+     {
+      "tipo": "tip",
+      "texto": "Un proveedor que revisa 10 actas conoce el mercado mejor que uno que ganó una licitación por suerte. Las actas son gratis y públicas."
+     }
+    ]
+   }
+  ]
+ }
+]

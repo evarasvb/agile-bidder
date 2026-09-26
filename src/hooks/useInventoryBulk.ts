@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabaseClient as supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { InventoryInput } from './useInventory';
+import { validateInventoryImportTextLengths } from '@/lib/inventoryImportValidation';
 
 export interface BulkProductRow {
   sku: string;
@@ -111,6 +112,12 @@ export function useInventoryBulk(onProgress?: (progress: ImportProgress) => void
       for (let i = 0; i < products.length; i++) {
         const row = products[i];
         const rowNum = i + 2;
+
+        const lengthErrors = validateInventoryImportTextLengths(row);
+        if (lengthErrors.length > 0) {
+          errors.push(...lengthErrors.map((error) => ({ row: rowNum, ...error })));
+          continue;
+        }
 
         if (!row.sku || String(row.sku).trim() === '') {
           errors.push({ row: rowNum, field: 'Código', message: 'Código es obligatorio' });

@@ -1,0 +1,355 @@
+[
+ {
+  "titulo": "Casos reales 2026 · Mirar donde otros no ven",
+  "lecciones": [
+   {
+    "titulo": "Cuándo compra el Estado: el calendario real",
+    "bloques": [
+     {
+      "tipo": "grafico",
+      "titulo": "Monto emitido por mes (2026)",
+      "subtipo": "barras",
+      "datos": [
+       {
+        "etiqueta": "Ene",
+        "valor": 2227.7
+       },
+       {
+        "etiqueta": "Feb",
+        "valor": 1064.0
+       },
+       {
+        "etiqueta": "Mar",
+        "valor": 2983.9
+       },
+       {
+        "etiqueta": "Abr",
+        "valor": 1580.1
+       },
+       {
+        "etiqueta": "May",
+        "valor": 1058.3
+       },
+       {
+        "etiqueta": "Jun",
+        "valor": 1216.9
+       },
+       {
+        "etiqueta": "Jul",
+        "valor": 1285.1
+       },
+       {
+        "etiqueta": "Ago",
+        "valor": 997.0
+       }
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "unidad": "Miles de millones de pesos con IVA",
+      "lectura": "Enero y marzo concentran los contratos anuales. Los meses normales mueven 1.000 a 1.600 mil millones. Tu temporada de venta de contratos anuales es octubre a marzo."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Monto según el tercio del mes (2026)",
+      "columnas": [
+       "Días del mes",
+       "Órdenes",
+       "Monto (miles de millones)",
+       "% del monto"
+      ],
+      "filas": [
+       [
+        "1 al 10",
+        363444,
+        3164.0,
+        25.5
+       ],
+       [
+        "11 al 20",
+        386982,
+        3991.3,
+        32.2
+       ],
+       [
+        "21 al 31",
+        383145,
+        5257.6,
+        42.4
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "El último tercio del mes mueve el 42% del dinero. Stock y capacidad de despacho listos la última semana de cada mes."
+     },
+     {
+      "tipo": "grafico",
+      "titulo": "Órdenes por día de la semana",
+      "subtipo": "barras",
+      "datos": [
+       {
+        "etiqueta": "Lun",
+        "valor": 240217
+       },
+       {
+        "etiqueta": "Mar",
+        "valor": 232826
+       },
+       {
+        "etiqueta": "Mié",
+        "valor": 227462
+       },
+       {
+        "etiqueta": "Jue",
+        "valor": 219025
+       },
+       {
+        "etiqueta": "Vie",
+        "valor": 198378
+       },
+       {
+        "etiqueta": "Sáb",
+        "valor": 12417
+       },
+       {
+        "etiqueta": "Dom",
+        "valor": 3246
+       }
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "unidad": "Cantidad de órdenes (enero a agosto 2026)",
+      "lectura": "Lunes y martes concentran la actividad; el martes concentra el monto (3.817 mil millones). Revisa tu radar lunes y martes temprano."
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Reporte de productos con serie mensual",
+      "ruta": "/reportes/productos"
+     }
+    ]
+   },
+   {
+    "titulo": "Compras repetidas, convenio marco evitado y reclamos: tres señales",
+    "bloques": [
+     {
+      "tipo": "tabla",
+      "titulo": "Compras ágiles repetidas del mismo producto (julio a septiembre 2026)",
+      "columnas": [
+       "Organismo",
+       "Producto",
+       "Veces",
+       "Monto (millones)"
+      ],
+      "filas": [
+       [
+        "Universidad de Chile",
+        "Reactivos químicos",
+        49,
+        156.1
+       ],
+       [
+        "Universidad de Chile",
+        "Servicios quirúrgicos",
+        38,
+        150.8
+       ],
+       [
+        "Hospital de Puerto Montt",
+        "Clorhidrato de hidralazina",
+        46,
+        104.2
+       ],
+       [
+        "Hospital La Serena",
+        "Cajas de medicamentos de urgencia",
+        49,
+        100.9
+       ],
+       [
+        "Municipalidad de Talca",
+        "Materiales educativos",
+        19,
+        83.5
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "Compra repetida es demanda frecuente sin planificación: responde todas con una oferta estándar y propón un contrato de suministro."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Compras ágiles en categorías con convenio marco (julio a septiembre 2026)",
+      "columnas": [
+       "Categoría",
+       "Compras ágiles",
+       "Monto (millones)"
+      ],
+      "filas": [
+       [
+        "Insumos médicos",
+        5915,
+        12956
+       ],
+       [
+        "Ferretería y construcción",
+        3480,
+        6085
+       ],
+       [
+        "Alimentos",
+        3259,
+        4048
+       ],
+       [
+        "Hardware y computación",
+        2662,
+        4371
+       ],
+       [
+        "Aseo e higiene",
+        1601,
+        2468
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "El comprador puede comprar fuera del convenio si es más ventajoso: precio bajo catálogo y despacho local son tu entrada sin estar en el convenio."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Reclamos de pago y compras por organismo",
+      "columnas": [
+       "Organismo",
+       "Reclamos 12 meses",
+       "Órdenes 2026",
+       "Reclamos por 100 órdenes"
+      ],
+      "filas": [
+       [
+        "Universidad de Chile",
+        1992,
+        29366,
+        6.8
+       ],
+       [
+        "MOP Dirección General de Obras Públicas",
+        1302,
+        11767,
+        11.1
+       ],
+       [
+        "Municipalidad de El Monte",
+        1199,
+        790,
+        151.8
+       ],
+       [
+        "Dirección de Logística de Carabineros",
+        1024,
+        1391,
+        73.6
+       ],
+       [
+        "Complejo Asistencial Sótero del Río",
+        596,
+        9828,
+        6.1
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "Menos de 15 reclamos por cada 100 órdenes es normal en un comprador grande. Sobre 50, vende solo con condiciones."
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Ficha de instituciones y seguimiento",
+      "ruta": "/mercado/instituciones"
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "Un hospital hizo 46 compras ágiles del mismo medicamento en un mes. ¿Cuál es la mejor jugada?",
+      "opciones": [
+       "Reclamar por fragmentación.",
+       "Responder todas con una oferta estándar y proponer un contrato de suministro.",
+       "Ignorarlo: son compras chicas."
+      ],
+      "correcta": 1,
+      "explicacion": "Primero se vende, después se propone un contrato. La compra repetida es demanda real."
+     }
+    ]
+   },
+   {
+    "titulo": "Cobrar con método: nota de cobro y nota de débito",
+    "bloques": [
+     {
+      "tipo": "tabla",
+      "titulo": "Línea de tiempo de cobranza",
+      "columnas": [
+       "Día",
+       "Acción"
+      ],
+      "filas": [
+       [
+        "0",
+        "Entrega con recepción conforme y factura el mismo día"
+       ],
+       [
+        "30",
+        "Vence el plazo legal (Ley 21.131)"
+       ],
+       [
+        "31",
+        "Nota de cobro: correo formal y llamada a finanzas"
+       ],
+       [
+        "45",
+        "Segunda nota con interés calculado; reclamo de pago en Mercado Público"
+       ],
+       [
+        "60",
+        "Nota de débito (interés más comisión del 1%) y requerimiento prejudicial"
+       ],
+       [
+        "90",
+        "Contraloría y, si el monto lo justifica, cobro ejecutivo con la copia cedible"
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026"
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Nota de débito: factura de 5.000.000 con 45 días de atraso",
+      "columnas": [
+       "Concepto",
+       "Cálculo",
+       "Monto"
+      ],
+      "filas": [
+       [
+        "Interés moratorio (referencial 1,5% mensual)",
+        "5.000.000 × 1,5% × 45 / 30",
+        "112.500"
+       ],
+       [
+        "Comisión fija de cobranza",
+        "1% del saldo insoluto",
+        "50.000"
+       ],
+       [
+        "Total",
+        "",
+        "162.500"
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "Emitir la nota de débito cambia tu lugar en la fila de pago: para finanzas es más barato pagarte a tiempo que aprobar notas de débito."
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Cobranza en FirmaVB con el Abogado",
+      "ruta": "/experto/cobranza"
+     },
+     {
+      "tipo": "video",
+      "titulo": "Cobranza completa en FirmaVB",
+      "minutos": 15,
+      "resumen": "Registro de facturas, atraso e interés, nota de cobro y requerimiento con el Abogado."
+     }
+    ]
+   }
+  ]
+ }
+]

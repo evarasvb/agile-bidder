@@ -28,6 +28,15 @@ function subtitulo(a: Aviso) {
   const d = a.datos || {};
   return d.organismo || d.institucion || (a.licitacion_id ? `Código ${a.licitacion_id}` : "");
 }
+// Licitaciones y compras ágiles comparten esta misma tabla de avisos, pero
+// /oportunidades/:tipo/:id necesita distinguir cuál es cuál. Los avisos
+// nuevos ya traen `tipo_oportunidad`; los generados antes de ese cambio no,
+// así que se asume "licitacion" (el tipo más común hasta ahora).
+function hrefOportunidad(a: Aviso): string | null {
+  if (!a.licitacion_id) return null;
+  const tipo = a.datos?.tipo_oportunidad === "compra_agil" ? "compra_agil" : "licitacion";
+  return `/oportunidades/${tipo}/${a.licitacion_id}`;
+}
 function fecha(iso: string) {
   try {
     return formatDistanceToNow(new Date(iso), { addSuffix: true, locale: es });
@@ -90,21 +99,45 @@ export function AvisosBell({ className }: Props) {
         ) : (
           <ScrollArea className="max-h-96">
             <ul className="divide-y">
-              {avisos.map((a) => (
-                <li
-                  key={a.id}
-                  className={cn("flex gap-3 p-3 text-sm", !a.leida && "bg-firmavb-blue/5")}
-                  onClick={() => !a.leida && marcarUna.mutate(a.id)}
-                >
-                  <span className="text-lg leading-none">{icono(a.tipo)}</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-foreground">{titulo(a)}</p>
-                    {subtitulo(a) && <p className="truncate text-xs text-muted-foreground">{subtitulo(a)}</p>}
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">{fecha(a.created_at)}</p>
-                  </div>
-                  {!a.leida && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-firmavb-blue" />}
-                </li>
-              ))}
+              {avisos.map((a) => {
+                const href = hrefOportunidad(a);
+                const contenido = (
+                  <>
+                    <span className="text-lg leading-none">{icono(a.tipo)}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-foreground">{titulo(a)}</p>
+                      {subtitulo(a) && <p className="truncate text-xs text-muted-foreground">{subtitulo(a)}</p>}
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">{fecha(a.created_at)}</p>
+                    </div>
+                    {!a.leida && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-firmavb-blue" />}
+                  </>
+                );
+                const onClick = () => {
+                  if (!a.leida) marcarUna.mutate(a.id);
+                  setOpen(false);
+                };
+                // Sin código de licitación/compra ágil asociado, no hay a dónde
+                // llevar al usuario: se deja como fila no clickeable (solo marca leído).
+                return href ? (
+                  <li key={a.id} className={cn(!a.leida && "bg-firmavb-blue/5")}>
+                    <Link
+                      to={href}
+                      onClick={onClick}
+                      className="flex gap-3 p-3 text-sm hover:bg-muted/60 transition-colors"
+                    >
+                      {contenido}
+                    </Link>
+                  </li>
+                ) : (
+                  <li
+                    key={a.id}
+                    className={cn("flex gap-3 p-3 text-sm cursor-pointer", !a.leida && "bg-firmavb-blue/5")}
+                    onClick={onClick}
+                  >
+                    {contenido}
+                  </li>
+                );
+              })}
             </ul>
           </ScrollArea>
         )}

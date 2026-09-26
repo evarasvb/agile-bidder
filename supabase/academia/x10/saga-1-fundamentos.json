@@ -1,0 +1,471 @@
+[
+ {
+  "titulo": "Casos reales · El Estado en números (2026)",
+  "lecciones": [
+   {
+    "titulo": "Cuánto y cuándo compra el Estado, mes a mes",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "Antes de vender hay que saber el tamaño de la cancha. Esto no es un dato de prensa: son las órdenes de compra reales que FirmaVB lee de Mercado Público todos los días. Entre enero y agosto de 2026 el Estado emitió más de 1.130.000 órdenes de compra. Eso son, en promedio, unas 6.800 órdenes por día hábil."
+     },
+     {
+      "tipo": "grafico",
+      "titulo": "Órdenes de compra emitidas por mes (2026)",
+      "subtipo": "barras",
+      "datos": [
+       {
+        "etiqueta": "Ene",
+        "valor": 129808
+       },
+       {
+        "etiqueta": "Feb",
+        "valor": 122491
+       },
+       {
+        "etiqueta": "Mar",
+        "valor": 144272
+       },
+       {
+        "etiqueta": "Abr",
+        "valor": 146475
+       },
+       {
+        "etiqueta": "May",
+        "valor": 138106
+       },
+       {
+        "etiqueta": "Jun",
+        "valor": 150870
+       },
+       {
+        "etiqueta": "Jul",
+        "valor": 148487
+       },
+       {
+        "etiqueta": "Ago",
+        "valor": 153062
+       }
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "unidad": "Cantidad de órdenes de compra",
+      "lectura": "El volumen es parejo: entre 122 mil y 153 mil órdenes al mes. Febrero baja (vacaciones) y agosto es el mes más alto. No existe el 'mes muerto': el Estado compra todos los meses."
+     },
+     {
+      "tipo": "grafico",
+      "titulo": "Monto emitido por mes (2026)",
+      "subtipo": "barras",
+      "datos": [
+       {
+        "etiqueta": "Ene",
+        "valor": 2227.7
+       },
+       {
+        "etiqueta": "Feb",
+        "valor": 1064.0
+       },
+       {
+        "etiqueta": "Mar",
+        "valor": 2983.9
+       },
+       {
+        "etiqueta": "Abr",
+        "valor": 1580.1
+       },
+       {
+        "etiqueta": "May",
+        "valor": 1058.3
+       },
+       {
+        "etiqueta": "Jun",
+        "valor": 1216.9
+       },
+       {
+        "etiqueta": "Jul",
+        "valor": 1285.1
+       },
+       {
+        "etiqueta": "Ago",
+        "valor": 997.0
+       }
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "unidad": "Miles de millones de pesos (con IVA)",
+      "lectura": "El monto sí salta: marzo (2.984 mil millones) y enero (2.228) concentran contratos anuales grandes, que se emiten al inicio del año presupuestario. De abril en adelante el mes típico mueve entre 1.000 y 1.600 mil millones."
+     },
+     {
+      "tipo": "dato",
+      "texto": "Enero y marzo de 2026 movieron juntos 5.212 mil millones de pesos, casi lo mismo que abril, mayo, junio y julio sumados (5.140). Si vendes servicios anuales o contratos de suministro, tu temporada de venta es octubre a marzo: ahí se deciden los contratos que se emiten a inicio de año.",
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026"
+     },
+     {
+      "tipo": "tip",
+      "texto": "Guarda esta regla: la cantidad de órdenes te dice cuántas oportunidades hay; el monto te dice cuándo se juegan los contratos grandes. Son dos calendarios distintos y conviene mirar los dos."
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "Según los datos de 2026, ¿cuál de estas afirmaciones es correcta?",
+      "opciones": [
+       "El Estado deja de comprar en verano, así que conviene esperar a marzo.",
+       "La cantidad de órdenes es pareja todo el año, pero el monto se concentra a inicio de año.",
+       "Agosto es el mes con menos órdenes de compra."
+      ],
+      "correcta": 1,
+      "explicacion": "Febrero baja un poco en cantidad, pero nunca se detiene (122 mil órdenes). Lo que cambia fuerte es el monto: enero y marzo concentran los contratos grandes del año."
+     }
+    ]
+   },
+   {
+    "titulo": "Por qué vía te van a comprar: compra ágil, convenio marco, licitación",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "Cada orden de compra nace de un mecanismo distinto, y el código de la orden lo dice: termina en -AG (compra ágil), -CM (convenio marco), -SE (licitación u otro proceso) o -TD (trato directo). Para un proveedor nuevo esta es la decisión más importante: ¿por dónde me van a comprar?"
+     },
+     {
+      "tipo": "grafico",
+      "titulo": "Órdenes por mecanismo de compra, cada mes de 2026",
+      "subtipo": "lineas",
+      "datos": [
+       {
+        "etiqueta": "Ene",
+        "valor": 42181,
+        "valor2": 14903
+       },
+       {
+        "etiqueta": "Feb",
+        "valor": 46849,
+        "valor2": 12337
+       },
+       {
+        "etiqueta": "Mar",
+        "valor": 57368,
+        "valor2": 15890
+       },
+       {
+        "etiqueta": "Abr",
+        "valor": 59874,
+        "valor2": 16898
+       },
+       {
+        "etiqueta": "May",
+        "valor": 55717,
+        "valor2": 15401
+       },
+       {
+        "etiqueta": "Jun",
+        "valor": 61556,
+        "valor2": 16681
+       },
+       {
+        "etiqueta": "Jul",
+        "valor": 58591,
+        "valor2": 17985
+       },
+       {
+        "etiqueta": "Ago",
+        "valor": 62987,
+        "valor2": 17672
+       }
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "unidad": "Cantidad de órdenes",
+      "serie": "Compra ágil",
+      "serie2": "Convenio marco",
+      "lectura": "La compra ágil creció de 42 mil órdenes en enero a 63 mil en agosto: es la vía que más crece y donde más proveedores nuevos entran. El convenio marco se mueve estable entre 12 mil y 18 mil órdenes al mes."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Reparto de las órdenes de compra de 2026 (enero a agosto)",
+      "columnas": [
+       "Mecanismo",
+       "Órdenes",
+       "% de las órdenes",
+       "Monto (miles de millones)"
+      ],
+      "filas": [
+       [
+        "Compra ágil (-AG)",
+        445123,
+        39.3,
+        649.3
+       ],
+       [
+        "Licitaciones y otros (-SE)",
+        476462,
+        42.0,
+        "resto"
+       ],
+       [
+        "Convenio marco (-CM)",
+        127767,
+        11.3,
+        534.3
+       ],
+       [
+        "Trato directo (-TD)",
+        75157,
+        6.6,
+        "resto"
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "Cuatro de cada diez órdenes del Estado son compras ágiles. Por monto, en cambio, la compra ágil y el convenio marco pesan menos: son compras chicas y frecuentes. Las licitaciones mueven el dinero grande, pero son menos y más lentas."
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Compra ágil: hasta 100 UTM (cerca de 7 millones de pesos). Sin garantías, cierra en días. Es la puerta de entrada y la que más crece.",
+       "Convenio marco: catálogo. Si tu producto está en el catálogo, los organismos están obligados a comprarlo ahí. Entrar cuesta, pero después venden solos.",
+       "Licitación: procesos formales con bases, criterios y garantías. Menos órdenes, montos grandes, más competencia y más tiempo.",
+       "Trato directo: excepcional y justificado. Unas 9.000 órdenes al mes: no es marginal, pero no se planifica."
+      ]
+     },
+     {
+      "tipo": "caso",
+      "titulo": "Un proveedor de insumos de aseo",
+      "texto": "Si vende solo por licitación, compite en unos pocos procesos al año. Si además está en el convenio marco de aseo (8.884 órdenes en 2026) y responde compras ágiles de aseo (1.601 solo entre julio y septiembre), tiene tres canales con el mismo producto. Los proveedores que escalan usan los tres."
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "Un organismo necesita 40 resmas de papel y el producto está en el convenio marco. ¿Qué debería hacer?",
+      "opciones": [
+       "Publicar una licitación pública.",
+       "Comprar por convenio marco, salvo que acredite condiciones más ventajosas fuera de él.",
+       "Hacer una compra ágil porque es más rápida."
+      ],
+      "correcta": 1,
+      "explicacion": "Cuando el bien está en el catálogo del convenio marco, la regla general es comprar ahí. Por eso estar en el catálogo es tan valioso, y por eso una compra ágil de un producto de catálogo es una señal que vale la pena investigar (lo vemos en la Saga 2)."
+     }
+    ]
+   },
+   {
+    "titulo": "El ritmo del comprador: días, semanas y fin de mes",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "El Estado no compra parejo dentro del mes ni dentro de la semana. Conocer su ritmo te dice cuándo estar disponible, cuándo responder rápido y cuándo no perder tiempo."
+     },
+     {
+      "tipo": "grafico",
+      "titulo": "Órdenes de compra por día de la semana (enero a agosto 2026)",
+      "subtipo": "barras",
+      "datos": [
+       {
+        "etiqueta": "Lunes",
+        "valor": 240217
+       },
+       {
+        "etiqueta": "Martes",
+        "valor": 232826
+       },
+       {
+        "etiqueta": "Miércoles",
+        "valor": 227462
+       },
+       {
+        "etiqueta": "Jueves",
+        "valor": 219025
+       },
+       {
+        "etiqueta": "Viernes",
+        "valor": 198378
+       },
+       {
+        "etiqueta": "Sábado",
+        "valor": 12417
+       },
+       {
+        "etiqueta": "Domingo",
+        "valor": 3246
+       }
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "unidad": "Cantidad de órdenes",
+      "lectura": "Lunes y martes son los días fuertes. El viernes cae 17% respecto del lunes. El fin de semana prácticamente no existe: si una compra ágil cierra un lunes, tu oferta se prepara la semana anterior."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Monto emitido según el tercio del mes (enero a agosto 2026)",
+      "columnas": [
+       "Días del mes",
+       "Órdenes",
+       "Monto (miles de millones)",
+       "% del monto"
+      ],
+      "filas": [
+       [
+        "1 al 10",
+        363444,
+        3164.0,
+        25.5
+       ],
+       [
+        "11 al 20",
+        386982,
+        3991.3,
+        32.2
+       ],
+       [
+        "21 al 31",
+        383145,
+        5257.6,
+        42.4
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "El último tercio del mes concentra el 42% del dinero con solo un tercio de las órdenes: ahí salen las órdenes grandes. Si tu producto es de ticket alto, la segunda quincena es tu momento."
+     },
+     {
+      "tipo": "dato",
+      "texto": "El martes concentra 3.817 mil millones de pesos en órdenes de compra en 2026, más que el miércoles y el jueves juntos. Muchas unidades de compra cierran sus procesos el lunes y emiten el martes.",
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026"
+     },
+     {
+      "tipo": "tip",
+      "texto": "Regla práctica: responde compras ágiles el mismo día que se publican, revisa tu radar lunes y martes a primera hora, y reserva el viernes para preparar las ofertas de la semana siguiente."
+     },
+     {
+      "tipo": "ejercicio",
+      "titulo": "Tu calendario de venta",
+      "pasos": [
+       "Anota los tres días del mes en que más órdenes recibe tu rubro (usa el reporte de órdenes de compra de FirmaVB filtrado por tu producto).",
+       "Define un bloque fijo de 30 minutos los lunes y martes para revisar oportunidades.",
+       "Anota qué contratos anuales de tu rubro se emitieron en enero y marzo: esa es tu lista de renovaciones para postular en octubre-diciembre."
+      ],
+      "entregable": "Un calendario de una hoja con tus días fuertes y tus fechas de renovación."
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Reporte de órdenes de compra por producto y mes",
+      "ruta": "/reportes/ordenes-compra",
+      "detalle": "Filtra por tu producto y mira en qué meses y a quién se lo compran."
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "titulo": "Casos reales · Tu primer mapa de clientes",
+  "lecciones": [
+   {
+    "titulo": "Leer una institución como lo hace FirmaVB",
+    "bloques": [
+     {
+      "tipo": "parrafo",
+      "texto": "Antes de ofertarle a un organismo, mira su ficha. Un ejemplo real: el Hospital de Puerto Montt en lo que va de 2026, tal como lo ve FirmaVB."
+     },
+     {
+      "tipo": "tabla",
+      "titulo": "Ficha del Hospital de Puerto Montt (enero a septiembre 2026)",
+      "columnas": [
+       "Indicador",
+       "Valor"
+      ],
+      "filas": [
+       [
+        "Órdenes de compra vistas",
+        244
+       ],
+       [
+        "Monto total (miles de millones)",
+        1.2
+       ],
+       [
+        "Por compra ágil",
+        116
+       ],
+       [
+        "Por licitación u otros",
+        105
+       ],
+       [
+        "Por convenio marco",
+        18
+       ],
+       [
+        "Por trato directo",
+        5
+       ],
+       [
+        "Proveedores distintos",
+        146
+       ],
+       [
+        "Compras ágiles publicadas julio a septiembre",
+        566
+       ],
+       [
+        "Ofertas promedio por compra ágil",
+        "1,4"
+       ],
+       [
+        "Reclamos de pago en 12 meses",
+        209
+       ]
+      ],
+      "fuente": "FirmaVB con datos de Mercado Público, enero a septiembre de 2026",
+      "lectura": "Un hospital que publica 566 compras ágiles en tres meses y recibe 1,4 ofertas por cada una es un cliente abierto: hay más demanda que proveedores respondiendo. Los 209 reclamos de pago avisan que hay que cobrar con método (Saga 5)."
+     },
+     {
+      "tipo": "lista",
+      "items": [
+       "Sus proveedores más grandes no son los que más órdenes tienen: UC Christus (2 órdenes, 103 millones) y Quarto Consultores (2 órdenes, 102 millones) venden servicios de alto valor; Terumo, Stryker o Vantive venden insumos por 38 a 57 millones en 3 órdenes.",
+       "Entre julio y septiembre pidió 46 veces el mismo medicamento (hidralazina) por compra ágil, sumando 104 millones. Un patrón así se llama compra repetida y se estudia en la Saga 2.",
+       "Tiene 209 reclamos de pago en un año. No significa que no pague: significa que hay proveedores que tuvieron que reclamar. Antes de vender, revisa su plazo real de pago."
+      ]
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Ficha de instituciones y botón Seguir",
+      "ruta": "/mercado/instituciones",
+      "detalle": "Busca el organismo, revisa sus compras y sus reclamos, y síguelo para recibir sus nuevas oportunidades y noticias."
+     },
+     {
+      "tipo": "quiz",
+      "pregunta": "Un organismo publica muchas compras ágiles y recibe en promedio 1,4 ofertas. ¿Qué significa para ti?",
+      "opciones": [
+       "Que es un mal cliente porque nadie quiere venderle.",
+       "Que hay más demanda que oferta: es un cliente donde una oferta correcta tiene alta probabilidad de ganar.",
+       "Que solo compra a proveedores conocidos."
+      ],
+      "correcta": 1,
+      "explicacion": "Pocas ofertas por compra ágil significa poca competencia. En estos organismos, responder bien y rápido es la mitad de la venta."
+     }
+    ]
+   },
+   {
+    "titulo": "Ejercicio guiado: tus 20 organismos objetivo",
+    "bloques": [
+     {
+      "tipo": "video",
+      "titulo": "Cómo armar tu lista de 20 organismos objetivo",
+      "minutos": 12,
+      "resumen": "Demostración en FirmaVB: buscar organismos por rubro y región, leer su ficha, revisar reclamos de pago y seguirlos para recibir alertas."
+     },
+     {
+      "tipo": "ejercicio",
+      "titulo": "Lista de 20 organismos",
+      "pasos": [
+       "Elige tu producto principal y ábrelo en el reporte de compradores de FirmaVB.",
+       "Anota los 20 organismos que más lo compraron en 2026, con cantidad de órdenes y monto.",
+       "Marca con verde los que tienen menos de 50 reclamos de pago en el año y con rojo los que tienen más de 300.",
+       "Sigue a los 10 verdes más grandes desde la ficha de instituciones.",
+       "Para cada uno anota: ¿compra por compra ágil, convenio o licitación? Esa es la puerta por la que vas a entrar."
+      ],
+      "entregable": "Tu planilla de 20 organismos con puerta de entrada y semáforo de pago."
+     },
+     {
+      "tipo": "herramienta",
+      "texto": "Reporte de compradores por producto",
+      "ruta": "/reportes/compradores"
+     },
+     {
+      "tipo": "tip",
+      "texto": "No empieces por los organismos más grandes. Empieza por los que reciben pocas ofertas y pagan bien. Ahí se construye historial, y el historial es lo que después te abre las puertas grandes."
+     }
+    ]
+   }
+  ]
+ }
+]
