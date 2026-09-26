@@ -127,8 +127,8 @@ Mismo guion que Saga 5, versión resumida para el Programa Pro.
 
 **Etapa 4 (9:00–11:30).** Facturación: guía firmada + OC aceptada. Factura con protocolo de cobro e interés (Ley 21.131), en el formato que pide la OC (XML a la casilla indicada). Error más caro: casilla equivocada.
 
-**Etapa 5 (11:30–13:30).** Radar de cobranza: operaciones y comercial entregan contactos. "No dejen la cobranza en manos del factoring": el factoring financia, no cobra. Si no hay pago, no hay negocio.
+**Etapa 5 (11:30–13:30).** Radar de cobranza: operaciones y comercial entregan contactos. "No dejen la cobranza en manos del factoring": si la factura está cedida, el factoring recibe el pago y con él se coordina el cobro formal, pero el seguimiento (ingreso, observaciones, contactos) es del proveedor. Si no hay pago, no hay negocio.
 
-**Etapa 6 y 7 (13:30–17:00).** Escalera con días: confirmación día 7, recordatorio día 20, nota de cobro día 31, visita presencial si no contestan, nota de débito y segunda nota de cobro día 45, escalar día 60. Mostrar Cobranza y el Abogado generando las notas.
+**Etapa 6 y 7 (13:30–17:00).** Escalera con días: confirmación día 7, recordatorio día 20, nota de cobro día 31, visita presencial si no contestan, nota de débito y segunda nota de cobro día 45, escalar día 60. Mostrar Cobranza y el Abogado calculando intereses y redactando la nota de cobro; la nota de débito se emite en el facturador propio.
 
 **Cierre (17:00–18:00).** Ejercicio: cartera de cobro con peldaño y próxima acción, y semáforo de 10 instituciones. "Cobrar es un oficio. Se aprende con método."
