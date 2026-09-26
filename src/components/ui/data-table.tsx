@@ -63,6 +63,10 @@ export interface DataTableProps<T> {
   rowKey: (row: T) => string;
   /** Texto por fila para la búsqueda. Si se entrega, aparece el buscador. */
   searchText?: (row: T) => string;
+  /** Se llama con el texto de búsqueda en cada cambio (además del filtrado local
+   *  por `searchText`). Útil cuando `rows` viene truncado por el servidor (un
+   *  `limit` en la RPC) y hay que reconsultar con ese mismo término. */
+  onSearchChange?: (value: string) => void;
   searchPlaceholder?: string;
   defaultSort?: DataTableSort;
   pageSizeOptions?: number[];
@@ -152,6 +156,7 @@ export function DataTable<T>({
   rows,
   rowKey,
   searchText,
+  onSearchChange,
   searchPlaceholder = 'Buscar…',
   defaultSort,
   pageSizeOptions = [25, 50, 100, 200],
@@ -203,6 +208,11 @@ export function DataTable<T>({
   useEffect(() => {
     if (!manual) setPageLocal(1);
   }, [busqueda, sort, pageSize, rows.length, manual]);
+
+  useEffect(() => {
+    onSearchChange?.(busqueda);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busqueda]);
 
   const irA = (n: number) => {
     const destino = Math.min(Math.max(1, n), totalPaginas);

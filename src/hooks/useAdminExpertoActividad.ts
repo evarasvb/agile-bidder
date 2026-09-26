@@ -45,23 +45,33 @@ export interface EvaristoMensaje {
 export function useExpertoResumen() {
   return useQuery({
     queryKey: ['admin_experto_resumen'],
-    queryFn: async () => (await (supabase as any).rpc('admin_experto_resumen')).data as ExpertoResumen | null,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc('admin_experto_resumen');
+      if (error) throw error;
+      return data as ExpertoResumen | null;
+    },
   });
 }
 
 export function useExpertoConsultas(dias: number, buscar: string) {
   return useQuery({
     queryKey: ['admin_experto_consultas', dias, buscar],
-    queryFn: async () =>
-      ((await (supabase as any).rpc('admin_experto_consultas', { dias, lim: 300, buscar: buscar || null })).data ?? []) as ExpertoConsulta[],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc('admin_experto_consultas', { dias, lim: 300, buscar: buscar || null });
+      if (error) throw error;
+      return (data ?? []) as ExpertoConsulta[];
+    },
   });
 }
 
 export function useEvaristoConversaciones(dias: number) {
   return useQuery({
     queryKey: ['admin_evaristo_conversaciones', dias],
-    queryFn: async () =>
-      ((await (supabase as any).rpc('admin_evaristo_conversaciones', { dias, lim: 200 })).data ?? []) as EvaristoConversacion[],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc('admin_evaristo_conversaciones', { dias, lim: 200 });
+      if (error) throw error;
+      return (data ?? []) as EvaristoConversacion[];
+    },
   });
 }
 
@@ -69,7 +79,10 @@ export function useEvaristoMensajes(conversacionId: string | null) {
   return useQuery({
     queryKey: ['admin_evaristo_mensajes', conversacionId],
     enabled: !!conversacionId,
-    queryFn: async () =>
-      ((await (supabase as any).rpc('admin_evaristo_mensajes', { p_conversacion_id: conversacionId })).data ?? []) as EvaristoMensaje[],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc('admin_evaristo_mensajes', { p_conversacion_id: conversacionId });
+      if (error) throw error;
+      return (data ?? []) as EvaristoMensaje[];
+    },
   });
 }

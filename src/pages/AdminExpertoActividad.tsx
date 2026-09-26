@@ -52,7 +52,8 @@ const DIAS_OPCIONES = [
 
 function TabExperto() {
   const [dias, setDias] = useState('7');
-  const { data: consultas, isLoading } = useExpertoConsultas(Number(dias), '');
+  const [buscar, setBuscar] = useState('');
+  const { data: consultas, isLoading } = useExpertoConsultas(Number(dias), buscar);
   const [abierta, setAbierta] = useState<ExpertoConsulta | null>(null);
 
   const columnas: DataTableColumn<ExpertoConsulta>[] = [
@@ -108,6 +109,7 @@ function TabExperto() {
           itemLabel="consultas"
           columns={columnas}
           searchText={(c) => `${c.pregunta} ${c.respuesta} ${c.empresa_nombre ?? ''} ${c.email ?? ''} ${c.licitacion ?? ''}`}
+          onSearchChange={setBuscar}
           searchPlaceholder="Buscar por pregunta, respuesta, cliente o licitación…"
           defaultSort={{ id: 'fecha', dir: 'desc' }}
           exportFileName="experto-consultas"
