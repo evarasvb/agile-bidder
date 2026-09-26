@@ -143,6 +143,7 @@ const navItems: NavItem[] = [
       { title: "Contactos", url: "/academia/leads", icon: Users, adminOnly: true },
       { title: "Compradores", url: "/academia/compradores", icon: CreditCard, adminOnly: true },
       { title: "Ajustes / Avisos", url: "/fundador/ajustes", icon: Settings, adminOnly: true },
+      { title: "Créditos y planes", url: "/fundador/creditos", icon: CreditCard, adminOnly: true },
     ],
   },
   {
