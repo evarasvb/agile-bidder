@@ -49,32 +49,13 @@ export function useLicitacionItemsConMatch(
     return fuzzy.map((item): ItemConMatch => {
       const dbRow = dbByItemId.get(item.id);
       if (!dbRow || !dbRow.inventario_id) return item;
-      // Producto vivo del inventario si sigue activo; si se desactivó desde que
-      // se calculó el match, se arma uno mínimo con lo que quedó guardado en
-      // lic_item_matches (nombre/sku/precio de ese momento) para no perder el
-      // match por completo.
-      const inventoryItem: InventoryItem =
-        inventarioById.get(dbRow.inventario_id) ?? ({
-          id: dbRow.inventario_id,
-          sku: dbRow.sku || '',
-          nombre_producto: dbRow.nombre_producto || '',
-          descripcion: null,
-          categoria: null,
-          keywords: null,
-          precio_unitario: dbRow.precio_unitario || 0,
-          margen_minimo: null,
-          margen_objetivo: null,
-          stock_disponible: null,
-          unidad_medida: null,
-          marca: null,
-          tiempo_entrega_dias: null,
-          proveedor: null,
-          activo: null,
-          imagen_url: null,
-          cliente_id: '',
-          created_at: '',
-          updated_at: '',
-        } as InventoryItem);
+      // cliente_inventario no tiene columna "activo" (useInventoryActivo trae
+      // TODOS los productos del cliente); si el id no aparece ahí es porque el
+      // producto se borró de verdad. Mostrar ese SKU/precio viejo dejaría
+      // cotizar algo que ya no existe, así que se cae al resultado fuzzy (o sin
+      // match) en vez de fabricar el producto desde la foto vieja del cron.
+      const inventoryItem = inventarioById.get(dbRow.inventario_id);
+      if (!inventoryItem) return item;
       return {
         ...item,
         bestMatch: {
