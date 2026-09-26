@@ -129,6 +129,20 @@ export default function LibroLicitacion() {
   const [buscarLibro, setBuscarLibro] = useState('');
   const [verArchivados, setVerArchivados] = useState(false);
   const { data: libros = [] } = useQuery({ queryKey: ['experto_mis_libros', verArchivados, buscarLibro], enabled: !!token, queryFn: async () => ((await supabase.rpc('experto_mis_libros', { p_archivados: verArchivados, p_buscar: buscarLibro || null })).data ?? []) as any[] });
+
+  // Leyes de compras públicas relevantes para la licitación actual
+  const { data: leyes = [] } = useQuery({
+    queryKey: ['experto_leyes', cod],
+    enabled: !!cod && !!token,
+    queryFn: async () => ((await (supabase as any).rpc('experto_leyes', { consulta: libro?.ficha?.tipo || 'compras públicas', cantidad: 5 })).data ?? []) as any[],
+  });
+
+  // Demandas (Tribunal de Contratación Pública) y causas (Contraloría) relevantes
+  const { data: jurisprudencia = [] } = useQuery({
+    queryKey: ['experto_jurisprudencia', cod],
+    enabled: !!cod && !!token,
+    queryFn: async () => ((await (supabase as any).rpc('experto_jurisprudencia', { consulta: libro?.ficha?.tipo || 'impugnación licitación adjudicación', cantidad: 6 })).data ?? []) as any[],
+  });
   const archivarLibro = async (c: string, archivado: boolean) => {
     const { error } = await supabase.rpc('experto_libro_archivar', { p_codigo: c, p_archivado: archivado });
     if (error) { toast.error('No pude archivar'); return; }
@@ -749,6 +763,33 @@ export default function LibroLicitacion() {
                 <p className="font-medium">Quién le gana a este organismo (12 m)</p>
                 {top.length ? top.slice(0, 5).map((t: any) => <p key={t.adjudicatario} className="text-muted-foreground truncate">{t.adjudicatario}: {t.licitaciones} · {fmt(t.monto)}</p>) : <p className="text-muted-foreground">sin adjudicaciones registradas aún</p>}
               </div>
+              {leyes.length > 0 && (
+                <div>
+                  <p className="font-medium">Leyes aplicables</p>
+                  {leyes.map((l: any) => (
+                    <div key={l.id} className="text-muted-foreground text-sm space-y-0.5 mb-1.5">
+                      <p className="font-semibold text-foreground">{l.seccion}</p>
+                      <p className="text-xs line-clamp-2">{l.texto}</p>
+                      {l.url && <a className="text-primary underline text-xs hover:no-underline" href={l.url} target="_blank" rel="noreferrer">Ver más</a>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {jurisprudencia.length > 0 && (
+                <div>
+                  <p className="font-medium">Demandas y fallos relacionados</p>
+                  {jurisprudencia.map((j: any) => (
+                    <div key={j.id} className="text-muted-foreground text-sm space-y-0.5 mb-1.5">
+                      <p className="font-semibold text-foreground">
+                        <span className="text-[10px] uppercase mr-1 rounded bg-muted px-1 py-0.5">{j.tipo === 'demanda' ? 'Demanda' : 'Causa'}</span>
+                        {j.seccion}
+                      </p>
+                      <p className="text-xs line-clamp-2">{j.texto}</p>
+                      {j.url && <a className="text-primary underline text-xs hover:no-underline" href={j.url} target="_blank" rel="noreferrer">Ver más</a>}
+                    </div>
+                  ))}
+                </div>
+              )}
               {libro?.licitaciones_similares && libro.licitaciones_similares.length > 0 && (
                 <div>
                   <p className="font-medium">Licitaciones similares de este organismo (últimas)</p>
