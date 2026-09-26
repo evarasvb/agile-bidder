@@ -691,6 +691,19 @@ export const CURSOS: Curso[] = [
           { titulo: "Cobrar con método: nota de cobro y nota de débito", bloques: [] },
         ],
       },
+      {
+        titulo: "Método Evaristo · El ciclo completo del cobro: del foro a la caja",
+        lecciones: [
+          { titulo: "Regla de oro: si no hay pago, no hay negocio", bloques: [] },
+          { titulo: "Etapa 1 · Preguntas al foro: lo que no aclaras hoy es tu disputa de mañana", bloques: [] },
+          { titulo: "Etapa 2 · Postular considerando todos los espacios y todos los puntos", bloques: [] },
+          { titulo: "Etapa 3 · La entrega: la guía viaja con el protocolo de revisión y el proceso de cobro", bloques: [] },
+          { titulo: "Etapa 4 · Facturación: guía firmada + OC aceptada = factura con protocolo, en el formato que pide la OC", bloques: [] },
+          { titulo: "Etapa 5 · El radar de cobranza: el factoring financia, el seguimiento no se delega", bloques: [] },
+          { titulo: "Etapa 6 · Recordatorios, visita presencial y, si pagan tarde, nota de débito y nota de cobro", bloques: [] },
+          { titulo: "Etapa 0 · Elegir a quién venderle: noticias, fragmentación, reclamos y el calendario de la caja", bloques: [] },
+        ],
+      },
     ],
   },
 
@@ -1007,6 +1020,19 @@ export const CURSOS: Curso[] = [
         lecciones: [
           { titulo: "Ranking de reclamos de pago", bloques: [] },
           { titulo: "Decide antes de vender: el semáforo por institución", bloques: [] },
+        ],
+      },
+      {
+        titulo: "Método Evaristo · El ciclo completo del cobro: del foro a la caja",
+        lecciones: [
+          { titulo: "Regla de oro: si no hay pago, no hay negocio", bloques: [] },
+          { titulo: "Etapa 1 · Preguntas al foro: lo que no aclaras hoy es tu disputa de mañana", bloques: [] },
+          { titulo: "Etapa 2 · Postular considerando todos los espacios y todos los puntos", bloques: [] },
+          { titulo: "Etapa 3 · La entrega: la guía viaja con el protocolo de revisión y el proceso de cobro", bloques: [] },
+          { titulo: "Etapa 4 · Facturación: guía firmada + OC aceptada = factura con protocolo, en el formato que pide la OC", bloques: [] },
+          { titulo: "Etapa 5 · El radar de cobranza: el factoring financia, el seguimiento no se delega", bloques: [] },
+          { titulo: "Etapa 6 · Recordatorios, visita presencial y, si pagan tarde, nota de débito y nota de cobro", bloques: [] },
+          { titulo: "Etapa 0 · Elegir a quién venderle: noticias, fragmentación, reclamos y el calendario de la caja", bloques: [] },
         ],
       },
     ],
