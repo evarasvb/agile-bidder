@@ -9,9 +9,9 @@ import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2, X, FileUp,
 import { useInventoryBulk, esSkuFecha, BulkProductRow, ImportProgress, generateInventoryTemplateData, generateInventoryInstructions } from '@/hooks/useInventoryBulk';
 import { useCreateImportHistory } from '@/hooks/useImportHistory';
 import { validateImageUrl } from '@/hooks/useProductImageUpload';
-import * as XLSX from 'xlsx';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { downloadSpreadsheetWorkbook, readFirstSpreadsheetSheet, recordsToSpreadsheetRows, SpreadsheetReadError } from '@/lib/excelFiles';
 
 interface BulkUploadDialogProps {
   open: boolean;
@@ -82,41 +82,22 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
     onOpenChange(false);
   };
 
-  const handleDownloadTemplate = () => {
+  const handleDownloadTemplate = async () => {
     try {
-      const wb = XLSX.utils.book_new();
-      
-      // Products sheet with template data
       const templateData = generateInventoryTemplateData();
-      const wsProducts = XLSX.utils.json_to_sheet(templateData);
-      
-      // Set column widths
-      wsProducts['!cols'] = [
-        { wch: 15 },  // Código
-        { wch: 40 },  // Descripción
-        { wch: 15 },  // Marca
-        { wch: 12 },  // Precio de Venta
-        { wch: 10 },  // Unidad
-        { wch: 20 },  // Categoría
-        { wch: 10 },  // Stock
-        { wch: 15 },  // Margen Mínimo
-        { wch: 15 },  // Margen Objetivo
-        { wch: 18 },  // Tiempo Entrega
-        { wch: 20 },  // Proveedor
-        { wch: 40 },  // Keywords
-        { wch: 50 },  // URL Imagen
-      ];
-      
-      XLSX.utils.book_append_sheet(wb, wsProducts, 'Productos');
-      
-      // Instructions sheet
       const instructionsData = generateInventoryInstructions();
-      const wsInstructions = XLSX.utils.json_to_sheet(instructionsData);
-      wsInstructions['!cols'] = [{ wch: 80 }];
-      
-      XLSX.utils.book_append_sheet(wb, wsInstructions, 'Instrucciones');
-      
-      XLSX.writeFile(wb, 'plantilla_inventario.xlsx');
+      await downloadSpreadsheetWorkbook('plantilla_inventario.xlsx', [
+        {
+          name: 'Productos',
+          rows: recordsToSpreadsheetRows(templateData),
+          columnWidths: [15, 40, 15, 12, 10, 20, 10, 15, 15, 18, 20, 40, 50],
+        },
+        {
+          name: 'Instrucciones',
+          rows: recordsToSpreadsheetRows(instructionsData),
+          columnWidths: [80],
+        },
+      ]);
       toast.success('📥 Plantilla descargada');
     } catch (error) {
       console.error('Error downloading template:', error);
@@ -128,17 +109,15 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
     resetState();
     
     const extension = file.name.split('.').pop()?.toLowerCase();
-    if (!['xlsx', 'xls', 'csv'].includes(extension || '')) {
-      setParseErrors(['Formato no soportado. Use archivos .xlsx, .xls o .csv']);
+    if (!['xlsx', 'csv'].includes(extension || '')) {
+      setParseErrors([extension === 'xls'
+        ? 'El formato .xls antiguo no es compatible. Ábrelo en Excel y guárdalo como .xlsx.'
+        : 'Formato no soportado. Use archivos .xlsx o .csv']);
       return;
     }
 
     try {
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data, { type: 'array' });
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+      const jsonData = await readFirstSpreadsheetSheet(file);
 
       if (jsonData.length === 0) {
         setParseErrors(['El archivo está vacío o no tiene datos válidos']);
@@ -222,7 +201,9 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
       });
     } catch (error) {
       console.error('Error parsing file:', error);
-      setParseErrors(['Error al leer el archivo. Verifique que sea un archivo Excel/CSV válido.']);
+      setParseErrors([error instanceof SpreadsheetReadError
+        ? error.message
+        : 'Error al leer el archivo. Verifique que sea un archivo Excel/CSV válido.']);
     }
   };
 
@@ -401,7 +382,7 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".xlsx,.xls,.csv"
+                  accept=".xlsx,.csv"
                   onChange={handleFileSelect}
                   className="hidden"
                 />
@@ -410,10 +391,7 @@ export function BulkUploadDialog({ open, onOpenChange, onSuccess }: BulkUploadDi
                   Seleccionar Archivo
                 </Button>
                 <p className="text-xs text-muted-foreground mt-4">
-                  {/* El "máximo 10.000" nunca se aplicó en el código y ya vimos
-                      catálogos reales de más de 16.000 productos (se suben en
-                      lotes de 500, sin tope real). No prometer un número falso. */}
-                  Formatos soportados: .xlsx, .xls, .csv — cualquier tamaño de catálogo
+                  Formatos: .xlsx y .csv · máximo 20 MB y 50.000 filas
                 </p>
               </div>
               
