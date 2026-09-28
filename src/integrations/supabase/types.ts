@@ -154,6 +154,7 @@ export type Database = {
       }
       agendamientos_meet: {
         Row: {
+          avisado: boolean
           email: string
           empresa: string
           estado: string | null
@@ -169,6 +170,7 @@ export type Database = {
           temas: string[] | null
         }
         Insert: {
+          avisado?: boolean
           email: string
           empresa: string
           estado?: string | null
@@ -184,6 +186,7 @@ export type Database = {
           temas?: string[] | null
         }
         Update: {
+          avisado?: boolean
           email?: string
           empresa?: string
           estado?: string | null
@@ -214,6 +217,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ajustes_avisos: {
+        Row: {
+          activo: boolean
+          actualizado_en: string
+          clave: string
+          descripcion: string | null
+          etiqueta: string
+        }
+        Insert: {
+          activo?: boolean
+          actualizado_en?: string
+          clave: string
+          descripcion?: string | null
+          etiqueta: string
+        }
+        Update: {
+          activo?: boolean
+          actualizado_en?: string
+          clave?: string
+          descripcion?: string | null
+          etiqueta?: string
+        }
+        Relationships: []
       }
       alertas_enviadas: {
         Row: {
@@ -1097,6 +1124,7 @@ export type Database = {
       cliente_documentos: {
         Row: {
           archivo_url: string
+          avisado: boolean
           cliente_id: string
           created_at: string
           descripcion: string | null
@@ -1107,6 +1135,7 @@ export type Database = {
         }
         Insert: {
           archivo_url: string
+          avisado?: boolean
           cliente_id: string
           created_at?: string
           descripcion?: string | null
@@ -1117,6 +1146,7 @@ export type Database = {
         }
         Update: {
           archivo_url?: string
+          avisado?: boolean
           cliente_id?: string
           created_at?: string
           descripcion?: string | null
@@ -1214,6 +1244,30 @@ export type Database = {
           },
         ]
       }
+      cliente_instituciones_seguidas: {
+        Row: {
+          cliente_id: string
+          created_at: string
+          id: string
+          nombre_institucion: string | null
+          rut_institucion: string
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string
+          id?: string
+          nombre_institucion?: string | null
+          rut_institucion: string
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string
+          id?: string
+          nombre_institucion?: string | null
+          rut_institucion?: string
+        }
+        Relationships: []
+      }
       cliente_inventario: {
         Row: {
           busqueda_match: string | null
@@ -1222,6 +1276,7 @@ export type Database = {
           codigo_producto: string | null
           created_at: string
           descripcion: string | null
+          embedding: string | null
           id: string
           imagen_url: string | null
           marca: string | null
@@ -1246,6 +1301,7 @@ export type Database = {
           codigo_producto?: string | null
           created_at?: string
           descripcion?: string | null
+          embedding?: string | null
           id?: string
           imagen_url?: string | null
           marca?: string | null
@@ -1270,6 +1326,7 @@ export type Database = {
           codigo_producto?: string | null
           created_at?: string
           descripcion?: string | null
+          embedding?: string | null
           id?: string
           imagen_url?: string | null
           marca?: string | null
@@ -1557,6 +1614,7 @@ export type Database = {
       clientes: {
         Row: {
           activo: boolean
+          aviso_onboarding: boolean
           categoria_negocio: string | null
           created_at: string
           direccion: string | null
@@ -1582,6 +1640,7 @@ export type Database = {
         }
         Insert: {
           activo?: boolean
+          aviso_onboarding?: boolean
           categoria_negocio?: string | null
           created_at?: string
           direccion?: string | null
@@ -1607,6 +1666,7 @@ export type Database = {
         }
         Update: {
           activo?: boolean
+          aviso_onboarding?: boolean
           categoria_negocio?: string | null
           created_at?: string
           direccion?: string | null
@@ -1760,6 +1820,66 @@ export type Database = {
         }
         Relationships: []
       }
+      cm_cargas: {
+        Row: {
+          cargado_en: string | null
+          detalle: string | null
+          estado: string
+          filas: number | null
+          ocs: number | null
+          ocs_actualizadas: number | null
+          periodo: string
+        }
+        Insert: {
+          cargado_en?: string | null
+          detalle?: string | null
+          estado?: string
+          filas?: number | null
+          ocs?: number | null
+          ocs_actualizadas?: number | null
+          periodo: string
+        }
+        Update: {
+          cargado_en?: string | null
+          detalle?: string | null
+          estado?: string
+          filas?: number | null
+          ocs?: number | null
+          ocs_actualizadas?: number | null
+          periodo?: string
+        }
+        Relationships: []
+      }
+      cm_convenios: {
+        Row: {
+          actualizado_en: string
+          categoria: string | null
+          codigo: string
+          id_cm: string | null
+          nombre: string
+          nombre_corto: string
+          ultimo_periodo: string | null
+        }
+        Insert: {
+          actualizado_en?: string
+          categoria?: string | null
+          codigo: string
+          id_cm?: string | null
+          nombre: string
+          nombre_corto: string
+          ultimo_periodo?: string | null
+        }
+        Update: {
+          actualizado_en?: string
+          categoria?: string | null
+          codigo?: string
+          id_cm?: string | null
+          nombre?: string
+          nombre_corto?: string
+          ultimo_periodo?: string | null
+        }
+        Relationships: []
+      }
       cm_distribuidores: {
         Row: {
           cliente_id: string
@@ -1828,16 +1948,44 @@ export type Database = {
         }
         Relationships: []
       }
+      cm_oc_convenio: {
+        Row: {
+          codigo_oc: string
+          convenio_codigo: string
+          periodo: string
+        }
+        Insert: {
+          codigo_oc: string
+          convenio_codigo: string
+          periodo: string
+        }
+        Update: {
+          codigo_oc?: string
+          convenio_codigo?: string
+          periodo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cm_oc_convenio_convenio_codigo_fkey"
+            columns: ["convenio_codigo"]
+            isOneToOne: false
+            referencedRelation: "cm_convenios"
+            referencedColumns: ["codigo"]
+          },
+        ]
+      }
       cm_solicitudes: {
         Row: {
           cliente_id: string
           created_at: string
           estado: string
+          etapa: string
           fecha_envio: string | null
           id: string
           marca_id: string | null
           marca_nombre: string | null
           motivo: string | null
+          ordenes: Json
           producto: string | null
           producto_key: string | null
           proveedor_nombre: string
@@ -1849,11 +1997,13 @@ export type Database = {
           cliente_id: string
           created_at?: string
           estado?: string
+          etapa?: string
           fecha_envio?: string | null
           id?: string
           marca_id?: string | null
           marca_nombre?: string | null
           motivo?: string | null
+          ordenes?: Json
           producto?: string | null
           producto_key?: string | null
           proveedor_nombre: string
@@ -1865,11 +2015,13 @@ export type Database = {
           cliente_id?: string
           created_at?: string
           estado?: string
+          etapa?: string
           fecha_envio?: string | null
           id?: string
           marca_id?: string | null
           marca_nombre?: string | null
           motivo?: string | null
+          ordenes?: Json
           producto?: string | null
           producto_key?: string | null
           proveedor_nombre?: string
@@ -1886,6 +2038,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      compradores_encargados: {
+        Row: {
+          cargo: string | null
+          comuna: string | null
+          creado_en: string
+          fuente: string
+          id: string
+          nombre: string
+          region: string | null
+          rut_organismo: string
+          unidad: string | null
+        }
+        Insert: {
+          cargo?: string | null
+          comuna?: string | null
+          creado_en?: string
+          fuente?: string
+          id?: string
+          nombre: string
+          region?: string | null
+          rut_organismo: string
+          unidad?: string | null
+        }
+        Update: {
+          cargo?: string | null
+          comuna?: string | null
+          creado_en?: string
+          fuente?: string
+          id?: string
+          nombre?: string
+          region?: string | null
+          rut_organismo?: string
+          unidad?: string | null
+        }
+        Relationships: []
       }
       compras_agiles: {
         Row: {
@@ -2004,6 +2192,7 @@ export type Database = {
           compra_agil_id: number
           created_at: string
           descripcion_producto: string | null
+          embedding: string | null
           id: string
           id_producto_inventario: string | null
           match_confidence: number | null
@@ -2020,6 +2209,7 @@ export type Database = {
           compra_agil_id: number
           created_at?: string
           descripcion_producto?: string | null
+          embedding?: string | null
           id?: string
           id_producto_inventario?: string | null
           match_confidence?: number | null
@@ -2036,6 +2226,7 @@ export type Database = {
           compra_agil_id?: number
           created_at?: string
           descripcion_producto?: string | null
+          embedding?: string | null
           id?: string
           id_producto_inventario?: string | null
           match_confidence?: number | null
@@ -2184,6 +2375,95 @@ export type Database = {
           registros_actualizados?: number | null
           registros_nuevos?: number | null
           registros_procesados?: number | null
+        }
+        Relationships: []
+      }
+      creditos_costos: {
+        Row: {
+          accion: string
+          creditos: number
+          descripcion: string | null
+          grupo: string
+        }
+        Insert: {
+          accion: string
+          creditos: number
+          descripcion?: string | null
+          grupo: string
+        }
+        Update: {
+          accion?: string
+          creditos?: number
+          descripcion?: string | null
+          grupo?: string
+        }
+        Relationships: []
+      }
+      creditos_cuenta: {
+        Row: {
+          actualizado_en: string
+          creado_en: string
+          plan: string
+          renovado_en: string | null
+          saldo: number
+          user_id: string
+        }
+        Insert: {
+          actualizado_en?: string
+          creado_en?: string
+          plan?: string
+          renovado_en?: string | null
+          saldo?: number
+          user_id: string
+        }
+        Update: {
+          actualizado_en?: string
+          creado_en?: string
+          plan?: string
+          renovado_en?: string | null
+          saldo?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creditos_cuenta_plan_fkey"
+            columns: ["plan"]
+            isOneToOne: false
+            referencedRelation: "planes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creditos_movimientos: {
+        Row: {
+          accion: string
+          creado_en: string
+          creditos: number
+          id: number
+          motivo: string | null
+          referencia: string | null
+          saldo_despues: number
+          user_id: string
+        }
+        Insert: {
+          accion: string
+          creado_en?: string
+          creditos: number
+          id?: never
+          motivo?: string | null
+          referencia?: string | null
+          saldo_despues: number
+          user_id: string
+        }
+        Update: {
+          accion?: string
+          creado_en?: string
+          creditos?: number
+          id?: never
+          motivo?: string | null
+          referencia?: string | null
+          saldo_despues?: number
+          user_id?: string
         }
         Relationships: []
       }
@@ -3015,9 +3295,76 @@ export type Database = {
         }
         Relationships: []
       }
+      facturas_por_cobrar: {
+        Row: {
+          cliente_id: string
+          created_at: string
+          deudor_nombre: string
+          deudor_rut: string | null
+          deudor_tipo: string
+          estado: string
+          factura_archivo_nombre: string | null
+          factura_archivo_url: string | null
+          fecha_emision: string | null
+          fecha_recepcion: string | null
+          fecha_vencimiento: string | null
+          guia_archivo_nombre: string | null
+          guia_archivo_url: string | null
+          id: string
+          monto: number
+          notas: string | null
+          numero_factura: string | null
+          oc_codigo: string | null
+          updated_at: string
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string
+          deudor_nombre: string
+          deudor_rut?: string | null
+          deudor_tipo?: string
+          estado?: string
+          factura_archivo_nombre?: string | null
+          factura_archivo_url?: string | null
+          fecha_emision?: string | null
+          fecha_recepcion?: string | null
+          fecha_vencimiento?: string | null
+          guia_archivo_nombre?: string | null
+          guia_archivo_url?: string | null
+          id?: string
+          monto?: number
+          notas?: string | null
+          numero_factura?: string | null
+          oc_codigo?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string
+          deudor_nombre?: string
+          deudor_rut?: string | null
+          deudor_tipo?: string
+          estado?: string
+          factura_archivo_nombre?: string | null
+          factura_archivo_url?: string | null
+          fecha_emision?: string | null
+          fecha_recepcion?: string | null
+          fecha_vencimiento?: string | null
+          guia_archivo_nombre?: string | null
+          guia_archivo_url?: string | null
+          id?: string
+          monto?: number
+          notas?: string | null
+          numero_factura?: string | null
+          oc_codigo?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       google_drive_conexiones: {
         Row: {
           access_token: string | null
+          avisado: boolean
           created_at: string
           google_email: string | null
           refresh_token: string | null
@@ -3028,6 +3375,7 @@ export type Database = {
         }
         Insert: {
           access_token?: string | null
+          avisado?: boolean
           created_at?: string
           google_email?: string | null
           refresh_token?: string | null
@@ -3038,6 +3386,7 @@ export type Database = {
         }
         Update: {
           access_token?: string | null
+          avisado?: boolean
           created_at?: string
           google_email?: string | null
           refresh_token?: string | null
@@ -3722,6 +4071,33 @@ export type Database = {
           ultima_compra_fecha?: string | null
           updated_at?: string | null
           website?: string | null
+        }
+        Relationships: []
+      }
+      interes_mora_cmf: {
+        Row: {
+          creado_en: string
+          fuente_url: string | null
+          mes: string
+          monto_desde: number
+          monto_hasta: number | null
+          tasa_anual: number
+        }
+        Insert: {
+          creado_en?: string
+          fuente_url?: string | null
+          mes: string
+          monto_desde: number
+          monto_hasta?: number | null
+          tasa_anual: number
+        }
+        Update: {
+          creado_en?: string
+          fuente_url?: string | null
+          mes?: string
+          monto_desde?: number
+          monto_hasta?: number | null
+          tasa_anual?: number
         }
         Relationships: []
       }
@@ -4501,6 +4877,7 @@ export type Database = {
           correlativo: number | null
           created_at: string
           descripcion: string | null
+          embedding: string | null
           id: string
           id_producto_inventario: string | null
           licitacion_id: string
@@ -4519,6 +4896,7 @@ export type Database = {
           correlativo?: number | null
           created_at?: string
           descripcion?: string | null
+          embedding?: string | null
           id?: string
           id_producto_inventario?: string | null
           licitacion_id: string
@@ -4537,6 +4915,7 @@ export type Database = {
           correlativo?: number | null
           created_at?: string
           descripcion?: string | null
+          embedding?: string | null
           id?: string
           id_producto_inventario?: string | null
           licitacion_id?: string
@@ -4971,6 +5350,7 @@ export type Database = {
           campana_id: string
           canal: string
           cantidad_objetivo: number | null
+          contactos_ids: string[] | null
           contenido: string
           creado_en: string
           estado: string
@@ -4987,6 +5367,7 @@ export type Database = {
           campana_id: string
           canal: string
           cantidad_objetivo?: number | null
+          contactos_ids?: string[] | null
           contenido: string
           creado_en?: string
           estado?: string
@@ -5003,6 +5384,7 @@ export type Database = {
           campana_id?: string
           canal?: string
           cantidad_objetivo?: number | null
+          contactos_ids?: string[] | null
           contenido?: string
           creado_en?: string
           estado?: string
@@ -5142,6 +5524,7 @@ export type Database = {
           datos: Json | null
           email_enviado: boolean | null
           id: string
+          leida: boolean
           licitacion_id: string | null
           tipo: string
         }
@@ -5151,6 +5534,7 @@ export type Database = {
           datos?: Json | null
           email_enviado?: boolean | null
           id?: string
+          leida?: boolean
           licitacion_id?: string | null
           tipo: string
         }
@@ -5160,6 +5544,7 @@ export type Database = {
           datos?: Json | null
           email_enviado?: boolean | null
           id?: string
+          leida?: boolean
           licitacion_id?: string | null
           tipo?: string
         }
@@ -5169,6 +5554,32 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notificaciones_log_leidas: {
+        Row: {
+          leida_en: string
+          notificacion_id: string
+          user_id: string
+        }
+        Insert: {
+          leida_en?: string
+          notificacion_id: string
+          user_id: string
+        }
+        Update: {
+          leida_en?: string
+          notificacion_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notificaciones_log_leidas_notificacion_id_fkey"
+            columns: ["notificacion_id"]
+            isOneToOne: false
+            referencedRelation: "notificaciones_log"
             referencedColumns: ["id"]
           },
         ]
@@ -5509,6 +5920,45 @@ export type Database = {
           },
         ]
       }
+      oportunidad_veredictos: {
+        Row: {
+          cliente_id: string
+          codigo: string
+          created_at: string
+          generado_en: string
+          id: string
+          puntos_contra: string[]
+          puntos_favor: string[]
+          razon: string
+          recomendacion: string
+          tipo: string
+        }
+        Insert: {
+          cliente_id: string
+          codigo: string
+          created_at?: string
+          generado_en?: string
+          id?: string
+          puntos_contra?: string[]
+          puntos_favor?: string[]
+          razon: string
+          recomendacion: string
+          tipo: string
+        }
+        Update: {
+          cliente_id?: string
+          codigo?: string
+          created_at?: string
+          generado_en?: string
+          id?: string
+          puntos_contra?: string[]
+          puntos_favor?: string[]
+          razon?: string
+          recomendacion?: string
+          tipo?: string
+        }
+        Relationships: []
+      }
       orden_compra_items: {
         Row: {
           cantidad: number | null
@@ -5586,6 +6036,8 @@ export type Database = {
       ordenes_compra: {
         Row: {
           codigo: string
+          convenio: string | null
+          convenio_codigo: string | null
           created_at: string | null
           datos_json: Json | null
           demandante: string | null
@@ -5618,6 +6070,8 @@ export type Database = {
         }
         Insert: {
           codigo: string
+          convenio?: string | null
+          convenio_codigo?: string | null
           created_at?: string | null
           datos_json?: Json | null
           demandante?: string | null
@@ -5650,6 +6104,8 @@ export type Database = {
         }
         Update: {
           codigo?: string
+          convenio?: string | null
+          convenio_codigo?: string | null
           created_at?: string | null
           datos_json?: Json | null
           demandante?: string | null
@@ -5888,6 +6344,7 @@ export type Database = {
           activo: boolean | null
           comision_porcentaje: number | null
           comision_tope_mensual: number | null
+          creditos_incluidos: number
           id: string
           inventario_max: number | null
           licitaciones_dia: number | null
@@ -5895,11 +6352,13 @@ export type Database = {
           max_usuarios: number | null
           nombre: string
           precio_mensual: number | null
+          recarga_creditos: string
         }
         Insert: {
           activo?: boolean | null
           comision_porcentaje?: number | null
           comision_tope_mensual?: number | null
+          creditos_incluidos?: number
           id: string
           inventario_max?: number | null
           licitaciones_dia?: number | null
@@ -5907,11 +6366,13 @@ export type Database = {
           max_usuarios?: number | null
           nombre: string
           precio_mensual?: number | null
+          recarga_creditos?: string
         }
         Update: {
           activo?: boolean | null
           comision_porcentaje?: number | null
           comision_tope_mensual?: number | null
+          creditos_incluidos?: number
           id?: string
           inventario_max?: number | null
           licitaciones_dia?: number | null
@@ -5919,6 +6380,7 @@ export type Database = {
           max_usuarios?: number | null
           nombre?: string
           precio_mensual?: number | null
+          recarga_creditos?: string
         }
         Relationships: []
       }
@@ -5958,6 +6420,7 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          avisado: boolean
           created_at: string
           email: string | null
           full_name: string | null
@@ -5967,6 +6430,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          avisado?: boolean
           created_at?: string
           email?: string | null
           full_name?: string | null
@@ -5976,6 +6440,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          avisado?: boolean
           created_at?: string
           email?: string | null
           full_name?: string | null
@@ -7403,6 +7868,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      uso_ia_costo: {
+        Row: {
+          costo_usd: number | null
+          creado_en: string
+          creditos_cobrados: number | null
+          funcion: string
+          id: number
+          modelo: string | null
+          referencia: string | null
+          tokens_in: number | null
+          tokens_out: number | null
+          user_id: string | null
+        }
+        Insert: {
+          costo_usd?: number | null
+          creado_en?: string
+          creditos_cobrados?: number | null
+          funcion: string
+          id?: never
+          modelo?: string | null
+          referencia?: string | null
+          tokens_in?: number | null
+          tokens_out?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          costo_usd?: number | null
+          creado_en?: string
+          creditos_cobrados?: number | null
+          funcion?: string
+          id?: never
+          modelo?: string | null
+          referencia?: string | null
+          tokens_in?: number | null
+          tokens_out?: number | null
+          user_id?: string | null
+        }
+        Relationships: []
       }
       validador_email_queue: {
         Row: {
@@ -8990,6 +9494,19 @@ export type Database = {
         }
         Relationships: []
       }
+      mv_cm_por_convenio: {
+        Row: {
+          anio: number | null
+          codigo: string | null
+          convenio: string | null
+          mes: string | null
+          monto_total: number | null
+          ocs: number | null
+          organismos: number | null
+          proveedores: number | null
+        }
+        Relationships: []
+      }
       mv_cm_producto: {
         Row: {
           codigo_producto: string | null
@@ -9041,6 +9558,17 @@ export type Database = {
           producto_key: string | null
           proveedor: string | null
           tipo_origen: string | null
+        }
+        Relationships: []
+      }
+      mv_compradores_publicos: {
+        Row: {
+          institucion: string | null
+          monto_total: number | null
+          n_oc: number | null
+          primera_compra: string | null
+          rut: string | null
+          ultima_compra: string | null
         }
         Relationships: []
       }
@@ -9571,6 +10099,10 @@ export type Database = {
     }
     Functions: {
       _test_norm: { Args: { txt: string }; Returns: string }
+      academia_x10_insertar: {
+        Args: { p_nuevos: Json; p_slug: string }
+        Returns: string
+      }
       add_keyword: {
         Args: { p_keyword: string; p_profile_id: string }
         Returns: string
@@ -9642,7 +10174,7 @@ export type Database = {
         }[]
       }
       admin_evaristo_conversaciones: {
-        Args: { dias?: number; lim?: number }
+        Args: { buscar?: string; dias?: number; lim?: number }
         Returns: {
           actualizado_en: string
           canal: string
@@ -9733,6 +10265,15 @@ export type Database = {
         }
         Returns: Json
       }
+      buscar_inventario_semantico: {
+        Args: { p_embedding: string; p_limite?: number }
+        Returns: {
+          id: string
+          nombre_producto: string
+          similitud: number
+          sku: string
+        }[]
+      }
       buscar_licitaciones: {
         Args: { busqueda: string }
         Returns: {
@@ -9783,10 +10324,28 @@ export type Database = {
         Args: { limite?: number; termino: string }
         Returns: Json
       }
+      busqueda_global_oportunidades: {
+        Args: { p_limite?: number; p_termino: string }
+        Returns: Json
+      }
       ca_hora_chile: { Args: { p: string }; Returns: string }
       calcular_buen_pagador: {
         Args: { organismo_nombre: string }
         Returns: boolean
+      }
+      calcular_interes_mora: {
+        Args: {
+          p_fecha_pago?: string
+          p_fecha_vencimiento: string
+          p_monto: number
+        }
+        Returns: {
+          completo: boolean
+          detalle: Json
+          dias_atraso: number
+          interes: number
+          total: number
+        }[]
       }
       calcular_margen_comercial: {
         Args: { costo_neto: number; precio_unitario: number }
@@ -9799,7 +10358,23 @@ export type Database = {
         Returns: Json
       }
       cliente_inventario_resumen: { Args: never; Returns: Json }
+      cliente_noticias_instituciones: {
+        Args: { p_max_instituciones?: number; p_por_institucion?: number }
+        Returns: {
+          fecha: string
+          fuente: string
+          institucion: string
+          noticia_id: number
+          seccion: string
+          texto: string
+          url: string
+        }[]
+      }
       cliente_owner_id: { Args: never; Returns: string }
+      cliente_panel_proveedor: {
+        Args: { p_max_comp?: number; p_max_prod?: number }
+        Returns: Json
+      }
       cm_buscar_productos: {
         Args: {
           desplazamiento?: number
@@ -9809,9 +10384,60 @@ export type Database = {
         }
         Returns: Json
       }
+      cm_cargar_convenios: {
+        Args: { p_convenios: Json; p_ocs: Json; p_periodo: string }
+        Returns: Json
+      }
+      cm_categoria_convenio: {
+        Args: { p_codigo: string; p_nombre: string }
+        Returns: string
+      }
+      cm_convenio_de: { Args: { p_texto: string }; Returns: string }
+      cm_convenio_etiqueta: { Args: { p_categoria: string }; Returns: string }
+      cm_convenio_meses: {
+        Args: { p_anio?: number; p_convenio: string }
+        Returns: {
+          mes: string
+          monto_total: number
+          ocs: number
+        }[]
+      }
+      cm_convenio_top: {
+        Args: { p_anio?: number; p_convenio: string; p_limite?: number }
+        Returns: {
+          monto_total: number
+          nombre: string
+          ocs: number
+          rut: string
+          tipo: string
+        }[]
+      }
       cm_mi_competitividad: {
         Args: { p_tipo?: string; umbral?: number }
         Returns: Json
+      }
+      cm_nombre_corto: { Args: { p_nombre: string }; Returns: string }
+      cm_ordenes_proveedor: {
+        Args: {
+          limite?: number
+          p_proveedor: string
+          p_termino?: string
+          p_tipo?: string
+        }
+        Returns: Json
+      }
+      cm_por_convenio: {
+        Args: { p_anio?: number }
+        Returns: {
+          codigo: string
+          convenio: string
+          estimadas: number
+          monto_total: number
+          ocs: number
+          organismos: number
+          participacion: number
+          proveedores: number
+        }[]
       }
       cm_producto_detalle: {
         Args: { p_producto_key: string; p_tipo?: string }
@@ -9821,7 +10447,14 @@ export type Database = {
         Args: { p_producto_key: string; p_tipo?: string }
         Returns: Json
       }
+      cm_reclasificar_pendientes: { Args: { p_dias?: number }; Returns: number }
+      cm_refrescar_por_convenio: { Args: never; Returns: undefined }
+      cm_sincronizar_ocs: { Args: { p_periodo?: string }; Returns: number }
       cm_stats: { Args: { p_tipo?: string }; Returns: Json }
+      cm_texto_oc: {
+        Args: { p_codigo?: string; p_nombre: string; p_raw: Json }
+        Returns: string
+      }
       comisiones_atribuir: { Args: never; Returns: number }
       comisiones_cerrar_mes: {
         Args: { p_periodo?: string }
@@ -9870,10 +10503,37 @@ export type Database = {
           ultimo_seq: number
         }[]
       }
+      consumir_creditos: {
+        Args: {
+          p_accion: string
+          p_cantidad?: number
+          p_referencia?: string
+          p_user_id?: string
+        }
+        Returns: Json
+      }
       create_default_search_profile: {
         Args: { user_id: string }
         Returns: string
       }
+      creditos_asegurar_cuenta: {
+        Args: { p_user_id: string }
+        Returns: {
+          actualizado_en: string
+          creado_en: string
+          plan: string
+          renovado_en: string | null
+          saldo: number
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "creditos_cuenta"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      creditos_saldo: { Args: never; Returns: Json }
       cubo_consultar: {
         Args: {
           p_desc?: boolean
@@ -9885,6 +10545,15 @@ export type Database = {
           p_limite?: number
           p_offset?: number
           p_orden?: string
+        }
+        Returns: Json
+      }
+      cubo_oc_ordenes: {
+        Args: {
+          p_desde?: string
+          p_filtros?: Json
+          p_hasta?: string
+          p_limite?: number
         }
         Returns: Json
       }
@@ -9925,6 +10594,28 @@ export type Database = {
         }
         Returns: boolean
       }
+      documentos_por_avisar: {
+        Args: never
+        Returns: {
+          email: string
+          empresa: string
+          id: string
+          nombre: string
+          subido_en: string
+          tipo: string
+        }[]
+      }
+      drive_conexiones_por_avisar: {
+        Args: never
+        Returns: {
+          conectado_en: string
+          email_app: string
+          google_email: string
+          nombre: string
+          scope: string
+          user_id: string
+        }[]
+      }
       estadisticas_licitaciones: {
         Args: never
         Returns: {
@@ -9944,6 +10635,7 @@ export type Database = {
         Args: { p_limite?: number }
         Returns: Json
       }
+      evaristo_admin_resumen: { Args: never; Returns: Json }
       evaristo_contexto: { Args: { p_codigo?: string }; Returns: Json }
       exec_sql: { Args: { sql_text: string }; Returns: Json }
       experto_activar_pro:
@@ -10280,6 +10972,7 @@ export type Database = {
         Args: { p_archivado?: boolean; p_codigo: string }
         Returns: undefined
       }
+      experto_libro_eliminar: { Args: { p_codigo: string }; Returns: undefined }
       experto_licitaciones: {
         Args: {
           cantidad?: number
@@ -10518,6 +11211,139 @@ export type Database = {
           top_organismos: Json
         }[]
       }
+      fundador_ajuste_set: {
+        Args: { p_activo: boolean; p_clave: string }
+        Returns: undefined
+      }
+      fundador_ajustes_listar: {
+        Args: never
+        Returns: {
+          activo: boolean
+          actualizado_en: string
+          clave: string
+          descripcion: string
+          etiqueta: string
+        }[]
+      }
+      fundador_comprador_contactos: {
+        Args: { p_rut: string }
+        Returns: {
+          cargo: string
+          consentimiento: boolean
+          email: string
+          estado: string
+          id: string
+          nombre: string
+          telefono: string
+        }[]
+      }
+      fundador_comprador_eliminar_contacto: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
+      fundador_comprador_encargados: {
+        Args: { p_rut: string }
+        Returns: {
+          cargo: string
+          id: string
+          nombre: string
+          region: string
+          unidad: string
+        }[]
+      }
+      fundador_comprador_guardar_contacto: {
+        Args: {
+          p_cargo?: string
+          p_consentimiento?: boolean
+          p_email: string
+          p_id?: string
+          p_institucion: string
+          p_nombre?: string
+          p_rut: string
+          p_telefono?: string
+        }
+        Returns: string
+      }
+      fundador_comprador_importar_contactos: {
+        Args: { p_items: Json }
+        Returns: number
+      }
+      fundador_compradores_resumen: {
+        Args: never
+        Returns: {
+          con_consentimiento: number
+          con_contacto: number
+          total_organismos: number
+        }[]
+      }
+      fundador_contactos_estado: {
+        Args: { p_buscar?: string; p_sector?: string }
+        Returns: {
+          creado_en: string
+          dominio: string
+          email: string
+          empresa: string
+          estado: string
+          id: string
+          nombre: string
+          sector: string
+        }[]
+      }
+      fundador_costo_set: {
+        Args: { p_accion: string; p_creditos: number }
+        Returns: Json
+      }
+      fundador_costos_listar: {
+        Args: never
+        Returns: {
+          accion: string
+          creditos: number
+          descripcion: string | null
+          grupo: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "creditos_costos"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      fundador_creditos_otorgar: {
+        Args: { p_creditos: number; p_motivo?: string; p_user_id: string }
+        Returns: Json
+      }
+      fundador_directorio_compradores: {
+        Args: { p_buscar?: string; p_limite?: number; p_tipo?: string }
+        Returns: {
+          consentimiento: boolean
+          encargados: string
+          institucion: string
+          monto_total: number
+          n_correos: number
+          n_encargados: number
+          n_oc: number
+          region: string
+          rut: string
+          tiene_contacto: boolean
+          tipo: string
+          ultima_compra: string
+        }[]
+      }
+      fundador_metricas: { Args: never; Returns: Json }
+      fundador_plan_set: {
+        Args: { p_plan: string; p_user_id: string }
+        Returns: Json
+      }
+      fundador_uso_ia_resumen: {
+        Args: { p_dias?: number }
+        Returns: {
+          costo_usd_prom: number
+          costo_usd_total: number
+          funcion: string
+          llamadas: number
+          tokens_prom: number
+        }[]
+      }
       generar_matches_ca: {
         Args: { p_cliente: string; p_umbral?: number }
         Returns: number
@@ -10734,6 +11560,10 @@ export type Database = {
           email: string
         }[]
       }
+      guardar_embeddings: {
+        Args: { p_filas: Json; p_tabla: string }
+        Returns: number
+      }
       guardian_fix_detalle_flag: { Args: never; Returns: number }
       guardian_fix_lic_match_flag: { Args: never; Returns: number }
       guardian_fix_match_flag: { Args: never; Returns: number }
@@ -10806,6 +11636,18 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
       is_current_user_admin: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
+      item_texto_embedding: {
+        Args: { p_descripcion: string; p_nombre: string }
+        Returns: string
+      }
+      items_pendientes_embedding: {
+        Args: { p_limite?: number }
+        Returns: {
+          id: string
+          tabla: string
+          texto: string
+        }[]
+      }
       licitaciones_adjuntos_pendientes: {
         Args: { p_limite?: number }
         Returns: {
@@ -10841,6 +11683,7 @@ export type Database = {
         Args: { campana_id_in: string; fecha_in: string }
         Returns: undefined
       }
+      marketing_continuar_envios_pendientes: { Args: never; Returns: undefined }
       marketing_importar_contactos: {
         Args: { p_cantidad?: number; p_fuente: string; p_tabla_origen: string }
         Returns: {
@@ -10855,6 +11698,19 @@ export type Database = {
           duplicados: number
           errores: number
           importados: number
+        }[]
+      }
+      marketing_reclamar_continuacion: {
+        Args: { p_pieza_id: string }
+        Returns: {
+          asunto: string
+          campana_id: string
+          canal: string
+          contactos_ids: string[]
+          contenido: string
+          estado: string
+          id: string
+          tipo: string
         }[]
       }
       marketing_registrar_auditoria: {
@@ -10895,6 +11751,18 @@ export type Database = {
             }
             Returns: number
           }
+      match_sim_v3: {
+        Args: {
+          p_inv_busqueda: string
+          p_inv_cod: string
+          p_inv_emb: string
+          p_inv_norm: string
+          p_item_cod: string
+          p_item_emb: string
+          p_item_norm: string
+        }
+        Returns: number
+      }
       medios_norm: { Args: { p: string }; Returns: string }
       medios_organismo: {
         Args: { p_cantidad?: number; p_codigo?: string; p_organismo?: string }
@@ -10949,6 +11817,20 @@ export type Database = {
         Args: { p_candidatas: string[]; p_incluidas: string[] }
         Returns: Json
       }
+      onboardings_por_avisar: {
+        Args: never
+        Returns: {
+          completado_en: string
+          email: string
+          empresa: string
+          id: string
+          nombre: string
+          plan: string
+          region: string
+          rut: string
+          telefono: string
+        }[]
+      }
       organismo_riesgo: {
         Args: { p_codigo?: string; p_nombre?: string }
         Returns: {
@@ -10971,6 +11853,7 @@ export type Database = {
         }[]
       }
       pexels_termino_rubro: { Args: { p_texto: string }; Returns: string }
+      pipeline_tasa_exito_equipo: { Args: never; Returns: number }
       precio_mercado: {
         Args: { p_texto: string }
         Returns: {
@@ -11061,6 +11944,30 @@ export type Database = {
         }
         Returns: string
       }
+      registrar_uso_ia: {
+        Args: {
+          p_costo_usd: number
+          p_creditos_cobrados?: number
+          p_funcion: string
+          p_modelo: string
+          p_referencia?: string
+          p_tokens_in: number
+          p_tokens_out: number
+          p_user_id?: string
+        }
+        Returns: undefined
+      }
+      registros_por_avisar: {
+        Args: never
+        Returns: {
+          creado_en: string
+          email: string
+          empresa: string
+          id: string
+          nombre: string
+          plan: string
+        }[]
+      }
       revisar_datos_prueba_licitaciones: {
         Args: never
         Returns: {
@@ -11097,6 +12004,7 @@ export type Database = {
         Returns: boolean
       }
       validar_email_basico: { Args: { p_email: string }; Returns: string }
+      vendedores_owner_auth_id: { Args: never; Returns: string }
       youtube_sincronizar_suscriptores: {
         Args: { p_canal_id: string }
         Returns: {

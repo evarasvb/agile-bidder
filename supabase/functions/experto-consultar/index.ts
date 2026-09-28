@@ -5,6 +5,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { evidenceGateLicitacion, crearEstadoDocumentacionLicitacion } from "../_shared/evidenceGateHelper.ts";
 import { textoPanorama, REGLAS_PANORAMA } from "../_shared/panorama.ts";
 import { fetchClaudeComoOpenAI } from "../_shared/claudeFallback.ts";
+import { guardarTurnoEvaristo } from "../_shared/evaristoMemoria.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -197,6 +198,13 @@ Deno.serve(async (req) => {
       userId = user?.id ?? null;
     }
 
+    // Cliente con el JWT del usuario (cuando lo hay): permite leer/escribir la
+    // memoria compartida de Don Evaristo (evaristo_contexto, evaristo_conversaciones)
+    // respetando su RLS, igual que hace evaristo-soporte (chat).
+    const sbUser = token && token !== serviceRoleKey
+      ? createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: `Bearer ${token}` } } })
+      : null;
+
     // Límites
     const { data: uso } = await sb.rpc("experto_uso_mes", { p_user_id: userId, p_huella: huella || "anon" });
     const u = uso?.[0] ?? { consultas: 0, informes: 0, plan: "free" };
@@ -288,6 +296,9 @@ Deno.serve(async (req) => {
     // Perfil del usuario (qué vende, rubro, región) y memoria (lo que pidió mejorar antes): personalizan la respuesta.
     if (userId) tareas.perfil = sb.from("clientes").select("empresa_nombre, categoria_negocio, industrias, palabras_clave_busqueda, region").eq("user_id", userId).maybeSingle().then((r) => r.data);
     tareas.memoria = sb.rpc("experto_memoria", { p_user_id: userId, p_huella: huella || "anon" }).then((r) => r.data ?? []);
+    // Memoria compartida entre los 3 Evaristos: lo último que este cliente
+    // conversó en cualquier modo (chat/abogado/experto), últimas 48h.
+    if (sbUser) tareas.memoriaEvaristo = sbUser.rpc("evaristo_contexto", { p_codigo: codigo ?? null }).then((r) => r.data?.conversaciones_recientes ?? []);
     const res: Record<string, any> = {};
     const tiempos: Record<string, number> = {};
     await Promise.all(Object.entries(tareas).map(async ([k, p]) => { const ti = Date.now(); try { res[k] = await p; } catch { res[k] = null; } tiempos[k] = Date.now() - ti; }));
@@ -338,6 +349,10 @@ Deno.serve(async (req) => {
     if (noticias.length) partes.push("NOTICIAS RECIENTES (fuente externa, prensa y ChileCompra; distingue lo que dice la prensa de nuestros datos):\n" + noticias.map((n, i) => `[${fragmentos.length + bases.length + anexos.length + i + 1}] ${n.fuente} — ${n.seccion}\n${String(n.texto).slice(0, 700)}`).join("\n\n"));
     if (res.perfil) partes.push(`PERFIL DEL USUARIO (personaliza con esto, sin repetirlo): empresa ${res.perfil.empresa_nombre ?? "s/i"}; rubro ${res.perfil.categoria_negocio ?? "s/i"}; industrias ${(res.perfil.industrias ?? []).join(", ") || "s/i"}; vende/busca: ${(res.perfil.palabras_clave_busqueda ?? []).slice(0, 12).join(", ") || "s/i"}; región ${res.perfil.region ?? "s/i"}.`);
     if (res.memoria?.length) partes.push("LO QUE ESTE USUARIO PIDIÓ MEJORAR EN RESPUESTAS ANTERIORES (tenlo en cuenta):\n" + res.memoria.map((m: any) => `- ${m.util === false ? "No le sirvió" : "Comentó"} en "${String(m.pregunta ?? "").slice(0, 80)}": ${m.comentario}`).join("\n"));
+    if (Array.isArray(res.memoriaEvaristo) && res.memoriaEvaristo.length && modo === "chat") {
+      partes.push("MEMORIA (lo último que este cliente conversó con Don Evaristo en otros modos, últimas 48h — úsalo solo si es relevante, no lo repitas si no viene al caso):\n" +
+        res.memoriaEvaristo.map((m: any) => `[${m.canal}, ${m.rol === "user" ? "preguntó" : "Evaristo respondió"}] ${m.texto}`).join("\n"));
+    }
     if (tareas.lic && !res.lic?.length) partes.push(`BÚSQUEDA DE LICITACIONES ABIERTAS para "${qDatos}": sin resultados en títulos, descripciones ni ítems de los últimos 180 días (Datos Mercado Público vía FirmaVB). Dilo así (no digas que no tienes fuente) y sugiere otras palabras o el rubro.`);
     if (res.lic?.length) partes.push("LICITACIONES ABIERTAS (Datos Mercado Público vía FirmaVB):\n" + res.lic.map((l: any) => `${l.codigo} | ${l.nombre} | ${l.institucion} | ${l.region ?? ""} | ${fmt(l.presupuesto)} | cierra ${fecha(l.cierra)} | ${l.url}${l.coincidencia ? " | coincide en el ítem: " + l.coincidencia : ""}`).join("\n"));
     if (res.ca?.length) partes.push("COMPRAS ÁGILES ABIERTAS:\n" + res.ca.map((l: any) => `${l.codigo} | ${l.nombre} | ${l.organismo} | ${fmt(l.monto)} | cierra ${fecha(l.cierra)} | pago: ${l.conducta_pago ?? "s/i"} ${l.pago_dias ? l.pago_dias + " días" : ""} | ${l.url ?? ""}`).join("\n"));
@@ -424,6 +439,15 @@ Deno.serve(async (req) => {
         ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ done: true, ms: Date.now() - t0 })}\n\n`));
         ctrl.close();
         try { await sb.rpc("experto_registrar_uso", { p_user_id: userId, p_huella: huella || "anon", p_modo: modo, p_pregunta: pregunta || `informe ${codigo}`, p_respuesta: respuesta, p_fuentes: fuentesMeta, p_licitacion: codigo, p_ms: Date.now() - t0, p_ip: ip }); } catch { /* no bloquear */ }
+        if (userId) {
+          await guardarTurnoEvaristo(sbUser ?? sb, {
+            userId,
+            canal: "experto",
+            pregunta: pregunta || `[Informe] ${codigo}`,
+            respuesta,
+            meta: { modo, codigo, modelo },
+          });
+        }
         // Medidor de costo real de IA (estimado desde tokens ~ chars/4), para calibrar créditos.
         try {
           const tin = Math.ceil(userMsg.length / 4), tout = Math.ceil(respuesta.length / 4);
