@@ -526,12 +526,14 @@ serve(async (req) => {
 
     let recipientEmail = to;
     let empresaNombre = 'Usuario';
+    let clienteWhatsapp: string | null = null;
+    let prefsWhatsapp = true;
 
     // If cliente_id provided, get client info
     if (cliente_id) {
       const { data: clienteData, error: clienteError } = await serviceClient
         .from('clientes')
-        .select('id, email, empresa_nombre, user_id')
+        .select('id, email, empresa_nombre, user_id, whatsapp')
         .eq('id', cliente_id)
         .single();
 
@@ -545,6 +547,7 @@ serve(async (req) => {
 
       recipientEmail = recipientEmail || clienteData.email;
       empresaNombre = clienteData.empresa_nombre;
+      clienteWhatsapp = (clienteData as any).whatsapp || null;
 
       // Check notification preferences
       const { data: prefsData } = await serviceClient
@@ -555,6 +558,7 @@ serve(async (req) => {
 
       if (prefsData) {
         const prefs = prefsData as ClienteNotificaciones;
+        prefsWhatsapp = (prefs as any).whatsapp_avisos !== false;
         
         // Check if we should send based on preferences
         if (tipo === 'nuevo_match' && prefs.alerta_nuevos_matches === false) {
@@ -621,6 +625,26 @@ serve(async (req) => {
 
     // Send email
     const emailResult = await sendViaResend(resendApiKey, recipientEmail, subject, html);
+    // WhatsApp: mismo criterio que el correo (solo adjudicación ganada y novedades de FirmaVB),
+    // si el cliente dejó su número y no apagó el aviso. Nunca bloquea el registro del aviso.
+    let whatsappEnviado = false;
+    if (cliente_id && clienteWhatsapp && prefsWhatsapp) {
+      try {
+        const texto = tipo === 'adjudicacion'
+          ? `¡ganaste ${data.licitacion_codigo || data.licitacion_id || 'una licitación'}${data.licitacion_titulo ? `: ${data.licitacion_titulo}` : ''}${data.organismo ? ` (${data.organismo})` : ''}!`
+          : String((data as any).mensaje || (data as any).titulo || subject || 'hay una novedad de FirmaVB.');
+        const r = await fetch(`${supabaseUrl}/functions/v1/enviar-whatsapp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabaseServiceKey}` },
+          body: JSON.stringify({ cliente_id, telefono: clienteWhatsapp, empresa: empresaNombre, texto }),
+        });
+        const j = await r.json().catch(() => ({}));
+        whatsappEnviado = !!j?.ok;
+        if (!j?.ok && j?.motivo !== 'no_configurado') console.error('enviar-whatsapp', cliente_id, JSON.stringify(j).slice(0, 200));
+      } catch (e) {
+        console.error('enviar-whatsapp', cliente_id, String(e).slice(0, 200));
+      }
+    }
 
     // Log notification
     if (cliente_id) {
@@ -631,7 +655,7 @@ serve(async (req) => {
           tipo,
           licitacion_id: data.licitacion_id || null,
           email_enviado: emailResult.success,
-          datos: data as any,
+          datos: { ...(data as any), whatsapp_enviado: whatsappEnviado },
         });
     }
 

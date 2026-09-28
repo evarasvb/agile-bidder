@@ -57,6 +57,7 @@ interface NotificacionPreferencias {
   alerta_nuevos_matches: boolean;
   alerta_cierre_proximo: boolean;
   alerta_cambios_guardadas: boolean;
+  whatsapp_avisos?: boolean;
   horas_antes_cierre: number;
   score_minimo_alerta: number;
   presupuesto_minimo: number | null;
