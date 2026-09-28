@@ -133,7 +133,9 @@ const queryClient = new QueryClient({
 // cargó (o no existe), no redirige: deja pasar (evita lockouts).
 const OnboardingGate = ({ children }: { children: React.ReactNode }) => {
   const { data: cliente, isLoading } = useCliente();
-  if (!isLoading && cliente && cliente.onboarding_completado === false) {
+  // Sep 2026: también pasan por el paso "Tu empresa" los clientes antiguos que
+  // nunca aceptaron Términos de forma expresa (y en su mayoría no tienen RUT).
+  if (!isLoading && cliente && (cliente.onboarding_completado === false || !cliente.terminos_aceptados_at)) {
     return <Navigate to="/onboarding" replace />;
   }
   return <>{children}</>;
