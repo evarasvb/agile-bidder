@@ -1,31 +1,37 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check, Tag, Ban, Sparkles, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Tag, Building2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useCliente, useActualizarCliente } from '@/hooks/useCliente';
 import { supabase } from '@/integrations/supabase/client';
 import OnboardingStep1 from '@/components/cliente-onboarding/OnboardingStep1';
-import OnboardingStep3 from '@/components/cliente-onboarding/OnboardingStep3';
+import OnboardingEmpresa from '@/components/cliente-onboarding/OnboardingEmpresa';
 import OnboardingResultados from '@/components/cliente-onboarding/OnboardingResultados';
 
+// Sep 2026: el paso "¿Qué NO vendes?" salió del onboarding (se ajusta en
+// Configuración → Palabras a excluir) y entró "Tu empresa": RUT, WhatsApp,
+// descripción, regiones y aceptación expresa de Términos, todo validado.
 const STEPS = [
-  { id: 1, title: '¿Qué vendes?', icon: Tag },
-  { id: 2, title: '¿Qué NO vendes?', icon: Ban },
+  { id: 1, title: 'Tu empresa', icon: Building2 },
+  { id: 2, title: '¿Qué vendes?', icon: Tag },
   { id: 3, title: 'Tus oportunidades', icon: Sparkles },
 ];
 
 export default function ClienteOnboarding() {
   const navigate = useNavigate();
-  const { data: cliente, isLoading } = useCliente();
+  const { data: cliente, isLoading, refetch } = useCliente();
   const actualizarCliente = useActualizarCliente();
   
   const [currentStep, setCurrentStep] = useState(1);
 
   useEffect(() => {
     if (cliente) {
-      if (cliente.onboarding_completado) {
+      if (cliente.onboarding_completado && cliente.terminos_aceptados_at) {
         navigate('/dashboard');
+      } else if (!cliente.terminos_aceptados_at) {
+        // Cliente antiguo sin "Tu empresa": parte por el paso 1.
+        setCurrentStep(1);
       } else {
         // Clamp: clientes viejos podían tener onboarding_step hasta 4.
         setCurrentStep(Math.min(cliente.onboarding_step || 1, STEPS.length));
@@ -93,10 +99,22 @@ export default function ClienteOnboarding() {
   }
 
   const progress = (currentStep / STEPS.length) * 100;
+  // Paso 1 obligatorio: sin empresa, RUT válido y Términos aceptados no se sale.
+  const empresaCompleta = !!cliente.terminos_aceptados_at && !!cliente.rut;
+
+  // Al terminar "Tu empresa" se re-lee el cliente para que "¿Qué vendes?"
+  // arranque ya con las palabras clave que armó la IA.
+  const handleEmpresaLista = async () => {
+    await refetch();
+    const nextStep = 2;
+    await actualizarCliente.mutateAsync({ id: cliente.id, onboarding_step: nextStep });
+    setCurrentStep(nextStep);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   // Sin esto, un usuario podía llegar al paso 3 sin haber elegido nada y toparse
   // con "cuéntanos qué vendes... vuelve al paso 1" — mejor frenarlo antes, en el
   // mismo paso 1, que dejarlo avanzar para después devolverlo.
-  const sinNadaElegido = currentStep === 1
+  const sinNadaElegido = currentStep === 2
     && (cliente.industrias?.length ?? 0) === 0
     && (cliente.palabras_clave_busqueda?.length ?? 0) === 0;
 
@@ -111,15 +129,17 @@ export default function ClienteOnboarding() {
               <span className="hidden sm:inline text-sm text-muted-foreground">
                 {cliente.empresa_nombre}
               </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground"
-                onClick={handleSaltarOnboarding}
-                disabled={actualizarCliente.isPending}
-              >
-                Lo hago después
-              </Button>
+              {empresaCompleta && currentStep > 1 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground"
+                  onClick={handleSaltarOnboarding}
+                  disabled={actualizarCliente.isPending}
+                >
+                  Lo hago después
+                </Button>
+              )}
             </div>
           </div>
           <Progress value={progress} className="mt-4" />
@@ -158,11 +178,12 @@ export default function ClienteOnboarding() {
 
         {/* Step content */}
         <div className="max-w-3xl mx-auto">
-          {currentStep === 1 && <OnboardingStep1 cliente={cliente} />}
-          {currentStep === 2 && <OnboardingStep3 />}
+          {currentStep === 1 && <OnboardingEmpresa cliente={cliente} onDone={handleEmpresaLista} />}
+          {currentStep === 2 && <OnboardingStep1 cliente={cliente} />}
           {currentStep === 3 && <OnboardingResultados cliente={cliente} />}
 
-          {/* Navigation */}
+          {/* Navigation (el paso 1 tiene su propio botón con validación) */}
+          {currentStep > 1 && (
           <div className="flex items-center justify-between mt-8 pt-6 border-t">
             <Button
               variant="outline"
@@ -195,6 +216,7 @@ export default function ClienteOnboarding() {
               )}
             </Button>
           </div>
+          )}
         </div>
       </div>
     </div>
