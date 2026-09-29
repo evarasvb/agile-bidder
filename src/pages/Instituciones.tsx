@@ -138,14 +138,17 @@ export default function Instituciones() {
   const [sel, setSel] = useState<InstitucionSeguida | null>(null);
 
   // Llegada desde la campanita de avisos (reclamo_institucion / compras_institucion):
-  // trae el RUT exacto en la URL para abrir el zoom de una vez.
+  // trae el RUT exacto en la URL para abrir el zoom de una vez. Se recuerda el
+  // último rutUrl procesado (no solo "ya procesé alguno") para que un segundo
+  // clic en la campanita, con otro RUT, mientras la página ya está abierta,
+  // también cambie la selección.
   const [searchParams] = useSearchParams();
   const rutUrl = searchParams.get("rut");
-  const autoSeleccionado = useRef(false);
+  const rutUrlProcesado = useRef<string | null>(null);
 
   useEffect(() => {
-    if (autoSeleccionado.current || !rutUrl || !seguidas) return;
-    autoSeleccionado.current = true;
+    if (!rutUrl || rutUrlProcesado.current === rutUrl || !seguidas) return;
+    rutUrlProcesado.current = rutUrl;
     const match = seguidas.find((s) => s.rut_institucion === rutUrl);
     setSel(match ?? { rut_institucion: rutUrl, nombre_institucion: rutUrl, created_at: "" });
   }, [rutUrl, seguidas]);
@@ -154,7 +157,7 @@ export default function Instituciones() {
     if (!sel && seguidas?.length && !rutUrl) setSel(seguidas[0]);
   }, [seguidas, sel, rutUrl]);
 
-  const { data: zoom, isLoading: zoomLoading } = useInstitucionZoom(sel?.rut_institucion ?? null);
+  const { data: zoom, isLoading: zoomLoading } = useInstitucionZoom(sel?.rut_institucion ?? null, sel?.nombre_institucion ?? null);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -205,7 +208,14 @@ export default function Instituciones() {
                       disabled={dejar.isPending}
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (sel?.rut_institucion === s.rut_institucion) setSel(null);
+                        if (sel?.rut_institucion === s.rut_institucion) {
+                          // Selecciona explícitamente la siguiente institución (o
+                          // null si era la última) en vez de limpiar sel: si se
+                          // deja en null, el efecto de selección por defecto la
+                          // vuelve a elegir desde la lista todavía no invalidada.
+                          const siguiente = seguidas.find((x) => x.rut_institucion !== s.rut_institucion) ?? null;
+                          setSel(siguiente);
+                        }
                         dejar.mutate(s.rut_institucion);
                       }}
                     >

@@ -100,13 +100,16 @@ export interface InstitucionZoom {
 
 // El "zoom" de una institución: pagos oportunos, reclamos, noticias,
 // licitaciones y compras ágiles, todo junto en una sola RPC (institucion_zoom,
-// exacta por RUT — ver 20260929143000_institucion_zoom.sql).
-export function useInstitucionZoom(rut: string | null) {
+// exacta por RUT — ver 20260929143000_institucion_zoom.sql). `nombre` es el
+// respaldo cuando rut_institucion no es un RUT real (a veces es un código de
+// Mercado Público copiado de ordenes_compra.rut_demandante) ni resuelve por
+// licitaciones_bi: institucion_zoom lo usa para buscar por nombre normalizado.
+export function useInstitucionZoom(rut: string | null, nombre?: string | null) {
   return useQuery({
-    queryKey: ['institucion-zoom', rut],
+    queryKey: ['institucion-zoom', rut, nombre],
     enabled: !!rut,
     queryFn: async (): Promise<InstitucionZoom> => {
-      const { data, error } = await (supabase.rpc as any)('institucion_zoom', { p_rut: rut });
+      const { data, error } = await (supabase.rpc as any)('institucion_zoom', { p_rut: rut, p_nombre: nombre ?? null });
       if (error) throw error;
       return data as InstitucionZoom;
     },
