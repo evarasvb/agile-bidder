@@ -154,8 +154,13 @@ export default function Instituciones() {
   }, [rutUrl, seguidas]);
 
   useEffect(() => {
-    if (!sel && seguidas?.length && !rutUrl) setSel(seguidas[0]);
-  }, [seguidas, sel, rutUrl]);
+    // dejar.isPending bloquea la reselección mientras se está quitando una
+    // institución: si era la única seguida, sel queda en null a propósito y
+    // seguidas todavía trae en caché la que se está por borrar — sin este
+    // freno, este efecto la volvería a elegir antes de que el refetch la
+    // saque de la lista.
+    if (!sel && seguidas?.length && !rutUrl && !dejar.isPending) setSel(seguidas[0]);
+  }, [seguidas, sel, rutUrl, dejar.isPending]);
 
   const { data: zoom, isLoading: zoomLoading } = useInstitucionZoom(sel?.rut_institucion ?? null, sel?.nombre_institucion ?? null);
 
