@@ -48,9 +48,19 @@ verify_jwt = false
 [functions.crear-pago-curso]
 verify_jwt = false
 
+# academia-premium es público porque los compradores no requieren cuenta. El
+# acceso usa un código secreto y la recuperación solo reenvía al correo de pago.
+[functions.academia-premium]
+verify_jwt = false
+
 # mp-curso-webhook: Mercado Pago notifica sin JWT (se verifica el pago contra la API de MP)
 [functions.mp-curso-webhook]
 verify_jwt = false
+
+# Worker privado para la bandeja durable de contracargos. Supabase valida el
+# JWT y la función exige que el bearer sea exactamente el service_role.
+[functions.procesar-academia-mp-inbox]
+verify_jwt = true
 
 [functions.resumir-bases]
 verify_jwt = true

@@ -1,4 +1,5 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
+// deno-lint-ignore no-import-prefix
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,7 +12,12 @@ interface EnrichmentResult {
   actualizados: number
   errores: number
   tiempo_segundos: number
+  has_more?: boolean
+  next_cursor?: number
 }
+
+const BATCH_SIZE = 100
+type AdminClient = SupabaseClient
 
 // Validar email con lógica básica
 function esEmailValido(email: string): boolean {
@@ -38,7 +44,7 @@ function clasificarRubro(empresa: string, descripcion?: string): string {
 }
 
 // Obtener contactos de MercadoPublico API (usando datos ya disponibles)
-async function sincronizarMercadoPublico(supabase: any): Promise<EnrichmentResult> {
+async function sincronizarMercadoPublico(supabase: AdminClient): Promise<EnrichmentResult> {
   const inicio = Date.now()
   let procesados = 0, nuevos = 0, actualizados = 0, errores = 0
 
@@ -51,7 +57,7 @@ async function sincronizarMercadoPublico(supabase: any): Promise<EnrichmentResul
 
     if (!response || !response.ok) {
       console.log('API MercadoPublico no disponible, usando datos locales almacenados')
-      return { procesados, nuevos, actualizados, errores, tiempo_segundos: 0 }
+      return { procesados, nuevos, actualizados, errores: 1, tiempo_segundos: 0 }
     }
 
     const data = await response.json()
@@ -67,12 +73,13 @@ async function sincronizarMercadoPublico(supabase: any): Promise<EnrichmentResul
         const rubro = clasificarRubro(proveedor.razon_social, proveedor.descripcion)
 
         // Buscar si ya existe
-        const { data: existente } = await supabase
+        const { data: existente, error: existeError } = await supabase
           .from('marketing_contactos')
           .select('id')
           .eq('email', email)
-          .single()
-          .catch(() => ({ data: null }))
+          .maybeSingle()
+
+        if (existeError) throw existeError
 
         if (existente) {
           // Actualizar con datos enriquecidos
@@ -88,6 +95,7 @@ async function sincronizarMercadoPublico(supabase: any): Promise<EnrichmentResul
               actualizado_en: new Date().toISOString()
             })
             .eq('id', existente.id)
+            .throwOnError()
           actualizados++
         } else {
           // Insertar nuevo
@@ -111,6 +119,7 @@ async function sincronizarMercadoPublico(supabase: any): Promise<EnrichmentResul
               consentimiento_marketing: true,
               consentimiento_fecha: new Date().toISOString()
             })
+            .throwOnError()
           nuevos++
         }
       } catch (e) {
@@ -133,17 +142,24 @@ async function sincronizarMercadoPublico(supabase: any): Promise<EnrichmentResul
 }
 
 // Validar y limpiar emails
-async function validarEmails(supabase: any): Promise<EnrichmentResult> {
+async function validarEmails(supabase: AdminClient, batchSize = BATCH_SIZE): Promise<EnrichmentResult> {
   const inicio = Date.now()
-  let procesados = 0, nuevos = 0, actualizados = 0, errores = 0
+  let procesados = 0, actualizados = 0, errores = 0
+  const nuevos = 0
 
   try {
     // Obtener contactos sin validar
-    const { data: contactos } = await supabase
+    const { data: contactos, error: fetchError } = await supabase
       .from('marketing_contactos')
-      .select('id, email, estado_email')
+      .select('id, email, estado_email, intentos_validacion')
       .or('email_validado.is.false,estado_email.is.null')
-      .limit(1000)
+      .order('id', { ascending: true })
+      .limit(batchSize)
+
+    if (fetchError) {
+      console.error('Error obteniendo emails pendientes:', fetchError)
+      return { procesados, nuevos, actualizados, errores: 1, tiempo_segundos: (Date.now() - inicio) / 1000 }
+    }
 
     if (!contactos) return { procesados, nuevos, actualizados, errores, tiempo_segundos: (Date.now() - inicio) / 1000 }
 
@@ -161,6 +177,7 @@ async function validarEmails(supabase: any): Promise<EnrichmentResult> {
             intentos_validacion: (contacto.intentos_validacion || 0) + 1
           })
           .eq('id', contacto.id)
+          .throwOnError()
 
         actualizados++
       } catch (e) {
@@ -170,6 +187,7 @@ async function validarEmails(supabase: any): Promise<EnrichmentResult> {
     }
   } catch (error) {
     console.error('Error en validación de emails:', error)
+    errores++
   }
 
   return {
@@ -177,23 +195,29 @@ async function validarEmails(supabase: any): Promise<EnrichmentResult> {
     nuevos,
     actualizados,
     errores,
-    tiempo_segundos: (Date.now() - inicio) / 1000
+    tiempo_segundos: (Date.now() - inicio) / 1000,
+    has_more: procesados === batchSize,
+    next_cursor: 0
   }
 }
 
 // Eliminar duplicados
-async function eliminarDuplicados(supabase: any): Promise<EnrichmentResult> {
+async function eliminarDuplicados(supabase: AdminClient): Promise<EnrichmentResult> {
   const inicio = Date.now()
-  let procesados = 0, nuevos = 0, actualizados = 0, errores = 0
+  let procesados = 0, actualizados = 0, errores = 0
+  const nuevos = 0
 
   try {
     // Ejecutar función PL/pgSQL de limpieza
-    const { data } = await supabase
+    const { data, error } = await supabase
       .rpc('limpiar_duplicados_contactos')
 
-    if (data) {
-      procesados = data.procesados
-      actualizados = data.eliminados
+    if (error) throw error
+
+    const result = Array.isArray(data) ? data[0] : data
+    if (result) {
+      procesados = Number(result.procesados) || 0
+      actualizados = Number(result.eliminados) || 0
     }
   } catch (error) {
     console.error('Error eliminando duplicados:', error)
@@ -210,7 +234,11 @@ async function eliminarDuplicados(supabase: any): Promise<EnrichmentResult> {
 }
 
 // Sincronizar proveedores del Estado (tabla proveedores local)
-async function sincronizarProveedoresEstado(supabase: any): Promise<EnrichmentResult> {
+async function sincronizarProveedoresEstado(
+  supabase: AdminClient,
+  cursor = 0,
+  batchSize = BATCH_SIZE,
+): Promise<EnrichmentResult> {
   const inicio = Date.now()
   let procesados = 0, nuevos = 0, actualizados = 0, errores = 0
 
@@ -220,6 +248,8 @@ async function sincronizarProveedoresEstado(supabase: any): Promise<EnrichmentRe
       .from('proveedores')
       .select('id, rut, nombre, razon_social, email, rubro, actividad_economica, tamanio_empresa')
       .not('email', 'is', null)
+      .order('id', { ascending: true })
+      .range(cursor, cursor + batchSize - 1)
 
     if (fetchError) {
       console.error('Error fetching proveedores:', fetchError)
@@ -245,12 +275,13 @@ async function sincronizarProveedoresEstado(supabase: any): Promise<EnrichmentRe
         const rubro = proveedor.rubro || clasificarRubro(proveedor.razon_social || proveedor.nombre, proveedor.actividad_economica)
 
         // Buscar si ya existe
-        const { data: existente } = await supabase
+        const { data: existente, error: existeError } = await supabase
           .from('marketing_contactos')
           .select('id')
           .eq('email', email)
-          .single()
-          .catch(() => ({ data: null }))
+          .maybeSingle()
+
+        if (existeError) throw existeError
 
         if (existente) {
           // Actualizar si no viene de proveedores_estado o con datos más recientes
@@ -269,6 +300,7 @@ async function sincronizarProveedoresEstado(supabase: any): Promise<EnrichmentRe
               actualizado_en: new Date().toISOString()
             })
             .eq('id', existente.id)
+            .throwOnError()
           actualizados++
         } else {
           // Insertar nuevo
@@ -295,6 +327,7 @@ async function sincronizarProveedoresEstado(supabase: any): Promise<EnrichmentRe
               consentimiento_marketing: false,
               consentimiento_fecha: null
             })
+            .throwOnError()
           nuevos++
         }
       } catch (e) {
@@ -312,24 +345,28 @@ async function sincronizarProveedoresEstado(supabase: any): Promise<EnrichmentRe
     nuevos,
     actualizados,
     errores,
-    tiempo_segundos: (Date.now() - inicio) / 1000
+    tiempo_segundos: (Date.now() - inicio) / 1000,
+    has_more: procesados === batchSize,
+    next_cursor: cursor + procesados
   }
 }
 
 // Sincronizar contactos de webinars (convenios marcos) - con paginación
-async function sincronizarWebinars(supabase: any): Promise<EnrichmentResult> {
+async function sincronizarWebinars(supabase: AdminClient, cursor = 0, batchSize = BATCH_SIZE): Promise<EnrichmentResult> {
   const inicio = Date.now()
   let procesados = 0, nuevos = 0, actualizados = 0, errores = 0
-  let desde = 0
-  const limit = 1000
+  let desde = cursor
+  const limit = batchSize
+  let hasMore = false
 
   try {
-    let hasMore = true
+    hasMore = true
     while (hasMore) {
       const { data: webinars, error: fetchError } = await supabase
         .from('webinar_inscripciones')
         .select('id, email, nombre, empresa')
         .not('email', 'is', null)
+        .order('id', { ascending: true })
         .range(desde, desde + limit - 1)
 
       if (fetchError) {
@@ -361,6 +398,7 @@ async function sincronizarWebinars(supabase: any): Promise<EnrichmentResult> {
             .eq('email', email)
             .single()
 
+          if (existeError && existeError.code !== 'PGRST116') throw existeError
           if (existente) {
             await supabase
               .from('marketing_contactos')
@@ -369,6 +407,7 @@ async function sincronizarWebinars(supabase: any): Promise<EnrichmentResult> {
                 actualizado_en: new Date().toISOString()
               })
               .eq('id', existente.id)
+              .throwOnError()
             actualizados++
           } else if (!existeError || existeError.code === 'PGRST116') {
             // PGRST116 = no row found (expected)
@@ -387,6 +426,7 @@ async function sincronizarWebinars(supabase: any): Promise<EnrichmentResult> {
                 consentimiento_marketing: true,
                 consentimiento_fecha: new Date().toISOString()
               })
+              .throwOnError()
             nuevos++
           }
         } catch (e) {
@@ -397,6 +437,7 @@ async function sincronizarWebinars(supabase: any): Promise<EnrichmentResult> {
 
       desde += limit
       hasMore = webinars.length === limit
+      break
     }
   } catch (error) {
     console.error('Error sincronizando webinars:', error)
@@ -408,24 +449,28 @@ async function sincronizarWebinars(supabase: any): Promise<EnrichmentResult> {
     nuevos,
     actualizados,
     errores,
-    tiempo_segundos: (Date.now() - inicio) / 1000
+    tiempo_segundos: (Date.now() - inicio) / 1000,
+    has_more: hasMore,
+    next_cursor: desde
   }
 }
 
 // Sincronizar suscriptores de YouTube - con paginación
-async function sincronizarYouTube(supabase: any): Promise<EnrichmentResult> {
+async function sincronizarYouTube(supabase: AdminClient, cursor = 0, batchSize = BATCH_SIZE): Promise<EnrichmentResult> {
   const inicio = Date.now()
   let procesados = 0, nuevos = 0, actualizados = 0, errores = 0
-  let desde = 0
-  const limit = 1000
+  let desde = cursor
+  const limit = batchSize
+  let hasMore = false
 
   try {
-    let hasMore = true
+    hasMore = true
     while (hasMore) {
       const { data: youtubers, error: fetchError } = await supabase
         .from('youtube_subscribers')
         .select('id, nombre, email')
         .not('email', 'is', null)
+        .order('id', { ascending: true })
         .range(desde, desde + limit - 1)
 
       if (fetchError) {
@@ -457,6 +502,7 @@ async function sincronizarYouTube(supabase: any): Promise<EnrichmentResult> {
             .eq('email', email)
             .single()
 
+          if (existeError && existeError.code !== 'PGRST116') throw existeError
           if (existente) {
             await supabase
               .from('marketing_contactos')
@@ -465,6 +511,7 @@ async function sincronizarYouTube(supabase: any): Promise<EnrichmentResult> {
                 actualizado_en: new Date().toISOString()
               })
               .eq('id', existente.id)
+              .throwOnError()
             actualizados++
           } else if (!existeError || existeError.code === 'PGRST116') {
             // PGRST116 = no row found (expected)
@@ -482,6 +529,7 @@ async function sincronizarYouTube(supabase: any): Promise<EnrichmentResult> {
                 consentimiento_marketing: false,
                 consentimiento_fecha: null
               })
+              .throwOnError()
             nuevos++
           }
         } catch (e) {
@@ -492,6 +540,7 @@ async function sincronizarYouTube(supabase: any): Promise<EnrichmentResult> {
 
       desde += limit
       hasMore = youtubers.length === limit
+      break
     }
   } catch (error) {
     console.error('Error sincronizando YouTube:', error)
@@ -503,25 +552,29 @@ async function sincronizarYouTube(supabase: any): Promise<EnrichmentResult> {
     nuevos,
     actualizados,
     errores,
-    tiempo_segundos: (Date.now() - inicio) / 1000
+    tiempo_segundos: (Date.now() - inicio) / 1000,
+    has_more: hasMore,
+    next_cursor: desde
   }
 }
 
 // Sincronizar clientes existentes - con paginación y columnas correctas
-async function sincronizarClientes(supabase: any): Promise<EnrichmentResult> {
+async function sincronizarClientes(supabase: AdminClient, cursor = 0, batchSize = BATCH_SIZE): Promise<EnrichmentResult> {
   const inicio = Date.now()
   let procesados = 0, nuevos = 0, actualizados = 0, errores = 0
-  let desde = 0
-  const limit = 1000
+  let desde = cursor
+  const limit = batchSize
+  let hasMore = false
 
   try {
-    let hasMore = true
+    hasMore = true
     while (hasMore) {
       // Columnas correctas: nombre_responsable, empresa_nombre, categoria_negocio
       const { data: clientes, error: fetchError } = await supabase
         .from('clientes')
         .select('id, nombre_responsable, email, empresa_nombre, categoria_negocio')
         .not('email', 'is', null)
+        .order('id', { ascending: true })
         .range(desde, desde + limit - 1)
 
       if (fetchError) {
@@ -555,6 +608,7 @@ async function sincronizarClientes(supabase: any): Promise<EnrichmentResult> {
             .eq('email', email)
             .single()
 
+          if (existeError && existeError.code !== 'PGRST116') throw existeError
           if (existente) {
             await supabase
               .from('marketing_contactos')
@@ -564,6 +618,7 @@ async function sincronizarClientes(supabase: any): Promise<EnrichmentResult> {
                 actualizado_en: new Date().toISOString()
               })
               .eq('id', existente.id)
+              .throwOnError()
             actualizados++
           } else if (!existeError || existeError.code === 'PGRST116') {
             // PGRST116 = no row found (expected)
@@ -583,6 +638,7 @@ async function sincronizarClientes(supabase: any): Promise<EnrichmentResult> {
                 consentimiento_marketing: true,
                 consentimiento_fecha: new Date().toISOString()
               })
+              .throwOnError()
             nuevos++
           }
         } catch (e) {
@@ -593,6 +649,7 @@ async function sincronizarClientes(supabase: any): Promise<EnrichmentResult> {
 
       desde += limit
       hasMore = clientes.length === limit
+      break
     }
   } catch (error) {
     console.error('Error sincronizando clientes:', error)
@@ -604,24 +661,28 @@ async function sincronizarClientes(supabase: any): Promise<EnrichmentResult> {
     nuevos,
     actualizados,
     errores,
-    tiempo_segundos: (Date.now() - inicio) / 1000
+    tiempo_segundos: (Date.now() - inicio) / 1000,
+    has_more: hasMore,
+    next_cursor: desde
   }
 }
 
 // Sincronizar webinar_invitacion (tabla separada de webinar_inscripciones) - con paginación
-async function sincronizarWebinarInvitacion(supabase: any): Promise<EnrichmentResult> {
+async function sincronizarWebinarInvitacion(supabase: AdminClient, cursor = 0, batchSize = BATCH_SIZE): Promise<EnrichmentResult> {
   const inicio = Date.now()
   let procesados = 0, nuevos = 0, actualizados = 0, errores = 0
-  let desde = 0
-  const limit = 1000
+  let desde = cursor
+  const limit = batchSize
+  let hasMore = false
 
   try {
-    let hasMore = true
+    hasMore = true
     while (hasMore) {
       const { data: registros, error: fetchError } = await supabase
         .from('webinar_invitacion')
         .select('id, email, nombre, empresa, campana')
         .not('email', 'is', null)
+        .order('id', { ascending: true })
         .range(desde, desde + limit - 1)
 
       if (fetchError) {
@@ -648,6 +709,7 @@ async function sincronizarWebinarInvitacion(supabase: any): Promise<EnrichmentRe
             .eq('email', email)
             .single()
 
+          if (existeError && existeError.code !== 'PGRST116') throw existeError
           if (existente) {
             await supabase
               .from('marketing_contactos')
@@ -656,6 +718,7 @@ async function sincronizarWebinarInvitacion(supabase: any): Promise<EnrichmentRe
                 actualizado_en: new Date().toISOString()
               })
               .eq('id', existente.id)
+              .throwOnError()
             actualizados++
           } else if (!existeError || existeError.code === 'PGRST116') {
             await supabase
@@ -674,6 +737,7 @@ async function sincronizarWebinarInvitacion(supabase: any): Promise<EnrichmentRe
                 consentimiento_fecha: null,
                 datos_enriquecimiento: { campana: registro.campana }
               })
+              .throwOnError()
             nuevos++
           }
         } catch (e) {
@@ -684,6 +748,7 @@ async function sincronizarWebinarInvitacion(supabase: any): Promise<EnrichmentRe
 
       desde += limit
       hasMore = registros.length === limit
+      break
     }
   } catch (error) {
     console.error('Error sincronizando webinar_invitacion:', error)
@@ -695,24 +760,28 @@ async function sincronizarWebinarInvitacion(supabase: any): Promise<EnrichmentRe
     nuevos,
     actualizados,
     errores,
-    tiempo_segundos: (Date.now() - inicio) / 1000
+    tiempo_segundos: (Date.now() - inicio) / 1000,
+    has_more: hasMore,
+    next_cursor: desde
   }
 }
 
 // Sincronizar profiles (usuarios del sistema) - con paginación
-async function sincronizarProfiles(supabase: any): Promise<EnrichmentResult> {
+async function sincronizarProfiles(supabase: AdminClient, cursor = 0, batchSize = BATCH_SIZE): Promise<EnrichmentResult> {
   const inicio = Date.now()
   let procesados = 0, nuevos = 0, actualizados = 0, errores = 0
-  let desde = 0
-  const limit = 1000
+  let desde = cursor
+  const limit = batchSize
+  let hasMore = false
 
   try {
-    let hasMore = true
+    hasMore = true
     while (hasMore) {
       const { data: profiles, error: fetchError } = await supabase
         .from('profiles')
         .select('id, email, full_name')
         .not('email', 'is', null)
+        .order('id', { ascending: true })
         .range(desde, desde + limit - 1)
 
       if (fetchError) {
@@ -739,6 +808,7 @@ async function sincronizarProfiles(supabase: any): Promise<EnrichmentResult> {
             .eq('email', email)
             .single()
 
+          if (existeError && existeError.code !== 'PGRST116') throw existeError
           if (existente) {
             await supabase
               .from('marketing_contactos')
@@ -747,6 +817,7 @@ async function sincronizarProfiles(supabase: any): Promise<EnrichmentResult> {
                 actualizado_en: new Date().toISOString()
               })
               .eq('id', existente.id)
+              .throwOnError()
             actualizados++
           } else if (!existeError || existeError.code === 'PGRST116') {
             await supabase
@@ -763,6 +834,7 @@ async function sincronizarProfiles(supabase: any): Promise<EnrichmentResult> {
                 consentimiento_marketing: false,
                 consentimiento_fecha: null
               })
+              .throwOnError()
             nuevos++
           }
         } catch (e) {
@@ -773,6 +845,7 @@ async function sincronizarProfiles(supabase: any): Promise<EnrichmentResult> {
 
       desde += limit
       hasMore = profiles.length === limit
+      break
     }
   } catch (error) {
     console.error('Error sincronizando profiles:', error)
@@ -784,24 +857,28 @@ async function sincronizarProfiles(supabase: any): Promise<EnrichmentResult> {
     nuevos,
     actualizados,
     errores,
-    tiempo_segundos: (Date.now() - inicio) / 1000
+    tiempo_segundos: (Date.now() - inicio) / 1000,
+    has_more: hasMore,
+    next_cursor: desde
   }
 }
 
 // Sincronizar vista_contacto_prospectos (view con prospectos validados) - con paginación
-async function sincronizarProspectos(supabase: any): Promise<EnrichmentResult> {
+async function sincronizarProspectos(supabase: AdminClient, cursor = 0, batchSize = BATCH_SIZE): Promise<EnrichmentResult> {
   const inicio = Date.now()
   let procesados = 0, nuevos = 0, actualizados = 0, errores = 0
-  let desde = 0
-  const limit = 1000
+  let desde = cursor
+  const limit = batchSize
+  let hasMore = false
 
   try {
-    let hasMore = true
+    hasMore = true
     while (hasMore) {
       const { data: prospectos, error: fetchError } = await supabase
         .from('vista_contacto_prospectos')
         .select('id, email, contacto, empresa, categorias, puntaje')
         .not('email', 'is', null)
+        .order('id', { ascending: true })
         .range(desde, desde + limit - 1)
 
       if (fetchError) {
@@ -830,6 +907,7 @@ async function sincronizarProspectos(supabase: any): Promise<EnrichmentResult> {
             .eq('email', email)
             .single()
 
+          if (existeError && existeError.code !== 'PGRST116') throw existeError
           if (existente) {
             await supabase
               .from('marketing_contactos')
@@ -839,6 +917,7 @@ async function sincronizarProspectos(supabase: any): Promise<EnrichmentResult> {
                 actualizado_en: new Date().toISOString()
               })
               .eq('id', existente.id)
+              .throwOnError()
             actualizados++
           } else if (!existeError || existeError.code === 'PGRST116') {
             await supabase
@@ -858,6 +937,7 @@ async function sincronizarProspectos(supabase: any): Promise<EnrichmentResult> {
                 consentimiento_fecha: null,
                 datos_enriquecimiento: { puntaje: prospecto.puntaje }
               })
+              .throwOnError()
             nuevos++
           }
         } catch (e) {
@@ -868,6 +948,7 @@ async function sincronizarProspectos(supabase: any): Promise<EnrichmentResult> {
 
       desde += limit
       hasMore = prospectos.length === limit
+      break
     }
   } catch (error) {
     console.error('Error sincronizando prospectos:', error)
@@ -879,24 +960,28 @@ async function sincronizarProspectos(supabase: any): Promise<EnrichmentResult> {
     nuevos,
     actualizados,
     errores,
-    tiempo_segundos: (Date.now() - inicio) / 1000
+    tiempo_segundos: (Date.now() - inicio) / 1000,
+    has_more: hasMore,
+    next_cursor: desde
   }
 }
 
 // Sincronizar academia_leads (leads de academias) - con paginación
-async function sincronizarAcademiaLeads(supabase: any): Promise<EnrichmentResult> {
+async function sincronizarAcademiaLeads(supabase: AdminClient, cursor = 0, batchSize = BATCH_SIZE): Promise<EnrichmentResult> {
   const inicio = Date.now()
   let procesados = 0, nuevos = 0, actualizados = 0, errores = 0
-  let desde = 0
-  const limit = 1000
+  let desde = cursor
+  const limit = batchSize
+  let hasMore = false
 
   try {
-    let hasMore = true
+    hasMore = true
     while (hasMore) {
       const { data: leads, error: fetchError } = await supabase
         .from('academia_leads')
         .select('id, email, nombre_contacto, nombre_empresa')
         .not('email', 'is', null)
+        .order('id', { ascending: true })
         .range(desde, desde + limit - 1)
 
       if (fetchError) {
@@ -923,6 +1008,7 @@ async function sincronizarAcademiaLeads(supabase: any): Promise<EnrichmentResult
             .eq('email', email)
             .single()
 
+          if (existeError && existeError.code !== 'PGRST116') throw existeError
           if (existente) {
             await supabase
               .from('marketing_contactos')
@@ -931,6 +1017,7 @@ async function sincronizarAcademiaLeads(supabase: any): Promise<EnrichmentResult
                 actualizado_en: new Date().toISOString()
               })
               .eq('id', existente.id)
+              .throwOnError()
             actualizados++
           } else if (!existeError || existeError.code === 'PGRST116') {
             await supabase
@@ -948,6 +1035,7 @@ async function sincronizarAcademiaLeads(supabase: any): Promise<EnrichmentResult
                 consentimiento_marketing: false,
                 consentimiento_fecha: null
               })
+              .throwOnError()
             nuevos++
           }
         } catch (e) {
@@ -958,6 +1046,7 @@ async function sincronizarAcademiaLeads(supabase: any): Promise<EnrichmentResult
 
       desde += limit
       hasMore = leads.length === limit
+      break
     }
   } catch (error) {
     console.error('Error sincronizando academia_leads:', error)
@@ -969,24 +1058,28 @@ async function sincronizarAcademiaLeads(supabase: any): Promise<EnrichmentResult
     nuevos,
     actualizados,
     errores,
-    tiempo_segundos: (Date.now() - inicio) / 1000
+    tiempo_segundos: (Date.now() - inicio) / 1000,
+    has_more: hasMore,
+    next_cursor: desde
   }
 }
 
 // Sincronizar agendamientos_meet (leads con agendamientos) - con paginación
-async function sincronizarAgendamientos(supabase: any): Promise<EnrichmentResult> {
+async function sincronizarAgendamientos(supabase: AdminClient, cursor = 0, batchSize = BATCH_SIZE): Promise<EnrichmentResult> {
   const inicio = Date.now()
   let procesados = 0, nuevos = 0, actualizados = 0, errores = 0
-  let desde = 0
-  const limit = 1000
+  let desde = cursor
+  const limit = batchSize
+  let hasMore = false
 
   try {
-    let hasMore = true
+    hasMore = true
     while (hasMore) {
       const { data: agendamientos, error: fetchError } = await supabase
         .from('agendamientos_meet')
         .select('id, email, nombre, empresa')
         .not('email', 'is', null)
+        .order('id', { ascending: true })
         .range(desde, desde + limit - 1)
 
       if (fetchError) {
@@ -1013,6 +1106,7 @@ async function sincronizarAgendamientos(supabase: any): Promise<EnrichmentResult
             .eq('email', email)
             .single()
 
+          if (existeError && existeError.code !== 'PGRST116') throw existeError
           if (existente) {
             await supabase
               .from('marketing_contactos')
@@ -1021,6 +1115,7 @@ async function sincronizarAgendamientos(supabase: any): Promise<EnrichmentResult
                 actualizado_en: new Date().toISOString()
               })
               .eq('id', existente.id)
+              .throwOnError()
             actualizados++
           } else if (!existeError || existeError.code === 'PGRST116') {
             await supabase
@@ -1038,6 +1133,7 @@ async function sincronizarAgendamientos(supabase: any): Promise<EnrichmentResult
                 consentimiento_marketing: false,
                 consentimiento_fecha: null
               })
+              .throwOnError()
             nuevos++
           }
         } catch (e) {
@@ -1048,6 +1144,7 @@ async function sincronizarAgendamientos(supabase: any): Promise<EnrichmentResult
 
       desde += limit
       hasMore = agendamientos.length === limit
+      break
     }
   } catch (error) {
     console.error('Error sincronizando agendamientos:', error)
@@ -1059,108 +1156,179 @@ async function sincronizarAgendamientos(supabase: any): Promise<EnrichmentResult
     nuevos,
     actualizados,
     errores,
-    tiempo_segundos: (Date.now() - inicio) / 1000
+    tiempo_segundos: (Date.now() - inicio) / 1000,
+    has_more: hasMore,
+    next_cursor: desde
+  }
+}
+
+type EnrichmentAction = 'enqueue' | 'worker'
+
+interface ClaimedJob {
+  job_id: string
+  run_id: string
+  source: string
+  cursor_value: number
+  attempt: number
+  max_attempts: number
+}
+
+function jsonResponse(body: unknown, status = 200, extraHeaders: Record<string, string> = {}) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, ...extraHeaders, 'Content-Type': 'application/json' },
+  })
+}
+
+async function authorizeCaller(
+  admin: AdminClient,
+  token: string,
+  serviceRoleKey: string,
+) {
+  if (token === serviceRoleKey) return { serviceRole: true, userId: null }
+
+  const { data: { user }, error } = await admin.auth.getUser(token)
+  if (error || !user) return null
+
+  if (
+    user.email?.toLowerCase() === 'evaras@firmavb.cl' &&
+    Boolean(user.email_confirmed_at)
+  ) {
+    return { serviceRole: false, userId: user.id }
+  }
+
+  return null
+}
+
+function processSourceBatch(
+  admin: AdminClient,
+  source: string,
+  cursor: number,
+): Promise<EnrichmentResult> {
+  switch (source) {
+    case 'mercadopublico': return sincronizarMercadoPublico(admin)
+    case 'proveedores_estado': return sincronizarProveedoresEstado(admin, cursor)
+    case 'webinars': return sincronizarWebinars(admin, cursor)
+    case 'youtube': return sincronizarYouTube(admin, cursor)
+    case 'clientes': return sincronizarClientes(admin, cursor)
+    case 'webinar_invitacion': return sincronizarWebinarInvitacion(admin, cursor)
+    case 'profiles': return sincronizarProfiles(admin, cursor)
+    case 'prospectos': return sincronizarProspectos(admin, cursor)
+    case 'academia_leads': return sincronizarAcademiaLeads(admin, cursor)
+    case 'agendamientos': return sincronizarAgendamientos(admin, cursor)
+    case 'validacion': return validarEmails(admin)
+    case 'duplicados': return eliminarDuplicados(admin)
+    default: throw new Error('unknown_enrichment_source')
   }
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
-
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Allow': 'POST' }
-    })
+    return jsonResponse({ error: 'Method not allowed' }, 405, { Allow: 'POST' })
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '').trim()
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    if (!supabaseUrl || !serviceRoleKey) return jsonResponse({ error: 'Service unavailable' }, 503)
 
-    // Proceso administrativo: solo una llamada interna con la clave exacta de servicio.
-    // Un JWT público/anónimo válido no debe poder iniciar este trabajo costoso.
-    if (!supabaseKey || token !== supabaseKey) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+    const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '').trim()
+    if (!token) return jsonResponse({ error: 'Unauthorized' }, 401)
+
+    const admin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
+    const caller = await authorizeCaller(admin, token, serviceRoleKey)
+    if (!caller) return jsonResponse({ error: 'Forbidden' }, 403)
+
+    const rawBody = await req.text()
+    if (new TextEncoder().encode(rawBody).byteLength > 10_000) {
+      return jsonResponse({ error: 'Request too large' }, 413)
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    let action: EnrichmentAction = 'enqueue'
+    if (rawBody.trim()) {
+      try {
+        const parsed = JSON.parse(rawBody) as { action?: unknown }
+        if (parsed.action === 'enqueue' || parsed.action === 'worker') action = parsed.action
+        else if (parsed.action !== undefined) return jsonResponse({ error: 'Invalid action' }, 400)
+      } catch {
+        return jsonResponse({ error: 'Invalid JSON' }, 400)
+      }
+    }
 
-    console.log('Iniciando enriquecimiento de contactos...')
-
-    // Ejecutar todas las operaciones en paralelo
-    const [resultMercado, resultProveedores, resultWebinars, resultYouTube, resultClientes, resultWebinarInvitacion, resultProfiles, resultProspectos, resultAcademia, resultAgendamientos, resultValidacion, resultDuplicados] = await Promise.all([
-      sincronizarMercadoPublico(supabase),
-      sincronizarProveedoresEstado(supabase),
-      sincronizarWebinars(supabase),
-      sincronizarYouTube(supabase),
-      sincronizarClientes(supabase),
-      sincronizarWebinarInvitacion(supabase),
-      sincronizarProfiles(supabase),
-      sincronizarProspectos(supabase),
-      sincronizarAcademiaLeads(supabase),
-      sincronizarAgendamientos(supabase),
-      validarEmails(supabase),
-      eliminarDuplicados(supabase)
-    ])
-
-    // Registrar en log
-    await supabase
-      .from('contact_enrichment_logs')
-      .insert({
-        proceso: 'enriquecimiento_completo',
-        registros_procesados: resultMercado.procesados + resultProveedores.procesados + resultWebinars.procesados + resultYouTube.procesados + resultClientes.procesados + resultWebinarInvitacion.procesados + resultProfiles.procesados + resultProspectos.procesados + resultAcademia.procesados + resultAgendamientos.procesados + resultValidacion.procesados + resultDuplicados.procesados,
-        registros_nuevos: resultMercado.nuevos + resultProveedores.nuevos + resultWebinars.nuevos + resultYouTube.nuevos + resultClientes.nuevos + resultWebinarInvitacion.nuevos + resultProfiles.nuevos + resultProspectos.nuevos + resultAcademia.nuevos + resultAgendamientos.nuevos + resultValidacion.nuevos,
-        registros_actualizados: resultMercado.actualizados + resultProveedores.actualizados + resultWebinars.actualizados + resultYouTube.actualizados + resultClientes.actualizados + resultWebinarInvitacion.actualizados + resultProfiles.actualizados + resultProspectos.actualizados + resultAcademia.actualizados + resultAgendamientos.actualizados + resultValidacion.actualizados + resultDuplicados.actualizados,
-        errores: resultMercado.errores + resultProveedores.errores + resultWebinars.errores + resultYouTube.errores + resultClientes.errores + resultWebinarInvitacion.errores + resultProfiles.errores + resultProspectos.errores + resultAcademia.errores + resultAgendamientos.errores + resultValidacion.errores + resultDuplicados.errores,
-        estado: 'completado',
-        fecha_fin: new Date().toISOString(),
-        metadata: {
-          mercadopublico: resultMercado,
-          proveedores_estado: resultProveedores,
-          webinars: resultWebinars,
-          youtube: resultYouTube,
-          clientes: resultClientes,
-          webinar_invitacion: resultWebinarInvitacion,
-          profiles: resultProfiles,
-          prospectos: resultProspectos,
-          academia_leads: resultAcademia,
-          agendamientos: resultAgendamientos,
-          validacion: resultValidacion,
-          duplicados: resultDuplicados
-        }
+    if (action === 'enqueue') {
+      const { data, error } = await admin.rpc('contact_enrichment_enqueue', {
+        p_trigger_source: caller.serviceRole ? 'cron' : 'manual',
+        p_requested_by: caller.userId,
       })
+      if (error) {
+        console.error('No se pudo encolar el enriquecimiento:', error.code)
+        return jsonResponse({ error: 'Queue unavailable' }, 503)
+      }
+      return jsonResponse({ accepted: true, ...data }, 202)
+    }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        resultados: {
-          mercadopublico: resultMercado,
-          proveedores_estado: resultProveedores,
-          webinars: resultWebinars,
-          youtube: resultYouTube,
-          clientes: resultClientes,
-          webinar_invitacion: resultWebinarInvitacion,
-          profiles: resultProfiles,
-          prospectos: resultProspectos,
-          academia_leads: resultAcademia,
-          agendamientos: resultAgendamientos,
-          validacion: resultValidacion,
-          duplicados: resultDuplicados
-        }
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    if (!caller.serviceRole) return jsonResponse({ error: 'Forbidden' }, 403)
+
+    const { data: claimed, error: claimError } = await admin
+      .rpc('contact_enrichment_claim_job')
+      .maybeSingle()
+    if (claimError) {
+      console.error('No se pudo reclamar un lote:', claimError.code)
+      return jsonResponse({ error: 'Worker unavailable' }, 503)
+    }
+    if (!claimed) return jsonResponse({ accepted: true, work: 'none' })
+
+    const job = claimed as ClaimedJob
+    try {
+      const result = await processSourceBatch(admin, job.source, job.cursor_value)
+      if (result.errores > 0 && result.nuevos + result.actualizados === 0) {
+        throw new Error(`${job.source}_batch_failed`)
+      }
+      if (
+        result.has_more === true &&
+        result.procesados > 0 &&
+        result.nuevos + result.actualizados === 0 &&
+        (result.next_cursor ?? job.cursor_value) <= job.cursor_value
+      ) {
+        throw new Error(`${job.source}_batch_without_progress`)
+      }
+
+      const { error: finishError } = await admin.rpc('contact_enrichment_finish_job', {
+        p_job_id: job.job_id,
+        p_has_more: result.has_more === true,
+        p_next_cursor: result.next_cursor ?? job.cursor_value,
+        p_processed: result.procesados,
+        p_new: result.nuevos,
+        p_updated: result.actualizados,
+        p_errors: result.errores,
+      })
+      if (finishError) throw new Error('finish_job_failed')
+
+      return jsonResponse({
+        accepted: true,
+        job_id: job.job_id,
+        source: job.source,
+        has_more: result.has_more === true,
+        result,
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'batch_failed'
+      const { data: retry, error: retryError } = await admin.rpc('contact_enrichment_fail_job', {
+        p_job_id: job.job_id,
+        p_error: message,
+      })
+      if (retryError) {
+        console.error('No se pudo persistir el fallo del lote:', retryError.code)
+        return jsonResponse({ error: 'Batch state unavailable' }, 503)
+      }
+      // HTTP 200 significa que el resultado (incluido el fallo) quedo durable.
+      return jsonResponse({ accepted: true, job_id: job.job_id, source: job.source, retry })
+    }
   } catch (error) {
-    console.error('Error:', error)
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    console.error('Error no controlado en contact-enrichment:', error)
+    return jsonResponse({ error: 'Internal server error' }, 500)
   }
 })
