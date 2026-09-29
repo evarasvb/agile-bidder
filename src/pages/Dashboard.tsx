@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { montoCorto } from "@/lib/formatoMonto";
 import {
   Target,
   DollarSign,
@@ -73,11 +74,7 @@ const formatCurrency = (value: number) =>
     maximumFractionDigits: 0,
   }).format(value);
 
-const formatCompact = (value: number) => {
-  if (value >= 1000000000) return `$${(value / 1000000000).toFixed(1)}B`;
-  if (value >= 1000000) return `$${(value / 1000000).toFixed(0)}M`;
-  return formatCurrency(value);
-};
+const formatCompact = (value: number) => montoCorto(value);
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -228,10 +225,10 @@ export default function Dashboard() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-heading font-semibold flex items-center gap-2">
                 <BarChart3 className="h-4 w-4 text-firmavb-blue" />
-                Pipeline por Etapa
+                El mercado hoy, por estado
               </CardTitle>
               <p className="text-xs text-muted-foreground">
-                Cuántas oportunidades tienes en cada estado del proceso.
+                Licitaciones y compras de Mercado Público según su estado. Tus postulaciones están en el Resumen de arriba.
               </p>
             </CardHeader>
             <CardContent>

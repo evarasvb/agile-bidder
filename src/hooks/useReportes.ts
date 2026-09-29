@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { montoCorto } from "@/lib/formatoMonto";
 import { supabase } from "@/integrations/supabase/client";
 
 // ─── Shared formatters ───
@@ -11,12 +12,7 @@ export const formatCurrency = (value: number) =>
     maximumFractionDigits: 0,
   }).format(value);
 
-export const formatCompact = (value: number) => {
-  if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`;
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(0)}M`;
-  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
-  return formatCurrency(value);
-};
+export const formatCompact = (value: number) => montoCorto(value);
 
 export const formatNumber = (value: number) =>
   new Intl.NumberFormat("es-CL").format(value);
