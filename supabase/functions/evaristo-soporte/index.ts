@@ -46,9 +46,9 @@ MATCH: el % indica qué tan bien calza una oportunidad con su inventario. Se cor
 
 BASES: el robot baja las bases que Mercado Público entrega sin captcha; las de la sección con captcha se suben solas si tiene la extensión, o a mano con "Subir bases (PDF)". Una vez leídas, el Libro del Experto las usa.
 
-PLANES: gratis (oportunidades con límites, 3 preguntas al Experto al mes) y Pro (todo ilimitado). Para pagos o planes, deriva al WhatsApp humano https://wa.me/56994259157.
+PLANES: gratis (oportunidades con límites, 3 preguntas al Experto al mes) y Pro (todo ilimitado). Para pagos o planes, deriva al WhatsApp humano https://wa.me/56990996055.
 
-CANALIZAR AL EQUIPO: cuando no puedas resolver algo, o el usuario quiera dejar un caso, invítalo a tocar el botón "¿Prefieres que te contacte el equipo?" que está ABAJO en este chat: registra el caso con número de ticket y el equipo responde a su correo. NO digas que ya lo enviaste tú. Urgencias o hablar con una persona: WhatsApp https://wa.me/56994259157 (+56 9 9425 9157); correo contacto@firmavb.cl.
+CANALIZAR AL EQUIPO: cuando no puedas resolver algo, o el usuario quiera dejar un caso, invítalo a tocar el botón "¿Prefieres que te contacte el equipo?" que está ABAJO en este chat: registra el caso con número de ticket y el equipo responde a su correo. NO digas que ya lo enviaste tú. Urgencias o hablar con una persona: WhatsApp https://wa.me/56990996055 (+56 9 9099 6055); correo contacto@firmavb.cl.
 EXCEPCIÓN — REPORTE DE ERROR TÉCNICO (algo no funciona, no carga, no redirige, se cae, manda un print de un error): si el usuario tiene sesión, el sistema deja el caso registrado automáticamente al tiro (sin que toque ningún botón) y eso se te avisa aparte en la propia respuesta. En ese caso NO le pidas que toque el botón: solo reconoce el problema, dale tu mejor hipótesis o paso para probar, y sigue con tu día. No prometas tú mismo un número de ticket ni digas "ya quedó registrado": eso lo agrega el sistema si corresponde.
 
 ACCIONES QUE PUEDES EJECUTAR (no solo aconsejas: también haces). Tienes herramientas para dejar acciones en cola; la extensión de Chrome del cliente las ejecuta en SU navegador, con SU sesión de Mercado Público, en el próximo minuto. Solo funcionan si la extensión está conectada (lo dice el contexto: "Extensión lista para ejecutar acciones"). Si no está conectada, no llames la herramienta: guíalo a instalarla y conectarla.
@@ -198,7 +198,7 @@ serve(async (req) => {
         const desde = new Date(Date.now() - 864e5).toISOString();
         const { count } = await sbUser.from("evaristo_mensajes").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("rol", "user").gte("creado_en", desde);
         if ((count ?? 0) >= MAX_MENSAJES_DIA) {
-          return json({ reply: "Hoy ya conversamos harto 😅. Mañana seguimos; si es urgente, escríbeme por WhatsApp https://wa.me/56994259157.", error: "tope_diario" });
+          return json({ reply: "Hoy ya conversamos harto 😅. Mañana seguimos; si es urgente, escríbeme por WhatsApp https://wa.me/56990996055.", error: "tope_diario" });
         }
       }
     }
@@ -413,7 +413,7 @@ serve(async (req) => {
     }
 
     if (!reply) {
-      let fallback = "Uf, tuve un problemita para responderte 🙈. Reintenta en un ratito, o escríbeme por WhatsApp +56 9 9425 9157 / contacto@firmavb.cl.";
+      let fallback = "Uf, tuve un problemita para responderte 🙈. Reintenta en un ratito, o escríbeme por WhatsApp +56 9 9099 6055 / contacto@firmavb.cl.";
       if (ticket?.numero) fallback += `\n\n✅ Aun así, ya dejé tu problema registrado como caso **#${ticket.numero}**; el equipo técnico te va a responder a **${identidad?.email ?? userEmail}**.`;
       return json({ reply: fallback, ticket, error: diag || "sin_respuesta" });
     }

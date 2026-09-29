@@ -25,6 +25,7 @@ const conCitas = (html: string, fuentes?: any[]) => html.replace(/\[(\d{1,2})\]/
 });
 
 const TIPOS_DOCUMENTO = [
+  { value: 'defensa_tcp', label: 'Defensa ante el Tribunal de Contratación Pública (adjudicatario)' },
   { value: 'apelacion', label: 'Recurso / reclamo por una licitación o compra ágil' },
   { value: 'reclamo_contraloria', label: 'Reclamo ante la Contraloría' },
   { value: 'cobro_intereses_mora', label: 'Nota de débito / cobro de intereses por mora' },
@@ -65,6 +66,9 @@ export default function Abogado() {
 
   // Documentos de respaldo (contratos, notificaciones, reclamos previos)
   const [documentos, setDocumentos] = useState<{ id: string; nombre: string; tipo: string }[]>([]);
+  // Documentos generales (subidos sin ligarlos a un caso). Se muestran siempre, para que un
+  // documento no "desaparezca" cuando el ID del caso no calza con el que se escribió al subirlo.
+  const [documentosGenerales, setDocumentosGenerales] = useState<{ id: string; nombre: string; tipo: string }[]>([]);
   const [subiendo, setSubiendo] = useState(false);
 
   async function pedir(body: Record<string, unknown>, onTexto: (t: string, meta?: any) => void) {
@@ -103,6 +107,7 @@ export default function Abogado() {
   };
 
   const esMora = tipoDoc === 'cobro_intereses_mora';
+  const esDefensa = tipoDoc === 'defensa_tcp';
   const faltanDatosMora = esMora && (!montoAdeudado || Number(montoAdeudado) <= 0 || !fechaVencimiento || (!sigueImpago && !fechaPago));
   const puedeGenerar = esMora ? !faltanDatosMora : !!hechos.trim();
 
@@ -161,11 +166,18 @@ export default function Abogado() {
   const listarDocumentos = async () => {
     const codigoAlPedir = codigo;
     try {
-      const qs = codigoAlPedir ? `?codigo=${encodeURIComponent(codigoAlPedir)}` : '';
-      const r = await fetch(`${SUPA}/functions/v1/experto-documentos${qs}`, { headers: auth });
-      const j = await r.json().catch(() => ({}));
+      // Siempre traemos los documentos generales (sin caso). Si hay un código, además
+      // traemos los de ese caso. Así un documento subido "sin código" (o bajo otro ID) no
+      // queda escondido cuando el usuario está mirando un caso puntual.
+      const [rGen, rCaso] = await Promise.all([
+        fetch(`${SUPA}/functions/v1/experto-documentos`, { headers: auth }),
+        codigoAlPedir ? fetch(`${SUPA}/functions/v1/experto-documentos?codigo=${encodeURIComponent(codigoAlPedir)}`, { headers: auth }) : Promise.resolve(null),
+      ]);
+      const jGen = await rGen.json().catch(() => ({}));
+      const jCaso = rCaso ? await rCaso.json().catch(() => ({})) : { documentos: [] };
       if (codigoAlPedir !== codigoRef.current) return;
-      setDocumentos(j.documentos ?? []);
+      setDocumentosGenerales(jGen.documentos ?? []);
+      setDocumentos(codigoAlPedir ? (jCaso.documentos ?? []) : []);
     } catch { /* silencioso */ }
   };
 
@@ -198,6 +210,7 @@ export default function Abogado() {
     try {
       await fetch(`${SUPA}/functions/v1/experto-documentos?id=${id}`, { method: 'DELETE', headers: auth });
       setDocumentos((d) => d.filter((x) => x.id !== id));
+      setDocumentosGenerales((d) => d.filter((x) => x.id !== id));
     } catch { toast.error('No pude borrar el documento'); }
   };
 
@@ -263,10 +276,15 @@ export default function Abogado() {
                   </SelectContent>
                 </Select>
               </div>
+              {esDefensa && (
+                <div className="rounded-md border border-blue-300 bg-blue-50 p-3 text-sm text-blue-900">
+                  Sube en <strong>"Mis documentos"</strong> las resoluciones y oficios del caso (adjudicación, invalidación, oficio de Contraloría, respuestas del foro) y pon el <strong>ID de la licitación</strong> para que Don Evaristo arme la defensa con las fechas y números reales. El escrito queda como borrador para que lo revise y firme tu abogado.
+                </div>
+              )}
               <div className="grid sm:grid-cols-2 gap-3">
                 <div>
-                  <Label>Destinatario / institución</Label>
-                  <Input value={destinatario} onChange={(e) => setDestinatario(e.target.value)} placeholder="Ej: Municipalidad de Puerto Montt" />
+                  <Label>{esDefensa ? 'Tribunal / destinatario' : 'Destinatario / institución'}</Label>
+                  <Input value={destinatario} onChange={(e) => setDestinatario(e.target.value)} placeholder={esDefensa ? 'Ilustre Tribunal de Contratación Pública' : 'Ej: Municipalidad de Puerto Montt'} />
                 </div>
                 <div>
                   <Label>ID de licitación o compra (opcional)</Label>
@@ -300,7 +318,7 @@ export default function Abogado() {
               <div>
                 <Label>{esMora ? 'Detalles adicionales (opcional)' : 'Hechos — cuéntame qué pasó'}</Label>
                 <Textarea value={hechos} onChange={(e) => setHechos(e.target.value)} rows={esMora ? 2 : 5}
-                  placeholder={esMora ? 'Algo más que deba saber (ej: número de OC, contacto del organismo)' : 'Ej: Postulé a la licitación X, me declararon inadmisible el 12 de marzo por...'} />
+                  placeholder={esMora ? 'Algo más que deba saber (ej: número de OC, contacto del organismo)' : esDefensa ? 'Ej: Soy el adjudicatario. Un competidor impugnó la adjudicación alegando... Ya subí las resoluciones del caso.' : 'Ej: Postulé a la licitación X, me declararon inadmisible el 12 de marzo por...'} />
               </div>
               <div>
                 <Label>Qué quieres pedir (opcional)</Label>
@@ -387,14 +405,46 @@ export default function Abogado() {
                 <input type="file" className="hidden" multiple disabled={subiendo}
                   onChange={(e) => e.target.files && subirDocumento(e.target.files)} />
               </label>
-              <div className="space-y-2">
-                {documentos.map((d) => (
-                  <div key={d.id} className="flex items-center justify-between rounded-md border p-2 text-sm">
-                    <span className="flex items-center gap-2"><Paperclip className="h-3.5 w-3.5" />{d.nombre}</span>
-                    <Button size="icon" variant="ghost" onClick={() => borrarDocumento(d.id)}><Trash2 className="h-4 w-4" /></Button>
+              <div className="space-y-3">
+                {codigo ? (
+                  <>
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">Documentos de este caso ({codigo.toUpperCase()})</p>
+                      {documentos.length === 0 && (
+                        <p className="rounded-md border border-yellow-300 bg-yellow-50 p-2 text-xs text-yellow-900">
+                          No hay documentos ligados a {codigo.toUpperCase()}. Revisa que el ID esté bien escrito; si lo subiste sin ID, aparece más abajo en "Documentos generales".
+                        </p>
+                      )}
+                      {documentos.map((d) => (
+                        <div key={d.id} className="flex items-center justify-between rounded-md border p-2 text-sm">
+                          <span className="flex items-center gap-2"><Paperclip className="h-3.5 w-3.5" />{d.nombre}</span>
+                          <Button size="icon" variant="ghost" onClick={() => borrarDocumento(d.id)}><Trash2 className="h-4 w-4" /></Button>
+                        </div>
+                      ))}
+                    </div>
+                    {documentosGenerales.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground">Documentos generales (sin caso)</p>
+                        {documentosGenerales.map((d) => (
+                          <div key={d.id} className="flex items-center justify-between rounded-md border p-2 text-sm">
+                            <span className="flex items-center gap-2"><Paperclip className="h-3.5 w-3.5" />{d.nombre}</span>
+                            <Button size="icon" variant="ghost" onClick={() => borrarDocumento(d.id)}><Trash2 className="h-4 w-4" /></Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    {documentosGenerales.map((d) => (
+                      <div key={d.id} className="flex items-center justify-between rounded-md border p-2 text-sm">
+                        <span className="flex items-center gap-2"><Paperclip className="h-3.5 w-3.5" />{d.nombre}</span>
+                        <Button size="icon" variant="ghost" onClick={() => borrarDocumento(d.id)}><Trash2 className="h-4 w-4" /></Button>
+                      </div>
+                    ))}
+                    {documentosGenerales.length === 0 && <p className="text-sm text-muted-foreground">Aún no subes documentos.</p>}
                   </div>
-                ))}
-                {documentos.length === 0 && <p className="text-sm text-muted-foreground">Aún no subes documentos.</p>}
+                )}
               </div>
             </CardContent>
           </Card>

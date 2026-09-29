@@ -66,6 +66,23 @@ function gapFillTasas(calculo: any, monto: number, tasasManual: Record<string, n
 const NOTA_DEBITO_INSTR = `INSTRUCCIÓN OBLIGATORIA sobre la nota de débito: la carta anterior es el documento que se envía al DEUDOR y va lista para descargar en PDF. Los intereses moratorios y la comisión de cobranza NO se cargan en esa carta: se cobran emitiendo una NOTA DE DÉBITO EXENTA (documento tributario exento de IVA) referida a la factura original. Por eso, DESPUÉS de la firma del documento, agrega un bloque separado por una línea de guiones "----------------------------------------" y titulado exactamente "NOTA INTERNA PARA EL PROVEEDOR — NO ENVIAR AL DEUDOR", con este texto para el acreedor: "Para cobrar formalmente los intereses por mora y la comisión de recuperación de costos, debes emitir una NOTA DE DÉBITO EXENTA en tu propio sistema de facturación electrónica del SII, referenciándola a la factura N° [número] que se está cobrando. FirmaVB todavía no tiene integración con el SII, así que este documento tributario lo generas tú directamente en tu portal de facturación (SII o tu proveedor de boleta/factura electrónica). Emítela por el monto de los intereses y la comisión legal antes de exigir su pago, y adjúntala o menciónala al enviar esta carta." No cuentes los detalles de esta nota interna dentro del cuerpo de la carta dirigida al deudor.`;
 
 const TIPOS_DOC: Record<string, { titulo: string; guia: string }> = {
+  defensa_tcp: {
+    titulo: "Defensa / téngase presente ante el Tribunal de Contratación Pública (como adjudicatario o tercero con interés)",
+    guia: `Es un ESCRITO JUDICIAL que presenta el ADJUDICATARIO (o un tercero con interés actual y directo) ante el Tribunal de Contratación Pública para defender una adjudicación que un tercero impugna, o para hacerse parte del proceso. Redáctalo como un escrito de tribunal chileno, con SUMA y otrosíes.
+Estructura obligatoria:
+- SUMA (encabezado): "EN LO PRINCIPAL:" el objeto (se tenga presente / contesta y solicita el rechazo de la impugnación); y los otrosíes ("PRIMER OTROSÍ:" alega incompetencia y extemporaneidad, cuando aplique; "SEGUNDO OTROSÍ:" acompaña documentos; "TERCER OTROSÍ:" patrocinio y poder).
+- "ILUSTRE TRIBUNAL DE CONTRATACIÓN PÚBLICA".
+- Comparecencia: nombre del representante legal, cédula de identidad, en representación de la empresa (razón social y RUT del proveedor entregados), domicilio, en los autos Rol N°[completar: rol], sobre impugnación de la licitación (ID y nombre); indicando su calidad de adjudicataria o tercero con interés actual y directo, y que viene en hacerse parte y solicitar el rechazo total de la impugnación, con costas.
+- I. ANTECEDENTES DE HECHO: la cronología del proceso EXTRAÍDA DE LOS DOCUMENTOS DEL USUARIO (resoluciones exentas, órdenes de compra, oficios de Contraloría, respuestas del foro de consultas). Cita cada resolución u oficio por su número y fecha tal como aparecen en los documentos; no inventes números ni fechas.
+- II. DEFENSA DE FORMA (solo cuando el acto atacado es posterior a la adjudicación o el plazo está vencido): incompetencia y/o extemporaneidad. Conforme al artículo 24 de la Ley 19.886 la impugnación ante el TCP procede contra actos u omisiones ocurridos entre la aprobación de las bases y la adjudicación, ambas inclusive, y dentro del plazo fatal de 10 días hábiles.
+- III. DEFENSA DE FONDO: la adjudicación se ajusta a derecho. Fundamenta con lo que respalden los documentos y las FUENTES: Ley 19.886 (art. 10 inc. 3, las bases, sus aclaraciones y la oferta del adjudicatario integran el marco jurídico del contrato), las respuestas del foro de consultas que integran las bases, el Reglamento (Decreto 661/2024), el artículo 53 de la Ley 19.880 (límite a la potestad invalidatoria por situaciones jurídicas consolidadas de terceros de buena fe) y los dictámenes u oficios de Contraloría que consten en los documentos del usuario. Usa SOLO argumentos respaldados por los hechos, documentos y fuentes entregados.
+- IV. PETICIONES ("POR TANTO" / "RUEGO A US. ILUSTRÍSIMO"): tener por evacuada la defensa, rechazar la impugnación en todas sus partes, declarar que la adjudicación se ajusta a derecho y se mantiene plenamente vigente, con expresa condena en costas.
+- OTROSÍES: PRIMER OTROSÍ (alega incompetencia y extemporaneidad, si aplica); SEGUNDO OTROSÍ (acompaña, con citación, los documentos —enumera los que consten en los documentos del usuario—); TERCER OTROSÍ (designa abogado patrocinante y confiere poder a [completar: nombre del abogado]).
+Reglas propias de este documento:
+- Los hechos y las resoluciones deben salir de los DOCUMENTOS DEL USUARIO. Si un dato no está (Rol de la causa, nombre del representante legal, domicilio, fecha de notificación, nombre del abogado patrocinante), déjalo entre corchetes como "[completar: dato]"; nunca lo inventes.
+- Termina con una línea de guiones "----------------------------------------" y, bajo el título exacto "— NOTA PARA REVISIÓN (no forma parte del escrito) —", una advertencia breve: este es un borrador que debe revisar y firmar un abogado habilitado; verificar el foro y el plazo reales (el TCP conoce impugnaciones hasta la adjudicación y dentro de 10 días hábiles; si el acto atacado es posterior, la vía puede ser reposición ante el Servicio, reclamo ante la Contraloría o nulidad de derecho público ante tribunales ordinarios, y este mismo fondo sirve cambiando el encabezado) y completar los campos entre corchetes antes de presentar.
+Máximo 1100 palabras (sin contar la nota final).`
+  },
   apelacion: {
     titulo: "Recurso/reclamo formal por una licitación o compra ágil",
     guia: "Estructura: Antecedentes del proceso (código, organismo, acto que se impugna — rechazo, inadmisibilidad, adjudicación); Hechos en orden cronológico; Fundamentos de derecho citando la Ley 19.886, el Reglamento D.661/2024, dictámenes de Contraloría o sentencias del TCP que respalden el reclamo; Petitorio claro (qué se pide: reconsideración, dejar sin efecto el acto, admitir la oferta, etc.). Si corresponde, menciona el plazo legal para presentarlo y ante quién se presenta (la propia entidad, el Tribunal de Contratación Pública o Contraloría, según el caso)."
@@ -119,8 +136,25 @@ Reglas:
 - Si las fuentes no cubren la pregunta, dilo ("No tengo fuente en mi base para eso") y no inventes artículos, plazos ni jurisprudencia.
 - Máximo 280 palabras salvo que pidan detalle. Párrafos cortos. Formato Markdown simple.`;
 
+// Tipos que se redactan como escrito judicial (SUMA + otrosíes ante un tribunal),
+// no como carta con encabezado "Señor(a)... PRESENTE".
+const ESCRITOS_JUDICIALES = new Set(["defensa_tcp"]);
+
+// Conceptos legales con los que sembrar la búsqueda de fuentes según el tipo de documento,
+// para traer las normas aplicables aunque el usuario no las nombre en los hechos (si no, el
+// escrito tendría que argumentar de memoria, sin fuente que lo respalde).
+const SEMILLA_BUSQUEDA: Record<string, string> = {
+  defensa_tcp: "impugnación tribunal contratación pública artículo 24 plazo adjudicación invalidación situación jurídica consolidada buena fe bases oferta aclaraciones ley 19.886 ley 19.880",
+};
+
 function sysDocumento(tipo: string): string {
   const t = TIPOS_DOC[tipo] ?? TIPOS_DOC.carta;
+  if (ESCRITOS_JUDICIALES.has(tipo)) {
+    return `Eres Don Evaristo Abogado, redactando un ESCRITO JUDICIAL FORMAL para un proveedor del Estado chileno ante el Tribunal de Contratación Pública: ${t.titulo}.
+Es un escrito de tribunal en español formal chileno, con SUMA y otrosíes. Usa SOLO los hechos, datos, documentos y fuentes que se te entregan; no inventes fechas, montos, números de resolución, artículos ni jurisprudencia.
+${t.guia}
+Formato de salida (texto plano, sin encabezados Markdown "#"): primero la SUMA ("EN LO PRINCIPAL:" ... y los otrosíes), luego en una línea "ILUSTRE TRIBUNAL DE CONTRATACIÓN PÚBLICA" y a continuación el cuerpo (comparecencia, antecedentes de hecho, defensas, peticiones y otrosíes). Puedes usar mayúsculas para los títulos de sección y de los otrosíes, como en un escrito real. Cita [n] tras cada afirmación de derecho que venga de una FUENTE (artículo, número de dictamen/año, rol y fecha del TCP). Cuando invoques un artículo o norma que NO aparezca en las FUENTES entregadas, nómbralo por su número (son normas vigentes en Chile) pero NO le pongas una cita [n] falsa: la NOTA final ya pide verificar cada fundamento con el abogado. Si falta un dato, déjalo como "[completar: dato]" en vez de inventarlo.`;
+  }
   return `Eres Don Evaristo Abogado, redactando un documento FORMAL Y PROFESIONAL para un proveedor del Estado chileno: ${t.titulo}.
 Aquí NO hablas cercano: es un documento oficial en español formal chileno, con la estructura clásica de una carta/recurso ante un organismo público. Usa SOLO los hechos, datos y fuentes que se te entregan; no inventes fechas, montos, artículos ni jurisprudencia.
 ${t.guia}
@@ -215,8 +249,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Recolección en paralelo
-    const consultaBase = modo === "chat" ? pregunta : `${hechos} ${peticion}`;
+    // Recolección en paralelo. Para ciertos escritos sembramos la búsqueda con los conceptos
+    // legales del tipo, para traer las normas aplicables aunque el usuario no las mencione.
+    const semillaTipo = modo === "documento" ? (SEMILLA_BUSQUEDA[tipoDocumento] ?? "") : "";
+    const consultaBase = modo === "chat" ? pregunta : `${hechos} ${peticion} ${semillaTipo}`.trim();
     const kws = palabrasClave(consultaBase);
     const qOr = kws.slice(0, 4).join(" or ");
     const tareas: Record<string, Promise<any>> = {};
@@ -230,8 +266,17 @@ Deno.serve(async (req) => {
       // (posible fragmentación) — mismo panorama que ya usa Don Evaristo Experto.
       tareas.panorama = sb.rpc("experto_panorama_licitacion", { p_codigo: codigo, p_user_id: userId }).then((r) => r.data);
     }
-    // Documentos que el usuario subió (contratos, notificaciones, reclamos previos): sin código = carpeta general.
-    tareas.docs = sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: codigo, p_max: 10000 }).then((r) => r.data ?? []);
+    // Documentos que el usuario subió (contratos, notificaciones, reclamos previos).
+    // Sin código = carpeta general. Con código traemos los del caso Y los generales (sin
+    // código), porque experto_documentos_texto filtra por código exacto: un documento subido
+    // "sin ID" (que la UI sí muestra) quedaría fuera del contexto y la defensa no podría usar
+    // las resoluciones que el cliente ve en pantalla.
+    tareas.docs = codigo
+      ? Promise.all([
+          sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: codigo, p_max: 8000 }).then((r) => r.data ?? []),
+          sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: null, p_max: 5000 }).then((r) => r.data ?? []),
+        ]).then(([caso, general]) => [...caso, ...general])
+      : sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: null, p_max: 10000 }).then((r) => r.data ?? []);
     // Organismo: por destinatario/institución escrita o detectado en el texto de la pregunta/hechos.
     const org = (pregunta + " " + hechos).match(/((?:i\.?\s*)?municipalidad|hospital|ministerio|servicio de salud|servicio local|universidad|gobierno regional|subsecretar[ií]a|direcci[oó]n|instituto|carabineros|ej[eé]rcito|armada|junaeb|junji|sename|cenabast|serviu|corfo|sence|fonasa)\s+(?:de\s+)?([a-záéíóúñ\s]{3,40})/i);
     const busquedaOrg = destinatario || org?.[0];
