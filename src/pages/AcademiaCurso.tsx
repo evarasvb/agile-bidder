@@ -32,6 +32,8 @@ import {
   type Modulo,
 } from "@/data/academiaCursos";
 import { Seo } from "@/components/Seo";
+import { createAcademyPayment } from "@/services/academyPayments";
+import { getAcademyPaymentReturnNotice } from "@/services/academyPaymentMessages";
 import { GraficoView, TablaView, VideoView, QuizView, HerramientaView, EjercicioView } from "@/components/academia/BloquesX10";
 
 // Cuentas que ven los cursos premium sin código (para revisarlos y probarlos).
@@ -253,9 +255,9 @@ export default function AcademiaCurso() {
   // Aviso al volver de Mercado Pago (?pago=ok|pendiente|error).
   useEffect(() => {
     const p = new URLSearchParams(window.location.search).get("pago");
-    if (p === "ok") toast.success("¡Pago recibido! Te enviamos el código por correo. Desbloquéalo abajo con tu correo o código.");
-    else if (p === "pendiente") toast.info("Tu pago quedó pendiente. Cuando se apruebe te llega el código por correo.");
-    else if (p === "error") toast.error("El pago no se completó. Puedes intentar de nuevo.");
+    const notice = getAcademyPaymentReturnNotice(p);
+    if (notice?.tone === "info") toast.info(notice.message);
+    else if (notice?.tone === "error") toast.error(notice.message);
     if (p) window.history.replaceState({}, "", window.location.pathname);
   }, []);
 
@@ -306,27 +308,26 @@ export default function AcademiaCurso() {
     });
     setRecuperando(false);
     if (error || !data?.ok) {
-      toast.error(data?.error || "No encontramos tu compra con ese correo.");
+      toast.error(data?.error || "No pudimos solicitar el reenvío. Intenta nuevamente.");
       return;
     }
-    setDesbloqueado(data.modulos as Modulo[]);
-    toast.success("¡Acceso recuperado! 🎉");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    toast.success(
+      data?.message ||
+        "Si existe una compra para ese correo, enviaremos el código. Revisa también spam.",
+    );
   };
 
   // Compra dinámica con Mercado Pago (Checkout Pro): crea la preferencia en el
   // servidor y redirige. Reemplaza el link estático mpago.la.
   const comprarConMP = async () => {
     setComprando(true);
-    const { data, error } = await supabase.functions.invoke("crear-pago-curso", {
-      body: { slug: curso.slug, back_url: window.location.origin },
-    });
-    if (error || !data?.url) {
+    try {
+      const checkout = await createAcademyPayment(curso.slug);
+      window.location.href = checkout.url;
+    } catch (error) {
       setComprando(false);
-      toast.error(data?.error || "No pudimos iniciar el pago. Intenta de nuevo.");
-      return;
+      toast.error(error instanceof Error ? error.message : "No pudimos iniciar el pago. Intenta de nuevo.");
     }
-    window.location.href = data.url;
   };
 
   const esPremiumBloqueado = curso.premium && !desbloqueado;
@@ -574,8 +575,8 @@ export default function AcademiaCurso() {
 
                   <div className="mt-5 pt-5 border-t border-border/50">
                     <p className="text-sm text-muted-foreground mb-3">
-                      ¿Pagaste y no tienes el código? Recupéralo con el correo que usaste en
-                      Mercado Pago:
+                      ¿Pagaste y no tienes el código? Te lo enviaremos al correo que usaste en
+                      Mercado Pago. Por seguridad, el curso no se abre solo con escribir un correo.
                     </p>
                     <div className="flex flex-col sm:flex-row gap-3">
                       <Input
@@ -595,10 +596,10 @@ export default function AcademiaCurso() {
                         {recuperando ? (
                           <>
                             <Loader2 className="h-4 w-4 animate-spin" />
-                            Buscando…
+                            Enviando…
                           </>
                         ) : (
-                          "Recuperar acceso"
+                          "Enviar código"
                         )}
                       </Button>
                     </div>

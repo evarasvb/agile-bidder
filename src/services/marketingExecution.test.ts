@@ -23,7 +23,8 @@ const piece: MarketingPiece = {
   asunto: 'Asunto de prueba',
   tipo: 'email',
   canal: 'email',
-  estado: 'ejecutando',
+  estado: 'procesando',
+  contactos_ids: [contactId],
 };
 
 function createStore(
@@ -37,6 +38,7 @@ function createStore(
       total: 1,
     }),
     persistExecutions: async () => undefined,
+    markPiecePendingContinuation: async () => undefined,
     markPieceExecuted: async () => undefined,
     markCampaignExecuting: async () => undefined,
     calculateMetrics: async () => undefined,
@@ -90,13 +92,35 @@ describe('marketing-ejecutar', () => {
     expect(sendEmail).not.toHaveBeenCalled();
   });
 
+  it('reclama una pieza inicial como procesando y guarda su audiencia', async () => {
+    const update = vi.fn(() => query);
+    const eq = vi.fn(() => query);
+    const query: AtomicClaimQuery = {
+      update,
+      eq,
+      select: vi.fn(() => ({
+        maybeSingle: async () => ({ data: piece, error: null }),
+      })),
+    };
+
+    const result = await claimEmailPiece(query, pieceId, [contactId]);
+
+    expect(result.piece).toBe(piece);
+    expect(update).toHaveBeenCalledWith({
+      estado: 'procesando',
+      contactos_ids: [contactId],
+    });
+    expect(eq).toHaveBeenCalledWith('estado', 'draft');
+    expect(eq).toHaveBeenCalledWith('canal', 'email');
+  });
+
   it('permite que solo una ejecución concurrente reclame y envíe la pieza', async () => {
-    let state: 'draft' | 'ejecutando' = 'draft';
+    let state: 'draft' | 'procesando' = 'draft';
     const sendEmail = vi.fn(async () => ({ success: true, statusCode: 200 }));
     const store = createStore({
       claimPiece: async () => {
         if (state !== 'draft') return { piece: null };
-        state = 'ejecutando';
+        state = 'procesando';
         return { piece };
       },
     });
@@ -240,7 +264,7 @@ describe('marketing-ejecutar', () => {
     );
 
     expect(outcome).toMatchObject({ status: 500, body: { codigo: 'contacts_failed' } });
-    expect(releasePieceClaim).toHaveBeenCalledWith(pieceId);
+    expect(releasePieceClaim).toHaveBeenCalledWith(pieceId, 'initial');
     expect(sendEmail).not.toHaveBeenCalled();
   });
 
@@ -327,5 +351,197 @@ describe('marketing-ejecutar', () => {
       ]),
     );
     expect(markPieceExecuted).not.toHaveBeenCalled();
+  });
+
+  it('con maxPerRun manda solo un lote y deja la pieza abierta para que el cron la retome', async () => {
+    const contacts = [
+      { id: contactId, email: 'one@example.com', nombre: 'One' },
+      { id: '44444444-4444-4444-8444-444444444444', email: 'two@example.com', nombre: 'Two' },
+      { id: '55555555-5555-4555-8555-555555555555', email: 'three@example.com', nombre: 'Three' },
+    ];
+    const sendEmail = vi.fn(async () => ({ success: true, statusCode: 200 }));
+    const markPiecePendingContinuation = vi.fn(async () => undefined);
+    const markPieceExecuted = vi.fn(async () => undefined);
+    const store = createStore({
+      getContactsPage: async () => ({ contacts, total: contacts.length }),
+      markPiecePendingContinuation,
+      markPieceExecuted,
+    });
+
+    const outcome = await executeMarketingCampaign(
+      { pieza_id: pieceId, contactos_ids: contacts.map(({ id }) => id) },
+      { store, sendEmail, maxPerRun: 2 },
+    );
+
+    expect(sendEmail).toHaveBeenCalledTimes(2);
+    expect(outcome.status).toBe(200);
+    expect(outcome.body as ExecutionResult).toMatchObject({
+      total_objetivo: 3,
+      total_procesados: 2,
+      pendiente_continuacion: true,
+      restantes: 1,
+    });
+    expect(markPiecePendingContinuation).toHaveBeenCalledWith(pieceId);
+    expect(markPieceExecuted).not.toHaveBeenCalled();
+  });
+
+  it('en una continuación usa la audiencia guardada y no repite resultados previos', async () => {
+    const contacts = [
+      { id: contactId, email: 'one@example.com', nombre: 'One' },
+      { id: '44444444-4444-4444-8444-444444444444', email: 'two@example.com', nombre: 'Two' },
+    ];
+    const sendEmail = vi.fn(async () => ({ success: true, statusCode: 200 }));
+    const markPieceExecuted = vi.fn(async () => undefined);
+    const store = createStore({
+      claimPiece: async () => ({
+        piece: { ...piece, contactos_ids: contacts.map(({ id }) => id) },
+      }),
+      getContactsPage: async () => ({ contacts, total: contacts.length }),
+      getProcessedContactIds: async () => new Set([contactId]),
+      markPieceExecuted,
+    });
+
+    const outcome = await executeMarketingCampaign(
+      { pieza_id: pieceId, contactos_ids: [contactId] },
+      { store, sendEmail, mode: 'continuation' },
+    );
+
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: 'two@example.com' }));
+    expect(outcome.status).toBe(200);
+    expect(markPieceExecuted).toHaveBeenCalledWith(pieceId);
+  });
+
+  it('permite un único claim concurrente de continuación', async () => {
+    let state: 'ejecutando' | 'procesando' | 'ejecutado' = 'ejecutando';
+    const sendEmail = vi.fn(async () => ({ success: true, statusCode: 200 }));
+    const continuationPiece: MarketingPiece = {
+      ...piece,
+      contactos_ids: [contactId],
+    };
+    const store = createStore({
+      claimPiece: async (_id, _ids, mode) => {
+        if (mode !== 'continuation' || state !== 'ejecutando') return { piece: null };
+        state = 'procesando';
+        return { piece: continuationPiece };
+      },
+      markPieceExecuted: async () => {
+        state = 'ejecutado';
+      },
+    });
+
+    const outcomes = await Promise.all([
+      executeMarketingCampaign(
+        { pieza_id: pieceId, contactos_ids: [contactId] },
+        { store, sendEmail, mode: 'continuation' },
+      ),
+      executeMarketingCampaign(
+        { pieza_id: pieceId, contactos_ids: [contactId] },
+        { store, sendEmail, mode: 'continuation' },
+      ),
+    ]);
+
+    expect(outcomes.map(({ status }) => status).sort()).toEqual([200, 409]);
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    expect(state).toBe('ejecutado');
+  });
+
+  it('omite los 40 enviados y continúa con el siguiente lote sin duplicarlos', async () => {
+    const contacts = Array.from({ length: 85 }, (_, index) => ({
+      id: `33333333-3333-4333-8333-${index.toString(16).padStart(12, '0')}`,
+      email: `contacto-${index}@example.com`,
+      nombre: `Contacto ${index}`,
+    }));
+    const processedIds = new Set(contacts.slice(0, 40).map(({ id }) => id));
+    const sendEmail = vi.fn(async () => ({ success: true, statusCode: 200 }));
+    const markPiecePendingContinuation = vi.fn(async () => undefined);
+    const markPieceExecuted = vi.fn(async () => undefined);
+    const store = createStore({
+      claimPiece: async () => ({
+        piece: { ...piece, contactos_ids: contacts.map(({ id }) => id) },
+      }),
+      getContactsPage: async ({ contactIds }) => ({
+        contacts: contacts.filter(({ id }) => contactIds.includes(id)),
+        total: contactIds.length,
+      }),
+      getProcessedContactIds: async () => processedIds,
+      markPiecePendingContinuation,
+      markPieceExecuted,
+    });
+
+    const outcome = await executeMarketingCampaign(
+      { pieza_id: pieceId, contactos_ids: [contactId] },
+      { store, sendEmail, mode: 'continuation', maxPerRun: 40 },
+    );
+
+    expect(sendEmail).toHaveBeenCalledTimes(40);
+    expect(sendEmail).not.toHaveBeenCalledWith(
+      expect.objectContaining({ to: 'contacto-0@example.com' }),
+    );
+    expect(sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: 'contacto-40@example.com' }),
+    );
+    expect(outcome.body as ExecutionResult).toMatchObject({
+      total_objetivo: 85,
+      total_procesados: 40,
+      pendiente_continuacion: true,
+      restantes: 5,
+    });
+    expect(markPiecePendingContinuation).toHaveBeenCalledWith(pieceId);
+    expect(markPieceExecuted).not.toHaveBeenCalled();
+  });
+
+  it('deja bloqueada para revisión una continuación con resultado incierto', async () => {
+    const secondId = '44444444-4444-4444-8444-444444444444';
+    const contacts = [
+      { id: contactId, email: 'one@example.com', nombre: 'One' },
+      { id: secondId, email: 'two@example.com', nombre: 'Two' },
+    ];
+    const markPiecePendingContinuation = vi.fn(async () => undefined);
+    const store = createStore({
+      claimPiece: async () => ({
+        piece: { ...piece, contactos_ids: contacts.map(({ id }) => id) },
+      }),
+      getContactsPage: async () => ({ contacts, total: contacts.length }),
+      markPiecePendingContinuation,
+    });
+
+    const outcome = await executeMarketingCampaign(
+      { pieza_id: pieceId, contactos_ids: [contactId] },
+      {
+        store,
+        mode: 'continuation',
+        maxPerRun: 1,
+        sendEmail: async () => ({ success: false, uncertain: true }),
+      },
+    );
+
+    expect(outcome.status).toBe(202);
+    expect(outcome.body).toMatchObject({ requiere_revision_manual: true });
+    expect(markPiecePendingContinuation).not.toHaveBeenCalled();
+  });
+
+  it('no libera al cron una continuación cuya audiencia dejó de coincidir', async () => {
+    const secondId = '44444444-4444-4444-8444-444444444444';
+    const releasePieceClaim = vi.fn(async () => true);
+    const sendEmail = vi.fn(async () => ({ success: true, statusCode: 200 }));
+    const store = createStore({
+      claimPiece: async () => ({
+        piece: { ...piece, contactos_ids: [contactId, secondId] },
+      }),
+      releasePieceClaim,
+    });
+
+    const outcome = await executeMarketingCampaign(
+      { pieza_id: pieceId, contactos_ids: [contactId] },
+      { store, sendEmail, mode: 'continuation' },
+    );
+
+    expect(outcome).toMatchObject({
+      status: 500,
+      body: { codigo: 'contacts_failed', requiere_revision_manual: true },
+    });
+    expect(releasePieceClaim).not.toHaveBeenCalled();
+    expect(sendEmail).not.toHaveBeenCalled();
   });
 });

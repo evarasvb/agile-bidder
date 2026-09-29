@@ -6,8 +6,10 @@ import {
   getMarketingContactsPage,
   type AtomicClaimQuery,
   type EmailSendResult,
+  type ExecutionMode,
   type MarketingContactsTable,
   type MarketingExecutionRow,
+  type MarketingPiece,
 } from "./logic.ts";
 
 const corsHeaders = {
@@ -19,6 +21,24 @@ const jsonHeaders = { ...corsHeaders, 'Content-Type': 'application/json' };
 
 function jsonResponse(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), { status, headers: jsonHeaders });
+}
+
+// Cuánto manda cada corrida y qué tan seguido, para no mandar todo el envío
+// de golpe (riesgo de listas negras). Lo que sobra lo retoma solo el cron
+// marketing-continuar-envios cada pocos minutos.
+const MAX_EMAILS_PER_RUN = 40;
+const SEND_DELAY_MS = 350;
+
+// El cron llama esta misma función con el JWT de service_role para retomar
+// envíos pendientes; el resto de las llamadas (desde la pantalla) vienen con
+// el JWT del usuario evaras@firmavb.cl. Mismo patrón que otras funciones del
+// repo (p. ej. sync-licitaciones-bi).
+function jwtRole(authorization: string | null): string | null {
+  try {
+    const token = (authorization ?? '').replace(/^Bearer\s+/i, '');
+    const encoded = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(encoded)).role ?? null;
+  } catch { return null; }
 }
 
 async function sendEmailViaResend(
@@ -87,9 +107,10 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
 
-    if (!supabaseUrl || !supabaseServiceKey || !resendApiKey) {
+    if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey || !resendApiKey) {
       console.error('Faltan variables requeridas para marketing-ejecutar');
       return jsonResponse({ error: 'Servicio no configurado' }, 500);
     }
@@ -101,11 +122,24 @@ serve(async (req) => {
 
     const sb = createClient(supabaseUrl, supabaseServiceKey);
     const token = authHeader.slice('Bearer '.length);
-    const { data: { user }, error: authError } = await sb.auth.getUser(token);
 
-    if (authError || !user || user.email !== 'evaras@firmavb.cl') {
-      return jsonResponse({ error: 'Unauthorized' }, 403);
+    // El cron de continuación llama con el JWT de service_role: no tiene un
+    // usuario detrás, así que se valida por rol en vez de por auth.getUser.
+    const esServiceRole = jwtRole(authHeader) === 'service_role';
+    if (!esServiceRole) {
+      const { data: { user }, error: authError } = await sb.auth.getUser(token);
+      if (authError || !user || user.email !== 'evaras@firmavb.cl') {
+        return jsonResponse({ error: 'Unauthorized' }, 403);
+      }
     }
+    const mode: ExecutionMode = esServiceRole ? 'continuation' : 'initial';
+    // Conserva el JWT entrante para que Postgres aplique los grants del RPC.
+    // Aunque `sb` sea administrador para las escrituras internas, este cliente
+    // no puede reclamar continuaciones si el token no es realmente service_role.
+    const callerSb = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
 
     const contentLength = Number(req.headers.get('content-length') || '0');
     if (Number.isFinite(contentLength) && contentLength > 100_000) {
@@ -125,16 +159,44 @@ serve(async (req) => {
 
     const outcome = await executeMarketingCampaign(body, {
       store: {
-        claimPiece: (pieceId) => {
+        claimPiece: async (pieceId, contactosIds, requestedMode) => {
+          if (requestedMode === 'continuation') {
+            if (!esServiceRole) return { piece: null, failed: true };
+
+            // Este RPC solo tiene EXECUTE para service_role y hace el cambio
+            // `ejecutando` -> `procesando` de forma atómica. Dos crons no
+            // pueden reclamar la misma pieza al mismo tiempo.
+            const { data, error } = await callerSb
+              .rpc('marketing_reclamar_continuacion', { p_pieza_id: pieceId })
+              .maybeSingle();
+
+            return error
+              ? { piece: null, failed: true }
+              : { piece: data as MarketingPiece | null };
+          }
+
           const query = sb.from('marketing_piezas') as unknown as AtomicClaimQuery;
-          return claimEmailPiece(query, pieceId);
+          return claimEmailPiece(query, pieceId, contactosIds);
         },
-        releasePieceClaim: async (pieceId) => {
+        getProcessedContactIds: async (pieceId) => {
+          const { data, error } = await sb
+            .from('marketing_ejecucion')
+            .select('contacto_id')
+            .eq('pieza_id', pieceId);
+
+          if (error) {
+            console.error('No se pudo revisar resultados previos:', error.code);
+            throw new Error('execution_history_failed');
+          }
+          return new Set((data || []).map((r: { contacto_id: string }) => r.contacto_id));
+        },
+        releasePieceClaim: async (pieceId, claimMode) => {
+          const releasedState = claimMode === 'continuation' ? 'ejecutando' : 'draft';
           const { data, error } = await sb
             .from('marketing_piezas')
-            .update({ estado: 'draft' })
+            .update({ estado: releasedState })
             .eq('id', pieceId)
-            .eq('estado', 'ejecutando')
+            .eq('estado', 'procesando')
             .select('id')
             .maybeSingle();
 
@@ -146,10 +208,29 @@ serve(async (req) => {
           return getMarketingContactsPage(table, filters);
         },
         persistExecutions: async (rows: MarketingExecutionRow[]) => {
-          const { error } = await sb.from('marketing_ejecucion').insert(rows);
+          // upsert + ignoreDuplicates: si el cron de continuación y una
+          // corrida anterior se llegaran a superponer, no duplica filas para
+          // el mismo (pieza_id, contacto_id).
+          const { error } = await sb
+            .from('marketing_ejecucion')
+            .upsert(rows, { onConflict: 'pieza_id,contacto_id', ignoreDuplicates: true });
           if (error) {
             console.error('No se pudieron registrar resultados:', error.code);
             throw new Error('execution_persistence_failed');
+          }
+        },
+        markPiecePendingContinuation: async (pieceId) => {
+          const { data, error } = await sb
+            .from('marketing_piezas')
+            .update({ estado: 'ejecutando' })
+            .eq('id', pieceId)
+            .eq('estado', 'procesando')
+            .select('id')
+            .maybeSingle();
+
+          if (error || !data) {
+            console.error('No se pudo liberar el siguiente lote:', error?.code || 'no_row');
+            throw new Error('continuation_release_failed');
           }
         },
         markPieceExecuted: async (pieceId) => {
@@ -157,7 +238,7 @@ serve(async (req) => {
             .from('marketing_piezas')
             .update({ estado: 'ejecutado' })
             .eq('id', pieceId)
-            .eq('estado', 'ejecutando')
+            .eq('estado', 'procesando')
             .select('id')
             .maybeSingle();
 
@@ -190,6 +271,9 @@ serve(async (req) => {
         },
       },
       sendEmail: (input) => sendEmailViaResend(resendApiKey, input),
+      maxPerRun: MAX_EMAILS_PER_RUN,
+      sendDelayMs: SEND_DELAY_MS,
+      mode,
     });
 
     if ('total_procesados' in outcome.body) {
