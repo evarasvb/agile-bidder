@@ -19,8 +19,9 @@ const Privacidad = () => (
         <section>
           <p>
             En FirmaVB tratamos tus datos personales conforme a la Ley N° 19.628 sobre Protección de la Vida
-            Privada de Chile. Esta política explica qué datos recopilamos, para qué los usamos y qué derechos
-            tienes sobre ellos.
+            Privada y a la Ley N° 21.719 que la moderniza. Esta política explica qué datos recopilamos, para qué
+            los usamos y qué derechos tienes sobre ellos. Al registrarte, aceptas esta política de forma expresa
+            y guardamos la fecha y la versión que aceptaste.
           </p>
         </section>
 
@@ -29,6 +30,8 @@ const Privacidad = () => (
           <ul className="list-disc pl-5 space-y-1">
             <li>Datos de cuenta: nombre, email, contraseña (o inicio de sesión con Google).</li>
             <li>Datos de empresa: razón social, RUT, giro, dirección, email de contacto.</li>
+            <li>Contacto: tu nombre y tu número de WhatsApp, para avisarte de oportunidades.</li>
+            <li>La descripción de tu empresa que escribes al registrarte, que usamos para armar tu búsqueda.</li>
             <li>Datos de inventario y de negocio que tú cargas: productos, precios, ofertas, propuestas.</li>
             <li>
               Datos de uso: qué páginas visitas, qué oportunidades revisas, para mejorar las recomendaciones
@@ -57,9 +60,11 @@ const Privacidad = () => (
           <h2 className="text-lg font-semibold mb-2">3. Con quién compartimos datos</h2>
           <p>
             Usamos proveedores externos para operar el servicio, quienes procesan datos en nuestro nombre bajo
-            acuerdos de confidencialidad: Supabase (base de datos e infraestructura), proveedores de modelos de
-            IA (para el matching de productos y la generación de contenido, como fichas técnicas o respuestas
-            del asistente), y procesadores de pago para las suscripciones Pro. No compartimos tus datos de
+            acuerdos de confidencialidad: Supabase (base de datos e infraestructura), Vercel (alojamiento del
+            sitio), proveedores de modelos de IA como Google Gemini y Anthropic (para el matching de productos,
+            el perfil de tu empresa y las respuestas del asistente), Resend (envío de correos), Meta/WhatsApp
+            (avisos por WhatsApp, cuando estén activos) y Mercado Pago (pagos). Algunos de estos proveedores
+            procesan datos fuera de Chile, principalmente en Estados Unidos. No compartimos tus datos de
             inventario o precios con otras empresas clientes de FirmaVB.
           </p>
         </section>
@@ -74,10 +79,10 @@ const Privacidad = () => (
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold mb-2">5. Tus derechos (Ley 19.628)</h2>
+          <h2 className="text-lg font-semibold mb-2">5. Tus derechos (Leyes 19.628 y 21.719)</h2>
           <p>
-            Puedes solicitar acceso, rectificación, cancelación u oposición sobre tus datos personales (derechos
-            ARCO) en cualquier momento. La mayoría de tus datos de empresa e inventario los puedes editar
+            Puedes solicitar acceso, rectificación, supresión, oposición y portabilidad de tus datos personales
+            en cualquier momento, y retirar tu consentimiento para recibir avisos. La mayoría de tus datos de empresa e inventario los puedes editar
             directamente desde tu cuenta; para lo demás, o para eliminar tu cuenta por completo, escríbenos a{" "}
             <a href="mailto:contacto@firmavb.cl" className="text-primary underline">
               contacto@firmavb.cl

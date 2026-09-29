@@ -1,4 +1,5 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { Menu } from "lucide-react";
 import { AppSidebar } from "./AppSidebar";
 import { StatusBar } from "./StatusBar";
@@ -14,8 +15,33 @@ interface AppLayoutProps {
 
 const SIDEBAR_COLLAPSED_KEY = "firmavb-sidebar-collapsed";
 
+// Título de la pestaña por sección (antes todas decían lo mismo y no se
+// distinguían en el navegador ni en el historial). Las fichas con título
+// propio (licitación, compra ágil, Experto) lo sobreescriben al cargar.
+const TITULOS: Array<[string, string]> = [
+  ["/dashboard", "Inicio"],
+  ["/oportunidades", "Oportunidades"],
+  ["/compras-agiles/", "Compra ágil"],
+  ["/licitaciones/", "Licitación"],
+  ["/experto", "Don Evaristo"],
+  ["/pipeline", "Postulaciones"],
+  ["/inventario", "Inventario"],
+  ["/convenio-marco", "Convenio Marco"],
+  ["/academia", "Academia"],
+  ["/reportes", "Reportes"],
+  ["/equipo", "Equipo"],
+  ["/configuracion", "Configuración"],
+  ["/soporte", "Soporte"],
+  ["/planes", "Planes"],
+];
+
 export function AppLayout({ children }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { pathname } = useLocation();
+  useEffect(() => {
+    const t = TITULOS.find(([ruta]) => pathname === ruta || pathname.startsWith(ruta.endsWith("/") ? ruta : ruta + "/"));
+    document.title = t ? `${t[1]} · FirmaVB` : "FirmaVB";
+  }, [pathname]);
   // Preferencia de menú achicado (solo escritorio), guardada en el navegador.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
