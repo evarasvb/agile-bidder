@@ -14,11 +14,11 @@
 create table if not exists public.consultas_mercado_sync_estado (
   id boolean primary key default true,
   constraint consultas_mercado_sync_estado_singleton check (id),
-  ultima_pagina_backfill integer not null default 2,
+  ultima_pagina_backfill integer not null default 1,
   updated_at timestamptz not null default now()
 );
 insert into public.consultas_mercado_sync_estado (id, ultima_pagina_backfill)
-values (true, 2)
+values (true, 1)
 on conflict (id) do nothing;
 
 alter table public.consultas_mercado_sync_estado enable row level security;

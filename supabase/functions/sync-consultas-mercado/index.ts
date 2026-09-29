@@ -105,20 +105,22 @@ Deno.serve(async (req: Request) => {
       const reservadasRecientes = Math.ceil(paginasMax / 2);
       const reservadasBackfill = paginasMax - reservadasRecientes;
       const recientes = Array.from({ length: reservadasRecientes }, (_, i) => pageCount - reservadasRecientes + 1 + i);
-      const limiteBackfill = pageCount - reservadasRecientes; // páginas 2..limiteBackfill quedan fuera de "recientes"
+      const limiteBackfill = pageCount - reservadasRecientes; // páginas 1..limiteBackfill quedan fuera de "recientes"
 
       let backfill: number[] = [];
-      if (reservadasBackfill > 0 && limiteBackfill >= 2) {
+      if (reservadasBackfill > 0 && limiteBackfill >= 1) {
         const { data: estado } = await supabase
           .from("consultas_mercado_sync_estado")
           .select("ultima_pagina_backfill")
           .eq("id", true)
           .maybeSingle();
-        let cursor = estado?.ultima_pagina_backfill ?? 2;
-        if (cursor > limiteBackfill) cursor = 2; // ya se cubrió toda la ventana: vuelve a empezar
+        // Arranca (y reinicia) en 1, no en 2: la página 1 también tiene RF
+        // propias (las más antiguas de la ventana), no es solo metadata.
+        let cursor = estado?.ultima_pagina_backfill ?? 1;
+        if (cursor > limiteBackfill) cursor = 1; // ya se cubrió toda la ventana: vuelve a empezar
         const fin = Math.min(cursor + reservadasBackfill - 1, limiteBackfill);
         backfill = Array.from({ length: fin - cursor + 1 }, (_, i) => cursor + i);
-        nuevoCursor = fin >= limiteBackfill ? 2 : fin + 1;
+        nuevoCursor = fin >= limiteBackfill ? 1 : fin + 1;
       }
       paginas = [...recientes, ...backfill];
     }
