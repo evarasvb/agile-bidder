@@ -65,6 +65,9 @@ export default function Abogado() {
 
   // Documentos de respaldo (contratos, notificaciones, reclamos previos)
   const [documentos, setDocumentos] = useState<{ id: string; nombre: string; tipo: string }[]>([]);
+  // Documentos generales (subidos sin ligarlos a un caso). Se muestran siempre, para que un
+  // documento no "desaparezca" cuando el ID del caso no calza con el que se escribió al subirlo.
+  const [documentosGenerales, setDocumentosGenerales] = useState<{ id: string; nombre: string; tipo: string }[]>([]);
   const [subiendo, setSubiendo] = useState(false);
 
   async function pedir(body: Record<string, unknown>, onTexto: (t: string, meta?: any) => void) {
@@ -161,11 +164,18 @@ export default function Abogado() {
   const listarDocumentos = async () => {
     const codigoAlPedir = codigo;
     try {
-      const qs = codigoAlPedir ? `?codigo=${encodeURIComponent(codigoAlPedir)}` : '';
-      const r = await fetch(`${SUPA}/functions/v1/experto-documentos${qs}`, { headers: auth });
-      const j = await r.json().catch(() => ({}));
+      // Siempre traemos los documentos generales (sin caso). Si hay un código, además
+      // traemos los de ese caso. Así un documento subido "sin código" (o bajo otro ID) no
+      // queda escondido cuando el usuario está mirando un caso puntual.
+      const [rGen, rCaso] = await Promise.all([
+        fetch(`${SUPA}/functions/v1/experto-documentos`, { headers: auth }),
+        codigoAlPedir ? fetch(`${SUPA}/functions/v1/experto-documentos?codigo=${encodeURIComponent(codigoAlPedir)}`, { headers: auth }) : Promise.resolve(null),
+      ]);
+      const jGen = await rGen.json().catch(() => ({}));
+      const jCaso = rCaso ? await rCaso.json().catch(() => ({})) : { documentos: [] };
       if (codigoAlPedir !== codigoRef.current) return;
-      setDocumentos(j.documentos ?? []);
+      setDocumentosGenerales(jGen.documentos ?? []);
+      setDocumentos(codigoAlPedir ? (jCaso.documentos ?? []) : []);
     } catch { /* silencioso */ }
   };
 
@@ -198,6 +208,7 @@ export default function Abogado() {
     try {
       await fetch(`${SUPA}/functions/v1/experto-documentos?id=${id}`, { method: 'DELETE', headers: auth });
       setDocumentos((d) => d.filter((x) => x.id !== id));
+      setDocumentosGenerales((d) => d.filter((x) => x.id !== id));
     } catch { toast.error('No pude borrar el documento'); }
   };
 
@@ -387,14 +398,46 @@ export default function Abogado() {
                 <input type="file" className="hidden" multiple disabled={subiendo}
                   onChange={(e) => e.target.files && subirDocumento(e.target.files)} />
               </label>
-              <div className="space-y-2">
-                {documentos.map((d) => (
-                  <div key={d.id} className="flex items-center justify-between rounded-md border p-2 text-sm">
-                    <span className="flex items-center gap-2"><Paperclip className="h-3.5 w-3.5" />{d.nombre}</span>
-                    <Button size="icon" variant="ghost" onClick={() => borrarDocumento(d.id)}><Trash2 className="h-4 w-4" /></Button>
+              <div className="space-y-3">
+                {codigo ? (
+                  <>
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">Documentos de este caso ({codigo.toUpperCase()})</p>
+                      {documentos.length === 0 && (
+                        <p className="rounded-md border border-yellow-300 bg-yellow-50 p-2 text-xs text-yellow-900">
+                          No hay documentos ligados a {codigo.toUpperCase()}. Revisa que el ID esté bien escrito; si lo subiste sin ID, aparece más abajo en "Documentos generales".
+                        </p>
+                      )}
+                      {documentos.map((d) => (
+                        <div key={d.id} className="flex items-center justify-between rounded-md border p-2 text-sm">
+                          <span className="flex items-center gap-2"><Paperclip className="h-3.5 w-3.5" />{d.nombre}</span>
+                          <Button size="icon" variant="ghost" onClick={() => borrarDocumento(d.id)}><Trash2 className="h-4 w-4" /></Button>
+                        </div>
+                      ))}
+                    </div>
+                    {documentosGenerales.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground">Documentos generales (sin caso)</p>
+                        {documentosGenerales.map((d) => (
+                          <div key={d.id} className="flex items-center justify-between rounded-md border p-2 text-sm">
+                            <span className="flex items-center gap-2"><Paperclip className="h-3.5 w-3.5" />{d.nombre}</span>
+                            <Button size="icon" variant="ghost" onClick={() => borrarDocumento(d.id)}><Trash2 className="h-4 w-4" /></Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    {documentosGenerales.map((d) => (
+                      <div key={d.id} className="flex items-center justify-between rounded-md border p-2 text-sm">
+                        <span className="flex items-center gap-2"><Paperclip className="h-3.5 w-3.5" />{d.nombre}</span>
+                        <Button size="icon" variant="ghost" onClick={() => borrarDocumento(d.id)}><Trash2 className="h-4 w-4" /></Button>
+                      </div>
+                    ))}
+                    {documentosGenerales.length === 0 && <p className="text-sm text-muted-foreground">Aún no subes documentos.</p>}
                   </div>
-                ))}
-                {documentos.length === 0 && <p className="text-sm text-muted-foreground">Aún no subes documentos.</p>}
+                )}
               </div>
             </CardContent>
           </Card>
