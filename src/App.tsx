@@ -67,6 +67,7 @@ const Inventory = lazy(() => import("./pages/Inventory"));
 const Pipeline = lazy(() => import("./pages/Pipeline"));
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Instituciones = lazy(() => import("./pages/Instituciones"));
 const CalendarioIntegrado = lazy(() => import("./pages/CalendarioIntegrado"));
 const GestionVendedores = lazy(() => import("./pages/GestionVendedores"));
 
@@ -252,6 +253,7 @@ const App = () => (
             
             {/* ----- DASHBOARD ----- */}
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/instituciones" element={<Instituciones />} />
             <Route path="/dashboard/calendario" element={<Navigate to="/calendario" replace />} />
             <Route path="/calendario" element={<CalendarioIntegrado />} />
             <Route path="/dashboard/vendedores" element={<GestionVendedores />} />

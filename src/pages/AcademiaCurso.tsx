@@ -334,7 +334,7 @@ export default function AcademiaCurso() {
 
   const agendarUrl =
     curso.sesionEnVivo?.agendarUrl ||
-    "https://wa.me/56994259157?text=" +
+    "https://wa.me/56990996055?text=" +
       encodeURIComponent(`Hola, compré "${curso.titulo}" y quiero agendar mi sesión en vivo.`);
 
   return (

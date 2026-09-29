@@ -19,7 +19,7 @@ export interface OrganismoRiesgo {
   procesos_12m: number | null;
   pago_por_100_procesos: number | null;
   reclamos_desde: string | null;
-  nivel: 'bajo' | 'medio' | 'alto' | 'sin_dato';
+  nivel: 'bajo' | 'medio' | 'alto' | 'sin_dato' | 'bloqueado';
 }
 
 export function useOrganismoRiesgo(codigo?: string | null, organismo?: string | null) {
