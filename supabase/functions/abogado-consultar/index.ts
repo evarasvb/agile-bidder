@@ -140,13 +140,20 @@ Reglas:
 // no como carta con encabezado "Señor(a)... PRESENTE".
 const ESCRITOS_JUDICIALES = new Set(["defensa_tcp"]);
 
+// Conceptos legales con los que sembrar la búsqueda de fuentes según el tipo de documento,
+// para traer las normas aplicables aunque el usuario no las nombre en los hechos (si no, el
+// escrito tendría que argumentar de memoria, sin fuente que lo respalde).
+const SEMILLA_BUSQUEDA: Record<string, string> = {
+  defensa_tcp: "impugnación tribunal contratación pública artículo 24 plazo adjudicación invalidación situación jurídica consolidada buena fe bases oferta aclaraciones ley 19.886 ley 19.880",
+};
+
 function sysDocumento(tipo: string): string {
   const t = TIPOS_DOC[tipo] ?? TIPOS_DOC.carta;
   if (ESCRITOS_JUDICIALES.has(tipo)) {
     return `Eres Don Evaristo Abogado, redactando un ESCRITO JUDICIAL FORMAL para un proveedor del Estado chileno ante el Tribunal de Contratación Pública: ${t.titulo}.
 Es un escrito de tribunal en español formal chileno, con SUMA y otrosíes. Usa SOLO los hechos, datos, documentos y fuentes que se te entregan; no inventes fechas, montos, números de resolución, artículos ni jurisprudencia.
 ${t.guia}
-Formato de salida (texto plano, sin encabezados Markdown "#"): primero la SUMA ("EN LO PRINCIPAL:" ... y los otrosíes), luego en una línea "ILUSTRE TRIBUNAL DE CONTRATACIÓN PÚBLICA" y a continuación el cuerpo (comparecencia, antecedentes de hecho, defensas, peticiones y otrosíes). Puedes usar mayúsculas para los títulos de sección y de los otrosíes, como en un escrito real. Cita [n] tras cada afirmación de derecho que venga de una FUENTE (artículo, número de dictamen/año, rol y fecha del TCP). Si falta un dato, déjalo como "[completar: dato]" en vez de inventarlo.`;
+Formato de salida (texto plano, sin encabezados Markdown "#"): primero la SUMA ("EN LO PRINCIPAL:" ... y los otrosíes), luego en una línea "ILUSTRE TRIBUNAL DE CONTRATACIÓN PÚBLICA" y a continuación el cuerpo (comparecencia, antecedentes de hecho, defensas, peticiones y otrosíes). Puedes usar mayúsculas para los títulos de sección y de los otrosíes, como en un escrito real. Cita [n] tras cada afirmación de derecho que venga de una FUENTE (artículo, número de dictamen/año, rol y fecha del TCP). Cuando invoques un artículo o norma que NO aparezca en las FUENTES entregadas, nómbralo por su número (son normas vigentes en Chile) pero NO le pongas una cita [n] falsa: la NOTA final ya pide verificar cada fundamento con el abogado. Si falta un dato, déjalo como "[completar: dato]" en vez de inventarlo.`;
   }
   return `Eres Don Evaristo Abogado, redactando un documento FORMAL Y PROFESIONAL para un proveedor del Estado chileno: ${t.titulo}.
 Aquí NO hablas cercano: es un documento oficial en español formal chileno, con la estructura clásica de una carta/recurso ante un organismo público. Usa SOLO los hechos, datos y fuentes que se te entregan; no inventes fechas, montos, artículos ni jurisprudencia.
@@ -242,8 +249,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Recolección en paralelo
-    const consultaBase = modo === "chat" ? pregunta : `${hechos} ${peticion}`;
+    // Recolección en paralelo. Para ciertos escritos sembramos la búsqueda con los conceptos
+    // legales del tipo, para traer las normas aplicables aunque el usuario no las mencione.
+    const semillaTipo = modo === "documento" ? (SEMILLA_BUSQUEDA[tipoDocumento] ?? "") : "";
+    const consultaBase = modo === "chat" ? pregunta : `${hechos} ${peticion} ${semillaTipo}`.trim();
     const kws = palabrasClave(consultaBase);
     const qOr = kws.slice(0, 4).join(" or ");
     const tareas: Record<string, Promise<any>> = {};
@@ -257,8 +266,17 @@ Deno.serve(async (req) => {
       // (posible fragmentación) — mismo panorama que ya usa Don Evaristo Experto.
       tareas.panorama = sb.rpc("experto_panorama_licitacion", { p_codigo: codigo, p_user_id: userId }).then((r) => r.data);
     }
-    // Documentos que el usuario subió (contratos, notificaciones, reclamos previos): sin código = carpeta general.
-    tareas.docs = sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: codigo, p_max: 10000 }).then((r) => r.data ?? []);
+    // Documentos que el usuario subió (contratos, notificaciones, reclamos previos).
+    // Sin código = carpeta general. Con código traemos los del caso Y los generales (sin
+    // código), porque experto_documentos_texto filtra por código exacto: un documento subido
+    // "sin ID" (que la UI sí muestra) quedaría fuera del contexto y la defensa no podría usar
+    // las resoluciones que el cliente ve en pantalla.
+    tareas.docs = codigo
+      ? Promise.all([
+          sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: codigo, p_max: 8000 }).then((r) => r.data ?? []),
+          sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: null, p_max: 5000 }).then((r) => r.data ?? []),
+        ]).then(([caso, general]) => [...caso, ...general])
+      : sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: null, p_max: 10000 }).then((r) => r.data ?? []);
     // Organismo: por destinatario/institución escrita o detectado en el texto de la pregunta/hechos.
     const org = (pregunta + " " + hechos).match(/((?:i\.?\s*)?municipalidad|hospital|ministerio|servicio de salud|servicio local|universidad|gobierno regional|subsecretar[ií]a|direcci[oó]n|instituto|carabineros|ej[eé]rcito|armada|junaeb|junji|sename|cenabast|serviu|corfo|sence|fonasa)\s+(?:de\s+)?([a-záéíóúñ\s]{3,40})/i);
     const busquedaOrg = destinatario || org?.[0];
