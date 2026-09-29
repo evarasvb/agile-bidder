@@ -89,9 +89,14 @@ export function useCreateApiKey() {
       });
     },
     onError: (error) => {
+      // La base rechaza la emisión si el cliente no tiene plan de pago (RLS).
+      // Traducimos ese error técnico a un mensaje de venta claro.
+      const esPlan = /row-level security|violates row-level|policy/i.test(error.message);
       toast({
-        title: 'Error al crear API Key',
-        description: error.message,
+        title: esPlan ? 'La extensión es de plan de pago' : 'Error al crear API Key',
+        description: esPlan
+          ? 'Postular y autocompletar con la extensión viene con FirmaVB ERP. Súbete de plan para activarla.'
+          : error.message,
         variant: 'destructive'
       });
     }
