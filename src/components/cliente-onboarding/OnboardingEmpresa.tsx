@@ -58,7 +58,7 @@ export default function OnboardingEmpresa({ cliente, onDone }: Props) {
     setEmpresa(cliente.empresa_nombre && cliente.empresa_nombre !== cliente.email ? cliente.empresa_nombre : '');
     setRut(cliente.rut ? formatearRut(cliente.rut) : '');
     setNombre(cliente.nombre_responsable || '');
-    setWhatsapp((cliente.telefono || '').replace(/\D/g, '').replace(/^56/, '').slice(-9));
+    setWhatsapp(((cliente as { whatsapp?: string | null }).whatsapp || cliente.telefono || '').replace(/\D/g, '').replace(/^56/, '').slice(-9));
     setDescripcion(cliente.descripcion_empresa || '');
     setTerminos(!!cliente.terminos_aceptados_at);
     supabase
@@ -116,10 +116,12 @@ export default function OnboardingEmpresa({ cliente, onDone }: Props) {
         rut: rutSinPuntos(rut),
         nombre_responsable: nombre.trim(),
         telefono: `+56${whatsapp.replace(/\D/g, '')}`,
+        // Columna que usan los avisos por WhatsApp (enviar-whatsapp, #416).
+        whatsapp: `+56${whatsapp.replace(/\D/g, '')}`,
         descripcion_empresa: descripcion.trim(),
         terminos_aceptados_at: cliente.terminos_aceptados_at || new Date().toISOString(),
         terminos_version: TERMINOS_VERSION,
-      });
+      } as Partial<Cliente> & { id: string });
 
       await supabase
         .from('cliente_filtros_oportunidades')
