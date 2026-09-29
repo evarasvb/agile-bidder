@@ -88,16 +88,40 @@ Deno.serve(async (req: Request) => {
 
     // La API ordena de la consulta más antigua a la más nueva (igual que
     // documenta supabase/functions/experto-bajo-agua/index.ts para el mismo
-    // endpoint): con más páginas disponibles que paginasMax, pedir siempre
-    // 1..paginasMax deja afuera las más recientes para siempre, porque el
-    // cron repite esta misma ventana de días cada 15 minutos. Se lee la
-    // página 1 solo para saber cuántas hay y, si sobran, se leen las
-    // últimas paginasMax páginas (las recientes) en vez de las primeras.
+    // endpoint). Se lee la página 1 solo para saber cuántas hay.
     const j1 = await pedirPagina(1);
     const pageCount = Math.max(1, Number(j1?.payload?.pageCount) || 1);
-    const paginas = pageCount <= paginasMax
-      ? Array.from({ length: pageCount }, (_, i) => i + 1)
-      : Array.from({ length: paginasMax }, (_, i) => pageCount - paginasMax + 1 + i);
+
+    let paginas: number[];
+    let nuevoCursor: number | null = null;
+    if (pageCount <= paginasMax) {
+      // Cabe todo en una corrida: no hace falta repartir cupo ni tocar el cursor.
+      paginas = Array.from({ length: pageCount }, (_, i) => i + 1);
+    } else {
+      // Reparte el cupo entre "recientes" (siempre las últimas páginas, para
+      // no perder nunca lo nuevo) y "backfill" (avanza con un cursor
+      // persistente por el resto de la ventana hasta cubrirla completa; el
+      // cron cada 15 min hace varias corridas, así que se termina cubriendo).
+      const reservadasRecientes = Math.ceil(paginasMax / 2);
+      const reservadasBackfill = paginasMax - reservadasRecientes;
+      const recientes = Array.from({ length: reservadasRecientes }, (_, i) => pageCount - reservadasRecientes + 1 + i);
+      const limiteBackfill = pageCount - reservadasRecientes; // páginas 2..limiteBackfill quedan fuera de "recientes"
+
+      let backfill: number[] = [];
+      if (reservadasBackfill > 0 && limiteBackfill >= 2) {
+        const { data: estado } = await supabase
+          .from("consultas_mercado_sync_estado")
+          .select("ultima_pagina_backfill")
+          .eq("id", true)
+          .maybeSingle();
+        let cursor = estado?.ultima_pagina_backfill ?? 2;
+        if (cursor > limiteBackfill) cursor = 2; // ya se cubrió toda la ventana: vuelve a empezar
+        const fin = Math.min(cursor + reservadasBackfill - 1, limiteBackfill);
+        backfill = Array.from({ length: fin - cursor + 1 }, (_, i) => cursor + i);
+        nuevoCursor = fin >= limiteBackfill ? 2 : fin + 1;
+      }
+      paginas = [...recientes, ...backfill];
+    }
 
     for (const pagina of paginas) {
       let j: any;
@@ -121,8 +145,16 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    if (nuevoCursor !== null) {
+      const { error } = await supabase
+        .from("consultas_mercado_sync_estado")
+        .update({ ultima_pagina_backfill: nuevoCursor, updated_at: new Date().toISOString() })
+        .eq("id", true);
+      if (error) errores.push(`cursor backfill: ${error.message}`);
+    }
+
     return new Response(
-      JSON.stringify({ ok: errores.length === 0, dias, desde, hasta, page_count: pageCount, paginas_leidas: paginasLeidas, total_listado: total, guardadas, errores, muestra, ms: Date.now() - t0 }),
+      JSON.stringify({ ok: errores.length === 0, dias, desde, hasta, page_count: pageCount, paginas_leidas: paginasLeidas, backfill_cursor_siguiente: nuevoCursor, total_listado: total, guardadas, errores, muestra, ms: Date.now() - t0 }),
       { headers: { ...cors, "Content-Type": "application/json" } },
     );
   } catch (e) {
