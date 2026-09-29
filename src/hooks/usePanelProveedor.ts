@@ -73,6 +73,7 @@ export function useSeguirInstitucion() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['panel-proveedor'] });
+      qc.invalidateQueries({ queryKey: ['instituciones-seguidas'] });
       toast.success('Institución agregada a tu seguimiento');
     },
     onError: () => toast.error('No se pudo seguir la institución'),
@@ -96,6 +97,7 @@ export function useDejarInstitucion() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['panel-proveedor'] });
+      qc.invalidateQueries({ queryKey: ['instituciones-seguidas'] });
       toast.success('Dejaste de seguir la institución');
     },
     onError: () => toast.error('No se pudo actualizar el seguimiento'),

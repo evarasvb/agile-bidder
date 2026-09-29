@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   Landmark,
   Building2,
@@ -34,17 +34,21 @@ import {
 import { useDejarInstitucion } from "@/hooks/usePanelProveedor";
 import { RiesgoOrganismoCard } from "@/components/organismo/RiesgoOrganismoCard";
 
-const fechaCorta = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleDateString("es-CL", { day: "2-digit", month: "short", year: "numeric" }) : "s/i";
+// Fechas tipo `date` (solo "AAAA-MM-DD", sin hora) se parsean en hora local
+// para no correr un día por el desfase UTC; las que ya traen hora (timestamptz)
+// se parsean tal cual.
+const fechaCorta = (iso: string | null) => {
+  if (!iso) return "s/i";
+  const d = new Date(iso.includes("T") ? iso : `${iso}T00:00:00`);
+  return d.toLocaleDateString("es-CL", { day: "2-digit", month: "short", year: "numeric" });
+};
 
-function FilaProceso({ p }: { p: ProcesoZoom }) {
+function FilaProceso({ p, tipo }: { p: ProcesoZoom; tipo: "licitacion" | "compra_agil" }) {
   const monto = p.presupuesto_estimado ?? p.monto_estimado;
   const abierto = p.fecha_cierre ? new Date(p.fecha_cierre) > new Date() : false;
   return (
-    <a
-      href={`https://www.mercadopublico.cl/Procurement/Modules/RFB/DetailsAcquisition.aspx?qs=${p.codigo}`}
-      target="_blank"
-      rel="noopener noreferrer"
+    <Link
+      to={tipo === "licitacion" ? `/licitaciones/${p.codigo}` : `/compras-agiles/${p.codigo}`}
       className="flex items-center justify-between gap-3 rounded-md border p-2.5 text-sm hover:bg-muted/50 transition-colors"
     >
       <div className="min-w-0">
@@ -54,7 +58,7 @@ function FilaProceso({ p }: { p: ProcesoZoom }) {
         </p>
       </div>
       {monto != null && monto > 1 && <span className="shrink-0 font-mono text-xs text-muted-foreground">{formatCompact(monto)}</span>}
-    </a>
+    </Link>
   );
 }
 
@@ -340,7 +344,7 @@ export default function Instituciones() {
                 <CardContent>
                   {zoom?.licitaciones.length ? (
                     <div className="space-y-1.5 max-h-72 overflow-y-auto">
-                      {zoom.licitaciones.map((p) => <FilaProceso key={p.codigo} p={p} />)}
+                      {zoom.licitaciones.map((p) => <FilaProceso key={p.codigo} p={p} tipo="licitacion" />)}
                     </div>
                   ) : <ListaVacia texto="Sin licitaciones recientes." />}
                 </CardContent>
@@ -354,7 +358,7 @@ export default function Instituciones() {
                 <CardContent>
                   {zoom?.compras_agiles.length ? (
                     <div className="space-y-1.5 max-h-72 overflow-y-auto">
-                      {zoom.compras_agiles.map((p) => <FilaProceso key={p.codigo} p={p} />)}
+                      {zoom.compras_agiles.map((p) => <FilaProceso key={p.codigo} p={p} tipo="compra_agil" />)}
                     </div>
                   ) : <ListaVacia texto="Sin compras ágiles recientes." />}
                 </CardContent>
