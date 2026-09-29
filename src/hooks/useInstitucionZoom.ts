@@ -86,7 +86,7 @@ export interface InstitucionZoom {
   procesos_12m: number | null;
   pago_por_100_procesos: number | null;
   reclamos_desde: string | null;
-  nivel: 'bajo' | 'medio' | 'alto' | 'sin_dato';
+  nivel: 'bajo' | 'medio' | 'alto' | 'sin_dato' | 'bloqueado';
   reclamos: ReclamoZoom[];
   noticias: NoticiaZoom[];
   licitaciones: ProcesoZoom[];
