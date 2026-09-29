@@ -5,129 +5,62 @@ import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 
-interface SystemLog {
-  id: string;
-  created_at: string;
-  severidad: string;
-  tipo: string;
-  mensaje: string;
-}
-
+// Sep 2026: antes el estado salía de `system_logs`, tabla que dejó de escribirse
+// el 4-sep. Resultado: TODOS los clientes veían "Sistema Inactivo" en rojo aunque
+// la ingesta funcionaba cada pocos minutos. Ahora se mide lo que le importa al
+// cliente: cuándo entró la última compra ágil desde Mercado Público.
 export function useSystemHealth() {
   return useQuery({
-    queryKey: ['system-health'],
-    queryFn: async (): Promise<SystemLog | null> => {
+    queryKey: ["system-health"],
+    queryFn: async (): Promise<string | null> => {
       const { data, error } = await supabase
-        .from('system_logs')
-        .select('*')
-        .order('created_at', { ascending: false })
+        .from("compras_agiles")
+        .select("created_at")
+        .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      
-      if (error) {
-        console.error('[SystemHealth] Error fetching:', error);
-        throw error;
-      }
-      
-      return data;
+      if (error) throw error;
+      return (data as { created_at: string } | null)?.created_at ?? null;
     },
-    refetchInterval: 60000, // Refresh every minute
-    staleTime: 30000,
+    refetchInterval: 5 * 60_000,
+    staleTime: 2 * 60_000,
   });
 }
 
+const HORA = 60 * 60 * 1000;
+
 export function SystemHealthIndicator() {
-  const { data: lastLog, isLoading, error } = useSystemHealth();
-  
-  // Check if system is healthy
-  const isHealthy = lastLog && 
-    lastLog.severidad !== 'error' && 
-    new Date(lastLog.created_at) > new Date(Date.now() - 2 * 60 * 60 * 1000); // Within last 2 hours
-  
-  // If no logs exist at all, treat as idle (not unhealthy)
-  const isIdle = !lastLog && !error;
-  
-  const getStatusInfo = () => {
-    if (isLoading) {
-      return {
-        label: "Verificando...",
-        color: "bg-muted-foreground",
-        textColor: "text-muted-foreground",
-        animate: true,
-      };
-    }
-    
-    if (error) {
-      return {
-        label: "Error de conexión",
-        color: "bg-firmavb-red",
-        textColor: "text-firmavb-red",
-        animate: true,
-      };
-    }
-    
-    if (isIdle) {
-      return {
-        label: "Sistema Inactivo",
-        color: "bg-warning",
-        textColor: "text-warning",
-        animate: true,
-      };
-    }
-    
-    if (isHealthy) {
-      return {
-        label: "Sistema Online",
-        color: "bg-success",
-        textColor: "text-success",
-        animate: false,
-      };
-    }
-    
-    return {
-      label: "Sistema Inactivo",
-      color: "bg-firmavb-red",
-      textColor: "text-firmavb-red",
-      animate: true,
-    };
-  };
-  
-  const status = getStatusInfo();
-  
+  const { data: ultima, isLoading, error } = useSystemHealth();
+  const edad = ultima ? Date.now() - new Date(ultima).getTime() : null;
+
+  // Verde: datos al día (< 3 h; la API de Mercado Público se degrada en horario
+  // de oficina). Ámbar: atrasado. Rojo solo si no se pudo consultar.
+  const status = isLoading
+    ? { label: "Verificando…", color: "bg-muted-foreground", text: "text-muted-foreground", pulse: true }
+    : error
+      ? { label: "Sin conexión", color: "bg-firmavb-red", text: "text-firmavb-red", pulse: true }
+      : edad !== null && edad < 3 * HORA
+        ? { label: "Datos al día", color: "bg-success", text: "text-success", pulse: false }
+        : { label: "Actualizando datos", color: "bg-warning", text: "text-warning", pulse: true };
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <div className="flex items-center gap-2 cursor-help px-3 py-1.5 rounded-full bg-muted/50 hover:bg-muted transition-colors">
-          <div className={cn(
-            "h-2.5 w-2.5 rounded-full transition-colors",
-            status.color,
-            status.animate && "animate-pulse"
-          )} />
-          <span className={cn("text-xs font-medium", status.textColor)}>
-            {status.label}
-          </span>
+          <div className={cn("h-2.5 w-2.5 rounded-full transition-colors", status.color, status.pulse && "animate-pulse")} />
+          <span className={cn("text-xs font-medium", status.text)}>{status.label}</span>
         </div>
       </TooltipTrigger>
       <TooltipContent side="bottom" className="max-w-xs">
         <div className="space-y-1.5 text-xs">
-          <p className="font-medium">Estado del Sistema</p>
-          {lastLog ? (
-            <>
-              <p>
-                <span className="text-muted-foreground">Último evento:</span>{" "}
-                {formatDistanceToNow(new Date(lastLog.created_at), { addSuffix: true, locale: es })}
-              </p>
-              <p>
-                <span className="text-muted-foreground">Tipo:</span>{" "}
-                {lastLog.tipo}
-              </p>
-              <p>
-                <span className="text-muted-foreground">Mensaje:</span>{" "}
-                {lastLog.mensaje.slice(0, 50)}...
-              </p>
-            </>
+          <p className="font-medium">Conexión con Mercado Público</p>
+          {ultima ? (
+            <p>
+              <span className="text-muted-foreground">Última compra ágil recibida:</span>{" "}
+              {formatDistanceToNow(new Date(ultima), { addSuffix: true, locale: es })}
+            </p>
           ) : (
-            <p className="text-muted-foreground">Sin registros de actividad</p>
+            <p className="text-muted-foreground">Aún sin datos</p>
           )}
         </div>
       </TooltipContent>
