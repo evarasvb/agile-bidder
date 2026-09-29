@@ -48,8 +48,15 @@ function subtitulo(a: Aviso) {
 // así que se asume "licitacion" (el tipo más común hasta ahora).
 function hrefOportunidad(a: Aviso): string | null {
   // Reclamos y compras de una institución seguida: al reporte de compradores,
-  // donde está su conducta de pago y a quién le compra.
-  if (a.tipo === "reclamo_institucion" || a.tipo === "compras_institucion") return "/reportes/compradores";
+  // con la institución en la URL para que abra su detalle (reclamos, conducta
+  // de pago, a quién le compra) de una vez, sin que el cliente tenga que
+  // volver a buscarla.
+  if (a.tipo === "reclamo_institucion" || a.tipo === "compras_institucion") {
+    const nombre = a.datos?.organismo;
+    return typeof nombre === "string" && nombre
+      ? `/reportes/compradores?institucion=${encodeURIComponent(nombre)}`
+      : "/reportes/compradores";
+  }
   if (!a.licitacion_id) return null;
   const tipo = a.datos?.tipo_oportunidad === "compra_agil" ? "compra_agil" : "licitacion";
   return `/oportunidades/${tipo}/${a.licitacion_id}`;
