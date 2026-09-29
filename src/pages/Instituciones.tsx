@@ -78,21 +78,34 @@ const TIPO_RECLAMO: Record<number, string> = { 1: "No pago", 2: "Proceso" };
 // Mercado Público publica el código del proceso al que corresponde el
 // reclamo, pero no un texto/motivo (su ficha pública de reclamos es solo
 // categórica: tipo, fecha, estado). Con el código sí se puede abrir el
-// proceso real y ver de qué se trataba. "COT" en el código es el patrón de
-// compra ágil (mismo criterio que compras_agiles.url_ficha); cualquier otro
-// formato se trata como licitación.
-const linkProcesoReclamo = (codigo: string) =>
-  /cot/i.test(codigo)
+// proceso real y ver de qué se trataba — pero reclamos_mp.proceso_codigo
+// trae formatos muy distintos: licitaciones/Convenio Marco/compras ágiles
+// como "1211839-319-CM26" o "3760-797-COT25", pero también IDs sueltos sin
+// ese formato ("3747", "40101701") que no son un proceso navegable. Contra
+// datos reales de `ordenes_compra.link_oficial` (que sí guarda el link
+// oficial de Mercado Público para muchas órdenes ya scrapeadas): los
+// códigos con formato "algo-números-LETRASdígitos" siempre abren en
+// DetailsAcquisition.aspx?idlicitacion=, sea licitación, Convenio Marco o
+// compra ágil con sufijo distinto a COT; el sufijo "COT" es el único caso
+// que usa la ficha de compra-agil.mercadopublico.cl (igual que
+// compras_agiles.url_ficha). Un código que no calza ese formato no se
+// enlaza: mejor no linkear que llevar a una ficha equivocada o vacía.
+const FORMATO_PROCESO_MP = /^[a-z0-9]+-\d+-[a-z]{1,4}\d{2,4}$/i;
+const linkProcesoReclamo = (codigo: string): string | null => {
+  if (!FORMATO_PROCESO_MP.test(codigo)) return null;
+  return /cot/i.test(codigo)
     ? `https://compra-agil.mercadopublico.cl/resumen-cotizacion/${codigo}`
     : `https://www.mercadopublico.cl/Procurement/Modules/RFB/DetailsAcquisition.aspx?idlicitacion=${codigo}`;
+};
 
 function FilaReclamo({ r }: { r: ReclamoZoom }) {
+  const link = r.proceso_codigo ? linkProcesoReclamo(r.proceso_codigo) : null;
   const contenido = (
     <>
       <div className="min-w-0">
         <p className="truncate font-medium">{r.reclamante || "Reclamante sin nombre"}</p>
         <p className="text-xs text-muted-foreground">{fechaCorta(r.fecha)} · {r.estado || "s/i"}</p>
-        {r.proceso_codigo && (
+        {link && (
           <p className="mt-0.5 flex items-center gap-1 text-xs text-firmavb-blue">
             <ExternalLink className="h-3 w-3" /> Ver proceso {r.proceso_codigo} en Mercado Público
           </p>
@@ -103,12 +116,12 @@ function FilaReclamo({ r }: { r: ReclamoZoom }) {
       </Badge>
     </>
   );
-  if (!r.proceso_codigo) {
+  if (!link) {
     return <div className="flex items-center justify-between gap-3 rounded-md border p-2.5 text-sm">{contenido}</div>;
   }
   return (
     <a
-      href={linkProcesoReclamo(r.proceso_codigo)}
+      href={link}
       target="_blank"
       rel="noopener noreferrer"
       className="flex items-center justify-between gap-3 rounded-md border p-2.5 text-sm hover:bg-muted/50 transition-colors"
