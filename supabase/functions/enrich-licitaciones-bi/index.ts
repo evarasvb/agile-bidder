@@ -15,7 +15,11 @@ function itemsOf(d:any){ const it=d?.Items; if(!it) return []; if(Array.isArray(
 Deno.serve(async (req)=>{
   if(req.method==='OPTIONS') return new Response('ok',{headers:cors});
   const supabase = createClient(Deno.env.get('SUPABASE_URL')??'', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')??'');
-  const ticket = Deno.env.get('MERCADOPUBLICO_API_KEY');
+  // Ticket dedicado a las visitas al detalle (bóveda 'mercadopublico_ticket_visitas', tercer
+  // ticket conseguido el 29-09-2026) para no agotar la cuota del ticket general que comparten
+  // los otros robots; si no existe, cae al env MERCADOPUBLICO_API_KEY.
+  const { data: ticketVault } = await supabase.rpc('secreto_vault', { p_nombre: 'mercadopublico_ticket_visitas' });
+  const ticket = (typeof ticketVault === 'string' && ticketVault.trim().length >= 20) ? ticketVault.trim() : Deno.env.get('MERCADOPUBLICO_API_KEY');
   if(!ticket) return new Response(JSON.stringify({error:'API key no configurada'}),{status:500,headers:{...cors,'Content-Type':'application/json'}});
 
   let limit = 40;
