@@ -123,12 +123,19 @@ export default function OnboardingEmpresa({ cliente, onDone }: Props) {
         terminos_version: TERMINOS_VERSION,
       } as Partial<Cliente> & { id: string });
 
-      await supabase
+      const { error: errorRegiones } = await supabase
         .from('cliente_filtros_oportunidades')
         .upsert(
           { cliente_id: cliente.id, regiones_activas: regiones, updated_at: new Date().toISOString() },
           { onConflict: 'cliente_id' },
         );
+      // upsert() no rechaza la promesa en un error de PostgREST/RLS: sin este
+      // chequeo, una región obligatoria podía quedar sin guardar en silencio
+      // y el cliente avanzaba igual, con oportunidades sin filtrar por región.
+      if (errorRegiones) {
+        toast.error('No pudimos guardar tus regiones. Intenta de nuevo.');
+        return;
+      }
 
       // La IA arma el perfil. Si falla, el cliente igual avanza y elige a mano.
       setEtapa('Revisando lo que tu empresa le ha vendido al Estado…');
