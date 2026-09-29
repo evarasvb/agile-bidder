@@ -58,6 +58,7 @@ export function ContactosSaludPanel() {
   const [enriqueciendo, setEnriqueciendo] = useState(false);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const [errorEnriquecimiento, setErrorEnriquecimiento] = useState<string | null>(null);
+  const [mensajeEnriquecimiento, setMensajeEnriquecimiento] = useState<string | null>(null);
 
   const cargarSalud = useCallback(async () => {
     setCargando(true);
@@ -121,6 +122,7 @@ export function ContactosSaludPanel() {
   const handleEnriquecerAhora = async () => {
     setEnriqueciendo(true);
     setErrorEnriquecimiento(null);
+    setMensajeEnriquecimiento(null);
     try {
       const { data: session, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !session.session?.access_token) {
@@ -135,14 +137,21 @@ export function ContactosSaludPanel() {
             'Authorization': `Bearer ${session.session.access_token}`,
             'apikey': (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string,
           },
+          body: JSON.stringify({ action: 'enqueue' }),
         }
       );
 
-      if (!response.ok) throw new Error(`El enriquecimiento respondió con estado ${response.status}`);
+      const outcome = await response.json().catch(() => null) as { accepted?: boolean; reused?: boolean } | null;
+      if (!response.ok || !outcome?.accepted) {
+        throw new Error(`El enriquecimiento respondió con estado ${response.status}`);
+      }
+      setMensajeEnriquecimiento(outcome.reused
+        ? 'Ya había un enriquecimiento en curso. Se mantiene la misma ejecución.'
+        : 'Enriquecimiento programado. Los lotes avanzarán en segundo plano.');
       await cargarSalud();
     } catch (error) {
       console.error('Error ejecutando enriquecimiento:', error);
-      setErrorEnriquecimiento('No se pudo completar el enriquecimiento. Revisa la última ejecución antes de reintentar.');
+      setErrorEnriquecimiento('No se pudo programar el enriquecimiento. Revisa la última ejecución antes de reintentar.');
     } finally {
       setEnriqueciendo(false);
     }
@@ -264,7 +273,7 @@ export function ContactosSaludPanel() {
             aria-busy={enriqueciendo}
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${enriqueciendo ? 'animate-spin' : ''}`} />
-            {enriqueciendo ? 'Enriqueciendo…' : 'Enriquecer ahora'}
+            {enriqueciendo ? 'Programando…' : 'Enriquecer ahora'}
           </Button>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -272,6 +281,13 @@ export function ContactosSaludPanel() {
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>{errorEnriquecimiento}</AlertDescription>
+            </Alert>
+          )}
+
+          {mensajeEnriquecimiento && (
+            <Alert>
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertDescription>{mensajeEnriquecimiento}</AlertDescription>
             </Alert>
           )}
 

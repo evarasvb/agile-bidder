@@ -1,15 +1,30 @@
-import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
+import { getAcademyProduct } from '../_shared/academia-products.ts';
+import {
+  consumeAcademyRateLimit,
+  rateLimitWindowStart,
+  requestRateLimitHash,
+  sha256Hex,
+} from '../_shared/academia-security.ts';
+import {
+  attachPrivatePlanillasUrl,
+  containsPrivatePlanillasDownload,
+  normalizeCourseSlug,
+  normalizeRecoveryEmail,
+  PRIVATE_ACADEMY_BUCKET,
+  PRIVATE_PLANILLAS_OBJECT_PATH,
+  PRIVATE_PLANILLAS_PLACEHOLDER,
+  recoveryWindowStart,
+  safeRecoveryResponse,
+} from './logic.ts';
 
-// Contenido de los cursos premium de la Academia. La fuente de verdad es la
-// tabla academia_contenido (slug, modulos jsonb), que se edita con los archivos
-// de supabase/academia/x10 y SQL. CONTENIDO es el respaldo histórico de dos
-// cursos por si la fila no existiera. Todo se sirve SOLO desde el servidor,
-// después de validar el código de acceso o el correo de la compra.
-
-const PLANILLAS = '/media/academia/planillas-programa-pro.xlsx';
+const PLANILLAS = PRIVATE_PLANILLAS_PLACEHOLDER;
 // Cuentas que abren cualquier curso premium sin código (revisar y probar). Se verifica la sesión, no el correo enviado.
 const FUNDADORES = ['evaras@firmavb.cl'];
 
+// Contenido de cursos premium. Los cursos base viven aquí; los nuevos pueden
+// vivir en la tabla academia_contenido (fuente de verdad, editable sin
+// redeploy). Todo SOLO en el servidor.
 const CONTENIDO: Record<string, unknown> = {
   'programa-pro-adjudica-al-estado': [
     { titulo: 'Módulo 1 · El terreno de juego (y cómo pensar)', lecciones: [
@@ -120,56 +135,194 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 }
 
+const FROM = 'FirmaVB <notificaciones@notifications.firmavb.cl>';
+
+function escapeHtml(value: unknown) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+async function getCourseContent(
+  admin: SupabaseClient,
+  slug: string,
+) {
+  // Primero la tabla (editable sin redeploy); el respaldo en código solo si no hay fila.
+  const { data } = await admin.from('academia_contenido')
+    .select('modulos').eq('slug', slug).maybeSingle();
+  return data?.modulos ?? CONTENIDO[slug];
+}
+
+// Los bloques "x10" (gráfico, tabla, video, quiz, herramienta, ejercicio) solo se
+// entregan a la app que sabe dibujarlos (envía x10: true); una app antigua recibe
+// el contenido clásico en vez de espacios en blanco.
+function filtrarBloquesClasicos(contenido: unknown) {
+  if (!Array.isArray(contenido)) return contenido;
+  const clasicos = new Set(['parrafo', 'subtitulo', 'lista', 'tip', 'descarga', 'caso', 'dato', 'cta']);
+  return (contenido as { titulo: string; lecciones: { titulo: string; bloques: { tipo: string }[] }[] }[]).map((m) => ({
+    ...m,
+    lecciones: m.lecciones.map((l) => ({ ...l, bloques: (l.bloques || []).filter((b) => clasicos.has(b.tipo)) })),
+  }));
+}
+
+async function sendRecoveryEmail(
+  resendKey: string,
+  input: { email: string; slug: string; code: string; idempotencyKey: string },
+) {
+  const productTitle = getAcademyProduct(input.slug)?.title || input.slug;
+  const courseUrl = `https://www.firmavb.cl/academia/curso/${encodeURIComponent(input.slug)}`;
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${resendKey}`,
+      'Content-Type': 'application/json',
+      'Idempotency-Key': input.idempotencyKey,
+    },
+    body: JSON.stringify({
+      from: FROM,
+      to: [input.email],
+      subject: 'Tu código de acceso — FirmaVB Academia',
+      html: `<p>Solicitaste recuperar tu acceso a <strong>${escapeHtml(productTitle)}</strong>.</p>
+        <p>Tu código es:</p>
+        <p style="font-size:22px;font-weight:700;letter-spacing:1px">${escapeHtml(input.code)}</p>
+        <p><a href="${courseUrl}">Abrir el curso</a></p>
+        <p>Si no hiciste esta solicitud, puedes ignorar este mensaje.</p>`,
+    }),
+  });
+  if (!response.ok) throw new Error('recovery_email_failed');
+}
+
+async function authorizedContent(admin: SupabaseClient, contenido: unknown) {
+  if (!containsPrivatePlanillasDownload(contenido)) return contenido;
+  const { data: signedDownload, error: signedDownloadError } = await admin.storage
+    .from(PRIVATE_ACADEMY_BUCKET)
+    .createSignedUrl(PRIVATE_PLANILLAS_OBJECT_PATH, 5 * 60);
+  if (signedDownloadError || !signedDownload?.signedUrl) {
+    return null;
+  }
+  return attachPrivatePlanillasUrl(contenido, signedDownload.signedUrl);
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
+  if (req.method !== 'POST') return json({ ok: false, error: 'Método no permitido' }, 405);
   try {
-    const { action, slug, codigo, email, x10 } = await req.json();
-    const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-    // Primero la tabla (editable sin redeploy); el respaldo en código solo si no hay fila.
-    const { data: fila } = await admin.from('academia_contenido').select('modulos').eq('slug', slug).maybeSingle();
-    let contenido: unknown = fila?.modulos ?? CONTENIDO[slug as string];
-    if (!contenido) return json({ ok: false, error: 'Curso no encontrado' }, 404);
-    // Los bloques "x10" (gráfico, tabla, video, quiz, herramienta, ejercicio) solo se
-    // entregan a la app que sabe dibujarlos (envía x10: true); una app antigua recibe
-    // el contenido clásico en vez de espacios en blanco.
-    if (x10 !== true && Array.isArray(contenido)) {
-      const clasicos = new Set(['parrafo', 'subtitulo', 'lista', 'tip', 'descarga', 'caso', 'dato', 'cta']);
-      contenido = (contenido as { titulo: string; lecciones: { titulo: string; bloques: { tipo: string }[] }[] }[]).map((m) => ({
-        ...m,
-        lecciones: m.lecciones.map((l) => ({ ...l, bloques: (l.bloques || []).filter((b) => clasicos.has(b.tipo)) })),
-      }));
-    }
+    const { action, slug: rawSlug, codigo, email, x10 } = await req.json();
+    const slug = normalizeCourseSlug(rawSlug);
+    if (!slug) return json({ ok: false, error: 'Curso no válido' }, 400);
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!supabaseUrl || !serviceRole) return json({ ok: false, error: 'Servicio no disponible' }, 503);
+    const admin = createClient(supabaseUrl, serviceRole);
+
+    const contenidoCrudo = await getCourseContent(admin, slug);
+    if (!contenidoCrudo) return json({ ok: false, error: 'Curso no encontrado' }, 404);
+    const contenido = x10 === true ? contenidoCrudo : filtrarBloquesClasicos(contenidoCrudo);
 
     if (action === 'fundador') {
       const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
       const { data: sesion } = jwt ? await admin.auth.getUser(jwt) : { data: { user: null } };
       const mail = String(sesion?.user?.email || '').toLowerCase();
       if (!mail || !FUNDADORES.includes(mail)) return json({ ok: false, error: 'Solo el fundador abre los cursos sin código.' }, 403);
-      return json({ ok: true, modulos: contenido });
+      const contenidoAutorizado = await authorizedContent(admin, contenido);
+      if (!contenidoAutorizado) return json({ ok: false, error: 'Material temporalmente no disponible.' }, 503);
+      return json({ ok: true, modulos: contenidoAutorizado });
     }
 
     if (action === 'validar') {
       const code = String(codigo || '').trim().toUpperCase();
-      if (!code) return json({ ok: false, error: 'Ingresa tu código.' }, 400);
-      const { data, error } = await admin.from('academia_accesos').select('id, estado').eq('curso_slug', slug).eq('codigo', code).maybeSingle();
+      if (!code || code.length > 128) return json({ ok: false, error: 'Ingresa tu código.' }, 400);
+
+      const rateKey = await requestRateLimitHash(req.headers, serviceRole, 'validar_codigo');
+      const allowed = await consumeAcademyRateLimit(
+        (args) => admin.rpc('academia_consumir_rate_limit', args),
+        {
+          action: 'validar_codigo',
+          keyHash: rateKey,
+          windowStart: rateLimitWindowStart(new Date(), 15 * 60 * 1_000),
+          limit: 12,
+        },
+      ).catch(() => null);
+      if (allowed === null) return json({ ok: false, error: 'Servicio no disponible' }, 503);
+      if (!allowed) {
+        return json({ ok: false, error: 'Demasiados intentos. Espera unos minutos.' }, 429);
+      }
+
+      const { data, error } = await admin.from('academia_accesos')
+        .select('id, estado').eq('curso_slug', slug).eq('codigo', code).maybeSingle();
       if (error) return json({ ok: false, error: 'Error validando el código.' }, 500);
       if (!data || data.estado === 'revocado') return json({ ok: false, error: 'Código inválido. Revísalo o escríbenos.' }, 200);
+
+      const contenidoAutorizado = await authorizedContent(admin, contenido);
+      if (!contenidoAutorizado) return json({ ok: false, error: 'Material temporalmente no disponible.' }, 503);
       if (data.estado === 'disponible') {
-        await admin.from('academia_accesos').update({ estado: 'usado', asignado_at: new Date().toISOString(), email: email || null }).eq('id', data.id);
+        const { error: updateError } = await admin.from('academia_accesos')
+          .update({ estado: 'usado', asignado_at: new Date().toISOString(), email: email || null })
+          .eq('id', data.id).neq('estado', 'revocado');
+        if (updateError) return json({ ok: false, error: 'Error validando el código.' }, 500);
       }
-      return json({ ok: true, modulos: contenido });
+      return json({ ok: true, modulos: contenidoAutorizado });
     }
 
     if (action === 'recuperar') {
-      const mail = String(email || '').trim().toLowerCase();
-      if (!mail) return json({ ok: false, error: 'Ingresa tu correo.' }, 400);
-      const { data } = await admin.from('academia_accesos').select('codigo').eq('curso_slug', slug).eq('email', mail).not('mp_payment_id', 'is', null).maybeSingle();
-      if (!data) return json({ ok: false, error: 'No encontramos una compra con ese correo. Si acabas de pagar, espera un minuto.' }, 200);
-      return json({ ok: true, codigo: data.codigo, modulos: contenido });
+      const mail = normalizeRecoveryEmail(email);
+      if (!mail) return json({ ok: false, error: 'Ingresa un correo válido.' }, 400);
+
+      const rateKey = await requestRateLimitHash(req.headers, serviceRole, 'recuperar_acceso');
+      const allowed = await consumeAcademyRateLimit(
+        (args) => admin.rpc('academia_consumir_rate_limit', args),
+        {
+          action: 'recuperar_acceso',
+          keyHash: rateKey,
+          windowStart: rateLimitWindowStart(new Date(), 15 * 60 * 1_000),
+          limit: 5,
+        },
+      ).catch(() => null);
+      if (allowed === null) return json({ ok: false, error: 'Servicio no disponible' }, 503);
+      if (!allowed) {
+        return json({ ok: false, error: 'Demasiadas solicitudes. Espera unos minutos.' }, 429);
+      }
+
+      const emailHash = await sha256Hex(mail);
+      const windowStart = recoveryWindowStart();
+      const { error: claimError } = await admin.from('academia_recuperaciones').insert({
+        email_hash: emailHash,
+        curso_slug: slug,
+        ventana_inicio: windowStart,
+      });
+
+      // La misma respuesta se usa si no existe la compra o si ya se solicitó
+      // dentro de la ventana; así no se revela quién es cliente.
+      if (claimError) return json(safeRecoveryResponse());
+
+      const { data: access } = await admin.from('academia_accesos')
+        .select('codigo')
+        .eq('curso_slug', slug)
+        .eq('email', mail)
+        .not('mp_payment_id', 'is', null)
+        .neq('estado', 'revocado')
+        .order('asignado_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const resendKey = Deno.env.get('RESEND_API_KEY');
+      if (access?.codigo && resendKey) {
+        await sendRecoveryEmail(resendKey, {
+          email: mail,
+          slug,
+          code: access.codigo,
+          idempotencyKey: `academia-recuperacion-${emailHash}-${slug}-${windowStart}`,
+        }).catch(() => undefined);
+      }
+      return json(safeRecoveryResponse());
     }
 
     return json({ ok: false, error: 'Acción no válida' }, 400);
-  } catch (_e) {
+  } catch {
     return json({ ok: false, error: 'Error inesperado' }, 500);
   }
 });

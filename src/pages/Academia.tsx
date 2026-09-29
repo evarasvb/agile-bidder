@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   Youtube,
@@ -16,6 +16,7 @@ import {
   CalendarClock,
   Play,
   ArrowRight,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,6 +27,9 @@ import { AcademiaLeadForm } from "@/components/academia/AcademiaLeadForm";
 import { CursoCard } from "@/components/academia/CursoCard";
 import { CURSOS, ACENTO, SAGA_BUNDLE } from "@/data/academiaCursos";
 import { Seo } from "@/components/Seo";
+import { createAcademyPayment } from "@/services/academyPayments";
+import { getAcademyPaymentReturnNotice } from "@/services/academyPaymentMessages";
+import { toast } from "sonner";
 
 // =============================================================================
 //  CONTENIDO DE LA ACADEMIA  ← EDITA AQUÍ TUS LINKS Y TEXTOS
@@ -293,6 +297,26 @@ export default function Academia() {
   // Si la foto de perfil no carga (archivo aún no subido), caemos a las iniciales
   // en vez de mostrar el ícono de imagen rota.
   const [fotoPerfilRota, setFotoPerfilRota] = useState(false);
+  const [comprandoSaga, setComprandoSaga] = useState(false);
+
+  useEffect(() => {
+    const paymentStatus = new URLSearchParams(window.location.search).get("pago");
+    const notice = getAcademyPaymentReturnNotice(paymentStatus);
+    if (notice?.tone === "info") toast.info(notice.message);
+    else if (notice?.tone === "error") toast.error(notice.message);
+    if (paymentStatus) window.history.replaceState({}, "", window.location.pathname);
+  }, []);
+
+  const comprarSaga = async () => {
+    setComprandoSaga(true);
+    try {
+      const checkout = await createAcademyPayment(SAGA_BUNDLE.slug);
+      window.location.href = checkout.url;
+    } catch (error) {
+      setComprandoSaga(false);
+      toast.error(error instanceof Error ? error.message : "No pudimos iniciar el pago.");
+    }
+  };
 
   // Salto por capítulos en el video destacado: al elegir un capítulo, recargamos
   // el iframe con ?start= en ese segundo.
@@ -834,21 +858,17 @@ export default function Academia() {
                   </div>
                   <div className="mt-4 md:mt-0 text-center shrink-0">
                     <p className="text-3xl font-bold mb-2">{SAGA_BUNDLE.precio}</p>
-                    {SAGA_BUNDLE.pagoUrl ? (
-                      <Button
-                        asChild
-                        size="lg"
-                        className="bg-white text-firmavb-blue hover:bg-white/90 font-semibold gap-2"
-                      >
-                        <a href={SAGA_BUNDLE.pagoUrl} target="_blank" rel="noopener noreferrer" aria-label="Comprar la saga completa (abre en nueva pestaña)">
-                          Comprar la saga completa
-                        </a>
-                      </Button>
-                    ) : (
-                      <Button size="lg" disabled>
-                        Muy pronto
-                      </Button>
-                    )}
+                    <Button
+                      type="button"
+                      size="lg"
+                      onClick={comprarSaga}
+                      disabled={comprandoSaga}
+                      className="bg-white text-firmavb-blue hover:bg-white/90 font-semibold gap-2"
+                      aria-label="Comprar la saga completa con Mercado Pago"
+                    >
+                      {comprandoSaga && <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />}
+                      {comprandoSaga ? "Preparando pago…" : "Comprar la saga completa"}
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
