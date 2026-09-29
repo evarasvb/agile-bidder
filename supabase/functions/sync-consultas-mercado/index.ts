@@ -73,22 +73,45 @@ Deno.serve(async (req: Request) => {
 
     const mpToken = await tokenAnonimo();
 
-    let pagina = 1;
+    const urlPagina = (pagina: number) => `${API_BASE}?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&pagina=${pagina}`;
+    const pedirPagina = async (pagina: number) => {
+      const r = await fetch(urlPagina(pagina), { headers: { Authorization: `Bearer ${mpToken}`, Accept: "application/json" } });
+      if (!r.ok) throw new Error(`listado pag ${pagina}: HTTP ${r.status} ${(await r.text().catch(() => "")).slice(0, 200)}`);
+      return await r.json();
+    };
+
     let total = 0;
     let guardadas = 0;
     let muestra: unknown = null;
     const errores: string[] = [];
+    const paginasLeidas: number[] = [];
 
-    while (pagina <= paginasMax) {
-      const url = `${API_BASE}?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&pagina=${pagina}`;
-      const r = await fetch(url, { headers: { Authorization: `Bearer ${mpToken}`, Accept: "application/json" } });
-      if (!r.ok) { errores.push(`listado pag ${pagina}: HTTP ${r.status} ${(await r.text().catch(() => "")).slice(0, 200)}`); break; }
-      const j = await r.json();
+    // La API ordena de la consulta más antigua a la más nueva (igual que
+    // documenta supabase/functions/experto-bajo-agua/index.ts para el mismo
+    // endpoint): con más páginas disponibles que paginasMax, pedir siempre
+    // 1..paginasMax deja afuera las más recientes para siempre, porque el
+    // cron repite esta misma ventana de días cada 15 minutos. Se lee la
+    // página 1 solo para saber cuántas hay y, si sobran, se leen las
+    // últimas paginasMax páginas (las recientes) en vez de las primeras.
+    const j1 = await pedirPagina(1);
+    const pageCount = Math.max(1, Number(j1?.payload?.pageCount) || 1);
+    const paginas = pageCount <= paginasMax
+      ? Array.from({ length: pageCount }, (_, i) => i + 1)
+      : Array.from({ length: paginasMax }, (_, i) => pageCount - paginasMax + 1 + i);
+
+    for (const pagina of paginas) {
+      let j: any;
+      try {
+        j = pagina === 1 ? j1 : await pedirPagina(pagina);
+      } catch (e) {
+        errores.push(e instanceof Error ? e.message : String(e));
+        continue;
+      }
       const listado: any[] = j?.payload?.resultados ?? j?.payload?.listado ?? j?.listado ?? j?.data ?? (Array.isArray(j) ? j : []);
-      const pageCount = Number(j?.payload?.pageCount) || null;
       if (!muestra && listado[0]) muestra = listado[0];
-      if (!listado.length) break;
+      if (!listado.length) continue;
       total += listado.length;
+      paginasLeidas.push(pagina);
 
       const filas = listado.map(filaAConsulta).filter((f): f is NonNullable<typeof f> => f !== null);
       if (filas.length) {
@@ -96,12 +119,10 @@ Deno.serve(async (req: Request) => {
         if (error) errores.push(`upsert pag ${pagina}: ${error.message}`);
         else guardadas += count ?? filas.length;
       }
-      pagina++;
-      if (pageCount !== null && pagina > pageCount) break; // ya se leyeron todas las páginas disponibles
     }
 
     return new Response(
-      JSON.stringify({ ok: errores.length === 0, dias, desde, hasta, paginas_leidas: pagina - 1, total_listado: total, guardadas, errores, muestra, ms: Date.now() - t0 }),
+      JSON.stringify({ ok: errores.length === 0, dias, desde, hasta, page_count: pageCount, paginas_leidas: paginasLeidas, total_listado: total, guardadas, errores, muestra, ms: Date.now() - t0 }),
       { headers: { ...cors, "Content-Type": "application/json" } },
     );
   } catch (e) {
