@@ -233,10 +233,11 @@ serve(async (req: Request) => {
     }
 
     // El veredicto IA (score de pago, precios propios, recomendación) es inteligencia
-    // del plan de pago. Un usuario free recibe 402, mismo patrón que estudio/matriz.
-    const { data: usoPlan } = await supabase.rpc('experto_uso_mes', { p_user_id: userData.user.id, p_huella: 'anon' });
-    const planUsuario = (usoPlan as any)?.[0]?.plan ?? 'free';
-    if (!planUsuario || planUsuario === 'free') {
+    // del plan de pago. Se evalúa el plan de la EMPRESA DUEÑA (no el asiento
+    // invitado, cuya ficha personal es 'free'), para no dejar fuera a los equipos
+    // de un cliente que sí paga.
+    const { data: pagaPlan } = await supabase.rpc('plan_pagado_de_usuario', { p_user_id: userData.user.id });
+    if (pagaPlan !== true) {
       return new Response(JSON.stringify({ error: 'pro', mensaje: 'El veredicto IA es del plan Pro: $50.000 por 30 días, con veredicto, estudio profundo y preguntas sin límite.' }), { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 

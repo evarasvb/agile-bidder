@@ -125,12 +125,12 @@ Deno.serve(async (req) => {
     if (r !== "authenticated" && r !== "service_role") return json({ error: "login", mensaje: "Inicia sesión en FirmaVB para ver qué dicen los medios." }, 401);
     // Los medios cruzados del organismo son inteligencia del plan de pago. Un usuario
     // free (autenticado) recibe 402; el service_role (cron u otras edge functions) pasa.
+    // Se evalúa el plan de la EMPRESA DUEÑA (no el asiento invitado, ficha 'free').
     if (r === "authenticated") {
       let sub: string | null = null;
       try { sub = JSON.parse(atob((req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).sub ?? null; } catch { /* sin sub */ }
-      const { data: usoPlan } = await sb.rpc("experto_uso_mes", { p_user_id: sub, p_huella: "anon" });
-      const plan = (usoPlan as any)?.[0]?.plan ?? "free";
-      if (!plan || plan === "free") return json({ error: "pro", mensaje: "Los medios del organismo son del plan Pro: $50.000 por 30 días." }, 402);
+      const { data: pagaPlan } = await sb.rpc("plan_pagado_de_usuario", { p_user_id: sub });
+      if (pagaPlan !== true) return json({ error: "pro", mensaje: "Los medios del organismo son del plan Pro: $50.000 por 30 días." }, 402);
     }
     const codigo = String(body.codigo ?? "").trim().toUpperCase() || undefined;
     let organismo = String(body.organismo ?? "").trim();

@@ -316,6 +316,22 @@ Deno.serve(async (req) => {
       clienteId = keyData.cliente_id;
       apiKeyId = keyData.id;
 
+      // La extensión (postular/cotizar) es de plan de pago. Verificamos el plan
+      // del cliente dueño de la key EN CADA USO, no solo al emitirla: así una key
+      // creada antes del cobro, o un cliente cuyo plan venció, deja de funcionar.
+      const { data: clientePlan } = await supabase
+        .from('clientes')
+        .select('plan')
+        .eq('id', clienteId)
+        .maybeSingle();
+      const planExtension = (clientePlan as { plan?: string } | null)?.plan ?? 'free';
+      if (!planExtension || planExtension === 'free') {
+        return new Response(
+          JSON.stringify({ error: 'plan', mensaje: 'La extensión de FirmaVB requiere un plan de pago activo.' }),
+          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       // Update last_used
       await supabase
         .from('extension_api_keys')

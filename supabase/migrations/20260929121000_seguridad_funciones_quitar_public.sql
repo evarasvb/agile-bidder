@@ -17,7 +17,6 @@ declare
     'noticias_refrescar_clientes',
     'experto_libro_eliminar',
     'consumir_creditos',
-    'creditos_asegurar_cuenta',
     'creditos_saldo',
     'experto_bajo_agua_mi_cuota',
     'experto_jurisprudencia',
@@ -26,8 +25,12 @@ declare
     'cliente_panel_proveedor',
     'inteligencia_oc_oportunidad'
   ];
-  -- Funciones de trigger: nadie las llama directo. Revocar a todos los roles cliente.
-  trg_nombres text[] := array['creditos_sync_plan_trigger'];
+  -- Funciones de trigger o exclusivas del backend: nadie las llama directo desde
+  -- el cliente. Revocar a todos los roles cliente (solo service_role).
+  -- creditos_asegurar_cuenta es SECURITY DEFINER, recibe un UUID arbitrario y
+  -- devuelve la cuenta/plan/saldo de ese usuario: debe quedar solo service_role
+  -- (lo aseguró 20260926190000).
+  trg_nombres text[] := array['creditos_sync_plan_trigger', 'creditos_asegurar_cuenta'];
 begin
   foreach fn in array rpc_nombres loop
     for sig in

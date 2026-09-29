@@ -6,18 +6,41 @@
 -- toma efecto al mergear y desplegar. Los clientes que pagan no se ven afectados.
 
 -- ─────────────────────────────────────────────────────────────
--- Helper reutilizable: ¿el usuario tiene plan de pago?
--- Paga = clientes.plan distinto de 'free', o ventana Experto Pro/Plus activa.
+-- Helper reutilizable: ¿este usuario tiene plan de pago?
+-- Clave: se evalúa el plan de la EMPRESA DUEÑA, no el de la ficha personal.
+-- Un asiento invitado (tabla vendedores) tiene su propia ficha 'clientes' en
+-- 'free'; el plan que vale es el del dueño que lo invitó. Se resuelve el dueño
+-- igual que cliente_owner_id(), pero parametrizado por user_id para poder usarlo
+-- también desde las edge functions (service_role, sin auth.uid()).
+-- Paga = plan del dueño distinto de 'free', o ventana Experto Pro/Plus personal.
 -- ─────────────────────────────────────────────────────────────
+create or replace function public.plan_pagado_de_usuario(p_user_id uuid)
+returns boolean
+language sql stable security definer set search_path to 'public' as $$
+  with owner as (
+    select coalesce(
+      (select c.id
+         from public.vendedores v
+         join public.clientes c on c.user_id = v.invitado_por
+        where v.user_id = p_user_id and v.activo is true and v.invitado_por is not null
+        order by v.updated_at desc nulls last limit 1),
+      (select id from public.clientes where user_id = p_user_id order by created_at asc limit 1)
+    ) as cid
+  )
+  select
+    coalesce((select c.plan is not null and c.plan <> 'free'
+                from public.clientes c join owner o on o.cid = c.id), false)
+    or exists (select 1 from public.experto_pro e
+               where e.user_id = p_user_id and e.hasta > now());
+$$;
+revoke execute on function public.plan_pagado_de_usuario(uuid) from public, anon;
+grant execute on function public.plan_pagado_de_usuario(uuid) to authenticated, service_role;
+
+-- Azúcar para el usuario actual (lo usan las RPC y las políticas RLS).
 create or replace function public.tiene_plan_pago(p_user_id uuid default auth.uid())
 returns boolean
 language sql stable security definer set search_path to 'public' as $$
-  select coalesce(
-    (select c.plan is not null and c.plan <> 'free'
-       from public.clientes c where c.user_id = p_user_id limit 1),
-    false)
-  or exists (select 1 from public.experto_pro e
-             where e.user_id = p_user_id and e.hasta > now());
+  select public.plan_pagado_de_usuario(coalesce(p_user_id, auth.uid()));
 $$;
 revoke execute on function public.tiene_plan_pago(uuid) from public, anon;
 grant execute on function public.tiene_plan_pago(uuid) to authenticated, service_role;

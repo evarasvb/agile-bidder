@@ -32,6 +32,10 @@ from anon;
 --    autenticados (lectura/escritura) ya existen y se mantienen.
 -- ─────────────────────────────────────────────────────────────
 drop policy if exists "Allow public read" on public.compras_agiles;
+-- Una migración vieja (20260118141817) creó además "Anyone can view compras_agiles"
+-- con USING (true); al reconstruir desde cero hay que eliminarla también, o el
+-- acceso anónimo quedaría reabierto.
+drop policy if exists "Anyone can view compras_agiles" on public.compras_agiles;
 
 -- ─────────────────────────────────────────────────────────────
 -- 3) noticias_pendientes: cola interna que estaba SIN RLS y con acceso total
