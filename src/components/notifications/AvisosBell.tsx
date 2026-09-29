@@ -47,9 +47,13 @@ function subtitulo(a: Aviso) {
 // nuevos ya traen `tipo_oportunidad`; los generados antes de ese cambio no,
 // así que se asume "licitacion" (el tipo más común hasta ahora).
 function hrefOportunidad(a: Aviso): string | null {
-  // Reclamos y compras de una institución seguida: al reporte de compradores,
-  // donde está su conducta de pago y a quién le compra.
-  if (a.tipo === "reclamo_institucion" || a.tipo === "compras_institucion") return "/reportes/compradores";
+  // Reclamos y compras de una institución seguida: al módulo "Instituciones
+  // que sigo", con el RUT exacto en la URL para que abra su zoom (reclamos,
+  // pagos, noticias, licitaciones y compras ágiles) de una vez.
+  if (a.tipo === "reclamo_institucion" || a.tipo === "compras_institucion") {
+    const rut = a.datos?.rut;
+    return typeof rut === "string" && rut ? `/instituciones?rut=${encodeURIComponent(rut)}` : "/instituciones";
+  }
   if (!a.licitacion_id) return null;
   const tipo = a.datos?.tipo_oportunidad === "compra_agil" ? "compra_agil" : "licitacion";
   return `/oportunidades/${tipo}/${a.licitacion_id}`;
@@ -180,7 +184,7 @@ export function AvisosBell({ className }: Props) {
             <Link to="/oportunidades">Mis oportunidades</Link>
           </Button>
           <Button asChild variant="ghost" size="sm" className="w-full text-xs" onClick={() => setOpen(false)}>
-            <Link to="/dashboard">Instituciones que sigo</Link>
+            <Link to="/instituciones">Instituciones que sigo</Link>
           </Button>
         </div>
       </PopoverContent>
