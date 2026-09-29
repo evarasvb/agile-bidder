@@ -232,6 +232,14 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
+    // El veredicto IA (score de pago, precios propios, recomendación) es inteligencia
+    // del plan de pago. Un usuario free recibe 402, mismo patrón que estudio/matriz.
+    const { data: usoPlan } = await supabase.rpc('experto_uso_mes', { p_user_id: userData.user.id, p_huella: 'anon' });
+    const planUsuario = (usoPlan as any)?.[0]?.plan ?? 'free';
+    if (!planUsuario || planUsuario === 'free') {
+      return new Response(JSON.stringify({ error: 'pro', mensaje: 'El veredicto IA es del plan Pro: $50.000 por 30 días, con veredicto, estudio profundo y preguntas sin límite.' }), { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     const body = await req.json().catch(() => ({})) as { tipo?: string; codigo?: string };
     const tipo = body.tipo;
     const codigo = (body.codigo || '').trim();
