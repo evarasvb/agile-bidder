@@ -95,9 +95,16 @@ export function useDejarInstitucion() {
         .eq('rut_institucion', rut);
       if (error) throw error;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['panel-proveedor'] });
-      qc.invalidateQueries({ queryKey: ['instituciones-seguidas'] });
+    onSuccess: async () => {
+      // Espera a que termine el refetch (no solo la invalidación) antes de
+      // resolver: mientras la mutación esté "pending", Instituciones.tsx
+      // bloquea la reselección automática, así que si esto no espera, la
+      // institución recién eliminada puede volver a elegirse desde la
+      // lista todavía en caché.
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['panel-proveedor'] }),
+        qc.invalidateQueries({ queryKey: ['instituciones-seguidas'] }),
+      ]);
       toast.success('Dejaste de seguir la institución');
     },
     onError: () => toast.error('No se pudo actualizar el seguimiento'),
