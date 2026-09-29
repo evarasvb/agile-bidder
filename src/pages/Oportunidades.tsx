@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { montoCorto } from "@/lib/formatoMonto";
 import { useInventoryStats } from "@/hooks/useInventory";
 
 // De dónde sale el % de match, para que nunca parezca magia: inventario (por producto) o palabras clave.
@@ -67,10 +68,7 @@ function formatCurrency(value: number | null) {
 }
 
 function formatCompactCurrency(value: number) {
-  if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`;
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(0)}M`;
-  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
-  return `$${value}`;
+  return montoCorto(value);
 }
 
 function getDeadlineText(fechaCierre: string | null): { text: string; urgent: boolean; closed: boolean } {
@@ -547,7 +545,11 @@ export default function Oportunidades() {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-muted-foreground">
-            {oportunidades.length} oportunidades encontradas
+            {isLoading
+              ? "Buscando tus oportunidades…"
+              : stats.totalActivas > oportunidades.length
+                ? `Mostrando ${oportunidades.length.toLocaleString("es-CL")} de ${stats.totalActivas.toLocaleString("es-CL")} oportunidades (ajusta los filtros para ver otras)`
+                : `${oportunidades.length.toLocaleString("es-CL")} oportunidades encontradas`}
           </p>
           {stats.busqueda && (
             <p className="text-xs text-muted-foreground">

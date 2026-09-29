@@ -1376,6 +1376,7 @@ export type Database = {
           score_minimo_alerta: number | null
           updated_at: string
           webhook_url: string | null
+          whatsapp_avisos: boolean
         }
         Insert: {
           alerta_cambios_guardadas?: boolean | null
@@ -1398,6 +1399,7 @@ export type Database = {
           score_minimo_alerta?: number | null
           updated_at?: string
           webhook_url?: string | null
+          whatsapp_avisos?: boolean
         }
         Update: {
           alerta_cambios_guardadas?: boolean | null
@@ -1420,6 +1422,7 @@ export type Database = {
           score_minimo_alerta?: number | null
           updated_at?: string
           webhook_url?: string | null
+          whatsapp_avisos?: boolean
         }
         Relationships: [
           {
@@ -1617,6 +1620,7 @@ export type Database = {
           aviso_onboarding: boolean
           categoria_negocio: string | null
           created_at: string
+          descripcion_empresa: string | null
           direccion: string | null
           email: string
           email_contacto: string | null
@@ -1635,14 +1639,18 @@ export type Database = {
           representante_rut: string | null
           rut: string | null
           telefono: string | null
+          terminos_aceptados_at: string | null
+          terminos_version: string | null
           updated_at: string
           user_id: string | null
+          whatsapp: string | null
         }
         Insert: {
           activo?: boolean
           aviso_onboarding?: boolean
           categoria_negocio?: string | null
           created_at?: string
+          descripcion_empresa?: string | null
           direccion?: string | null
           email: string
           email_contacto?: string | null
@@ -1661,14 +1669,18 @@ export type Database = {
           representante_rut?: string | null
           rut?: string | null
           telefono?: string | null
+          terminos_aceptados_at?: string | null
+          terminos_version?: string | null
           updated_at?: string
           user_id?: string | null
+          whatsapp?: string | null
         }
         Update: {
           activo?: boolean
           aviso_onboarding?: boolean
           categoria_negocio?: string | null
           created_at?: string
+          descripcion_empresa?: string | null
           direccion?: string | null
           email?: string
           email_contacto?: string | null
@@ -1687,8 +1699,11 @@ export type Database = {
           representante_rut?: string | null
           rut?: string | null
           telefono?: string | null
+          terminos_aceptados_at?: string | null
+          terminos_version?: string | null
           updated_at?: string
           user_id?: string | null
+          whatsapp?: string | null
         }
         Relationships: []
       }
@@ -4942,6 +4957,39 @@ export type Database = {
           },
         ]
       }
+      licitaciones_cambios: {
+        Row: {
+          campo: string
+          codigo: string
+          detectado_en: string
+          id: string
+          procesado: boolean
+          tipo_proceso: string
+          valor_anterior: string | null
+          valor_nuevo: string | null
+        }
+        Insert: {
+          campo: string
+          codigo: string
+          detectado_en?: string
+          id?: string
+          procesado?: boolean
+          tipo_proceso: string
+          valor_anterior?: string | null
+          valor_nuevo?: string | null
+        }
+        Update: {
+          campo?: string
+          codigo?: string
+          detectado_en?: string
+          id?: string
+          procesado?: boolean
+          tipo_proceso?: string
+          valor_anterior?: string | null
+          valor_nuevo?: string | null
+        }
+        Relationships: []
+      }
       licitaciones_logs: {
         Row: {
           created_at: string | null
@@ -5514,6 +5562,60 @@ export type Database = {
           organismo?: string
           organismo_norm?: string
           revisado_en?: string
+        }
+        Relationships: []
+      }
+      noticias_institucion: {
+        Row: {
+          consulta: string
+          created_at: string | null
+          fecha: string | null
+          id: number
+          medio: string | null
+          rut_institucion: string | null
+          titulo: string
+          url: string | null
+        }
+        Insert: {
+          consulta: string
+          created_at?: string | null
+          fecha?: string | null
+          id?: number
+          medio?: string | null
+          rut_institucion?: string | null
+          titulo: string
+          url?: string | null
+        }
+        Update: {
+          consulta?: string
+          created_at?: string | null
+          fecha?: string | null
+          id?: number
+          medio?: string | null
+          rut_institucion?: string | null
+          titulo?: string
+          url?: string | null
+        }
+        Relationships: []
+      }
+      noticias_pendientes: {
+        Row: {
+          consulta: string
+          created_at: string | null
+          req_id: number
+          rut_institucion: string | null
+        }
+        Insert: {
+          consulta: string
+          created_at?: string | null
+          req_id: number
+          rut_institucion?: string | null
+        }
+        Update: {
+          consulta?: string
+          created_at?: string | null
+          req_id?: number
+          rut_institucion?: string | null
         }
         Relationships: []
       }
@@ -10512,6 +10614,20 @@ export type Database = {
         }
         Returns: Json
       }
+      correo_gancho_html: {
+        Args: { p_email: string }
+        Returns: {
+          asunto: string
+          html: string
+        }[]
+      }
+      correo_novedades_html: {
+        Args: { p_rut: string }
+        Returns: {
+          asunto: string
+          html: string
+        }[]
+      }
       create_default_search_profile: {
         Args: { user_id: string }
         Returns: string
@@ -10533,6 +10649,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      creditos_recargar_mensuales: { Args: never; Returns: number }
       creditos_saldo: { Args: never; Returns: Json }
       cubo_consultar: {
         Args: {
@@ -10967,6 +11084,31 @@ export type Database = {
         }[]
       }
       experto_insertar: { Args: { filas: Json }; Returns: number }
+      experto_jurisprudencia: {
+        Args: { cantidad?: number; consulta: string }
+        Returns: {
+          fecha: string
+          fuente: string
+          id: number
+          relevancia: number
+          seccion: string
+          texto: string
+          tipo: string
+          url: string
+        }[]
+      }
+      experto_leyes: {
+        Args: { cantidad?: number; consulta: string }
+        Returns: {
+          fecha: string
+          fuente: string
+          id: number
+          relevancia: number
+          seccion: string
+          texto: string
+          url: string
+        }[]
+      }
       experto_libro: { Args: { p_codigo: string }; Returns: Json }
       experto_libro_archivar: {
         Args: { p_archivado?: boolean; p_codigo: string }
@@ -11211,6 +11353,7 @@ export type Database = {
           top_organismos: Json
         }[]
       }
+      fmt_clp: { Args: { n: number }; Returns: string }
       fundador_ajuste_set: {
         Args: { p_activo: boolean; p_clave: string }
         Returns: undefined
@@ -11307,6 +11450,17 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      fundador_creditos_clientes: {
+        Args: { p_buscar?: string }
+        Returns: {
+          actualizado: string
+          email: string
+          empresa: string
+          plan: string
+          saldo: number
+          user_id: string
+        }[]
       }
       fundador_creditos_otorgar: {
         Args: { p_creditos: number; p_motivo?: string; p_user_id: string }
@@ -11618,6 +11772,10 @@ export type Database = {
           rut: string
         }[]
       }
+      instituciones_seguidas_avisar: {
+        Args: { p_desde?: string }
+        Returns: number
+      }
       inteligencia_oc_oportunidad: {
         Args: { p_codigo: string; p_limit?: number; p_tipo: string }
         Returns: {
@@ -11648,6 +11806,8 @@ export type Database = {
           texto: string
         }[]
       }
+      jurisprudencia_insertar: { Args: { p_filas: Json }; Returns: number }
+      leyes_insertar: { Args: { p_filas: Json }; Returns: number }
       licitaciones_adjuntos_pendientes: {
         Args: { p_limite?: number }
         Returns: {
@@ -11787,6 +11947,13 @@ export type Database = {
       }
       mp_tipo_oc: { Args: { codigo: string }; Returns: string }
       noticias_insertar: { Args: { p_filas: Json }; Returns: number }
+      noticias_procesar: { Args: never; Returns: number }
+      noticias_refrescar_clientes: { Args: never; Returns: number }
+      noticias_solicitar: {
+        Args: { p_consulta: string; p_rut?: string }
+        Returns: number
+      }
+      novedades_por_rut: { Args: { p_rut: string }; Returns: Json }
       ocds_codigos_pendientes: {
         Args: { p_max?: number }
         Returns: {
@@ -11813,6 +11980,7 @@ export type Database = {
         }[]
       }
       ocds_upsert: { Args: { p_filas: Json }; Returns: number }
+      onboarding_por_rut: { Args: { p_rut: string }; Returns: Json }
       onboarding_resumen: {
         Args: { p_candidatas: string[]; p_incluidas: string[] }
         Returns: Json
@@ -11851,6 +12019,10 @@ export type Database = {
           rut: string
           top_reclamante_pct: number
         }[]
+      }
+      perfil_por_rut: {
+        Args: { p_rubro?: string; p_rut: string }
+        Returns: Json
       }
       pexels_termino_rubro: { Args: { p_texto: string }; Returns: string }
       pipeline_tasa_exito_equipo: { Args: never; Returns: number }
@@ -11988,10 +12160,16 @@ export type Database = {
       }
       rut_cuerpo: { Args: { p: string }; Returns: string }
       rut_formatear: { Args: { p: string }; Returns: string }
+      rut_normalizar: { Args: { p: string }; Returns: string }
+      rut_valido: { Args: { p: string }; Returns: boolean }
       secreto_vault: { Args: { p_nombre: string }; Returns: string }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       sync_compras_agiles_match_flags: { Args: never; Returns: number }
+      token_es_service_role_legacy: {
+        Args: { p_token: string }
+        Returns: boolean
+      }
       tsq_oportunidad: { Args: { texto: string }; Returns: unknown }
       tsv_oportunidad: { Args: { a: string; b: string }; Returns: unknown }
       unaccent: { Args: { "": string }; Returns: string }
@@ -11999,12 +12177,21 @@ export type Database = {
         Args: { compras_data: Json }
         Returns: Json
       }
+      url_encode: { Args: { p: string }; Returns: string }
       user_can_access_section: {
         Args: { _section_key: string; _user_id: string }
         Returns: boolean
       }
       validar_email_basico: { Args: { p_email: string }; Returns: string }
       vendedores_owner_auth_id: { Args: never; Returns: string }
+      vigia_clientes_interesados: {
+        Args: { p_codigo: string }
+        Returns: {
+          cliente_id: string
+          email: string
+          empresa_nombre: string
+        }[]
+      }
       youtube_sincronizar_suscriptores: {
         Args: { p_canal_id: string }
         Returns: {

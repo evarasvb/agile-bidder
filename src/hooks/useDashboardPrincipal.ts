@@ -106,7 +106,17 @@ export function usePipelineByStage() {
         adjudicada: 'Adjudicada',
         cerrada: 'Cerrada',
         desierta: 'Desierta',
+        proveedorseleccionado: 'Proveedor seleccionado',
+        proveedor_seleccionado: 'Proveedor seleccionado',
+        'oc emitida': 'OC emitida',
+        oc_emitida: 'OC emitida',
+        suspendida: 'Suspendida',
+        revocada: 'Revocada',
+        activa: 'Activa',
+        cancelada: 'Cancelada',
       };
+      // Estados internos de FirmaVB que no son del mercado: no van en este gráfico.
+      const internos = new Set(['propuesta_lista', 'sin_estado']);
 
       const result: PipelineStage[] = [];
       // Add known stages in order
@@ -122,9 +132,10 @@ export function usePipelineByStage() {
       }
       // Add any remaining stages
       for (const [key, val] of Object.entries(stageMap)) {
-        if (key === 'sin_estado') continue;
+        if (internos.has(key)) continue;
+        const legible = key.replace(/_/g, ' ');
         result.push({
-          etapa: stageLabels[key] || key.charAt(0).toUpperCase() + key.slice(1),
+          etapa: stageLabels[key] || legible.charAt(0).toUpperCase() + legible.slice(1),
           count: val.count,
           monto: val.monto,
         });
