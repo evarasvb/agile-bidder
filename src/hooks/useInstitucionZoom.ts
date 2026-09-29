@@ -44,6 +44,29 @@ export interface ProcesoZoom {
   presupuesto_estimado?: number | null;
   monto_estimado?: number | null;
 }
+export interface RfZoom {
+  codigo: string;
+  nombre: string | null;
+  estado: string | null;
+  fecha_publicacion: string | null;
+  fecha_cierre: string | null;
+}
+export interface FuncionarioZoom {
+  nombre: string;
+  cargo: string | null;
+  procesos: number;
+  ultimo: string | null;
+}
+export interface CausaZoom {
+  extracto: string;
+  fecha: string;
+}
+export interface CobranzaZoom {
+  numero_factura: string | null;
+  monto: number;
+  fecha_vencimiento: string | null;
+  estado: string;
+}
 export interface InstitucionZoom {
   rut: string;
   encontrada: boolean;
@@ -68,8 +91,11 @@ export interface InstitucionZoom {
   noticias: NoticiaZoom[];
   licitaciones: ProcesoZoom[];
   compras_agiles: ProcesoZoom[];
-  rf: unknown[];
+  rf: RfZoom[];
   rf_disponible: boolean;
+  funcionarios: FuncionarioZoom[];
+  causas: CausaZoom[];
+  cobranza: CobranzaZoom[];
 }
 
 // El "zoom" de una institución: pagos oportunos, reclamos, noticias,

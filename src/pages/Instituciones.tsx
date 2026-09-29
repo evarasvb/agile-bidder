@@ -10,6 +10,9 @@ import {
   Clock,
   BellOff,
   Sparkles,
+  Users,
+  Scale,
+  Receipt,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +25,10 @@ import {
   useInstitucionZoom,
   type ReclamoZoom,
   type ProcesoZoom,
+  type RfZoom,
+  type FuncionarioZoom,
+  type CausaZoom,
+  type CobranzaZoom,
   type InstitucionSeguida,
 } from "@/hooks/useInstitucionZoom";
 import { useDejarInstitucion } from "@/hooks/usePanelProveedor";
@@ -69,6 +76,55 @@ function FilaReclamo({ r }: { r: ReclamoZoom }) {
 
 function ListaVacia({ texto }: { texto: string }) {
   return <p className="py-6 text-center text-sm text-muted-foreground">{texto}</p>;
+}
+
+const CLP = (v: number) => "$" + Math.round(v || 0).toLocaleString("es-CL");
+
+function FilaRf({ r }: { r: RfZoom }) {
+  const abierto = r.fecha_cierre ? new Date(r.fecha_cierre) > new Date() : false;
+  return (
+    <div className="rounded-md border p-2.5 text-sm">
+      <p className="line-clamp-2 font-medium">{r.nombre || r.codigo}</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        {r.codigo} · {abierto ? <span className="text-firmavb-blue">Cierra {fechaCorta(r.fecha_cierre)}</span> : "Cerrada"}
+      </p>
+    </div>
+  );
+}
+
+function FilaFuncionario({ f }: { f: FuncionarioZoom }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-md border p-2.5 text-sm">
+      <div className="min-w-0">
+        <p className="truncate font-medium">{f.nombre}</p>
+        <p className="text-xs text-muted-foreground">{f.cargo || "Cargo sin especificar"}</p>
+      </div>
+      <span className="shrink-0 text-xs text-muted-foreground">{f.procesos} proceso{f.procesos === 1 ? "" : "s"}</span>
+    </div>
+  );
+}
+
+function FilaCausa({ c }: { c: CausaZoom }) {
+  return (
+    <div className="rounded-md border p-2.5 text-sm">
+      <p className="line-clamp-2 text-muted-foreground">{c.extracto}</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">{fechaCorta(c.fecha)}</p>
+    </div>
+  );
+}
+
+function FilaCobranza({ f }: { f: CobranzaZoom }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-md border p-2.5 text-sm">
+      <div className="min-w-0">
+        <p className="truncate font-medium">{f.numero_factura || "Factura sin número"}</p>
+        <p className="text-xs text-muted-foreground">
+          Vence {fechaCorta(f.fecha_vencimiento)} · {f.estado}
+        </p>
+      </div>
+      <span className="shrink-0 font-mono text-xs text-muted-foreground">{CLP(f.monto)}</span>
+    </div>
+  );
 }
 
 export default function Instituciones() {
@@ -216,13 +272,63 @@ export default function Instituciones() {
                 </CardContent>
               </Card>
 
-              {/* RF / consultas al mercado: sin fuente de datos todavía */}
-              <Card className="border-dashed border-border/50">
+              {/* RF / consultas al mercado: lo que el organismo pregunta antes de licitar */}
+              <Card className="border-border/50 shadow-sm">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm flex items-center gap-2 text-muted-foreground"><Clock className="h-4 w-4" /> Consultas al mercado (RF)</CardTitle>
+                  <CardTitle className="text-sm flex items-center gap-2"><Clock className="h-4 w-4" /> Consultas al mercado (RF)</CardTitle>
+                  <CardDescription className="text-xs">Lo que el organismo pregunta antes de licitar: adelanto de lo que se viene.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground">Próximamente. Todavía no ingestamos las consultas/RFI de Mercado Público.</p>
+                  {zoom?.rf.length ? (
+                    <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                      {zoom.rf.map((r) => <FilaRf key={r.codigo} r={r} />)}
+                    </div>
+                  ) : <ListaVacia texto="Sin consultas al mercado en los últimos meses." />}
+                </CardContent>
+              </Card>
+
+              {/* Funcionarios: solo nombre y cargo, tal como los publica Mercado Público */}
+              <Card className="border-border/50 shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2"><Users className="h-4 w-4" /> Funcionarios de contacto</CardTitle>
+                  <CardDescription className="text-xs">Nombre y cargo, según los procesos publicados. Mercado Público no expone email ni teléfono.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {zoom?.funcionarios.length ? (
+                    <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                      {zoom.funcionarios.map((f, i) => <FilaFuncionario key={i} f={f} />)}
+                    </div>
+                  ) : <ListaVacia texto="Todavía no tenemos funcionarios identificados para esta institución." />}
+                </CardContent>
+              </Card>
+
+              {/* Causas: aproximación vía chat con Don Evaristo Abogado, no es registro judicial */}
+              <Card className="border-border/50 shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2"><Scale className="h-4 w-4" /> Causas y gestiones legales</CardTitle>
+                  <CardDescription className="text-xs">Conversaciones tuyas con Don Evaristo Abogado que mencionan esta institución. No es un registro de causas judiciales.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {zoom?.causas.length ? (
+                    <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                      {zoom.causas.map((c, i) => <FilaCausa key={i} c={c} />)}
+                    </div>
+                  ) : <ListaVacia texto="No has conversado con Don Evaristo Abogado sobre esta institución." />}
+                </CardContent>
+              </Card>
+
+              {/* Cobranza: facturas propias donde esta institución es la deudora */}
+              <Card className="border-border/50 shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2"><Receipt className="h-4 w-4" /> Cobranza</CardTitle>
+                  <CardDescription className="text-xs">Tus facturas por cobrar a esta institución (módulo Cobranza).</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {zoom?.cobranza.length ? (
+                    <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                      {zoom.cobranza.map((f, i) => <FilaCobranza key={i} f={f} />)}
+                    </div>
+                  ) : <ListaVacia texto="No tienes facturas registradas a esta institución." />}
                 </CardContent>
               </Card>
 
