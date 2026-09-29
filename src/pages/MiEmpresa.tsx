@@ -3,6 +3,7 @@ import { ArrowLeft, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DatosEmpresaCard } from '@/components/settings/DatosEmpresaCard';
 import { DocumentosEmpresaCard } from '@/components/settings/DocumentosEmpresaCard';
+import { HistorialMercadoPublicoCard } from '@/components/settings/HistorialMercadoPublicoCard';
 
 /**
  * Página dedicada a los datos de la empresa (logo, RUT, dirección, contacto).
@@ -28,6 +29,7 @@ export default function MiEmpresa() {
         </div>
       </div>
 
+      <HistorialMercadoPublicoCard />
       <DatosEmpresaCard />
       <DocumentosEmpresaCard />
     </div>
