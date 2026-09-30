@@ -163,7 +163,7 @@ begin
   -- solo durante este bloque atómico permite la reparación administrativa;
   -- cualquier error revierte también el cambio de estado del trigger.
   alter table public.notificaciones_log disable trigger trg_notificaciones_log_bloquear_columnas;
-with candidatos as (
+with candidatos as materialized (
   select n.id,min(s.rut_institucion) rut
   from public.notificaciones_log n
   join public.cliente_instituciones_seguidas s on s.cliente_id=n.cliente_id
@@ -173,6 +173,18 @@ with candidatos as (
   where n.datos->>'rut_institucion' is null
     and n.tipo in ('medio_institucion','reclamo_institucion','adjudicacion_institucion','compras_institucion')
   group by n.id having count(distinct s.rut_institucion)=1
+), identidades as materialized (
+  -- Resolver una vez por institución; nunca por cada orden histórica.
+  select rut,public.institucion_rut_seguro(rut) rut_real
+  from (select distinct rut from candidatos) r
+), codigos as materialized (
+  select s.*,array(
+    select distinct x.codigo from (
+      select s.rut codigo union select s.rut_real
+      union select i.codigo_entidad from public.instituciones i where i.rut=s.rut_real
+      union select l.institucion_codigo from public.licitaciones_bi l where l.institucion_rut=s.rut_real
+    ) x where public.institucion_rut_seguro(x.codigo)=s.rut_real
+  ) identificadores from identidades s
 ), reparacion as (
   select n.id,c.rut,
     case n.tipo when 'medio_institucion' then 'noticias' when 'reclamo_institucion' then 'reclamos'
@@ -182,22 +194,23 @@ with candidatos as (
         select m.id::text from public.medios_menciones m
         join public.cliente_instituciones_seguidas s on s.cliente_id=n.cliente_id and s.rut_institucion=c.rut
         where n.datos->>'clave'='medio:'||m.id and m.organismo_norm=public.medios_norm(s.nombre_institucion)
-          and public.institucion_nombre_seguro(s.nombre_institucion,public.institucion_rut_seguro(c.rut)) limit 1)
+          and public.institucion_nombre_seguro(s.nombre_institucion,ic.rut_real) limit 1)
       when 'adjudicacion_institucion' then (
         select l.codigo from public.licitaciones_bi l
         where l.codigo=coalesce(n.datos->>'licitacion_codigo',n.datos->>'licitacion_id',n.licitacion_id)
-          and l.institucion_rut=public.institucion_rut_seguro(c.rut) limit 1)
+          and l.institucion_rut=ic.rut_real limit 1)
       when 'reclamo_institucion' then (
         select min(r.id_reclamo) from public.reclamos_mp r
-        where r.organismo_rut=public.institucion_rut_seguro(c.rut)
+        where r.organismo_rut=ic.rut_real
           and n.datos->>'clave'='reclamos:'||c.rut||':'||r.created_at::date)
       when 'compras_institucion' then (
         select o.codigo from public.ordenes_compra o
-        where public.institucion_rut_seguro(o.rut_demandante)=public.institucion_rut_seguro(c.rut)
+        where o.rut_demandante=any(ic.identificadores)
           and n.datos->>'clave'='oc:'||c.rut||':'||o.fecha_emision::date
         order by o.total desc nulls last,o.codigo limit 1)
     end evento
   from public.notificaciones_log n join candidatos c on c.id=n.id
+  join codigos ic on ic.rut=c.rut
 )
 update public.notificaciones_log n set datos=coalesce(n.datos,'{}'::jsonb)||
   jsonb_build_object('rut_institucion',r.rut,'evento_tipo',r.categoria)||
