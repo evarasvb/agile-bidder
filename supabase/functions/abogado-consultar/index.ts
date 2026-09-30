@@ -90,7 +90,7 @@ Máximo 1100 palabras (sin contar la nota final).`
 (B) el proveedor RECURRE por reposición un acto que lo perjudica, pidiendo dejarlo sin efecto o modificarlo. Elige el escenario según los hechos del usuario; si no queda claro, redacta el (A) y deja una nota para ajustarlo.
 Estructura:
 - SUMA: "EN LO PRINCIPAL:" el objeto (hacerse parte y pedir el rechazo de la reposición; o deducir reposición y pedir dejar sin efecto el acto); y otrosíes ("PRIMER OTROSÍ:" acompaña documentos; "SEGUNDO OTROSÍ:" forma de notificación).
-- Encabezado: "SEÑOR DIRECTOR EJECUTIVO DEL [nombre del Servicio]" (usa el organismo entregado).
+- Encabezado dirigido a la AUTORIDAD QUE DICTÓ EL ACTO que se recurre (la reposición se presenta ante el mismo órgano que lo emitió): usa el cargo y organismo que correspondan según los DOCUMENTOS DEL USUARIO (quién firmó la resolución) o el destinatario entregado. Por ejemplo "SEÑOR DIRECTOR EJECUTIVO DEL [Servicio Local de Educación Pública ...]", "SEÑOR ALCALDE DE LA [Municipalidad de ...]", "SEÑOR RECTOR DE LA [Universidad ...]", "SEÑOR DIRECTOR (A) DEL [Servicio de Salud ...]" o "SEÑOR DIRECTOR REGIONAL DE [organismo]". NO uses "Director Ejecutivo" si el acto lo dictó otra autoridad; si no puedes determinar el cargo, déjalo como "[completar: autoridad que dictó el acto]".
 - Comparecencia: representante legal, cédula, en representación de la empresa (razón social y RUT entregados), domicilio, indicando el ID y nombre de la licitación y su calidad (adjudicataria/tercero interesado o recurrente).
 - ANTECEDENTES DE HECHO: cronología EXTRAÍDA DE LOS DOCUMENTOS DEL USUARIO (resoluciones exentas, órdenes de compra, oficios de Contraloría, respuestas del foro). Cita cada acto por su número y fecha; no inventes nada.
 - SOBRE EL RECURSO: el recurso de reposición del artículo 59 de la Ley 19.880 se interpone ante el mismo órgano que dictó el acto, dentro del plazo de 5 días hábiles desde su notificación. En el escenario (A) pide verificar si la reposición del reclamante fue extemporánea; en el (B) deja constancia de que se interpone dentro de plazo.
@@ -170,7 +170,7 @@ function sysDocumento(tipo: string): string {
     return `Eres Don Evaristo Abogado, redactando un ESCRITO FORMAL (con SUMA y otrosíes) para un proveedor del Estado chileno: ${t.titulo}.
 Es un escrito en español formal chileno, con SUMA y otrosíes, dirigido a la autoridad que indique la guía (un tribunal o el jefe del Servicio). Usa SOLO los hechos, datos, documentos y fuentes que se te entregan; no inventes fechas, montos, números de resolución, artículos ni jurisprudencia.
 ${t.guia}
-Formato de salida (texto plano, sin encabezados Markdown "#"): primero la SUMA ("EN LO PRINCIPAL:" ... y los otrosíes), luego en una línea el ENCABEZADO dirigido a la autoridad que indica la guía (por ejemplo "ILUSTRE TRIBUNAL DE CONTRATACIÓN PÚBLICA" o "SEÑOR DIRECTOR EJECUTIVO DEL [Servicio]") y a continuación el cuerpo (comparecencia, antecedentes de hecho, fundamentos/defensas, peticiones y otrosíes). Puedes usar mayúsculas para los títulos de sección y de los otrosíes, como en un escrito real. Cita [n] tras cada afirmación de derecho que venga de una FUENTE (artículo, número de dictamen/año, rol y fecha del TCP). Cuando invoques un artículo o norma que NO aparezca en las FUENTES entregadas, nómbralo por su número (son normas vigentes en Chile) pero NO le pongas una cita [n] falsa: la NOTA final ya pide verificar cada fundamento con el abogado. Si falta un dato, déjalo como "[completar: dato]" en vez de inventarlo.`;
+Formato de salida (texto plano, sin encabezados Markdown "#"): primero la SUMA ("EN LO PRINCIPAL:" ... y los otrosíes), luego en una línea el ENCABEZADO dirigido a la autoridad que indica la guía (por ejemplo "ILUSTRE TRIBUNAL DE CONTRATACIÓN PÚBLICA", o la autoridad que dictó el acto en sede administrativa: "SEÑOR DIRECTOR...", "SEÑOR ALCALDE...", "SEÑOR RECTOR...", según corresponda) y a continuación el cuerpo (comparecencia, antecedentes de hecho, fundamentos/defensas, peticiones y otrosíes). Puedes usar mayúsculas para los títulos de sección y de los otrosíes, como en un escrito real. Cita [n] tras cada afirmación de derecho que venga de una FUENTE (artículo, número de dictamen/año, rol y fecha del TCP). Cuando invoques un artículo o norma que NO aparezca en las FUENTES entregadas, nómbralo por su número (son normas vigentes en Chile) pero NO le pongas una cita [n] falsa: la NOTA final ya pide verificar cada fundamento con el abogado. Si falta un dato, déjalo como "[completar: dato]" en vez de inventarlo.`;
   }
   return `Eres Don Evaristo Abogado, redactando un documento FORMAL Y PROFESIONAL para un proveedor del Estado chileno: ${t.titulo}.
 Aquí NO hablas cercano: es un documento oficial en español formal chileno, con la estructura clásica de una carta/recurso ante un organismo público. Usa SOLO los hechos, datos y fuentes que se te entregan; no inventes fechas, montos, artículos ni jurisprudencia.
@@ -280,7 +280,10 @@ Deno.serve(async (req) => {
     // Recolección en paralelo. Para ciertos escritos sembramos la búsqueda con los conceptos
     // legales del tipo, para traer las normas aplicables aunque el usuario no las mencione.
     const semillaTipo = modo === "documento" ? (SEMILLA_BUSQUEDA[tipoDocumento] ?? "") : "";
-    const consultaBase = modo === "chat" ? pregunta : `${hechos} ${peticion} ${semillaTipo}`.trim();
+    // La semilla va PRIMERO: palabrasClave respeta el orden y la búsqueda solo usa las primeras
+    // 3-4 palabras, así que, puesta al final, no alcanzaba a participar cuando los hechos ya traían
+    // varias palabras. Adelante, garantiza que las normas del tipo (art. 59, art. 24, etc.) se busquen.
+    const consultaBase = modo === "chat" ? pregunta : `${semillaTipo} ${hechos} ${peticion}`.trim();
     const kws = palabrasClave(consultaBase);
     const qOr = kws.slice(0, 4).join(" or ");
     const tareas: Record<string, Promise<any>> = {};
