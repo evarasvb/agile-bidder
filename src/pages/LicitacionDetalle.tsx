@@ -31,6 +31,7 @@ import { LicitacionItemsMatch } from '@/components/licitaciones/LicitacionItemsM
 import { FichaMercadoPublico } from '@/components/licitaciones/FichaMercadoPublico';
 import { AdjuntosLicitacion } from '@/components/licitaciones/AdjuntosLicitacion';
 import { GarantiaCard } from '@/components/licitaciones/GarantiaCard';
+import { AvisoPagaTarde } from '@/components/organismo/AvisoPagaTarde';
 import { useDocumentosLicitacion } from '@/hooks/useChatIA';
 import { RiesgoOrganismoCard } from '@/components/organismo/RiesgoOrganismoCard';
 import { MediosOrganismoCard } from '@/components/organismo/MediosOrganismoCard';
@@ -385,6 +386,8 @@ export default function LicitacionDetalle() {
           </TooltipProvider>
         </div>
       </div>
+
+      <AvisoPagaTarde codigo={licitacion.codigo} organismo={licitacion.organismo} />
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main Content */}

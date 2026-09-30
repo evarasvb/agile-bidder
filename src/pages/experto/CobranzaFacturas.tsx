@@ -80,6 +80,21 @@ export default function CobranzaFacturas() {
     };
   }, [facturas]);
 
+  // Alerta "paga tarde" desde los propios datos del cliente: agrupa por deudor
+  // las facturas activas ya atrasadas, para ver de un vistazo quién se demora.
+  const pagadoresLentos = useMemo(() => {
+    const map = new Map<string, { nombre: string; n: number; monto: number; maxDias: number }>();
+    for (const f of facturas) {
+      if (f.estado === 'pagada' || f.estado === 'incobrable') continue;
+      const d = diasAtraso(f) ?? 0;
+      if (d <= 0) continue;
+      const cur = map.get(f.deudor_nombre) || { nombre: f.deudor_nombre, n: 0, monto: 0, maxDias: 0 };
+      cur.n += 1; cur.monto += f.monto || 0; cur.maxDias = Math.max(cur.maxDias, d);
+      map.set(f.deudor_nombre, cur);
+    }
+    return [...map.values()].sort((a, b) => b.maxDias - a.maxDias);
+  }, [facturas]);
+
   async function pedir(body: Record<string, unknown>, onTexto: (t: string) => void) {
     const r = await fetch(`${SUPA}/functions/v1/abogado-consultar`, { method: 'POST', headers: auth, body: JSON.stringify(body) });
     if (!r.ok) { const j = await r.json().catch(() => ({})); throw Object.assign(new Error(j.mensaje || j.error || `Error ${r.status}`), { status: r.status }); }
@@ -149,6 +164,25 @@ export default function CobranzaFacturas() {
         <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Facturas atrasadas</p><p className="text-xl font-bold text-red-600">{totales.nAtrasadas}</p></CardContent></Card>
         <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Monto atrasado</p><p className="text-xl font-bold text-red-600">{CLP(totales.montoAtrasado)}</p></CardContent></Card>
       </div>
+
+      {pagadoresLentos.length > 0 && (
+        <Card className="border-red-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm text-red-700">
+              <AlertTriangle className="h-4 w-4" /> Te están pagando tarde
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1.5">
+            {pagadoresLentos.slice(0, 6).map((l) => (
+              <div key={l.nombre} className="flex items-center justify-between gap-2 text-sm">
+                <span className="truncate">{l.nombre}</span>
+                <span className="shrink-0 text-muted-foreground">{l.n} factura(s) · {CLP(l.monto)} · hasta {l.maxDias}d</span>
+              </div>
+            ))}
+            <p className="pt-1 text-[11px] text-muted-foreground">Ojo antes de volver a ofertarles: llevan facturas tuyas atrasadas.</p>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">{facturas.length} factura(s) registrada(s)</p>
