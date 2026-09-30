@@ -13,8 +13,8 @@ export default defineConfig(({ mode }) => ({
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },
   server: {
-    host: "::",
-    port: 8080,
+    host: "127.0.0.1",
+    port: 5173,
   },
   plugins: [
     react(),
