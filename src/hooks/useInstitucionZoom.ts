@@ -28,6 +28,7 @@ export interface ReclamoZoom {
   tipo: number;
   reclamante: string | null;
   estado: string | null;
+  proceso_codigo: string | null;
 }
 export interface NoticiaZoom {
   titulo: string;
@@ -96,6 +97,12 @@ export interface InstitucionZoom {
   funcionarios: FuncionarioZoom[];
   causas: CausaZoom[];
   cobranza: CobranzaZoom[];
+  // Dirección de la institución, tomada de la licitación enriquecida más
+  // reciente que la trae (raw_data->Comprador). No todas las instituciones
+  // la tienen: cuando no hay dato, los tres campos vienen en null.
+  direccion: string | null;
+  comuna: string | null;
+  region: string | null;
 }
 
 // El "zoom" de una institución: pagos oportunos, reclamos, noticias,

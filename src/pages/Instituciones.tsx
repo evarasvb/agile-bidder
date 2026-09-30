@@ -13,6 +13,9 @@ import {
   Users,
   Scale,
   Receipt,
+  MapPin,
+  Gavel,
+  ExternalLink,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +46,14 @@ const fechaCorta = (iso: string | null) => {
   return d.toLocaleDateString("es-CL", { day: "2-digit", month: "short", year: "numeric" });
 };
 
+// Enlaces de contacto/ubicación: solo se arman con datos reales (dirección
+// que trae la propia institución, o su nombre). Nada de teléfono/correo/
+// horarios acá: Mercado Público no los publica y no se inventan.
+const linkMaps = (direccion: string, comuna: string | null, region: string | null) =>
+  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([direccion, comuna, region].filter(Boolean).join(", "))}`;
+const linkLobby = (nombre: string) => `https://www.leylobby.gob.cl/instituciones?search=${encodeURIComponent(nombre)}`;
+const LINK_TRANSPARENCIA = "https://www.portaltransparencia.cl";
+
 function FilaProceso({ p, tipo }: { p: ProcesoZoom; tipo: "licitacion" | "compra_agil" }) {
   const monto = p.presupuesto_estimado ?? p.monto_estimado;
   const abierto = p.fecha_cierre ? new Date(p.fecha_cierre) > new Date() : false;
@@ -64,17 +75,59 @@ function FilaProceso({ p, tipo }: { p: ProcesoZoom; tipo: "licitacion" | "compra
 
 const TIPO_RECLAMO: Record<number, string> = { 1: "No pago", 2: "Proceso" };
 
+// Mercado Público publica el código del proceso al que corresponde el
+// reclamo, pero no un texto/motivo (su ficha pública de reclamos es solo
+// categórica: tipo, fecha, estado). Con el código sí se puede abrir el
+// proceso real y ver de qué se trataba — pero reclamos_mp.proceso_codigo
+// trae formatos muy distintos: licitaciones/Convenio Marco/compras ágiles
+// como "1211839-319-CM26" o "3760-797-COT25", pero también IDs sueltos sin
+// ese formato ("3747", "40101701") que no son un proceso navegable. Contra
+// datos reales de `ordenes_compra.link_oficial` (que sí guarda el link
+// oficial de Mercado Público para muchas órdenes ya scrapeadas): los
+// códigos con formato "algo-números-LETRASdígitos" siempre abren en
+// DetailsAcquisition.aspx?idlicitacion=, sea licitación, Convenio Marco o
+// compra ágil con sufijo distinto a COT; el sufijo "COT" es el único caso
+// que usa la ficha de compra-agil.mercadopublico.cl (igual que
+// compras_agiles.url_ficha). Un código que no calza ese formato no se
+// enlaza: mejor no linkear que llevar a una ficha equivocada o vacía.
+const FORMATO_PROCESO_MP = /^[a-z0-9]+-\d+-[a-z]{1,4}\d{2,4}$/i;
+const linkProcesoReclamo = (codigo: string): string | null => {
+  if (!FORMATO_PROCESO_MP.test(codigo)) return null;
+  return /cot/i.test(codigo)
+    ? `https://compra-agil.mercadopublico.cl/resumen-cotizacion/${codigo}`
+    : `https://www.mercadopublico.cl/Procurement/Modules/RFB/DetailsAcquisition.aspx?idlicitacion=${codigo}`;
+};
+
 function FilaReclamo({ r }: { r: ReclamoZoom }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-md border p-2.5 text-sm">
+  const link = r.proceso_codigo ? linkProcesoReclamo(r.proceso_codigo) : null;
+  const contenido = (
+    <>
       <div className="min-w-0">
         <p className="truncate font-medium">{r.reclamante || "Reclamante sin nombre"}</p>
         <p className="text-xs text-muted-foreground">{fechaCorta(r.fecha)} · {r.estado || "s/i"}</p>
+        {link && (
+          <p className="mt-0.5 flex items-center gap-1 text-xs text-firmavb-blue">
+            <ExternalLink className="h-3 w-3" /> Ver proceso {r.proceso_codigo} en Mercado Público
+          </p>
+        )}
       </div>
       <Badge variant="outline" className={r.tipo === 1 ? "shrink-0 border-red-300 bg-red-50 text-red-700" : "shrink-0 border-yellow-300 bg-yellow-50 text-yellow-700"}>
         {TIPO_RECLAMO[r.tipo] ?? "Reclamo"}
       </Badge>
-    </div>
+    </>
+  );
+  if (!link) {
+    return <div className="flex items-center justify-between gap-3 rounded-md border p-2.5 text-sm">{contenido}</div>;
+  }
+  return (
+    <a
+      href={link}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center justify-between gap-3 rounded-md border p-2.5 text-sm hover:bg-muted/50 transition-colors"
+    >
+      {contenido}
+    </a>
   );
 }
 
@@ -252,12 +305,68 @@ export default function Instituciones() {
                 <p className="text-sm text-muted-foreground">{sel.rut_institucion}</p>
               </div>
 
+              {/* Contacto y ubicación: solo con datos reales disponibles. Mercado
+                  Público no publica teléfono, correo ni horarios de atención
+                  de las instituciones (columnas vacías en el 100% de los
+                  casos) — no se muestran para no inventarlos. */}
+              <Card className="border-border/50 shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2"><MapPin className="h-4 w-4" /> Contacto y ubicación</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {zoom?.direccion ? (
+                    <div className="flex items-start justify-between gap-3 rounded-md border p-2.5 text-sm">
+                      <div className="min-w-0">
+                        <p className="font-medium">{zoom.direccion}</p>
+                        <p className="text-xs text-muted-foreground">{[zoom.comuna, zoom.region].filter(Boolean).join(", ") || "Comuna/región sin dato"}</p>
+                      </div>
+                      <a
+                        href={linkMaps(zoom.direccion, zoom.comuna, zoom.region)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shrink-0 text-xs text-firmavb-blue hover:underline"
+                      >
+                        Ver mapa
+                      </a>
+                    </div>
+                  ) : (
+                    <p className="rounded-md border border-dashed p-2.5 text-xs text-muted-foreground">
+                      Todavía no tenemos la dirección de esta institución (Mercado Público no la incluye en todos sus procesos).
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    No hay teléfono, correo ni horarios de atención publicados por Mercado Público para esta institución.
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <a
+                      href={linkLobby(zoom?.institucion || sel.nombre_institucion)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs hover:bg-muted/50 transition-colors"
+                    >
+                      <Gavel className="h-3.5 w-3.5" /> Ley de Lobby
+                    </a>
+                    <a
+                      href={LINK_TRANSPARENCIA}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs hover:bg-muted/50 transition-colors"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" /> Portal de Transparencia
+                    </a>
+                  </div>
+                </CardContent>
+              </Card>
+
               <RiesgoOrganismoCard organismo={zoom?.institucion || sel.nombre_institucion} />
 
               {/* Reclamos recientes (detalle: quién reclamó y cuándo) */}
               <Card className="border-border/50 shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm flex items-center gap-2"><MessageSquareWarning className="h-4 w-4" /> Reclamos recientes</CardTitle>
+                  <CardDescription className="text-xs">
+                    Mercado Público no publica el motivo del reclamo, solo tipo, fecha y estado. Cuando el reclamo trae el código del proceso, puedes abrirlo para ver de qué se trataba.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {!verInteligencia ? (

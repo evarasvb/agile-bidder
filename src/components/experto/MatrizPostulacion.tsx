@@ -23,7 +23,7 @@ export function evaluarEntrada(r: any): string {
 }
 type Seccion = { clave: keyof Matriz; titulo: string; cols: [string, string][] };
 const SECCIONES: Seccion[] = [
-  { clave: 'admisibilidad', titulo: '1. Admisibilidad (si falla una, quedas fuera)', cols: [['requisito', 'Requisito'], ['regla', 'Regla'], ['entrada', 'Tu dato'], ['estado', 'Estado'], ['nota', 'Nota'], ['fuente', 'Fuente']] },
+  { clave: 'admisibilidad', titulo: '1. Admisibilidad (si falla una, quedas fuera)', cols: [['requisito', 'Requisito'], ['regla', 'Regla'], ['condicion', 'Cuándo aplica'], ['entrada', 'Tu dato'], ['estado', 'Estado'], ['nota', 'Nota'], ['fuente', 'Fuente']] },
   { clave: 'evaluacion', titulo: '2. Cómo se puntúa', cols: [['criterio', 'Criterio'], ['como_se_puntua', 'Cómo se puntúa'], ['ponderacion', 'Ponderación'], ['puntaje_max', 'Máximo'], ['que_hacer', 'Qué hacer para el máximo'], ['fuente', 'Fuente']] },
   { clave: 'anexos', titulo: '3. Anexos', cols: [['anexo', 'Anexo'], ['cuando', 'Cuándo'], ['quien_firma', 'Quién firma'], ['nota', 'Nota']] },
   { clave: 'reglas_especiales', titulo: '4. Reglas especiales', cols: [['aspecto', 'Aspecto'], ['regla', 'Regla']] },
