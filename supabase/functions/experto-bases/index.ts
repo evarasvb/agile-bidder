@@ -87,14 +87,19 @@ const SYS_RESUMEN = `Eres un experto en licitaciones públicas chilenas (Ley 19.
 {"objeto":"qué se compra, en una línea",
  "presupuesto":"monto y si es con o sin impuestos, o null",
  "criterios_evaluacion":[{"criterio":"nombre","ponderacion":"porcentaje o puntaje","como_se_puntua":"fórmula o escala resumida"}],
- "requisitos_admisibilidad":["cada requisito o documento cuya falta deja fuera la oferta"],
+ "requisitos_admisibilidad":["cada requisito o documento cuya falta DEJA FUERA la oferta (inadmisible/rechazada), tal como lo dicen las bases"],
  "anexos_obligatorios":["Anexo N° y nombre"],
  "garantias":{"seriedad":"monto/porcentaje, vigencia o null","fiel_cumplimiento":"monto/porcentaje, vigencia o null"},
  "plazos":[{"hito":"consultas, respuestas, cierre, apertura, adjudicación, entrega, vigencia contrato","valor":"fecha o plazo tal como está escrito"}],
  "forma_de_pago":"plazo y condiciones de pago, o null",
  "multas_y_clausulas_riesgosas":["multa o cláusula con su monto/porcentaje y por qué es riesgosa"],
  "advertencias":["cualquier cosa rara: criterios subjetivos, experiencia imposible de acreditar, plazos de entrega irreales, exclusividad, etc."]}
-Si algo no está en el texto, usa null o lista vacía. No inventes.`;
+Si algo no está en el texto, usa null o lista vacía. No inventes.
+CRÍTICO sobre "requisitos_admisibilidad" — clasificar mal acá hace que el proveedor pierda plata preparando algo que no era obligatorio, o quede fuera por no leer bien lo que sí lo era. Antes de listar algo ahí, verifica contra el texto exacto de las bases:
+1. Ponderado/evaluado ≠ admisible. Si las bases dicen que algo "se evaluará", "otorgará puntaje" o "será considerado como criterio" (p. ej. una certificación ISO, experiencia adicional), va SOLO en "criterios_evaluacion", nunca en "requisitos_admisibilidad", aunque sea deseable tenerlo.
+2. Certificaciones o documentos "para acreditar" algo no son todas obligatorias por separado: si las bases ofrecen alternativas ("mediante certificado O declaración jurada", "cualquiera de los siguientes documentos"), no las listes cada una como requisito aparte — indica que basta UNA de ellas.
+3. Condicional ≠ exigible para todos: si un requisito o certificación aplica "solo para la línea X", "solo si postula como UTP", "solo sobre cierto monto" u otra condición, dilo en el mismo texto del ítem (p. ej. "Certificado X — solo línea 2"), nunca como obligación general.
+4. Si el texto no dice EXPLÍCITAMENTE que la falta de ese documento deja la oferta fuera, no lo pongas en "requisitos_admisibilidad": va en "advertencias" como algo a verificar, no como certeza.`;
 // Respuesta de un modelo tipo chat/completions (Gemini u openai-compat): saca el primer bloque {...}.
 function jsonDeRespuesta(c: string): Record<string, unknown> {
   c = c.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");

@@ -46,6 +46,14 @@ export default function Abogado() {
   const [pregunta, setPregunta] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [limite, setLimite] = useState<string | null>(null);
+  // Pestaña controlada: "Usar esta conversación" (abajo) salta de Chat a Generar
+  // documento llevándose el hilo, para no obligar a escribir los hechos de nuevo.
+  const [tab, setTab] = useState('chat');
+  // Tono: "full" argumenta con toda la fuerza y cita todo lo aplicable; "tibio" es más
+  // mesurado y prioriza el diálogo con el organismo antes de lo formal. Se guarda para
+  // no tener que elegirlo de nuevo en cada visita.
+  const [tono, setTono] = useState<'full' | 'tibio'>(() => (localStorage.getItem('abogado_tono') === 'tibio' ? 'tibio' : 'full'));
+  const cambiarTono = (t: 'full' | 'tibio') => { setTono(t); localStorage.setItem('abogado_tono', t); };
 
   // Generar documento
   const [tipoDoc, setTipoDoc] = useState('apelacion');
@@ -97,13 +105,21 @@ export default function Abogado() {
     setMsgs((m) => [...m, { rol: 'yo', texto: p }, { rol: 'exp', texto: '' }]);
     setEnviando(true);
     try {
-      await pedir({ modo: 'chat', pregunta: p, historial, codigo: codigo || undefined, huella: 'abogado' }, (t, meta) =>
+      await pedir({ modo: 'chat', pregunta: p, historial, codigo: codigo || undefined, huella: 'abogado', modo_tono: tono }, (t, meta) =>
         setMsgs((m) => { const c = [...m]; c[c.length - 1] = { rol: 'exp', texto: t, fuentes: meta?.fuentes }; return c; }));
     } catch (e: any) {
       if (e.status === 402 || e.status === 401) setLimite(e.message);
       setMsgs((m) => { const c = [...m]; c[c.length - 1] = { rol: 'exp', texto: (e.status === 402 ? '' : 'No pude responder: ') + e.message }; return c; });
     }
     setEnviando(false);
+  };
+
+  // Copia la conversación del chat a "Hechos" (sin pisar lo que el usuario ya haya
+  // escrito ahí) y salta a "Generar documento": el mismo caso, sin volver a explicarlo.
+  const usarConversacion = () => {
+    const resumen = msgs.filter((m) => m.texto.trim()).map((m) => (m.rol === 'yo' ? m.texto : `Don Evaristo respondió: ${m.texto.replace(/<[^>]+>/g, '')}`)).join('\n\n');
+    setHechos((h) => (h.trim() ? h : resumen));
+    setTab('documento');
   };
 
   const esMora = tipoDoc === 'cobro_intereses_mora';
@@ -123,7 +139,7 @@ export default function Abogado() {
       await pedir({
         modo: 'documento', tipo_documento: tipoDoc, destinatario, codigo: codigo || undefined, hechos: hechosFinal, peticion,
         ciudad_fecha: new Date().toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' }),
-        huella: 'abogado',
+        huella: 'abogado', modo_tono: tono,
         ...(esMora ? {
           monto_adeudado: Number(montoAdeudado), fecha_vencimiento: fechaVencimiento, fecha_pago: sigueImpago ? undefined : (fechaPago || undefined),
           tasas_manual: Object.entries(tasasManual).filter(([, v]) => Number(v) > 0).map(([mes, v]) => ({ mes, tasa_anual: Number(v) })),
@@ -224,7 +240,24 @@ export default function Abogado() {
         Tu asesor legal en Mercado Público: pregúntale en el chat o pídele que redacte una carta de apelación, un reclamo o cualquier documento formal.
       </p>
 
-      <Tabs defaultValue="chat">
+      <div className="flex items-center gap-2 text-sm">
+        <span className="text-muted-foreground">Tono:</span>
+        <div className="inline-flex rounded-md border p-0.5">
+          <button type="button" onClick={() => cambiarTono('full')}
+            className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${tono === 'full' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}>
+            Full leyes
+          </button>
+          <button type="button" onClick={() => cambiarTono('tibio')}
+            className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${tono === 'tibio' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}>
+            Tibio
+          </button>
+        </div>
+        <span className="text-xs text-muted-foreground">
+          {tono === 'full' ? 'Cita todo lo aplicable y argumenta con firmeza' : 'Mesurado: prioriza el diálogo antes de lo formal'}
+        </span>
+      </div>
+
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="chat">Chat</TabsTrigger>
           <TabsTrigger value="documento">Generar documento</TabsTrigger>
@@ -261,6 +294,11 @@ export default function Abogado() {
               {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
           </div>
+          {msgs.length > 0 && (
+            <Button variant="outline" size="sm" onClick={usarConversacion}>
+              <FileText className="h-4 w-4 mr-2" />Usar esta conversación para generar un documento
+            </Button>
+          )}
         </TabsContent>
 
         <TabsContent value="documento" className="space-y-4">

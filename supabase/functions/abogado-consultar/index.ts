@@ -180,12 +180,23 @@ Sin otro particular, saluda atentamente a usted,
 Reglas: cita [n] tras cada afirmación de derecho, con el mismo criterio que en el chat (artículo, número de dictamen/año, rol y fecha del TCP). Si falta un dato (fecha, destinatario, RUT), dejarlo entre corchetes como "[completar: dato]" en vez de inventarlo. Máximo 900 palabras.`;
 }
 
+// Se agrega al final del mensaje de sistema (chat o documento) según el modo de tono que eligió el
+// usuario. No cambia las reglas de "no inventar" ni las citas [n]: solo la firmeza y extensión.
+const TONO: Record<"full" | "tibio", string> = {
+  full: "MODO FULL LEYES (elegido por el usuario): sé exhaustivo. Cita TODAS las normas, dictámenes o sentencias de las FUENTES que apliquen al caso, no solo la principal. Argumenta con la máxima firmeza que los hechos y fuentes permitan; si hay más de una vía legal disponible (reclamo ante el organismo, TCP, Contraloría), menciónalas todas y cuál conviene primero. No suavices el mensaje si el caso tiene mérito.",
+  tibio: "MODO TIBIO (elegido por el usuario): sé mesurado y conciliador. Prioriza agotar el diálogo directo con el organismo (aclaración, conversación, correo) antes de sugerir un paso formal o confrontacional. Cita solo la norma central del caso, sin abrumar con todas las alternativas. Si el caso es débil o dudoso, dilo con más cautela todavía, y evita adjetivos fuertes contra el organismo.",
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   const t0 = Date.now();
   try {
     const body = await req.json();
     const modo: "chat" | "documento" = body.modo === "documento" ? "documento" : "chat";
+    // Modo del tono legal: "full" (por defecto) argumenta con toda la fuerza que den los hechos y
+    // fuentes, citando cada norma aplicable; "tibio" es más mesurado, sugiere agotar el diálogo con
+    // el organismo antes de ir a lo formal y evita afirmaciones que las fuentes no respalden del todo.
+    const modoTono: "full" | "tibio" = body.modo_tono === "tibio" ? "tibio" : "full";
     const pregunta: string = String(body.pregunta ?? "").trim();
     const huella: string = String(body.huella ?? "").slice(0, 80);
     const historial: { role: string; content: string }[] = Array.isArray(body.historial) ? body.historial.slice(-6) : [];
@@ -307,7 +318,11 @@ Deno.serve(async (req) => {
     if (res.org) partes.push("FICHA ORGANISMO (Datos Mercado Público vía FirmaVB):\n" + textoOrganismo(res.org));
     if (res.docs?.length) partes.push("DOCUMENTOS DEL USUARIO (contratos, notificaciones, reclamos previos que subió; son evidencia de los hechos):\n" + res.docs.map((d: any) => `### ${d.nombre} (${d.tipo})\n${d.texto}`).join("\n\n"));
     if (res.perfil) partes.push(`DATOS DEL PROVEEDOR (para firmar el documento): empresa "${res.perfil.empresa_nombre ?? "s/i"}", RUT ${res.perfil.rut ?? "s/i"}, región ${res.perfil.region ?? "s/i"}.`);
-    if (Array.isArray(res.memoria) && res.memoria.length && modo === "chat") {
+    if (Array.isArray(res.memoria) && res.memoria.length) {
+      // También en modo documento: si el cliente ya le contó el caso a Don Evaristo por chat, el
+      // formulario de "Generar documento" no lo obliga a re-escribirlo completo en "Hechos" — esto
+      // le da el contexto previo como respaldo (los "Hechos" del formulario siguen siendo la fuente
+      // principal, esto es un complemento).
       partes.push("MEMORIA (lo último que este cliente conversó con Don Evaristo en otros modos, últimas 48h — úsalo solo si es relevante, no lo repitas si no viene al caso):\n" +
         res.memoria.map((m: any) => `[${m.canal}, ${m.rol === "user" ? "preguntó" : "Evaristo respondió"}] ${m.texto}`).join("\n"));
     }
@@ -338,7 +353,7 @@ Si hay más de un tramo, menciona en el documento que el interés se calculó po
 
     const userMsg = modo === "chat" ? `${contexto}\n\nPREGUNTA: ${pregunta}` : `${contexto}\n\nRedacta el documento completo con los datos y hechos de arriba.`;
     const messages = [
-      { role: "system", content: modo === "chat" ? SYS_CHAT : sysDocumento(tipoDocumento) },
+      { role: "system", content: `${modo === "chat" ? SYS_CHAT : sysDocumento(tipoDocumento)}\n\n${TONO[modoTono]}` },
       ...(modo === "chat" ? historial.filter((h) => h && (h.role === "user" || h.role === "assistant") && h.content).map((h) => ({ role: h.role, content: String(h.content).slice(0, 2000) })) : []),
       { role: "user", content: userMsg },
     ];
