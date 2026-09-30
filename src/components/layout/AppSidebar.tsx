@@ -30,6 +30,7 @@ import {
   Rocket,
   Scale,
   HandCoins,
+  Landmark,
 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -108,6 +109,11 @@ const navItems: NavItem[] = [
       // Órdenes de Compra dejó de ser un ítem suelto: ahora es un reporte-cubo.
       { title: "Órdenes de compra", url: "/reportes/ordenes-compra", icon: FileText },
     ],
+  },
+  {
+    title: "Instituciones que sigo",
+    url: "/instituciones",
+    icon: Landmark,
   },
   {
     title: "Equipo",

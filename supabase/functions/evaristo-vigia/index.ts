@@ -83,17 +83,20 @@ Deno.serve(async (req) => {
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    // Solo el cron (que llama con la service-role key, ver vault.decrypted_secrets en
-    // la migración) puede disparar este escaneo: revisa todo el sistema, gasta cuota
-    // de IA y manda notificaciones a clientes ajenos al llamador — ningún cliente
-    // autenticado normal debe poder ejecutarlo por su cuenta.
+    // Solo el cron (que llama con el JWT legacy guardado en vault.decrypted_secrets,
+    // ver la migración de la vigía) puede disparar este escaneo: revisa todo el sistema,
+    // gasta cuota de IA y manda notificaciones a clientes ajenos al llamador — ningún
+    // cliente autenticado normal debe poder ejecutarlo por su cuenta.
+    // Nota: SUPABASE_SERVICE_ROLE_KEY (la llave nueva) ya NO es el mismo valor que el
+    // JWT legacy que usa el cron, así que la comparación se hace en SQL contra el
+    // secreto real (token_es_service_role_legacy), no contra esta env var.
     const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
-    if (!token || token !== SERVICE_KEY) {
+    const { data: autorizado } = await sb.rpc("token_es_service_role_legacy", { p_token: token });
+    if (!token || !autorizado) {
       return new Response(JSON.stringify({ error: "no_autorizado" }), { status: 401, headers: { ...cors, "Content-Type": "application/json" } });
     }
-
-    const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 
     const { data: pendientes, error } = await sb
       .from("licitaciones_cambios")

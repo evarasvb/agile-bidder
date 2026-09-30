@@ -28,6 +28,11 @@ export interface Cliente {
   activo: boolean;
   onboarding_completado: boolean;
   onboarding_step: number;
+  // Onboarding "Tu empresa" (sep 2026): qué hace la empresa en sus palabras
+  // y el consentimiento expreso a Términos y Privacidad.
+  descripcion_empresa?: string | null;
+  terminos_aceptados_at?: string | null;
+  terminos_version?: string | null;
   created_at: string;
   updated_at: string;
 }

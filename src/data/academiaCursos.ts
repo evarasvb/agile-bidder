@@ -1150,11 +1150,11 @@ export const CURSOS: Curso[] = [
 // Pack de la saga completa (7 cursos) con descuento.
 export const SAGA_BUNDLE = {
   activo: true,
+  slug: "saga-completa-7x1",
   titulo: "Saga Completa 7x1",
   descripcion:
     "Los 7 cursos de la saga Véndele al Estado en un solo pack, con descuento. El camino completo, de cero a experto.",
   precio: "$250.000",
-  pagoUrl: "https://mpago.li/1sf5rNp",
 };
 
 export function getCursoBySlug(slug: string): Curso | undefined {

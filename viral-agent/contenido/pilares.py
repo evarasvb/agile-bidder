@@ -138,20 +138,21 @@ PILARES = [
     },
     {
         "clave": "prueba_social",
-        "nombre": "Prueba social / reseñas",
+        "nombre": "Conversación con lectores",
         "formatos": ["post_imagen", "story"],
         "captions": [
             (
-                "\"{cita_lector}\" — gracias por leer '{titulo}' 🙌 Si tú también lo leíste, "
-                "cuéntame qué capítulo te sirvió más."
+                "¿Ya leíste '{titulo}'? Cuéntame qué capítulo te sirvió más y qué tema "
+                "te gustaría que profundizara en una próxima edición."
             ),
             (
-                "Lo que más me repiten los lectores de '{titulo}': \"{cita_lector}\". "
-                "Si postulas a licitaciones y aún no lo lees, este es tu momento 📖"
+                "Quiero conocer a quienes están usando '{titulo}' para ordenar sus "
+                "postulaciones. ¿En qué etapa estás: buscando, ofertando o ejecutando "
+                "un contrato? Te leo 👇"
             ),
             (
-                "Cada semana llega un mensaje como este sobre '{titulo}': \"{cita_lector}\". "
-                "Gracias por leerlo y compartirlo con tu equipo."
+                "Si estás leyendo '{titulo}', guarda esta publicación y vuelve cuando "
+                "termines: ¿qué error de Mercado Público te ayudó a evitar?"
             ),
         ],
     },

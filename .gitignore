@@ -36,3 +36,6 @@ e2e/.auth/
 playwright-report/
 test-results/
 blob-report/
+
+# Material premium: se carga al bucket privado de Supabase Storage, nunca a Git.
+supabase/storage/academia-premium/*.xlsx

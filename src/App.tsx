@@ -67,6 +67,7 @@ const Inventory = lazy(() => import("./pages/Inventory"));
 const Pipeline = lazy(() => import("./pages/Pipeline"));
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Instituciones = lazy(() => import("./pages/Instituciones"));
 const CalendarioIntegrado = lazy(() => import("./pages/CalendarioIntegrado"));
 const GestionVendedores = lazy(() => import("./pages/GestionVendedores"));
 
@@ -133,7 +134,9 @@ const queryClient = new QueryClient({
 // cargó (o no existe), no redirige: deja pasar (evita lockouts).
 const OnboardingGate = ({ children }: { children: React.ReactNode }) => {
   const { data: cliente, isLoading } = useCliente();
-  if (!isLoading && cliente && cliente.onboarding_completado === false) {
+  // Sep 2026: también pasan por el paso "Tu empresa" los clientes antiguos que
+  // nunca aceptaron Términos de forma expresa (y en su mayoría no tienen RUT).
+  if (!isLoading && cliente && (cliente.onboarding_completado === false || !cliente.terminos_aceptados_at)) {
     return <Navigate to="/onboarding" replace />;
   }
   return <>{children}</>;
@@ -250,6 +253,7 @@ const App = () => (
             
             {/* ----- DASHBOARD ----- */}
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/instituciones" element={<Instituciones />} />
             <Route path="/dashboard/calendario" element={<Navigate to="/calendario" replace />} />
             <Route path="/calendario" element={<CalendarioIntegrado />} />
             <Route path="/dashboard/vendedores" element={<GestionVendedores />} />

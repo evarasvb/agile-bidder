@@ -82,7 +82,7 @@ export function PrimerosPasos() {
     {
       id: "perfil", done: perfilListo, icon: Tag,
       titulo: "Cuéntanos qué vendes",
-      desc: "Industria, palabras clave y qué NO vendes: es lo que arma tus primeras oportunidades.",
+      desc: "Tu empresa, tu RUT y lo que vendes: con eso la IA arma tus primeras oportunidades.",
       to: "/onboarding",
       aviso: "Vamos a armar tu perfil 🏷️",
     },
@@ -143,6 +143,10 @@ export function PrimerosPasos() {
       oferta: "¡Bien ahí! Creaste tu primera oferta 🎉",
       extension: "¡Extensión conectada! ⚡",
     };
+    // Mientras los datos cargan, todos los pasos parecen "pendientes": si se
+    // registraran así, al terminar de cargar se celebraría algo que el cliente
+    // hizo hace días ("¡Creaste tu primera oferta!" al abrir el panel).
+    if (cargando) return;
     for (const p of pasos) {
       if (p.done && prevDone.current[p.id] === false) {
         toast.success(celebra[p.id] ?? "¡Paso completado!");
@@ -150,7 +154,7 @@ export function PrimerosPasos() {
       prevDone.current[p.id] = p.done;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [perfilListo, tieneInventario, revisoOportunidades, tieneOfertas, isConnected]);
+  }, [cargando, perfilListo, tieneInventario, revisoOportunidades, tieneOfertas, isConnected]);
 
   const irAlPaso = (p: typeof pasos[number]) => {
     p.onClick?.();

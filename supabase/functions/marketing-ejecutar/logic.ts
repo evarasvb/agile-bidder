@@ -11,7 +11,10 @@ export interface MarketingPiece {
   tipo: string;
   canal: string;
   estado: string;
+  contactos_ids?: string[] | null;
 }
+
+export type ExecutionMode = 'initial' | 'continuation';
 
 export interface MarketingContact {
   id: string;
@@ -54,6 +57,11 @@ export interface ExecutionResult {
     estado: 'enviado' | 'fallo' | 'incierto';
     error?: string;
   }>;
+  // true cuando quedan contactos por enviar porque esta corrida topó con
+  // maxPerRun: la pieza queda en 'ejecutando' y el cron de continuación
+  // la retoma solo, no hace falta volver a apretar enviar.
+  pendiente_continuacion?: boolean;
+  restantes?: number;
 }
 
 export interface ExecutionError {
@@ -74,7 +82,7 @@ export interface ClaimResult {
 }
 
 export interface AtomicClaimQuery {
-  update(values: { estado: string }): AtomicClaimQuery;
+  update(values: { estado: string; contactos_ids?: string[] }): AtomicClaimQuery;
   eq(column: string, value: string): AtomicClaimQuery;
   select(columns: string): {
     maybeSingle(): Promise<{
@@ -103,14 +111,23 @@ export interface MarketingContactsTable {
 }
 
 export interface MarketingExecutionStore {
-  claimPiece(piezaId: string): Promise<ClaimResult>;
-  releasePieceClaim(piezaId: string): Promise<boolean>;
+  claimPiece(
+    piezaId: string,
+    contactosIds: string[],
+    mode: ExecutionMode,
+  ): Promise<ClaimResult>;
+  releasePieceClaim(piezaId: string, mode: ExecutionMode): Promise<boolean>;
   getContactsPage(filters: {
     contactIds: string[];
     from: number;
     to: number;
   }): Promise<{ contacts: MarketingContact[]; total: number }>;
+  // Contactos que ya tuvieron un resultado persistido en otra corrida. Se
+  // omiten todos: reenviar un resultado incierto o un fallo confirmado puede
+  // duplicar correos y debe requerir una acción manual explícita.
+  getProcessedContactIds?(piezaId: string): Promise<Set<string>>;
   persistExecutions(rows: MarketingExecutionRow[]): Promise<void>;
+  markPiecePendingContinuation(piezaId: string): Promise<void>;
   markPieceExecuted(piezaId: string): Promise<void>;
   markCampaignExecuting(campaignId: string, updatedAt: string): Promise<void>;
   calculateMetrics(campaignId: string, date: string): Promise<void>;
@@ -126,6 +143,16 @@ export interface MarketingExecutionDependencies {
   }): Promise<EmailSendResult>;
   now?: () => Date;
   contactPageSize?: number;
+  // Tope de correos que se mandan en ESTA invocación (para no mandar cientos
+  // de golpe). Lo que sobra queda pendiente y el cron de continuación lo
+  // retoma. Sin límite por defecto (mantiene el comportamiento de antes).
+  maxPerRun?: number;
+  // Pausa entre un envío y el siguiente dentro de esta misma corrida, para
+  // no mandar todo en ráfaga. Sin pausa por defecto.
+  sendDelayMs?: number;
+  // Solo el JWT service_role puede seleccionar continuation en la Edge
+  // Function. El modo initial sigue reservado a la sesión del fundador.
+  mode?: ExecutionMode;
 }
 
 const UUID_PATTERN =
@@ -134,13 +161,17 @@ const UUID_PATTERN =
 export async function claimEmailPiece(
   query: AtomicClaimQuery,
   pieceId: string,
+  contactosIds: string[] = [],
 ): Promise<ClaimResult> {
+  // Guarda la audiencia objetivo en la propia pieza: si esta corrida no
+  // alcanza a mandarle a todos (maxPerRun), el cron de continuación sabe a
+  // quién le falta sin depender de que el navegador vuelva a mandarla.
   const { data, error } = await query
-    .update({ estado: 'ejecutando' })
+    .update({ estado: 'procesando', contactos_ids: contactosIds })
     .eq('id', pieceId)
     .eq('estado', 'draft')
     .eq('canal', 'email')
-    .select('id, campana_id, contenido, asunto, tipo, canal, estado')
+    .select('id, campana_id, contenido, asunto, tipo, canal, estado, contactos_ids')
     .maybeSingle();
 
   return error ? { piece: null, failed: true } : { piece: data };
@@ -195,6 +226,14 @@ function parseRequest(input: unknown): ExecuteRequest | null {
   };
 }
 
+function isValidContactIds(value: unknown): value is string[] {
+  return Array.isArray(value) &&
+    value.length > 0 &&
+    value.length <= 1000 &&
+    value.every((id) => typeof id === 'string' && UUID_PATTERN.test(id)) &&
+    new Set(value).size === value.length;
+}
+
 export async function executeMarketingCampaign(
   input: unknown,
   dependencies: MarketingExecutionDependencies,
@@ -207,9 +246,10 @@ export async function executeMarketingCampaign(
     };
   }
 
+  const mode = dependencies.mode ?? 'initial';
   let claim: ClaimResult;
   try {
-    claim = await dependencies.store.claimPiece(request.pieza_id);
+    claim = await dependencies.store.claimPiece(request.pieza_id, request.contactos_ids, mode);
   } catch {
     claim = { piece: null, failed: true };
   }
@@ -232,6 +272,27 @@ export async function executeMarketingCampaign(
   }
 
   const piece = claim.piece;
+  // El continuador no confía en la audiencia del body: procesa únicamente la
+  // lista guardada al reclamar inicialmente la pieza.
+  const audienceIds = mode === 'continuation' ? piece.contactos_ids : request.contactos_ids;
+  if (!isValidContactIds(audienceIds)) {
+    let released = false;
+    if (mode === 'initial') {
+      try {
+        released = await dependencies.store.releasePieceClaim(request.pieza_id, mode);
+      } catch {
+        released = false;
+      }
+    }
+    return {
+      status: 500,
+      body: {
+        error: 'La audiencia guardada no es válida',
+        codigo: 'stored_audience_invalid',
+        requiere_revision_manual: mode === 'continuation' || !released,
+      },
+    };
+  }
   const contacts: MarketingContact[] = [];
 
   try {
@@ -241,8 +302,8 @@ export async function executeMarketingCampaign(
     }
     const seenContactIds = new Set<string>();
 
-    for (let offset = 0; offset < request.contactos_ids.length; offset += pageSize) {
-      const requestedPageIds = request.contactos_ids.slice(offset, offset + pageSize);
+    for (let offset = 0; offset < audienceIds.length; offset += pageSize) {
+      const requestedPageIds = audienceIds.slice(offset, offset + pageSize);
       const requestedPageSet = new Set(requestedPageIds);
       const page = await dependencies.store.getContactsPage({
         contactIds: requestedPageIds,
@@ -267,18 +328,20 @@ export async function executeMarketingCampaign(
       }
     }
 
-    if (contacts.length !== request.contactos_ids.length) {
+    if (contacts.length !== audienceIds.length) {
       throw new Error('explicit_audience_changed');
     }
-    for (const contactId of request.contactos_ids) {
+    for (const contactId of audienceIds) {
       if (!seenContactIds.has(contactId)) throw new Error('explicit_audience_mismatch');
     }
   } catch {
     let released = false;
-    try {
-      released = await dependencies.store.releasePieceClaim(request.pieza_id);
-    } catch {
-      released = false;
+    if (mode === 'initial') {
+      try {
+        released = await dependencies.store.releasePieceClaim(request.pieza_id, mode);
+      } catch {
+        released = false;
+      }
     }
 
     return {
@@ -286,10 +349,39 @@ export async function executeMarketingCampaign(
       body: {
         error: 'No se pudieron obtener los contactos',
         codigo: 'contacts_failed',
-        requiere_revision_manual: !released,
+        requiere_revision_manual: mode === 'continuation' || !released,
       },
     };
   }
+
+  // Salta a quien ya tuvo un resultado en una corrida anterior y limita
+  // cuántos se procesan AHORA.
+  let pendientes = contacts;
+  if (dependencies.store.getProcessedContactIds) {
+    try {
+      const yaProcesados = await dependencies.store.getProcessedContactIds(request.pieza_id);
+      pendientes = contacts.filter((c) => !yaProcesados.has(c.id));
+    } catch {
+      return {
+        status: 500,
+        body: {
+          error: 'No se pudo verificar el historial de la pieza',
+          codigo: 'execution_history_failed',
+          requiere_revision_manual: true,
+        },
+      };
+    }
+  }
+  const maxPerRun = dependencies.maxPerRun ?? Infinity;
+  if (maxPerRun !== Infinity && (!Number.isSafeInteger(maxPerRun) || maxPerRun < 1)) {
+    return {
+      status: 500,
+      body: { error: 'Configuración de lote inválida', codigo: 'invalid_batch_size' },
+    };
+  }
+  const batch = pendientes.slice(0, Math.max(0, maxPerRun));
+  const restantes = pendientes.length - batch.length;
+  const delayMs = dependencies.sendDelayMs ?? 0;
 
   const now = dependencies.now ?? (() => new Date());
   const result: ExecutionResult = {
@@ -306,7 +398,11 @@ export async function executeMarketingCampaign(
   };
   const executionRows: MarketingExecutionRow[] = [];
 
-  for (const contact of contacts) {
+  for (let i = 0; i < batch.length; i++) {
+    const contact = batch[i];
+    if (delayMs > 0 && i > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
     let emailResult: EmailSendResult;
     try {
       emailResult = await dependencies.sendEmail({
@@ -376,8 +472,30 @@ export async function executeMarketingCampaign(
     };
   }
 
+  // Un resultado incierto queda bloqueado en `procesando`: el cron no puede
+  // retomarlo automáticamente y arriesgar un correo duplicado.
   if (result.total_inciertos > 0) {
     return { status: 202, body: result };
+  }
+
+  if (restantes > 0) {
+    try {
+      await dependencies.store.markPiecePendingContinuation(request.pieza_id);
+    } catch {
+      result.requiere_revision_manual = true;
+      return {
+        status: 500,
+        body: {
+          error: 'El lote terminó, pero la continuación no pudo quedar disponible',
+          codigo: 'continuation_release_failed',
+          requiere_revision_manual: true,
+          resultado: result,
+        },
+      };
+    }
+    result.pendiente_continuacion = true;
+    result.restantes = restantes;
+    return { status: 200, body: result };
   }
 
   try {

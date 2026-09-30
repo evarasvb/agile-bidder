@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
+import { useCliente, useActualizarCliente } from '@/hooks/useCliente';
+import { MessageCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -17,6 +20,19 @@ interface NotificacionesSettingsProps {
 export default function NotificacionesSettings({ clienteId }: NotificacionesSettingsProps) {
   const { data: preferencias, isLoading } = useNotificacionPreferencias(clienteId);
   const { mutate: actualizarPreferencias, isPending: isSaving } = useActualizarNotificacionPreferencias();
+  const { data: cliente } = useCliente();
+  const actualizarCliente = useActualizarCliente();
+  const [whatsapp, setWhatsapp] = useState('');
+  useEffect(() => { setWhatsapp(((cliente as { whatsapp?: string | null } | null)?.whatsapp) ?? ''); }, [cliente]);
+  // Solo avisos importantes (adjudicación ganada, novedades de FirmaVB); nunca cambios de licitaciones ni compras ágiles.
+  const guardarWhatsapp = () => {
+    if (!cliente?.id) return;
+    const d = whatsapp.replace(/\D/g, '');
+    const normal = d.length === 9 && d.startsWith('9') ? '+56' + d : d.length === 11 && d.startsWith('569') ? '+' + d : d ? '+' + d : '';
+    if (whatsapp && !normal) { toast.error('Escribe un celular chileno, por ejemplo 9 1234 5678'); return; }
+    setWhatsapp(normal);
+    actualizarCliente.mutate({ id: cliente.id, whatsapp: normal || null } as Parameters<typeof actualizarCliente.mutate>[0]);
+  };
   
   const [formData, setFormData] = useState({
     email_instantaneo: true,
@@ -25,6 +41,7 @@ export default function NotificacionesSettings({ clienteId }: NotificacionesSett
     alerta_nuevos_matches: true,
     alerta_cierre_proximo: true,
     alerta_cambios_guardadas: true,
+    whatsapp_avisos: true,
     horas_antes_cierre: 48,
     score_minimo_alerta: 70,
     presupuesto_minimo: 0,
@@ -40,6 +57,7 @@ export default function NotificacionesSettings({ clienteId }: NotificacionesSett
         alerta_nuevos_matches: preferencias.alerta_nuevos_matches ?? true,
         alerta_cierre_proximo: preferencias.alerta_cierre_proximo ?? true,
         alerta_cambios_guardadas: preferencias.alerta_cambios_guardadas ?? true,
+        whatsapp_avisos: (preferencias as { whatsapp_avisos?: boolean | null }).whatsapp_avisos ?? true,
         horas_antes_cierre: preferencias.horas_antes_cierre ?? 48,
         score_minimo_alerta: preferencias.score_minimo_alerta ?? 70,
         presupuesto_minimo: preferencias.presupuesto_minimo ?? 0,
@@ -226,6 +244,35 @@ export default function NotificacionesSettings({ clienteId }: NotificacionesSett
         </CardContent>
       </Card>
       
+      {/* WhatsApp: solo lo importante */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MessageCircle className="h-5 w-5 text-emerald-600" />
+            WhatsApp
+          </CardTitle>
+          <CardDescription>
+            Te escribimos por WhatsApp solo cuando ganas una licitación o hay una novedad de FirmaVB. Los cambios de licitaciones y compras ágiles se ven en tu panel, no llegan por WhatsApp ni correo.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="whatsapp">Número de WhatsApp</Label>
+            <Input id="whatsapp" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} onBlur={guardarWhatsapp} placeholder="+56 9 1234 5678" inputMode="tel" className="max-w-xs" />
+          </div>
+          <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+            <div>
+              <Label className="font-medium">Avisos importantes por WhatsApp</Label>
+              <p className="text-sm text-muted-foreground">Adjudicación ganada y novedades de FirmaVB</p>
+            </div>
+            <Switch
+              checked={formData.whatsapp_avisos}
+              onCheckedChange={(checked) => setFormData({ ...formData, whatsapp_avisos: checked })}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Configuraciones Adicionales */}
       <Card>
         <CardHeader>
