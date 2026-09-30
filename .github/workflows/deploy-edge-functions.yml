@@ -1,0 +1,112 @@
+# Auto-deploy de las Edge Functions de Supabase al hacer merge a main.
+# Despliega SOLO las funciones cuya carpeta cambió en el push (y, si cambió algo
+# en _shared, las funciones que importan ese código compartido). No hace un
+# "deploy de todo": así el radio de impacto es exactamente lo que se modificó.
+# El verify_jwt de cada función lo controla supabase/config.toml (no tocarlo a mano).
+#
+# REQUISITO: agregar el secreto SUPABASE_ACCESS_TOKEN en
+# Settings -> Secrets and variables -> Actions (token personal de Supabase,
+# https://supabase.com/dashboard/account/tokens). Sin ese secreto el workflow
+# falla de forma inofensiva (no despliega nada).
+name: Deploy Edge Functions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+      - 'supabase/config.toml'
+  workflow_dispatch:
+    inputs:
+      funciones:
+        description: 'Funciones a desplegar (separadas por espacio). Vacío = detectar por cambios.'
+        required: false
+        default: ''
+
+concurrency:
+  group: deploy-edge-functions
+  cancel-in-progress: false
+
+env:
+  PROJECT_REF: juiskeeutbaipwbeeezw
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Verificar secreto SUPABASE_ACCESS_TOKEN
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "::error::Falta el secreto SUPABASE_ACCESS_TOKEN. Agrégalo en Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+
+      - name: Instalar Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Detectar y desplegar funciones cambiadas
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          MANUAL: ${{ github.event.inputs.funciones }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "${MANUAL:-}" ]; then
+            FUNCS="$(echo "$MANUAL" | tr ' ' '\n' | sort -u)"
+          else
+            BEFORE="${{ github.event.before }}"
+            AFTER="${{ github.sha }}"
+            if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+              BEFORE="$(git rev-parse "${AFTER}^" 2>/dev/null || echo "$AFTER")"
+            fi
+            CHANGED="$(git diff --name-only "$BEFORE" "$AFTER" -- supabase/functions/ || true)"
+            echo "Archivos cambiados bajo supabase/functions/:"
+            echo "$CHANGED"
+
+            # Funciones cuya propia carpeta cambió (excluye _shared).
+            FUNCS="$(echo "$CHANGED" | grep -E '^supabase/functions/[^_/][^/]*/' | sed -E 's#^supabase/functions/([^/]+)/.*#\1#' | sort -u || true)"
+
+            # Si cambió _shared, agrega toda función que importe de ../_shared.
+            if echo "$CHANGED" | grep -q '^supabase/functions/_shared/'; then
+              echo "Cambió _shared: agrego las funciones que lo importan."
+              IMPORTERS="$(grep -rlE '\.\./_shared/' supabase/functions --include='*.ts' 2>/dev/null | sed -E 's#^supabase/functions/([^/]+)/.*#\1#' | grep -v '^_shared$' | sort -u || true)"
+              FUNCS="$(printf '%s\n%s\n' "$FUNCS" "$IMPORTERS" | sort -u)"
+            fi
+          fi
+
+          FUNCS="$(echo "$FUNCS" | grep -v '^$' || true)"
+          if [ -z "$FUNCS" ]; then
+            echo "No hay funciones que desplegar."
+            exit 0
+          fi
+
+          echo "Funciones a desplegar:"
+          echo "$FUNCS"
+
+          FAILED=""
+          while IFS= read -r fn; do
+            [ -z "$fn" ] && continue
+            if [ ! -d "supabase/functions/$fn" ]; then
+              echo "Saltando '$fn' (no existe en el repo)."
+              continue
+            fi
+            echo "== Desplegando $fn =="
+            if ! supabase functions deploy "$fn" --project-ref "$PROJECT_REF"; then
+              FAILED="$FAILED $fn"
+            fi
+          done <<< "$FUNCS"
+
+          if [ -n "$FAILED" ]; then
+            echo "::error::Fallaron estas funciones:$FAILED"
+            exit 1
+          fi
+          echo "Listo. verify_jwt de cada función según supabase/config.toml."

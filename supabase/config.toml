@@ -119,3 +119,63 @@ verify_jwt = false
 
 [functions.sii-contribuyente]
 verify_jwt = true
+
+# --- Funciones sin JWT de Supabase (autentican por otro medio o las llama un
+# webhook/cron externo). DEBEN declararse aquí para que el auto-deploy no las
+# vuelva a verify_jwt = true (el valor por defecto de la CLI) y las rompa. ---
+
+# activar-miembro: enlace de activación abierto (valida un token propio)
+[functions.activar-miembro]
+verify_jwt = false
+
+# mp-suscripcion-webhook: Mercado Pago notifica sin JWT
+[functions.mp-suscripcion-webhook]
+verify_jwt = false
+
+# mp-pago-experto-webhook: Mercado Pago notifica sin JWT
+[functions.mp-pago-experto-webhook]
+verify_jwt = false
+
+# publicar-libro-redes: la llama un cron/servicio, sin JWT de usuario
+[functions.publicar-libro-redes]
+verify_jwt = false
+
+# marketing-generar-ia: acceso público controlado en el handler
+[functions.marketing-generar-ia]
+verify_jwt = false
+
+# extension-adjuntos: la extensión Chrome autentica con x-api-key, no con JWT
+[functions.extension-adjuntos]
+verify_jwt = false
+
+# webinar-baja: enlace público de baja (unsubscribe)
+[functions.webinar-baja]
+verify_jwt = false
+
+# evaristo-vigia: la dispara un cron, sin JWT de usuario
+[functions.evaristo-vigia]
+verify_jwt = false
+
+# sync-consultas-mercado: la dispara un cron/servicio, sin JWT de usuario
+[functions.sync-consultas-mercado]
+verify_jwt = false
+
+# alertas-instituciones-seguidas: la dispara un cron, sin JWT de usuario
+[functions.alertas-instituciones-seguidas]
+verify_jwt = false
+
+# Correos de alerta disparados por triggers/cron (sin JWT de usuario)
+[functions.alerta-cita-email]
+verify_jwt = false
+
+[functions.alerta-drive-email]
+verify_jwt = false
+
+[functions.alerta-registro-email]
+verify_jwt = false
+
+[functions.alerta-onboarding-email]
+verify_jwt = false
+
+[functions.alerta-documento-email]
+verify_jwt = false
