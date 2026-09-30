@@ -38,7 +38,10 @@ export async function matrizAExcelPro(m: Matriz) {
   adm.forEach((r: any, i: number) => {
     const f = 5 + i; const ch = r.chequeo ?? {}; const tipo = String(ch.tipo ?? (/^(s[ií]|no)$/i.test(String(r.entrada ?? '')) ? 'si_no' : 'texto'));
     const u = num(ch.umbral), u2 = num(ch.umbral2);
-    const row = ws.getRow(f); row.values = [r.requisito ?? '', r.regla ?? '', r.entrada ?? '', '', r.fuente ?? '', r.nota ?? '']; row.alignment = { vertical: 'top', wrapText: true };
+    // La condición ("solo línea 2", "solo si postula como UTP", etc.) se agrega a la regla en vez de
+    // una columna nueva: así no se corren las fórmulas de cumplimiento, que apuntan a columnas fijas.
+    const regla = r.condicion && !/^siempre$/i.test(String(r.condicion)) ? `${r.regla ?? ''} (${r.condicion})` : (r.regla ?? '');
+    const row = ws.getRow(f); row.values = [r.requisito ?? '', regla, r.entrada ?? '', '', r.fuente ?? '', r.nota ?? '']; row.alignment = { vertical: 'top', wrapText: true };
     const c = row.getCell(3); entrada(c);
     let formula: string;
     if (tipo === 'si_no') { const esp = /^no$/i.test(String(ch.esperado ?? '')) ? 'NO' : 'SÍ'; c.dataValidation = { type: 'list', allowBlank: true, formulae: ['"SÍ,NO"'] }; formula = `IF(C${f}="","PENDIENTE",IF(UPPER(C${f})="${esp}","CUMPLE","NO CUMPLE"))`; }

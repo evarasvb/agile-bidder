@@ -6,6 +6,7 @@ import { Check, Plus, X, Tag } from 'lucide-react';
 import { InfoHint } from '@/components/ui/info-hint';
 import { useActualizarCliente, Cliente } from '@/hooks/useCliente';
 import { INDUSTRIAS } from './industrias';
+import OnboardingRut from './OnboardingRut';
 
 interface OnboardingStep1Props {
   cliente: Cliente;
@@ -96,8 +97,19 @@ export default function OnboardingStep1({ cliente }: OnboardingStep1Props) {
     return [...set].filter((k) => !palabras.includes(k.toLowerCase())).slice(0, 12);
   }, [industrias, palabras]);
 
+  // Palabras que vienen del historial real del RUT (productos que ya vendió al Estado).
+  const agregarPalabras = (nuevas: string[]) => {
+    const next = [...palabras];
+    for (const n of nuevas) if (n && !next.includes(n)) next.push(n);
+    if (next.length === palabras.length) return;
+    setPalabras(next);
+    persist(industrias, next);
+  };
+
   return (
     <div className="space-y-6">
+      <OnboardingRut cliente={cliente} onPalabras={agregarPalabras} />
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

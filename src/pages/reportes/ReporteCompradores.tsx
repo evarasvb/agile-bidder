@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { Building2, Package, Users, DollarSign, FileText, Crown, Landmark } from "lucide-react";
@@ -10,6 +11,7 @@ import { ReportHero } from "@/components/reportes/ReportHero";
 import { formatCompact, formatNumber } from "@/hooks/useReportes";
 import { useBIStats, useTopCompradores, useCompradorDetalle, rangoDePreset, type BIComprador, type PeriodoPreset } from "@/hooks/useBI";
 import { PeriodoSelector } from "@/components/reportes/PeriodoSelector";
+import { RiesgoOrganismoCard } from "@/components/organismo/RiesgoOrganismoCard";
 
 /** Fila del ranking: la institución más su posición por monto (fija aunque se reordene la tabla). */
 type FilaComprador = BIComprador & { posicion: number };
@@ -61,14 +63,29 @@ export default function ReporteCompradores() {
   const [preset, setPreset] = useState<PeriodoPreset>("total");
   const periodo = rangoDePreset(preset);
 
+  // Llegada desde la campanita de avisos (reclamo_institucion / compras_institucion):
+  // trae la institución en la URL para abrir su detalle de una vez, sin que el
+  // cliente tenga que volver a buscarla a mano.
+  const [searchParams] = useSearchParams();
+  const institucionUrl = searchParams.get("institucion");
+  const autoSeleccionado = useRef(false);
+
   // La búsqueda va al servidor (busca en TODAS las instituciones antes del
   // top 200); la tabla solo ordena/pagina lo que llega.
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(institucionUrl ?? "");
   const termino = useDebouncedValue(q.trim(), 400);
   const { data: stats } = useBIStats(periodo);
   const { data, isLoading } = useTopCompradores(termino, 200, periodo);
   const filas = useMemo<FilaComprador[]>(() => (data?.items ?? []).map((c, i) => ({ ...c, posicion: i + 1 })), [data]);
   const { data: detalle, isLoading: detalleLoading } = useCompradorDetalle(sel?.comprador ?? null);
+
+  useEffect(() => {
+    if (autoSeleccionado.current || !institucionUrl || !filas.length) return;
+    autoSeleccionado.current = true;
+    const match = filas.find((c) => c.comprador.toLowerCase() === institucionUrl.toLowerCase())
+      ?? filas.find((c) => c.comprador.toLowerCase().includes(institucionUrl.toLowerCase()));
+    setSel(match ?? { comprador: institucionUrl, ordenes: 0, monto_total: 0, proveedores: 0, share: null, ultima: null });
+  }, [institucionUrl, filas]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -141,6 +158,7 @@ export default function ReporteCompradores() {
                   </p>
                 )}
               </div>
+              <RiesgoOrganismoCard organismo={sel.comprador} />
               <Card className="border-border/50 shadow-sm">
                 <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Package className="h-4 w-4" /> Qué compra</CardTitle></CardHeader>
                 <CardContent>

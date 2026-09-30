@@ -25,6 +25,8 @@ const conCitas = (html: string, fuentes?: any[]) => html.replace(/\[(\d{1,2})\]/
 });
 
 const TIPOS_DOCUMENTO = [
+  { value: 'defensa_tcp', label: 'Defensa ante el Tribunal de Contratación Pública (adjudicatario)' },
+  { value: 'reposicion_servicio', label: 'Reposición ante el Servicio (recurso administrativo, art. 59 Ley 19.880)' },
   { value: 'apelacion', label: 'Recurso / reclamo por una licitación o compra ágil' },
   { value: 'reclamo_contraloria', label: 'Reclamo ante la Contraloría' },
   { value: 'cobro_intereses_mora', label: 'Nota de débito / cobro de intereses por mora' },
@@ -45,6 +47,14 @@ export default function Abogado() {
   const [pregunta, setPregunta] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [limite, setLimite] = useState<string | null>(null);
+  // Pestaña controlada: "Usar esta conversación" (abajo) salta de Chat a Generar
+  // documento llevándose el hilo, para no obligar a escribir los hechos de nuevo.
+  const [tab, setTab] = useState('chat');
+  // Tono: "full" argumenta con toda la fuerza y cita todo lo aplicable; "tibio" es más
+  // mesurado y prioriza el diálogo con el organismo antes de lo formal. Se guarda para
+  // no tener que elegirlo de nuevo en cada visita.
+  const [tono, setTono] = useState<'full' | 'tibio'>(() => (localStorage.getItem('abogado_tono') === 'tibio' ? 'tibio' : 'full'));
+  const cambiarTono = (t: 'full' | 'tibio') => { setTono(t); localStorage.setItem('abogado_tono', t); };
 
   // Generar documento
   const [tipoDoc, setTipoDoc] = useState('apelacion');
@@ -65,6 +75,9 @@ export default function Abogado() {
 
   // Documentos de respaldo (contratos, notificaciones, reclamos previos)
   const [documentos, setDocumentos] = useState<{ id: string; nombre: string; tipo: string }[]>([]);
+  // Documentos generales (subidos sin ligarlos a un caso). Se muestran siempre, para que un
+  // documento no "desaparezca" cuando el ID del caso no calza con el que se escribió al subirlo.
+  const [documentosGenerales, setDocumentosGenerales] = useState<{ id: string; nombre: string; tipo: string }[]>([]);
   const [subiendo, setSubiendo] = useState(false);
 
   async function pedir(body: Record<string, unknown>, onTexto: (t: string, meta?: any) => void) {
@@ -93,7 +106,7 @@ export default function Abogado() {
     setMsgs((m) => [...m, { rol: 'yo', texto: p }, { rol: 'exp', texto: '' }]);
     setEnviando(true);
     try {
-      await pedir({ modo: 'chat', pregunta: p, historial, codigo: codigo || undefined, huella: 'abogado' }, (t, meta) =>
+      await pedir({ modo: 'chat', pregunta: p, historial, codigo: codigo || undefined, huella: 'abogado', modo_tono: tono }, (t, meta) =>
         setMsgs((m) => { const c = [...m]; c[c.length - 1] = { rol: 'exp', texto: t, fuentes: meta?.fuentes }; return c; }));
     } catch (e: any) {
       if (e.status === 402 || e.status === 401) setLimite(e.message);
@@ -102,7 +115,18 @@ export default function Abogado() {
     setEnviando(false);
   };
 
+  // Copia la conversación del chat a "Hechos" (sin pisar lo que el usuario ya haya
+  // escrito ahí) y salta a "Generar documento": el mismo caso, sin volver a explicarlo.
+  const usarConversacion = () => {
+    const resumen = msgs.filter((m) => m.texto.trim()).map((m) => (m.rol === 'yo' ? m.texto : `Don Evaristo respondió: ${m.texto.replace(/<[^>]+>/g, '')}`)).join('\n\n');
+    setHechos((h) => (h.trim() ? h : resumen));
+    setTab('documento');
+  };
+
   const esMora = tipoDoc === 'cobro_intereses_mora';
+  const esDefensa = tipoDoc === 'defensa_tcp';
+  const esReposicion = tipoDoc === 'reposicion_servicio';
+  const esEscrito = esDefensa || esReposicion;
   const faltanDatosMora = esMora && (!montoAdeudado || Number(montoAdeudado) <= 0 || !fechaVencimiento || (!sigueImpago && !fechaPago));
   const puedeGenerar = esMora ? !faltanDatosMora : !!hechos.trim();
 
@@ -118,7 +142,7 @@ export default function Abogado() {
       await pedir({
         modo: 'documento', tipo_documento: tipoDoc, destinatario, codigo: codigo || undefined, hechos: hechosFinal, peticion,
         ciudad_fecha: new Date().toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' }),
-        huella: 'abogado',
+        huella: 'abogado', modo_tono: tono,
         ...(esMora ? {
           monto_adeudado: Number(montoAdeudado), fecha_vencimiento: fechaVencimiento, fecha_pago: sigueImpago ? undefined : (fechaPago || undefined),
           tasas_manual: Object.entries(tasasManual).filter(([, v]) => Number(v) > 0).map(([mes, v]) => ({ mes, tasa_anual: Number(v) })),
@@ -161,11 +185,18 @@ export default function Abogado() {
   const listarDocumentos = async () => {
     const codigoAlPedir = codigo;
     try {
-      const qs = codigoAlPedir ? `?codigo=${encodeURIComponent(codigoAlPedir)}` : '';
-      const r = await fetch(`${SUPA}/functions/v1/experto-documentos${qs}`, { headers: auth });
-      const j = await r.json().catch(() => ({}));
+      // Siempre traemos los documentos generales (sin caso). Si hay un código, además
+      // traemos los de ese caso. Así un documento subido "sin código" (o bajo otro ID) no
+      // queda escondido cuando el usuario está mirando un caso puntual.
+      const [rGen, rCaso] = await Promise.all([
+        fetch(`${SUPA}/functions/v1/experto-documentos`, { headers: auth }),
+        codigoAlPedir ? fetch(`${SUPA}/functions/v1/experto-documentos?codigo=${encodeURIComponent(codigoAlPedir)}`, { headers: auth }) : Promise.resolve(null),
+      ]);
+      const jGen = await rGen.json().catch(() => ({}));
+      const jCaso = rCaso ? await rCaso.json().catch(() => ({})) : { documentos: [] };
       if (codigoAlPedir !== codigoRef.current) return;
-      setDocumentos(j.documentos ?? []);
+      setDocumentosGenerales(jGen.documentos ?? []);
+      setDocumentos(codigoAlPedir ? (jCaso.documentos ?? []) : []);
     } catch { /* silencioso */ }
   };
 
@@ -198,6 +229,7 @@ export default function Abogado() {
     try {
       await fetch(`${SUPA}/functions/v1/experto-documentos?id=${id}`, { method: 'DELETE', headers: auth });
       setDocumentos((d) => d.filter((x) => x.id !== id));
+      setDocumentosGenerales((d) => d.filter((x) => x.id !== id));
     } catch { toast.error('No pude borrar el documento'); }
   };
 
@@ -211,7 +243,24 @@ export default function Abogado() {
         Tu asesor legal en Mercado Público: pregúntale en el chat o pídele que redacte una carta de apelación, un reclamo o cualquier documento formal.
       </p>
 
-      <Tabs defaultValue="chat">
+      <div className="flex items-center gap-2 text-sm">
+        <span className="text-muted-foreground">Tono:</span>
+        <div className="inline-flex rounded-md border p-0.5">
+          <button type="button" onClick={() => cambiarTono('full')}
+            className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${tono === 'full' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}>
+            Full leyes
+          </button>
+          <button type="button" onClick={() => cambiarTono('tibio')}
+            className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${tono === 'tibio' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}>
+            Tibio
+          </button>
+        </div>
+        <span className="text-xs text-muted-foreground">
+          {tono === 'full' ? 'Cita todo lo aplicable y argumenta con firmeza' : 'Mesurado: prioriza el diálogo antes de lo formal'}
+        </span>
+      </div>
+
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="chat">Chat</TabsTrigger>
           <TabsTrigger value="documento">Generar documento</TabsTrigger>
@@ -248,6 +297,11 @@ export default function Abogado() {
               {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
           </div>
+          {msgs.length > 0 && (
+            <Button variant="outline" size="sm" onClick={usarConversacion}>
+              <FileText className="h-4 w-4 mr-2" />Usar esta conversación para generar un documento
+            </Button>
+          )}
         </TabsContent>
 
         <TabsContent value="documento" className="space-y-4">
@@ -263,10 +317,15 @@ export default function Abogado() {
                   </SelectContent>
                 </Select>
               </div>
+              {esEscrito && (
+                <div className="rounded-md border border-blue-300 bg-blue-50 p-3 text-sm text-blue-900">
+                  Sube en <strong>"Mis documentos"</strong> las resoluciones y oficios del caso (adjudicación, invalidación, oficio de Contraloría, respuestas del foro) y pon el <strong>ID de la licitación</strong> para que Don Evaristo arme el escrito con las fechas y números reales. Queda como borrador para que lo revise y firme tu abogado.
+                </div>
+              )}
               <div className="grid sm:grid-cols-2 gap-3">
                 <div>
-                  <Label>Destinatario / institución</Label>
-                  <Input value={destinatario} onChange={(e) => setDestinatario(e.target.value)} placeholder="Ej: Municipalidad de Puerto Montt" />
+                  <Label>{esDefensa ? 'Tribunal / destinatario' : esReposicion ? 'Servicio / destinatario' : 'Destinatario / institución'}</Label>
+                  <Input value={destinatario} onChange={(e) => setDestinatario(e.target.value)} placeholder={esDefensa ? 'Ilustre Tribunal de Contratación Pública' : esReposicion ? 'Ej: Servicio Local de Educación Pública Puerto Cordillera' : 'Ej: Municipalidad de Puerto Montt'} />
                 </div>
                 <div>
                   <Label>ID de licitación o compra (opcional)</Label>
@@ -300,7 +359,7 @@ export default function Abogado() {
               <div>
                 <Label>{esMora ? 'Detalles adicionales (opcional)' : 'Hechos — cuéntame qué pasó'}</Label>
                 <Textarea value={hechos} onChange={(e) => setHechos(e.target.value)} rows={esMora ? 2 : 5}
-                  placeholder={esMora ? 'Algo más que deba saber (ej: número de OC, contacto del organismo)' : 'Ej: Postulé a la licitación X, me declararon inadmisible el 12 de marzo por...'} />
+                  placeholder={esMora ? 'Algo más que deba saber (ej: número de OC, contacto del organismo)' : esDefensa ? 'Ej: Soy el adjudicatario. Un competidor impugnó la adjudicación alegando... Ya subí las resoluciones del caso.' : esReposicion ? 'Ej: Un competidor presentó reposición contra la resolución que confirmó mi adjudicación. Ya subí las resoluciones del caso.' : 'Ej: Postulé a la licitación X, me declararon inadmisible el 12 de marzo por...'} />
               </div>
               <div>
                 <Label>Qué quieres pedir (opcional)</Label>
@@ -387,14 +446,46 @@ export default function Abogado() {
                 <input type="file" className="hidden" multiple disabled={subiendo}
                   onChange={(e) => e.target.files && subirDocumento(e.target.files)} />
               </label>
-              <div className="space-y-2">
-                {documentos.map((d) => (
-                  <div key={d.id} className="flex items-center justify-between rounded-md border p-2 text-sm">
-                    <span className="flex items-center gap-2"><Paperclip className="h-3.5 w-3.5" />{d.nombre}</span>
-                    <Button size="icon" variant="ghost" onClick={() => borrarDocumento(d.id)}><Trash2 className="h-4 w-4" /></Button>
+              <div className="space-y-3">
+                {codigo ? (
+                  <>
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">Documentos de este caso ({codigo.toUpperCase()})</p>
+                      {documentos.length === 0 && (
+                        <p className="rounded-md border border-yellow-300 bg-yellow-50 p-2 text-xs text-yellow-900">
+                          No hay documentos ligados a {codigo.toUpperCase()}. Revisa que el ID esté bien escrito; si lo subiste sin ID, aparece más abajo en "Documentos generales".
+                        </p>
+                      )}
+                      {documentos.map((d) => (
+                        <div key={d.id} className="flex items-center justify-between rounded-md border p-2 text-sm">
+                          <span className="flex items-center gap-2"><Paperclip className="h-3.5 w-3.5" />{d.nombre}</span>
+                          <Button size="icon" variant="ghost" onClick={() => borrarDocumento(d.id)}><Trash2 className="h-4 w-4" /></Button>
+                        </div>
+                      ))}
+                    </div>
+                    {documentosGenerales.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground">Documentos generales (sin caso)</p>
+                        {documentosGenerales.map((d) => (
+                          <div key={d.id} className="flex items-center justify-between rounded-md border p-2 text-sm">
+                            <span className="flex items-center gap-2"><Paperclip className="h-3.5 w-3.5" />{d.nombre}</span>
+                            <Button size="icon" variant="ghost" onClick={() => borrarDocumento(d.id)}><Trash2 className="h-4 w-4" /></Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    {documentosGenerales.map((d) => (
+                      <div key={d.id} className="flex items-center justify-between rounded-md border p-2 text-sm">
+                        <span className="flex items-center gap-2"><Paperclip className="h-3.5 w-3.5" />{d.nombre}</span>
+                        <Button size="icon" variant="ghost" onClick={() => borrarDocumento(d.id)}><Trash2 className="h-4 w-4" /></Button>
+                      </div>
+                    ))}
+                    {documentosGenerales.length === 0 && <p className="text-sm text-muted-foreground">Aún no subes documentos.</p>}
                   </div>
-                ))}
-                {documentos.length === 0 && <p className="text-sm text-muted-foreground">Aún no subes documentos.</p>}
+                )}
               </div>
             </CardContent>
           </Card>
