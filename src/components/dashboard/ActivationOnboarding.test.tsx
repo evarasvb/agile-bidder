@@ -4,19 +4,32 @@ import { describe, it, expect } from 'vitest';
  * ActivationOnboarding Component Tests
  *
  * Tests the activation onboarding 3-step flow:
- * 1. Profile complete (empresa_nombre, rut, nombre_responsable, region)
+ * 1. Profile complete (empresa_nombre, rut, nombre_responsable, region —
+ *    region falls back to cliente_filtros_oportunidades.regiones_activas
+ *    because no screen writes clientes.region directly)
  * 2. Criteria configured (palabras_incluir or regiones_activas)
- * 3. First offer created (ofertas.length > 0)
+ * 3. First offer created (a cliente_ofertas row exists for cliente.id)
  *
  * The component is integrated in Dashboard and shows a progress card.
  * It persists state to localStorage and uses backend data from:
  * - useCliente: for profile completeness
- * - useClienteFiltros: for criteria configuration
- * - useClienteOfertas: for offer tracking
+ * - useClienteFiltros: for criteria configuration and the region fallback
+ * - a direct cliente_ofertas query keyed by cliente.id (not the deprecated
+ *   getClienteId()/useClienteOfertas, which reads an unset localStorage key)
  */
 
 describe('ActivationOnboarding Logic', () => {
   describe('Profile Completion Detection', () => {
+    const profileComplete = (
+      cliente: { empresa_nombre?: string | null; rut?: string | null; nombre_responsable?: string | null; region?: string | null },
+      filtros: { regiones_activas?: string[] | null } | null,
+    ) => !!(
+      cliente.empresa_nombre?.trim()
+      && cliente.rut?.trim()
+      && cliente.nombre_responsable?.trim()
+      && (cliente.region?.trim() || (filtros?.regiones_activas && filtros.regiones_activas.length > 0))
+    );
+
     it('should detect complete profile with all required fields', () => {
       const cliente = {
         empresa_nombre: 'Mi Empresa',
@@ -25,14 +38,7 @@ describe('ActivationOnboarding Logic', () => {
         region: 'Metropolitana',
       };
 
-      const profileComplete = !!(
-        cliente.empresa_nombre?.trim()
-        && cliente.rut?.trim()
-        && cliente.nombre_responsable?.trim()
-        && cliente.region?.trim()
-      );
-
-      expect(profileComplete).toBe(true);
+      expect(profileComplete(cliente, null)).toBe(true);
     });
 
     it('should detect incomplete profile with missing fields', () => {
@@ -43,14 +49,7 @@ describe('ActivationOnboarding Logic', () => {
         region: 'Metropolitana',
       };
 
-      const profileComplete = !!(
-        cliente.empresa_nombre?.trim()
-        && cliente.rut?.trim()
-        && cliente.nombre_responsable?.trim()
-        && cliente.region?.trim()
-      );
-
-      expect(profileComplete).toBe(false);
+      expect(profileComplete(cliente, null)).toBe(false);
     });
 
     it('should detect incomplete profile with null values', () => {
@@ -61,14 +60,35 @@ describe('ActivationOnboarding Logic', () => {
         region: undefined,
       };
 
-      const profileComplete = !!(
-        cliente.empresa_nombre?.trim?.()
-        && cliente.rut?.trim?.()
-        && cliente.nombre_responsable?.trim?.()
-        && cliente.region?.trim?.()
-      );
+      expect(profileComplete(cliente, null)).toBe(false);
+    });
 
-      expect(profileComplete).toBe(false);
+    // Regresión: ninguna pantalla escribe clientes.region (OnboardingEmpresa
+    // guarda solo en cliente_filtros_oportunidades.regiones_activas), así que
+    // un cliente recién onboardeado con region=null nunca debía completar
+    // el paso 1 aunque hubiera elegido sus regiones. Ahora cae al fallback.
+    it('should complete profile via regiones_activas when clientes.region is never set', () => {
+      const cliente = {
+        empresa_nombre: 'Mi Empresa',
+        rut: '12345678-9',
+        nombre_responsable: 'Juan Pérez',
+        region: null,
+      };
+      const filtros = { regiones_activas: ['Metropolitana'] };
+
+      expect(profileComplete(cliente, filtros)).toBe(true);
+    });
+
+    it('should stay incomplete when region is unset and no regiones_activas either', () => {
+      const cliente = {
+        empresa_nombre: 'Mi Empresa',
+        rut: '12345678-9',
+        nombre_responsable: 'Juan Pérez',
+        region: null,
+      };
+      const filtros = { regiones_activas: [] };
+
+      expect(profileComplete(cliente, filtros)).toBe(false);
     });
   });
 
@@ -136,38 +156,33 @@ describe('ActivationOnboarding Logic', () => {
   });
 
   describe('Offer Creation Detection', () => {
+    // La pieza real usa un count('id', { count: 'exact', head: true }) contra
+    // cliente_ofertas filtrado por cliente.id (no la lista completa), así que
+    // acá se simula el mismo resultado: count > 0.
     it('should detect created offers', () => {
-      const ofertas = [{ id: '1', estado: 'borrador' }];
-
-      const ofertaCreada = !!(ofertas && ofertas.length > 0);
+      const count = 1;
+      const ofertaCreada = count > 0;
 
       expect(ofertaCreada).toBe(true);
     });
 
-    it('should detect no offers with empty array', () => {
-      const ofertas = [];
-
-      const ofertaCreada = !!(ofertas && ofertas.length > 0);
+    it('should detect no offers with zero count', () => {
+      const count = 0;
+      const ofertaCreada = count > 0;
 
       expect(ofertaCreada).toBe(false);
     });
 
-    it('should detect no offers with null', () => {
-      const ofertas = null;
-
-      const ofertaCreada = !!(ofertas && ofertas.length > 0);
+    it('should detect no offers when cliente.id is not resolved yet (count defaults to 0)', () => {
+      const count = 0;
+      const ofertaCreada = count > 0;
 
       expect(ofertaCreada).toBe(false);
     });
 
     it('should detect multiple offers', () => {
-      const ofertas = [
-        { id: '1', estado: 'borrador' },
-        { id: '2', estado: 'enviada' },
-        { id: '3', estado: 'aprobada' },
-      ];
-
-      const ofertaCreada = !!(ofertas && ofertas.length > 0);
+      const count = 3;
+      const ofertaCreada = count > 0;
 
       expect(ofertaCreada).toBe(true);
     });
@@ -288,14 +303,14 @@ describe('ActivationOnboarding Logic', () => {
         regiones_activas: ['Metropolitana'],
       };
 
-      const ofertas = [{ id: '1', estado: 'borrador' }];
+      const ofertasCount = 1;
 
       // Check each step
       const step1Done = !!(
         cliente.empresa_nombre?.trim()
         && cliente.rut?.trim()
         && cliente.nombre_responsable?.trim()
-        && cliente.region?.trim()
+        && (cliente.region?.trim() || (filtros.regiones_activas && filtros.regiones_activas.length > 0))
       );
 
       const step2Done = !!(
@@ -305,7 +320,7 @@ describe('ActivationOnboarding Logic', () => {
         )
       );
 
-      const step3Done = !!(ofertas && ofertas.length > 0);
+      const step3Done = ofertasCount > 0;
 
       const allDone = step1Done && step2Done && step3Done;
 
@@ -313,6 +328,28 @@ describe('ActivationOnboarding Logic', () => {
       expect(step2Done).toBe(true);
       expect(step3Done).toBe(true);
       expect(allDone).toBe(true);
+    });
+
+    // Regresión del hallazgo real: perfil "completo" sin clientes.region (nadie
+    // lo escribe) pero SIN regiones_activas tampoco — el paso 1 debe quedar
+    // pendiente, no marcarse falsamente como listo.
+    it('should keep profile pending when neither region nor regiones_activas are set', () => {
+      const cliente = {
+        empresa_nombre: 'Mi Empresa',
+        rut: '12345678-9',
+        nombre_responsable: 'Juan Pérez',
+        region: null as string | null,
+      };
+      const filtros = { palabras_incluir: ['toner'], regiones_activas: [] as string[] };
+
+      const step1Done = !!(
+        cliente.empresa_nombre?.trim()
+        && cliente.rut?.trim()
+        && cliente.nombre_responsable?.trim()
+        && (cliente.region?.trim() || (filtros.regiones_activas && filtros.regiones_activas.length > 0))
+      );
+
+      expect(step1Done).toBe(false);
     });
 
     it('should handle partial activation flow', () => {
@@ -324,14 +361,14 @@ describe('ActivationOnboarding Logic', () => {
         region: 'Metropolitana',
       };
 
-      const filtros = null;
-      const ofertas = [];
+      const filtros = null as { palabras_incluir: string[]; regiones_activas: string[] } | null;
+      const ofertasCount = 0;
 
       const step1Done = !!(
         cliente.empresa_nombre?.trim()
         && cliente.rut?.trim()
         && cliente.nombre_responsable?.trim()
-        && cliente.region?.trim()
+        && (cliente.region?.trim() || (filtros?.regiones_activas && filtros.regiones_activas.length > 0))
       );
 
       const step2Done = !!(
@@ -341,7 +378,7 @@ describe('ActivationOnboarding Logic', () => {
         )
       );
 
-      const step3Done = !!(ofertas && ofertas.length > 0);
+      const step3Done = ofertasCount > 0;
 
       expect(step1Done).toBe(true);
       expect(step2Done).toBe(false);

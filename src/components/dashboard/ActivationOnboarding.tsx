@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,9 +8,9 @@ import { Progress } from '@/components/ui/progress';
 import {
   CheckCircle2, User, Sliders, Sparkles, X, ChevronRight, Target, PartyPopper,
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { useCliente } from '@/hooks/useCliente';
 import { useClienteFiltros } from '@/hooks/useClienteFiltros';
-import { useClienteOfertas } from '@/hooks/useClienteOfertas';
 
 const HIDDEN_KEY = 'fvb_activation_onboarding_hidden';
 const SKIPPED_KEY = 'fvb_activation_onboarding_skipped';
@@ -37,16 +38,35 @@ export function ActivationOnboarding() {
 
   const { data: cliente, isLoading: loadingCliente } = useCliente();
   const { filtros, isLoading: loadingFiltros } = useClienteFiltros();
-  const { data: ofertas, isLoading: loadingOfertas } = useClienteOfertas();
+  // useClienteOfertas() depende de getClienteId() (localStorage), que ningún
+  // flujo de la app llena — queda deshabilitado para sesiones normales. Acá
+  // se consulta directo con el cliente.id que ya resolvió useCliente() desde
+  // la sesión autenticada.
+  const { data: tieneOferta, isLoading: loadingOfertas } = useQuery({
+    queryKey: ['activation-onboarding-tiene-oferta', cliente?.id],
+    queryFn: async () => {
+      if (!cliente?.id) return false;
+      const { count, error } = await supabase
+        .from('cliente_ofertas')
+        .select('id', { count: 'exact', head: true })
+        .eq('cliente_id', cliente.id);
+      if (error) throw error;
+      return (count ?? 0) > 0;
+    },
+    enabled: !!cliente?.id,
+  });
 
   const isLoading = loadingCliente || loadingFiltros || loadingOfertas;
 
-  // Step 1: Profile complete - check if empresa_nombre, rut, nombre_responsable, region are filled
+  // Step 1: Profile complete - check if empresa_nombre, rut, nombre_responsable, region are filled.
+  // La región no se guarda en clientes.region (ninguna pantalla la escribe ahí):
+  // el onboarding la persiste en cliente_filtros_oportunidades.regiones_activas,
+  // así que ese es el valor real a revisar.
   const profileComplete = !!(
     cliente?.empresa_nombre?.trim()
     && cliente?.rut?.trim()
     && cliente?.nombre_responsable?.trim()
-    && cliente?.region?.trim()
+    && (cliente?.region?.trim() || (filtros?.regiones_activas && filtros.regiones_activas.length > 0))
   );
 
   // Step 2: Matching criteria configured - check if filtros have palabras_incluir or regiones_activas
@@ -58,7 +78,7 @@ export function ActivationOnboarding() {
   );
 
   // Step 3: First opportunity reviewed/saved - check if they have any offers
-  const ofertaCreada = !!(ofertas && ofertas.length > 0);
+  const ofertaCreada = !!tieneOferta;
 
   const steps: Step[] = [
     {
