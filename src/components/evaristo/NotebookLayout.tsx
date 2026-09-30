@@ -77,7 +77,7 @@ export function NotebookLayout() {
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept=".txt,.pdf,.md,.json"
+                accept=".txt,.md,.json"
                 onChange={handleFileUpload}
                 className="hidden"
               />
