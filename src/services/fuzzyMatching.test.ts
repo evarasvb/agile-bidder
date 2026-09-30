@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { findMatches, findBestMatch, calculateCoverageMetrics, type PropuestaItemRow } from './fuzzyMatching';
+import { findMatches, findBestMatch, calculateCoverageMetrics, isIncompatibleMatch, type PropuestaItemRow } from './fuzzyMatching';
 import type { InventoryItem } from '@/hooks/useInventory';
 
 function producto(overrides: Partial<InventoryItem> = {}): InventoryItem {
@@ -413,5 +413,56 @@ describe('BLOCKER FIXES: Exact name + dimensions, multidimensional, coverage exc
     expect(metrics.itemsConMatchDebil).toBe(1); // score 59
     expect(metrics.cobertura).toBe(67); // 2/3 = 66.67 → 67
     expect(metrics.propuestaIncompleta).toBe(true); // Has weak match
+  });
+});
+
+describe('Codex fix: revalidación de matches persistidos (ca_item_matches)', () => {
+  it('isIncompatibleMatch detecta un match guardado que ya no pasaría la validación (cordel vs pendrive)', () => {
+    const itemRequerido = { id: '1', nombre: 'Pendrive 32GB' };
+    const cordelYaGuardado = producto({
+      id: 'cordel',
+      nombre_producto: 'Cordel de papel kraft',
+      categoria: 'oficina',
+      keywords: ['cordel', 'cuerda', 'adhesivo'],
+    });
+
+    // Simula un score persistido de una corrida vieja del motor (antes de
+    // esta validación), que la UI no debe seguir confiando ciegamente.
+    expect(isIncompatibleMatch(itemRequerido, cordelYaGuardado)).toBe(true);
+  });
+
+  it('isIncompatibleMatch no rechaza un match compatible ya guardado', () => {
+    const itemRequerido = { id: '1', nombre: 'Resma de papel carta' };
+    const papel = producto();
+
+    expect(isIncompatibleMatch(itemRequerido, papel)).toBe(false);
+  });
+});
+
+describe('Codex fix: tijeras para papel no se rechazan solo por mencionar "papel"', () => {
+  it('Tijeras para papel 8 pulgadas: match válido contra "tijera" requerida', () => {
+    const itemRequerido = { id: '1', nombre: 'Tijera de oficina' };
+    const tijerasPapel = producto({
+      id: 'tijeras',
+      nombre_producto: 'Tijeras para papel 8 pulgadas',
+      categoria: 'corte',
+      keywords: ['tijeras', 'corte', 'oficina'],
+    });
+
+    const match = findBestMatch(itemRequerido, [tijerasPapel]);
+    expect(match).not.toBeNull();
+  });
+
+  it('Tijera sigue rechazando electrónica (pendrive/usb)', () => {
+    const itemRequerido = { id: '1', nombre: 'Tijera de oficina' };
+    const pendrive = producto({
+      id: 'pendrive',
+      nombre_producto: 'Pendrive USB 32GB',
+      categoria: 'electronico',
+      keywords: ['pendrive', 'usb', 'memoria'],
+    });
+
+    const match = findBestMatch(itemRequerido, [pendrive]);
+    expect(match).toBeNull();
   });
 });

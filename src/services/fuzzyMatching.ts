@@ -178,8 +178,12 @@ function validateSpecifications(itemRequerido: ItemRequerido, producto: Inventor
       ['papel|papel|cordon|cuerda|adhesivo|pegamiento|cinta|scotch'],
     'papel|papeleria|resma|hoja':
       ['electronico|pendrive|usb|adaptador|hdmi|monitor'],
+    // Papel/hoja NO es incompatible con tijera/cutter: "tijeras para papel"
+    // es un producto de oficina legítimo (antes se rechazaba solo por
+    // mencionar "papel", perdiendo matches válidos). Solo se descarta contra
+    // electrónica, que sí es un desajuste real.
     'tijera|cutter|cortador':
-      ['papel|resma|hoja|pendrive|usb'],
+      ['pendrive|usb'],
   };
 
   for (const [category, incompatibles] of Object.entries(incompatibilities)) {
@@ -256,6 +260,22 @@ function validateSpecifications(itemRequerido: ItemRequerido, producto: Inventor
   return 0; // Compatible
 }
 
+// Umbral de rechazo por incompatibilidad, compartido entre calculateMatch()
+// (matches nuevos) y isIncompatibleMatch() (revalidación de matches ya
+// guardados en ca_item_matches, que pudieron persistirse con una versión
+// anterior de este motor y nunca pasar por esta validación).
+const INCOMPATIBILITY_REJECT_THRESHOLD = -50;
+
+/**
+ * Revalida un match YA PERSISTIDO (ca_item_matches) contra las reglas de
+ * incompatibilidad/dimensión actuales. Un score guardado puede venir de una
+ * corrida anterior a este fix y no reflejar las reglas vigentes — por eso no
+ * basta con confiar en el score guardado, hay que recalcular la penalidad.
+ */
+export function isIncompatibleMatch(itemRequerido: ItemRequerido, producto: InventoryItem): boolean {
+  return validateSpecifications(itemRequerido, producto) < INCOMPATIBILITY_REJECT_THRESHOLD;
+}
+
 /**
  * Calcula match entre un item requerido y un producto del inventario
  * Versión mejorada con soporte para sinónimos, categorías Y validación de especificaciones
@@ -263,7 +283,7 @@ function validateSpecifications(itemRequerido: ItemRequerido, producto: Inventor
 function calculateMatch(itemRequerido: ItemRequerido, producto: InventoryItem): ProductMatch | null {
   // Primero: validar que no haya incompatibilidades obvias
   const specPenalty = validateSpecifications(itemRequerido, producto);
-  if (specPenalty < -50) return null; // Rechazar si incompatible
+  if (specPenalty < INCOMPATIBILITY_REJECT_THRESHOLD) return null; // Rechazar si incompatible
 
   const nombreRequerido = normalizeText(itemRequerido.nombre);
   const descripcionRequerida = itemRequerido.descripcion ? normalizeText(itemRequerido.descripcion) : '';

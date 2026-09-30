@@ -28,7 +28,7 @@ import { MatchItemActions } from '@/components/compras-agiles/MatchItemActions';
 import { AgregarProductoManual } from '@/components/compras-agiles/AgregarProductoManual';
 import { AccionesCompartir } from '@/components/oportunidades/AccionesCompartir';
 import { DetalleCompraAgil } from '@/components/compras-agiles/DetalleCompraAgil';
-import { calculateCoverageMetrics, type PropuestaItemRow } from '@/services/fuzzyMatching';
+import { calculateCoverageMetrics, isIncompatibleMatch, type PropuestaItemRow } from '@/services/fuzzyMatching';
 import { unidadLabel } from '@/utils/unidades';
 
 // Color del badge de match según el %.
@@ -167,7 +167,16 @@ export default function CompraAgilDetalle() {
   const filasItems = (compra.items || []).map((it: any, idx: number) => {
     const m = matchByItem.get(it.id);
     const cantidad = it.cantidad || 1;
-    const matchAuto = m
+    // El match guardado en ca_item_matches pudo calcularse con una corrida
+    // anterior del motor y nunca pasar por validateSpecifications(): se
+    // revalida acá contra el producto real del inventario antes de confiar
+    // en su score, para no arrastrar mismatches tipo "cordel" ya persistidos.
+    const productoInventario = m?.inventario_id ? inventarioById.get(m.inventario_id) : null;
+    const matchPersistidoInvalido = !!(m && productoInventario && isIncompatibleMatch(
+      { id: String(it.id), nombre: it.nombre_producto || '', descripcion: it.descripcion_producto || '' },
+      productoInventario,
+    ));
+    const matchAuto = m && !matchPersistidoInvalido
       ? { inventarioId: m.inventario_id, nombre: m.nombre_producto, sku: m.sku, precio: m.precio_unitario, score: Math.round(Number(m.score) || 0) }
       : null;
     const { match, estado, override } = resolverMatch(String(it.id), matchAuto);
