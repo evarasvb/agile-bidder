@@ -26,6 +26,7 @@ const conCitas = (html: string, fuentes?: any[]) => html.replace(/\[(\d{1,2})\]/
 
 const TIPOS_DOCUMENTO = [
   { value: 'defensa_tcp', label: 'Defensa ante el Tribunal de Contratación Pública (adjudicatario)' },
+  { value: 'reposicion_servicio', label: 'Reposición ante el Servicio (recurso administrativo, art. 59 Ley 19.880)' },
   { value: 'apelacion', label: 'Recurso / reclamo por una licitación o compra ágil' },
   { value: 'reclamo_contraloria', label: 'Reclamo ante la Contraloría' },
   { value: 'cobro_intereses_mora', label: 'Nota de débito / cobro de intereses por mora' },
@@ -124,6 +125,8 @@ export default function Abogado() {
 
   const esMora = tipoDoc === 'cobro_intereses_mora';
   const esDefensa = tipoDoc === 'defensa_tcp';
+  const esReposicion = tipoDoc === 'reposicion_servicio';
+  const esEscrito = esDefensa || esReposicion;
   const faltanDatosMora = esMora && (!montoAdeudado || Number(montoAdeudado) <= 0 || !fechaVencimiento || (!sigueImpago && !fechaPago));
   const puedeGenerar = esMora ? !faltanDatosMora : !!hechos.trim();
 
@@ -314,15 +317,15 @@ export default function Abogado() {
                   </SelectContent>
                 </Select>
               </div>
-              {esDefensa && (
+              {esEscrito && (
                 <div className="rounded-md border border-blue-300 bg-blue-50 p-3 text-sm text-blue-900">
-                  Sube en <strong>"Mis documentos"</strong> las resoluciones y oficios del caso (adjudicación, invalidación, oficio de Contraloría, respuestas del foro) y pon el <strong>ID de la licitación</strong> para que Don Evaristo arme la defensa con las fechas y números reales. El escrito queda como borrador para que lo revise y firme tu abogado.
+                  Sube en <strong>"Mis documentos"</strong> las resoluciones y oficios del caso (adjudicación, invalidación, oficio de Contraloría, respuestas del foro) y pon el <strong>ID de la licitación</strong> para que Don Evaristo arme el escrito con las fechas y números reales. Queda como borrador para que lo revise y firme tu abogado.
                 </div>
               )}
               <div className="grid sm:grid-cols-2 gap-3">
                 <div>
-                  <Label>{esDefensa ? 'Tribunal / destinatario' : 'Destinatario / institución'}</Label>
-                  <Input value={destinatario} onChange={(e) => setDestinatario(e.target.value)} placeholder={esDefensa ? 'Ilustre Tribunal de Contratación Pública' : 'Ej: Municipalidad de Puerto Montt'} />
+                  <Label>{esDefensa ? 'Tribunal / destinatario' : esReposicion ? 'Servicio / destinatario' : 'Destinatario / institución'}</Label>
+                  <Input value={destinatario} onChange={(e) => setDestinatario(e.target.value)} placeholder={esDefensa ? 'Ilustre Tribunal de Contratación Pública' : esReposicion ? 'Ej: Servicio Local de Educación Pública Puerto Cordillera' : 'Ej: Municipalidad de Puerto Montt'} />
                 </div>
                 <div>
                   <Label>ID de licitación o compra (opcional)</Label>
@@ -356,7 +359,7 @@ export default function Abogado() {
               <div>
                 <Label>{esMora ? 'Detalles adicionales (opcional)' : 'Hechos — cuéntame qué pasó'}</Label>
                 <Textarea value={hechos} onChange={(e) => setHechos(e.target.value)} rows={esMora ? 2 : 5}
-                  placeholder={esMora ? 'Algo más que deba saber (ej: número de OC, contacto del organismo)' : esDefensa ? 'Ej: Soy el adjudicatario. Un competidor impugnó la adjudicación alegando... Ya subí las resoluciones del caso.' : 'Ej: Postulé a la licitación X, me declararon inadmisible el 12 de marzo por...'} />
+                  placeholder={esMora ? 'Algo más que deba saber (ej: número de OC, contacto del organismo)' : esDefensa ? 'Ej: Soy el adjudicatario. Un competidor impugnó la adjudicación alegando... Ya subí las resoluciones del caso.' : esReposicion ? 'Ej: Un competidor presentó reposición contra la resolución que confirmó mi adjudicación. Ya subí las resoluciones del caso.' : 'Ej: Postulé a la licitación X, me declararon inadmisible el 12 de marzo por...'} />
               </div>
               <div>
                 <Label>Qué quieres pedir (opcional)</Label>
