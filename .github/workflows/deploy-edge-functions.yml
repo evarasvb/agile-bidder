@@ -1,7 +1,7 @@
 # Auto-deploy de las Edge Functions de Supabase al hacer merge a main.
-# Despliega SOLO las funciones cuya carpeta cambió en el push (y, si cambió algo
-# en _shared, las funciones que importan ese código compartido). No hace un
-# "deploy de todo": así el radio de impacto es exactamente lo que se modificó.
+# Despliega SOLO las funciones cuya carpeta cambió en el push, más las que importan
+# un _shared modificado, más aquellas cuyo verify_jwt cambió en supabase/config.toml.
+# No hace un "deploy de todo": el radio de impacto es exactamente lo que se modificó.
 # El verify_jwt de cada función lo controla supabase/config.toml (no tocarlo a mano).
 #
 # REQUISITO: agregar el secreto SUPABASE_ACCESS_TOKEN en
@@ -37,7 +37,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0  # historial completo: diffs correctos incluso en push de varios commits
 
       - name: Verificar secreto SUPABASE_ACCESS_TOKEN
         env:
@@ -53,44 +53,59 @@ jobs:
         with:
           version: latest
 
-      - name: Detectar y desplegar funciones cambiadas
+      - name: Detectar y desplegar funciones afectadas
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           MANUAL: ${{ github.event.inputs.funciones }}
+          EVENT_BEFORE: ${{ github.event.before }}
+          EVENT_AFTER: ${{ github.sha }}
         run: |
           set -euo pipefail
 
           if [ -n "${MANUAL:-}" ]; then
-            FUNCS="$(echo "$MANUAL" | tr ' ' '\n' | sort -u)"
+            printf '%s\n' $MANUAL | sort -u > /tmp/funcs.txt
           else
-            BEFORE="${{ github.event.before }}"
-            AFTER="${{ github.sha }}"
+            AFTER="$EVENT_AFTER"
+            BEFORE="$EVENT_BEFORE"
+            # En un push nuevo/forzado o si el before no está, usar el padre del commit.
             if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
               BEFORE="$(git rev-parse "${AFTER}^" 2>/dev/null || echo "$AFTER")"
             fi
-            CHANGED="$(git diff --name-only "$BEFORE" "$AFTER" -- supabase/functions/ || true)"
-            echo "Archivos cambiados bajo supabase/functions/:"
-            echo "$CHANGED"
+            echo "Diff $BEFORE..$AFTER"
 
-            # Funciones cuya propia carpeta cambió (excluye _shared).
-            FUNCS="$(echo "$CHANGED" | grep -E '^supabase/functions/[^_/][^/]*/' | sed -E 's#^supabase/functions/([^/]+)/.*#\1#' | sort -u || true)"
+            CHANGED="$(git diff --name-only "$BEFORE" "$AFTER" -- supabase/functions/ supabase/config.toml || true)"
+            echo "Archivos cambiados:"; echo "$CHANGED"
 
-            # Si cambió _shared, agrega toda función que importe de ../_shared.
+            : > /tmp/funcs.txt
+
+            # 1) Funciones cuya propia carpeta cambió (excluye _shared).
+            echo "$CHANGED" | grep -E '^supabase/functions/[^_/][^/]*/' | sed -E 's#^supabase/functions/([^/]+)/.*#\1#' >> /tmp/funcs.txt || true
+
+            # 2) Si cambió _shared, agregar las funciones que importan de ../_shared.
             if echo "$CHANGED" | grep -q '^supabase/functions/_shared/'; then
               echo "Cambió _shared: agrego las funciones que lo importan."
-              IMPORTERS="$(grep -rlE '\.\./_shared/' supabase/functions --include='*.ts' 2>/dev/null | sed -E 's#^supabase/functions/([^/]+)/.*#\1#' | grep -v '^_shared$' | sort -u || true)"
-              FUNCS="$(printf '%s\n%s\n' "$FUNCS" "$IMPORTERS" | sort -u)"
+              grep -rlE '\.\./_shared/' supabase/functions --include='*.ts' 2>/dev/null \
+                | sed -E 's#^supabase/functions/([^/]+)/.*#\1#' | grep -v '^_shared$' >> /tmp/funcs.txt || true
+            fi
+
+            # 3) Si cambió config.toml, agregar las funciones cuyo bloque [functions.X]
+            #    tuvo un cambio de verify_jwt (líneas +/- de verify_jwt dentro del bloque).
+            if echo "$CHANGED" | grep -q '^supabase/config.toml$'; then
+              echo "Cambió config.toml: agrego las funciones cuyo verify_jwt cambió."
+              git diff -U3 "$BEFORE" "$AFTER" -- supabase/config.toml | awk '
+                { pfx = substr($0, 1, 1); rest = substr($0, 2) }
+                rest ~ /^\[functions\./ { cur = rest; gsub(/[][]/, "", cur); sub(/^functions\./, "", cur) }
+                (pfx == "+" || pfx == "-") && rest ~ /verify_jwt/ { if (cur != "") print cur }
+              ' >> /tmp/funcs.txt || true
             fi
           fi
 
-          FUNCS="$(echo "$FUNCS" | grep -v '^$' || true)"
+          FUNCS="$(sort -u /tmp/funcs.txt | grep -v '^$' || true)"
           if [ -z "$FUNCS" ]; then
             echo "No hay funciones que desplegar."
             exit 0
           fi
-
-          echo "Funciones a desplegar:"
-          echo "$FUNCS"
+          echo "Funciones a desplegar:"; echo "$FUNCS"
 
           FAILED=""
           while IFS= read -r fn; do
