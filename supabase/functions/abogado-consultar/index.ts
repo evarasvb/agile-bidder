@@ -66,6 +66,39 @@ function gapFillTasas(calculo: any, monto: number, tasasManual: Record<string, n
 const NOTA_DEBITO_INSTR = `INSTRUCCIÓN OBLIGATORIA sobre la nota de débito: la carta anterior es el documento que se envía al DEUDOR y va lista para descargar en PDF. Los intereses moratorios y la comisión de cobranza NO se cargan en esa carta: se cobran emitiendo una NOTA DE DÉBITO EXENTA (documento tributario exento de IVA) referida a la factura original. Por eso, DESPUÉS de la firma del documento, agrega un bloque separado por una línea de guiones "----------------------------------------" y titulado exactamente "NOTA INTERNA PARA EL PROVEEDOR — NO ENVIAR AL DEUDOR", con este texto para el acreedor: "Para cobrar formalmente los intereses por mora y la comisión de recuperación de costos, debes emitir una NOTA DE DÉBITO EXENTA en tu propio sistema de facturación electrónica del SII, referenciándola a la factura N° [número] que se está cobrando. FirmaVB todavía no tiene integración con el SII, así que este documento tributario lo generas tú directamente en tu portal de facturación (SII o tu proveedor de boleta/factura electrónica). Emítela por el monto de los intereses y la comisión legal antes de exigir su pago, y adjúntala o menciónala al enviar esta carta." No cuentes los detalles de esta nota interna dentro del cuerpo de la carta dirigida al deudor.`;
 
 const TIPOS_DOC: Record<string, { titulo: string; guia: string }> = {
+  defensa_tcp: {
+    titulo: "Defensa / téngase presente ante el Tribunal de Contratación Pública (como adjudicatario o tercero con interés)",
+    guia: `Es un ESCRITO JUDICIAL que presenta el ADJUDICATARIO (o un tercero con interés actual y directo) ante el Tribunal de Contratación Pública para defender una adjudicación que un tercero impugna, o para hacerse parte del proceso. Redáctalo como un escrito de tribunal chileno, con SUMA y otrosíes.
+Estructura obligatoria:
+- SUMA (encabezado): "EN LO PRINCIPAL:" el objeto (se tenga presente / contesta y solicita el rechazo de la impugnación); y los otrosíes ("PRIMER OTROSÍ:" alega incompetencia y extemporaneidad, cuando aplique; "SEGUNDO OTROSÍ:" acompaña documentos; "TERCER OTROSÍ:" patrocinio y poder).
+- "ILUSTRE TRIBUNAL DE CONTRATACIÓN PÚBLICA".
+- Comparecencia: nombre del representante legal, cédula de identidad, en representación de la empresa (razón social y RUT del proveedor entregados), domicilio, en los autos Rol N°[completar: rol], sobre impugnación de la licitación (ID y nombre); indicando su calidad de adjudicataria o tercero con interés actual y directo, y que viene en hacerse parte y solicitar el rechazo total de la impugnación, con costas.
+- I. ANTECEDENTES DE HECHO: la cronología del proceso EXTRAÍDA DE LOS DOCUMENTOS DEL USUARIO (resoluciones exentas, órdenes de compra, oficios de Contraloría, respuestas del foro de consultas). Cita cada resolución u oficio por su número y fecha tal como aparecen en los documentos; no inventes números ni fechas.
+- II. DEFENSA DE FORMA (solo cuando el acto atacado es posterior a la adjudicación o el plazo está vencido): incompetencia y/o extemporaneidad. Conforme al artículo 24 de la Ley 19.886 la impugnación ante el TCP procede contra actos u omisiones ocurridos entre la aprobación de las bases y la adjudicación, ambas inclusive, y dentro del plazo fatal de 10 días hábiles.
+- III. DEFENSA DE FONDO: la adjudicación se ajusta a derecho. Fundamenta con lo que respalden los documentos y las FUENTES: Ley 19.886 (art. 10 inc. 3, las bases, sus aclaraciones y la oferta del adjudicatario integran el marco jurídico del contrato), las respuestas del foro de consultas que integran las bases, el Reglamento (Decreto 661/2024), el artículo 53 de la Ley 19.880 (límite a la potestad invalidatoria por situaciones jurídicas consolidadas de terceros de buena fe) y los dictámenes u oficios de Contraloría que consten en los documentos del usuario. Usa SOLO argumentos respaldados por los hechos, documentos y fuentes entregados.
+- IV. PETICIONES ("POR TANTO" / "RUEGO A US. ILUSTRÍSIMO"): tener por evacuada la defensa, rechazar la impugnación en todas sus partes, declarar que la adjudicación se ajusta a derecho y se mantiene plenamente vigente, con expresa condena en costas.
+- OTROSÍES: PRIMER OTROSÍ (alega incompetencia y extemporaneidad, si aplica); SEGUNDO OTROSÍ (acompaña, con citación, los documentos —enumera los que consten en los documentos del usuario—); TERCER OTROSÍ (designa abogado patrocinante y confiere poder a [completar: nombre del abogado]).
+Reglas propias de este documento:
+- Los hechos y las resoluciones deben salir de los DOCUMENTOS DEL USUARIO. Si un dato no está (Rol de la causa, nombre del representante legal, domicilio, fecha de notificación, nombre del abogado patrocinante), déjalo entre corchetes como "[completar: dato]"; nunca lo inventes.
+- Termina con una línea de guiones "----------------------------------------" y, bajo el título exacto "— NOTA PARA REVISIÓN (no forma parte del escrito) —", una advertencia breve: este es un borrador que debe revisar y firmar un abogado habilitado; verificar el foro y el plazo reales (el TCP conoce impugnaciones hasta la adjudicación y dentro de 10 días hábiles; si el acto atacado es posterior, la vía puede ser reposición ante el Servicio, reclamo ante la Contraloría o nulidad de derecho público ante tribunales ordinarios, y este mismo fondo sirve cambiando el encabezado) y completar los campos entre corchetes antes de presentar.
+Máximo 1100 palabras (sin contar la nota final).`
+  },
+  reposicion_servicio: {
+    titulo: "Reposición ante el Servicio / téngase presente en sede administrativa (recurso del art. 59 Ley 19.880)",
+    guia: `Es un ESCRITO ADMINISTRATIVO dirigido al JEFE SUPERIOR DEL SERVICIO (Director) que dictó el acto, en el marco de un recurso de reposición (artículo 59 de la Ley 19.880). Cúbrelo según los hechos para uno de dos escenarios:
+(A) el proveedor ADJUDICATARIO o tercero interesado se hace parte y pide RECHAZAR una reposición que otro oferente dedujo contra el acto que lo favorece (por ejemplo la resolución que confirma su adjudicación), manteniéndola a firme; o
+(B) el proveedor RECURRE por reposición un acto que lo perjudica, pidiendo dejarlo sin efecto o modificarlo. Elige el escenario según los hechos del usuario; si no queda claro, redacta el (A) y deja una nota para ajustarlo.
+Estructura:
+- SUMA: "EN LO PRINCIPAL:" el objeto (hacerse parte y pedir el rechazo de la reposición; o deducir reposición y pedir dejar sin efecto el acto); y otrosíes ("PRIMER OTROSÍ:" acompaña documentos; "SEGUNDO OTROSÍ:" forma de notificación).
+- Encabezado dirigido a la AUTORIDAD QUE DICTÓ EL ACTO que se recurre (la reposición se presenta ante el mismo órgano que lo emitió): usa el cargo y organismo que correspondan según los DOCUMENTOS DEL USUARIO (quién firmó la resolución) o el destinatario entregado. Por ejemplo "SEÑOR DIRECTOR EJECUTIVO DEL [Servicio Local de Educación Pública ...]", "SEÑOR ALCALDE DE LA [Municipalidad de ...]", "SEÑOR RECTOR DE LA [Universidad ...]", "SEÑOR DIRECTOR (A) DEL [Servicio de Salud ...]" o "SEÑOR DIRECTOR REGIONAL DE [organismo]". NO uses "Director Ejecutivo" si el acto lo dictó otra autoridad; si no puedes determinar el cargo, déjalo como "[completar: autoridad que dictó el acto]".
+- Comparecencia: representante legal, cédula, en representación de la empresa (razón social y RUT entregados), domicilio, indicando el ID y nombre de la licitación y su calidad (adjudicataria/tercero interesado o recurrente).
+- ANTECEDENTES DE HECHO: cronología EXTRAÍDA DE LOS DOCUMENTOS DEL USUARIO (resoluciones exentas, órdenes de compra, oficios de Contraloría, respuestas del foro). Cita cada acto por su número y fecha; no inventes nada.
+- SOBRE EL RECURSO: el recurso de reposición del artículo 59 de la Ley 19.880 se interpone ante el mismo órgano que dictó el acto, dentro del plazo de 5 días hábiles desde su notificación. En el escenario (A) pide verificar si la reposición del reclamante fue extemporánea; en el (B) deja constancia de que se interpone dentro de plazo.
+- FUNDAMENTOS DE FONDO: según lo respalden los documentos y las FUENTES: Ley 19.886 (art. 10 inc. 3, las bases, aclaraciones y oferta integran el marco del contrato), las respuestas del foro de consultas que integran las bases, el Reglamento (Decreto 661/2024), el artículo 53 de la Ley 19.880 (límite a la invalidación por situaciones jurídicas consolidadas de terceros de buena fe) y los dictámenes u oficios de Contraloría que consten en los documentos.
+- PETICIÓN ("POR TANTO" / "SOLICITO A US."): en (A) tenerse por hecho parte y rechazar la reposición, manteniendo a firme la adjudicación; en (B) dejar sin efecto o modificar el acto recurrido.
+- OTROSÍES: PRIMER OTROSÍ (acompaña los documentos que consten en los del usuario, enumerados); SEGUNDO OTROSÍ (forma de notificación: correo y, en subsidio, domicilio).
+Reglas: los hechos y actos deben salir de los DOCUMENTOS DEL USUARIO; lo que falte (representante, domicilio, fecha de notificación, N° de ingreso del recurso) va como "[completar: dato]", nunca inventado. Termina con una línea de guiones "----------------------------------------" y, bajo el título exacto "— NOTA PARA REVISIÓN (no forma parte del escrito) —", advierte: borrador para revisar y firmar con abogado habilitado; verificar el plazo de 5 días hábiles y la fecha de notificación, y confirmar que la vía sea efectivamente la reposición administrativa (y no reclamo ante la Contraloría o acción judicial, que cambian el foro y el encabezado). Máximo 1000 palabras (sin contar la nota final).`
+  },
   apelacion: {
     titulo: "Recurso/reclamo formal por una licitación o compra ágil",
     guia: "Estructura: Antecedentes del proceso (código, organismo, acto que se impugna — rechazo, inadmisibilidad, adjudicación); Hechos en orden cronológico; Fundamentos de derecho citando la Ley 19.886, el Reglamento D.661/2024, dictámenes de Contraloría o sentencias del TCP que respalden el reclamo; Petitorio claro (qué se pide: reconsideración, dejar sin efecto el acto, admitir la oferta, etc.). Si corresponde, menciona el plazo legal para presentarlo y ante quién se presenta (la propia entidad, el Tribunal de Contratación Pública o Contraloría, según el caso)."
@@ -119,8 +152,26 @@ Reglas:
 - Si las fuentes no cubren la pregunta, dilo ("No tengo fuente en mi base para eso") y no inventes artículos, plazos ni jurisprudencia.
 - Máximo 280 palabras salvo que pidan detalle. Párrafos cortos. Formato Markdown simple.`;
 
+// Tipos que se redactan como escrito formal con SUMA y otrosíes (ante un tribunal o
+// en sede administrativa ante el jefe del Servicio), no como carta "Señor(a)... PRESENTE".
+const ESCRITOS_FORMALES = new Set(["defensa_tcp", "reposicion_servicio"]);
+
+// Conceptos legales con los que sembrar la búsqueda de fuentes según el tipo de documento,
+// para traer las normas aplicables aunque el usuario no las nombre en los hechos (si no, el
+// escrito tendría que argumentar de memoria, sin fuente que lo respalde).
+const SEMILLA_BUSQUEDA: Record<string, string> = {
+  defensa_tcp: "impugnación tribunal contratación pública artículo 24 plazo adjudicación invalidación situación jurídica consolidada buena fe bases oferta aclaraciones ley 19.886 ley 19.880",
+  reposicion_servicio: "recurso de reposición artículo 59 ley 19.880 plazo 5 días hábiles invalidación situación jurídica consolidada buena fe adjudicación bases oferta ley 19.886 decreto 661",
+};
+
 function sysDocumento(tipo: string): string {
   const t = TIPOS_DOC[tipo] ?? TIPOS_DOC.carta;
+  if (ESCRITOS_FORMALES.has(tipo)) {
+    return `Eres Don Evaristo Abogado, redactando un ESCRITO FORMAL (con SUMA y otrosíes) para un proveedor del Estado chileno: ${t.titulo}.
+Es un escrito en español formal chileno, con SUMA y otrosíes, dirigido a la autoridad que indique la guía (un tribunal o el jefe del Servicio). Usa SOLO los hechos, datos, documentos y fuentes que se te entregan; no inventes fechas, montos, números de resolución, artículos ni jurisprudencia.
+${t.guia}
+Formato de salida (texto plano, sin encabezados Markdown "#"): primero la SUMA ("EN LO PRINCIPAL:" ... y los otrosíes), luego en una línea el ENCABEZADO dirigido a la autoridad que indica la guía (por ejemplo "ILUSTRE TRIBUNAL DE CONTRATACIÓN PÚBLICA", o la autoridad que dictó el acto en sede administrativa: "SEÑOR DIRECTOR...", "SEÑOR ALCALDE...", "SEÑOR RECTOR...", según corresponda) y a continuación el cuerpo (comparecencia, antecedentes de hecho, fundamentos/defensas, peticiones y otrosíes). Puedes usar mayúsculas para los títulos de sección y de los otrosíes, como en un escrito real. Cita [n] tras cada afirmación de derecho que venga de una FUENTE (artículo, número de dictamen/año, rol y fecha del TCP). Cuando invoques un artículo o norma que NO aparezca en las FUENTES entregadas, nómbralo por su número (son normas vigentes en Chile) pero NO le pongas una cita [n] falsa: la NOTA final ya pide verificar cada fundamento con el abogado. Si falta un dato, déjalo como "[completar: dato]" en vez de inventarlo.`;
+  }
   return `Eres Don Evaristo Abogado, redactando un documento FORMAL Y PROFESIONAL para un proveedor del Estado chileno: ${t.titulo}.
 Aquí NO hablas cercano: es un documento oficial en español formal chileno, con la estructura clásica de una carta/recurso ante un organismo público. Usa SOLO los hechos, datos y fuentes que se te entregan; no inventes fechas, montos, artículos ni jurisprudencia.
 ${t.guia}
@@ -146,12 +197,23 @@ Sin otro particular, saluda atentamente a usted,
 Reglas: cita [n] tras cada afirmación de derecho, con el mismo criterio que en el chat (artículo, número de dictamen/año, rol y fecha del TCP). Si falta un dato (fecha, destinatario, RUT), dejarlo entre corchetes como "[completar: dato]" en vez de inventarlo. Máximo 900 palabras.`;
 }
 
+// Se agrega al final del mensaje de sistema (chat o documento) según el modo de tono que eligió el
+// usuario. No cambia las reglas de "no inventar" ni las citas [n]: solo la firmeza y extensión.
+const TONO: Record<"full" | "tibio", string> = {
+  full: "MODO FULL LEYES (elegido por el usuario): sé exhaustivo. Cita TODAS las normas, dictámenes o sentencias de las FUENTES que apliquen al caso, no solo la principal. Argumenta con la máxima firmeza que los hechos y fuentes permitan; si hay más de una vía legal disponible (reclamo ante el organismo, TCP, Contraloría), menciónalas todas y cuál conviene primero. No suavices el mensaje si el caso tiene mérito.",
+  tibio: "MODO TIBIO (elegido por el usuario): sé mesurado y conciliador. Prioriza agotar el diálogo directo con el organismo (aclaración, conversación, correo) antes de sugerir un paso formal o confrontacional. Cita solo la norma central del caso, sin abrumar con todas las alternativas. Si el caso es débil o dudoso, dilo con más cautela todavía, y evita adjetivos fuertes contra el organismo.",
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   const t0 = Date.now();
   try {
     const body = await req.json();
     const modo: "chat" | "documento" = body.modo === "documento" ? "documento" : "chat";
+    // Modo del tono legal: "full" (por defecto) argumenta con toda la fuerza que den los hechos y
+    // fuentes, citando cada norma aplicable; "tibio" es más mesurado, sugiere agotar el diálogo con
+    // el organismo antes de ir a lo formal y evita afirmaciones que las fuentes no respalden del todo.
+    const modoTono: "full" | "tibio" = body.modo_tono === "tibio" ? "tibio" : "full";
     const pregunta: string = String(body.pregunta ?? "").trim();
     const huella: string = String(body.huella ?? "").slice(0, 80);
     const historial: { role: string; content: string }[] = Array.isArray(body.historial) ? body.historial.slice(-6) : [];
@@ -215,8 +277,13 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Recolección en paralelo
-    const consultaBase = modo === "chat" ? pregunta : `${hechos} ${peticion}`;
+    // Recolección en paralelo. Para ciertos escritos sembramos la búsqueda con los conceptos
+    // legales del tipo, para traer las normas aplicables aunque el usuario no las mencione.
+    const semillaTipo = modo === "documento" ? (SEMILLA_BUSQUEDA[tipoDocumento] ?? "") : "";
+    // La semilla va PRIMERO: palabrasClave respeta el orden y la búsqueda solo usa las primeras
+    // 3-4 palabras, así que, puesta al final, no alcanzaba a participar cuando los hechos ya traían
+    // varias palabras. Adelante, garantiza que las normas del tipo (art. 59, art. 24, etc.) se busquen.
+    const consultaBase = modo === "chat" ? pregunta : `${semillaTipo} ${hechos} ${peticion}`.trim();
     const kws = palabrasClave(consultaBase);
     const qOr = kws.slice(0, 4).join(" or ");
     const tareas: Record<string, Promise<any>> = {};
@@ -230,8 +297,17 @@ Deno.serve(async (req) => {
       // (posible fragmentación) — mismo panorama que ya usa Don Evaristo Experto.
       tareas.panorama = sb.rpc("experto_panorama_licitacion", { p_codigo: codigo, p_user_id: userId }).then((r) => r.data);
     }
-    // Documentos que el usuario subió (contratos, notificaciones, reclamos previos): sin código = carpeta general.
-    tareas.docs = sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: codigo, p_max: 10000 }).then((r) => r.data ?? []);
+    // Documentos que el usuario subió (contratos, notificaciones, reclamos previos).
+    // Sin código = carpeta general. Con código traemos los del caso Y los generales (sin
+    // código), porque experto_documentos_texto filtra por código exacto: un documento subido
+    // "sin ID" (que la UI sí muestra) quedaría fuera del contexto y la defensa no podría usar
+    // las resoluciones que el cliente ve en pantalla.
+    tareas.docs = codigo
+      ? Promise.all([
+          sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: codigo, p_max: 8000 }).then((r) => r.data ?? []),
+          sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: null, p_max: 5000 }).then((r) => r.data ?? []),
+        ]).then(([caso, general]) => [...caso, ...general])
+      : sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: null, p_max: 10000 }).then((r) => r.data ?? []);
     // Organismo: por destinatario/institución escrita o detectado en el texto de la pregunta/hechos.
     const org = (pregunta + " " + hechos).match(/((?:i\.?\s*)?municipalidad|hospital|ministerio|servicio de salud|servicio local|universidad|gobierno regional|subsecretar[ií]a|direcci[oó]n|instituto|carabineros|ej[eé]rcito|armada|junaeb|junji|sename|cenabast|serviu|corfo|sence|fonasa)\s+(?:de\s+)?([a-záéíóúñ\s]{3,40})/i);
     const busquedaOrg = destinatario || org?.[0];
@@ -262,7 +338,11 @@ Deno.serve(async (req) => {
     if (res.org) partes.push("FICHA ORGANISMO (Datos Mercado Público vía FirmaVB):\n" + textoOrganismo(res.org));
     if (res.docs?.length) partes.push("DOCUMENTOS DEL USUARIO (contratos, notificaciones, reclamos previos que subió; son evidencia de los hechos):\n" + res.docs.map((d: any) => `### ${d.nombre} (${d.tipo})\n${d.texto}`).join("\n\n"));
     if (res.perfil) partes.push(`DATOS DEL PROVEEDOR (para firmar el documento): empresa "${res.perfil.empresa_nombre ?? "s/i"}", RUT ${res.perfil.rut ?? "s/i"}, región ${res.perfil.region ?? "s/i"}.`);
-    if (Array.isArray(res.memoria) && res.memoria.length && modo === "chat") {
+    if (Array.isArray(res.memoria) && res.memoria.length) {
+      // También en modo documento: si el cliente ya le contó el caso a Don Evaristo por chat, el
+      // formulario de "Generar documento" no lo obliga a re-escribirlo completo en "Hechos" — esto
+      // le da el contexto previo como respaldo (los "Hechos" del formulario siguen siendo la fuente
+      // principal, esto es un complemento).
       partes.push("MEMORIA (lo último que este cliente conversó con Don Evaristo en otros modos, últimas 48h — úsalo solo si es relevante, no lo repitas si no viene al caso):\n" +
         res.memoria.map((m: any) => `[${m.canal}, ${m.rol === "user" ? "preguntó" : "Evaristo respondió"}] ${m.texto}`).join("\n"));
     }
@@ -293,7 +373,7 @@ Si hay más de un tramo, menciona en el documento que el interés se calculó po
 
     const userMsg = modo === "chat" ? `${contexto}\n\nPREGUNTA: ${pregunta}` : `${contexto}\n\nRedacta el documento completo con los datos y hechos de arriba.`;
     const messages = [
-      { role: "system", content: modo === "chat" ? SYS_CHAT : sysDocumento(tipoDocumento) },
+      { role: "system", content: `${modo === "chat" ? SYS_CHAT : sysDocumento(tipoDocumento)}\n\n${TONO[modoTono]}` },
       ...(modo === "chat" ? historial.filter((h) => h && (h.role === "user" || h.role === "assistant") && h.content).map((h) => ({ role: h.role, content: String(h.content).slice(0, 2000) })) : []),
       { role: "user", content: userMsg },
     ];

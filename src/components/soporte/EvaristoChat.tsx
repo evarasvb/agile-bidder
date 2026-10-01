@@ -417,7 +417,7 @@ export function EvaristoChat() {
           content:
             `✅ ¡Listo! Registré tu caso${numero ? ` con el número **#${numero}**` : ""}. ` +
             `Te envié un correo de confirmación a **${email}** y el equipo te responderá ahí lo antes posible. ` +
-            `Si es urgente, escríbenos por WhatsApp: https://wa.me/56994259157`,
+            `Si es urgente, escríbenos por WhatsApp: https://wa.me/56990996055`,
         },
       ]);
     } catch {
@@ -467,7 +467,7 @@ export function EvaristoChat() {
             </div>
             <div className="flex items-center gap-1">
               <a
-                href="https://wa.me/56994259157"
+                href="https://wa.me/56990996055"
                 target="_blank"
                 rel="noreferrer"
                 aria-label="Hablar con un humano por WhatsApp (abre en nueva ventana)"

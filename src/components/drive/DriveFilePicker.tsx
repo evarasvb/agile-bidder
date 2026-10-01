@@ -1,7 +1,8 @@
-import { useEffect, useState, useCallback } from 'react';
-import { Loader2, Folder, FileText, ChevronRight, Paperclip, Sparkles, Home, RefreshCw } from 'lucide-react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { Loader2, Folder, FileText, ChevronRight, Paperclip, Sparkles, Home, RefreshCw, Search, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { useRequirePro } from '@/components/pro/UpgradeProProvider';
@@ -23,8 +24,15 @@ export function DriveFilePicker({ open, onOpenChange, onAttach, codigo }: DriveF
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState<string | null>(null);
+  const [busqueda, setBusqueda] = useState('');
 
   const actual = ruta[ruta.length - 1];
+
+  const filesFiltrados = useMemo(() => {
+    const q = busqueda.trim().toLowerCase();
+    if (!q) return files;
+    return files.filter((f) => f.name.toLowerCase().includes(q));
+  }, [files, busqueda]);
 
   const cargar = useCallback(async (folderId: string | null) => {
     setCargando(true); setError(null);
@@ -40,16 +48,18 @@ export function DriveFilePicker({ open, onOpenChange, onAttach, codigo }: DriveF
   }, []);
 
   useEffect(() => {
-    if (open) { setRuta([{ id: null, name: 'Mi Drive' }]); cargar(null); }
+    if (open) { setRuta([{ id: null, name: 'Mi Drive' }]); setBusqueda(''); cargar(null); }
   }, [open, cargar]);
 
   const entrarCarpeta = (f: DriveFile) => {
     setRuta((r) => [...r, { id: f.id, name: f.name }]);
+    setBusqueda('');
     cargar(f.id);
   };
   const irA = (idx: number) => {
     const nueva = ruta.slice(0, idx + 1);
     setRuta(nueva);
+    setBusqueda('');
     cargar(nueva[nueva.length - 1].id);
   };
 
@@ -75,7 +85,7 @@ export function DriveFilePicker({ open, onOpenChange, onAttach, codigo }: DriveF
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Folder className="h-5 w-5 text-primary" />
@@ -83,24 +93,47 @@ export function DriveFilePicker({ open, onOpenChange, onAttach, codigo }: DriveF
           </DialogTitle>
         </DialogHeader>
 
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-1 text-xs text-muted-foreground flex-wrap">
-          {ruta.map((r, i) => (
-            <span key={`${r.id}-${i}`} className="flex items-center gap-1">
-              {i > 0 && <ChevronRight className="h-3 w-3" />}
-              <button
-                onClick={() => irA(i)}
-                className="hover:text-foreground hover:underline flex items-center gap-1"
-                disabled={i === ruta.length - 1}
-              >
-                {i === 0 && <Home className="h-3 w-3" />}
-                {r.name}
-              </button>
-            </span>
-          ))}
-          <button onClick={() => cargar(actual.id)} className="ml-auto hover:text-foreground" title="Recargar">
+        {/* Breadcrumb: scroll horizontal en vez de amontonarse cuando la ruta es larga */}
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap min-w-0 flex-1">
+            {ruta.map((r, i) => (
+              <span key={`${r.id}-${i}`} className="flex items-center gap-1 shrink-0">
+                {i > 0 && <ChevronRight className="h-3 w-3 shrink-0" />}
+                <button
+                  onClick={() => irA(i)}
+                  className="hover:text-foreground hover:underline flex items-center gap-1 shrink-0 max-w-[220px]"
+                  disabled={i === ruta.length - 1}
+                  title={r.name}
+                >
+                  {i === 0 && <Home className="h-3 w-3 shrink-0" />}
+                  <span className="truncate">{r.name}</span>
+                </button>
+              </span>
+            ))}
+          </div>
+          <button onClick={() => cargar(actual.id)} className="shrink-0 hover:text-foreground" title="Recargar">
             <RefreshCw className="h-3.5 w-3.5" />
           </button>
+        </div>
+
+        {/* Buscador dentro de la carpeta actual: evita scrollear entre nombres largos de licitación */}
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar en esta carpeta..."
+            className="h-8 pl-8 pr-8 text-sm"
+          />
+          {busqueda && (
+            <button
+              onClick={() => setBusqueda('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              title="Limpiar búsqueda"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
 
         <ScrollArea className="h-[320px] rounded-md border">
@@ -115,22 +148,24 @@ export function DriveFilePicker({ open, onOpenChange, onAttach, codigo }: DriveF
             </div>
           ) : files.length === 0 ? (
             <div className="flex items-center justify-center h-[300px] text-sm text-muted-foreground">Carpeta vacía</div>
+          ) : filesFiltrados.length === 0 ? (
+            <div className="flex items-center justify-center h-[300px] text-sm text-muted-foreground">Sin resultados para "{busqueda}"</div>
           ) : (
             <div className="divide-y">
-              {files.map((f) => {
+              {filesFiltrados.map((f) => {
                 const esCarpeta = f.mimeType === CARPETA_MIME;
                 return (
                   <div key={f.id} className="flex items-center gap-2 px-3 py-2 hover:bg-muted/40">
                     {esCarpeta ? (
-                      <button onClick={() => entrarCarpeta(f)} className="flex items-center gap-2 flex-1 min-w-0 text-left">
+                      <button onClick={() => entrarCarpeta(f)} className="flex items-center gap-2 flex-1 min-w-0 text-left" title={f.name}>
                         <Folder className="h-4 w-4 text-amber-500 shrink-0" />
-                        <span className="text-sm truncate">{f.name}</span>
+                        <span className="text-sm truncate min-w-0">{f.name}</span>
                         <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto shrink-0" />
                       </button>
                     ) : (
                       <>
                         <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <span className="text-sm truncate flex-1 min-w-0">{f.name}</span>
+                        <span className="text-sm truncate flex-1 min-w-0" title={f.name}>{f.name}</span>
                         <div className="flex items-center gap-1 shrink-0">
                           <Button size="sm" variant="ghost" className="h-7 px-2 gap-1" onClick={() => adjuntar(f)} title="Adjuntar a la postulación">
                             <Paperclip className="h-3.5 w-3.5" />

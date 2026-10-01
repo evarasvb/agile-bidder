@@ -1,18 +1,33 @@
-import { GraduationCap } from "lucide-react";
+import { useState } from "react";
+import { GraduationCap, Loader2 } from "lucide-react";
 import { CursoCard } from "@/components/academia/CursoCard";
 import { CURSOS, SAGA_BUNDLE } from "@/data/academiaCursos";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { createAcademyPayment } from "@/services/academyPayments";
+import { toast } from "sonner";
 
 // Academia dentro de la app: los cursos de FirmaVB para que los clientes los
 // tomen sin salir del sistema. Mismo catálogo (CURSOS) y misma tarjeta
 // (CursoCard) que la Academia pública en firmavb.cl/academia — el lector de
 // cada curso (/academia/curso/:slug) también es el mismo.
 export default function MisCursos() {
+  const [comprandoSaga, setComprandoSaga] = useState(false);
   const cursosGratis = CURSOS.filter((c) => !c.premium);
   const cursosSaga = CURSOS.filter((c) => c.premium && c.slug.startsWith("saga-"));
   const cursosExpres = CURSOS.filter((c) => c.premium && !c.slug.startsWith("saga-"));
+
+  const comprarSaga = async () => {
+    setComprandoSaga(true);
+    try {
+      const checkout = await createAcademyPayment(SAGA_BUNDLE.slug);
+      window.location.href = checkout.url;
+    } catch (error) {
+      setComprandoSaga(false);
+      toast.error(error instanceof Error ? error.message : "No pudimos iniciar el pago.");
+    }
+  };
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-10">
@@ -69,15 +84,17 @@ export default function MisCursos() {
                 </div>
                 <div className="mt-4 md:mt-0 text-center shrink-0">
                   <p className="text-3xl font-bold mb-2">{SAGA_BUNDLE.precio}</p>
-                  {SAGA_BUNDLE.pagoUrl ? (
-                    <Button asChild size="lg" className="bg-white text-firmavb-blue hover:bg-white/90 font-semibold gap-2">
-                      <a href={SAGA_BUNDLE.pagoUrl} target="_blank" rel="noopener noreferrer" aria-label="Comprar la saga completa (abre en nueva pestaña)">
-                        Comprar la saga completa
-                      </a>
-                    </Button>
-                  ) : (
-                    <Button size="lg" disabled>Muy pronto</Button>
-                  )}
+                  <Button
+                    type="button"
+                    size="lg"
+                    onClick={comprarSaga}
+                    disabled={comprandoSaga}
+                    className="bg-white text-firmavb-blue hover:bg-white/90 font-semibold gap-2"
+                    aria-label="Comprar la saga completa con Mercado Pago"
+                  >
+                    {comprandoSaga && <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />}
+                    {comprandoSaga ? "Preparando pago…" : "Comprar la saga completa"}
+                  </Button>
                 </div>
               </CardContent>
             </Card>

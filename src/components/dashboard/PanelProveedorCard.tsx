@@ -260,6 +260,9 @@ export function PanelProveedorCard() {
                     </div>
                   ))}
                 </div>
+                <Button asChild variant="link" size="sm" className="h-auto p-0 text-xs">
+                  <Link to="/instituciones">Ver zoom de las que sigues (noticias, pagos, reclamos) →</Link>
+                </Button>
               </div>
             )}
           </>

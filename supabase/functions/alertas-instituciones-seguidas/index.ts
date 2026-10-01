@@ -124,6 +124,9 @@ Deno.serve(async (req) => {
                 // y compras_agiles comparten esta misma tabla de avisos, pero
                 // /oportunidades/:tipo/:id necesita distinguir cuál es cuál.
                 tipo_oportunidad: o.tipo,
+                rut_institucion: s.rut_institucion,
+                evento_id: o.codigo,
+                evento_tipo: o.tipo,
               },
             }),
           });
