@@ -77,7 +77,7 @@ export default function CobranzaFacturas() {
   const { data: ocLinks } = useOcLinksPorCodigos(facturas.filter((f) => f.deudor_tipo === 'estado').map((f) => f.oc_codigo || ''));
 
   const [expandido, setExpandido] = useState<Set<string>>(new Set());
-  const toggle = (id: string) => setExpandido((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggle = (id: string) => setExpandido((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const [filtro, setFiltro] = useState<Filtro>('activas');
   const [q, setQ] = useState('');
 
