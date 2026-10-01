@@ -6,6 +6,7 @@ import { Seo } from "@/components/Seo";
 import { useAuth } from "@/hooks/useAuth";
 import { usePlan } from "@/hooks/usePlan";
 import { PLANES } from "@/data/planes";
+import { CaminoCompleto } from "@/components/landing/CaminoCompleto";
 import logoFirmavbOriginal from "@/assets/logo-firmavb-original.png";
 
 // Antes /planes redirigía a /cuenta (que exige sesión iniciada): un visitante
@@ -129,6 +130,10 @@ export default function Planes() {
               </div>
             </div>
           ))}
+        </div>
+
+        <div className="-mx-6 mt-10">
+          <CaminoCompleto conTitulo={false} conCta={false} />
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-8">

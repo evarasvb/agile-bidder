@@ -27,6 +27,7 @@ import { DemoModal } from "@/components/landing/DemoModal";
 import { LandingChat, LandingChatButton } from "@/components/landing/LandingChat";
 import { TeaserResultados } from "@/components/landing/TeaserResultados";
 import { ExpertoComodin } from "@/components/landing/ExpertoComodin";
+import { CaminoCompleto } from "@/components/landing/CaminoCompleto";
 import logoFirmavbOriginal from "@/assets/logo-firmavb-original.png";
 import { toast } from "sonner";
 
@@ -393,6 +394,9 @@ Validar Admisibilidad Gratis
         </div>
       </section>
 
+      {/* El camino completo: encontrar, estudiar, postular, cobrar, con lo que cubre cada plan */}
+      <CaminoCompleto />
+
       {/* CTA Final */}
       <section className="py-20 px-6">
         <div className="max-w-4xl mx-auto">
@@ -444,13 +448,13 @@ Validar Admisibilidad Gratis
                 📧 contacto@firmavb.cl
               </a>
               <a
-                href="https://wa.me/56994259157"
+                href="https://wa.me/56990996055"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2"
-                aria-label="+56 9 9425 9157 por WhatsApp (abre en nueva ventana)"
+                aria-label="+56 9 9099 6055 por WhatsApp (abre en nueva ventana)"
               >
-                💬 +56 9 9425 9157
+                💬 +56 9 9099 6055
               </a>
             </div>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">

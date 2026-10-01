@@ -193,7 +193,7 @@ const CONTENIDO = {
 
   // --- Contacto directo -----------------------------------------------------
   contacto: {
-    whatsapp: "https://wa.me/56994259157",
+    whatsapp: "https://wa.me/56990996055",
     email: "contacto@firmavb.cl",
   },
 };

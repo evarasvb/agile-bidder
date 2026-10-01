@@ -123,7 +123,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Guía de primeros pasos para clientes nuevos (se auto-oculta al completar) */}
+      {/* Guía única de onboarding para clientes nuevos (se auto-oculta al completar) */}
       <PrimerosPasos />
 
       {/* Header */}

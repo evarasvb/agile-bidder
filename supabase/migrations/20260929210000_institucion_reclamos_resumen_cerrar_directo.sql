@@ -1,0 +1,11 @@
+-- Parte del hallazgo P1 de Codex sobre la PR (commit 2f00a81): además de
+-- organismo_riesgo, institucion_reclamos_resumen(text, integer) —la función
+-- base que arma el desglose de reclamos que tanto institucion_zoom como
+-- organismo_riesgo usan y ya gatean— estaba con EXECUTE concedido a
+-- authenticated (probablemente de un grant general antiguo), sin ningún
+-- llamador directo desde el frontend ni desde edge functions. Un usuario
+-- podía saltarse el gate de ambas RPC llamando esta función base directo.
+-- Se retira el acceso directo: solo queda alcanzable a través de las RPC
+-- security definer que sí la gatean (corren con los privilegios del dueño,
+-- no necesitan este grant).
+revoke execute on function public.institucion_reclamos_resumen(text, integer) from authenticated, anon, public;
