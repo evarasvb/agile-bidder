@@ -286,10 +286,15 @@ Deno.serve(async (req) => {
     // Un mensaje de seguimiento corto ("genera un documento tipo", "¿y el plazo?") no trae palabras
     // clave propias: la búsqueda terminaba trayendo fragmentos sin relación (una directiva de IA,
     // un artículo de tarifas del registro de proveedores) y el modelo igual los citaba con número
-    // como si respaldaran la afirmación. Se siembra con el final del historial para que el tema de
-    // fondo (de donde sale el seguimiento) siga guiando la búsqueda.
+    // como si respaldaran la afirmación. Se usa el historial SOLO cuando la pregunta no trae
+    // suficientes palabras clave propias: si el usuario cambia de tema con una pregunta nueva y
+    // completa, mezclar el historial ahí empujaría las palabras del tema nuevo fuera de los
+    // primeros 3-4 lugares que usa la búsqueda (hallazgo de Codex) — se usa sola en ese caso.
     const historialTexto = modo === "chat" ? historial.slice(-2).map((h) => h.content).join(" ") : "";
-    const consultaBase = modo === "chat" ? `${historialTexto} ${pregunta}`.trim() : `${semillaTipo} ${hechos} ${peticion}`.trim();
+    const kwsPregunta = modo === "chat" ? palabrasClave(pregunta) : [];
+    const consultaBase = modo === "chat"
+      ? (kwsPregunta.length >= 4 ? pregunta : `${historialTexto} ${pregunta}`.trim())
+      : `${semillaTipo} ${hechos} ${peticion}`.trim();
     const kws = palabrasClave(consultaBase);
     const qOr = kws.slice(0, 4).join(" or ");
     const tareas: Record<string, Promise<any>> = {};
