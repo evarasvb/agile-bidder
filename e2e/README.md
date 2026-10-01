@@ -46,6 +46,21 @@ npx playwright show-report            # reporte HTML
 
 ## Notas
 
+### Seguimiento de instituciones sin servicios externos
+
+`npx playwright test --config playwright.institution.config.ts` ejecuta la
+campanita y la ficha `Instituciones` reales con hooks de datos simulados. No
+requiere cuenta ni credenciales; bloquea solicitudes externas. Usa un Chromium
+instalado por Playwright o `PW_CHROMIUM` para indicar uno local.
+
+Comprueba el aviso exacto (incluidas noticias antiguas), cambios de institución
+sin recargar, enlaces adulterados, estados vacíos/errores, restricciones de plan
+y navegación móvil. Estas pruebas de interfaz no sustituyen una validación de
+RLS contra Supabase; las pruebas SQL aisladas están en
+`supabase/tests/institution-following.mjs`.
+
+### Pruebas con servicios conectados
+
 - Las personas autenticadas usan **una** cuenta admin (ve todas las pantallas).
   Para probar segregación por rol real, crear cuentas por rol y un
   `storageState` por persona.

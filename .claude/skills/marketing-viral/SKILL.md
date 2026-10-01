@@ -38,6 +38,7 @@ Mercado: Chile, B2B y B2C, español chileno neutro (tutear, sin modismos excesiv
 Cuando se pida una campaña, entregar: objetivo medible, audiencia, promesa, calendario de 2 semanas (día, canal, pieza, hook), las 3 primeras piezas escritas completas, y la métrica a mirar (clics, mensajes recibidos, ventas). Todo en un solo documento o mensaje, listo para copiar y pegar.
 
 ## Reglas
+- Nunca hablar de la competencia ni descalificar a otros (regla de Evaristo, 29-09-2026): hablamos de lo nuestro, de lo que FirmaVB hace y por qué le sirve al cliente. Sin comparativas con nombres de otros productos en landings, posts, propuestas ni respuestas.
 - Nunca inventar testimonios, cifras ni logos de clientes. Marcar los datos que faltan como [DATO].
 - Cumplir la ley chilena: no enviar correos masivos sin opción de baja, cuidar datos personales.
 - Ser económico: reutilizar una idea en 4 formatos antes de crear una nueva.
