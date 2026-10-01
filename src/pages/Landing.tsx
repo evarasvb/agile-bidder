@@ -27,6 +27,7 @@ import { DemoModal } from "@/components/landing/DemoModal";
 import { LandingChat, LandingChatButton } from "@/components/landing/LandingChat";
 import { TeaserResultados } from "@/components/landing/TeaserResultados";
 import { ExpertoComodin } from "@/components/landing/ExpertoComodin";
+import { CaminoCompleto } from "@/components/landing/CaminoCompleto";
 import logoFirmavbOriginal from "@/assets/logo-firmavb-original.png";
 import { toast } from "sonner";
 
@@ -389,6 +390,9 @@ Validar Admisibilidad Gratis
           </div>
         </div>
       </section>
+
+      {/* El camino completo: encontrar, estudiar, postular, cobrar, con lo que cubre cada plan */}
+      <CaminoCompleto />
 
       {/* CTA Final */}
       <section className="py-20 px-6">
