@@ -49,7 +49,7 @@ const FILAS: { etapa: string; celdas: Record<string, Celda> }[] = [
   } },
 ];
 
-const PRECIO_CORTO: Record<string, string> = { free: "$0", pro_30: "$50.000 por 30 días", plus_30: "$100.000 por 30 días", erp: "$149.990 + IVA al mes" };
+const PRECIO_CORTO: Record<string, string> = { free: "$0", pro_30: "$50.000 por 30 días", plus_30: "$100.000 por 30 días", erp: "$149.990 + IVA al mes, más 3% del neto de cada OC aceptada que postulaste desde FirmaVB (+ IVA)" };
 
 export function CaminoCompleto({ conTitulo = true, conCta = true }: { conTitulo?: boolean; conCta?: boolean }) {
   return (
