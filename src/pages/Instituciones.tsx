@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   Landmark,
@@ -32,10 +31,12 @@ import {
   type FuncionarioZoom,
   type CausaZoom,
   type CobranzaZoom,
-  type InstitucionSeguida,
 } from "@/hooks/useInstitucionZoom";
 import { useDejarInstitucion } from "@/hooks/usePanelProveedor";
 import { RiesgoOrganismoCard } from "@/components/organismo/RiesgoOrganismoCard";
+import { InstitutionNoticeCard } from "@/components/organismo/InstitutionNoticeCard";
+import { useInstitutionNotice } from "@/hooks/useInstitutionNotice";
+import { institutionPath, resolveNoticeInstitution } from "@/lib/institutionFollowing";
 
 // Fechas tipo `date` (solo "AAAA-MM-DD", sin hora) se parsean en hora local
 // para no correr un día por el desfase UTC; las que ya traen hora (timestamptz)
@@ -186,36 +187,19 @@ function FilaCobranza({ f }: { f: CobranzaZoom }) {
 
 export default function Instituciones() {
   const { verInteligencia } = usePlan();
-  const { data: seguidas, isLoading: seguidasLoading } = useInstitucionesSeguidas();
+  const { data: seguidas, isLoading: seguidasLoading, isError: seguidasError, refetch: reloadSeguidas } = useInstitucionesSeguidas();
   const dejar = useDejarInstitucion();
-  const [sel, setSel] = useState<InstitucionSeguida | null>(null);
-
-  // Llegada desde la campanita de avisos (reclamo_institucion / compras_institucion):
-  // trae el RUT exacto en la URL para abrir el zoom de una vez. Se recuerda el
-  // último rutUrl procesado (no solo "ya procesé alguno") para que un segundo
-  // clic en la campanita, con otro RUT, mientras la página ya está abierta,
-  // también cambie la selección.
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const rutUrl = searchParams.get("rut");
-  const rutUrlProcesado = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!rutUrl || rutUrlProcesado.current === rutUrl || !seguidas) return;
-    rutUrlProcesado.current = rutUrl;
-    const match = seguidas.find((s) => s.rut_institucion === rutUrl);
-    setSel(match ?? { rut_institucion: rutUrl, nombre_institucion: rutUrl, created_at: "" });
-  }, [rutUrl, seguidas]);
-
-  useEffect(() => {
-    // dejar.isPending bloquea la reselección mientras se está quitando una
-    // institución: si era la única seguida, sel queda en null a propósito y
-    // seguidas todavía trae en caché la que se está por borrar — sin este
-    // freno, este efecto la volvería a elegir antes de que el refetch la
-    // saque de la lista.
-    if (!sel && seguidas?.length && !rutUrl && !dejar.isPending) setSel(seguidas[0]);
-  }, [seguidas, sel, rutUrl, dejar.isPending]);
-
-  const { data: zoom, isLoading: zoomLoading } = useInstitucionZoom(sel?.rut_institucion ?? null, sel?.nombre_institucion ?? null);
+  const avisoId = searchParams.get("aviso");
+  const aviso = useInstitutionNotice(avisoId);
+  const institucionAviso = aviso.data ? resolveNoticeInstitution(aviso.data, seguidas ?? []) : null;
+  // Select only a visible follow. Never construct a synthetic institution from
+  // an arbitrary URL, and never replace an unavailable alert with the first row.
+  const sel = rutUrl ? seguidas?.find(s => s.rut_institucion === rutUrl) ?? null
+    : avisoId ? institucionAviso : seguidas?.[0] ?? null;
+  const avisoSeleccionado = aviso.data && sel && institucionAviso?.rut_institucion === sel.rut_institucion ? aviso.data : null;
+  const { data: zoom, isLoading: zoomLoading, isError: zoomError, refetch: reloadZoom } = useInstitucionZoom(sel?.rut_institucion ?? null, sel?.nombre_institucion ?? null);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -241,6 +225,8 @@ export default function Instituciones() {
           <CardContent>
             {seguidasLoading ? (
               <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
+            ) : seguidasError ? (
+              <div role="alert" className="space-y-3 py-6"><p>No pudimos cargar tus instituciones.</p><Button variant="outline" onClick={() => reloadSeguidas()}>Reintentar</Button></div>
             ) : !seguidas?.length ? (
               <div className="py-10 text-center text-muted-foreground">
                 <BellOff className="mx-auto mb-3 h-8 w-8 opacity-40" />
@@ -255,10 +241,11 @@ export default function Instituciones() {
                     className={`flex items-center gap-2 rounded-lg border p-2.5 cursor-pointer transition-colors ${
                       sel?.rut_institucion === s.rut_institucion ? "border-firmavb-blue bg-firmavb-blue/5" : "hover:bg-muted/50"
                     }`}
-                    onClick={() => setSel(s)}
                   >
-                    <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{s.nombre_institucion}</span>
+                    <Link to={institutionPath(s.rut_institucion)} className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded focus-visible:ring-2" aria-current={sel?.rut_institucion === s.rut_institucion ? 'page' : undefined}>
+                      <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                      <span className="min-w-0 flex-1 break-words text-sm font-medium">{s.nombre_institucion}</span>
+                    </Link>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -266,15 +253,12 @@ export default function Instituciones() {
                       disabled={dejar.isPending}
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (sel?.rut_institucion === s.rut_institucion) {
-                          // Selecciona explícitamente la siguiente institución (o
-                          // null si era la última) en vez de limpiar sel: si se
-                          // deja en null, el efecto de selección por defecto la
-                          // vuelve a elegir desde la lista todavía no invalidada.
-                          const siguiente = seguidas.find((x) => x.rut_institucion !== s.rut_institucion) ?? null;
-                          setSel(siguiente);
-                        }
-                        dejar.mutate(s.rut_institucion);
+                        dejar.mutate(s.rut_institucion, { onSuccess: () => {
+                          if (sel?.rut_institucion === s.rut_institucion) {
+                            const siguiente = seguidas.find(x => x.rut_institucion !== s.rut_institucion);
+                            setSearchParams(siguiente ? { rut: siguiente.rut_institucion } : {});
+                          }
+                        } });
                       }}
                     >
                       Dejar
@@ -287,7 +271,14 @@ export default function Instituciones() {
         </Card>
 
         {/* Zoom de la institución elegida */}
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-3 min-w-0 space-y-4">
+          {avisoId && (aviso.isLoading || seguidasLoading) && <p role="status">Cargando el aviso…</p>}
+          {avisoId && !aviso.isLoading && !seguidasLoading && !avisoSeleccionado && <div role="status" className="rounded-lg border p-4 text-sm">
+            {aviso.isError ? 'No pudimos cargar este aviso.' : 'Este aviso no está disponible o no se puede vincular de forma segura a una institución que sigues.'}
+            {aviso.isError && <Button variant="outline" className="mt-2" onClick={() => aviso.refetch()}>Reintentar aviso</Button>}
+          </div>}
+          {rutUrl && !seguidasLoading && !seguidasError && !sel && <p role="status" className="text-sm">Esta institución no está en tus seguimientos. Elige una institución de tu lista.</p>}
+          {avisoSeleccionado && <InstitutionNoticeCard notice={avisoSeleccionado} />}
           {!sel ? (
             <Card className="border-dashed h-full">
               <CardContent className="py-20 text-center text-muted-foreground">
@@ -298,6 +289,8 @@ export default function Instituciones() {
             </Card>
           ) : zoomLoading ? (
             <div className="space-y-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-32 w-full" />)}</div>
+          ) : zoomError ? (
+            <div role="alert" className="space-y-3 rounded-lg border p-4"><p>No pudimos cargar la información de esta institución.</p><Button variant="outline" onClick={() => reloadZoom()}>Reintentar ficha</Button></div>
           ) : (
             <div key={sel.rut_institucion} className="space-y-4 animate-slide-in">
               <div>
@@ -411,7 +404,7 @@ export default function Instituciones() {
                     <div className="space-y-1.5 max-h-64 overflow-y-auto">
                       {zoom.rf.map((r) => <FilaRf key={r.codigo} r={r} />)}
                     </div>
-                  ) : <ListaVacia texto="Sin consultas al mercado en los últimos meses." />}
+                  ) : <ListaVacia texto={zoom?.rf_disponible ? "Sin consultas al mercado registradas en los últimos meses." : "No hay un listado institucional disponible. Puedes revisar las consultas al mercado en el análisis del Experto de una licitación."} />}
                 </CardContent>
               </Card>
 

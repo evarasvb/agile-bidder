@@ -36,8 +36,10 @@ export interface PanelProveedor {
 }
 
 export function usePanelProveedor() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ['panel-proveedor'],
+    queryKey: ['panel-proveedor', user?.id],
+    enabled: !!user?.id,
     queryFn: async (): Promise<PanelProveedor> => {
       const { data, error } = await sb.rpc('cliente_panel_proveedor', { p_max_comp: 8, p_max_prod: 12 });
       if (error) throw error;
