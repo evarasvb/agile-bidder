@@ -1,4 +1,4 @@
-import { Search, LayoutGrid, Table2, Plus, Filter, X } from 'lucide-react';
+import { Search, LayoutGrid, Table2, History, Plus, Filter, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,8 +17,8 @@ import { Label } from '@/components/ui/label';
 import type { PipelineFilters } from './pipelineConstants';
 
 interface PipelineToolbarProps {
-  view: 'kanban' | 'table';
-  onViewChange: (view: 'kanban' | 'table') => void;
+  view: 'kanban' | 'table' | 'historico';
+  onViewChange: (view: 'kanban' | 'table' | 'historico') => void;
   filters: PipelineFilters;
   onFiltersChange: (filters: PipelineFilters) => void;
   onAddClick: () => void;
@@ -189,10 +189,19 @@ export function PipelineToolbar({
         <Button
           variant={view === 'table' ? 'default' : 'ghost'}
           size="sm"
-          className="rounded-l-none h-8 px-2.5"
+          className="rounded-none border-x h-8 px-2.5"
           onClick={() => onViewChange('table')}
         >
           <Table2 className="h-4 w-4" />
+        </Button>
+        <Button
+          variant={view === 'historico' ? 'default' : 'ghost'}
+          size="sm"
+          className="rounded-l-none h-8 px-2.5 gap-1.5"
+          onClick={() => onViewChange('historico')}
+        >
+          <History className="h-4 w-4" />
+          Histórico
         </Button>
       </div>
 
