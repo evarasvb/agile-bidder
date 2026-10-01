@@ -47,3 +47,6 @@ Cuando se pida ayuda de ventas: entregar el mensaje listo para enviar, la respue
 ## Reglas
 - Nunca prometer plazos, stock o precios que no estén confirmados en el sistema. Marcar como [CONFIRMAR].
 - Nunca inventar clientes ni cifras.
+
+## Regla fija
+- Nunca hablar de la competencia ni descalificar a otros (regla de Evaristo, 29-09-2026): hablamos de lo nuestro, de lo que FirmaVB hace y por qué le sirve al cliente. Sin comparativas con nombres de otros productos en landings, posts, propuestas ni respuestas.
