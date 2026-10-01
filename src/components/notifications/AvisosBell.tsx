@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { noticeHref } from "@/lib/institutionFollowing";
 import { Bell, CheckCheck, Inbox } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -33,30 +34,9 @@ function titulo(a: Aviso) {
 function detalle(a: Aviso): string {
   return String(a.datos?.detalle || "");
 }
-// Noticias de prensa llevan a la nota original (nueva pestaña).
-function hrefExterno(a: Aviso): string | null {
-  const u = a.datos?.url;
-  return a.tipo === "medio_institucion" && typeof u === "string" && /^https?:\/\//.test(u) ? u : null;
-}
 function subtitulo(a: Aviso) {
   const d = a.datos || {};
   return d.organismo || d.institucion || (a.licitacion_id ? `Código ${a.licitacion_id}` : "");
-}
-// Licitaciones y compras ágiles comparten esta misma tabla de avisos, pero
-// /oportunidades/:tipo/:id necesita distinguir cuál es cuál. Los avisos
-// nuevos ya traen `tipo_oportunidad`; los generados antes de ese cambio no,
-// así que se asume "licitacion" (el tipo más común hasta ahora).
-function hrefOportunidad(a: Aviso): string | null {
-  // Reclamos y compras de una institución seguida: al módulo "Instituciones
-  // que sigo", con el RUT exacto en la URL para que abra su zoom (reclamos,
-  // pagos, noticias, licitaciones y compras ágiles) de una vez.
-  if (a.tipo === "reclamo_institucion" || a.tipo === "compras_institucion") {
-    const rut = a.datos?.rut;
-    return typeof rut === "string" && rut ? `/instituciones?rut=${encodeURIComponent(rut)}` : "/instituciones";
-  }
-  if (!a.licitacion_id) return null;
-  const tipo = a.datos?.tipo_oportunidad === "compra_agil" ? "compra_agil" : "licitacion";
-  return `/oportunidades/${tipo}/${a.licitacion_id}`;
 }
 function fecha(iso: string) {
   try {
@@ -121,8 +101,8 @@ export function AvisosBell({ className }: Props) {
           <div className="max-h-[70vh] overflow-y-auto">
             <ul className="divide-y">
               {avisos.map((a) => {
-                const href = hrefOportunidad(a);
-                const externo = hrefExterno(a);
+                const href = noticeHref(a);
+
                 // Títulos completos (hasta 3 líneas) en vez de cortarlos: en el
                 // celular la campanita se veía con los avisos truncados a mitad de palabra.
                 const contenido = (
@@ -141,21 +121,8 @@ export function AvisosBell({ className }: Props) {
                   if (!a.leida) marcarUna.mutate(a.id);
                   setOpen(false);
                 };
-                // Sin código de licitación/compra ágil asociado, no hay a dónde
-                // llevar al usuario: se deja como fila no clickeable (solo marca leído).
-                return externo ? (
-                  <li key={a.id} className={cn(!a.leida && "bg-firmavb-blue/5")}>
-                    <a
-                      href={externo}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={onClick}
-                      className="flex gap-3 p-3 text-sm hover:bg-muted/60 transition-colors"
-                    >
-                      {contenido}
-                    </a>
-                  </li>
-                ) : href ? (
+                // Los avisos sin destino pueden marcarse leídos con teclado.
+                return href ? (
                   <li key={a.id} className={cn(!a.leida && "bg-firmavb-blue/5")}>
                     <Link
                       to={href}
@@ -166,12 +133,10 @@ export function AvisosBell({ className }: Props) {
                     </Link>
                   </li>
                 ) : (
-                  <li
-                    key={a.id}
-                    className={cn("flex gap-3 p-3 text-sm cursor-pointer", !a.leida && "bg-firmavb-blue/5")}
-                    onClick={onClick}
-                  >
-                    {contenido}
+                  <li key={a.id} className={cn(!a.leida && "bg-firmavb-blue/5")}>
+                    <button type="button" className="flex w-full gap-3 p-3 text-left text-sm hover:bg-muted/60 focus-visible:ring-2" onClick={onClick}>
+                      {contenido}
+                    </button>
                   </li>
                 );
               })}

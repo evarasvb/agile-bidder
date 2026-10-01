@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 export interface InstitucionSeguida {
   rut_institucion: string;
@@ -10,15 +11,23 @@ export interface InstitucionSeguida {
 // Lista de instituciones que el cliente sigue (cliente_instituciones_seguidas,
 // RLS ya la acota a su propia cuenta).
 export function useInstitucionesSeguidas() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ['instituciones-seguidas'],
+    queryKey: ['instituciones-seguidas', user?.id],
+    enabled: !!user?.id,
+    refetchInterval: 60_000,
     queryFn: async (): Promise<InstitucionSeguida[]> => {
-      const { data, error } = await supabase
-        .from('cliente_instituciones_seguidas')
-        .select('rut_institucion, nombre_institucion, created_at')
-        .order('nombre_institucion');
-      if (error) throw error;
-      return (data ?? []) as InstitucionSeguida[];
+      const rows: InstitucionSeguida[] = [];
+      for (let offset = 0; ; offset += 200) {
+        const { data, error } = await supabase
+          .from('cliente_instituciones_seguidas')
+          .select('rut_institucion, nombre_institucion, created_at')
+          .order('nombre_institucion').order('id')
+          .range(offset, offset + 199);
+        if (error) throw error;
+        rows.push(...(data ?? []) as InstitucionSeguida[]);
+        if (!data || data.length < 200) return rows;
+      }
     },
   });
 }
@@ -112,9 +121,10 @@ export interface InstitucionZoom {
 // Mercado Público copiado de ordenes_compra.rut_demandante) ni resuelve por
 // licitaciones_bi: institucion_zoom lo usa para buscar por nombre normalizado.
 export function useInstitucionZoom(rut: string | null, nombre?: string | null) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ['institucion-zoom', rut, nombre],
-    enabled: !!rut,
+    queryKey: ['institucion-zoom', user?.id, rut, nombre],
+    enabled: !!user?.id && !!rut,
     queryFn: async (): Promise<InstitucionZoom> => {
       const { data, error } = await (supabase.rpc as any)('institucion_zoom', { p_rut: rut, p_nombre: nombre ?? null });
       if (error) throw error;

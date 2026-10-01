@@ -101,6 +101,11 @@ const navItems: NavItem[] = [
     ],
   },
   {
+    title: "Market del Estado",
+    url: "/market-estado",
+    icon: Store,
+  },
+  {
     title: "Reportes",
     url: "/reportes",
     icon: BarChart3,

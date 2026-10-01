@@ -30,6 +30,8 @@ import LicitacionesSimilares from '@/components/licitaciones/LicitacionesSimilar
 import { LicitacionItemsMatch } from '@/components/licitaciones/LicitacionItemsMatch';
 import { FichaMercadoPublico } from '@/components/licitaciones/FichaMercadoPublico';
 import { AdjuntosLicitacion } from '@/components/licitaciones/AdjuntosLicitacion';
+import { GarantiaCard } from '@/components/licitaciones/GarantiaCard';
+import { AvisoPagaTarde } from '@/components/organismo/AvisoPagaTarde';
 import { useDocumentosLicitacion } from '@/hooks/useChatIA';
 import { RiesgoOrganismoCard } from '@/components/organismo/RiesgoOrganismoCard';
 import { MediosOrganismoCard } from '@/components/organismo/MediosOrganismoCard';
@@ -385,6 +387,8 @@ export default function LicitacionDetalle() {
         </div>
       </div>
 
+      <AvisoPagaTarde codigo={licitacion.codigo} organismo={licitacion.organismo} />
+
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
@@ -436,6 +440,8 @@ export default function LicitacionDetalle() {
               </p>
             </CardContent>
           </Card>
+
+          <GarantiaCard codigo={licitacion.codigo} />
 
           <RiesgoOrganismoCard codigo={licitacion.codigo} organismo={licitacion.organismo} />
 
