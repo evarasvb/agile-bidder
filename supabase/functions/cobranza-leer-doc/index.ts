@@ -22,7 +22,7 @@ Del texto entregado extrae SOLO estos campos y responde en JSON estricto (sin te
   "monto": number|null,            // monto TOTAL del documento, solo dígitos, sin puntos ni símbolos
   "fecha_emision": string|null,    // formato YYYY-MM-DD
   "fecha_recepcion": string|null,  // fecha de recepción conforme si aparece, formato YYYY-MM-DD
-  "rut_emisor": string|null        // RUT de quien emite el documento
+  "rut_receptor": string|null      // RUT del RECEPTOR / cliente al que se le factura (el que debe pagar), NO el del emisor
 }
 Si un dato no aparece con claridad, usa null. No inventes.`;
 

@@ -495,6 +495,7 @@ function NuevaFacturaDialog() {
   const [notas, setNotas] = useState('');
   const [facturaFile, setFacturaFile] = useState<File | null>(null);
   const [leyendoPdf, setLeyendoPdf] = useState(false);
+  const leerReqId = useRef(0); // invalida lecturas de PDF en curso si cambia el archivo o se cierra
   const [guiaFile, setGuiaFile] = useState<File | null>(null);
   const [subiendo, setSubiendo] = useState(false);
   const facturaInput = useRef<HTMLInputElement | null>(null);
@@ -526,6 +527,7 @@ function NuevaFacturaDialog() {
   const limpiar = () => {
     setNombre(''); setRut(''); setOc(''); setNumero(''); setMonto(''); setEmision(''); setRecepcion(''); setVencimiento(''); setNotas('');
     setFacturaFile(null); setGuiaFile(null); setOcBusqueda(''); setCodigoBuscar(null);
+    leerReqId.current++;
   };
 
   const subirArchivo = async (file: File, tag: 'factura' | 'guia'): Promise<{ url: string; nombre: string } | null> => {
@@ -542,16 +544,19 @@ function NuevaFacturaDialog() {
   const leerPdf = async () => {
     if (!facturaFile) return;
     if (facturaFile.type !== 'application/pdf') { toast.error('El lector funciona con PDF. Para fotos, ingresa los datos a mano.'); return; }
+    const target = facturaFile;
+    const myId = ++leerReqId.current;
     setLeyendoPdf(true);
     try {
       const b64 = await new Promise<string>((resolve, reject) => {
         const fr = new FileReader();
         fr.onload = () => resolve(String(fr.result).split(',')[1] || '');
         fr.onerror = () => reject(new Error('No se pudo leer el archivo'));
-        fr.readAsDataURL(facturaFile);
+        fr.readAsDataURL(target);
       });
       const { data, error } = await supabase.functions.invoke('cobranza-leer-doc', { body: { pdf_base64: b64 } });
       if (error) throw error;
+      if (leerReqId.current !== myId) return; // cambiaron el archivo o cerraron: la respuesta ya no aplica
       const r = data as { ok?: boolean; campos?: Record<string, unknown>; error?: string };
       if (!r?.ok || !r.campos) { toast.error(r?.error || 'No se pudo leer el PDF.'); return; }
       const c = r.campos;
@@ -559,7 +564,7 @@ function NuevaFacturaDialog() {
       if (c.monto != null) setMonto(String(c.monto));
       if (c.fecha_emision) setEmision(String(c.fecha_emision).slice(0, 10));
       if (c.fecha_recepcion) setRecepcion(String(c.fecha_recepcion).slice(0, 10));
-      if (!rut && c.rut_emisor) setRut(String(c.rut_emisor));
+      if (!rut && c.rut_receptor) setRut(String(c.rut_receptor));
       toast.success('Datos leídos del PDF. Revísalos antes de guardar.');
     } catch (e) {
       toast.error((e as Error).message || 'No se pudo leer el PDF.');
@@ -712,7 +717,7 @@ function NuevaFacturaDialog() {
             <p className="text-xs font-medium text-muted-foreground">Respaldo (opcional, pero recomendado para el cobro formal)</p>
             <div className="flex flex-wrap items-center gap-2">
               <input ref={facturaInput} type="file" accept="application/pdf,image/jpeg,image/png" className="hidden"
-                onChange={(e) => setFacturaFile(e.target.files?.[0] || null)} />
+                onChange={(e) => { leerReqId.current++; setFacturaFile(e.target.files?.[0] || null); }} />
               <Button type="button" variant="outline" size="sm" onClick={() => facturaInput.current?.click()}>
                 <Upload className="mr-1 h-3.5 w-3.5" /> {facturaFile ? 'Cambiar factura' : 'Adjuntar factura'}
               </Button>

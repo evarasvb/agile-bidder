@@ -188,6 +188,7 @@ const App = () => (
           <Route path="/terminos" element={<Terminos />} />
           <Route path="/privacidad" element={<Privacidad />} />
           <Route path="/planes" element={<Planes />} />
+          <Route path="/marketplace" element={<Navigate to="/market-estado" replace />} />
           
           {/* Onboarding - sin sidebar */}
           <Route path="/onboarding" element={<ProtectedRoute><ClienteOnboarding /></ProtectedRoute>} />
