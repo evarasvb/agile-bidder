@@ -8,7 +8,6 @@ import {
   CheckCircle2, Package, Sparkles, FileText, Plug, X, ChevronRight, Rocket, PartyPopper, Tag,
 } from "lucide-react";
 import { useInventoryStats } from "@/hooks/useInventory";
-import { useClienteOfertas } from "@/hooks/useClienteOfertas";
 import { useExtensionStatus } from "@/hooks/useExtensionStatus";
 import { useCliente } from "@/hooks/useCliente";
 import { useQuery } from "@tanstack/react-query";
@@ -43,7 +42,6 @@ export function PrimerosPasos() {
   });
 
   const { data: invStats, isLoading: cargandoInv } = useInventoryStats();
-  const { data: ofertas, isLoading: cargandoOf } = useClienteOfertas();
   const { isConnected } = useExtensionStatus();
   // El wizard de bienvenida (industria, palabras clave, qué no vendes) es el primer
   // paso de la MISMA guía: antes vivía aparte y el cliente lo terminaba viendo "100%"
@@ -53,11 +51,28 @@ export function PrimerosPasos() {
   // Eventos reales: libros del Experto (licitaciones analizadas) también cuentan como avance.
   const { session } = useAuth();
   const { data: libros, isLoading: cargandoLib } = useQuery({ queryKey: ["experto_mis_libros"], enabled: !!session, queryFn: async () => ((await supabase.rpc("experto_mis_libros")).data ?? []) as any[] });
+  // useClienteOfertas() depende de getClienteId() (localStorage), que ningún
+  // flujo de la app llena — queda deshabilitado para sesiones normales. Acá
+  // se consulta directo con el cliente.id que ya resolvió useCliente() desde
+  // la sesión autenticada (mismo fix aplicado en ActivationOnboarding/#276).
+  const { data: tieneOfertasReales, isLoading: cargandoOf } = useQuery({
+    queryKey: ["primeros-pasos-tiene-oferta", cliente?.id],
+    queryFn: async () => {
+      if (!cliente?.id) return false;
+      const { count, error } = await supabase
+        .from("cliente_ofertas")
+        .select("id", { count: "exact", head: true })
+        .eq("cliente_id", cliente.id);
+      if (error) throw error;
+      return (count ?? 0) > 0;
+    },
+    enabled: !!cliente?.id,
+  });
   const cargando = cargandoInv || cargandoOf || cargandoLib || cargandoCliente;
 
   const perfilListo = cliente?.onboarding_completado === true;
   const tieneInventario = (invStats?.total ?? 0) > 0;
-  const tieneOfertas = (ofertas?.length ?? 0) > 0;
+  const tieneOfertas = !!tieneOfertasReales;
   const tieneLibros = (libros?.length ?? 0) > 0;
   const revisoOportunidades = vistoOps || tieneOfertas || tieneLibros;
 
