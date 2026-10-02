@@ -23,6 +23,12 @@ verify_jwt = true
 [functions.extension-api]
 verify_jwt = false
 
+[functions.directorio]
+verify_jwt = false
+
+[functions.cobranza-leer-doc]
+verify_jwt = true
+
 [functions.fetch-compras-agiles]
 verify_jwt = true
 
