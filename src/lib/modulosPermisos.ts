@@ -30,7 +30,7 @@ export interface ModuloDef {
 
 export const MODULOS: ModuloDef[] = [
   { key: 'inicio', label: 'Inicio', prefijos: ['/dashboard'] },
-  { key: 'oportunidades', label: 'Oportunidades', prefijos: ['/oportunidades', '/calendario'] },
+  { key: 'oportunidades', label: 'Oportunidades', prefijos: ['/oportunidades', '/calendario', '/licitaciones', '/compras-agiles'] },
   { key: 'postulaciones', label: 'Postulaciones', prefijos: ['/pipeline'] },
   { key: 'inventario', label: 'Inventario', prefijos: ['/inventario'] },
   { key: 'convenio_marco', label: 'Convenio Marco', prefijos: ['/convenio-marco'] },

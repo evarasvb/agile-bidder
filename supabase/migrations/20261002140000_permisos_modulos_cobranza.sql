@@ -8,6 +8,14 @@
 
 alter type public.app_role add value if not exists 'cobranza';
 
+-- El CHECK histórico de vendedores.rol (migración 20260318000002) solo permitía
+-- admin/vendedor/viewer, lo que haría fallar el guardado del rol 'cobranza' (y
+-- 'visor'). Se recrea con el vocabulario completo. En prod ese CHECK ya no
+-- existía, pero en un build desde cero sí, así que esto lo deja consistente.
+alter table public.vendedores drop constraint if exists vendedores_rol_check;
+alter table public.vendedores add constraint vendedores_rol_check
+  check (rol in ('admin', 'vendedor', 'visor', 'viewer', 'cobranza'));
+
 alter table public.vendedores add column if not exists permisos jsonb;
 comment on column public.vendedores.permisos is
   'Lista jsonb de claves de módulos permitidos para este miembro (ver src/lib/modulosPermisos.ts). null = acceso a todo (sin restricción).';

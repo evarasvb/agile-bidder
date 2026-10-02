@@ -8,7 +8,7 @@ import { AvisosBell } from "@/components/notifications/AvisosBell";
 import { BusquedaGlobalProvider, BusquedaGlobalTrigger } from "@/components/busqueda/BusquedaGlobal";
 import { usePermisosModulos } from "@/hooks/usePermisosModulos";
 import { moduloDeRuta } from "@/lib/modulosPermisos";
-import { Lock } from "lucide-react";
+import { Lock, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import logoFirmavbBlanco from "@/assets/logo-firmavb-blanco.png";
 
@@ -45,7 +45,12 @@ export function AppLayout({ children }: AppLayoutProps) {
   // se muestra un aviso en vez del contenido (sin redirigir, para no provocar
   // loops). El dueño/admin y las rutas libres siempre pasan.
   const { puede, cargando: permisosCargando } = usePermisosModulos();
-  const sinAcceso = !permisosCargando && !puede(moduloDeRuta(pathname));
+  const modActual = moduloDeRuta(pathname);
+  // En una ruta gateada, mientras los permisos cargan NO se renderiza el
+  // contenido (evita que una página restringida se monte y dispare sus fetch
+  // antes de saber si hay acceso). Las rutas libres (modActual null) pasan.
+  const esperandoPermisos = modActual != null && permisosCargando;
+  const sinAcceso = modActual != null && !permisosCargando && !puede(modActual);
   useEffect(() => {
     const t = TITULOS.find(([ruta]) => pathname === ruta || pathname.startsWith(ruta.endsWith("/") ? ruta : ruta + "/"));
     document.title = t ? `${t[1]} · FirmaVB` : "FirmaVB";
@@ -113,7 +118,11 @@ export function AppLayout({ children }: AppLayoutProps) {
           {/* pb generoso: deja aire para que la burbuja flotante de Evaristo
               (abajo a la derecha) nunca tape la última fila de contenido */}
           <main id="main-content" className="p-4 sm:p-6 pb-24 sm:pb-28">
-            {sinAcceso ? (
+            {esperandoPermisos ? (
+              <div className="flex items-center justify-center py-24">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : sinAcceso ? (
               <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
                 <Lock className="h-10 w-10 text-muted-foreground" />
                 <h2 className="text-lg font-semibold">No tienes acceso a esta sección</h2>

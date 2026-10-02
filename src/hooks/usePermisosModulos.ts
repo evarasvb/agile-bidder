@@ -23,10 +23,14 @@ export function usePermisosModulos(): PermisosModulos {
   const { user } = useAuth();
   const { isAdmin, loading: perfilCargando } = useProfile();
 
-  const { data: permisosRaw, isLoading: permisosCargando } = useQuery({
+  const { data: permisosRaw, isLoading: permisosCargando, isSuccess } = useQuery({
     queryKey: ['mis-permisos-modulos', user?.id],
     enabled: !!user?.id && !isAdmin, // admin ve todo: no hace falta consultar
-    staleTime: 5 * 60_000,
+    staleTime: 60_000,
+    // Si el admin cambia los permisos mientras el miembro sigue adentro, que se
+    // refresquen solos: re-consulta cada minuto y al volver el foco a la pestaña.
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
     queryFn: async (): Promise<ModuloKey[] | null> => {
       // La RLS de vendedores permite ver la fila propia (user_id = auth.uid()).
       const { data, error } = await sb
@@ -43,9 +47,12 @@ export function usePermisosModulos(): PermisosModulos {
 
   const cargando = perfilCargando || (!isAdmin && permisosCargando);
 
-  // Admin/fundador, o miembro sin lista de permisos ⇒ todo.
-  const todo = isAdmin || permisosRaw == null;
-  const permitidos = new Set<ModuloKey>(todo ? [] : permisosRaw);
+  // Acceso total SOLO si: soy admin/fundador, o la consulta tuvo ÉXITO y
+  // devolvió null (sin restricción). Si la consulta falla (error de API/RLS),
+  // NO se concede todo: se "falla cerrado" ocultando lo gateado, para que un
+  // error transitorio nunca abra módulos que no corresponden.
+  const todo = isAdmin || (isSuccess && permisosRaw == null);
+  const permitidos = new Set<ModuloKey>(isSuccess && permisosRaw ? permisosRaw : []);
 
   const puede = (modulo: ModuloKey | null): boolean => {
     if (modulo == null) return true; // ruta libre
