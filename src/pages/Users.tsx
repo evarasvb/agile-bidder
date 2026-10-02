@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
-import { Loader2, UserPlus, Shield, User, Mail, MoreHorizontal, Trash2, KeyRound, UserCircle, Sparkles, RotateCcw } from "lucide-react";
+import { Loader2, UserPlus, Shield, User, Mail, MoreHorizontal, Trash2, KeyRound, UserCircle, Sparkles, RotateCcw, Clock, Send } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -20,6 +20,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ExecuteMigrationDialog } from "@/components/admin/ExecuteMigrationDialog";
 import { ApplyMigrationsButton } from "@/components/admin/ApplyMigrationsButton";
+import { useInvitarMiembro } from "@/hooks/useEquipo";
 
 interface UserWithProfile {
   id: string;
@@ -33,6 +34,12 @@ interface UserWithProfile {
   cliente: {
     empresa_nombre: string | null;
   } | null;
+  /** Invitación enviada (fila en `vendedores`) que la persona todavía no activó
+   *  (nunca creó su contraseña): no tiene user_id, así que no es una cuenta real
+   *  todavía. Antes estas filas se descartaban en silencio y quedaban invisibles
+   *  en esta pantalla (hallazgo de Evaristo: invitó a Eva Bahamonde y no aparecía
+   *  en "Roles y permisos", aunque la invitación sí se había creado). */
+  pendiente?: { vendedorNombre: string; vendedorRol: string };
 }
 
 export default function Users() {
@@ -42,6 +49,7 @@ export default function Users() {
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   const [userToReset, setUserToReset] = useState<string | null>(null);
   const [confirmRoleChange, setConfirmRoleChange] = useState<{ userId: string; isCurrentlyAdmin: boolean; userName?: string; newRole?: string } | null>(null);
+  const invitarMutation = useInvitarMiembro();
 
   // Solo MI equipo: yo (dueño) + los miembros que invité. La tabla `vendedores`
   // ya viene acotada por RLS a la empresa del usuario actual, así que NO se
@@ -55,14 +63,17 @@ export default function Users() {
       // Roster del equipo (RLS: solo mi empresa).
       const { data: equipo, error: equipoError } = await supabase
         .from('vendedores')
-        .select('user_id');
+        .select('user_id, nombre, email, rol, estado_invitacion, invited_at, created_at');
       if (equipoError) throw equipoError;
 
       const ids = Array.from(new Set(
         [myId, ...(equipo ?? []).map((v: { user_id: string | null }) => v.user_id)]
           .filter((x): x is string => !!x)
       ));
-      if (ids.length === 0) return [];
+      // Invitaciones enviadas que la persona nunca activó (sin user_id todavía):
+      // se listan aparte porque no tienen profile/roles/cliente que combinar.
+      const pendientes = (equipo ?? []).filter((v) => !v.user_id && v.estado_invitacion === 'pendiente');
+      if (ids.length === 0 && pendientes.length === 0) return [];
 
       // Solo los profiles/roles/clientes de mi equipo.
       const { data: profiles, error: profilesError } = await supabase
@@ -116,6 +127,18 @@ export default function Users() {
             };
           }
         }
+      });
+
+      pendientes.forEach((v) => {
+        usersMap.set(`pendiente-${v.email}`, {
+          id: `pendiente-${v.email}`,
+          email: v.email,
+          created_at: v.invited_at || v.created_at,
+          profile: { full_name: v.nombre, avatar_url: null },
+          roles: [],
+          cliente: null,
+          pendiente: { vendedorNombre: v.nombre, vendedorRol: v.rol || 'vendedor' },
+        });
       });
 
       return Array.from(usersMap.values());
@@ -329,8 +352,25 @@ export default function Users() {
     {
       id: 'rol',
       header: 'Rol',
-      sortValue: (user) => (esAdmin(user) ? 'Admin' : 'Usuario'),
+      sortValue: (user) => (user.pendiente ? 'Pendiente' : esAdmin(user) ? 'Admin' : 'Usuario'),
       cell: (user) => {
+        if (user.pendiente) {
+          return (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="outline" className="cursor-help border-amber-300 bg-amber-50 text-amber-700">
+                  <Clock className="h-3 w-3 mr-1" />
+                  Invitación pendiente
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">
+                  Se le envió la invitación pero todavía no crea su contraseña ni entra a la app. No tiene rol asignado hasta que active la cuenta.
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          );
+        }
         const isUserAdmin = esAdmin(user);
         return (
           <div className="flex items-center gap-2">
@@ -388,37 +428,59 @@ export default function Users() {
       id: 'acciones',
       header: '',
       headerClassName: 'w-[50px]',
-      cell: (user) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="Acciones del usuario">
-              <MoreHorizontal className="h-4 w-4" />
+      cell: (user) => {
+        if (user.pendiente) {
+          return (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-blue-600 hover:text-blue-700"
+              disabled={invitarMutation.isPending}
+              onClick={() =>
+                invitarMutation.mutate({
+                  nombre: user.pendiente!.vendedorNombre,
+                  email: user.email,
+                  rol: user.pendiente!.vendedorRol,
+                })
+              }
+            >
+              {invitarMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              Reenviar invitación
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56 z-50">
-            <DropdownMenuItem
-              onSelect={(e) => {
-                e.preventDefault();
-                setUserToReset(user.email);
-              }}
-              className="cursor-pointer focus:bg-muted"
-            >
-              <RotateCcw className="h-4 w-4 mr-2 text-blue-600" />
-              <span>Resetear Contraseña</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={(e) => {
-                e.preventDefault();
-                setUserToDelete(user.id);
-              }}
-              className="text-destructive cursor-pointer focus:bg-destructive/10 focus:text-destructive"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              <span>Eliminar Usuario</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
+          );
+        }
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label="Acciones del usuario">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 z-50">
+              <DropdownMenuItem
+                onSelect={(e) => {
+                  e.preventDefault();
+                  setUserToReset(user.email);
+                }}
+                className="cursor-pointer focus:bg-muted"
+              >
+                <RotateCcw className="h-4 w-4 mr-2 text-blue-600" />
+                <span>Resetear Contraseña</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={(e) => {
+                  e.preventDefault();
+                  setUserToDelete(user.id);
+                }}
+                className="text-destructive cursor-pointer focus:bg-destructive/10 focus:text-destructive"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                <span>Eliminar Usuario</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
     },
   ];
 
