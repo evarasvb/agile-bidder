@@ -35,6 +35,11 @@ export function MatchItemActions({ codigo, itemRef, itemNombre, hasSuggestion, o
   const upsert = useUpsertMatchOverride();
   const clear = useClearMatchOverride();
 
+  // Antes el error se tragaba en silencio (clic y "no pasa nada"); ahora se
+  // muestra el motivo real (hallazgo de Evaristo).
+  const mostrarError = (e: unknown) =>
+    toast.error(e instanceof Error ? e.message : "No se pudo guardar el cambio. Intenta de nuevo.");
+
   const resultados = useMemo(() => {
     const q = query.trim().toLowerCase();
     const base = inventario as InventoryItem[];
@@ -50,13 +55,13 @@ export function MatchItemActions({ codigo, itemRef, itemNombre, hasSuggestion, o
   const confirmar = () =>
     upsert.mutate(
       { codigo, itemRef, itemNombre, accion: "confirmado", procesoTipo },
-      { onSuccess: () => toast.success("Match confirmado") }
+      { onSuccess: () => toast.success("Match confirmado"), onError: mostrarError }
     );
 
   const descartar = () =>
     upsert.mutate(
       { codigo, itemRef, itemNombre, accion: "descartado", procesoTipo },
-      { onSuccess: () => toast.success("Ítem descartado de la propuesta") }
+      { onSuccess: () => toast.success("Ítem descartado de la propuesta"), onError: mostrarError }
     );
 
   const reasignar = (p: InventoryItem) =>
@@ -68,11 +73,12 @@ export function MatchItemActions({ codigo, itemRef, itemNombre, hasSuggestion, o
           setPickerOpen(false);
           setQuery("");
         },
+        onError: mostrarError,
       }
     );
 
   const quitar = () =>
-    clear.mutate({ codigo, itemRef, procesoTipo }, { onSuccess: () => toast.success("Corrección quitada") });
+    clear.mutate({ codigo, itemRef, procesoTipo }, { onSuccess: () => toast.success("Corrección quitada"), onError: mostrarError });
 
   return (
     <>

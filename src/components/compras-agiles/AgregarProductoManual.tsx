@@ -45,6 +45,11 @@ export function AgregarProductoManual({ codigo, procesoTipo }: Props) {
           setOpen(false);
           setQuery("");
         },
+        // Antes el error se tragaba en silencio: el usuario clickeaba y "no
+        // pasaba nada". Ahora se muestra el motivo real (hallazgo de Evaristo).
+        onError: (e: unknown) => {
+          toast.error(e instanceof Error ? e.message : "No se pudo agregar el producto. Intenta de nuevo.");
+        },
       }
     );
   };
