@@ -86,12 +86,22 @@ export function InvitarMiembroDialog({ open, onOpenChange }: InvitarMiembroDialo
               </div>
               <div className="space-y-2">
                 <Label htmlFor="invitar-rol">Rol</Label>
-                <Select value={form.rol} onValueChange={(v) => setForm({ ...form, rol: v })}>
+                <Select
+                  value={form.rol}
+                  onValueChange={(v) => {
+                    setForm({ ...form, rol: v });
+                    // Comprador existe para dejar a alguien SOLO pidiendo
+                    // cotizaciones en Market del Estado — preseleccionar ese
+                    // módulo evita que quede con acceso a todo por defecto.
+                    if (v === 'comprador') setPermisos(['market']);
+                  }}
+                >
                   <SelectTrigger id="invitar-rol"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="admin">Admin — Acceso completo</SelectItem>
                     <SelectItem value="cobranza">Cobranza — Enfocado en cobros</SelectItem>
                     <SelectItem value="vendedor">Vendedor — Pipeline y asignaciones</SelectItem>
+                    <SelectItem value="comprador">Comprador — Solo Market del Estado</SelectItem>
                     <SelectItem value="visor">Visor — Solo lectura</SelectItem>
                   </SelectContent>
                 </Select>

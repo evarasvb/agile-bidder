@@ -13,7 +13,7 @@ interface Profile {
   updated_at: string;
 }
 
-export type AppRole = 'super_admin' | 'admin' | 'user' | 'vendedor' | 'visor';
+export type AppRole = 'super_admin' | 'admin' | 'user' | 'vendedor' | 'visor' | 'cobranza' | 'comprador';
 
 interface UserRole {
   role: AppRole;
@@ -67,7 +67,7 @@ export function useProfile() {
           setRoles(typedRoles);
           
           // Determinar el rol principal (el de mayor jerarquía)
-          const roleHierarchy: AppRole[] = ['super_admin', 'admin', 'user', 'vendedor', 'visor'];
+          const roleHierarchy: AppRole[] = ['super_admin', 'admin', 'user', 'vendedor', 'cobranza', 'comprador', 'visor'];
           const userRoles = typedRoles.map(r => r.role);
           const primary = roleHierarchy.find(r => userRoles.includes(r)) || null;
           setPrimaryRole(primary);
