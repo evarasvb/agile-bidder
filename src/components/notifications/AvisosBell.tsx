@@ -21,6 +21,7 @@ function icono(tipo: string) {
     case "medio_institucion": return "📰";
     case "reclamo_institucion": return "⚠️";
     case "compras_institucion": return "🧾";
+    case "plan_postulacion": return "📅";
     default: return "🔔";
   }
 }
