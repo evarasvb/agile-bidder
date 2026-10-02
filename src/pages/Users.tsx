@@ -18,8 +18,6 @@ import { es } from "date-fns/locale";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ExecuteMigrationDialog } from "@/components/admin/ExecuteMigrationDialog";
-import { ApplyMigrationsButton } from "@/components/admin/ApplyMigrationsButton";
 import { useInvitarMiembro } from "@/hooks/useEquipo";
 import { useEsDuenoEquipo } from "@/hooks/useVendedores";
 
@@ -44,7 +42,7 @@ interface UserWithProfile {
 }
 
 export default function Users() {
-  const { isAdmin, isSuperAdmin, loading: profileLoading } = useProfile();
+  const { isAdmin, loading: profileLoading } = useProfile();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
@@ -536,12 +534,6 @@ export default function Users() {
           </p>
         </div>
         <div className="flex gap-2">
-          {isSuperAdmin && (
-            <>
-              <ApplyMigrationsButton />
-              <ExecuteMigrationDialog />
-            </>
-          )}
           <Button variant="outline" className="gap-2" onClick={() => navigate('/equipo')}>
             <UserPlus className="h-4 w-4" />
             Invitar miembro
