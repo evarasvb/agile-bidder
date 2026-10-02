@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   HandCoins, Plus, Trash2, FileText, Copy, Download, Loader2, Building2, User, AlertTriangle, Scale,
@@ -86,6 +86,14 @@ export default function CobranzaFacturas() {
   const toggle = (id: string) => setExpandido((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const [filtro, setFiltro] = useState<Filtro>('activas');
   const [q, setQ] = useState('');
+  // Mis OC del ERP (por mi RUT) que aún no tienen factura: se listan como filas para registrar la factura con un clic.
+  const [ocDialogAbierto, setOcDialogAbierto] = useState(false);
+  const [ocParaFactura, setOcParaFactura] = useState<OcParaFactura | null>(null);
+  const { data: misOcs = [] } = useMisOcAceptadas(cliente?.rut || null, cliente?.empresa_nombre || null);
+  const ocsSinFactura = useMemo(() => {
+    const yaConFactura = new Set(facturas.map((f) => f.oc_codigo).filter(Boolean));
+    return misOcs.filter((o) => !yaConFactura.has(o.codigo));
+  }, [misOcs, facturas]);
 
   const abrirArchivo = async (path: string) => {
     const { data, error } = await supabase.storage.from('documentos-empresa').createSignedUrl(path, 300);
@@ -294,9 +302,61 @@ export default function CobranzaFacturas() {
         </div>
         <div className="flex items-center gap-2">
           <CargaMasivaCobranzaDialog />
-          <NuevaFacturaDialog />
+          <Button size="sm" onClick={() => { setOcParaFactura(null); setOcDialogAbierto(true); }}><Plus className="mr-1 h-4 w-4" /> Nueva factura</Button>
         </div>
       </div>
+
+      <NuevaFacturaDialog abiertoExterno={ocDialogAbierto} onAbiertoChange={setOcDialogAbierto} ocInicial={ocParaFactura} conTrigger={false} />
+
+      {ocsSinFactura.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Órdenes de compra sin factura ({ocsSinFactura.length})</CardTitle>
+            <p className="text-xs font-normal text-muted-foreground">Tus OC traídas del ERP que aún no tienen factura por cobrar. Pulsa "Registrar factura" y se autocompletan organismo, RUT, monto y fecha.</p>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="max-h-[320px] overflow-auto">
+              <table className="w-full border-collapse text-xs">
+                <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
+                  <tr className="text-left text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <th className="px-2 py-1.5 font-medium">Código</th>
+                    <th className="px-2 py-1.5 font-medium">Estado</th>
+                    <th className="px-2 py-1.5 font-medium">Organismo</th>
+                    <th className="px-2 py-1.5 font-medium">RUT deudor</th>
+                    <th className="px-2 py-1.5 font-medium">Emisión</th>
+                    <th className="px-2 py-1.5 text-right font-medium">Monto</th>
+                    <th className="px-2 py-1.5"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ocsSinFactura.map((o) => {
+                    const aceptada = o.estado != null && ESTADOS_OC_ACEPTADA.includes(String(o.estado).trim());
+                    return (
+                      <tr key={o.codigo} className="border-t hover:bg-muted/40">
+                        <td className="whitespace-nowrap px-2 py-1.5 font-medium">
+                          <span className="flex items-center gap-1">{o.codigo}
+                            {o.link_oficial && <a href={o.link_oficial} target="_blank" rel="noreferrer" className="text-firmavb-blue hover:underline" title="Ver OC en Mercado Público"><ExternalLink className="h-3.5 w-3.5" /></a>}
+                          </span>
+                        </td>
+                        <td className={cn('whitespace-nowrap px-2 py-1.5', aceptada ? 'text-muted-foreground' : 'font-medium text-red-600')}>{etiquetaEstado(o.estado) ?? '—'}</td>
+                        <td className="max-w-[240px] truncate px-2 py-1.5 text-muted-foreground" title={o.organismo_comprador || ''}>{o.organismo_comprador || '—'}</td>
+                        <td className="whitespace-nowrap px-2 py-1.5 text-muted-foreground">{o.rut_demandante || '—'}</td>
+                        <td className="whitespace-nowrap px-2 py-1.5 text-muted-foreground">{fFecha(o.fecha_emision ? o.fecha_emision.slice(0, 10) : null)}</td>
+                        <td className="whitespace-nowrap px-2 py-1.5 text-right font-medium">{CLP(o.total || 0)}</td>
+                        <td className="whitespace-nowrap px-2 py-1.5 text-right">
+                          <Button size="sm" variant="outline" className="h-7" onClick={() => { setOcParaFactura(o); setOcDialogAbierto(true); }}>
+                            <Plus className="mr-1 h-3.5 w-3.5" /> Registrar factura
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Cargando…</p>
@@ -950,10 +1010,13 @@ function AdjuntarBoton({ factura, tipo }: { factura: FacturaCobrar; tipo: 'factu
   );
 }
 
-function NuevaFacturaDialog() {
+type OcParaFactura = { codigo: string; organismo_comprador: string | null; rut_demandante: string | null; total: number | null; fecha_emision: string | null };
+function NuevaFacturaDialog({ abiertoExterno, onAbiertoChange, ocInicial, conTrigger = true }: { abiertoExterno?: boolean; onAbiertoChange?: (o: boolean) => void; ocInicial?: OcParaFactura | null; conTrigger?: boolean } = {}) {
   const crear = useCrearFactura();
   const { data: cliente } = useCliente();
-  const [abierto, setAbierto] = useState(false);
+  const [abiertoLocal, setAbiertoLocal] = useState(false);
+  const abierto = abiertoExterno ?? abiertoLocal;
+  const setAbierto = (o: boolean) => { if (onAbiertoChange) onAbiertoChange(o); else setAbiertoLocal(o); };
   const [tipo, setTipo] = useState<DeudorTipo>('estado');
   const [nombre, setNombre] = useState('');
   const [rut, setRut] = useState('');
@@ -980,6 +1043,19 @@ function NuevaFacturaDialog() {
     setFacturaFile(null); setGuiaFile(null);
     leerReqId.current++;
   };
+
+  // Pre-rellena desde una OC al abrir para "Registrar factura" de una fila del listado de OC.
+  useEffect(() => {
+    if (abierto && ocInicial) {
+      setTipo('estado');
+      setOc(ocInicial.codigo);
+      setNombre(ocInicial.organismo_comprador || '');
+      setRut(ocInicial.rut_demandante || '');
+      setMonto(ocInicial.total ? String(ocInicial.total) : '');
+      setOcFecha(ocInicial.fecha_emision ? ocInicial.fecha_emision.slice(0, 10) : '');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abierto, ocInicial]);
 
   const subirArchivo = async (file: File, tag: 'factura' | 'guia'): Promise<{ url: string; nombre: string } | null> => {
     if (!cliente?.user_id) return null;
@@ -1076,9 +1152,11 @@ function NuevaFacturaDialog() {
 
   return (
     <Dialog open={abierto} onOpenChange={(o) => { setAbierto(o); if (!o) limpiar(); }}>
-      <DialogTrigger asChild>
-        <Button size="sm"><Plus className="mr-1 h-4 w-4" /> Nueva factura</Button>
-      </DialogTrigger>
+      {conTrigger && (
+        <DialogTrigger asChild>
+          <Button size="sm"><Plus className="mr-1 h-4 w-4" /> Nueva factura</Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nueva factura por cobrar</DialogTitle>
