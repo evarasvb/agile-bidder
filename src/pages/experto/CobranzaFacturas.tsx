@@ -28,7 +28,8 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
-import { useCliente } from '@/hooks/useCliente';
+import { useCliente, useActualizarCliente } from '@/hooks/useCliente';
+import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { descargarCartaAbogadoPDF } from '@/services/cartaAbogadoPdf';
 import {
@@ -46,9 +47,10 @@ import {
 import type { TasaMora, ResultadoInteres } from '@/lib/interesMora';
 import { CargaMasivaCobranzaDialog } from '@/components/experto/CargaMasivaCobranza';
 import {
-  useSeguimientoCobranza, useAgregarSeguimiento, useEliminarSeguimiento,
+  useSeguimientoCobranza, useAgregarSeguimiento, useEliminarSeguimiento, useUltimoContactoPorFactura,
   CANAL_LABEL, type CanalSeguimiento,
 } from '@/hooks/useSeguimientoCobranza';
+import { tonoRecordatorio } from '@/lib/recordatoriosCobranza';
 import { useContactosInstitucion, useAgregarContactoInstitucion } from '@/hooks/useInstitucionContactos';
 
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string;
@@ -80,6 +82,7 @@ export default function CobranzaFacturas() {
   const { data: tasas = [] } = useTasasMora();
   const actualizar = useActualizarFactura();
   const eliminar = useEliminarFactura();
+  const actualizarCli = useActualizarCliente();
   const { data: ocLinks } = useOcLinksPorCodigos(facturas.filter((f) => f.deudor_tipo === 'estado').map((f) => f.oc_codigo || ''));
 
   const [expandido, setExpandido] = useState<Set<string>>(new Set());
@@ -104,6 +107,31 @@ export default function CobranzaFacturas() {
   const [doc, setDoc] = useState<{ open: boolean; titulo: string; texto: string; generando: boolean }>({ open: false, titulo: '', texto: '', generando: false });
 
   const activa = (f: FacturaCobrar) => f.estado !== 'pagada' && f.estado !== 'incobrable';
+
+  // Recordatorios de hoy: facturas activas con correo del deudor cuyo atraso amerita
+  // un aviso (según el tono por días). Se excluyen las contactadas hace menos de 5 días.
+  const { data: ultimoContacto } = useUltimoContactoPorFactura();
+  const agregarSeg = useAgregarSeguimiento();
+  const recordatoriosHoy = useMemo(() => {
+    const hoy = Date.now();
+    return facturas
+      .filter((f) => activa(f) && !!f.deudor_email)
+      .map((f) => ({ f, tono: tonoRecordatorio(diasAtraso(f)) }))
+      .filter((x) => x.tono != null)
+      .filter((x) => {
+        const ult = ultimoContacto?.get(x.f.id);
+        if (!ult) return true;
+        const d = Math.round((hoy - new Date(ult + 'T00:00:00').getTime()) / 86400000);
+        return d >= 5;
+      })
+      .sort((a, b) => (diasAtraso(b.f) ?? 0) - (diasAtraso(a.f) ?? 0));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [facturas, ultimoContacto]);
+  const prepararRecordatorio = async (f: FacturaCobrar, label: string) => {
+    const ok = await enviarBorradorGmail(f);
+    if (!ok) return;
+    try { await agregarSeg.mutateAsync({ factura_id: f.id, canal: 'correo', nota: `Recordatorio (${label}) preparado — borrador en Gmail` }); } catch { /* el registro no es crítico */ }
+  };
 
   const totales = useMemo(() => {
     const activas = facturas.filter(activa);
@@ -208,10 +236,10 @@ export default function CobranzaFacturas() {
 
   // Deja en el Gmail del usuario un borrador de cobro con los PDFs y la
   // factura/guía adjuntas, y el cuerpo con el respaldo técnico/legal.
-  const enviarBorradorGmail = async (f: FacturaCobrar) => {
+  const enviarBorradorGmail = async (f: FacturaCobrar): Promise<boolean> => {
     if (!f.deudor_email) {
       toast.error('Agrega el correo del deudor a la factura para dejar el borrador de cobro.');
-      return;
+      return false;
     }
     const datos = datosNotaDe(f);
     const adjuntos = [{ ...notaCobroBase64(datos), mimeType: 'application/pdf' }];
@@ -224,12 +252,14 @@ export default function CobranzaFacturas() {
     try {
       const r = await gmailCrearBorrador({ to: f.deudor_email, subject, bodyHtml: cuerpoCorreoCobroHtml(datos), adjuntos, storage });
       toast.success('Borrador de cobro creado en tu Gmail', r.link ? { action: { label: 'Abrir Gmail', onClick: () => window.open(r.link!, '_blank') } } : undefined);
+      return true;
     } catch (e: any) {
       if (e?.code === 'no_conectado') {
         toast.error('Conecta tu Gmail primero.', { action: { label: 'Ir a Integraciones', onClick: () => navigate('/configuracion/integraciones') } });
       } else {
         toast.error(e?.message || 'No se pudo crear el borrador');
       }
+      return false;
     }
   };
 
@@ -307,6 +337,66 @@ export default function CobranzaFacturas() {
       </div>
 
       <NuevaFacturaDialog abiertoExterno={ocDialogAbierto} onAbiertoChange={setOcDialogAbierto} ocInicial={ocParaFactura} conTrigger={false} />
+
+      {cliente?.id && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 px-3 py-2">
+          <Switch
+            id="rec-auto"
+            checked={!!(cliente as any).recordatorios_cobranza_activo}
+            onCheckedChange={(v) => actualizarCli.mutate({ id: cliente.id, recordatorios_cobranza_activo: v } as any)}
+          />
+          <Label htmlFor="rec-auto" className="text-sm font-medium">Recordatorios automáticos (diario)</Label>
+          <span className="text-xs text-muted-foreground">
+            {(cliente as any).recordatorios_cobranza_activo
+              ? 'Encendido: cada mañana dejamos los borradores de recordatorio en tu Gmail (tú revisas y envías).'
+              : 'Apagado. Enciéndelo y cada mañana preparamos solos los recordatorios de las facturas con atraso.'}
+          </span>
+        </div>
+      )}
+
+      {recordatoriosHoy.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-1 text-sm"><Mail className="h-4 w-4" />Recordatorios de hoy ({recordatoriosHoy.length})</CardTitle>
+            <p className="text-xs font-normal text-muted-foreground">Facturas que conviene cobrar hoy, ordenadas por urgencia. "Preparar en Gmail" deja el borrador listo para que lo revises y envíes tú (ideal para organismos del Estado). Las contactadas hace menos de 5 días no se repiten.</p>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="max-h-[340px] overflow-auto">
+              <table className="w-full border-collapse text-xs">
+                <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
+                  <tr className="text-left text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <th className="px-2 py-1.5 font-medium">Deudor</th>
+                    <th className="px-2 py-1.5 font-medium">Factura / OC</th>
+                    <th className="px-2 py-1.5 text-right font-medium">Monto</th>
+                    <th className="px-2 py-1.5 font-medium">Atraso</th>
+                    <th className="px-2 py-1.5 font-medium">Tono</th>
+                    <th className="px-2 py-1.5"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recordatoriosHoy.map(({ f, tono }) => {
+                    const dias = diasAtraso(f) ?? 0;
+                    return (
+                      <tr key={f.id} className="border-t hover:bg-muted/40" title={tono!.descripcion}>
+                        <td className="max-w-[220px] truncate px-2 py-1.5 font-medium" title={f.deudor_nombre}>{f.deudor_nombre}</td>
+                        <td className="whitespace-nowrap px-2 py-1.5 text-muted-foreground">{f.numero_factura ? `N° ${f.numero_factura}` : f.oc_codigo ? `OC ${f.oc_codigo}` : '—'}</td>
+                        <td className="whitespace-nowrap px-2 py-1.5 text-right font-medium">{CLP(f.monto)}</td>
+                        <td className="whitespace-nowrap px-2 py-1.5 text-muted-foreground">{dias > 0 ? `${dias}d` : 'por vencer'}</td>
+                        <td className="whitespace-nowrap px-2 py-1.5"><span className={cn('rounded px-1.5 py-0.5 text-[10px]', tono!.clase)}>{tono!.label}</span></td>
+                        <td className="whitespace-nowrap px-2 py-1.5 text-right">
+                          <Button size="sm" variant="outline" className="h-7" onClick={() => prepararRecordatorio(f, tono!.label)}>
+                            <Mail className="mr-1 h-3.5 w-3.5" /> Preparar en Gmail
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {ocsSinFactura.length > 0 && (
         <Card>
