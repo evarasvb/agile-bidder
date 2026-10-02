@@ -6,7 +6,13 @@ import { supabase } from '@/integrations/supabase/client';
 // de un wrapper tipado hasta que se regeneren los types.
 type RpcResult<T> = { data: T | null; error: { message: string } | null };
 type RpcFn = <T = unknown>(fn: string, args?: Record<string, unknown>) => Promise<RpcResult<T>>;
-const rpc = supabase.rpc as unknown as RpcFn;
+// OJO: `const rpc = supabase.rpc as unknown as RpcFn` y llamar rpc(...)
+// directo "desenchufa" el método de su objeto — supabase.rpc usa `this`
+// internamente (this.rest) y al perder ese contexto revienta con "Cannot
+// read properties of undefined (reading 'rest')" en cualquier búsqueda
+// (hallazgo de Evaristo en Market del Estado). Por eso se envuelve en una
+// función que sí lo invoca como método de supabase (conserva el `this`).
+const rpc = ((fn: string, args?: Record<string, unknown>) => supabase.rpc(fn, args)) as unknown as RpcFn;
 
 export interface MarketProducto {
   producto: string;
