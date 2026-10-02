@@ -1,8 +1,8 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   HandCoins, Plus, Trash2, FileText, Copy, Download, Loader2, Building2, User, AlertTriangle, Scale,
-  Check, ChevronsUpDown, Upload, ExternalLink, RefreshCw, Paperclip,
+  Check, ChevronsUpDown, Upload, ExternalLink, RefreshCw, Paperclip, MessageSquare, CalendarClock, Search,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -26,13 +26,17 @@ import { useAuth } from '@/hooks/useAuth';
 import { useCliente } from '@/hooks/useCliente';
 import { supabase } from '@/integrations/supabase/client';
 import { descargarCartaAbogadoPDF } from '@/services/cartaAbogadoPdf';
-import { useOpcionesOC, useMisOcAceptadas, useOcLinksPorCodigos, useSyncMisOC, etiquetaEstado } from '@/hooks/useOrdenesCompra';
+import { useOpcionesOC, useMisOcAceptadas, useOcLinksPorCodigos, useSyncMisOC, useOrdenCompra, etiquetaEstado } from '@/hooks/useOrdenesCompra';
 import {
   useFacturasCobrar, useCrearFactura, useActualizarFactura, useEliminarFactura,
   diasAtraso, interesEstimado, hechosCobranza, fechasConsistentes, subirAdjuntoCobranza, CLP, ESTADO_COBRO_LABEL,
   type FacturaCobrar, type DeudorTipo, type EstadoCobro,
 } from '@/hooks/useCobranza';
 import { CargaMasivaCobranzaDialog } from '@/components/experto/CargaMasivaCobranza';
+import {
+  useSeguimientoCobranza, useAgregarSeguimiento, useEliminarSeguimiento,
+  CANAL_LABEL, type CanalSeguimiento,
+} from '@/hooks/useSeguimientoCobranza';
 
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string;
 const ANON = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
@@ -74,6 +78,21 @@ export default function CobranzaFacturas() {
       nAtrasadas: atrasadas.length,
       montoAtrasado: atrasadas.reduce((s, f) => s + (f.monto || 0), 0),
     };
+  }, [facturas]);
+
+  // Alerta "paga tarde" desde los propios datos del cliente: agrupa por deudor
+  // las facturas activas ya atrasadas, para ver de un vistazo quién se demora.
+  const pagadoresLentos = useMemo(() => {
+    const map = new Map<string, { nombre: string; n: number; monto: number; maxDias: number }>();
+    for (const f of facturas) {
+      if (f.estado === 'pagada' || f.estado === 'incobrable') continue;
+      const d = diasAtraso(f) ?? 0;
+      if (d <= 0) continue;
+      const cur = map.get(f.deudor_nombre) || { nombre: f.deudor_nombre, n: 0, monto: 0, maxDias: 0 };
+      cur.n += 1; cur.monto += f.monto || 0; cur.maxDias = Math.max(cur.maxDias, d);
+      map.set(f.deudor_nombre, cur);
+    }
+    return [...map.values()].sort((a, b) => b.maxDias - a.maxDias);
   }, [facturas]);
 
   async function pedir(body: Record<string, unknown>, onTexto: (t: string) => void) {
@@ -134,8 +153,8 @@ export default function CobranzaFacturas() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Cobranza de facturas</h1>
           <p className="text-sm text-muted-foreground">
-            Registra tus facturas por cobrar (al Estado o a clientes privados) y deja que Don Evaristo Abogado
-            genere la carta de cobro y el requerimiento pre-judicial, con el fundamento legal chileno.
+            Registra tus facturas y órdenes de compra, haz seguimiento del cobro con notas y estados, y ten a la
+            vista quién te paga tarde. Si hace falta, generas la carta de cobro legal con un clic.
           </p>
         </div>
       </header>
@@ -145,6 +164,25 @@ export default function CobranzaFacturas() {
         <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Facturas atrasadas</p><p className="text-xl font-bold text-red-600">{totales.nAtrasadas}</p></CardContent></Card>
         <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Monto atrasado</p><p className="text-xl font-bold text-red-600">{CLP(totales.montoAtrasado)}</p></CardContent></Card>
       </div>
+
+      {pagadoresLentos.length > 0 && (
+        <Card className="border-red-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm text-red-700">
+              <AlertTriangle className="h-4 w-4" /> Te están pagando tarde
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1.5">
+            {pagadoresLentos.slice(0, 6).map((l) => (
+              <div key={l.nombre} className="flex items-center justify-between gap-2 text-sm">
+                <span className="truncate">{l.nombre}</span>
+                <span className="shrink-0 text-muted-foreground">{l.n} factura(s) · {CLP(l.monto)} · hasta {l.maxDias}d</span>
+              </div>
+            ))}
+            <p className="pt-1 text-[11px] text-muted-foreground">Ojo antes de volver a ofertarles: llevan facturas tuyas atrasadas.</p>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">{facturas.length} factura(s) registrada(s)</p>
@@ -158,7 +196,7 @@ export default function CobranzaFacturas() {
         <p className="text-sm text-muted-foreground">Cargando…</p>
       ) : facturas.length === 0 ? (
         <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">
-          Aún no registras facturas por cobrar. Agrega la primera para empezar a gestionar el cobro.
+          Aún no registras facturas por cobrar. Agrega la primera (o pega tu N° de OC) para empezar a hacer seguimiento.
         </CardContent></Card>
       ) : (
         <div className="space-y-3">
@@ -168,7 +206,8 @@ export default function CobranzaFacturas() {
             const ocupada = doc.generando;
             return (
               <Card key={f.id}>
-                <CardContent className="flex flex-col gap-3 py-4 lg:flex-row lg:items-center lg:justify-between">
+                <CardContent className="space-y-3 py-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       {f.deudor_tipo === 'estado'
@@ -247,6 +286,8 @@ export default function CobranzaFacturas() {
                       </AlertDialogContent>
                     </AlertDialog>
                   </div>
+                  </div>
+                  <SeguimientoFactura factura={f} />
                 </CardContent>
               </Card>
             );
@@ -453,14 +494,40 @@ function NuevaFacturaDialog() {
   const [vencimiento, setVencimiento] = useState('');
   const [notas, setNotas] = useState('');
   const [facturaFile, setFacturaFile] = useState<File | null>(null);
+  const [leyendoPdf, setLeyendoPdf] = useState(false);
+  const leerReqId = useRef(0); // invalida lecturas de PDF en curso si cambia el archivo o se cierra
   const [guiaFile, setGuiaFile] = useState<File | null>(null);
   const [subiendo, setSubiendo] = useState(false);
   const facturaInput = useRef<HTMLInputElement | null>(null);
   const guiaInput = useRef<HTMLInputElement | null>(null);
+  const [ocBusqueda, setOcBusqueda] = useState('');
+  const [codigoBuscar, setCodigoBuscar] = useState<string | null>(null);
+  const ocQuery = useOrdenCompra(codigoBuscar, false);
+  const buscandoOc = ocQuery.isFetching && !!codigoBuscar;
+
+  // Atajo "pega la OC": cuando la búsqueda por número termina, autocompleta
+  // organismo, RUT, monto y fecha desde Mercado Público (o avisa si no está).
+  useEffect(() => {
+    if (!codigoBuscar || !ocQuery.isSuccess) return;
+    const d = ocQuery.data;
+    if (d) {
+      setTipo('estado');
+      setNombre(d.institucion_nombre || '');
+      setRut(d.institucion_rut || '');
+      setMonto(d.total != null ? String(d.total) : '');
+      setEmision(d.fecha_creacion ? d.fecha_creacion.slice(0, 10) : '');
+      setOc(d.codigo);
+      toast.success('Datos de la OC cargados. Agrega tu N° de factura y la guía.');
+    } else {
+      toast.error('No encontramos esa OC en Mercado Público. Revisa el número o complétala a mano.');
+    }
+    setCodigoBuscar(null);
+  }, [ocQuery.isSuccess, ocQuery.data, codigoBuscar]);
 
   const limpiar = () => {
     setNombre(''); setRut(''); setOc(''); setNumero(''); setMonto(''); setEmision(''); setRecepcion(''); setVencimiento(''); setNotas('');
-    setFacturaFile(null); setGuiaFile(null);
+    setFacturaFile(null); setGuiaFile(null); setOcBusqueda(''); setCodigoBuscar(null);
+    leerReqId.current++;
   };
 
   const subirArchivo = async (file: File, tag: 'factura' | 'guia'): Promise<{ url: string; nombre: string } | null> => {
@@ -471,6 +538,39 @@ function NuevaFacturaDialog() {
     const up = await supabase.storage.from('documentos-empresa').upload(path, file, { contentType: file.type || 'application/pdf' });
     if (up.error) throw new Error(`No se pudo subir ${tag === 'factura' ? 'la factura' : 'la guía'}: ${up.error.message}`);
     return { url: path, nombre: file.name };
+  };
+
+  // Lee la factura PDF con IA y prellena folio, monto y fechas (el cliente revisa).
+  const leerPdf = async () => {
+    if (!facturaFile) return;
+    if (facturaFile.type !== 'application/pdf') { toast.error('El lector funciona con PDF. Para fotos, ingresa los datos a mano.'); return; }
+    const target = facturaFile;
+    const myId = ++leerReqId.current;
+    setLeyendoPdf(true);
+    try {
+      const b64 = await new Promise<string>((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result).split(',')[1] || '');
+        fr.onerror = () => reject(new Error('No se pudo leer el archivo'));
+        fr.readAsDataURL(target);
+      });
+      const { data, error } = await supabase.functions.invoke('cobranza-leer-doc', { body: { pdf_base64: b64 } });
+      if (error) throw error;
+      if (leerReqId.current !== myId) return; // cambiaron el archivo o cerraron: la respuesta ya no aplica
+      const r = data as { ok?: boolean; campos?: Record<string, unknown>; error?: string };
+      if (!r?.ok || !r.campos) { toast.error(r?.error || 'No se pudo leer el PDF.'); return; }
+      const c = r.campos;
+      if (c.numero_factura) setNumero(String(c.numero_factura));
+      if (c.monto != null) setMonto(String(c.monto));
+      if (c.fecha_emision) setEmision(String(c.fecha_emision).slice(0, 10));
+      if (c.fecha_recepcion) setRecepcion(String(c.fecha_recepcion).slice(0, 10));
+      if (!rut && c.rut_receptor) setRut(String(c.rut_receptor));
+      toast.success('Datos leídos del PDF. Revísalos antes de guardar.');
+    } catch (e) {
+      toast.error((e as Error).message || 'No se pudo leer el PDF.');
+    } finally {
+      setLeyendoPdf(false);
+    }
   };
 
   const guardar = async () => {
@@ -544,6 +644,19 @@ function NuevaFacturaDialog() {
           </div>
           {tipo === 'estado' ? (
             <>
+              <div className="col-span-2 rounded-md border border-dashed p-3 space-y-2">
+                <Label className="text-xs">Atajo: pega tu N° de OC de Mercado Público</Label>
+                <div className="flex gap-2">
+                  <Input value={ocBusqueda} onChange={(e) => setOcBusqueda(e.target.value)}
+                    placeholder="Ej: 1509-1234-SE26"
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (ocBusqueda.trim()) setCodigoBuscar(ocBusqueda.trim()); } }} />
+                  <Button type="button" variant="secondary" className="shrink-0 gap-1"
+                    disabled={buscandoOc || !ocBusqueda.trim()} onClick={() => setCodigoBuscar(ocBusqueda.trim())}>
+                    {buscandoOc ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Traer datos
+                  </Button>
+                </div>
+                <p className="text-[11px] text-muted-foreground">Trae organismo, RUT, monto y fecha desde MP. Tú agregas tu N° de factura y la guía.</p>
+              </div>
               <div className="col-span-2">
                 <Label>Organismo</Label>
                 <InstitucionCombobox value={nombre} onSelect={(v) => { setNombre(v); setOc(''); setRut(''); setMonto(''); setEmision(''); }} />
@@ -604,11 +717,16 @@ function NuevaFacturaDialog() {
             <p className="text-xs font-medium text-muted-foreground">Respaldo (opcional, pero recomendado para el cobro formal)</p>
             <div className="flex flex-wrap items-center gap-2">
               <input ref={facturaInput} type="file" accept="application/pdf,image/jpeg,image/png" className="hidden"
-                onChange={(e) => setFacturaFile(e.target.files?.[0] || null)} />
+                onChange={(e) => { leerReqId.current++; setFacturaFile(e.target.files?.[0] || null); }} />
               <Button type="button" variant="outline" size="sm" onClick={() => facturaInput.current?.click()}>
                 <Upload className="mr-1 h-3.5 w-3.5" /> {facturaFile ? 'Cambiar factura' : 'Adjuntar factura'}
               </Button>
               {facturaFile && <span className="truncate text-xs text-muted-foreground max-w-[160px]">{facturaFile.name}</span>}
+              {facturaFile && facturaFile.type === 'application/pdf' && (
+                <Button type="button" variant="secondary" size="sm" disabled={leyendoPdf} onClick={leerPdf}>
+                  {leyendoPdf ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Search className="mr-1 h-3.5 w-3.5" />} Leer datos del PDF
+                </Button>
+              )}
               <input ref={guiaInput} type="file" accept="application/pdf,image/jpeg,image/png" className="hidden"
                 onChange={(e) => setGuiaFile(e.target.files?.[0] || null)} />
               <Button type="button" variant="outline" size="sm" onClick={() => guiaInput.current?.click()}>
@@ -628,5 +746,83 @@ function NuevaFacturaDialog() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Bitácora de seguimiento tipo CRM: anota cada gestión (llamada, correo, etc.)
+// sobre una factura, con próximo contacto. Se carga solo al desplegarla.
+function SeguimientoFactura({ factura }: { factura: FacturaCobrar }) {
+  const [abierto, setAbierto] = useState(false);
+  const { data: items = [], isLoading } = useSeguimientoCobranza(factura.id, abierto);
+  const agregar = useAgregarSeguimiento();
+  const eliminar = useEliminarSeguimiento();
+  const [canal, setCanal] = useState<CanalSeguimiento>('llamada');
+  const [nota, setNota] = useState('');
+  const [proximo, setProximo] = useState('');
+
+  const guardar = async () => {
+    if (!nota.trim()) { toast.error('Escribe qué pasó en la gestión.'); return; }
+    try {
+      await agregar.mutateAsync({ factura_id: factura.id, canal, nota: nota.trim(), proximo: proximo || null });
+      setNota(''); setProximo('');
+      toast.success('Seguimiento anotado');
+    } catch (e) { toast.error((e as Error).message); }
+  };
+
+  const fFecha = (s: string) => new Date(s + 'T00:00:00').toLocaleDateString('es-CL');
+
+  return (
+    <div className="border-t pt-2">
+      <button type="button" onClick={() => setAbierto((o) => !o)}
+        className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-firmavb-blue">
+        <MessageSquare className="h-3.5 w-3.5" /> Seguimiento {abierto ? '▲' : '▼'}
+      </button>
+      {abierto && (
+        <div className="mt-2 space-y-3">
+          <div className="grid gap-2 sm:grid-cols-[130px_1fr_auto]">
+            <Select value={canal} onValueChange={(v) => setCanal(v as CanalSeguimiento)}>
+              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {(Object.keys(CANAL_LABEL) as CanalSeguimiento[]).map((c) => <SelectItem key={c} value={c}>{CANAL_LABEL[c]}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Input value={nota} onChange={(e) => setNota(e.target.value)} className="h-9"
+              placeholder="Ej: Llamé, prometió pago el 15"
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); guardar(); } }} />
+            <Button size="sm" onClick={guardar} disabled={agregar.isPending} className="gap-1">
+              <Plus className="h-4 w-4" /> Anotar
+            </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <Label htmlFor={`prox-${factura.id}`} className="text-[11px] text-muted-foreground flex items-center gap-1">
+              <CalendarClock className="h-3 w-3" /> Próximo contacto
+            </Label>
+            <Input id={`prox-${factura.id}`} type="date" value={proximo} onChange={(e) => setProximo(e.target.value)} className="h-8 w-[160px]" />
+          </div>
+          {isLoading ? (
+            <p className="text-xs text-muted-foreground">Cargando…</p>
+          ) : items.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Sin gestiones aún. Anota la primera arriba.</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {items.map((s) => (
+                <li key={s.id} className="flex items-start justify-between gap-2 text-xs">
+                  <div className="min-w-0">
+                    <span className="font-medium">{fFecha(s.fecha)} · {CANAL_LABEL[s.canal]}</span>
+                    <span className="text-muted-foreground"> — {s.nota}</span>
+                    {s.proximo && <span className="text-firmavb-blue"> · próximo {fFecha(s.proximo)}</span>}
+                  </div>
+                  <button type="button" aria-label="Eliminar gestión"
+                    className="shrink-0 text-muted-foreground hover:text-red-600"
+                    onClick={async () => { try { await eliminar.mutateAsync({ id: s.id, facturaId: factura.id }); } catch (e) { toast.error((e as Error).message); } }}>
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

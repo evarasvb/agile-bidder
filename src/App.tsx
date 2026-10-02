@@ -38,6 +38,7 @@ const FundadorAjustes = lazy(() => import("./pages/FundadorAjustes"));
 const FundadorCreditos = lazy(() => import("./pages/FundadorCreditos"));
 const MisCursos = lazy(() => import("./pages/MisCursos"));
 const ProveedoresEstado = lazy(() => import("./pages/ProveedoresEstado"));
+const MarketEstado = lazy(() => import("./pages/MarketEstado"));
 const Auth = lazy(() => import("./pages/Auth"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const ClienteOnboarding = lazy(() => import("./pages/ClienteOnboarding"));
@@ -187,18 +188,21 @@ const App = () => (
           <Route path="/terminos" element={<Terminos />} />
           <Route path="/privacidad" element={<Privacidad />} />
           <Route path="/planes" element={<Planes />} />
+          <Route path="/marketplace" element={<Navigate to="/market-estado" replace />} />
           
           {/* Onboarding - sin sidebar */}
           <Route path="/onboarding" element={<ProtectedRoute><ClienteOnboarding /></ProtectedRoute>} />
           
           {/* Admin oculto */}
           <Route path="/admin/evaristo" element={<AdminOnlyRoute><AdminEvaristo /></AdminOnlyRoute>} />
-          <Route path="/admin/soporte" element={<AdminOnlyRoute><AdminSoporte /></AdminOnlyRoute>} />
           <Route path="/admin/experto-actividad" element={<AdminOnlyRoute><AdminExpertoActividad /></AdminOnlyRoute>} />
 
           {/* ========== RUTAS PROTEGIDAS CON LAYOUT ========== */}
           <Route element={<ProtectedLayoutWrapper />}>
             
+            {/* Tickets de soporte (admin): dentro del layout para conservar el menú lateral */}
+            <Route path="/admin/soporte" element={<AdminOnlyRoute><AdminSoporte /></AdminOnlyRoute>} />
+
             {/* ----- MIS OPORTUNIDADES ----- */}
             <Route path="/mis-oportunidades" element={<Navigate to="/oportunidades" replace />} />
             <Route path="/licitaciones/:id" element={<LicitacionDetalle />} />
@@ -234,6 +238,7 @@ const App = () => (
 
             {/* ----- ACADEMIA ----- */}
             <Route path="/academia/cursos" element={<MisCursos />} />
+            <Route path="/market-estado" element={<MarketEstado />} />
             <Route path="/academia/leads" element={<AdminOnlyRoute><AcademiaLeads /></AdminOnlyRoute>} />
             <Route path="/academia/compradores" element={<AdminOnlyRoute><AcademiaCompradores /></AdminOnlyRoute>} />
             <Route path="/fundador" element={<AdminOnlyRoute><FundadorPanel /></AdminOnlyRoute>} />
