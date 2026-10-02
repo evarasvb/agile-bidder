@@ -298,6 +298,32 @@ export function DataTable<T>({
 
   const alineacion = (a?: 'left' | 'right' | 'center') => (a === 'right' ? 'text-right' : a === 'center' ? 'text-center' : 'text-left');
 
+  // Barra deslizadora horizontal explícita. Se muestra ARRIBA y ABAJO de la
+  // tabla (pedido de Evaristo) para no tener que bajar hasta el final para
+  // encontrar el scroll lateral. Ambas comparten el mismo estado y mueven el
+  // scroll real de la tabla; el listener de scroll las mantiene sincronizadas.
+  const barraDeslizadora = (pos: 'arriba' | 'abajo') =>
+    scrollInfo.max > 0 ? (
+      <div className="flex items-center gap-2 px-1 text-muted-foreground">
+        <span className="text-xs shrink-0" aria-hidden="true">◂</span>
+        <input
+          type="range"
+          min={0}
+          max={scrollInfo.max}
+          value={scrollInfo.left}
+          onChange={(e) => {
+            const left = Number(e.target.value);
+            setScrollInfo((s) => ({ ...s, left }));
+            if (scrollRef.current) scrollRef.current.scrollLeft = left;
+          }}
+          className="w-full h-2 accent-primary cursor-pointer"
+          aria-label={`Desplazar la tabla horizontalmente (${pos})`}
+          title="Desplazar la tabla hacia los lados"
+        />
+        <span className="text-xs shrink-0" aria-hidden="true">▸</span>
+      </div>
+    ) : null;
+
   return (
     <div className={cn('space-y-3', className)}>
       {/* Barra: búsqueda + filtros a la izquierda, contador + exportar a la derecha */}
@@ -346,6 +372,9 @@ export function DataTable<T>({
           medir o engancharse al externo siempre daba "no hay overflow"
           (hallazgo de Codex) — por eso el maxHeight/overflow/scrollRef van en
           el contenedor real vía containerStyle/containerClassName/containerRef. */}
+      {/* Barra deslizadora superior (misma que la de abajo). */}
+      {barraDeslizadora('arriba')}
+
       <div className="rounded-lg border">
         <Table
           className="text-sm min-w-max"
@@ -466,29 +495,10 @@ export function DataTable<T>({
         </Table>
       </div>
 
-      {/* Barra deslizadora horizontal: solo aparece si la tabla no cabe
-          completa (scrollInfo.max > 0). Arrastrarla mueve el scroll real de
-          la tabla, y viceversa (el listener de scroll de arriba la sincroniza). */}
-      {scrollInfo.max > 0 && (
-        <div className="flex items-center gap-2 px-1 text-muted-foreground">
-          <span className="text-xs shrink-0" aria-hidden="true">◂</span>
-          <input
-            type="range"
-            min={0}
-            max={scrollInfo.max}
-            value={scrollInfo.left}
-            onChange={(e) => {
-              const left = Number(e.target.value);
-              setScrollInfo((s) => ({ ...s, left }));
-              if (scrollRef.current) scrollRef.current.scrollLeft = left;
-            }}
-            className="w-full h-2 accent-primary cursor-pointer"
-            aria-label="Desplazar la tabla horizontalmente"
-            title="Desplazar la tabla hacia los lados"
-          />
-          <span className="text-xs shrink-0" aria-hidden="true">▸</span>
-        </div>
-      )}
+      {/* Barra deslizadora horizontal inferior: solo aparece si la tabla no cabe
+          completa (scrollInfo.max > 0). Arrastrarla mueve el scroll real de la
+          tabla, y viceversa (el listener de scroll de arriba la sincroniza). */}
+      {barraDeslizadora('abajo')}
 
       {/* Pie: tamaño de página + paginación */}
       {total > 0 && (
