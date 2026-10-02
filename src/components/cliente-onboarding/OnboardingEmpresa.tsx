@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import EmpresaDesdeWeb from '@/components/cliente-onboarding/EmpresaDesdeWeb';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -245,7 +246,12 @@ export default function OnboardingEmpresa({ cliente, onDone }: Props) {
             Mientras más específico (productos, servicios, materiales), mejores oportunidades.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
+          <EmpresaDesdeWeb
+            cliente={cliente}
+            onDescripcion={(d) => { limpia('descripcion'); setDescripcion(d); }}
+            onNombre={(n) => { if (!empresa.trim()) { limpia('empresa'); setEmpresa(n); } }}
+          />
           <Textarea
             value={descripcion}
             onChange={(e) => { limpia('descripcion'); setDescripcion(e.target.value); }}
