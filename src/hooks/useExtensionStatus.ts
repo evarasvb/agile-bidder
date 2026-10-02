@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useId } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCliente } from '@/hooks/useCliente';
@@ -16,6 +16,11 @@ interface ExtensionStatus {
 export function useExtensionStatus() {
   const { data: cliente } = useCliente();
   const queryClient = useQueryClient();
+  // Nombre de canal único por instancia: este hook se usa a la vez en la barra
+  // de estado global y en tarjetas del Dashboard (ej. "Primeros pasos"), y dos
+  // canales con el mismo tópico chocaban ("cannot add postgres_changes
+  // callbacks... after subscribe()"), tirando abajo la página.
+  const instanceId = useId();
   const [realtimeStatus, setRealtimeStatus] = useState<{
     lastActivity: Date | null;
     lastAction: string | null;
@@ -65,7 +70,7 @@ export function useExtensionStatus() {
     if (!cliente?.id) return;
 
     const channel = supabase
-      .channel('extension-activity-realtime')
+      .channel(`extension-activity-realtime-${instanceId}`)
       .on(
         'postgres_changes',
         {
@@ -89,7 +94,7 @@ export function useExtensionStatus() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [cliente?.id, queryClient]);
+  }, [cliente?.id, queryClient, instanceId]);
 
   // Calculate connection status
   const calculateConnectionStatus = useCallback((): ExtensionStatus => {
