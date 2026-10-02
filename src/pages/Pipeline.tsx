@@ -7,13 +7,14 @@ import { PipelineTableView } from '@/components/pipeline/PipelineTableView';
 import { PipelineToolbar } from '@/components/pipeline/PipelineToolbar';
 import { PipelineDetailModal } from '@/components/pipeline/PipelineDetailModal';
 import { AddPipelineModal } from '@/components/pipeline/AddPipelineModal';
+import { HistoricoPostulaciones } from '@/components/pipeline/HistoricoPostulaciones';
 import { usePipeline } from '@/hooks/usePipeline';
 import type { PipelineItem, PipelineFilters } from '@/components/pipeline/pipelineConstants';
 
 export default function Pipeline() {
   // En celular el kanban de 9 columnas (~2.500px de scroll + arrastre táctil)
   // es inusable: parte en tabla. En escritorio, kanban.
-  const [view, setView] = useState<'kanban' | 'table'>(() =>
+  const [view, setView] = useState<'kanban' | 'table' | 'historico'>(() =>
     typeof window !== 'undefined' && window.innerWidth < 1024 ? 'table' : 'kanban'
   );
   const [filters, setFilters] = useState<PipelineFilters>({});
@@ -60,7 +61,9 @@ export default function Pipeline() {
       />
 
       {/* Content */}
-      {isLoading ? (
+      {view === 'historico' ? (
+        <HistoricoPostulaciones />
+      ) : isLoading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>

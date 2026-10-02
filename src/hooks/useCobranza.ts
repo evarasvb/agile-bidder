@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCliente } from '@/hooks/useCliente';
+import { calcularInteresMora, type TasaMora, type ResultadoInteres } from '@/lib/interesMora';
 
 // La tabla facturas_por_cobrar se creó en la migración 20260922060000 y aún no
 // está en los tipos generados de Supabase; se accede vía un cliente sin tipar.
@@ -27,6 +28,9 @@ export interface FacturaCobrar {
   factura_archivo_nombre: string | null;
   guia_archivo_url: string | null;
   guia_archivo_nombre: string | null;
+  fecha_pago_real: string | null;
+  monto_pagado: number | null;
+  deudor_email: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -57,8 +61,9 @@ export function useFacturasCobrar() {
   });
 }
 
-export type NuevaFactura = Omit<FacturaCobrar, 'id' | 'cliente_id' | 'estado' | 'created_at' | 'updated_at'> &
-  Partial<Pick<FacturaCobrar, 'estado'>>;
+export type NuevaFactura =
+  Omit<FacturaCobrar, 'id' | 'cliente_id' | 'estado' | 'created_at' | 'updated_at' | 'fecha_pago_real' | 'monto_pagado' | 'deudor_email'> &
+  Partial<Pick<FacturaCobrar, 'estado' | 'fecha_pago_real' | 'monto_pagado' | 'deudor_email'>>;
 
 export function useCrearFactura() {
   const qc = useQueryClient();
@@ -182,6 +187,50 @@ export function interesEstimado(f: FacturaCobrar, tasaMensualPct = 1.5): number 
   const d = diasAtraso(f);
   if (!d || d <= 0 || !f.monto) return 0;
   return Math.round((f.monto * (tasaMensualPct / 100) * d) / 30);
+}
+
+// Tabla de Tasa Máxima Convencional (CMF, Ley 18.010) por mes y tramo de monto.
+// Se usa para calcular el interés moratorio REAL por tramos. Se carga a mano cada
+// mes; se cachea largo porque cambia una vez al mes.
+export function useTasasMora() {
+  return useQuery({
+    queryKey: ['interes-mora-cmf'],
+    staleTime: 1000 * 60 * 60 * 6,
+    queryFn: async (): Promise<TasaMora[]> => {
+      const { data, error } = await sb
+        .from('interes_mora_cmf')
+        .select('mes, monto_desde, monto_hasta, tasa_anual, fuente_url')
+        .order('mes', { ascending: true });
+      if (error) throw error;
+      return (data ?? []).map((t: any) => ({
+        mes: t.mes,
+        monto_desde: Number(t.monto_desde),
+        monto_hasta: t.monto_hasta == null ? null : Number(t.monto_hasta),
+        tasa_anual: Number(t.tasa_anual),
+        fuente_url: t.fuente_url ?? null,
+      }));
+    },
+  });
+}
+
+// Fecha efectiva de pago (si el deudor ya pagó) o null (la mora sigue corriendo).
+export function fechaPagoReal(f: Pick<FacturaCobrar, 'fecha_pago_real'>): Date | null {
+  return f.fecha_pago_real ? new Date(f.fecha_pago_real + 'T00:00:00') : null;
+}
+
+// Diferencia de días entre el plazo de pago y el pago real (positivo = pagó
+// atrasado, negativo = pagó antes). Null si no hay pago registrado o falta fecha.
+export function diasDiferenciaPago(f: FacturaCobrar): number | null {
+  const plazo = fechaPago(f);
+  const pago = fechaPagoReal(f);
+  if (!plazo || !pago) return null;
+  return Math.round((pago.setHours(0, 0, 0, 0) - plazo.setHours(0, 0, 0, 0)) / 86_400_000);
+}
+
+// Interés moratorio REAL por tramos de TMC. Corre desde el plazo de pago hasta el
+// pago efectivo (o hasta hoy si sigue impaga). Devuelve el desglose mes a mes.
+export function interesMoraReal(f: FacturaCobrar, tasas: TasaMora[]): ResultadoInteres {
+  return calcularInteresMora(f.monto, fechaPago(f), fechaPagoReal(f), tasas);
 }
 
 export const CLP = (v: number) => '$' + Math.round(v || 0).toLocaleString('es-CL');

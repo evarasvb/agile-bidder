@@ -16,6 +16,7 @@ import {
   Gavel,
   ExternalLink,
 } from "lucide-react";
+import { linkProcesoMp } from "@/lib/procesoMp";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -82,22 +83,10 @@ const TIPO_RECLAMO: Record<number, string> = { 1: "No pago", 2: "Proceso" };
 // proceso real y ver de qué se trataba — pero reclamos_mp.proceso_codigo
 // trae formatos muy distintos: licitaciones/Convenio Marco/compras ágiles
 // como "1211839-319-CM26" o "3760-797-COT25", pero también IDs sueltos sin
-// ese formato ("3747", "40101701") que no son un proceso navegable. Contra
-// datos reales de `ordenes_compra.link_oficial` (que sí guarda el link
-// oficial de Mercado Público para muchas órdenes ya scrapeadas): los
-// códigos con formato "algo-números-LETRASdígitos" siempre abren en
-// DetailsAcquisition.aspx?idlicitacion=, sea licitación, Convenio Marco o
-// compra ágil con sufijo distinto a COT; el sufijo "COT" es el único caso
-// que usa la ficha de compra-agil.mercadopublico.cl (igual que
-// compras_agiles.url_ficha). Un código que no calza ese formato no se
-// enlaza: mejor no linkear que llevar a una ficha equivocada o vacía.
-const FORMATO_PROCESO_MP = /^[a-z0-9]+-\d+-[a-z]{1,4}\d{2,4}$/i;
-const linkProcesoReclamo = (codigo: string): string | null => {
-  if (!FORMATO_PROCESO_MP.test(codigo)) return null;
-  return /cot/i.test(codigo)
-    ? `https://compra-agil.mercadopublico.cl/resumen-cotizacion/${codigo}`
-    : `https://www.mercadopublico.cl/Procurement/Modules/RFB/DetailsAcquisition.aspx?idlicitacion=${codigo}`;
-};
+// ese formato ("3747", "40101701") que no son un proceso navegable. Ver
+// `linkProcesoMp` en `@/lib/procesoMp` para el detalle de por qué se
+// construye así (lo comparte con el histórico de postulaciones).
+const linkProcesoReclamo = linkProcesoMp;
 
 function FilaReclamo({ r }: { r: ReclamoZoom }) {
   const link = r.proceso_codigo ? linkProcesoReclamo(r.proceso_codigo) : null;
