@@ -1,6 +1,8 @@
 import { useCliente, useClienteOwner, useActualizarCliente } from '@/hooks/useCliente';
 import { useClienteFiltros } from '@/hooks/useClienteFiltros';
 import OnboardingRut from '@/components/cliente-onboarding/OnboardingRut';
+import EmpresaDesdeWeb from '@/components/cliente-onboarding/EmpresaDesdeWeb';
+import { Card, CardContent } from '@/components/ui/card';
 
 // La misma tarjeta de RUT del onboarding, disponible en Configuración → Empresa
 // para los clientes que ya pasaron el onboarding: cargan su RUT, ven su historial
@@ -31,5 +33,19 @@ export function HistorialMercadoPublicoCard() {
     }
   };
 
-  return <OnboardingRut cliente={dueno} onPalabras={agregarPalabras} />;
+  // La descripción leída del sitio reemplaza la del onboarding (el cliente la confirma con el botón).
+  const usarDescripcion = (descripcion: string) => {
+    actualizar.mutate({ id: dueno.id, descripcion_empresa: descripcion } as Parameters<typeof actualizar.mutate>[0]);
+  };
+
+  return (
+    <>
+      <OnboardingRut cliente={dueno} onPalabras={agregarPalabras} />
+      <Card>
+        <CardContent className="pt-6">
+          <EmpresaDesdeWeb cliente={dueno} onDescripcion={usarDescripcion} onPalabras={agregarPalabras} compacto />
+        </CardContent>
+      </Card>
+    </>
+  );
 }
