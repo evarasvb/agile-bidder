@@ -89,12 +89,6 @@ $$;
 -- que etiquetaba mal las de Convenio Marco (hallazgo de Evaristo revisando
 -- datos reales). Para Convenio Marco se usa ese código de licitación real
 -- como "oportunidad" (cuando está disponible) y el número de OC va aparte.
---
--- ordenes_compra.demandante es el ÁREA COMPRADORA (ej. "CMDS Nivel Central"),
--- NO el nombre de la institución (ej. "CORP MUNICIPAL DE DESARROLLO SOCIAL DE
--- NUNOA") — se verificó contra datos reales: mostrarlo como "institución" era
--- confuso (hallazgo de Evaristo). La institución real sale de
--- public.instituciones por rut_demandante (misma fuente que organismo_riesgo).
 create or replace function public.mis_compras_agiles_ganadas()
 returns jsonb
 language sql
@@ -127,8 +121,7 @@ as $$
       end as codigo,
       b.codigo as orden_compra_codigo,
       b.link_oficial as orden_compra_link,
-      coalesce(i.nombre, b.demandante) as institucion,
-      b.demandante as area_compradora,
+      b.demandante as institucion,
       b.rut_demandante as rut_institucion,
       b.fecha_envio_oc as fecha_publicacion,
       b.fecha_emision as fecha_cierre,

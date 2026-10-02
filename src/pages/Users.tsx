@@ -21,6 +21,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { ExecuteMigrationDialog } from "@/components/admin/ExecuteMigrationDialog";
 import { ApplyMigrationsButton } from "@/components/admin/ApplyMigrationsButton";
 import { useInvitarMiembro } from "@/hooks/useEquipo";
+import { useEsDuenoEquipo } from "@/hooks/useVendedores";
 
 interface UserWithProfile {
   id: string;
@@ -50,6 +51,12 @@ export default function Users() {
   const [userToReset, setUserToReset] = useState<string | null>(null);
   const [confirmRoleChange, setConfirmRoleChange] = useState<{ userId: string; isCurrentlyAdmin: boolean; userName?: string; newRole?: string } | null>(null);
   const invitarMutation = useInvitarMiembro();
+  // "Reenviar invitación" llama a invitar-miembro, que la función rechaza
+  // (403) si quien la invoca no es el dueño EFECTIVO del equipo (mismo
+  // criterio que ya usa el botón "Invitar Miembro" de Equipo.tsx) — un
+  // admin invitado vería el botón y solo recibiría un error (hallazgo de
+  // Codex).
+  const { data: esDuenoEquipo } = useEsDuenoEquipo();
 
   // Solo MI equipo: yo (dueño) + los miembros que invité. La tabla `vendedores`
   // ya viene acotada por RLS a la empresa del usuario actual, así que NO se
@@ -430,6 +437,21 @@ export default function Users() {
       headerClassName: 'w-[50px]',
       cell: (user) => {
         if (user.pendiente) {
+          if (!esDuenoEquipo) {
+            return (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="outline" className="cursor-help text-muted-foreground">
+                    <Clock className="h-3 w-3 mr-1" />
+                    Pendiente
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">Solo el dueño del equipo puede reenviar invitaciones.</p>
+                </TooltipContent>
+              </Tooltip>
+            );
+          }
           return (
             <Button
               variant="ghost"

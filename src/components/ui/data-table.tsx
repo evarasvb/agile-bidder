@@ -197,16 +197,29 @@ export function DataTable<T>({
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const medir = () => setScrollInfo({ max: Math.max(0, el.scrollWidth - el.clientWidth), left: el.scrollLeft });
+    // Sin array de dependencias fijo (montaje único): si se re-ejecutara en
+    // cada render, setScrollInfo() siempre crea un objeto nuevo y dispara
+    // otro render → vuelve a ejecutar el efecto → bucle infinito (hallazgo
+    // de Codex). La función que falta en el array (`setScrollInfo`) es
+    // estable (la da React), así que [] es seguro. Para notar cambios de
+    // ANCHO DEL CONTENIDO (más/menos columnas, texto más largo) sin volver a
+    // correr el efecto completo, se observa también el <table> interno
+    // (crece con `min-w-max`), no solo el contenedor con scroll.
+    const medir = () => {
+      const max = Math.max(0, el.scrollWidth - el.clientWidth);
+      const left = el.scrollLeft;
+      setScrollInfo((prev) => (prev.max === max && prev.left === left ? prev : { max, left }));
+    };
     medir();
     const ro = new ResizeObserver(medir);
     ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
     el.addEventListener('scroll', medir, { passive: true });
     return () => {
       ro.disconnect();
       el.removeEventListener('scroll', medir);
     };
-  });
+  }, []);
 
   // En modo servidor el orden, la página y el tamaño vienen de la página.
   const sort = manual ? manual.sort : sortLocal;
