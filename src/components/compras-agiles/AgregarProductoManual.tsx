@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useInventoryActivo, type InventoryItem } from "@/hooks/useInventory";
-import { useUpsertMatchOverride } from "@/hooks/useMatchOverrides";
+import { useUpsertMatchOverride, mensajeErrorOverride } from "@/hooks/useMatchOverrides";
 import { formatCurrency } from "@/utils/clasificacion";
 import { toast } from "sonner";
 
@@ -45,11 +45,9 @@ export function AgregarProductoManual({ codigo, procesoTipo }: Props) {
           setOpen(false);
           setQuery("");
         },
-        // Antes el error se tragaba en silencio: el usuario clickeaba y "no
-        // pasaba nada". Ahora se muestra el motivo real (hallazgo de Evaristo).
-        onError: (e: unknown) => {
-          toast.error(e instanceof Error ? e.message : "No se pudo agregar el producto. Intenta de nuevo.");
-        },
+        // Antes el error se tragaba en silencio (clic y "no pasa nada") y luego
+        // mostraba un código técnico; ahora muestra una frase clara.
+        onError: (e: unknown) => toast.error(mensajeErrorOverride(e)),
       }
     );
   };
