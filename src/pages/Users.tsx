@@ -1,5 +1,6 @@
 import { EquipoTabs } from "@/components/equipo/EquipoTabs";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/hooks/useProfile";
@@ -41,6 +42,7 @@ interface UserWithProfile {
 export default function Users() {
   const { isAdmin, isSuperAdmin, loading: profileLoading } = useProfile();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState("");
   const [newUserPassword, setNewUserPassword] = useState("");
@@ -50,29 +52,44 @@ export default function Users() {
   const [newUserRole, setNewUserRole] = useState<AppRole>('user');
   const [confirmRoleChange, setConfirmRoleChange] = useState<{ userId: string; isCurrentlyAdmin: boolean; userName?: string; newRole?: string } | null>(null);
 
-  // Fetch all users with their profiles and roles
+  // Solo MI equipo: yo (dueño) + los miembros que invité. La tabla `vendedores`
+  // ya viene acotada por RLS a la empresa del usuario actual, así que NO se
+  // filtran usuarios de otras empresas (antes se leían todos los profiles).
   const { data: users, isLoading } = useQuery({
     queryKey: ['admin-users'],
     queryFn: async () => {
-      // Get all profiles
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const myId = authUser?.id ?? null;
+
+      // Roster del equipo (RLS: solo mi empresa).
+      const { data: equipo, error: equipoError } = await supabase
+        .from('vendedores')
+        .select('user_id');
+      if (equipoError) throw equipoError;
+
+      const ids = Array.from(new Set(
+        [myId, ...(equipo ?? []).map((v: { user_id: string | null }) => v.user_id)]
+          .filter((x): x is string => !!x)
+      ));
+      if (ids.length === 0) return [];
+
+      // Solo los profiles/roles/clientes de mi equipo.
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('*');
-
+        .select('*')
+        .in('user_id', ids);
       if (profilesError) throw profilesError;
 
-      // Get all roles
       const { data: roles, error: rolesError } = await supabase
         .from('user_roles')
-        .select('*');
-
+        .select('*')
+        .in('user_id', ids);
       if (rolesError) throw rolesError;
 
-      // Get all clientes
       const { data: clientes, error: clientesError } = await supabase
         .from('clientes')
-        .select('user_id, empresa_nombre');
-
+        .select('user_id, empresa_nombre')
+        .in('user_id', ids);
       if (clientesError) throw clientesError;
 
       // Combine data
@@ -608,14 +625,22 @@ export default function Users() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Gestión de Usuarios</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Roles y permisos de mi equipo</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Administra los usuarios del sistema y sus permisos
+            Gestiona los roles, permisos y contraseñas de los miembros de tu equipo
           </p>
         </div>
         <div className="flex gap-2">
-          <ApplyMigrationsButton />
-          <ExecuteMigrationDialog />
+          {isSuperAdmin && (
+            <>
+              <ApplyMigrationsButton />
+              <ExecuteMigrationDialog />
+            </>
+          )}
+          <Button variant="outline" className="gap-2" onClick={() => navigate('/equipo')}>
+            <UserPlus className="h-4 w-4" />
+            Invitar miembro
+          </Button>
         <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
           <DialogTrigger asChild>
             <Button className="gap-2 bg-firmavb-blue hover:bg-firmavb-blue/90 shadow-md">
@@ -859,7 +884,7 @@ export default function Users() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Usuarios</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Miembros del equipo</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold">{users?.length || 0}</p>
@@ -880,9 +905,9 @@ export default function Users() {
       {/* Users Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Usuarios Registrados</CardTitle>
+          <CardTitle>Miembros de tu equipo</CardTitle>
           <CardDescription>
-            Lista de todos los usuarios del sistema con sus roles y permisos
+            Los miembros que invitaste a tu empresa, con sus roles y permisos
           </CardDescription>
         </CardHeader>
         <CardContent>
