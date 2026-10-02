@@ -6,6 +6,9 @@ import { StatusBar } from "./StatusBar";
 import { EvaristoChat } from "@/components/soporte/EvaristoChat";
 import { AvisosBell } from "@/components/notifications/AvisosBell";
 import { BusquedaGlobalProvider, BusquedaGlobalTrigger } from "@/components/busqueda/BusquedaGlobal";
+import { usePermisosModulos } from "@/hooks/usePermisosModulos";
+import { moduloDeRuta } from "@/lib/modulosPermisos";
+import { Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import logoFirmavbBlanco from "@/assets/logo-firmavb-blanco.png";
 
@@ -38,6 +41,11 @@ const TITULOS: Array<[string, string]> = [
 export function AppLayout({ children }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { pathname } = useLocation();
+  // Guard por módulo: si el miembro no tiene permiso para la sección actual,
+  // se muestra un aviso en vez del contenido (sin redirigir, para no provocar
+  // loops). El dueño/admin y las rutas libres siempre pasan.
+  const { puede, cargando: permisosCargando } = usePermisosModulos();
+  const sinAcceso = !permisosCargando && !puede(moduloDeRuta(pathname));
   useEffect(() => {
     const t = TITULOS.find(([ruta]) => pathname === ruta || pathname.startsWith(ruta.endsWith("/") ? ruta : ruta + "/"));
     document.title = t ? `${t[1]} · FirmaVB` : "FirmaVB";
@@ -104,7 +112,19 @@ export function AppLayout({ children }: AppLayoutProps) {
           <StatusBar />
           {/* pb generoso: deja aire para que la burbuja flotante de Evaristo
               (abajo a la derecha) nunca tape la última fila de contenido */}
-          <main id="main-content" className="p-4 sm:p-6 pb-24 sm:pb-28">{children}</main>
+          <main id="main-content" className="p-4 sm:p-6 pb-24 sm:pb-28">
+            {sinAcceso ? (
+              <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
+                <Lock className="h-10 w-10 text-muted-foreground" />
+                <h2 className="text-lg font-semibold">No tienes acceso a esta sección</h2>
+                <p className="max-w-sm text-sm text-muted-foreground">
+                  Tu perfil no tiene habilitado este módulo. Pídele a un administrador de tu empresa que te lo active en Equipo → Roles y permisos.
+                </p>
+              </div>
+            ) : (
+              children
+            )}
+          </main>
         </div>
 
         {/* Asistente de soporte con IA, disponible en toda la app */}
