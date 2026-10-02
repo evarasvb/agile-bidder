@@ -28,33 +28,20 @@ import { MatchItemActions } from '@/components/compras-agiles/MatchItemActions';
 import { AgregarProductoManual } from '@/components/compras-agiles/AgregarProductoManual';
 import { AccionesCompartir } from '@/components/oportunidades/AccionesCompartir';
 import { DetalleCompraAgil } from '@/components/compras-agiles/DetalleCompraAgil';
-import { calculateCoverageMetrics, isIncompatibleMatch, type PropuestaItemRow } from '@/services/fuzzyMatching';
+import { estadoMatch, isIncompatibleMatch, type EstadoMatch } from '@/services/fuzzyMatching';
 import { unidadLabel } from '@/utils/unidades';
 
-// Color del badge de match según el %.
-const matchBadge = (score: number) =>
-  score >= 80 ? 'bg-firmavb-green/15 text-firmavb-green border-firmavb-green/30'
-  : score >= 50 ? 'bg-firmavb-blue/15 text-firmavb-blue border-firmavb-blue/30'
-  : 'bg-amber-100 text-amber-800 border-amber-200';
 const clp = (n: number) => `$${Math.round(n || 0).toLocaleString('es-CL')}`;
 
-/**
- * Determina si un match es confiable o solo categoría débil
- * GARANTÍA: category-only matches (score < 60) se marcan como "por revisar"
- */
-function evaluarConfianzaMatch(match: any): { confianza: 'alta' | 'media' | 'baja'; tooltip: string } {
-  if (!match) return { confianza: 'baja', tooltip: 'Sin candidato' };
-
-  const score = match.score || 0;
-  if (score >= 75) {
-    return { confianza: 'alta', tooltip: `Coincidencia alta (${score}%)` };
-  }
-  if (score >= 60) {
-    return { confianza: 'media', tooltip: `Coincidencia parcial (${score}%) - revisar especificaciones` };
-  }
-  // score < 60: probablemente solo categoría
-  return { confianza: 'baja', tooltip: `Coincidencia débil (${score}%) - REVISAR, probablemente solo categoría` };
-}
+// Chip único de estado del match (un solo criterio y un solo lenguaje en toda
+// la app): Listo / Revisar / Sin producto. Reemplaza los antiguos "dudoso",
+// "REVISAR" y los tres cortes de color que convivían.
+const estadoChip = (est: EstadoMatch): { txt: string; cls: string } =>
+  est === 'listo'
+    ? { txt: 'Listo', cls: 'bg-firmavb-green/15 text-firmavb-green border-firmavb-green/30' }
+    : est === 'revisar'
+      ? { txt: 'Revisar', cls: 'bg-amber-100 text-amber-800 border-amber-300' }
+      : { txt: 'Sin producto', cls: 'bg-muted text-muted-foreground border-border' };
 
 // Chip que muestra si el cliente corrigió el match automático a mano.
 function EstadoBadge({ estado }: { estado: 'auto' | 'confirmado' | 'reasignado' | 'descartado' }) {
@@ -182,14 +169,14 @@ export default function CompraAgilDetalle() {
     const { match, estado, override } = resolverMatch(String(it.id), matchAuto);
     const subtotal = (match?.precio || 0) * cantidad;
     const score = match?.score ?? 0;
-    // Sugerencia automática que el cliente aún no confirmó y que tiene poca
-    // confianza (<60%) o confianza media (<80%) pero cuyo solo ítem ya supera
-    // TODO el presupuesto de la compra (señal clara de producto equivocado):
-    // se muestra marcada como dudosa y NO se suma al total ni va precargada a
-    // la propuesta. Caso real: "opalina" → "cordel de papel" al 77% entraba
-    // solo y la oferta salía 7x sobre el presupuesto.
+    // Estado único del match. Si el solo subtotal de un ítem ya supera TODO el
+    // presupuesto de la compra, es señal de match equivocado (caso real:
+    // "opalina" → "cordel de papel" al 77% salía 7x sobre el presupuesto), así
+    // que baja a "Revisar" aunque el score sea alto. "Revisar" y "Sin producto"
+    // no se suman al total ni van precargados a la propuesta.
     const superaPresupuesto = !!compra.monto && subtotal > compra.monto;
-    const dudoso = estado === 'auto' && !!match && (score < 60 || (score < 80 && superaPresupuesto));
+    let em: EstadoMatch = estado === 'descartado' ? 'sin_producto' : estadoMatch(score, !!match);
+    if (em === 'listo' && superaPresupuesto) em = 'revisar';
     return {
       idx,
       id: it.id,
@@ -202,7 +189,7 @@ export default function CompraAgilDetalle() {
       override,
       manual: false,
       match: match ? { ...match, subtotal } : null,
-      dudoso,
+      estadoM: em,
     };
   });
 
@@ -224,7 +211,7 @@ export default function CompraAgilDetalle() {
         estado: (descartado ? 'descartado' : 'reasignado') as const,
         override: ov,
         manual: true,
-        dudoso: false,
+        estadoM: (prod ? 'listo' : 'sin_producto') as EstadoMatch,
         match: prod
           ? { inventarioId: prod.id, nombre: prod.nombre_producto, sku: prod.sku, precio: prod.precio_unitario, score: 100, subtotal: prod.precio_unitario }
           : null,
@@ -233,30 +220,17 @@ export default function CompraAgilDetalle() {
 
   const filasTotal = [...filasItems, ...filasManuales];
 
-  // CRÍTICO FV-UX-002: Usar helper extractado (calculateCoverageMetrics)
-  // Este helper asegura que score >= 60 cuenta como VALIDADO
-  // score < 60 (REVISAR) NO cuenta; descartados NO cuentan
-  const coverageMetrics = calculateCoverageMetrics(
-    filasItems as PropuestaItemRow[]
-  );
-  const {
-    itemsConMatchValidado,
-    itemsConMatchDebil,
-    itemsSinMatch,
-    totalItems,
-    cobertura,
-    propuestaIncompleta
-  } = coverageMetrics;
+  // Resumen único de cobertura (mismo criterio que los chips de cada fila).
+  const itemsConsiderados = filasItems.filter((f) => f.estado !== 'descartado');
+  const totalItems = itemsConsiderados.length;
+  const listos = itemsConsiderados.filter((f) => f.estadoM === 'listo').length;
+  const porRevisar = totalItems - listos; // "revisar" + "sin producto"
+  const completa = totalItems > 0 && porRevisar === 0;
+  const cobertura = totalItems > 0 ? Math.round((listos / totalItems) * 100) : 0;
 
-  // itemsDudosos (fix ya en main): matches con poca confianza (<60%) o
-  // confianza media (<80%) que por sí solos ya superan el presupuesto de la
-  // compra. NO se suman al total hasta que el cliente los confirme.
-  const itemsDudosos = filasItems.filter((f) => f.dudoso).length;
-
-  // Total de oferta: excluye matches dudosos (más seguro no sobre-declarar
-  // certeza en la plata) y además se muestra advertencia si la propuesta
-  // está incompleta (ítems sin match o con match débil).
-  const totalOferta = filasTotal.reduce((s, f) => s + (!f.dudoso && f.match ? f.match.subtotal || 0 : 0), 0);
+  // Total de oferta: solo ítems "listos" (los "por revisar" o sin producto no
+  // se suman, para no sobre-declarar certeza en la plata).
+  const totalOferta = filasTotal.reduce((s, f) => s + (f.estadoM === 'listo' && f.match ? f.match.subtotal || 0 : 0), 0);
   const dentroPresupuesto = compra.monto ? totalOferta <= compra.monto : null;
 
   // Ítems en el formato del modal de propuesta, PRECARGADOS con el match para que
@@ -273,7 +247,7 @@ export default function CompraAgilDetalle() {
         descripcion: f.descripcion,
         cantidadSolicitada: f.cantidad,
         unidadMedida: f.unidad,
-        match: f.match && !f.dudoso
+        match: f.estadoM === 'listo' && f.match
           ? { id: f.match.inventarioId, sku: f.match.sku, nombre: f.match.nombre, precio_unitario: f.match.precio || 0, stock: null, matchScore: f.match.score, margen_estimado: 0 }
           : null,
       })),
@@ -425,12 +399,12 @@ export default function CompraAgilDetalle() {
             <div className="flex items-center gap-2 flex-wrap">
               {totalItems > 0 && (
                 <>
-                  <Badge variant="outline" className={`font-normal ${cobertura === 100 ? 'bg-firmavb-green/15 text-firmavb-green border-firmavb-green/30' : 'bg-amber-100 text-amber-800 border-amber-200'}`}>
-                    {itemsConMatchValidado} de {totalItems} validados ({cobertura}%)
+                  <Badge variant="outline" className={`font-normal ${completa ? 'bg-firmavb-green/15 text-firmavb-green border-firmavb-green/30' : 'bg-amber-100 text-amber-800 border-amber-200'}`}>
+                    {listos} de {totalItems} listos
                   </Badge>
-                  {propuestaIncompleta && (
-                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 font-normal">
-                      ⚠ {itemsSinMatch + itemsConMatchDebil} incompletos
+                  {porRevisar > 0 && (
+                    <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300 font-normal">
+                      {porRevisar} por revisar
                     </Badge>
                   )}
                 </>
@@ -458,9 +432,9 @@ export default function CompraAgilDetalle() {
                         <EstadoBadge estado={f.estado} />
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
-                        {f.match && (
-                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${f.dudoso ? 'bg-amber-100 text-amber-800 border-amber-300' : matchBadge(f.match.score)}`}>
-                            {f.match.score}%{f.dudoso ? ' · dudoso' : ''}
+                        {f.estado !== 'descartado' && (
+                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${estadoChip(f.estadoM).cls}`} title={f.match ? `${f.match.score}% de coincidencia` : undefined}>
+                            {estadoChip(f.estadoM).txt}
                           </span>
                         )}
                         <MatchItemActions
@@ -474,14 +448,7 @@ export default function CompraAgilDetalle() {
                     </div>
                     {f.match ? (
                       <div className="mt-1.5 text-sm">
-                        <div className="flex items-center gap-2">
-                          <p className="text-firmavb-blue font-medium">→ {f.match.nombre}</p>
-                          {evaluarConfianzaMatch(f.match).confianza === 'baja' && (
-                            <span className="text-xs font-semibold px-1.5 py-0.5 bg-red-100 text-red-700 rounded" title="Match débil - revisar especificaciones">
-                              REVISAR
-                            </span>
-                          )}
-                        </div>
+                        <p className="text-firmavb-blue font-medium">→ {f.match.nombre}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {f.cantidad} {unidadLabel(f.unidad)} × {clp(f.match.precio || 0)} = <span className="font-semibold text-foreground">{clp(f.match.subtotal)}</span>
                         </p>
@@ -533,20 +500,13 @@ export default function CompraAgilDetalle() {
                         )}
                       </TableCell>
                       <TableCell className="text-center align-top">
-                        {f.match ? (
-                          <div className="flex flex-col items-center gap-1">
-                            <span
-                              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${f.dudoso ? 'bg-amber-100 text-amber-800 border-amber-300' : matchBadge(f.match.score)}`}
-                              title={f.dudoso ? 'Coincidencia con poca confianza: confírmala o cámbiala. No se suma al total hasta que la confirmes.' : undefined}
-                            >
-                              {f.match.score}%{f.dudoso ? ' · dudoso' : ''}
-                            </span>
-                            {evaluarConfianzaMatch(f.match).confianza === 'baja' && (
-                              <span className="text-xs font-semibold px-1.5 py-0.5 bg-red-100 text-red-700 rounded whitespace-nowrap" title={evaluarConfianzaMatch(f.match).tooltip}>
-                                REVISAR
-                              </span>
-                            )}
-                          </div>
+                        {f.estado !== 'descartado' ? (
+                          <span
+                            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${estadoChip(f.estadoM).cls}`}
+                            title={f.match ? `${f.match.score}% de coincidencia${f.estadoM === 'revisar' ? ' · revisa especificaciones o precio' : ''}` : 'Sin producto en tu inventario'}
+                          >
+                            {estadoChip(f.estadoM).txt}
+                          </span>
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
@@ -569,49 +529,26 @@ export default function CompraAgilDetalle() {
               </Table>
               </div>
 
-              {/* Resumen: total de tu oferta vs presupuesto + advertencia si incompleta o con matches dudosos */}
-              <div className="mt-4 space-y-3">
-                {propuestaIncompleta && (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                    <p className="text-sm font-medium text-amber-900">⚠ Propuesta incompleta: {itemsSinMatch + itemsConMatchDebil} {itemsSinMatch + itemsConMatchDebil === 1 ? 'ítem falta' : 'ítems faltan'}</p>
-                    <p className="text-xs text-amber-800 mt-1">
-                      {itemsSinMatch > 0 && <>{itemsSinMatch} sin match en inventario. </>}
-                      {itemsConMatchDebil > 0 && <>{itemsConMatchDebil} con coincidencia débil (REVISAR). </>}
-                      Tu oferta actual ({clp(totalOferta)}) requiere validación o búsqueda de alternativas. El costo real será mayor.
-                    </p>
-                  </div>
-                )}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border bg-muted/30 p-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      Tu oferta {propuestaIncompleta ? `(${itemsConMatchValidado}/${totalItems} validados)` : '(completa)'}
-                    </p>
-                    <p className="text-2xl font-bold text-firmavb-blue">{clp(totalOferta)}</p>
-                    {itemsDudosos > 0 && (
-                      <p className="text-xs text-amber-700 mt-1">
-                        {itemsDudosos} coincidencia{itemsDudosos === 1 ? '' : 's'} dudosa{itemsDudosos === 1 ? '' : 's'} (poca confianza o precio fuera del presupuesto) no se suma{itemsDudosos === 1 ? '' : 'n'} hasta que la{itemsDudosos === 1 ? '' : 's'} confirmes.
-                      </p>
-                    )}
-                  </div>
-                  {compra.monto ? (
-                    <div className="text-sm">
-                      <p className="text-muted-foreground">Presupuesto: <span className="font-medium text-foreground">{clp(compra.monto)}</span></p>
-                      <p className={propuestaIncompleta ? 'text-amber-600 font-medium' : (dentroPresupuesto ? 'text-firmavb-green font-medium' : 'text-firmavb-red font-medium')}>
-                        {propuestaIncompleta
-                          ? '⚠ Presupuesto verificable solo si completan'
-                          : (dentroPresupuesto ? '✓ Dentro del presupuesto' : '⚠ Excede el presupuesto')}
-                        {!propuestaIncompleta && ` · ${((totalOferta / compra.monto) * 100).toFixed(0)}%`}
-                      </p>
-                    </div>
-                  ) : null}
-                  <Button onClick={() => setPropuestaOpen(true)} className="gap-2 shrink-0">
-                    <Sparkles className="h-4 w-4" /> Generar propuesta
-                  </Button>
+              {/* Resumen único: tu oferta vs presupuesto */}
+              <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border bg-muted/30 p-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Tu oferta {completa ? '(completa)' : `(${listos}/${totalItems} listos)`}</p>
+                  <p className="text-2xl font-bold text-firmavb-blue">{clp(totalOferta)}</p>
                 </div>
+                {compra.monto ? (
+                  <div className="text-sm sm:text-right">
+                    <p className="text-muted-foreground">Presupuesto: <span className="font-medium text-foreground">{clp(compra.monto)}</span></p>
+                    <p className={porRevisar > 0 ? 'text-amber-600 font-medium' : (dentroPresupuesto ? 'text-firmavb-green font-medium' : 'text-firmavb-red font-medium')}>
+                      {porRevisar > 0
+                        ? `Faltan ${porRevisar} por revisar`
+                        : (dentroPresupuesto ? `✓ Dentro del presupuesto · ${((totalOferta / compra.monto) * 100).toFixed(0)}%` : '⚠ Excede el presupuesto')}
+                    </p>
+                  </div>
+                ) : null}
               </div>
-              {itemsConMatchValidado === 0 && itemsConMatchDebil === 0 && (
+              {totalItems > 0 && listos === 0 && (
                 <p className="mt-3 text-sm text-muted-foreground text-center">
-                  Aún no hay match validado para estos ítems. Si acabas de cargar inventario, el match se actualiza en unos minutos; o ajusta tus productos/palabras clave, o agrega un producto manual arriba.
+                  Aún no hay productos listos. Confirma o cambia los que están "por revisar", o agrega un producto manual arriba.
                 </p>
               )}
             </div>

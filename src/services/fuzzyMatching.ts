@@ -476,9 +476,24 @@ export interface PropuestaItemRow {
 }
 
 /**
- * Calcula métricas de cobertura de propuesta
- * CRÍTICO FV-UX-002: solo score >= 60 cuenta como VALIDADO
- * score < 60 (REVISAR) NO cuenta; items descartados NO cuentan
+ * Único umbral de match de toda la app: score >= UMBRAL_MATCH = "listo"; por
+ * debajo = "revisar". Antes convivían varios cortes (80/50, 75/60, 60) que
+ * hacían que un mismo ítem se viera distinto en cada tabla.
+ */
+export const UMBRAL_MATCH = 70;
+
+export type EstadoMatch = 'listo' | 'revisar' | 'sin_producto';
+
+/** Estado único de un ítem según su match (sin producto, por revisar o listo). */
+export function estadoMatch(score: number | null | undefined, hayMatch: boolean): EstadoMatch {
+  if (!hayMatch) return 'sin_producto';
+  return (score ?? 0) >= UMBRAL_MATCH ? 'listo' : 'revisar';
+}
+
+/**
+ * Calcula métricas de cobertura de propuesta.
+ * Solo score >= UMBRAL_MATCH cuenta como LISTO; por debajo es "por revisar" y
+ * NO cuenta; items descartados NO cuentan.
  */
 export function calculateCoverageMetrics(rows: PropuestaItemRow[]): {
   itemsConMatchValidado: number;
@@ -490,12 +505,12 @@ export function calculateCoverageMetrics(rows: PropuestaItemRow[]): {
 } {
   const itemsConMatchValidado = rows.filter((f) => {
     if (!f.match || f.estado === 'descartado') return false;
-    return f.match.score >= 60; // Solo high/medium confidence
+    return f.match.score >= UMBRAL_MATCH;
   }).length;
 
   const itemsConMatchDebil = rows.filter((f) => {
     if (!f.match || f.estado === 'descartado') return false;
-    return f.match.score < 60; // Low confidence (REVISAR)
+    return f.match.score < UMBRAL_MATCH;
   }).length;
 
   const itemsSinMatch = rows.filter((f) => !f.match && f.estado !== 'descartado').length;
