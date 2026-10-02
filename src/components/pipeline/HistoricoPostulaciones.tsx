@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ExternalLink, Loader2 } from 'lucide-react';
+import { ExternalLink, Loader2, Sparkles, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { cn } from '@/lib/utils';
 import { linkProcesoMp } from '@/lib/procesoMp';
@@ -23,6 +24,7 @@ import {
   type HistoricoPostulacion,
   type HistoricoResultado,
 } from '@/hooks/useHistoricoPostulaciones';
+import { useAnalisisPostulacion, useGenerarAnalisisPostulacion } from '@/hooks/useAnalisisPostulacion';
 
 function formatCLP(amount: number): string {
   return new Intl.NumberFormat('es-CL', {
@@ -103,6 +105,57 @@ const PIPELINE_TIPO: Record<HistoricoPostulacion['tipo'], 'compra_agil' | 'licit
   trato_directo: 'compra_agil',
   otro: 'compra_agil',
 };
+
+const RESUMEN_POR_RESULTADO: Record<HistoricoResultado, string> = {
+  ganada: 'Por qué probablemente ganamos este proceso.',
+  perdida: 'Por qué probablemente lo perdimos (y quién se lo adjudicó).',
+  sin_tomar: 'Quién se lo adjudicó y qué tan competitivos hubiéramos sido.',
+};
+
+// Post-mortem de IA (pedido de Evaristo): un botón compacto por fila que
+// genera (y cachea) una explicación corta de por qué se ganó/perdió, o quién
+// ganó en lo que no se postuló. Solo pide los datos al abrir el popover, no
+// para cada fila visible de la tabla.
+function AnalisisIABoton({ item }: FilaProps) {
+  const tipoRpc: 'licitacion' | 'compra_agil' = item.tipo === 'licitacion' ? 'licitacion' : 'compra_agil';
+  const [open, setOpen] = useState(false);
+  const { data: analisis, isLoading } = useAnalisisPostulacion(open ? tipoRpc : null, open ? item.codigo : null);
+  const generar = useGenerarAnalisisPostulacion(tipoRpc, item.codigo, item.resultado);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button size="sm" variant="ghost" className="h-8 gap-1 text-xs text-muted-foreground hover:text-foreground">
+          <Sparkles className="h-3.5 w-3.5" /> {analisis ? 'Ver análisis' : '¿Por qué?'}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 space-y-2" align="end">
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Cargando…</div>
+        ) : analisis ? (
+          <>
+            <p className="text-sm">{analisis.resumen}</p>
+            {analisis.factores.length > 0 && (
+              <ul className="space-y-0.5 text-xs text-muted-foreground">
+                {analisis.factores.map((f, i) => <li key={i}>• {f}</li>)}
+              </ul>
+            )}
+            <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" disabled={generar.isPending} onClick={() => generar.mutate()}>
+              {generar.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Regenerar
+            </Button>
+          </>
+        ) : (
+          <>
+            <p className="text-xs text-muted-foreground">{RESUMEN_POR_RESULTADO[item.resultado]}</p>
+            <Button size="sm" disabled={generar.isPending} onClick={() => generar.mutate()} className="gap-1.5">
+              {generar.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />} Analizar con IA
+            </Button>
+          </>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 function BotonTrabajar({ item }: FilaProps) {
   const createItem = useCreatePipelineItem();
@@ -265,15 +318,14 @@ const COLUMNAS: DataTableColumn<HistoricoPostulacion>[] = [
   {
     id: 'accion',
     header: 'Acción',
-    // Ganada o perdida son resultados ya cerrados: no hay nada que "trabajar"
-    // (y mostrar el botón ahí confundía). Solo tiene sentido para las
-    // oportunidades de tu industria a las que todavía no postulaste.
-    cell: (item) =>
-      item.resultado === 'sin_tomar' ? (
-        <BotonTrabajar item={item} />
-      ) : (
-        <span className="text-gray-400">—</span>
-      ),
+    cell: (item) => (
+      <div className="flex items-center justify-end gap-1">
+        <AnalisisIABoton item={item} />
+        {/* Ganada o perdida son resultados ya cerrados: "Trabajar" solo tiene
+            sentido para oportunidades de tu industria aún sin postular. */}
+        {item.resultado === 'sin_tomar' && <BotonTrabajar item={item} />}
+      </div>
+    ),
   },
 ];
 
