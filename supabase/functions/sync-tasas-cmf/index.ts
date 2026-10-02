@@ -91,7 +91,10 @@ Deno.serve(async (req) => {
     if (!key) return json({ error: 'falta_api_key', mensaje: 'Carga CMF_API_KEY en app_config.' }, 412);
 
     const commit = body.commit === true;
-    if (commit && body.secret !== map['TMC_SYNC_SECRET']) return json({ error: 'no_autorizado' }, 403);
+    const secret = map['TMC_SYNC_SECRET'];
+    // Si el secreto no está configurado (o no se pudo leer), NUNCA autorizar un
+    // commit: body.secret vacío === map vacío autorizaría un commit anónimo.
+    if (commit && (!secret || body.secret !== secret)) return json({ error: 'no_autorizado' }, 403);
 
     // Rango de meses (YYYY-MM). Default: solo el mes actual.
     const now = new Date();
@@ -130,6 +133,10 @@ Deno.serve(async (req) => {
     if (!validado) return json({ ok: false, error: 'validacion_fallida', validacion, errores }, 409);
     if (!filas.length) return json({ ok: false, error: 'sin_datos', errores }, 502);
 
+    // Reemplaza los meses cargados. El cron mensual reprocesa, y el motor trata
+    // los meses faltantes como 'incompleto' (no como dato erróneo), así que una
+    // falla transitoria entre el delete y el insert se autocorrige en la próxima
+    // corrida sin cargar tasas equivocadas.
     const mesesSet = [...new Set(filas.map((f) => f.mes))];
     const del = await db.from('interes_mora_cmf').delete().in('mes', mesesSet);
     if (del.error) return json({ ok: false, error: del.error.message }, 500);
