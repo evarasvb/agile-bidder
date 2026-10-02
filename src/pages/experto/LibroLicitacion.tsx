@@ -744,7 +744,7 @@ export default function LibroLicitacion() {
                 )}
               </div>
               <div>
-                <p className="font-medium flex items-center gap-1"><Paperclip className="h-4 w-4" />Mis documentos de trabajo</p>
+                <p className="font-medium flex items-center gap-1"><Paperclip className="h-4 w-4" />Anexos de la licitación y documentos</p>
                 <p className="text-xs text-muted-foreground">Excel, Word, PDF o imágenes (tu matriz, checklist, anexos a medio llenar). El Experto los lee para anotar qué te falta y ayudarte a completarlos.{documentos.length === 0 ? ' Sube con el botón de arriba.' : ''}</p>
                 <Button size="sm" variant="outline" className="mt-1 mb-1 mr-2 w-full sm:w-auto" onClick={generarPptx} disabled={ocupado('pptx')} title="Portada, resumen, admisibilidad, evaluación, tareas por fase, garantías y pendientes en un PowerPoint">
                   {ocupado('pptx') ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Presentation className="h-4 w-4 mr-1" />}Generar PowerPoint de la matriz
@@ -788,6 +788,12 @@ export default function LibroLicitacion() {
                 )}
 
               </div>
+              <details className="group rounded-md border bg-muted/20 [&_summary::-webkit-details-marker]:hidden">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-2 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground">
+                  <span>Inteligencia de la licitación</span>
+                  <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
+                </summary>
+                <div className="space-y-3 px-2 pb-2 pt-1">
               <div>
                 <p className="font-medium">¿Cómo paga {o.institucion ? 'este organismo' : 'el organismo'}?</p>
                 {o.institucion ? (
@@ -843,6 +849,8 @@ export default function LibroLicitacion() {
                   {f.competencia.slice(0, 5).map((c: any) => <p key={c.proveedor} className="text-muted-foreground truncate">{c.proveedor}: {c.ordenes} OC · unit. {fmt(c.precio_unit_mediano)}</p>)}
                 </div>
               )}
+                </div>
+              </details>
             </CardContent>
           </Card>}
           {cod && licItems.length > 0 && <LicitacionItemsMatch codigo={cod} items={licItems} />}
@@ -1027,7 +1035,7 @@ export default function LibroLicitacion() {
                    {tab === 'informe' && 'Informe de trabajo: veredicto, fechas, checklist de admisibilidad, cómo se ganan los puntos, riesgos, competencia y próximos pasos.'}
                    {tab === 'estudio' && 'Estudio profundo (Pro): historial de compras parecidas del organismo, quién ganó y con cuánto, precio objetivo.'}
                    {tab === 'bajo_agua' && `Bajo el Agua: lo que no se ve en la ficha. A quién le compra siempre este organismo y por qué vía, consultas al mercado (RFI) previas, compras ágiles y convenio marco del mismo producto, desiertas, quién lleva el proceso y sus audiencias de lobby, reclamos, precio real del producto en el Estado, noticias y dictámenes, matriz de adjudicación con simulación y, si ya está adjudicada, por dónde se renueva. ${cuotaBajoAgua.texto}`}
-                   {tab === 'anexos' && 'Anexos completados (Plus): los formularios de las bases con los datos de tu empresa, listos para revisar y firmar.'}</p>
+                   {tab === 'anexos' && 'Anexos (Plus): un borrador en texto de lo que piden los anexos, con los datos de tu empresa. Para rellenar los Word OFICIALES de la licitación conservando su formato, usa el botón "Completar" en la columna Fuentes.'}</p>
                 {!esPro && tab !== 'informe' && tab !== 'bajo_agua' && <p className="text-xs">Requiere Experto {tab === 'anexos' ? 'Plus' : 'Pro'} o FirmaVB ERP.</p>}
                 <Button size="sm" onClick={() => generar(tab)} disabled={generandoEntregable}><Sparkles className="h-4 w-4 mr-1" />Generar</Button>
               </div>
