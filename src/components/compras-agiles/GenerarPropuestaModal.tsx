@@ -15,6 +15,7 @@ import { unidadLabel } from "@/utils/unidades";
 import { estadoMatch } from "@/services/fuzzyMatching";
 import { PrecioMercadoHint } from "./PrecioMercadoHint";
 import { MarketPickerDialog, type MarketSeleccion } from "./MarketPickerDialog";
+import { useMarketSolicitar } from "@/hooks/useMarketEstado";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { calcularDesgloseOferta } from "@/lib/ofertaCalculo";
 import { aplicarRecargoPorRegion, obtenerRecargoRegion } from "@/utils/regiones";
@@ -117,7 +118,39 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
     );
     toast.success(`"${sel.producto}" de ${sel.proveedor} agregado a la línea.`);
   };
-  
+
+  // Envía una solicitud de cotización a los proveedores del Market elegidos.
+  // El mensaje es NEUTRO: no menciona la licitación/compra ágil (el proveedor
+  // podría estar compitiendo), solo pide cotizar por una necesidad propia. Por
+  // lo mismo NO se liga a la oportunidad. Si el proveedor está en FirmaVB le
+  // llega el aviso; si no, queda en "Market del Estado → Mis solicitudes".
+  const solicitarMk = useMarketSolicitar();
+  const [enviandoCotiz, setEnviandoCotiz] = useState(false);
+
+  const handleEnviarCotizacionesMarket = async () => {
+    const lineas = itemsSeleccionados.filter((i) => i.selected && i.market && i.match);
+    if (lineas.length === 0) { toast.info('No hay productos del Market en la oferta.'); return; }
+    setEnviandoCotiz(true);
+    let ok = 0;
+    const proveedores = new Set<string>();
+    for (const l of lineas) {
+      const prod = l.match!.nombre;
+      const cant = l.cantidad;
+      const mensaje = `Hola, vimos que comercializas "${prod}" en Mercado Público. Tengo una necesidad y me gustaría cotizar este producto (${cant} ${unidadLabel(l.unidadMedida)}). ¿Podrías indicarme tu mejor precio y plazo de entrega? Quedo atento, muchas gracias.`;
+      try {
+        await solicitarMk.mutateAsync({ rut_proveedor: l.market!.rut, producto: prod, cantidad: cant, mensaje });
+        ok++;
+        proveedores.add(l.market!.proveedor);
+      } catch { /* sigue con los demás */ }
+    }
+    setEnviandoCotiz(false);
+    if (ok > 0) {
+      toast.success(`Cotización enviada: ${ok} producto${ok === 1 ? '' : 's'} a ${proveedores.size} proveedor${proveedores.size === 1 ? '' : 'es'}. A los que están en FirmaVB les llega el aviso; el resto queda en "Market del Estado → Mis solicitudes".`);
+    } else {
+      toast.error('No se pudo enviar la cotización a los proveedores.');
+    }
+  };
+
   // Calcular precio con recargo por región
   const calcularPrecioConRecargo = (precioNeto: number): number => {
     if (!compra?.region || !userSettings) return precioNeto;
@@ -900,6 +933,17 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            {itemsSeleccionados.some((i) => i.selected && i.market) && (
+              <Button
+                variant="secondary"
+                onClick={handleEnviarCotizacionesMarket}
+                disabled={enviandoCotiz}
+                title="Pide cotización a los proveedores del Market elegidos (correo neutro, sin mencionar la licitación)"
+              >
+                {enviandoCotiz ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Store className="h-4 w-4 mr-2" />}
+                Enviar cotización al proveedor
+              </Button>
+            )}
             <Button
               onClick={handleGuardarPropuesta}
               disabled={itemsActivos.length === 0 || updateCompra.isPending}
