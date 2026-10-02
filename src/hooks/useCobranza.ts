@@ -17,6 +17,11 @@ export interface FacturaCobrar {
   deudor_nombre: string;
   deudor_rut: string | null;
   oc_codigo: string | null;
+  // Fecha de EMISIÓN DE LA OC (no la de la factura) — se completa sola al
+  // elegir la OC del desplegable de "mis OC aceptadas". fecha_emision más
+  // abajo es la fecha propia de la factura, que el cliente anota a mano.
+  oc_fecha: string | null;
+  nombre_contacto: string | null;
   numero_factura: string | null;
   monto: number;
   fecha_emision: string | null;
@@ -62,8 +67,8 @@ export function useFacturasCobrar() {
 }
 
 export type NuevaFactura =
-  Omit<FacturaCobrar, 'id' | 'cliente_id' | 'estado' | 'created_at' | 'updated_at' | 'fecha_pago_real' | 'monto_pagado' | 'deudor_email'> &
-  Partial<Pick<FacturaCobrar, 'estado' | 'fecha_pago_real' | 'monto_pagado' | 'deudor_email'>>;
+  Omit<FacturaCobrar, 'id' | 'cliente_id' | 'estado' | 'created_at' | 'updated_at' | 'fecha_pago_real' | 'monto_pagado' | 'deudor_email' | 'oc_fecha' | 'nombre_contacto'> &
+  Partial<Pick<FacturaCobrar, 'estado' | 'fecha_pago_real' | 'monto_pagado' | 'deudor_email' | 'oc_fecha' | 'nombre_contacto'>>;
 
 export function useCrearFactura() {
   const qc = useQueryClient();
