@@ -36,7 +36,7 @@ import {
   cuerpoCorreoCobroHtml, type DatosNotaCobranza,
 } from '@/services/notasCobranzaPdf';
 import { gmailCrearBorrador } from '@/hooks/useGmail';
-import { useOpcionesOC, useMisOcAceptadas, useOcLinksPorCodigos, useSyncMisOC, useOrdenCompra, etiquetaEstado } from '@/hooks/useOrdenesCompra';
+import { useOpcionesOC, useMisOcAceptadas, useOcLinksPorCodigos, useSyncMisOC, useOrdenCompra, etiquetaEstado, ESTADOS_OC_ACEPTADA } from '@/hooks/useOrdenesCompra';
 import {
   useFacturasCobrar, useCrearFactura, useActualizarFactura, useEliminarFactura, useTasasMora,
   diasAtraso, interesMoraReal, diasDiferenciaPago, hechosCobranza, fechasConsistentes, fechaPago, fechaPagoReal,
@@ -748,7 +748,9 @@ function OcAceptadaCombobox({
                   </tr>
                 </thead>
                 <tbody>
-                  {filtradas.map((o) => (
+                  {filtradas.map((o) => {
+                    const aceptada = o.estado != null && ESTADOS_OC_ACEPTADA.includes(String(o.estado).trim());
+                    return (
                     <tr key={o.codigo} className={cn('border-t hover:bg-muted/50', value === o.codigo && 'bg-firmavb-blue/5')}>
                       <td className="whitespace-nowrap px-2 py-1.5 font-medium">
                         <span className="flex items-center gap-1">
@@ -760,23 +762,28 @@ function OcAceptadaCombobox({
                           )}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-2 py-1.5 text-muted-foreground">{etiquetaEstado(o.estado) ?? '—'}</td>
+                      <td className={cn('whitespace-nowrap px-2 py-1.5', aceptada ? 'text-muted-foreground' : 'font-medium text-red-600')}>{etiquetaEstado(o.estado) ?? '—'}</td>
                       <td className="whitespace-nowrap px-2 py-1.5 text-muted-foreground">{o.numero_licitacion || '—'}</td>
                       <td className="max-w-[220px] truncate px-2 py-1.5 text-muted-foreground" title={o.organismo_comprador || ''}>{o.organismo_comprador || '—'}</td>
                       <td className="whitespace-nowrap px-2 py-1.5 text-muted-foreground">{o.rut_demandante || '—'}</td>
                       <td className="whitespace-nowrap px-2 py-1.5 text-muted-foreground">{fFecha(o.fecha_emision ? o.fecha_emision.slice(0, 10) : null)}</td>
-                      <td className={cn('whitespace-nowrap px-2 py-1.5', o.fecha_aceptacion ? 'text-muted-foreground' : 'font-medium text-red-600')}>
+                      <td className={cn('whitespace-nowrap px-2 py-1.5', aceptada ? 'text-muted-foreground' : 'text-red-600')}>
                         {o.fecha_aceptacion ? fFecha(o.fecha_aceptacion.slice(0, 10)) : 'Sin aceptar'}
                       </td>
                       <td className="whitespace-nowrap px-2 py-1.5 text-right font-medium">{CLP(o.total || 0)}</td>
                       <td className="whitespace-nowrap px-2 py-1.5 text-right">
                         <Button type="button" size="sm" variant="secondary" className="h-7"
-                          onClick={() => { onSelect(o); setOpen(false); }}>
+                          onClick={() => {
+                            if (!aceptada) toast.warning('Ojo: esta OC no está aceptada en el portal. La institución puede rechazar el cobro hasta que la acepten.');
+                            onSelect(o);
+                            setOpen(false);
+                          }}>
                           {value === o.codigo ? <Check className="h-3.5 w-3.5" /> : 'Elegir'}
                         </Button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

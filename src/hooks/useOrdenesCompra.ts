@@ -485,7 +485,9 @@ export function useMisOcAceptadas(rut: string | null, nombre: string | null, ins
         // Público (no hay columna propia): 'raw_json.Fechas.FechaAceptacion' es
         // null hasta que el proveedor acepta la OC.
         .select('codigo, organismo_comprador, rut_demandante, total, fecha_emision, link_oficial, estado, numero_licitacion, fecha_aceptacion:raw_json->Fechas->>FechaAceptacion, fecha_envio_mp:raw_json->Fechas->>FechaEnvio')
-        .in('estado', ESTADOS_OC_ACEPTADA)
+        // Sin filtro de estado: trae TODAS las OC del cliente (el "cubo"). El
+        // estado real de cada una se muestra tal cual en el selector; las OC
+        // mutan (se aceptan/rechazan) y se refrescan con "Actualizar mis OC".
         .order('fecha_emision', { ascending: false, nullsFirst: false })
         .limit(300);
       // El RUT ya identifica al proveedor sin ambigüedad; si además viene el
