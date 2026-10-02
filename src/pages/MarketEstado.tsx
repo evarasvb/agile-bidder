@@ -3,7 +3,7 @@
 // las órdenes de compra— y permite pedirle cotización a otro proveedor. Si el
 // proveedor ya está en FirmaVB le llega el aviso; si no, la solicitud lo espera.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Store, Search, Building2, ShoppingCart, Send, CheckCircle2, Inbox, Package, MessageCircle, Copy, Loader2 } from "lucide-react";
+import { Store, Search, Building2, ShoppingCart, Send, CheckCircle2, Inbox, Package, MessageCircle, Copy, Loader2, Trash2, Contact, Pencil, MapPin, Phone } from "lucide-react";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
   useMarketBuscar,
@@ -13,9 +13,14 @@ import {
   useMkMensajes,
   useMkEnviarMensaje,
   useClienteOwnerId,
+  useMkEliminarSolicitud,
+  useMkContacto,
+  useMkGuardarContacto,
   type MarketProveedor,
   type MarketSolicitud,
+  type MarketContacto,
 } from "@/hooks/useMarketEstado";
+import { useProfile } from "@/hooks/useProfile";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -28,6 +33,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 
 const CHIPS = ["resma papel carta", "guantes nitrilo", "notebook", "cemento", "toner", "alcohol gel"];
@@ -252,14 +260,239 @@ function ProveedorCard({ p, onPedir }: { p: MarketProveedor; onPedir: (prod: str
 // (no tenemos su correo: Mercado Público no lo publica — ver hallazgo de
 // Evaristo al pedir cotización a DIMERC). Lo manda Evaristo por su cuenta
 // (WhatsApp, correo que ya tenga) en vez de que el sistema finja invitarlo.
-function textoInvitacion(s: MarketSolicitud): string {
+// Si ya hay una ficha de contacto (teléfono/dirección encontrados a mano o
+// por búsqueda web), se suman al mensaje.
+function textoInvitacion(s: MarketSolicitud, contacto?: MarketContacto | null): string {
   const prod = s.producto ? `"${s.producto}"${s.cantidad ? ` (x${s.cantidad})` : ""}` : "unos productos";
-  return `Hola${s.contraparte ? ` ${s.contraparte}` : ""}! Te escribo desde FirmaVB, la plataforma donde gestiono compras y ventas al Estado. Necesito cotizar ${prod} y me gustaría que me cotizaras ahí directo: te registras gratis en https://firmavb.cl y respondes mi solicitud desde el Market de proveedores. ¡Gracias!`;
+  let txt = `Hola${s.contraparte ? ` ${s.contraparte}` : ""}! Te escribo desde FirmaVB, la plataforma donde gestiono compras y ventas al Estado. Necesito cotizar ${prod} y me gustaría que me cotizaras ahí directo: te registras gratis en https://firmavb.cl y respondes mi solicitud desde el Market de proveedores. ¡Gracias!`;
+  if (contacto?.nombre_contacto) txt = `Hola ${contacto.nombre_contacto}! ` + txt.replace(/^Hola[^!]*!\s*/, "");
+  return txt;
+}
+
+// ── Ficha de contacto de un proveedor ─────────────────────────────
+function ContactoDialog({ rutNorm, nombreInicial, onClose }: { rutNorm: string | null; nombreInicial: string; onClose: () => void }) {
+  const { data: contacto } = useMkContacto(rutNorm);
+  const guardar = useMkGuardarContacto();
+  const [form, setForm] = useState({
+    email: "", telefono: "", whatsapp: "", sitio_web: "", direccion: "", comuna: "", region: "", nombre_contacto: "", notas: "",
+  });
+
+  useEffect(() => {
+    if (contacto) {
+      setForm({
+        email: contacto.email ?? "", telefono: contacto.telefono ?? "", whatsapp: contacto.whatsapp ?? "",
+        sitio_web: contacto.sitio_web ?? "", direccion: contacto.direccion ?? "", comuna: contacto.comuna ?? "",
+        region: contacto.region ?? "", nombre_contacto: contacto.nombre_contacto ?? "", notas: contacto.notas ?? "",
+      });
+    }
+  }, [contacto?.rut_norm]);
+
+  const campo = (k: keyof typeof form, label: string, placeholder = "") => (
+    <div>
+      <Label htmlFor={`ct-${k}`}>{label}</Label>
+      <Input id={`ct-${k}`} value={form[k]} onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))} placeholder={placeholder} />
+    </div>
+  );
+
+  const guardarYSalir = async () => {
+    if (!rutNorm) return;
+    try {
+      await guardar.mutateAsync({
+        rut_norm: rutNorm,
+        rut: contacto?.rut ?? rutNorm,
+        proveedor: contacto?.proveedor ?? nombreInicial,
+        email: form.email.trim() || null,
+        telefono: form.telefono.trim() || null,
+        whatsapp: form.whatsapp.trim() || null,
+        sitio_web: form.sitio_web.trim() || null,
+        direccion: form.direccion.trim() || null,
+        comuna: form.comuna.trim() || null,
+        region: form.region.trim() || null,
+        nombre_contacto: form.nombre_contacto.trim() || null,
+        fuente: contacto?.fuente ?? "Ingresado a mano por el equipo",
+        notas: form.notas.trim() || null,
+      });
+      toast.success("Contacto guardado.");
+      onClose();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo guardar.");
+    }
+  };
+
+  return (
+    <Dialog open={!!rutNorm} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><Contact className="h-4 w-4" /> Contacto de {contacto?.proveedor || nombreInicial}</DialogTitle>
+          <DialogDescription>
+            Mercado Público no publica el correo de los proveedores — guarda acá lo que encuentres (web, llamada) para la próxima vez.
+            {contacto?.fuente && <span className="block mt-1 text-xs">Fuente: {contacto.fuente}</span>}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            {campo("email", "Correo", "ventas@proveedor.cl")}
+            {campo("nombre_contacto", "Nombre de contacto")}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {campo("telefono", "Teléfono")}
+            {campo("whatsapp", "WhatsApp")}
+          </div>
+          {campo("sitio_web", "Sitio web", "https://")}
+          {campo("direccion", "Dirección")}
+          <div className="grid grid-cols-2 gap-3">
+            {campo("comuna", "Comuna")}
+            {campo("region", "Región")}
+          </div>
+          <div>
+            <Label htmlFor="ct-notas">Notas</Label>
+            <Textarea id="ct-notas" value={form.notas} onChange={(e) => setForm((f) => ({ ...f, notas: e.target.value }))} rows={2} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button onClick={guardarYSalir} disabled={guardar.isPending} className="gap-2">
+            {guardar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Guardar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Una solicitud ──────────────────────────────────────────────
+function SolicitudCard({ s, esAdmin, onResponder, onChat, onEditarContacto }: {
+  s: MarketSolicitud;
+  esAdmin: boolean;
+  onResponder: (s: MarketSolicitud) => void;
+  onChat: (s: MarketSolicitud) => void;
+  onEditarContacto: (s: MarketSolicitud) => void;
+}) {
+  const meLaPidieron = s.rol === "vendedor";
+  const esPendiente = s.estado === "invitacion_pendiente";
+  const { data: contacto } = useMkContacto(esPendiente ? s.proveedor_rut_norm : null);
+  const eliminar = useMkEliminarSolicitud();
+  const [confirmarBorrar, setConfirmarBorrar] = useState(false);
+
+  return (
+    <Card>
+      <CardContent className="pt-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge variant={meLaPidieron ? "default" : "secondary"}>
+                {meLaPidieron ? "Me la pidieron" : "La pedí yo"}
+              </Badge>
+              {s.estado && (
+                <Badge variant="outline" className="capitalize">
+                  {esPendiente ? "Aún no está en FirmaVB" : s.estado}
+                </Badge>
+              )}
+            </div>
+            <p className="font-medium mt-2 truncate">{s.producto || "—"}{s.cantidad ? ` · ${s.cantidad}` : ""}</p>
+            <p className="text-xs text-muted-foreground">
+              {s.contraparte ? `${meLaPidieron ? "De" : "A"} ${s.contraparte} · ` : ""}{fecha(s.created_at)}
+              {s.oportunidad_codigo ? ` · ${s.oportunidad_codigo}` : ""}
+            </p>
+            {s.creado_por_nombre && (
+              <p className="text-xs text-muted-foreground">Pedido por {s.creado_por_nombre}</p>
+            )}
+            {esPendiente && contacto && (contacto.email || contacto.telefono || contacto.direccion) && (
+              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                {contacto.telefono && <span className="inline-flex items-center gap-1"><Phone className="h-3 w-3" />{contacto.telefono}</span>}
+                {contacto.direccion && <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{contacto.direccion}{contacto.comuna ? `, ${contacto.comuna}` : ""}</span>}
+              </div>
+            )}
+          </div>
+          <div className="flex shrink-0 gap-2">
+            {meLaPidieron && (
+              <Button size="sm" onClick={() => onResponder(s)} className="gap-2">
+                <Send className="h-3.5 w-3.5" /> Cotizar
+              </Button>
+            )}
+            {esPendiente ? (
+              <>
+                <Button size="sm" variant="outline" className="gap-2" onClick={() => onEditarContacto(s)}>
+                  <Pencil className="h-3.5 w-3.5" /> Contacto
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => {
+                    navigator.clipboard.writeText(textoInvitacion(s, contacto));
+                    toast.success("Mensaje copiado — pégalo en WhatsApp o correo.");
+                  }}
+                >
+                  <Copy className="h-3.5 w-3.5" /> Copiar invitación
+                </Button>
+              </>
+            ) : (
+              <Button size="sm" variant="outline" className="gap-2" onClick={() => onChat(s)}>
+                <MessageCircle className="h-3.5 w-3.5" /> Chat
+              </Button>
+            )}
+            {esAdmin && (
+              <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setConfirmarBorrar(true)} aria-label="Eliminar solicitud">
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {s.cotizaciones.length > 0 && (
+          <div className="mt-3 border-t pt-3 space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground">Cotizaciones ({s.cotizaciones.length})</p>
+            {s.cotizaciones.map((c, i) => (
+              <div key={i} className="flex items-center justify-between text-sm gap-2">
+                <span className="truncate">{c.proveedor || "Proveedor"}{c.mensaje ? ` — ${c.mensaje}` : ""}</span>
+                <span className="shrink-0 tabular-nums">
+                  <b>{clp(c.precio)}</b>{c.plazo != null ? ` · ${c.plazo} días` : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+
+      <AlertDialog open={confirmarBorrar} onOpenChange={setConfirmarBorrar}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar esta solicitud?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se borra "{s.producto}" {s.contraparte ? `(${s.contraparte})` : ""} y su chat/cotizaciones. No se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90"
+              onClick={async () => {
+                try {
+                  await eliminar.mutateAsync(s.id);
+                  toast.success("Solicitud eliminada.");
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "No se pudo eliminar.");
+                }
+              }}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
+  );
 }
 
 // ── Mis solicitudes ──────────────────────────────────────────────
-function MisSolicitudes({ onResponder, onChat }: { onResponder: (s: MarketSolicitud) => void; onChat: (s: MarketSolicitud) => void }) {
+function MisSolicitudes({ onResponder, onChat, onEditarContacto }: {
+  onResponder: (s: MarketSolicitud) => void;
+  onChat: (s: MarketSolicitud) => void;
+  onEditarContacto: (s: MarketSolicitud) => void;
+}) {
   const { data = [], isLoading } = useMisSolicitudes();
+  const { isAdmin } = useProfile();
   if (isLoading) return <div className="space-y-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-24 w-full" />)}</div>;
   if (data.length === 0) {
     return (
@@ -271,72 +504,9 @@ function MisSolicitudes({ onResponder, onChat }: { onResponder: (s: MarketSolici
   }
   return (
     <div className="space-y-3">
-      {data.map((s) => {
-        const meLaPidieron = s.rol === "vendedor";
-        return (
-          <Card key={s.id}>
-            <CardContent className="pt-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant={meLaPidieron ? "default" : "secondary"}>
-                      {meLaPidieron ? "Me la pidieron" : "La pedí yo"}
-                    </Badge>
-                    {s.estado && (
-                      <Badge variant="outline" className="capitalize">
-                        {s.estado === "invitacion_pendiente" ? "Aún no está en FirmaVB" : s.estado}
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="font-medium mt-2 truncate">{s.producto || "—"}{s.cantidad ? ` · ${s.cantidad}` : ""}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {s.contraparte ? `${meLaPidieron ? "De" : "A"} ${s.contraparte} · ` : ""}{fecha(s.created_at)}
-                    {s.oportunidad_codigo ? ` · ${s.oportunidad_codigo}` : ""}
-                  </p>
-                </div>
-                <div className="flex shrink-0 gap-2">
-                  {meLaPidieron && (
-                    <Button size="sm" onClick={() => onResponder(s)} className="gap-2">
-                      <Send className="h-3.5 w-3.5" /> Cotizar
-                    </Button>
-                  )}
-                  {s.estado === "invitacion_pendiente" ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-2"
-                      onClick={() => {
-                        navigator.clipboard.writeText(textoInvitacion(s));
-                        toast.success("Mensaje copiado — pégalo en WhatsApp o correo.");
-                      }}
-                    >
-                      <Copy className="h-3.5 w-3.5" /> Copiar invitación
-                    </Button>
-                  ) : (
-                    <Button size="sm" variant="outline" className="gap-2" onClick={() => onChat(s)}>
-                      <MessageCircle className="h-3.5 w-3.5" /> Chat
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              {s.cotizaciones.length > 0 && (
-                <div className="mt-3 border-t pt-3 space-y-2">
-                  <p className="text-xs font-semibold text-muted-foreground">Cotizaciones ({s.cotizaciones.length})</p>
-                  {s.cotizaciones.map((c, i) => (
-                    <div key={i} className="flex items-center justify-between text-sm gap-2">
-                      <span className="truncate">{c.proveedor || "Proveedor"}{c.mensaje ? ` — ${c.mensaje}` : ""}</span>
-                      <span className="shrink-0 tabular-nums">
-                        <b>{clp(c.precio)}</b>{c.plazo != null ? ` · ${c.plazo} días` : ""}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })}
+      {data.map((s) => (
+        <SolicitudCard key={s.id} s={s} esAdmin={isAdmin} onResponder={onResponder} onChat={onChat} onEditarContacto={onEditarContacto} />
+      ))}
     </div>
   );
 }
@@ -421,6 +591,7 @@ export default function MarketEstado() {
   const [pedirA, setPedirA] = useState<{ prov: MarketProveedor; producto: string } | null>(null);
   const [responder, setResponder] = useState<MarketSolicitud | null>(null);
   const [chatSolicitud, setChatSolicitud] = useState<MarketSolicitud | null>(null);
+  const [contactoDe, setContactoDe] = useState<MarketSolicitud | null>(null);
 
   const estado = useMemo(() => {
     if (q.length < 3) return "Escribe un producto (mínimo 3 letras) para buscar proveedores.";
@@ -492,7 +663,7 @@ export default function MarketEstado() {
           </TabsContent>
 
           <TabsContent value="solicitudes" className="mt-4">
-            <MisSolicitudes onResponder={setResponder} onChat={setChatSolicitud} />
+            <MisSolicitudes onResponder={setResponder} onChat={setChatSolicitud} onEditarContacto={setContactoDe} />
           </TabsContent>
         </Tabs>
       </div>
@@ -504,6 +675,11 @@ export default function MarketEstado() {
       />
       <CotizarDialog solicitud={responder} onClose={() => setResponder(null)} />
       <ChatDialog solicitud={chatSolicitud} onClose={() => setChatSolicitud(null)} />
+      <ContactoDialog
+        rutNorm={contactoDe?.proveedor_rut_norm ?? null}
+        nombreInicial={contactoDe?.contraparte ?? "este proveedor"}
+        onClose={() => setContactoDe(null)}
+      />
     </div>
   );
 }
