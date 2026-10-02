@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   Dialog, 
   DialogContent, 
@@ -30,7 +30,10 @@ import {
   CheckCircle2,
   Building2,
   Calendar,
-  Mail
+  Mail,
+  Store,
+  ShoppingCart,
+  Search
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
@@ -38,6 +41,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useInventory } from '@/hooks/useInventory';
 import { useCliente } from '@/hooks/useCliente';
 import { useProfile } from '@/hooks/useProfile';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { useMarketBuscar, useMarketSolicitar, useMisSolicitudes, type MarketProveedor } from '@/hooks/useMarketEstado';
 import { gmailCrearBorrador } from '@/hooks/useGmail';
 import {
   descargarCotizacionPDF,
@@ -84,6 +89,49 @@ export function GenerarCotizacionModal({
   const { primaryRole } = useProfile();
   const navigate = useNavigate();
   const [productosOfertados, setProductosOfertados] = useState<ProductoOfertado[]>([]);
+  // Market del Estado dentro del modal: cuando faltan productos, se buscan acá
+  // y al elegir uno se agrega a la oferta y se le pide cotización al proveedor.
+  const [mkInput, setMkInput] = useState('');
+  const mkQ = useDebouncedValue(mkInput.trim(), 400);
+  const { data: mkProveedores = [], isLoading: mkLoading } = useMarketBuscar(mkQ);
+  const solicitarMk = useMarketSolicitar();
+  // Respuestas de proveedores: cotizaciones que llegaron a solicitudes ligadas
+  // a esta licitación. El precio vuelve solo a la línea de la oferta.
+  const { data: misSolicitudes = [] } = useMisSolicitudes();
+  const respuestasProveedor = useMemo(() => {
+    return misSolicitudes
+      .filter((s) => s.rol === 'comprador'
+        && s.oportunidad_codigo === licitacion.id_licitacion
+        && !!s.producto
+        && s.cotizaciones.some((c) => (c.precio ?? 0) > 0))
+      .map((s) => {
+        const precios = s.cotizaciones.map((c) => c.precio).filter((p): p is number => !!p && p > 0);
+        return { id: s.id, proveedor: s.contraparte, producto: s.producto as string, precio: Math.min(...precios) };
+      });
+  }, [misSolicitudes, licitacion.id_licitacion]);
+
+  // Lleva el precio que respondió el proveedor a la línea de la oferta (actualiza
+  // el costo y recalcula el precio de oferta con el margen actual). Si el producto
+  // no está en la oferta todavía, lo agrega con ese precio.
+  const aplicarPrecioProveedor = (producto: string, precio: number) => {
+    const p = Math.round(precio);
+    setProductosOfertados((prev) => {
+      const idx = prev.findIndex((l) => l.inventoryId.startsWith('mk:') && l.nombre === producto);
+      if (idx >= 0) {
+        const next = [...prev];
+        const linea = { ...next[idx], precioUnitario: p };
+        linea.precioOferta = Math.round(p * (1 + linea.margen / 100));
+        next[idx] = linea;
+        return next;
+      }
+      return [...prev, { inventoryId: `mk:resp:${producto}`, nombre: producto, sku: '', cantidad: 1, precioUnitario: p, margen: 0, precioOferta: p, imagen_url: null }];
+    });
+    toast.success(`Precio de "${producto}" actualizado a ${formatCurrency(p)}.`);
+  };
+
+  const aplicarTodasLasRespuestas = () => {
+    respuestasProveedor.forEach((r) => aplicarPrecioProveedor(r.producto, r.precio));
+  };
   const [observaciones, setObservaciones] = useState('');
   const [plazoEntrega, setPlazoEntrega] = useState(5);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -216,6 +264,43 @@ export function GenerarCotizacionModal({
 
     setSearchProduct('');
     toast.success(`${producto.nombre_producto} agregado a la cotización`);
+  };
+
+  // Agrega un producto del Market del Estado a la oferta y, en el mismo paso, le
+  // pide cotización al proveedor del marketplace (queda ligada a esta licitación).
+  const agregarDelMarket = async (prov: MarketProveedor, nombreProd: string, precioRef: number | null) => {
+    const synthId = `mk:${prov.rut}:${nombreProd}`;
+    if (productosOfertados.some(p => p.inventoryId === synthId)) {
+      toast.warning('Ese producto del Market ya está en la cotización');
+      return;
+    }
+    const precio = precioRef && precioRef > 0 ? Math.round(precioRef) : 0;
+    setProductosOfertados(prev => [...prev, {
+      inventoryId: synthId,
+      nombre: nombreProd,
+      sku: '',
+      cantidad: 1,
+      precioUnitario: precio,
+      margen: 0,
+      precioOferta: precio,
+      imagen_url: null,
+    }]);
+    const enFirmaVB = !!prov.es_firmavb && !!prov.acepta_solicitudes;
+    try {
+      await solicitarMk.mutateAsync({
+        rut_proveedor: prov.rut,
+        producto: nombreProd,
+        cantidad: 1,
+        oportunidad: licitacion.id_licitacion,
+      });
+      toast.success(
+        enFirmaVB
+          ? `Agregado a tu oferta y solicitud de cotización enviada a ${prov.proveedor}.`
+          : `Agregado a tu oferta. La solicitud a ${prov.proveedor} quedó en "Market del Estado → Mis solicitudes".`,
+      );
+    } catch (e) {
+      toast.error('Se agregó a la oferta, pero no se pudo enviar la solicitud al proveedor: ' + (e instanceof Error ? e.message : 'error'));
+    }
   };
 
   const actualizarProducto = (index: number, campo: keyof ProductoOfertado, valor: number) => {
@@ -579,6 +664,95 @@ export function GenerarCotizacionModal({
                       </CardContent>
                     </Card>
                   ))}
+                </div>
+              )}
+            </div>
+
+            {/* Respuestas de proveedores: el precio cotizado vuelve a la oferta */}
+            {respuestasProveedor.length > 0 && (
+              <div className="space-y-2 rounded-lg border border-firmavb-green/40 bg-firmavb-green/5 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="font-semibold text-sm flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-firmavb-green" /> Respuestas de proveedores (Market)
+                  </h4>
+                  <Button size="sm" variant="outline" onClick={aplicarTodasLasRespuestas}>Aplicar todas</Button>
+                </div>
+                <ul className="space-y-1">
+                  {respuestasProveedor.map((r) => (
+                    <li key={r.id} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="truncate" title={r.producto}>
+                        {r.producto}{r.proveedor ? ` · ${r.proveedor}` : ''}
+                      </span>
+                      <span className="flex items-center gap-2 shrink-0">
+                        <b className="tabular-nums">{formatCurrency(r.precio)}</b>
+                        <Button size="sm" variant="secondary" onClick={() => aplicarPrecioProveedor(r.producto, r.precio)}>Aplicar</Button>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Market del Estado: buscar productos que te faltan y pedir cotización al proveedor */}
+            <div className="space-y-3 rounded-lg border border-dashed p-3">
+              <div className="flex items-center gap-2">
+                <Store className="h-4 w-4 text-firmavb-blue" />
+                <h4 className="font-semibold text-sm">¿Te falta un producto? Búscalo en el Market del Estado</h4>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Elige un producto de un proveedor: se agrega a tu oferta y le pedimos cotización a ese proveedor (queda ligada a esta licitación).
+              </p>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={mkInput}
+                  onChange={(e) => setMkInput(e.target.value)}
+                  placeholder="Ej: resma papel carta, toner, guantes nitrilo"
+                  className="pl-8"
+                />
+              </div>
+              {mkQ.length >= 3 && (
+                <div className="max-h-56 overflow-auto space-y-2">
+                  {mkLoading ? (
+                    <div className="flex items-center justify-center py-4"><Loader2 className="h-4 w-4 animate-spin" /></div>
+                  ) : mkProveedores.length === 0 ? (
+                    <p className="text-center text-sm text-muted-foreground py-3">No encontramos proveedores para “{mkQ}”.</p>
+                  ) : (
+                    mkProveedores.slice(0, 5).map((prov) => (
+                      <div key={prov.rut} className="rounded-md border p-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium text-sm truncate" title={prov.proveedor}>{prov.proveedor}</span>
+                          {prov.es_firmavb && (
+                            <Badge className="shrink-0 bg-firmavb-green/15 text-firmavb-green border-0 gap-1">
+                              <CheckCircle2 className="h-3 w-3" /> FirmaVB
+                            </Badge>
+                          )}
+                        </div>
+                        <ul className="mt-1.5 space-y-1">
+                          {prov.productos.slice(0, 3).map((x, i) => {
+                            const precioRef = x.precio_mediana ?? x.precio ?? null;
+                            return (
+                              <li key={i}>
+                                <button
+                                  type="button"
+                                  disabled={solicitarMk.isPending}
+                                  onClick={() => agregarDelMarket(prov, x.producto, precioRef)}
+                                  className="w-full flex items-center justify-between gap-2 rounded px-2 py-1 text-left text-sm hover:bg-muted disabled:opacity-50"
+                                  title={`Agregar y pedir cotización: ${x.producto}`}
+                                >
+                                  <span className="truncate flex items-center gap-1">
+                                    <ShoppingCart className="h-3.5 w-3.5 text-primary shrink-0" />
+                                    {x.producto}
+                                  </span>
+                                  <span className="shrink-0 tabular-nums text-muted-foreground">{precioRef ? formatCurrency(precioRef) : '—'}</span>
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ))
+                  )}
                 </div>
               )}
             </div>
