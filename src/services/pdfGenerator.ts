@@ -404,6 +404,43 @@ export async function previsualizarCotizacionPDF(datos: DatosCotizacion): Promis
   window.open(url, '_blank');
 }
 
+// --- Para adjuntar al correo (Gmail): PDF en base64 + cuerpo HTML --------------
+function docABase64(doc: jsPDF): string {
+  const buf = new Uint8Array(doc.output('arraybuffer'));
+  let bin = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < buf.length; i += chunk) bin += String.fromCharCode(...buf.subarray(i, i + chunk));
+  return btoa(bin);
+}
+
+// Genera el PDF de la cotización (con logo y fotos resueltos) y lo devuelve en
+// base64 para adjuntarlo a un borrador de Gmail.
+export async function cotizacionBase64(datos: DatosCotizacion): Promise<{ filename: string; base64: string }> {
+  const [datosConLogo, fotos] = await Promise.all([
+    conLogoResuelto(datos),
+    Promise.all(datos.items.map((it) => cargarImagenProducto(it.imagenUrl))),
+  ]);
+  const doc = generarCotizacionPDF(datosConLogo, fotos);
+  const filename = `cotizacion_${datos.numero}_${datos.compra.codigo.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+  return { filename, base64: docABase64(doc) };
+}
+
+// Cuerpo HTML del correo que acompaña la cotización (borrador de Gmail).
+export function cuerpoCorreoCotizacionHtml(datos: DatosCotizacion): string {
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const subtotal = datos.items.reduce((sum, it) => sum + it.total, 0);
+  const iva = subtotal * IVA_RATE;
+  const total = subtotal + iva;
+  return `<div style="font-family:Arial,sans-serif;max-width:640px;color:#1f2937">
+    <p>Estimados:</p>
+    <p>Junto con saludar, adjuntamos nuestra <strong>cotización N° ${esc(datos.numero)}</strong> en respuesta a <strong>${esc(datos.compra.nombre)}</strong> (${esc(datos.compra.codigo)}), de ${esc(datos.compra.organismo)}.</p>
+    <p><strong>Total (IVA incluido):</strong> ${formatCurrency(total)} &middot; <strong>Validez:</strong> ${datos.validezDias} días${datos.tiempoEntrega ? ` &middot; <strong>Entrega:</strong> ${esc(datos.tiempoEntrega)}` : ''}</p>
+    ${datos.observaciones ? `<p>${esc(datos.observaciones)}</p>` : ''}
+    <p style="font-size:12px;color:#6b7280">Se adjunta el detalle en PDF. Quedamos atentos a sus comentarios.</p>
+    <p>Atentamente,<br>${esc(datos.empresa.nombre)}${datos.empresa.rut ? ` — RUT ${esc(datos.empresa.rut)}` : ''}</p>
+  </div>`;
+}
+
 // Helpers
 function formatDate(date: Date): string {
   return date.toLocaleDateString('es-CL', {
