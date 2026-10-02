@@ -19,6 +19,7 @@ import { useCreatePipelineItem } from '@/hooks/usePipeline';
 import {
   useMisPostulaciones,
   useOportunidadesNoTomadas,
+  useResumenMercado,
   type HistoricoPostulacion,
   type HistoricoResultado,
 } from '@/hooks/useHistoricoPostulaciones';
@@ -179,6 +180,19 @@ const COLUMNAS: DataTableColumn<HistoricoPostulacion>[] = [
     cell: (item) => TIPO_LABEL[item.tipo] ?? item.tipo,
   },
   {
+    id: 'calce',
+    header: 'Calce IA',
+    className: 'text-xs',
+    sortValue: (item) => item.score ?? -1,
+    exportValue: (item) => (item.score != null ? `${Math.round(item.score)}%` : ''),
+    cell: (item) =>
+      item.score != null ? (
+        <Badge variant="outline" className="whitespace-nowrap text-xs">{Math.round(item.score)}%</Badge>
+      ) : (
+        <span className="text-gray-400">—</span>
+      ),
+  },
+  {
     id: 'resultado',
     header: 'Resultado',
     sortValue: (item) => RESULTADO_CONFIG[item.resultado].label,
@@ -263,6 +277,32 @@ const COLUMNAS: DataTableColumn<HistoricoPostulacion>[] = [
   },
 ];
 
+// Resumen de "tamaño del mercado": cuántas oportunidades de su rubro
+// matchean en total (el motor de embeddings de Oportunidades), separadas en
+// las que ya trabaja (en pipeline) y las que no. Si todavía no tiene
+// inventario cargado el motor no tiene nada que comparar — se explica en vez
+// de dejar la tabla vacía sin más contexto (eso fue lo que reportó Evaristo).
+function ResumenMercado() {
+  const { data, isLoading } = useResumenMercado();
+  if (isLoading || !data) return null;
+  if (!data.tiene_inventario) {
+    return (
+      <p className="rounded-md border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+        Para ver "No postulaste" con IA, primero carga tu inventario de productos/servicios en el módulo Inventario — el motor de matching lo necesita para comparar contra las licitaciones.
+      </p>
+    );
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-md border bg-muted/30 px-3 py-2 text-xs">
+      <span><strong className="font-semibold">{data.tamano_mercado}</strong> oportunidades de tu rubro (tamaño del mercado)</span>
+      <span className="text-muted-foreground">·</span>
+      <span><strong className="font-semibold">{data.en_pipeline}</strong> ya en tu pipeline</span>
+      <span className="text-muted-foreground">·</span>
+      <span><strong className="font-semibold text-blue-700">{data.no_tomadas}</strong> sin postular</span>
+    </div>
+  );
+}
+
 export function HistoricoPostulaciones() {
   const { data: mias = [], isLoading: cargandoMias } = useMisPostulaciones();
   const { data: noTomadas = [], isLoading: cargandoNoTomadas } = useOportunidadesNoTomadas(40);
@@ -284,7 +324,9 @@ export function HistoricoPostulaciones() {
   const cargando = cargandoMias || cargandoNoTomadas;
 
   return (
-    <DataTable<HistoricoPostulacion>
+    <div className="space-y-2">
+      <ResumenMercado />
+      <DataTable<HistoricoPostulacion>
       storageKey="historico-postulaciones"
       rows={filtrados}
       rowKey={(item) => `${item.tipo}-${item.orden_compra_codigo ?? item.codigo}`}
@@ -325,6 +367,7 @@ export function HistoricoPostulaciones() {
           </Select>
         </>
       }
-    />
+      />
+    </div>
   );
 }
