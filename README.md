@@ -83,6 +83,72 @@ supabase db push
 
 O aplica las migraciones manualmente desde el dashboard de Supabase.
 
+## 📧 Integración con Gmail (cobranza y cotizaciones)
+
+El módulo de **Cobranza** y el de **Cotizaciones** pueden dejar un **borrador en el
+Gmail del propio usuario**, con los PDF adjuntos y el cuerpo del correo listo. El
+usuario revisa y envía desde su Gmail (nunca se envía automáticamente).
+
+- **Cobranza** (`src/pages/experto/CobranzaFacturas.tsx`): deja un borrador con la
+  **nota de cobro** y la **nota de débito exenta** (interés por mora calculado con la
+  tasa máxima convencional, Ley 18.010, prorrateada por tramo), más la factura/guía.
+- **Cotizaciones** (`src/components/licitaciones/GenerarCotizacionModal.tsx`): botón
+  **"Dejar en borrador (Gmail)"** con el PDF de la cotización. El **cuerpo del correo
+  es editable** (el total, la validez y la firma se agregan siempre en automático).
+  Visible según el rol (oculto para `visor`).
+- Lógica compartida: hook `src/hooks/useGmail.ts` (`gmailCrearBorrador`) y las Edge
+  Functions `supabase/functions/gmail` (acciones autenticadas) y `gmail-callback`
+  (callback OAuth de Google, sin JWT).
+
+### Conexión de cada usuario
+
+Cada usuario conecta su Gmail **una sola vez** en **Configuración → Integraciones**
+(tarjeta "Conectar Gmail"). Los tokens viven en la tabla `gmail_conexiones` (solo
+`service_role`). El scope usado es `gmail.compose` (crear/editar borradores).
+
+### Configuración OAuth en Google Cloud
+
+Gmail **reutiliza el mismo cliente OAuth que Google Drive** (cliente
+"FirmaVB Drive - Experto"). Ambas Edge Functions leen las mismas variables de entorno
+en Supabase: `GOOGLE_OAUTH_CLIENT_ID` y `GOOGLE_OAUTH_CLIENT_SECRET`. En ese proyecto
+de Google Cloud debe estar (ya configurado):
+
+1. **Gmail API** habilitada.
+2. Redirect URI: `https://juiskeeutbaipwbeeezw.supabase.co/functions/v1/gmail-callback`.
+3. Scope `gmail.compose` agregado en la pantalla de consentimiento.
+
+### Verificación de Google (decisión actual)
+
+`gmail.compose` es un **scope restringido**. La verificación completa exige, además de
+una justificación y un video, una **evaluación de seguridad CASA** (auditor externo,
+anual, con costo, ~6 semanas).
+
+**Decisión: NO verificar por ahora.** Existe una excepción oficial de Google: las apps
+que conectan **menos de 100 cuentas de Gmail** quedan **exentas de verificación y de
+CASA**. Mientras se esté bajo ese límite:
+
+- Cada usuario verá **una vez** la pantalla "app no verificada" → **Opciones avanzadas
+  → Continuar**, y queda conectado.
+- Como la app está **"En producción"** (no en "Testing"), la conexión **no expira cada
+  7 días**.
+
+Recién al superar ~100 usuarios conviene iniciar la verificación + CASA.
+
+## 📊 Tablas de datos (componente `DataTable`)
+
+Todas las tablas del sistema usan `src/components/ui/data-table.tsx`, que entrega:
+
+- **Buscador** y espacio para **filtros** (prop `toolbar`).
+- **Ordenar/priorizar** por cualquier columna (clic en el encabezado; recuerda la
+  preferencia por tabla).
+- **Barra de desplazamiento horizontal arriba y abajo** de la tabla (sincronizadas),
+  para no tener que bajar al final para ver las columnas de la derecha.
+- Botón **"Columnas"**: mostrar/ocultar y **reordenar** columnas con flechas, más
+  "Restablecer". El orden y las columnas ocultas se recuerdan por tabla
+  (`localStorage`, vía `storageKey`). No se puede ocultar la última columna visible.
+- **Exportar a CSV** solo las columnas visibles, en el orden elegido.
+- Encabezado fijo con scroll interno y paginación.
+
 ## 📁 Estructura del Proyecto
 
 ```
