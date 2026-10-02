@@ -1,19 +1,16 @@
 import { EquipoTabs } from "@/components/equipo/EquipoTabs";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/hooks/useProfile";
 import { type AppRole } from "@/hooks/useRolePermissions";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, UserPlus, Shield, User, Mail, MoreHorizontal, Trash2, KeyRound, UserCircle, Sparkles, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -41,38 +38,49 @@ interface UserWithProfile {
 export default function Users() {
   const { isAdmin, isSuperAdmin, loading: profileLoading } = useProfile();
   const queryClient = useQueryClient();
-  const [isAddUserOpen, setIsAddUserOpen] = useState(false);
-  const [newUserEmail, setNewUserEmail] = useState("");
-  const [newUserPassword, setNewUserPassword] = useState("");
-  const [newUserName, setNewUserName] = useState("");
+  const navigate = useNavigate();
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   const [userToReset, setUserToReset] = useState<string | null>(null);
-  const [newUserRole, setNewUserRole] = useState<AppRole>('user');
   const [confirmRoleChange, setConfirmRoleChange] = useState<{ userId: string; isCurrentlyAdmin: boolean; userName?: string; newRole?: string } | null>(null);
 
-  // Fetch all users with their profiles and roles
+  // Solo MI equipo: yo (dueño) + los miembros que invité. La tabla `vendedores`
+  // ya viene acotada por RLS a la empresa del usuario actual, así que NO se
+  // filtran usuarios de otras empresas (antes se leían todos los profiles).
   const { data: users, isLoading } = useQuery({
     queryKey: ['admin-users'],
     queryFn: async () => {
-      // Get all profiles
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const myId = authUser?.id ?? null;
+
+      // Roster del equipo (RLS: solo mi empresa).
+      const { data: equipo, error: equipoError } = await supabase
+        .from('vendedores')
+        .select('user_id');
+      if (equipoError) throw equipoError;
+
+      const ids = Array.from(new Set(
+        [myId, ...(equipo ?? []).map((v: { user_id: string | null }) => v.user_id)]
+          .filter((x): x is string => !!x)
+      ));
+      if (ids.length === 0) return [];
+
+      // Solo los profiles/roles/clientes de mi equipo.
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('*');
-
+        .select('*')
+        .in('user_id', ids);
       if (profilesError) throw profilesError;
 
-      // Get all roles
       const { data: roles, error: rolesError } = await supabase
         .from('user_roles')
-        .select('*');
-
+        .select('*')
+        .in('user_id', ids);
       if (rolesError) throw rolesError;
 
-      // Get all clientes
       const { data: clientes, error: clientesError } = await supabase
         .from('clientes')
-        .select('user_id, empresa_nombre');
-
+        .select('user_id, empresa_nombre')
+        .in('user_id', ids);
       if (clientesError) throw clientesError;
 
       // Combine data
@@ -285,176 +293,6 @@ export default function Users() {
     },
   });
 
-  // Create new user - Método simplificado y mejorado
-  const createUserMutation = useMutation({
-    mutationFn: async () => {
-      if (!newUserEmail || !newUserPassword) {
-        throw new Error('Email y contraseña son requeridos');
-      }
-
-      if (newUserPassword.length < 6) {
-        throw new Error('La contraseña debe tener al menos 6 caracteres');
-      }
-
-      // Validar formato de email
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(newUserEmail)) {
-        throw new Error('El formato del email no es válido');
-      }
-
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Debes estar autenticado para crear usuarios');
-
-      // Verificar si el usuario ya existe
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('user_id, email')
-        .eq('email', newUserEmail.toLowerCase().trim())
-        .maybeSingle();
-
-      if (existingProfile) {
-        throw new Error(`El usuario con email ${newUserEmail} ya existe en el sistema.`);
-      }
-
-      // Crear usuario directamente con signUp
-      console.log('Creando usuario:', newUserEmail);
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: newUserEmail.toLowerCase().trim(),
-        password: newUserPassword,
-        options: {
-          data: {
-            full_name: newUserName || newUserEmail.split('@')[0],
-          },
-          emailRedirectTo: `${window.location.origin}/auth`,
-        }
-      });
-
-      if (signUpError) {
-        console.error('Error en signUp:', signUpError);
-        // Mensajes de error más amigables
-        if (signUpError.message.includes('already registered') || signUpError.message.includes('already exists') || signUpError.message.includes('User already registered')) {
-          throw new Error(`El email ${newUserEmail} ya está registrado. El usuario puede iniciar sesión directamente.`);
-        }
-        if (signUpError.message.includes('Invalid email')) {
-          throw new Error('El formato del email no es válido.');
-        }
-        if (signUpError.message.includes('Password')) {
-          throw new Error('La contraseña no cumple con los requisitos de seguridad.');
-        }
-        throw new Error(signUpError.message || 'Error al crear el usuario. Intenta nuevamente.');
-      }
-
-      if (!signUpData.user) {
-        throw new Error('No se pudo crear el usuario. Verifica la configuración de Supabase.');
-      }
-
-      const userId = signUpData.user.id;
-      const fullName = newUserName || newUserEmail.split('@')[0];
-
-      // Crear perfil (puede que ya exista por trigger, pero lo creamos/actualizamos por si acaso)
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          user_id: userId,
-          email: newUserEmail.toLowerCase().trim(),
-          full_name: fullName,
-        }, {
-          onConflict: 'user_id'
-        });
-
-      if (profileError) {
-        console.warn('Advertencia al crear perfil (puede que ya exista):', profileError);
-        // Continuar aunque falle, el trigger puede haberlo creado
-      }
-
-      // Asignar rol (esperar un poco para que el perfil se cree)
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .upsert({
-          user_id: userId,
-          role: newUserRole,
-        }, {
-          onConflict: 'user_id,role'
-        });
-
-      if (roleError) {
-        console.warn('Advertencia al asignar rol:', roleError);
-        // Continuar aunque falle
-      }
-
-      // Crear registro en clientes si no existe - need to provide all required fields
-      const { error: clienteError } = await supabase
-        .from('clientes')
-        .upsert({
-          email: newUserEmail.toLowerCase().trim(),
-          empresa_nombre: newUserName || 'Sin nombre',
-          nombre_responsable: newUserName || 'Sin nombre',
-          region: 'Metropolitana',
-          rut: '00.000.000-0',
-          user_id: userId,
-        }, {
-          onConflict: 'user_id'
-        });
-
-      if (clienteError) {
-        console.warn('Advertencia al crear cliente:', clienteError);
-        // Continuar aunque falle
-      }
-
-      return {
-        user: signUpData.user,
-        message: 'Usuario creado exitosamente',
-        emailConfirmed: !!signUpData.user.email_confirmed_at,
-      };
-    },
-    onSuccess: (data: any) => {
-      setIsAddUserOpen(false);
-      const emailCreated = newUserEmail;
-      const roleCreated = newUserRole;
-      setNewUserEmail("");
-      setNewUserPassword("");
-      setNewUserName("");
-      setNewUserRole('user');
-      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-      toast.success(
-        `✅ Usuario creado exitosamente${roleCreated === 'admin' ? ' como Administrador' : ''}`,
-        {
-          description: `${emailCreated} puede iniciar sesión ahora. ${data?.emailConfirmed ? 'Email confirmado automáticamente.' : 'Debe confirmar su email para iniciar sesión.'}`,
-          duration: 6000,
-        }
-      );
-    },
-    onError: (error: Error) => {
-      console.error('Error creating user:', error);
-      const errorMessage = error.message || 'Error al crear usuario';
-      
-      // Mensajes más descriptivos y útiles
-      let userMessage = errorMessage;
-      let description = 'Revisa los datos e intenta nuevamente';
-      
-      if (errorMessage.includes('already registered') || errorMessage.includes('already exists') || errorMessage.includes('ya está registrado')) {
-        userMessage = 'El usuario ya existe';
-        description = 'Este email ya está registrado. El usuario puede iniciar sesión directamente o puedes resetear su contraseña.';
-      } else if (errorMessage.includes('Invalid email') || errorMessage.includes('formato del email')) {
-        userMessage = 'Email inválido';
-        description = 'Verifica que el email tenga un formato correcto (ejemplo: usuario@dominio.com)';
-      } else if (errorMessage.includes('Password') || errorMessage.includes('contraseña')) {
-        userMessage = 'Contraseña inválida';
-        description = 'La contraseña debe tener al menos 6 caracteres';
-      } else if (errorMessage.includes('autenticado')) {
-        userMessage = 'Sesión expirada';
-        description = 'Por favor, inicia sesión nuevamente';
-      }
-      
-      toast.error(userMessage, {
-        description: description,
-        duration: 6000,
-      });
-    },
-  });
-
   const esAdmin = (user: UserWithProfile) => user.roles.some((r) => r.role === 'admin');
 
   const columnasUsuarios: DataTableColumn<UserWithProfile>[] = [
@@ -608,250 +446,22 @@ export default function Users() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Gestión de Usuarios</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Roles y permisos de mi equipo</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Administra los usuarios del sistema y sus permisos
+            Gestiona los roles, permisos y contraseñas de los miembros de tu equipo
           </p>
         </div>
         <div className="flex gap-2">
-          <ApplyMigrationsButton />
-          <ExecuteMigrationDialog />
-        <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2 bg-firmavb-blue hover:bg-firmavb-blue/90 shadow-md">
-              <UserPlus className="h-4 w-4" />
-              Crear Usuario
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-firmavb-blue/20 to-firmavb-red/10 flex items-center justify-center">
-                  <UserPlus className="h-5 w-5 text-firmavb-blue" />
-                </div>
-                <div>
-                  <DialogTitle className="text-xl">Crear Nuevo Usuario</DialogTitle>
-                  <DialogDescription className="mt-1">
-                    Completa los datos para crear un usuario y asignarle un rol
-                  </DialogDescription>
-                </div>
-              </div>
-            </DialogHeader>
-            
-            <div className="space-y-5 py-4">
-              {/* Nombre Completo */}
-              <div className="space-y-2">
-                <Label htmlFor="user-name" className="flex items-center gap-2 text-sm font-medium">
-                  <UserCircle className="h-4 w-4 text-muted-foreground" />
-                  Nombre Completo
-                </Label>
-                <Input
-                  id="user-name"
-                  placeholder="Ej: Juan Pérez"
-                  value={newUserName}
-                  onChange={(e) => setNewUserName(e.target.value)}
-                  className="h-11"
-                />
-                <p className="text-xs text-muted-foreground">Opcional - Se usará el email si no se proporciona</p>
-              </div>
-
-              {/* Email */}
-              <div className="space-y-2">
-                <Label htmlFor="user-email" className="flex items-center gap-2 text-sm font-medium">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  Email <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="user-email"
-                  type="email"
-                  placeholder="usuario@ejemplo.com"
-                  value={newUserEmail}
-                  onChange={(e) => {
-                    const value = e.target.value.toLowerCase().trim();
-                    setNewUserEmail(value);
-                  }}
-                  required
-                  className="h-11"
-                  disabled={createUserMutation.isPending}
-                />
-                {newUserEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newUserEmail) && (
-                  <p className="text-xs text-destructive">El formato del email no es válido</p>
-                )}
-              </div>
-
-              {/* Contraseña */}
-              <div className="space-y-2">
-                <Label htmlFor="user-password" className="flex items-center gap-2 text-sm font-medium">
-                  <KeyRound className="h-4 w-4 text-muted-foreground" />
-                  Contraseña <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="user-password"
-                  type="password"
-                  placeholder="Mínimo 6 caracteres"
-                  value={newUserPassword}
-                  onChange={(e) => setNewUserPassword(e.target.value)}
-                  required
-                  className="h-11"
-                  disabled={createUserMutation.isPending}
-                />
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">El usuario podrá cambiarla después de iniciar sesión</p>
-                  {newUserPassword && (
-                    <p className={`text-xs ${newUserPassword.length >= 6 ? 'text-success' : 'text-destructive'}`}>
-                      {newUserPassword.length}/6 caracteres
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Rol */}
-              <div className="space-y-2">
-                <Label htmlFor="user-role" className="flex items-center gap-2 text-sm font-medium">
-                  <Shield className="h-4 w-4 text-muted-foreground" />
-                  Rol del Usuario
-                </Label>
-                <Select value={newUserRole} onValueChange={(value: AppRole) => setNewUserRole(value)}>
-                  <SelectTrigger className="h-11">
-                    <SelectValue>
-                      {newUserRole === 'super_admin' ? (
-                        <div className="flex items-center gap-2">
-                          <Shield className="h-4 w-4 text-destructive" />
-                          <span>Super Admin</span>
-                        </div>
-                      ) : newUserRole === 'admin' ? (
-                        <div className="flex items-center gap-2">
-                          <Shield className="h-4 w-4 text-firmavb-blue" />
-                          <span>Administrador</span>
-                        </div>
-                      ) : newUserRole === 'vendedor' ? (
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-blue-600" />
-                          <span>Vendedor</span>
-                        </div>
-                      ) : newUserRole === 'visor' ? (
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                          <span>Visor</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4" />
-                          <span>Usuario</span>
-                        </div>
-                      )}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="user" className="py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
-                          <User className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <div className="font-medium">Usuario</div>
-                          <div className="text-xs text-muted-foreground">Acceso básico al sistema</div>
-                        </div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="admin" className="py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-firmavb-blue/10 flex items-center justify-center">
-                          <Shield className="h-4 w-4 text-firmavb-blue" />
-                        </div>
-                        <div>
-                          <div className="font-medium">Administrador</div>
-                          <div className="text-xs text-muted-foreground">Gestión completa del sistema</div>
-                        </div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="vendedor" className="py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                          <User className="h-4 w-4 text-blue-600" />
-                        </div>
-                        <div>
-                          <div className="font-medium">Vendedor</div>
-                          <div className="text-xs text-muted-foreground">Enfocado en oportunidades y postulaciones</div>
-                        </div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="visor" className="py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                        <div>
-                          <div className="font-medium">Visor</div>
-                          <div className="text-xs text-muted-foreground">Solo lectura de reportes</div>
-                        </div>
-                      </div>
-                    </SelectItem>
-                    {isSuperAdmin && (
-                      <SelectItem value="super_admin" className="py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-full bg-destructive/10 flex items-center justify-center">
-                            <Shield className="h-4 w-4 text-destructive" />
-                          </div>
-                          <div>
-                            <div className="font-medium">Super Admin</div>
-                            <div className="text-xs text-muted-foreground">Acceso total y configuración de roles</div>
-                          </div>
-                        </div>
-                      </SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-                <div className="flex items-start gap-2 p-3 rounded-lg bg-gradient-to-r from-firmavb-blue/5 to-firmavb-red/5 border border-firmavb-blue/10">
-                  <Sparkles className="h-4 w-4 text-firmavb-blue mt-0.5 shrink-0" />
-                  <div className="text-xs">
-                    <strong className="text-foreground font-medium">💡 Tip:</strong>{' '}
-                    <span className="text-muted-foreground">Puedes cambiar el rol después desde la lista de usuarios usando el switch</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <DialogFooter className="gap-2 sm:gap-0">
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setIsAddUserOpen(false);
-                  setNewUserName("");
-                  setNewUserEmail("");
-                  setNewUserPassword("");
-                  setNewUserRole('user');
-                }}
-                disabled={createUserMutation.isPending}
-              >
-                Cancelar
-              </Button>
-              <Button 
-                onClick={() => createUserMutation.mutate()}
-                disabled={
-                  createUserMutation.isPending || 
-                  !newUserEmail || 
-                  !newUserPassword || 
-                  newUserPassword.length < 6 ||
-                  !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newUserEmail)
-                }
-                className="bg-firmavb-blue hover:bg-firmavb-blue/90"
-              >
-                {createUserMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creando usuario...
-                  </>
-                ) : (
-                  <>
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Crear Usuario
-                  </>
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          {isSuperAdmin && (
+            <>
+              <ApplyMigrationsButton />
+              <ExecuteMigrationDialog />
+            </>
+          )}
+          <Button variant="outline" className="gap-2" onClick={() => navigate('/equipo')}>
+            <UserPlus className="h-4 w-4" />
+            Invitar miembro
+          </Button>
         </div>
       </div>
 
@@ -859,7 +469,7 @@ export default function Users() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Usuarios</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Miembros del equipo</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold">{users?.length || 0}</p>
@@ -880,9 +490,9 @@ export default function Users() {
       {/* Users Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Usuarios Registrados</CardTitle>
+          <CardTitle>Miembros de tu equipo</CardTitle>
           <CardDescription>
-            Lista de todos los usuarios del sistema con sus roles y permisos
+            Los miembros que invitaste a tu empresa, con sus roles y permisos
           </CardDescription>
         </CardHeader>
         <CardContent>
