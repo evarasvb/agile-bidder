@@ -36,7 +36,7 @@ import {
   cuerpoCorreoCobroHtml, type DatosNotaCobranza,
 } from '@/services/notasCobranzaPdf';
 import { gmailCrearBorrador } from '@/hooks/useGmail';
-import { useOpcionesOC, useMisOcAceptadas, useOcLinksPorCodigos, useSyncMisOC, useOrdenCompra, etiquetaEstado } from '@/hooks/useOrdenesCompra';
+import { useOpcionesOC, useMisOcAceptadas, useOcLinksPorCodigos, useSyncMisOC, useOrdenCompra, etiquetaEstado, ESTADOS_OC_ACEPTADA } from '@/hooks/useOrdenesCompra';
 import {
   useFacturasCobrar, useCrearFactura, useActualizarFactura, useEliminarFactura, useTasasMora,
   diasAtraso, interesMoraReal, diasDiferenciaPago, hechosCobranza, fechasConsistentes, fechaPago, fechaPagoReal,
@@ -687,51 +687,107 @@ function OcAceptadaCombobox({
 }: {
   institucion: string;
   value: string;
-  onSelect: (oc: { codigo: string; rut_demandante: string | null; total: number | null; fecha_emision: string | null }) => void;
+  onSelect: (oc: { codigo: string; organismo_comprador: string | null; rut_demandante: string | null; total: number | null; fecha_emision: string | null }) => void;
 }) {
   const [open, setOpen] = useState(false);
   const { data: cliente } = useCliente();
-  // No se piden OC hasta elegir el organismo: si no, el desplegable mezclaría
-  // aceptaciones de cualquier institución con la que el cliente haya trabajado.
+  // Lista TODAS mis OC aceptadas por mi RUT (el "cubo"): ya no exige elegir el
+  // organismo primero. Si viene `institucion` se usa solo como filtro extra.
+  // Al elegir una OC, el organismo se autocompleta desde la propia orden.
   const { data: ocs = [], isLoading, refetch, isFetching } = useMisOcAceptadas(
-    institucion ? cliente?.rut || null : null,
-    institucion ? cliente?.empresa_nombre || null : null,
-    institucion,
+    cliente?.rut || null,
+    cliente?.empresa_nombre || null,
+    institucion || undefined,
   );
   const sync = useSyncMisOC();
+
+  const filtradas = useMemo(() => {
+    const term = filtro.trim().toLowerCase();
+    if (!term) return ocs;
+    return ocs.filter((o) =>
+      [o.codigo, o.organismo_comprador, o.rut_demandante, o.numero_licitacion]
+        .some((v) => (v || '').toLowerCase().includes(term)));
+  }, [ocs, filtro]);
 
   return (
     <div className="flex gap-1.5">
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button variant="outline" role="combobox" aria-expanded={open} className="flex-1 justify-between font-normal">
-            <span className={cn('truncate text-left', !value && 'text-muted-foreground')}>{value || 'Elige una OC aceptada…'}</span>
+            <span className={cn('truncate text-left', !value && 'text-muted-foreground')}>{value || 'Elige una OC de tus órdenes…'}</span>
             <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-          <Command>
-            <CommandInput placeholder="Filtra por código…" />
-            <CommandList>
-              {isLoading ? (
-                <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Buscando tus OC…</div>
-              ) : (
-                <>
-                  <CommandEmpty>
-                    {institucion ? 'No tienes OC aceptadas de este organismo aún. Prueba "Actualizar mis OC".' : 'Primero elige el organismo.'}
-                  </CommandEmpty>
-                  <CommandGroup>
-                    {ocs.map((o) => (
-                      <CommandItem key={o.codigo} value={o.codigo} onSelect={() => { onSelect(o); setOpen(false); }} className="cursor-pointer">
-                        <Check className={cn('mr-2 h-4 w-4', value === o.codigo ? 'opacity-100' : 'opacity-0')} />
-                        <span className="truncate">{o.codigo} · {CLP(o.total || 0)}</span>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </>
-              )}
-            </CommandList>
-          </Command>
+        <PopoverContent className="w-[min(96vw,980px)] p-0" align="start">
+          <div className="border-b p-2">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input value={filtro} onChange={(e) => setFiltro(e.target.value)} placeholder="Filtra por código, organismo, RUT o N° licitación…" className="h-9 pl-8" />
+            </div>
+          </div>
+          {isLoading ? (
+            <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Buscando tus OC…</div>
+          ) : filtradas.length === 0 ? (
+            <div className="p-4 text-sm text-muted-foreground">
+              No tienes OC{institucion ? ' de este organismo' : ''} {filtro ? 'que coincidan con el filtro' : 'aún'}. Prueba "Actualizar mis OC".
+            </div>
+          ) : (
+            <div className="max-h-[360px] overflow-auto">
+              <table className="w-full border-collapse text-xs">
+                <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
+                  <tr className="text-left text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <th className="px-2 py-1.5 font-medium">Código</th>
+                    <th className="px-2 py-1.5 font-medium">Estado</th>
+                    <th className="px-2 py-1.5 font-medium">N° licitación</th>
+                    <th className="px-2 py-1.5 font-medium">Organismo</th>
+                    <th className="px-2 py-1.5 font-medium">RUT deudor</th>
+                    <th className="px-2 py-1.5 font-medium">Emisión</th>
+                    <th className="px-2 py-1.5 font-medium">Aceptación</th>
+                    <th className="px-2 py-1.5 text-right font-medium">Monto</th>
+                    <th className="px-2 py-1.5"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtradas.map((o) => {
+                    const aceptada = o.estado != null && ESTADOS_OC_ACEPTADA.includes(String(o.estado).trim());
+                    return (
+                    <tr key={o.codigo} className={cn('border-t hover:bg-muted/50', value === o.codigo && 'bg-firmavb-blue/5')}>
+                      <td className="whitespace-nowrap px-2 py-1.5 font-medium">
+                        <span className="flex items-center gap-1">
+                          {o.codigo}
+                          {o.link_oficial && (
+                            <a href={o.link_oficial} target="_blank" rel="noreferrer" className="text-firmavb-blue hover:underline" title="Ver OC en Mercado Público">
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                          )}
+                        </span>
+                      </td>
+                      <td className={cn('whitespace-nowrap px-2 py-1.5', aceptada ? 'text-muted-foreground' : 'font-medium text-red-600')}>{etiquetaEstado(o.estado) ?? '—'}</td>
+                      <td className="whitespace-nowrap px-2 py-1.5 text-muted-foreground">{o.numero_licitacion || '—'}</td>
+                      <td className="max-w-[220px] truncate px-2 py-1.5 text-muted-foreground" title={o.organismo_comprador || ''}>{o.organismo_comprador || '—'}</td>
+                      <td className="whitespace-nowrap px-2 py-1.5 text-muted-foreground">{o.rut_demandante || '—'}</td>
+                      <td className="whitespace-nowrap px-2 py-1.5 text-muted-foreground">{fFecha(o.fecha_emision ? o.fecha_emision.slice(0, 10) : null)}</td>
+                      <td className={cn('whitespace-nowrap px-2 py-1.5', aceptada ? 'text-muted-foreground' : 'text-red-600')}>
+                        {o.fecha_aceptacion ? fFecha(o.fecha_aceptacion.slice(0, 10)) : 'Sin aceptar'}
+                      </td>
+                      <td className="whitespace-nowrap px-2 py-1.5 text-right font-medium">{CLP(o.total || 0)}</td>
+                      <td className="whitespace-nowrap px-2 py-1.5 text-right">
+                        <Button type="button" size="sm" variant="secondary" className="h-7"
+                          onClick={() => {
+                            if (!aceptada) toast.warning('Ojo: esta OC no está aceptada en el portal. La institución puede rechazar el cobro hasta que la acepten.');
+                            onSelect(o);
+                            setOpen(false);
+                          }}>
+                          {value === o.codigo ? <Check className="h-3.5 w-3.5" /> : 'Elegir'}
+                        </Button>
+                      </td>
+                    </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </PopoverContent>
       </Popover>
       <Button type="button" variant="outline" size="icon" className="shrink-0" disabled={sync.isPending || isFetching}
@@ -973,22 +1029,34 @@ function NuevaFacturaDialog() {
                 <p className="text-[11px] text-muted-foreground">Trae organismo, RUT, monto y fecha desde MP. Tú agregas tu N° de factura y la guía.</p>
               </div>
               <div className="col-span-2">
-                <Label>Organismo</Label>
-                <InstitucionCombobox value={nombre} onSelect={(v) => { setNombre(v); setOc(''); setRut(''); setMonto(''); setEmision(''); }} />
-              </div>
-              <div className="col-span-2">
-                <Label>Orden de Compra aceptada</Label>
+                <Label>Elige la OC de tus órdenes</Label>
                 <OcAceptadaCombobox institucion={nombre} value={oc} onSelect={(o) => {
                   setOc(o.codigo);
+                  setNombre(o.organismo_comprador || '');
                   setRut(o.rut_demandante || '');
                   setMonto(o.total ? String(o.total) : '');
                   setEmision(o.fecha_emision ? o.fecha_emision.slice(0, 10) : '');
                 }} />
-                <p className="mt-1 text-[11px] text-muted-foreground">Solo se listan OC ya aceptadas o con recepción conforme — así el respaldo del cobro es real.</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">Lista todas tus OC aceptadas (por tu RUT). Al elegir una se autocompletan organismo, RUT, monto y fecha.</p>
+              </div>
+              <div className="col-span-2">
+                <Label>Organismo <span className="font-normal text-muted-foreground">(opcional, para filtrar)</span></Label>
+                <InstitucionCombobox value={nombre} onSelect={(v) => { setNombre(v); setOc(''); setRut(''); setMonto(''); setEmision(''); }} />
               </div>
             </>
           ) : (
             <>
+              <div className="col-span-2">
+                <Label>Elige la OC de tus órdenes <span className="font-normal text-muted-foreground">(opcional)</span></Label>
+                <OcAceptadaCombobox institucion="" value={oc} onSelect={(o) => {
+                  setOc(o.codigo);
+                  setNombre(o.organismo_comprador || '');
+                  setRut(o.rut_demandante || '');
+                  setMonto(o.total ? String(o.total) : '');
+                  setEmision(o.fecha_emision ? o.fecha_emision.slice(0, 10) : '');
+                }} />
+                <p className="mt-1 text-[11px] text-muted-foreground">Si el cobro nace de una OC tuya, elígela y se autocompleta todo. Si no, completa a mano.</p>
+              </div>
               <div className="col-span-2">
                 <Label htmlFor="f-nombre">Nombre del deudor</Label>
                 <Input id="f-nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Comercial XYZ SpA" />
