@@ -69,6 +69,8 @@ grant execute on function public.mk_mis_solicitudes_v2() to anon, authenticated,
 -- DELETE: solo un administrador (user_roles.role = 'admin', misma función
 -- que ya usan las demás políticas del proyecto) de alguna de las dos
 -- empresas involucradas.
+-- (Ampliada a super_admin en 20261002140000_mksol_del_super_admin.sql —
+-- is_super_admin() todavía no existía cuando se escribió esta migración.)
 create policy mksol_del on public.mk_solicitudes for delete to authenticated
   using (
     ((solicitante_id = (select public.cliente_owner_id())) or (proveedor_id = (select public.cliente_owner_id())))

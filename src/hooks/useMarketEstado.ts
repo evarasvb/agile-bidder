@@ -313,12 +313,15 @@ export type GuardarContactoInput = Omit<MarketContacto, 'actualizado_en'>;
 
 export function useMkGuardarContacto() {
   const qc = useQueryClient();
+  const { user } = useAuth();
   return useMutation({
     mutationFn: async (c: GuardarContactoInput) => {
-      const { data: owner } = await supabase.rpc('cliente_owner_id');
+      // actualizado_por referencia auth.users(id): usar el uuid del usuario
+      // autenticado (user.id), no cliente_owner_id() (que devuelve clientes.id
+      // y violaba la foreign key, haciendo fallar todo guardado de contacto).
       const { error } = await sb
         .from('mk_proveedor_contactos')
-        .upsert({ ...c, actualizado_en: new Date().toISOString(), actualizado_por: owner ?? null }, { onConflict: 'rut_norm' });
+        .upsert({ ...c, actualizado_en: new Date().toISOString(), actualizado_por: user?.id ?? null }, { onConflict: 'rut_norm' });
       if (error) throw error;
     },
     onSuccess: (_, c) => qc.invalidateQueries({ queryKey: ['mk-contacto', c.rut_norm] }),

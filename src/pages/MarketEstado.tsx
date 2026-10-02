@@ -278,14 +278,21 @@ function ContactoDialog({ rutNorm, nombreInicial, onClose }: { rutNorm: string |
   });
 
   useEffect(() => {
+    // Sin esto, al pasar de un proveedor con contacto guardado a uno sin
+    // contacto, `contacto` queda null y el form se quedaba con los valores
+    // del proveedor anterior (podía guardarle a uno el correo/teléfono de
+    // otro). Se limpia también al cambiar de proveedor, no solo cuando
+    // llega un contacto nuevo.
     if (contacto) {
       setForm({
         email: contacto.email ?? "", telefono: contacto.telefono ?? "", whatsapp: contacto.whatsapp ?? "",
         sitio_web: contacto.sitio_web ?? "", direccion: contacto.direccion ?? "", comuna: contacto.comuna ?? "",
         region: contacto.region ?? "", nombre_contacto: contacto.nombre_contacto ?? "", notas: contacto.notas ?? "",
       });
+    } else {
+      setForm({ email: "", telefono: "", whatsapp: "", sitio_web: "", direccion: "", comuna: "", region: "", nombre_contacto: "", notas: "" });
     }
-  }, [contacto?.rut_norm]);
+  }, [rutNorm, contacto]);
 
   const campo = (k: keyof typeof form, label: string, placeholder = "") => (
     <div>
