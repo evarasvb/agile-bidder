@@ -90,6 +90,9 @@ export function GenerarCotizacionModal({
   const [isSending, setIsSending] = useState(false);
   const [isDrafting, setIsDrafting] = useState(false);
   const [emailDestino, setEmailDestino] = useState('');
+  const [mensajeCorreo, setMensajeCorreo] = useState(
+    `Estimados:\n\nJunto con saludar, adjuntamos nuestra cotización en respuesta a ${licitacion.titulo} (${licitacion.id_licitacion}), de ${licitacion.organismo}.\n\nQuedamos atentos a sus comentarios.`
+  );
   const [searchProduct, setSearchProduct] = useState('');
 
   // El perfil de solo lectura (visor) no deja borradores de cotización.
@@ -153,7 +156,7 @@ export function GenerarCotizacionModal({
       const r = await gmailCrearBorrador({
         to: emailDestino.trim(),
         subject,
-        bodyHtml: cuerpoCorreoCotizacionHtml(datos),
+        bodyHtml: cuerpoCorreoCotizacionHtml(datos, mensajeCorreo),
         adjuntos: [{ ...pdf, mimeType: 'application/pdf' }],
       });
       toast.success(
@@ -617,6 +620,16 @@ export function GenerarCotizacionModal({
                   value={emailDestino}
                   onChange={(e) => setEmailDestino(e.target.value)}
                 />
+                <Label>Mensaje del correo (editable)</Label>
+                <Textarea
+                  placeholder="Escribe el mensaje que acompañará la cotización..."
+                  value={mensajeCorreo}
+                  onChange={(e) => setMensajeCorreo(e.target.value)}
+                  rows={6}
+                />
+                <p className="text-xs text-muted-foreground">
+                  El total, la validez y la firma se agregan automáticamente al final del correo.
+                </p>
               </div>
             )}
 
