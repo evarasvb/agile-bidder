@@ -687,16 +687,17 @@ function OcAceptadaCombobox({
 }: {
   institucion: string;
   value: string;
-  onSelect: (oc: { codigo: string; rut_demandante: string | null; total: number | null; fecha_emision: string | null }) => void;
+  onSelect: (oc: { codigo: string; organismo_comprador: string | null; rut_demandante: string | null; total: number | null; fecha_emision: string | null }) => void;
 }) {
   const [open, setOpen] = useState(false);
   const { data: cliente } = useCliente();
-  // No se piden OC hasta elegir el organismo: si no, el desplegable mezclaría
-  // aceptaciones de cualquier institución con la que el cliente haya trabajado.
+  // Lista TODAS mis OC aceptadas por mi RUT (el "cubo"): ya no exige elegir el
+  // organismo primero. Si viene `institucion` se usa solo como filtro extra.
+  // Al elegir una OC, el organismo se autocompleta desde la propia orden.
   const { data: ocs = [], isLoading, refetch, isFetching } = useMisOcAceptadas(
-    institucion ? cliente?.rut || null : null,
-    institucion ? cliente?.empresa_nombre || null : null,
-    institucion,
+    cliente?.rut || null,
+    cliente?.empresa_nombre || null,
+    institucion || undefined,
   );
   const sync = useSyncMisOC();
 
@@ -711,20 +712,23 @@ function OcAceptadaCombobox({
         </PopoverTrigger>
         <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
           <Command>
-            <CommandInput placeholder="Filtra por código…" />
+            <CommandInput placeholder="Filtra por código u organismo…" />
             <CommandList>
               {isLoading ? (
                 <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Buscando tus OC…</div>
               ) : (
                 <>
                   <CommandEmpty>
-                    {institucion ? 'No tienes OC aceptadas de este organismo aún. Prueba "Actualizar mis OC".' : 'Primero elige el organismo.'}
+                    No tienes OC aceptadas{institucion ? ' de este organismo' : ''} aún. Prueba "Actualizar mis OC".
                   </CommandEmpty>
                   <CommandGroup>
                     {ocs.map((o) => (
-                      <CommandItem key={o.codigo} value={o.codigo} onSelect={() => { onSelect(o); setOpen(false); }} className="cursor-pointer">
-                        <Check className={cn('mr-2 h-4 w-4', value === o.codigo ? 'opacity-100' : 'opacity-0')} />
-                        <span className="truncate">{o.codigo} · {CLP(o.total || 0)}</span>
+                      <CommandItem key={o.codigo} value={`${o.codigo} ${o.organismo_comprador ?? ''}`} onSelect={() => { onSelect(o); setOpen(false); }} className="cursor-pointer">
+                        <Check className={cn('mr-2 h-4 w-4 shrink-0', value === o.codigo ? 'opacity-100' : 'opacity-0')} />
+                        <span className="flex min-w-0 flex-col">
+                          <span className="truncate font-medium">{o.codigo} · {CLP(o.total || 0)}</span>
+                          {o.organismo_comprador && <span className="truncate text-xs text-muted-foreground">{o.organismo_comprador}</span>}
+                        </span>
                       </CommandItem>
                     ))}
                   </CommandGroup>
@@ -973,18 +977,19 @@ function NuevaFacturaDialog() {
                 <p className="text-[11px] text-muted-foreground">Trae organismo, RUT, monto y fecha desde MP. Tú agregas tu N° de factura y la guía.</p>
               </div>
               <div className="col-span-2">
-                <Label>Organismo</Label>
-                <InstitucionCombobox value={nombre} onSelect={(v) => { setNombre(v); setOc(''); setRut(''); setMonto(''); setEmision(''); }} />
-              </div>
-              <div className="col-span-2">
-                <Label>Orden de Compra aceptada</Label>
+                <Label>Elige la OC de tus órdenes</Label>
                 <OcAceptadaCombobox institucion={nombre} value={oc} onSelect={(o) => {
                   setOc(o.codigo);
+                  setNombre(o.organismo_comprador || '');
                   setRut(o.rut_demandante || '');
                   setMonto(o.total ? String(o.total) : '');
                   setEmision(o.fecha_emision ? o.fecha_emision.slice(0, 10) : '');
                 }} />
-                <p className="mt-1 text-[11px] text-muted-foreground">Solo se listan OC ya aceptadas o con recepción conforme — así el respaldo del cobro es real.</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">Lista todas tus OC aceptadas (por tu RUT). Al elegir una se autocompletan organismo, RUT, monto y fecha.</p>
+              </div>
+              <div className="col-span-2">
+                <Label>Organismo <span className="font-normal text-muted-foreground">(opcional, para filtrar)</span></Label>
+                <InstitucionCombobox value={nombre} onSelect={(v) => { setNombre(v); setOc(''); setRut(''); setMonto(''); setEmision(''); }} />
               </div>
             </>
           ) : (
