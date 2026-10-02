@@ -45,6 +45,27 @@ export function useSeguimientoCobranza(facturaId: string | null, enabled = true)
   });
 }
 
+// Último contacto (cualquier canal) por factura, en una sola consulta. Sirve
+// para no repetir recordatorios de facturas contactadas hace pocos días.
+export function useUltimoContactoPorFactura() {
+  return useQuery({
+    queryKey: ['cobranza-ultimo-contacto'],
+    staleTime: 30000,
+    queryFn: async (): Promise<Map<string, string>> => {
+      const { data, error } = await sb
+        .from('cobranza_seguimiento')
+        .select('factura_id, fecha')
+        .order('fecha', { ascending: false });
+      if (error) throw error;
+      const m = new Map<string, string>();
+      for (const r of (data ?? []) as { factura_id: string; fecha: string }[]) {
+        if (r.factura_id && !m.has(r.factura_id)) m.set(r.factura_id, r.fecha);
+      }
+      return m;
+    },
+  });
+}
+
 export interface NuevoSeguimiento {
   factura_id: string;
   canal: CanalSeguimiento;
@@ -69,7 +90,7 @@ export function useAgregarSeguimiento() {
       });
       if (error) throw error;
     },
-    onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ['cobranza-seguimiento', v.factura_id] }),
+    onSuccess: (_d, v) => { qc.invalidateQueries({ queryKey: ['cobranza-seguimiento', v.factura_id] }); qc.invalidateQueries({ queryKey: ['cobranza-ultimo-contacto'] }); },
   });
 }
 
