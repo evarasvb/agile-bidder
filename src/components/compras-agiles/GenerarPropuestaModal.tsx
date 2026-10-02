@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, Package, Calculator, Check, Loader2, Download, Edit, Search, Plus, X, CheckCircle2, XCircle } from "lucide-react";
+import { FileText, Package, Calculator, Check, Loader2, Download, Edit, Search, Plus, X, CheckCircle2, XCircle, Store } from "lucide-react";
 import { toast } from "sonner";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 import { useUpdateCompraAgil } from "@/hooks/useComprasAgiles";
@@ -14,6 +14,7 @@ import { formatCurrency } from "@/utils/clasificacion";
 import { unidadLabel } from "@/utils/unidades";
 import { estadoMatch } from "@/services/fuzzyMatching";
 import { PrecioMercadoHint } from "./PrecioMercadoHint";
+import { MarketPickerDialog, type MarketSeleccion } from "./MarketPickerDialog";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { calcularDesgloseOferta } from "@/lib/ofertaCalculo";
 import { aplicarRecargoPorRegion, obtenerRecargoRegion } from "@/utils/regiones";
@@ -74,6 +75,9 @@ interface ItemSeleccionado {
   precioUnitario: number;
   margen: number; // Margen calculado
   esManual?: boolean; // Si fue agregado manualmente
+  /** Proveedor del Market del Estado si el producto se eligió desde ahí
+   *  (para pedirle cotización al final). */
+  market?: { rut: string; proveedor: string };
 }
 
 export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }: GenerarPropuestaModalProps) {
@@ -91,6 +95,28 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
   const crearPipeline = useCreatePipelineItem();
   const [productoSeleccionando, setProductoSeleccionando] = useState<string | null>(null);
   const [mostrarAgregarManual, setMostrarAgregarManual] = useState(false);
+  // Ítem para el que se está eligiendo un producto del Market del Estado.
+  const [marketPara, setMarketPara] = useState<string | null>(null);
+
+  // Llena una línea de la propuesta con un producto elegido del Market del Estado
+  // (deja registrado el proveedor para, al final, poder pedirle cotización).
+  const handleElegirDelMarket = (itemId: string, sel: MarketSeleccion) => {
+    const precio = sel.precioRef && sel.precioRef > 0 ? Math.round(sel.precioRef) : 0;
+    setItemsSeleccionados((prev) =>
+      prev.map((item) =>
+        item.itemId === itemId
+          ? {
+              ...item,
+              selected: true,
+              match: { id: `mk:${sel.rut}:${sel.producto}`, sku: '', nombre: sel.producto, precio_unitario: precio, matchScore: 100, margen_estimado: 0 },
+              precioUnitario: precio,
+              market: { rut: sel.rut, proveedor: sel.proveedor },
+            }
+          : item,
+      ),
+    );
+    toast.success(`"${sel.producto}" de ${sel.proveedor} agregado a la línea.`);
+  };
   
   // Calcular precio con recargo por región
   const calcularPrecioConRecargo = (precioNeto: number): number => {
@@ -739,12 +765,23 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                               {estadoMatch(item.match.matchScore, true) === 'listo' ? 'Listo' : 'Revisar'}
                             </Badge>
                             {selector}
+                            <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setMarketPara(item.itemId)} title="Buscar este producto en el Market del Estado">
+                              <Store className="h-3 w-3 mr-1" /> Market
+                            </Button>
+                            {item.market && (
+                              <span className="text-[10px] text-firmavb-blue inline-flex items-center gap-1" title={`Elegido del Market: ${item.market.proveedor}`}>
+                                <Store className="h-3 w-3" />{item.market.proveedor}
+                              </span>
+                            )}
                           </div>
                         </>
                       ) : (
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs text-amber-700">Sin producto en tu inventario</span>
                           {selector}
+                          <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setMarketPara(item.itemId)} title="Buscar este producto en el Market del Estado">
+                            <Store className="h-3 w-3 mr-1" /> Market
+                          </Button>
                           {!item.selected && (
                             <Button variant="secondary" size="sm" className="h-7 px-2 text-xs" onClick={() => handleToggleItem(item.itemId)} title="Ofrecer este ítem con tu propio precio">
                               <Plus className="h-3 w-3 mr-1" />Ofertar manual
@@ -951,6 +988,17 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Picker visual del Market del Estado para llenar una línea de la propuesta */}
+      <MarketPickerDialog
+        abierto={marketPara !== null}
+        terminoInicial={(() => {
+          const it = itemsSeleccionados.find((i) => i.itemId === marketPara);
+          return it ? (it.descripcion || it.nombre || '') : '';
+        })()}
+        onClose={() => setMarketPara(null)}
+        onSeleccionar={(sel) => { if (marketPara) handleElegirDelMarket(marketPara, sel); }}
+      />
     </Dialog>
   );
 }
