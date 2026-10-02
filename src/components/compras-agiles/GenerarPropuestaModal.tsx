@@ -6,12 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, Package, Calculator, Check, Loader2, Download, Edit, Search, Plus, X, TrendingUp, TrendingDown, CheckCircle2, XCircle } from "lucide-react";
+import { FileText, Package, Calculator, Check, Loader2, Download, Edit, Search, Plus, X, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import type { CompraAgil } from "@/hooks/useComprasAgiles";
 import { useUpdateCompraAgil } from "@/hooks/useComprasAgiles";
 import { formatCurrency } from "@/utils/clasificacion";
 import { unidadLabel } from "@/utils/unidades";
+import { estadoMatch } from "@/services/fuzzyMatching";
 import { PrecioMercadoHint } from "./PrecioMercadoHint";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { calcularDesgloseOferta } from "@/lib/ofertaCalculo";
@@ -620,37 +621,6 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                   </Badge>
                 )}
               </div>
-              {compra.monto && (
-                // La decisión "dentro/excede" se toma con el NETO, igual que el
-                // detalle de la compra y que Mercado Público (compara netos).
-                // Antes aquí se comparaba CON IVA y la misma oferta cambiaba de
-                // "dentro" a "excede" entre una pantalla y la otra.
-                <div className="flex items-center gap-4 text-xs pt-1 border-t flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">Nuestra oferta (neto):</span>
-                    <span className={`font-bold ${
-                      subtotalItems <= compra.monto ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {formatCurrency(subtotalItems)}
-                    </span>
-                  </div>
-                  {compra.monto > 0 && (
-                    <div className="flex items-center gap-2">
-                      {subtotalItems <= compra.monto ? (
-                        <TrendingDown className="h-3.5 w-3.5 text-green-600" />
-                      ) : (
-                        <TrendingUp className="h-3.5 w-3.5 text-red-600" />
-                      )}
-                      <span className={subtotalItems <= compra.monto ? 'text-green-600' : 'text-red-600'}>
-                        {subtotalItems <= compra.monto ? 'Dentro del presupuesto' : 'Excede presupuesto'}
-                      </span>
-                      <span className="text-muted-foreground">
-                        ({((subtotalItems / compra.monto) * 100).toFixed(1)}%)
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           )}
         </DialogHeader>
@@ -765,8 +735,8 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                             />
                           </div>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <Badge variant={item.match.matchScore >= 80 ? 'success' : item.match.matchScore >= 60 ? 'secondary' : 'warning'} className="text-[10px] px-1.5 py-0">
-                              {item.match.matchScore}% parecido
+                            <Badge variant={estadoMatch(item.match.matchScore, true) === 'listo' ? 'success' : 'warning'} className="text-[10px] px-1.5 py-0" title={`${item.match.matchScore}% de coincidencia`}>
+                              {estadoMatch(item.match.matchScore, true) === 'listo' ? 'Listo' : 'Revisar'}
                             </Badge>
                             {selector}
                           </div>
@@ -848,9 +818,14 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
             <div className="flex items-center gap-2">
               <Calculator className="h-4 w-4 text-muted-foreground" />
               <div className="text-right leading-tight">
-                <span className="text-lg font-bold text-primary">{formatCurrency(subtotalItems)}</span>
+                <span className={`text-lg font-bold ${compra?.monto && subtotalItems > compra.monto ? 'text-red-600' : 'text-primary'}`}>{formatCurrency(subtotalItems)}</span>
                 <span className="text-sm text-muted-foreground font-normal"> neto</span>
                 <p className="text-xs text-muted-foreground">+ IVA = {formatCurrency(montoTotal)}</p>
+                {compra?.monto ? (
+                  <p className={`text-xs font-medium ${subtotalItems <= compra.monto ? 'text-green-600' : 'text-red-600'}`}>
+                    {subtotalItems <= compra.monto ? '✓ Dentro' : '⚠ Excede'} del presupuesto ({((subtotalItems / compra.monto) * 100).toFixed(0)}%)
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>

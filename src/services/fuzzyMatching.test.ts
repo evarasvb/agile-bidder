@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { findMatches, findBestMatch, calculateCoverageMetrics, isIncompatibleMatch, type PropuestaItemRow } from './fuzzyMatching';
+import { findMatches, findBestMatch, calculateCoverageMetrics, isIncompatibleMatch, UMBRAL_MATCH, type PropuestaItemRow } from './fuzzyMatching';
 import type { InventoryItem } from '@/hooks/useInventory';
 
 function producto(overrides: Partial<InventoryItem> = {}): InventoryItem {
@@ -168,7 +168,7 @@ describe('FV-UX-002 Case 2: Unit conversion with epsilon equivalence', () => {
 });
 
 describe('FV-UX-002 Case 2 (4168-340-COT26): Coverage calculation - weak matches NOT counted', () => {
-  it('4 items totales: 1 high (100) + 1 medium (≥60) + 1 weak (<60) + 1 missing = 50% cobertura', () => {
+  it('4 items totales: 1 high (100) + 1 en el umbral + 1 weak + 1 missing = 50% cobertura', () => {
     const rows: PropuestaItemRow[] = [
       {
         id: 'i1',
@@ -177,7 +177,7 @@ describe('FV-UX-002 Case 2 (4168-340-COT26): Coverage calculation - weak matches
       },
       {
         id: 'i2',
-        match: { inventoryItem: producto(), score: 65, matchType: 'partial', matchedTerms: [] },
+        match: { inventoryItem: producto(), score: UMBRAL_MATCH, matchType: 'partial', matchedTerms: [] },
         estado: 'auto',
       },
       {
@@ -193,7 +193,7 @@ describe('FV-UX-002 Case 2 (4168-340-COT26): Coverage calculation - weak matches
     ];
 
     const metrics = calculateCoverageMetrics(rows);
-    expect(metrics.itemsConMatchValidado).toBe(2); // score100 + score65
+    expect(metrics.itemsConMatchValidado).toBe(2); // score100 + score UMBRAL_MATCH
     expect(metrics.itemsConMatchDebil).toBe(1); // score45
     expect(metrics.itemsSinMatch).toBe(1);
     expect(metrics.totalItems).toBe(4);
@@ -229,26 +229,26 @@ describe('FV-UX-002 Case 2 (4168-340-COT26): Coverage calculation - weak matches
     expect(metrics.propuestaIncompleta).toBe(false);
   });
 
-  it('REVISAR badge score<60 no infla cobertura: 60 vs 59 punto de inflexión', () => {
-    // Score 60 → validado
-    const row60: PropuestaItemRow = {
+  it('Umbral único: score == UMBRAL_MATCH valida; uno menos es "por revisar"', () => {
+    // Score == UMBRAL_MATCH → validado
+    const rowListo: PropuestaItemRow = {
       id: 'x',
-      match: { inventoryItem: producto(), score: 60, matchType: 'keyword', matchedTerms: [] },
+      match: { inventoryItem: producto(), score: UMBRAL_MATCH, matchType: 'keyword', matchedTerms: [] },
       estado: 'auto',
     };
-    const metrics60 = calculateCoverageMetrics([row60]);
-    expect(metrics60.itemsConMatchValidado).toBe(1);
-    expect(metrics60.itemsConMatchDebil).toBe(0);
+    const metricsListo = calculateCoverageMetrics([rowListo]);
+    expect(metricsListo.itemsConMatchValidado).toBe(1);
+    expect(metricsListo.itemsConMatchDebil).toBe(0);
 
-    // Score 59 → REVISAR (no validado)
-    const row59: PropuestaItemRow = {
+    // Score == UMBRAL_MATCH - 1 → por revisar (no validado)
+    const rowRevisar: PropuestaItemRow = {
       id: 'y',
-      match: { inventoryItem: producto(), score: 59, matchType: 'category', matchedTerms: [] },
+      match: { inventoryItem: producto(), score: UMBRAL_MATCH - 1, matchType: 'category', matchedTerms: [] },
       estado: 'auto',
     };
-    const metrics59 = calculateCoverageMetrics([row59]);
-    expect(metrics59.itemsConMatchValidado).toBe(0);
-    expect(metrics59.itemsConMatchDebil).toBe(1);
+    const metricsRevisar = calculateCoverageMetrics([rowRevisar]);
+    expect(metricsRevisar.itemsConMatchValidado).toBe(0);
+    expect(metricsRevisar.itemsConMatchDebil).toBe(1);
   });
 });
 
@@ -389,7 +389,7 @@ describe('BLOCKER FIXES: Exact name + dimensions, multidimensional, coverage exc
     }
   });
 
-  it('BLOCKER 3: Coverage exclusion - weak matches (score <60) NOT counted in cobertura', () => {
+  it('BLOCKER 3: Coverage exclusion - matches bajo el umbral NO cuentan en cobertura', () => {
     const rows: PropuestaItemRow[] = [
       {
         id: 'i1',
@@ -398,21 +398,21 @@ describe('BLOCKER FIXES: Exact name + dimensions, multidimensional, coverage exc
       },
       {
         id: 'i2',
-        match: { inventoryItem: producto(), score: 59, matchType: 'category', matchedTerms: [] }, // Just under threshold
+        match: { inventoryItem: producto(), score: UMBRAL_MATCH - 1, matchType: 'category', matchedTerms: [] }, // Justo bajo el umbral
         estado: 'auto',
       },
       {
         id: 'i3',
-        match: { inventoryItem: producto(), score: 60, matchType: 'partial', matchedTerms: [] }, // At threshold
+        match: { inventoryItem: producto(), score: UMBRAL_MATCH, matchType: 'partial', matchedTerms: [] }, // En el umbral
         estado: 'auto',
       },
     ];
 
     const metrics = calculateCoverageMetrics(rows);
-    expect(metrics.itemsConMatchValidado).toBe(2); // score 100 + score 60
-    expect(metrics.itemsConMatchDebil).toBe(1); // score 59
+    expect(metrics.itemsConMatchValidado).toBe(2); // score 100 + score UMBRAL_MATCH
+    expect(metrics.itemsConMatchDebil).toBe(1); // score UMBRAL_MATCH - 1
     expect(metrics.cobertura).toBe(67); // 2/3 = 66.67 → 67
-    expect(metrics.propuestaIncompleta).toBe(true); // Has weak match
+    expect(metrics.propuestaIncompleta).toBe(true); // Hay un match por revisar
   });
 });
 
