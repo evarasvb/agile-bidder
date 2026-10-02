@@ -28,7 +28,8 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
-import { useCliente } from '@/hooks/useCliente';
+import { useCliente, useActualizarCliente } from '@/hooks/useCliente';
+import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { descargarCartaAbogadoPDF } from '@/services/cartaAbogadoPdf';
 import {
@@ -81,6 +82,7 @@ export default function CobranzaFacturas() {
   const { data: tasas = [] } = useTasasMora();
   const actualizar = useActualizarFactura();
   const eliminar = useEliminarFactura();
+  const actualizarCli = useActualizarCliente();
   const { data: ocLinks } = useOcLinksPorCodigos(facturas.filter((f) => f.deudor_tipo === 'estado').map((f) => f.oc_codigo || ''));
 
   const [expandido, setExpandido] = useState<Set<string>>(new Set());
@@ -335,6 +337,22 @@ export default function CobranzaFacturas() {
       </div>
 
       <NuevaFacturaDialog abiertoExterno={ocDialogAbierto} onAbiertoChange={setOcDialogAbierto} ocInicial={ocParaFactura} conTrigger={false} />
+
+      {cliente?.id && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 px-3 py-2">
+          <Switch
+            id="rec-auto"
+            checked={!!(cliente as any).recordatorios_cobranza_activo}
+            onCheckedChange={(v) => actualizarCli.mutate({ id: cliente.id, recordatorios_cobranza_activo: v } as any)}
+          />
+          <Label htmlFor="rec-auto" className="text-sm font-medium">Recordatorios automáticos (diario)</Label>
+          <span className="text-xs text-muted-foreground">
+            {(cliente as any).recordatorios_cobranza_activo
+              ? 'Encendido: cada mañana dejamos los borradores de recordatorio en tu Gmail (tú revisas y envías).'
+              : 'Apagado. Enciéndelo y cada mañana preparamos solos los recordatorios de las facturas con atraso.'}
+          </span>
+        </div>
+      )}
 
       {recordatoriosHoy.length > 0 && (
         <Card>
