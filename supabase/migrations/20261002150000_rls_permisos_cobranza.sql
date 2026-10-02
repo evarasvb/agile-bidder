@@ -53,3 +53,52 @@ alter policy cs_update_owner on public.cobranza_seguimiento
   with check (((cliente_id = cliente_owner_id()) or (cliente_id = auth.uid())) and public.tiene_modulo('cobranza'));
 alter policy cs_delete_owner on public.cobranza_seguimiento
   using (((cliente_id = cliente_owner_id()) or (cliente_id = auth.uid())) and public.tiene_modulo('cobranza'));
+
+-- Endurecimientos tras revisión Codex (2 P1 de seguridad):
+--
+-- (1) La FUENTE de permisos no puede ser editable por el propio miembro: sin
+-- esto, un miembro podía UPDATE su fila de vendedores y ponerse permisos=null o
+-- agregar 'cobranza' (la política vendedores_update_owner permite user_id =
+-- auth.uid()). Se extiende el trigger para que SOLO el dueño del equipo
+-- (invitado_por = auth.uid()) o service_role puedan cambiar `permisos` y `rol`.
+create or replace function public.vendedores_bloquear_invitado_por_cliente()
+returns trigger
+language plpgsql
+as $function$
+begin
+  if auth.role() is distinct from 'service_role' then
+    if tg_op = 'INSERT' then
+      if new.invitado_por is distinct from auth.uid() then
+        new.invitado_por := null;
+      end if;
+      if new.user_id is distinct from auth.uid() then
+        new.user_id := null;
+      end if;
+      if new.invitado_por is distinct from auth.uid() then
+        new.permisos := null;
+        new.rol := 'vendedor';
+      end if;
+    else
+      if new.invitado_por is distinct from old.invitado_por then
+        new.invitado_por := old.invitado_por;
+      end if;
+      if new.user_id is distinct from old.user_id then
+        new.user_id := old.user_id;
+      end if;
+      if auth.uid() is distinct from old.invitado_por then
+        new.permisos := old.permisos;
+        new.rol := old.rol;
+      end if;
+    end if;
+  end if;
+  return new;
+end;
+$function$;
+
+-- (2) Las funciones SECURITY DEFINER que leen facturas_por_cobrar
+-- (evaristo_contexto, institucion_zoom, conciliar_cartola, panel_cumplimiento,
+-- mis_ordenes_compra) corrían como dueño y saltaban la RLS. Con FORCE ROW LEVEL
+-- SECURITY, la RLS (y el chequeo de módulo) aplica también dentro de ellas con
+-- el auth.uid() del que llama; service_role (crons/sync) la sigue saltando.
+alter table public.facturas_por_cobrar force row level security;
+alter table public.cobranza_seguimiento force row level security;
