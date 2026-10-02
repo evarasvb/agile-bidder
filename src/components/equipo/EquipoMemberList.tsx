@@ -25,6 +25,7 @@ const rolColors: Record<string, string> = {
   admin: 'bg-purple-100 text-purple-700 border-purple-200',
   cobranza: 'bg-emerald-100 text-emerald-700 border-emerald-200',
   vendedor: 'bg-blue-100 text-blue-700 border-blue-200',
+  comprador: 'bg-amber-100 text-amber-700 border-amber-200',
   viewer: 'bg-gray-100 text-gray-600 border-gray-200',
 };
 
@@ -32,6 +33,7 @@ const rolLabels: Record<string, string> = {
   admin: 'Admin',
   cobranza: 'Cobranza',
   vendedor: 'Vendedor',
+  comprador: 'Comprador',
   viewer: 'Viewer',
 };
 
@@ -255,7 +257,13 @@ export function EquipoMemberList() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-rol">Rol</Label>
-              <Select value={editForm.rol} onValueChange={(v) => setEditForm({ ...editForm, rol: v })}>
+              <Select
+                value={editForm.rol}
+                onValueChange={(v) => {
+                  setEditForm({ ...editForm, rol: v });
+                  if (v === 'comprador') setEditPermisos(['market']);
+                }}
+              >
                 <SelectTrigger id="edit-rol">
                   <SelectValue />
                 </SelectTrigger>
@@ -263,6 +271,7 @@ export function EquipoMemberList() {
                   <SelectItem value="admin">Admin (acceso completo)</SelectItem>
                   <SelectItem value="cobranza">Cobranza (enfocado en cobros)</SelectItem>
                   <SelectItem value="vendedor">Vendedor (pipeline + asignaciones)</SelectItem>
+                  <SelectItem value="comprador">Comprador (solo Market del Estado)</SelectItem>
                   <SelectItem value="viewer">Viewer (solo lectura)</SelectItem>
                 </SelectContent>
               </Select>
