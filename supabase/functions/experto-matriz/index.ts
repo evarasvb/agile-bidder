@@ -82,6 +82,10 @@ Deno.serve(async (req) => {
     if (!matriz) return json({ error: "ia_no_disponible", mensaje: "El modelo no respondió bien. Intenta de nuevo en un minuto." }, 502);
     matriz.generada_en = new Date().toISOString(); matriz.codigo = codigo;
     try { await sb.rpc("experto_registrar_uso", { p_user_id: userId, p_huella: "libro", p_modo: "matriz", p_pregunta: `matriz ${codigo}`, p_respuesta: JSON.stringify(matriz), p_fuentes: [], p_licitacion: codigo, p_ms: 0, p_ip: null }); } catch { /* no bloquear */ }
+    // Alimenta el reporte "Criterios de evaluación" (qué factores se repiten
+    // más entre licitaciones) con la matriz recién generada — sin esto solo
+    // se completaría con un backfill manual.
+    try { await sb.rpc("criterios_evaluacion_extraer_uno", { p_codigo: codigo }); } catch { /* no bloquear */ }
     return json({ ok: true, codigo, matriz, documentos: (docs as any[]).length });
   } catch (e) { return json({ error: String((e as Error)?.message ?? e) }, 500); }
 });
