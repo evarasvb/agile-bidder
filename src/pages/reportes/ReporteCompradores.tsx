@@ -28,7 +28,7 @@ const COLUMNAS_COMPRADORES: DataTableColumn<FilaComprador>[] = [
   {
     id: "comprador",
     header: "Institución",
-    className: "font-medium max-w-[240px] truncate",
+    className: "font-medium whitespace-nowrap",
     sortValue: (c) => c.comprador,
     cell: (c) => c.comprador,
   },

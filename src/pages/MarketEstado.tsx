@@ -2,17 +2,21 @@
 // Busca quién le vende un producto al Estado —con precio y frecuencia reales de
 // las órdenes de compra— y permite pedirle cotización a otro proveedor. Si el
 // proveedor ya está en FirmaVB le llega el aviso; si no, la solicitud lo espera.
-import { useMemo, useState } from "react";
-import { Store, Search, Building2, ShoppingCart, Send, CheckCircle2, Inbox } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Store, Search, Building2, ShoppingCart, Send, CheckCircle2, Inbox, Package, MessageCircle, Copy, Loader2 } from "lucide-react";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
   useMarketBuscar,
   useMisSolicitudes,
   useMarketSolicitar,
   useMarketCotizar,
+  useMkMensajes,
+  useMkEnviarMensaje,
+  useClienteOwnerId,
   type MarketProveedor,
   type MarketSolicitud,
 } from "@/hooks/useMarketEstado";
+import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -69,7 +73,7 @@ function SolicitarDialog({ proveedor, productoInicial, onClose }: {
       });
       toast.success(enFirmaVB
         ? "Solicitud enviada. Le llegará el aviso al proveedor."
-        : "Solicitud registrada. Se le entregará al proveedor cuando se registre en FirmaVB.");
+        : "Solicitud registrada. Mercado Público no publica su correo, así que avísale tú: en \"Mis solicitudes\" tienes un mensaje listo para copiar y mandarle.");
       onClose();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo enviar la solicitud.");
@@ -84,7 +88,7 @@ function SolicitarDialog({ proveedor, productoInicial, onClose }: {
           <DialogDescription>
             A <span className="font-medium text-foreground">{proveedor?.proveedor}</span>{" "}
             <span className="font-mono text-xs">{proveedor?.rut}</span>
-            {!enFirmaVB && " — todavía no está en FirmaVB; lo invitamos y tu solicitud queda esperándolo."}
+            {!enFirmaVB && " — todavía no está en FirmaVB. No tenemos su correo (Mercado Público no lo publica), así que la solicitud queda guardada y en \"Mis solicitudes\" te dejamos un mensaje listo para que tú se lo mandes."}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -201,11 +205,15 @@ function ProveedorCard({ p, onPedir }: { p: MarketProveedor; onPedir: (prod: str
               RUT {p.rut}{p.ultima_venta ? ` · última venta ${fecha(p.ultima_venta)}` : ""}
             </p>
           </div>
-          {p.es_firmavb && (
-            <Badge className="shrink-0 bg-firmavb-green/15 text-firmavb-green border-0 gap-1">
+          {p.tiene_inventario ? (
+            <Badge className="shrink-0 bg-firmavb-green/15 text-firmavb-green border-0 gap-1" title="Vende por FirmaVB: tiene su catálogo cargado acá, no solo historial de ventas al Estado">
+              <Package className="h-3 w-3" /> Catálogo en FirmaVB
+            </Badge>
+          ) : p.es_firmavb ? (
+            <Badge className="shrink-0 bg-firmavb-blue/10 text-firmavb-blue border-0 gap-1">
               <CheckCircle2 className="h-3 w-3" /> En FirmaVB
             </Badge>
-          )}
+          ) : null}
         </div>
 
         <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-sm">
@@ -233,15 +241,24 @@ function ProveedorCard({ p, onPedir }: { p: MarketProveedor; onPedir: (prod: str
           variant={p.es_firmavb ? "default" : "secondary"}
         >
           <ShoppingCart className="h-4 w-4" />
-          {p.es_firmavb ? "Pedir cotización" : "Pedir cotización (lo invitamos)"}
+          Pedir cotización
         </Button>
       </CardContent>
     </Card>
   );
 }
 
+// Mensaje listo para copiar y mandar a un proveedor que no está en FirmaVB
+// (no tenemos su correo: Mercado Público no lo publica — ver hallazgo de
+// Evaristo al pedir cotización a DIMERC). Lo manda Evaristo por su cuenta
+// (WhatsApp, correo que ya tenga) en vez de que el sistema finja invitarlo.
+function textoInvitacion(s: MarketSolicitud): string {
+  const prod = s.producto ? `"${s.producto}"${s.cantidad ? ` (x${s.cantidad})` : ""}` : "unos productos";
+  return `Hola${s.contraparte ? ` ${s.contraparte}` : ""}! Te escribo desde FirmaVB, la plataforma donde gestiono compras y ventas al Estado. Necesito cotizar ${prod} y me gustaría que me cotizaras ahí directo: te registras gratis en https://firmavb.cl y respondes mi solicitud desde el Market de proveedores. ¡Gracias!`;
+}
+
 // ── Mis solicitudes ──────────────────────────────────────────────
-function MisSolicitudes({ onResponder }: { onResponder: (s: MarketSolicitud) => void }) {
+function MisSolicitudes({ onResponder, onChat }: { onResponder: (s: MarketSolicitud) => void; onChat: (s: MarketSolicitud) => void }) {
   const { data = [], isLoading } = useMisSolicitudes();
   if (isLoading) return <div className="space-y-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-24 w-full" />)}</div>;
   if (data.length === 0) {
@@ -265,7 +282,11 @@ function MisSolicitudes({ onResponder }: { onResponder: (s: MarketSolicitud) => 
                     <Badge variant={meLaPidieron ? "default" : "secondary"}>
                       {meLaPidieron ? "Me la pidieron" : "La pedí yo"}
                     </Badge>
-                    {s.estado && <Badge variant="outline" className="capitalize">{s.estado}</Badge>}
+                    {s.estado && (
+                      <Badge variant="outline" className="capitalize">
+                        {s.estado === "invitacion_pendiente" ? "Aún no está en FirmaVB" : s.estado}
+                      </Badge>
+                    )}
                   </div>
                   <p className="font-medium mt-2 truncate">{s.producto || "—"}{s.cantidad ? ` · ${s.cantidad}` : ""}</p>
                   <p className="text-xs text-muted-foreground">
@@ -273,11 +294,30 @@ function MisSolicitudes({ onResponder }: { onResponder: (s: MarketSolicitud) => 
                     {s.oportunidad_codigo ? ` · ${s.oportunidad_codigo}` : ""}
                   </p>
                 </div>
-                {meLaPidieron && (
-                  <Button size="sm" onClick={() => onResponder(s)} className="shrink-0 gap-2">
-                    <Send className="h-3.5 w-3.5" /> Cotizar
-                  </Button>
-                )}
+                <div className="flex shrink-0 gap-2">
+                  {meLaPidieron && (
+                    <Button size="sm" onClick={() => onResponder(s)} className="gap-2">
+                      <Send className="h-3.5 w-3.5" /> Cotizar
+                    </Button>
+                  )}
+                  {s.estado === "invitacion_pendiente" ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() => {
+                        navigator.clipboard.writeText(textoInvitacion(s));
+                        toast.success("Mensaje copiado — pégalo en WhatsApp o correo.");
+                      }}
+                    >
+                      <Copy className="h-3.5 w-3.5" /> Copiar invitación
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="outline" className="gap-2" onClick={() => onChat(s)}>
+                      <MessageCircle className="h-3.5 w-3.5" /> Chat
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {s.cotizaciones.length > 0 && (
@@ -301,6 +341,78 @@ function MisSolicitudes({ onResponder }: { onResponder: (s: MarketSolicitud) => 
   );
 }
 
+// ── Chat de una solicitud ─────────────────────────────────────────
+function ChatDialog({ solicitud, onClose }: { solicitud: MarketSolicitud | null; onClose: () => void }) {
+  const { data: ownerId } = useClienteOwnerId();
+  const solicitudId = solicitud?.id ?? null;
+  const { data: mensajes = [], isLoading } = useMkMensajes(solicitudId);
+  const enviar = useMkEnviarMensaje(solicitudId);
+  const [texto, setTexto] = useState("");
+  const finRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    finRef.current?.scrollIntoView({ block: "end" });
+  }, [mensajes.length]);
+
+  const mandar = async () => {
+    const t = texto.trim();
+    if (!t) return;
+    setTexto("");
+    try {
+      await enviar.mutateAsync(t);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo enviar el mensaje.");
+      setTexto(t);
+    }
+  };
+
+  return (
+    <Dialog open={!!solicitud} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-md flex flex-col max-h-[80vh]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <MessageCircle className="h-4 w-4" /> {solicitud?.contraparte || "Chat"}
+          </DialogTitle>
+          <DialogDescription>
+            {solicitud?.producto}{solicitud?.cantidad ? ` · ${solicitud.cantidad}` : ""}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex-1 min-h-[240px] overflow-y-auto space-y-2 py-2 border-y">
+          {isLoading ? (
+            <div className="space-y-2">{[0, 1].map((i) => <Skeleton key={i} className="h-10 w-2/3" />)}</div>
+          ) : mensajes.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">Todavía no hay mensajes. Escribe el primero.</p>
+          ) : (
+            mensajes.map((m) => {
+              const esMio = !!ownerId && m.autor_id === ownerId;
+              return (
+                <div key={m.id} className={cn("max-w-[80%] rounded-lg px-3 py-2 text-sm", esMio ? "ml-auto bg-firmavb-blue text-white" : "bg-muted")}>
+                  {m.mensaje}
+                </div>
+              );
+            })
+          )}
+          <div ref={finRef} />
+        </div>
+
+        <div className="flex items-center gap-2 pt-1">
+          <Input
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); mandar(); } }}
+            placeholder="Escribe un mensaje…"
+            disabled={enviar.isPending}
+          />
+          <Button size="icon" onClick={mandar} disabled={enviar.isPending || !texto.trim()}>
+            {enviar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Página ───────────────────────────────────────────────────────
 export default function MarketEstado() {
   const [input, setInput] = useState("");
@@ -308,6 +420,7 @@ export default function MarketEstado() {
   const { data: proveedores = [], isLoading, isError } = useMarketBuscar(q);
   const [pedirA, setPedirA] = useState<{ prov: MarketProveedor; producto: string } | null>(null);
   const [responder, setResponder] = useState<MarketSolicitud | null>(null);
+  const [chatSolicitud, setChatSolicitud] = useState<MarketSolicitud | null>(null);
 
   const estado = useMemo(() => {
     if (q.length < 3) return "Escribe un producto (mínimo 3 letras) para buscar proveedores.";
@@ -379,7 +492,7 @@ export default function MarketEstado() {
           </TabsContent>
 
           <TabsContent value="solicitudes" className="mt-4">
-            <MisSolicitudes onResponder={setResponder} />
+            <MisSolicitudes onResponder={setResponder} onChat={setChatSolicitud} />
           </TabsContent>
         </Tabs>
       </div>
@@ -390,6 +503,7 @@ export default function MarketEstado() {
         onClose={() => setPedirA(null)}
       />
       <CotizarDialog solicitud={responder} onClose={() => setResponder(null)} />
+      <ChatDialog solicitud={chatSolicitud} onClose={() => setChatSolicitud(null)} />
     </div>
   );
 }

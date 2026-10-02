@@ -39,20 +39,20 @@ const COLUMNAS_MI_COMPETITIVIDAD: DataTableColumn<FilaCompetitividad>[] = [
   {
     id: "mi_producto",
     header: "Mi producto",
-    className: "font-medium max-w-[200px] truncate",
+    className: "font-medium whitespace-nowrap",
     sortValue: (r) => r.mi_producto,
     cell: (r) => r.mi_producto,
   },
   {
     id: "producto_cm",
     header: "Producto en el mercado",
-    className: "max-w-[240px]",
+    className: "whitespace-nowrap",
     sortValue: (r) => r.producto_cm,
     exportValue: (r) => `${r.producto_cm} (${Math.round(r.similitud * 100)}% coincidencia)`,
     cell: (r) => (
       <>
-        <span className="line-clamp-1 text-sm">{r.producto_cm}</span>
-        <span className="text-[11px] text-muted-foreground">{Math.round(r.similitud * 100)}% coincidencia</span>
+        <span className="text-sm">{r.producto_cm}</span>
+        <span className="text-[11px] text-muted-foreground"> · {Math.round(r.similitud * 100)}% coincidencia</span>
       </>
     ),
   },
@@ -97,7 +97,7 @@ const COLUMNAS_MI_COMPETITIVIDAD: DataTableColumn<FilaCompetitividad>[] = [
 ];
 
 const COLUMNAS_COMPRADORES_CM: DataTableColumn<CMComprador>[] = [
-  { id: "comprador", header: "Institución", className: "font-medium max-w-[220px] truncate", sortValue: (c) => c.comprador, cell: (c) => c.comprador },
+  { id: "comprador", header: "Institución", className: "font-medium whitespace-nowrap", sortValue: (c) => c.comprador, cell: (c) => c.comprador },
   { id: "ordenes", header: "Órdenes", align: "right", sortValue: (c) => c.lineas, cell: (c) => c.lineas },
   {
     id: "precio_prom",
@@ -211,7 +211,7 @@ export default function ReporteConvenioMarco() {
       {
         id: "proveedor",
         header: "Proveedor",
-        className: "font-medium max-w-[220px] truncate",
+        className: "font-medium whitespace-nowrap",
         sortValue: (pr) => pr.proveedor,
         cell: (pr) => (
           <span className="flex items-center gap-1">
