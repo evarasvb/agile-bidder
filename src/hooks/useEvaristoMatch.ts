@@ -3,6 +3,7 @@
  * useEvaristoMatch - Sistema de matching inteligente item por item * Similar al sistema de Lici: genera ofertas automáticas con precios del inventario
  */
 
+import { COLUMNAS_INVENTARIO } from '@/lib/inventarioColumnas';
 import { useQuery } from '@tanstack/react-query';
 import { supabaseClient as supabase } from '@/lib/supabaseClient';
 import type { InventoryItem } from './useInventory';
@@ -225,7 +226,7 @@ export function useEvaristoMatch(licitacionId: string | null, threshold: number 
       const { data: licitacion, error: licitacionError } = await supabase
         .from('licitaciones')
               .select('*')
-              .eq('id', licitacionId)        
+              .eq('id', licitacionId)
                     .single();
       
       if (licitacionError || !licitacion) {
@@ -266,9 +267,13 @@ export function useEvaristoMatch(licitacionId: string | null, threshold: number 
       // 4. Obtener inventario del cliente
       const { data: inventoryData, error: inventoryError } = await supabase
         .from('cliente_inventario')
-        .select('*')
-        .eq('cliente_id', user.id)
-        .eq('activo', true);
+        .select(COLUMNAS_INVENTARIO)
+        // `cliente_inventario` NO tiene columna `activo` (verificado contra
+        // information_schema el 2-oct-2026). PostgREST devolvía error en CADA
+        // llamada, así que este match nunca funcionó. Se quita el filtro en vez
+        // de inventar la columna: si más adelante hace falta marcar productos
+        // de baja, se agrega la columna y se vuelve a filtrar acá.
+        .eq('cliente_id', user.id);
       
       if (inventoryError) {
         console.error('[useEvaristoMatch] Error obteniendo inventario:', inventoryError);

@@ -1,3 +1,4 @@
+import { COLUMNAS_INVENTARIO } from '@/lib/inventarioColumnas';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabaseClient as supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/hooks/useAuth';
@@ -124,7 +125,7 @@ export function useInventarioPagina(opts: InventarioPaginaOpts) {
       const from = (opts.page - 1) * opts.pageSize;
       let query = supabase
         .from('cliente_inventario')
-        .select('*', { count: 'exact' })
+        .select(COLUMNAS_INVENTARIO, { count: 'exact' })
         .eq('cliente_id', ownerId);
       if (q) {
         const t = valorIlike(q);
@@ -198,7 +199,7 @@ export async function cargarInventarioCompleto(): Promise<InventoryItem[]> {
   for (let page = 0; ; page++) {
     const { data, error } = await supabase
       .from('cliente_inventario')
-      .select('*')
+      .select(COLUMNAS_INVENTARIO)
       .eq('cliente_id', ownerId)
       .order('created_at', { ascending: false })
       .range(page * 1000, page * 1000 + 999);
@@ -245,7 +246,7 @@ export function useInventory() {
 
         const { data, error } = await supabase
           .from('cliente_inventario')
-          .select('*')
+          .select(COLUMNAS_INVENTARIO)
           .eq('cliente_id', ownerId)
           .order('created_at', { ascending: false })
           .range(from, to);
@@ -315,7 +316,7 @@ export function useInventoryActivo() {
 
         const { data, error } = await supabase
           .from('cliente_inventario')
-          .select('*')
+          .select(COLUMNAS_INVENTARIO)
           .eq('cliente_id', ownerId)
           .order('nombre')
           .range(from, to);
@@ -355,7 +356,7 @@ export function useInventoryItem(id: string | null) {
 
       const { data, error } = await supabase
         .from('cliente_inventario')
-        .select('*')
+        .select(COLUMNAS_INVENTARIO)
         .eq('id', id)
         .eq('cliente_id', ownerId)
         .maybeSingle();

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { etiquetaCalce } from "@/lib/calceOportunidad";
 import { montoCorto } from "@/lib/formatoMonto";
 import { useInventoryStats } from "@/hooks/useInventory";
 
@@ -52,7 +53,6 @@ import {
 import { useRegistrarSenal } from "@/hooks/useSenales";
 import { useClienteFiltros } from "@/hooks/useClienteFiltros";
 import { presupuestoTexto } from "@/lib/organismoPago";
-import { PISO_MATCH } from "@/hooks/useOportunidadesPanel";
 import { format, differenceInDays, differenceInHours } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -101,6 +101,13 @@ function OpportunityCard({
   onDescartar: () => void;
 }) {
   const deadline = getDeadlineText(op.fecha_cierre);
+  // Cobertura y calidad separadas, con su criterio en src/lib/calceOportunidad.ts
+  // (puro y con test) para que no vuelva a quedar enterrado en el render.
+  const calce = etiquetaCalce({
+    calidad: op.match_calidad ?? null,
+    itemsMatched: op.items_matched ?? 0,
+    itemsCount: op.items_count ?? 0,
+  });
 
   return (
     <Card
@@ -119,13 +126,24 @@ function OpportunityCard({
         {/* Top row: Score + Type + Deadline */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
-            {/* La tarjeta dice POR QUÉ está aquí: % si calza con tu inventario,
-                "Tu rubro" si coincide con tus palabras clave del onboarding.
-                (Antes decía "N/A": parecía que el match no funcionaba.) */}
-            {op.match_score && op.match_score >= PISO_MATCH ? (
-              <Badge className={getScoreColor(op.match_score)}>
-                {op.match_score}% match
-              </Badge>
+            {/* La tarjeta dice POR QUÉ está aquí: cuántos ítems calzan y con qué
+                calidad, "Tu rubro" si coincide con tus palabras clave.
+                (Antes decía "N/A": parecía que el match no funcionaba.)
+
+                El color y el número GRANDE van por CALIDAD, no por cobertura:
+                antes decía "{cobertura}% match", así que una compra con un solo
+                ítem calzado a 47 puntos salía como "100% match" y arriba de la
+                lista. Medido: de 598 compras con cobertura 100%, 548 tenían
+                calidad media bajo 60. La cobertura sigue visible, pero dicha
+                con sus palabras: "3/3 ítems". */}
+            {calce ? (
+              calce.confiable && calce.tono !== null ? (
+                <Badge className={getScoreColor(calce.tono)}>{calce.texto}</Badge>
+              ) : (
+                <Badge variant="outline" className="border-muted-foreground/30 text-muted-foreground">
+                  {calce.texto}
+                </Badge>
+              )
             ) : op.rubro_match ? (
               <Badge variant="outline" className="border-firmavb-blue/40 text-firmavb-blue bg-firmavb-blue/5">
                 {op.rubro_palabra ? `Tu rubro: ${op.rubro_palabra}` : "Tu rubro ✓"}
@@ -405,9 +423,14 @@ export default function Oportunidades() {
               {isLoading ? (
                 <Skeleton className="h-7 w-14" />
               ) : (
-                <p className="text-2xl font-bold">{stats.totalActivas}</p>
+                <p className="text-2xl font-bold">{stats.conMatch.toLocaleString("es-CL")}</p>
               )}
-              <p className="text-xs text-muted-foreground">Matches Activos</p>
+              {/* Decía "Matches Activos" con stats.totalActivas, que es el
+                  conteo de TODO lo abierto en Mercado Público (6.062), no lo
+                  que calza contigo. Eran dos cosas distintas con un rótulo. */}
+              <p className="text-xs text-muted-foreground">
+                Con match · de {stats.totalActivas.toLocaleString("es-CL")} abiertas
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -423,7 +446,7 @@ export default function Oportunidades() {
               ) : (
                 <p className="text-2xl font-bold">{stats.avgMatchScore}%</p>
               )}
-              <p className="text-xs text-muted-foreground">Match Promedio</p>
+              <p className="text-xs text-muted-foreground">Calidad promedio del calce</p>
             </div>
           </CardContent>
         </Card>
@@ -548,7 +571,11 @@ export default function Oportunidades() {
             {isLoading
               ? "Buscando tus oportunidades…"
               : stats.totalActivas > oportunidades.length
-                ? `Mostrando ${oportunidades.length.toLocaleString("es-CL")} de ${stats.totalActivas.toLocaleString("es-CL")} oportunidades (ajusta los filtros para ver otras)`
+                /* Comparaba las que se muestran contra TODO el mercado abierto
+                   ("232 de 6.062"), que son magnitudes distintas: las 6.062 no
+                   calzan contigo. Ahora dice contra qué se compara y cuántas
+                   de las que SÍ calzan están a la vista. */
+                ? `Mostrando ${oportunidades.length.toLocaleString("es-CL")} (${stats.conMatch.toLocaleString("es-CL")} con match) de ${stats.totalActivas.toLocaleString("es-CL")} abiertas en Mercado Público. Para ver más, ajusta tus filtros.`
                 : `${oportunidades.length.toLocaleString("es-CL")} oportunidades encontradas`}
           </p>
           {stats.busqueda && (

@@ -24,6 +24,14 @@ export interface OportunidadPanel {
   match_encontrado: boolean;
   items_count: number;
   items_matched: number;
+  /**
+   * COBERTURA vs CALIDAD son dos cosas distintas y la tarjeta debe decir cuál
+   * muestra. `match_score` es la cobertura (ítems con candidato / ítems
+   * pedidos). `match_calidad` es el promedio de los scores de esos candidatos.
+   * Una compra de un solo ítem calzado a 47 puntos tiene cobertura 100 y
+   * calidad 47: mostrar solo lo primero como "100% match" es engañoso.
+   */
+  match_calidad?: number | null;
   created_at: string;
   // Texto concatenado de los productos de la compra, para buscar por ítem
   // (una compra "Insumos de oficina" que en su lista tiene tóner debe calzar).
@@ -122,7 +130,14 @@ function detalleItem(i: any): string {
 }
 
 export interface PanelStats {
+  /**
+   * Oportunidades ABIERTAS en Mercado Público (conteo head:true de toda la
+   * tabla). Es el tamaño del mercado, NO cuántas calzan con el cliente: no
+   * rotularlo "Matches activos", que era el error que tenía el panel.
+   */
   totalActivas: number;
+  /** Oportunidades que SÍ tienen match sobre el piso, de las traídas al panel. */
+  conMatch: number;
   avgMatchScore: number;
   cierranEstaSemana: number;
   valorTotal: number;
@@ -363,6 +378,10 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       // códigos: URLs enormes y dos idas y vueltas extra que hacían lento el panel.
       const bestMatchByCodigo: Record<string, { score: number; producto: string | null; count: number }> = {};
       const itemMatchCountByCodigo: Record<string, number> = {};
+      // Suma de scores por compra, para poder informar la CALIDAD media del
+      // calce además de la cobertura. Sin esto la tarjeta solo tenía "cuántos
+      // ítems calzan", y ese número se leía como "qué tan bien calzan".
+      const itemScoreSumByCodigo: Record<string, number> = {};
       let itemMatchesFallaron = false;
       // Si el RPC de empresa dueña no resolvió (p. ej. un usuario recién
       // registrado que todavía no tiene fila en `clientes`), NO se muestran
@@ -379,7 +398,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
           .gte('fecha_cierre', nowIso);
         const itemQuery = supabase
           .from('ca_item_matches')
-          .select('compra_agil_codigo')
+          .select('compra_agil_codigo, score')
           .eq('cliente_id', clienteIdPanel)
           .gte('fecha_cierre', nowIso)
           .gte('score', PISO_MATCH);
@@ -406,10 +425,12 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
             }
           }
         }
-        // Cobertura ÍTEM POR ÍTEM: cuántos ítems de cada compra calzan.
+        // Cobertura ÍTEM POR ÍTEM: cuántos ítems de cada compra calzan, y con
+        // qué score, que son dos cosas distintas y hay que poder separarlas.
         for (const im of (((itemMatchesRes as any)?.data) || []) as any[]) {
           const k = im.compra_agil_codigo as string;
           itemMatchCountByCodigo[k] = (itemMatchCountByCodigo[k] || 0) + 1;
+          itemScoreSumByCodigo[k] = (itemScoreSumByCodigo[k] || 0) + (Number(im.score) || 0);
         }
       }
 
@@ -427,6 +448,14 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         // nivel de compra (ca_matches) como respaldo, en vez de forzar 0%.
         const coverageScore = !itemMatchesFallaron && itemsCount > 0 && itemsMatched > 0 ? Math.round((itemsMatched / itemsCount) * 100) : null;
         const fallbackScore = bestMatchByCodigo[c.codigo]?.score ?? (c.match_score >= PISO_MATCH ? c.match_score : null);
+        // CALIDAD media del calce (promedio de los scores de los ítems que
+        // calzaron). Es un dato DISTINTO de la cobertura y hay que mostrarlo
+        // aparte: medido sobre las compras abiertas, 598 llegaban a cobertura
+        // 100% y 548 de esas tenían calidad media bajo 60. Una compra con un
+        // solo ítem calzado a 47 puntos marcaba "100% match".
+        const calidadMedia = itemsMatched > 0
+          ? Math.round((itemScoreSumByCodigo[c.codigo] || 0) / itemsMatched)
+          : (bestMatchByCodigo[c.codigo]?.score ?? null);
         return {
           id: c.id,
           codigo: c.codigo,
@@ -446,6 +475,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
           // Ítems que calzan producto-a-producto (ca_item_matches). Antes era el
           // conteo de filas de ca_matches (match a nivel de compra), poco útil.
           items_matched: itemsMatched,
+          match_calidad: calidadMedia,
           created_at: c.created_at,
           items_text: (c.compras_agiles_items || [])
             .map((i: any) => `${i.nombre_producto || ''} ${i.descripcion_producto || ''}`)
@@ -568,8 +598,13 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
           // Lo que calza con las PALABRAS del cliente (su rubro) sube junto a
           // los matches de inventario: si definió "licencia", eso va arriba y
           // no queda enterrado bajo productos sueltos del inventario.
-          valA = (a.match_score || 0) + (boostByCodigo[a.codigo] || 0) + Math.min(a.items_matched || 0, 15) * 3 + (a.rubro_match ? 40 : 0);
-          valB = (b.match_score || 0) + (boostByCodigo[b.codigo] || 0) + Math.min(b.items_matched || 0, 15) * 3 + (b.rubro_match ? 40 : 0);
+          // Manda la CALIDAD del calce; la cobertura suma pero no decide. Antes
+          // el primer término era la cobertura, así que una compra de 1 ítem
+          // calzado a 47 puntos (cobertura 100) le ganaba a una de 12 ítems
+          // calzados a 85. El usuario abría la primera, no servía, y dejaba de
+          // creerle a la lista.
+          valA = (a.match_calidad ?? a.match_score ?? 0) + (boostByCodigo[a.codigo] || 0) + Math.min(a.items_matched || 0, 15) * 3 + (a.rubro_match ? 40 : 0);
+          valB = (b.match_calidad ?? b.match_score ?? 0) + (boostByCodigo[b.codigo] || 0) + Math.min(b.items_matched || 0, 15) * 3 + (b.rubro_match ? 40 : 0);
         } else if (sortBy === 'fecha_cierre') {
           valA = a.fecha_cierre ? new Date(a.fecha_cierre).getTime() : Infinity;
           valB = b.fecha_cierre ? new Date(b.fecha_cierre).getTime() : Infinity;
@@ -594,10 +629,19 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         if (licN || caN) totalActivasReal = licN + caN;
       }
 
+      const conMatch = all.filter(o => o.match_encontrado).length;
+
       const stats: PanelStats = {
         totalActivas: totalActivasReal,
-        avgMatchScore: all.length > 0
-          ? Math.round(all.reduce((sum, o) => sum + (o.match_score || 0), 0) / all.length)
+        conMatch,
+        // Promedio de CALIDAD, no de cobertura, y solo sobre las que tienen
+        // match: antes promediaba la cobertura de TODAS (incluidas las que no
+        // calzan, con 0) y daba una cifra que no significaba nada.
+        avgMatchScore: conMatch > 0
+          ? Math.round(
+              all.filter(o => o.match_encontrado)
+                 .reduce((sum, o) => sum + (o.match_calidad ?? o.match_score ?? 0), 0) / conMatch,
+            )
           : 0,
         cierranEstaSemana: all.filter(o => {
           if (!o.fecha_cierre) return false;

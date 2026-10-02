@@ -1,3 +1,4 @@
+import { COLUMNAS_INVENTARIO } from '@/lib/inventarioColumnas';
 import { useQuery } from '@tanstack/react-query';
 import { supabaseClient } from '@/lib/supabaseClient';
 import { useAuth } from './useAuth';
@@ -42,7 +43,7 @@ export function useClienteInventario(filters?: ClienteInventarioFilters) {
       while (hasMore) {
         let query = supabaseClient
           .from('cliente_inventario')
-          .select('*', { count: 'exact' })
+          .select(COLUMNAS_INVENTARIO, { count: 'exact' })
           .eq('cliente_id', user.id)
           .range(from, from + pageSize - 1)
           .order('nombre', { ascending: true });
