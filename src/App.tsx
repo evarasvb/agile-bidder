@@ -195,12 +195,14 @@ const App = () => (
           
           {/* Admin oculto */}
           <Route path="/admin/evaristo" element={<AdminOnlyRoute><AdminEvaristo /></AdminOnlyRoute>} />
-          <Route path="/admin/soporte" element={<AdminOnlyRoute><AdminSoporte /></AdminOnlyRoute>} />
           <Route path="/admin/experto-actividad" element={<AdminOnlyRoute><AdminExpertoActividad /></AdminOnlyRoute>} />
 
           {/* ========== RUTAS PROTEGIDAS CON LAYOUT ========== */}
           <Route element={<ProtectedLayoutWrapper />}>
             
+            {/* Tickets de soporte (admin): dentro del layout para conservar el menú lateral */}
+            <Route path="/admin/soporte" element={<AdminOnlyRoute><AdminSoporte /></AdminOnlyRoute>} />
+
             {/* ----- MIS OPORTUNIDADES ----- */}
             <Route path="/mis-oportunidades" element={<Navigate to="/oportunidades" replace />} />
             <Route path="/licitaciones/:id" element={<LicitacionDetalle />} />
