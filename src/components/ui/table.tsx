@@ -2,9 +2,23 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
-  ({ className, ...props }, ref) => (
-    <div className="relative w-full overflow-auto">
+interface TableProps extends React.HTMLAttributes<HTMLTableElement> {
+  /** Clases extra para el div que envuelve la tabla (el que de verdad hace
+   *  scroll horizontal — ver containerRef). */
+  containerClassName?: string;
+  containerStyle?: React.CSSProperties;
+  /** Ref al div que envuelve la tabla, NO al <table>. Lo necesita quien mida
+   *  o controle el scroll horizontal real (ej. DataTable y su barra
+   *  deslizadora): `ref` acá siempre apuntó al <table>, que nunca scrollea —
+   *  es este div quien tiene el overflow-auto y el scrollWidth/scrollLeft
+   *  reales (hallazgo de Codex: medir el <table> o el div externo de
+   *  DataTable daba siempre 0, porque el que scrollea es este). */
+  containerRef?: React.Ref<HTMLDivElement>;
+}
+
+const Table = React.forwardRef<HTMLTableElement, TableProps>(
+  ({ className, containerClassName, containerStyle, containerRef, ...props }, ref) => (
+    <div ref={containerRef} className={cn("relative w-full overflow-auto", containerClassName)} style={containerStyle}>
       <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
     </div>
   ),

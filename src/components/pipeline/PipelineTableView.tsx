@@ -30,9 +30,9 @@ const COLUMNAS_PIPELINE: DataTableColumn<PipelineItem>[] = [
     id: 'titulo',
     header: 'Oportunidad',
     headerClassName: 'w-[300px]',
-    className: 'font-medium',
+    className: 'font-medium whitespace-nowrap',
     sortValue: (item) => item.titulo,
-    cell: (item) => <span className="line-clamp-1">{item.titulo}</span>,
+    cell: (item) => <span>{item.titulo}</span>,
   },
   {
     id: 'etapa',
@@ -47,7 +47,7 @@ const COLUMNAS_PIPELINE: DataTableColumn<PipelineItem>[] = [
   {
     id: 'institucion',
     header: 'Institución',
-    className: 'text-sm text-gray-600 max-w-[180px] truncate',
+    className: 'text-sm text-gray-600 whitespace-nowrap',
     sortValue: (item) => item.institucion,
     exportValue: (item) => item.institucion ?? '',
     cell: (item) => item.institucion || '—',

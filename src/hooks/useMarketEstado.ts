@@ -1,5 +1,7 @@
+import { useEffect, useId } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 // Market de proveedores del Estado. El backend (funciones mk_*) es reciente y
 // todavía no está en los tipos generados de Supabase, así que se llama a través
@@ -25,6 +27,11 @@ export interface MarketProveedor {
   rut: string;
   proveedor: string;
   es_firmavb: boolean;
+  /** Tiene catálogo propio cargado en FirmaVB (no solo cuenta): mk_buscar no
+   *  devuelve esto como columna aparte (agregarla requería un DROP FUNCTION
+   *  que quedaba colgado al aplicarlo — ver la migración), así que se deriva
+   *  de `productos`: solo los del propio inventario traen `catalogo: true`. */
+  tiene_inventario: boolean;
   acepta_solicitudes: boolean;
   cliente_id: string | null;
   productos: MarketProducto[];
@@ -45,7 +52,10 @@ export function useMarketBuscar(q: string) {
     queryFn: async (): Promise<MarketProveedor[]> => {
       const { data, error } = await rpc<MarketProveedor[]>('mk_buscar', { p_q: term, p_limit: 30 });
       if (error) throw new Error(error.message);
-      return (data ?? []).map((p) => ({ ...p, productos: p.productos ?? [] }));
+      return (data ?? []).map((p) => {
+        const productos = p.productos ?? [];
+        return { ...p, productos, tiene_inventario: productos.some((x) => x.catalogo) };
+      });
     },
   });
 }
@@ -139,5 +149,100 @@ export function useMarketCotizar() {
       return data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['mk-mis-solicitudes'] }),
+  });
+}
+
+// ── Chat por solicitud (mk_mensajes) ──────────────────────────────
+// Tabla reciente, aún no está en los tipos generados de Supabase.
+const sb = supabase as unknown as { from: (t: string) => any };
+
+export interface MarketMensaje {
+  id: string;
+  solicitud_id: string;
+  autor_id: string;
+  mensaje: string;
+  created_at: string;
+}
+
+// Mensajes de una solicitud, en vivo: la RLS de mk_mensajes ya acota a
+// quienes participan en esa solicitud (solicitante o proveedor), así que
+// basta un filtro por solicitud_id, sin el escenario de doble-fila-cliente
+// que sí aplica a la campanita (useAvisos).
+export function useMkMensajes(solicitudId: string | null) {
+  const qc = useQueryClient();
+  const instanceId = useId();
+  const queryKey = ['mk-mensajes', solicitudId];
+
+  const query = useQuery({
+    queryKey,
+    enabled: !!solicitudId,
+    staleTime: 10_000,
+    queryFn: async (): Promise<MarketMensaje[]> => {
+      const { data, error } = await sb
+        .from('mk_mensajes')
+        .select('id, solicitud_id, autor_id, mensaje, created_at')
+        .eq('solicitud_id', solicitudId)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as MarketMensaje[];
+    },
+  });
+
+  useEffect(() => {
+    if (!solicitudId) return;
+    const channel = supabase
+      .channel(`mk-mensajes-${solicitudId}-${instanceId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'mk_mensajes', filter: `solicitud_id=eq.${solicitudId}` },
+        () => qc.invalidateQueries({ queryKey }),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [solicitudId, instanceId]);
+
+  return query;
+}
+
+// Mandar un mensaje en una solicitud. La RLS exige ser el autor Y
+// participar en esa solicitud (solicitante o proveedor) — mismo chequeo que
+// ya hace mk_mis_solicitudes/mk_cotizar para sus respectivas tablas.
+export function useMkEnviarMensaje(solicitudId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (mensaje: string) => {
+      if (!solicitudId) throw new Error('Falta la solicitud');
+      const texto = mensaje.trim();
+      if (!texto) throw new Error('Escribe un mensaje');
+      const { data: owner, error: errOwner } = await supabase.rpc('cliente_owner_id');
+      if (errOwner) throw errOwner;
+      if (!owner) throw new Error('Debes iniciar sesión como cliente FirmaVB');
+      const { error } = await sb
+        .from('mk_mensajes')
+        .insert({ solicitud_id: solicitudId, autor_id: owner, mensaje: texto });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['mk-mensajes', solicitudId] }),
+  });
+}
+
+// RUT/id del cliente dueño de la sesión (mismo RPC y misma queryKey que ya
+// usa useAvisos.ts, para compartir caché): lo necesita el chat para saber
+// qué mensajes son "míos" — mk_mensajes.autor_id es un clientes.id, no el
+// user_id de auth, así que no sirve comparar contra user.id directo.
+export function useClienteOwnerId() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['cliente-owner-id', user?.id],
+    enabled: !!user?.id,
+    refetchInterval: (query) => (query.state.data ? 5 * 60_000 : 15_000),
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await supabase.rpc('cliente_owner_id');
+      if (error) throw error;
+      return (data as string | null) ?? null;
+    },
   });
 }

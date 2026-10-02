@@ -29,7 +29,7 @@ const COLUMNAS_PROVEEDORES: DataTableColumn<FilaProveedor>[] = [
   {
     id: "proveedor",
     header: "Proveedor",
-    className: "font-medium max-w-[220px] truncate",
+    className: "font-medium whitespace-nowrap",
     sortValue: (p) => p.proveedor,
     cell: (p) => p.proveedor,
   },
