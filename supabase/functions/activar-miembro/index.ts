@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
       // permisos y no aparecía en "Roles y permisos". Mapeamos el rol de la
       // invitación al enum app_role y lo dejamos escrito, con el perfil, para que
       // el miembro entre operativo y en un solo roster.
-      const roleMap: Record<string, string> = { admin: 'admin', visor: 'visor', viewer: 'visor', vendedor: 'vendedor' };
+      const roleMap: Record<string, string> = { admin: 'admin', cobranza: 'cobranza', visor: 'visor', viewer: 'visor', vendedor: 'vendedor' };
       const appRole = roleMap[String(v.rol || '').toLowerCase()] || 'vendedor';
       let rolError: string | null = null;
       try {

@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useInvitarMiembro, type InvitacionResultado } from '@/hooks/useEquipo';
+import { SelectorPermisosModulos } from '@/components/equipo/SelectorPermisosModulos';
+import type { ModuloKey } from '@/lib/modulosPermisos';
 import { toast } from 'sonner';
 
 interface InvitarMiembroDialogProps {
@@ -15,6 +17,7 @@ interface InvitarMiembroDialogProps {
 
 export function InvitarMiembroDialog({ open, onOpenChange }: InvitarMiembroDialogProps) {
   const [form, setForm] = useState({ nombre: '', email: '', rol: 'vendedor', telefono: '' });
+  const [permisos, setPermisos] = useState<ModuloKey[] | null>(null);
   const [enviado, setEnviado] = useState<InvitacionResultado | null>(null);
   const [copiado, setCopiado] = useState(false);
   const invitarMutation = useInvitarMiembro();
@@ -22,6 +25,7 @@ export function InvitarMiembroDialog({ open, onOpenChange }: InvitarMiembroDialo
   const cerrar = (v: boolean) => {
     if (!v) {
       setForm({ nombre: '', email: '', rol: 'vendedor', telefono: '' });
+      setPermisos(null);
       setEnviado(null);
       setCopiado(false);
     }
@@ -31,7 +35,7 @@ export function InvitarMiembroDialog({ open, onOpenChange }: InvitarMiembroDialo
   const handleSubmit = () => {
     if (!form.nombre || !form.email) return;
     invitarMutation.mutate(
-      { nombre: form.nombre, email: form.email, rol: form.rol, telefono: form.telefono || undefined },
+      { nombre: form.nombre, email: form.email, rol: form.rol, telefono: form.telefono || undefined, permisos },
       { onSuccess: (res) => setEnviado(res) },
     );
   };
@@ -86,10 +90,15 @@ export function InvitarMiembroDialog({ open, onOpenChange }: InvitarMiembroDialo
                   <SelectTrigger id="invitar-rol"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="admin">Admin — Acceso completo</SelectItem>
+                    <SelectItem value="cobranza">Cobranza — Enfocado en cobros</SelectItem>
                     <SelectItem value="vendedor">Vendedor — Pipeline y asignaciones</SelectItem>
                     <SelectItem value="visor">Visor — Solo lectura</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Módulos a los que puede entrar</Label>
+                <SelectorPermisosModulos value={permisos} onChange={setPermisos} />
               </div>
             </div>
 
