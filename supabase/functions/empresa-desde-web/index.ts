@@ -49,19 +49,79 @@ export function htmlATexto(html: string): { titulo: string; meta: string; texto:
   return { titulo, meta, texto, enlaces };
 }
 
+// IP pública: rechaza loopback, privadas, link-local, CGNAT, multicast y sus equivalentes IPv6.
+export function ipPublica(ip: string): boolean {
+  const v4 = ip.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])];
+    if (a === 0 || a === 10 || a === 127 || a >= 224) return false;
+    if (a === 100 && b >= 64 && b <= 127) return false;
+    if (a === 169 && b === 254) return false;
+    if (a === 172 && b >= 16 && b <= 31) return false;
+    if (a === 192 && b === 168) return false;
+    if (a === 198 && (b === 18 || b === 19)) return false;
+    return true;
+  }
+  const v6 = ip.toLowerCase().replace(/^\[|\]$/g, "");
+  if (v6 === "::" || v6 === "::1" || v6.startsWith("fe80:") || v6.startsWith("fc") || v6.startsWith("fd") || v6.startsWith("ff")) return false;
+  if (v6.startsWith("::ffff:")) return ipPublica(v6.slice(7));
+  return v6.includes(":");
+}
+
+// Resuelve el DNS y exige que TODAS las direcciones sean públicas (evita SSRF hacia servicios internos).
+async function resuelvePublico(host: string): Promise<boolean> {
+  if (!urlSegura("https://" + host)) return false;
+  const ips: string[] = [];
+  for (const tipo of ["A", "AAAA"] as const) {
+    try { ips.push(...(await Deno.resolveDns(host, tipo))); } catch { /* sin registros de ese tipo */ }
+  }
+  return ips.length > 0 && ips.every(ipPublica);
+}
+
+// Lee el cuerpo por trozos y corta en MAX_HTML (no se carga entero en memoria).
+async function leerConTope(r: Response, max: number): Promise<string> {
+  const declarado = Number(r.headers.get("content-length") ?? 0);
+  if (declarado > max * 4) return "";
+  const reader = r.body?.getReader();
+  if (!reader) return (await r.text()).slice(0, max);
+  const dec = new TextDecoder();
+  let texto = "";
+  while (texto.length < max) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    texto += dec.decode(value, { stream: true });
+  }
+  try { await reader.cancel(); } catch { /* ya cerrado */ }
+  return texto.slice(0, max);
+}
+
+// Baja una página siguiendo como máximo 3 redirecciones, validando cada destino (host público y resuelto a IP pública).
 async function bajar(u: URL): Promise<string | null> {
-  try {
-    const r = await fetch(u.toString(), {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; FirmaVB/1.0; +https://firmavb.cl)", Accept: "text/html,application/xhtml+xml" },
-      redirect: "follow",
-      signal: AbortSignal.timeout(8000),
-    });
+  let actual: URL | null = u;
+  for (let salto = 0; salto < 4 && actual; salto++) {
+    if (!(await resuelvePublico(actual.hostname))) return null;
+    let r: Response;
+    try {
+      r = await fetch(actual.toString(), {
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; FirmaVB/1.0; +https://firmavb.cl)", Accept: "text/html,application/xhtml+xml" },
+        redirect: "manual",
+        signal: AbortSignal.timeout(8000),
+      });
+    } catch { return null; }
+    if (r.status >= 300 && r.status < 400) {
+      const destino = r.headers.get("location");
+      try { await r.body?.cancel(); } catch { /* sin cuerpo */ }
+      if (!destino) return null;
+      let siguiente: URL; try { siguiente = new URL(destino, actual); } catch { return null; }
+      actual = urlSegura(siguiente.toString());
+      continue;
+    }
     if (!r.ok) return null;
     const tipo = r.headers.get("content-type") ?? "";
-    if (tipo && !/html|xml|text/i.test(tipo)) return null;
-    const html = await r.text();
-    return html.slice(0, MAX_HTML);
-  } catch { return null; }
+    if (tipo && !/html|xml|text/i.test(tipo)) { try { await r.body?.cancel(); } catch { /* sin cuerpo */ } return null; }
+    return await leerConTope(r, MAX_HTML);
+  }
+  return null;
 }
 
 const INTERNAS = /nosotros|quienes|about|empresa|productos|servicios|catalogo|catálogo|soluciones/i;
@@ -133,8 +193,8 @@ Responde SOLO JSON con:
       }
     }
     const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
-    const productos = Array.from(new Set(((ia?.productos ?? []) as unknown[]).map((p) => norm(String(p))).filter((p) => p.length >= 4 && p.split(" ").length <= 4))).slice(0, 20);
-    const industrias = ((ia?.industrias ?? []) as string[]).filter((i) => INDUSTRIAS.includes(i)).slice(0, 3);
+    const productos = Array.from(new Set((Array.isArray(ia?.productos) ? (ia.productos as unknown[]) : []).map((p) => norm(String(p))).filter((p) => p.length >= 4 && p.split(" ").length <= 4))).slice(0, 20);
+    const industrias = (Array.isArray(ia?.industrias) ? (ia.industrias as unknown[]).map(String) : []).filter((i) => INDUSTRIAS.includes(i)).slice(0, 3);
     const texto_o_null = (v: unknown, max = 300) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
 
     return json({
