@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -20,6 +20,12 @@ export interface Aviso {
 export function useAvisos() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  // Nombre de canal único por instancia: AvisosBell se monta dos veces a la
+  // vez en AppLayout (menú lateral y header), y dos canales con el mismo
+  // tópico chocaban ("cannot add postgres_changes callbacks... after
+  // subscribe()"), tirando abajo toda la página (el mismo bug que ya se
+  // arregló en useExtensionStatus).
+  const instanceId = useId();
 
   const query = useQuery({
     queryKey: ['avisos', user?.id],
@@ -126,7 +132,7 @@ export function useAvisos() {
     const clienteIds = propioClienteId && propioClienteId !== clienteId
       ? [clienteId, propioClienteId]
       : [clienteId];
-    let channel = supabase.channel(`notificaciones-log-${clienteId}-${uid}`);
+    let channel = supabase.channel(`notificaciones-log-${clienteId}-${uid}-${instanceId}`);
     for (const cid of clienteIds) {
       channel = channel
         .on(
@@ -161,7 +167,7 @@ export function useAvisos() {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       supabase.removeChannel(channel);
     };
-  }, [clienteId, propioClienteId, user?.id, qc]);
+  }, [clienteId, propioClienteId, user?.id, qc, instanceId]);
 
   return query;
 }
