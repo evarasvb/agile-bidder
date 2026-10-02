@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   HandCoins, Plus, Trash2, FileText, Copy, Download, Loader2, Building2, User, AlertTriangle, Scale,
   Check, ChevronsUpDown, Upload, ExternalLink, RefreshCw, Paperclip, MessageSquare, CalendarClock, Search,
-  ChevronDown, ChevronRight, MoreVertical, CheckCircle2, CircleDollarSign, Info,
+  ChevronDown, ChevronRight, MoreVertical, CheckCircle2, CircleDollarSign, Info, Mail,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,7 +31,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { useCliente } from '@/hooks/useCliente';
 import { supabase } from '@/integrations/supabase/client';
 import { descargarCartaAbogadoPDF } from '@/services/cartaAbogadoPdf';
-import { descargarNotaCobroPDF, descargarNotaDebitoExentaPDF, type DatosNotaCobranza } from '@/services/notasCobranzaPdf';
+import {
+  descargarNotaCobroPDF, descargarNotaDebitoExentaPDF, notaCobroBase64, notaDebitoExentaBase64,
+  cuerpoCorreoCobroHtml, type DatosNotaCobranza,
+} from '@/services/notasCobranzaPdf';
+import { gmailCrearBorrador } from '@/hooks/useGmail';
 import { useOpcionesOC, useMisOcAceptadas, useOcLinksPorCodigos, useSyncMisOC, useOrdenCompra, etiquetaEstado } from '@/hooks/useOrdenesCompra';
 import {
   useFacturasCobrar, useCrearFactura, useActualizarFactura, useEliminarFactura, useTasasMora,
@@ -166,30 +170,58 @@ export default function CobranzaFacturas() {
     setDoc((d) => ({ ...d, generando: false }));
   };
 
-  // Nota de cobro / nota de débito exenta (borradores para el ERP del cliente),
-  // con el interés moratorio real y la glosa técnica/legal.
+  // Arma los datos de cobro (acreedor + deudor + interés real) para PDFs y correo.
+  const datosNotaDe = (f: FacturaCobrar): DatosNotaCobranza => ({
+    empresa: {
+      nombre: cliente?.empresa_nombre || 'FirmaVB',
+      rut: (cliente as any)?.rut || '',
+      direccion: (cliente as any)?.direccion || '',
+      telefono: (cliente as any)?.telefono || '',
+      email: (cliente as any)?.email_contacto || (cliente as any)?.email || '',
+    },
+    deudor: { nombre: f.deudor_nombre, rut: f.deudor_rut, email: f.deudor_email, tipo: f.deudor_tipo },
+    numeroFactura: f.numero_factura, oc: f.oc_codigo, capital: f.monto,
+    fechaEmision: f.fecha_emision, fechaRecepcion: f.fecha_recepcion,
+    fechaVencimiento: fechaPago(f), fechaCalculo: fechaPagoReal(f) ?? new Date(),
+    interes: interesMoraReal(f, tasas),
+  });
+
+  // Nota de cobro / nota de débito exenta (borradores para el ERP del cliente).
   const generarNota = (f: FacturaCobrar, tipo: 'cobro' | 'debito') => {
-    const interes = interesMoraReal(f, tasas);
-    if (tipo === 'debito' && interes.interes <= 0) {
+    const datos = datosNotaDe(f);
+    if (tipo === 'debito' && datos.interes.interes <= 0) {
       toast.error('Esta factura no tiene interés por mora que cobrar (está en plazo o sin fecha suficiente).');
       return;
     }
-    const datos: DatosNotaCobranza = {
-      empresa: {
-        nombre: cliente?.empresa_nombre || 'FirmaVB',
-        rut: (cliente as any)?.rut || '',
-        direccion: (cliente as any)?.direccion || '',
-        telefono: (cliente as any)?.telefono || '',
-        email: (cliente as any)?.email_contacto || (cliente as any)?.email || '',
-      },
-      deudor: { nombre: f.deudor_nombre, rut: f.deudor_rut, email: f.deudor_email, tipo: f.deudor_tipo },
-      numeroFactura: f.numero_factura, oc: f.oc_codigo, capital: f.monto,
-      fechaEmision: f.fecha_emision, fechaRecepcion: f.fecha_recepcion,
-      fechaVencimiento: fechaPago(f), fechaCalculo: fechaPagoReal(f) ?? new Date(),
-      interes,
-    };
     if (tipo === 'cobro') descargarNotaCobroPDF(datos); else descargarNotaDebitoExentaPDF(datos);
     toast.success(tipo === 'cobro' ? 'Nota de cobro descargada' : 'Nota de débito exenta descargada');
+  };
+
+  // Deja en el Gmail del usuario un borrador de cobro con los PDFs y la
+  // factura/guía adjuntas, y el cuerpo con el respaldo técnico/legal.
+  const enviarBorradorGmail = async (f: FacturaCobrar) => {
+    if (!f.deudor_email) {
+      toast.error('Agrega el correo del deudor a la factura para dejar el borrador de cobro.');
+      return;
+    }
+    const datos = datosNotaDe(f);
+    const adjuntos = [{ ...notaCobroBase64(datos), mimeType: 'application/pdf' }];
+    if (datos.interes.interes > 0) adjuntos.push({ ...notaDebitoExentaBase64(datos), mimeType: 'application/pdf' });
+    const storage = [
+      f.factura_archivo_url ? { path: f.factura_archivo_url, filename: f.factura_archivo_nombre || 'factura.pdf' } : null,
+      f.guia_archivo_url ? { path: f.guia_archivo_url, filename: f.guia_archivo_nombre || 'guia.pdf' } : null,
+    ].filter(Boolean) as { path: string; filename: string }[];
+    const subject = `Cobro de factura ${f.numero_factura ? `N° ${f.numero_factura}` : ''} — ${datos.empresa.nombre}`.trim();
+    try {
+      const r = await gmailCrearBorrador({ to: f.deudor_email, subject, bodyHtml: cuerpoCorreoCobroHtml(datos), adjuntos, storage });
+      toast.success('Borrador de cobro creado en tu Gmail', r.link ? { action: { label: 'Abrir Gmail', onClick: () => window.open(r.link!, '_blank') } } : undefined);
+    } catch (e: any) {
+      if (e?.code === 'no_conectado') {
+        toast.error('Conecta tu Gmail primero.', { action: { label: 'Ir a Integraciones', onClick: () => navigate('/configuracion/integraciones') } });
+      } else {
+        toast.error(e?.message || 'No se pudo crear el borrador');
+      }
+    }
   };
 
   const descargarPDF = () => {
@@ -320,6 +352,7 @@ export default function CobranzaFacturas() {
                     }}
                     onGenerar={generar}
                     onNota={generarNota}
+                    onGmail={enviarBorradorGmail}
                     generando={doc.generando}
                     abrirArchivo={abrirArchivo}
                   />
@@ -365,7 +398,7 @@ export default function CobranzaFacturas() {
 // Fila de la tabla (una factura) + fila expandible con el detalle del CRM.
 // ---------------------------------------------------------------------------
 function FilaFactura({
-  f, tasas, ocLink, expandido, onToggle, onEstado, onMarcarPagada, onReabrir, onEliminar, onGenerar, onNota, generando, abrirArchivo,
+  f, tasas, ocLink, expandido, onToggle, onEstado, onMarcarPagada, onReabrir, onEliminar, onGenerar, onNota, onGmail, generando, abrirArchivo,
 }: {
   f: FacturaCobrar;
   tasas: TasaMora[];
@@ -378,6 +411,7 @@ function FilaFactura({
   onEliminar: () => void;
   onGenerar: (f: FacturaCobrar, tipo: 'carta_cobranza' | 'requerimiento_pago') => void;
   onNota: (f: FacturaCobrar, tipo: 'cobro' | 'debito') => void;
+  onGmail: (f: FacturaCobrar) => void;
   generando: boolean;
   abrirArchivo: (path: string) => void;
 }) {
@@ -459,6 +493,9 @@ function FilaFactura({
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onNota(f, 'debito')}>
                 <CircleDollarSign className="mr-2 h-4 w-4" /> Nota de débito exenta (PDF)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onGmail(f)}>
+                <Mail className="mr-2 h-4 w-4" /> Dejar borrador en Gmail
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               {f.factura_archivo_url && (

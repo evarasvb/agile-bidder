@@ -249,3 +249,36 @@ export function descargarNotaCobroPDF(d: DatosNotaCobranza): void {
 export function descargarNotaDebitoExentaPDF(d: DatosNotaCobranza): void {
   generarNotaDebitoExentaPDF(d).save(`nota_debito_exenta_${slug(d.deudor.nombre)}_${d.numeroFactura || 's_n'}.pdf`);
 }
+
+// --- Para adjuntar al correo (Gmail): PDFs en base64 + cuerpo HTML -------------
+function docBase64(doc: jsPDF): string {
+  const buf = new Uint8Array(doc.output('arraybuffer'));
+  let bin = ''; const chunk = 0x8000;
+  for (let i = 0; i < buf.length; i += chunk) bin += String.fromCharCode(...buf.subarray(i, i + chunk));
+  return btoa(bin);
+}
+
+export function notaCobroBase64(d: DatosNotaCobranza): { filename: string; base64: string } {
+  return { filename: `nota_cobro_${slug(d.deudor.nombre)}_${d.numeroFactura || 's_n'}.pdf`, base64: docBase64(generarNotaCobroPDF(d)) };
+}
+
+export function notaDebitoExentaBase64(d: DatosNotaCobranza): { filename: string; base64: string } {
+  return { filename: `nota_debito_exenta_${slug(d.deudor.nombre)}_${d.numeroFactura || 's_n'}.pdf`, base64: docBase64(generarNotaDebitoExentaPDF(d)) };
+}
+
+// Cuerpo HTML del correo de cobro con la base técnica/legal (respaldo del envío).
+export function cuerpoCorreoCobroHtml(d: DatosNotaCobranza): string {
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const glosa = glosaInteresMora(d).map((l) => `<p style="margin:0 0 8px">${esc(l)}</p>`).join('');
+  const hayInteres = d.interes.interes > 0;
+  return `<div style="font-family:Arial,sans-serif;max-width:640px;color:#1f2937">
+    <p>Estimados ${esc(d.deudor.nombre)}:</p>
+    <p>Junto con saludar, y habiendo transcurrido el plazo legal de pago, adjuntamos la <strong>nota de cobro</strong>${hayInteres ? ' y la <strong>nota de débito exenta</strong> por intereses de mora' : ''} correspondiente${d.numeroFactura ? ` a la factura N° ${esc(d.numeroFactura)}` : ''}${d.oc ? ` (OC ${esc(d.oc)})` : ''}.</p>
+    <p><strong>Capital:</strong> ${CLP(d.capital)}${hayInteres ? ` &middot; <strong>Interés por mora:</strong> ${CLP(d.interes.interes)} &middot; <strong>Total:</strong> ${CLP(d.capital + d.interes.interes)}` : ''}</p>
+    <hr style="border:none;border-top:1px solid #e5e7eb;margin:12px 0">
+    <p style="font-size:13px;color:#4b5563"><strong>Respaldo técnico y legal</strong></p>
+    <div style="font-size:12px;color:#4b5563">${glosa}</div>
+    <p style="font-size:12px;color:#6b7280">Se adjunta la documentación de respaldo. Agradecemos regularizar el pago a la brevedad.</p>
+    <p>Atentamente,<br>${esc(d.empresa.nombre)}${d.empresa.rut ? ` — RUT ${esc(d.empresa.rut)}` : ''}</p>
+  </div>`;
+}

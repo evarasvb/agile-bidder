@@ -44,6 +44,14 @@ verify_jwt = true
 [functions.google-drive-callback]
 verify_jwt = false
 
+# gmail: acciones autenticadas (start / crear_borrador / desconectar)
+[functions.gmail]
+verify_jwt = true
+
+# gmail-callback: Google redirige aquí sin JWT (verifica un state firmado)
+[functions.gmail-callback]
+verify_jwt = false
+
 # crear-pago-curso: la Academia es pública; el comprador puede no tener cuenta
 [functions.crear-pago-curso]
 verify_jwt = false
