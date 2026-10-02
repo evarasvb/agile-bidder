@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, Search, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Columns3, Download, RotateCcw, Search, X } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
 /**
@@ -185,6 +186,9 @@ export function DataTable<T>({
   const [sortLocal, setSortLocal] = useState<DataTableSort | null>(() => leerPreferencia(storageKey, 'sort', defaultSort ?? null));
   const [pageSizeLocal, setPageSizeLocal] = useState<number>(() => leerPreferencia(storageKey, 'pageSize', defaultPageSize));
   const [pageLocal, setPageLocal] = useState(1);
+  // Orden de columnas (lista de ids) y columnas ocultas, recordados por tabla.
+  const [ordenColumnas, setOrdenColumnas] = useState<string[]>(() => leerPreferencia<string[]>(storageKey, 'orden', []));
+  const [columnasOcultas, setColumnasOcultas] = useState<string[]>(() => leerPreferencia<string[]>(storageKey, 'ocultas', []));
 
   // Barra deslizadora horizontal explícita bajo la tabla: la scrollbar nativa
   // (aunque ya se intentó hacer visible con `.scrollbar-x-visible`) queda
@@ -224,6 +228,56 @@ export function DataTable<T>({
   // En modo servidor el orden, la página y el tamaño vienen de la página.
   const sort = manual ? manual.sort : sortLocal;
   const pageSize = manual ? manual.pageSize : pageSizeLocal;
+
+  // Columnas en el orden elegido por el usuario. Reconcilia contra las columnas
+  // actuales: respeta el orden guardado, agrega al final las columnas nuevas y
+  // descarta ids que ya no existen (así guardar en localStorage no rompe si la
+  // tabla cambia de columnas en una versión futura).
+  const columnasEnOrden = useMemo(() => {
+    const porId = new Map(columns.map((c) => [c.id, c]));
+    const enOrden: DataTableColumn<T>[] = [];
+    for (const id of ordenColumnas) {
+      const c = porId.get(id);
+      if (c) enOrden.push(c);
+    }
+    for (const c of columns) if (!ordenColumnas.includes(c.id)) enOrden.push(c);
+    return enOrden;
+  }, [columns, ordenColumnas]);
+
+  // Las que de verdad se dibujan (orden del usuario, sin las ocultas).
+  const columnasVisibles = useMemo(
+    () => columnasEnOrden.filter((c) => !columnasOcultas.includes(c.id)),
+    [columnasEnOrden, columnasOcultas],
+  );
+
+  const moverColumna = (id: string, dir: -1 | 1) => {
+    const ids = columnasEnOrden.map((c) => c.id);
+    const i = ids.indexOf(id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    setOrdenColumnas(ids);
+    guardarPreferencia(storageKey, 'orden', ids);
+  };
+
+  const toggleColumna = (id: string) => {
+    // No permitir ocultar la última columna visible (quedaría una tabla vacía).
+    const next = columnasOcultas.includes(id) ? columnasOcultas.filter((x) => x !== id) : [...columnasOcultas, id];
+    if (columns.length - next.length < 1) return;
+    setColumnasOcultas(next);
+    guardarPreferencia(storageKey, 'ocultas', next);
+  };
+
+  const restablecerColumnas = () => {
+    const ids = columns.map((c) => c.id);
+    setOrdenColumnas(ids);
+    setColumnasOcultas([]);
+    guardarPreferencia(storageKey, 'orden', ids);
+    guardarPreferencia(storageKey, 'ocultas', []);
+  };
+
+  const etiquetaColumna = (col: DataTableColumn<T>) =>
+    typeof col.header === 'string' && col.header.trim() ? col.header : col.exportHeader ?? col.id;
 
   const filtradas = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
@@ -298,6 +352,32 @@ export function DataTable<T>({
 
   const alineacion = (a?: 'left' | 'right' | 'center') => (a === 'right' ? 'text-right' : a === 'center' ? 'text-center' : 'text-left');
 
+  // Barra deslizadora horizontal explícita. Se muestra ARRIBA y ABAJO de la
+  // tabla (pedido de Evaristo) para no tener que bajar hasta el final para
+  // encontrar el scroll lateral. Ambas comparten el mismo estado y mueven el
+  // scroll real de la tabla; el listener de scroll las mantiene sincronizadas.
+  const barraDeslizadora = (pos: 'arriba' | 'abajo') =>
+    scrollInfo.max > 0 ? (
+      <div className="flex items-center gap-2 px-1 text-muted-foreground">
+        <span className="text-xs shrink-0" aria-hidden="true">◂</span>
+        <input
+          type="range"
+          min={0}
+          max={scrollInfo.max}
+          value={scrollInfo.left}
+          onChange={(e) => {
+            const left = Number(e.target.value);
+            setScrollInfo((s) => ({ ...s, left }));
+            if (scrollRef.current) scrollRef.current.scrollLeft = left;
+          }}
+          className="w-full h-2 accent-primary cursor-pointer"
+          aria-label={`Desplazar la tabla horizontalmente (${pos})`}
+          title="Desplazar la tabla hacia los lados"
+        />
+        <span className="text-xs shrink-0" aria-hidden="true">▸</span>
+      </div>
+    ) : null;
+
   return (
     <div className={cn('space-y-3', className)}>
       {/* Barra: búsqueda + filtros a la izquierda, contador + exportar a la derecha */}
@@ -330,8 +410,69 @@ export function DataTable<T>({
             {total === 0 ? `0 ${itemLabel}` : `${inicio + 1}–${Math.min(inicio + pageSize, total)} de ${total} ${itemLabel}`}
             {selection && selection.selected.size > 0 ? ` · ${selection.selected.size} seleccionados` : ''}
           </span>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" title="Mostrar, ocultar y reordenar columnas">
+                <Columns3 className="h-4 w-4 mr-1" /> Columnas
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-72 p-2">
+              <div className="flex items-center justify-between px-1 pb-2">
+                <span className="text-sm font-medium">Columnas</span>
+                <button
+                  type="button"
+                  onClick={restablecerColumnas}
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                  title="Volver al orden y columnas por defecto"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" /> Restablecer
+                </button>
+              </div>
+              <div className="max-h-72 overflow-auto">
+                {columnasEnOrden.map((col, i) => {
+                  const oculta = columnasOcultas.includes(col.id);
+                  return (
+                    <div key={col.id} className="flex items-center gap-1 rounded px-1 py-1 hover:bg-muted">
+                      <label className="flex flex-1 items-center gap-2 cursor-pointer min-w-0">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 accent-primary cursor-pointer shrink-0"
+                          checked={!oculta}
+                          onChange={() => toggleColumna(col.id)}
+                          aria-label={`Mostrar columna ${etiquetaColumna(col)}`}
+                        />
+                        <span className={cn('truncate text-sm', oculta && 'text-muted-foreground line-through')}>
+                          {etiquetaColumna(col)}
+                        </span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => moverColumna(col.id, -1)}
+                        disabled={i === 0}
+                        aria-label={`Subir columna ${etiquetaColumna(col)}`}
+                        title="Mover a la izquierda"
+                        className="rounded p-1 text-muted-foreground hover:bg-background hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent"
+                      >
+                        <ArrowUp className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moverColumna(col.id, 1)}
+                        disabled={i === columnasEnOrden.length - 1}
+                        aria-label={`Bajar columna ${etiquetaColumna(col)}`}
+                        title="Mover a la derecha"
+                        className="rounded p-1 text-muted-foreground hover:bg-background hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent"
+                      >
+                        <ArrowDown className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
           {exportFileName && (
-            <Button variant="outline" size="sm" onClick={() => exportarCSV(columns, ordenadas, exportFileName)} disabled={total === 0}>
+            <Button variant="outline" size="sm" onClick={() => exportarCSV(columnasVisibles, ordenadas, exportFileName)} disabled={total === 0}>
               <Download className="h-4 w-4 mr-1" /> Exportar CSV
             </Button>
           )}
@@ -346,6 +487,9 @@ export function DataTable<T>({
           medir o engancharse al externo siempre daba "no hay overflow"
           (hallazgo de Codex) — por eso el maxHeight/overflow/scrollRef van en
           el contenedor real vía containerStyle/containerClassName/containerRef. */}
+      {/* Barra deslizadora superior (misma que la de abajo). */}
+      {barraDeslizadora('arriba')}
+
       <div className="rounded-lg border">
         <Table
           className="text-sm min-w-max"
@@ -370,7 +514,7 @@ export function DataTable<T>({
                   />
                 </TableHead>
               )}
-              {columns.map((col) => {
+              {columnasVisibles.map((col) => {
                 const activa = sort?.id === col.id;
                 const ordenable = !!col.sortValue;
                 return (
@@ -409,7 +553,7 @@ export function DataTable<T>({
               Array.from({ length: 6 }).map((_, i) => (
                 <TableRow key={`sk-${i}`}>
                   {selection && <TableCell className="px-3" />}
-                  {columns.map((c) => (
+                  {columnasVisibles.map((c) => (
                     <TableCell key={c.id} className="px-3 py-2.5">
                       <div className="h-4 w-3/4 rounded bg-muted animate-pulse" />
                     </TableCell>
@@ -418,7 +562,7 @@ export function DataTable<T>({
               ))
             ) : visibles.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length + (selection ? 1 : 0)} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={columnasVisibles.length + (selection ? 1 : 0)} className="py-10 text-center text-muted-foreground">
                   {busqueda ? (
                     <>
                       Nada coincide con “{busqueda}”.{' '}
@@ -453,7 +597,7 @@ export function DataTable<T>({
                         />
                       </TableCell>
                     )}
-                    {columns.map((col) => (
+                    {columnasVisibles.map((col) => (
                       <TableCell key={col.id} className={cn('px-3 py-2 align-middle', alineacion(col.align), col.className)}>
                         {col.cell(row)}
                       </TableCell>
@@ -466,29 +610,10 @@ export function DataTable<T>({
         </Table>
       </div>
 
-      {/* Barra deslizadora horizontal: solo aparece si la tabla no cabe
-          completa (scrollInfo.max > 0). Arrastrarla mueve el scroll real de
-          la tabla, y viceversa (el listener de scroll de arriba la sincroniza). */}
-      {scrollInfo.max > 0 && (
-        <div className="flex items-center gap-2 px-1 text-muted-foreground">
-          <span className="text-xs shrink-0" aria-hidden="true">◂</span>
-          <input
-            type="range"
-            min={0}
-            max={scrollInfo.max}
-            value={scrollInfo.left}
-            onChange={(e) => {
-              const left = Number(e.target.value);
-              setScrollInfo((s) => ({ ...s, left }));
-              if (scrollRef.current) scrollRef.current.scrollLeft = left;
-            }}
-            className="w-full h-2 accent-primary cursor-pointer"
-            aria-label="Desplazar la tabla horizontalmente"
-            title="Desplazar la tabla hacia los lados"
-          />
-          <span className="text-xs shrink-0" aria-hidden="true">▸</span>
-        </div>
-      )}
+      {/* Barra deslizadora horizontal inferior: solo aparece si la tabla no cabe
+          completa (scrollInfo.max > 0). Arrastrarla mueve el scroll real de la
+          tabla, y viceversa (el listener de scroll de arriba la sincroniza). */}
+      {barraDeslizadora('abajo')}
 
       {/* Pie: tamaño de página + paginación */}
       {total > 0 && (
