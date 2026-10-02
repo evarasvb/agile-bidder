@@ -96,9 +96,14 @@ function FilaReclamo({ r }: { r: ReclamoZoom }) {
         <p className="truncate font-medium">{r.reclamante || "Reclamante sin nombre"}</p>
         <p className="text-xs text-muted-foreground">{fechaCorta(r.fecha)} · {r.estado || "s/i"}</p>
         {link && (
-          <p className="mt-0.5 flex items-center gap-1 text-xs text-firmavb-blue">
-            <ExternalLink className="h-3 w-3" /> Ver proceso {r.proceso_codigo} en Mercado Público
-          </p>
+          <>
+            <p className="mt-0.5 flex items-center gap-1 text-xs text-firmavb-blue">
+              <ExternalLink className="h-3 w-3" /> Ver proceso {r.proceso_codigo} en Mercado Público
+            </p>
+            {/* Mercado Público restringe algunas fichas (p. ej. compras ágiles donde no
+                participaste): el link es el oficial, pero MP puede pedir sesión o negar acceso. */}
+            <p className="text-[11px] text-muted-foreground">Puede requerir sesión en Mercado Público</p>
+          </>
         )}
       </div>
       <Badge variant="outline" className={r.tipo === 1 ? "shrink-0 border-red-300 bg-red-50 text-red-700" : "shrink-0 border-yellow-300 bg-yellow-50 text-yellow-700"}>

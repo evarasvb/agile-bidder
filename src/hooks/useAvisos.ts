@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -20,12 +20,6 @@ export interface Aviso {
 export function useAvisos() {
   const { user } = useAuth();
   const qc = useQueryClient();
-  // Nombre de canal único por instancia: AvisosBell se monta dos veces a la
-  // vez en AppLayout (menú lateral y header), y dos canales con el mismo
-  // tópico chocaban ("cannot add postgres_changes callbacks... after
-  // subscribe()"), tirando abajo toda la página (el mismo bug que ya se
-  // arregló en useExtensionStatus).
-  const instanceId = useId();
 
   const query = useQuery({
     queryKey: ['avisos', user?.id],
@@ -121,6 +115,21 @@ export function useAvisos() {
   useEffect(() => {
     if (!clienteId || !user?.id) return;
     const uid = user.id;
+    // Nombre de canal ÚNICO por cada ejecución del efecto. AvisosBell se monta
+    // dos veces a la vez en AppLayout (menú lateral + header), y además este
+    // efecto puede reiniciarse cuando `propioClienteId` resuelve después de
+    // `clienteId` (o por el ciclo setup/cleanup/setup de StrictMode). Si dos
+    // ejecuciones usaran el mismo tópico, la segunda reusaría el canal de la
+    // primera —cuyo `removeChannel` es asíncrono y puede no haber terminado— y
+    // al registrar sus callbacks `.on()` tras el `.subscribe()` Supabase lanza
+    // "cannot add 'postgres_changes' callbacks ... after subscribe()" y cae
+    // toda la página. Generar el nonce DENTRO del efecto da un canal distinto
+    // en cada setup (un id estable por componente no basta: no cambia entre
+    // reinicios del efecto).
+    const nonce =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2);
     const invalidar = () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
@@ -132,7 +141,7 @@ export function useAvisos() {
     const clienteIds = propioClienteId && propioClienteId !== clienteId
       ? [clienteId, propioClienteId]
       : [clienteId];
-    let channel = supabase.channel(`notificaciones-log-${clienteId}-${uid}-${instanceId}`);
+    let channel = supabase.channel(`notificaciones-log-${clienteId}-${uid}-${nonce}`);
     for (const cid of clienteIds) {
       channel = channel
         .on(
@@ -167,7 +176,7 @@ export function useAvisos() {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       supabase.removeChannel(channel);
     };
-  }, [clienteId, propioClienteId, user?.id, qc, instanceId]);
+  }, [clienteId, propioClienteId, user?.id, qc]);
 
   return query;
 }
