@@ -175,8 +175,16 @@ export default function CompraAgilDetalle() {
     // que baja a "Revisar" aunque el score sea alto. "Revisar" y "Sin producto"
     // no se suman al total ni van precargados a la propuesta.
     const superaPresupuesto = !!compra.monto && subtotal > compra.monto;
-    let em: EstadoMatch = estado === 'descartado' ? 'sin_producto' : estadoMatch(score, !!match);
-    if (em === 'listo' && superaPresupuesto) em = 'revisar';
+    // Si el usuario confirmó o eligió el producto, su decisión manda: queda
+    // "listo". Solo las sugerencias automáticas dependen del umbral de score (y
+    // bajan a "revisar" si su solo subtotal ya supera todo el presupuesto).
+    let em: EstadoMatch;
+    if (estado === 'descartado') em = 'sin_producto';
+    else if (estado === 'confirmado' || estado === 'reasignado') em = match ? 'listo' : 'sin_producto';
+    else {
+      em = estadoMatch(score, !!match);
+      if (em === 'listo' && superaPresupuesto) em = 'revisar';
+    }
     return {
       idx,
       id: it.id,

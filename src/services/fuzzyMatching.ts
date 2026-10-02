@@ -503,15 +503,16 @@ export function calculateCoverageMetrics(rows: PropuestaItemRow[]): {
   cobertura: number;
   propuestaIncompleta: boolean;
 } {
-  const itemsConMatchValidado = rows.filter((f) => {
-    if (!f.match || f.estado === 'descartado') return false;
-    return f.match.score >= UMBRAL_MATCH;
-  }).length;
+  // Un ítem está "listo" si el usuario lo confirmó (su decisión manda) o si el
+  // score automático alcanza el umbral. Por debajo del umbral y sin confirmar
+  // queda "por revisar".
+  const esListo = (f: PropuestaItemRow) =>
+    !!f.match && f.estado !== 'descartado' && (f.estado === 'confirmado' || f.match.score >= UMBRAL_MATCH);
 
-  const itemsConMatchDebil = rows.filter((f) => {
-    if (!f.match || f.estado === 'descartado') return false;
-    return f.match.score < UMBRAL_MATCH;
-  }).length;
+  const itemsConMatchValidado = rows.filter(esListo).length;
+  const itemsConMatchDebil = rows.filter(
+    (f) => !!f.match && f.estado !== 'descartado' && !esListo(f),
+  ).length;
 
   const itemsSinMatch = rows.filter((f) => !f.match && f.estado !== 'descartado').length;
   const totalItems = rows.filter((f) => f.estado !== 'descartado').length;
