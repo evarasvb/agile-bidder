@@ -74,9 +74,21 @@ as $$
   ) x;
 $$;
 
--- Compras ágiles que el cliente ganó (ordenes_compra propias no ligadas a una
--- licitación). No hay "perdiste esta compra ágil" verificable: Mercado Público
--- no publica la lista de oferentes de una compra ágil.
+-- Compras ágiles, Convenio Marco y trato directo que el cliente ganó
+-- (ordenes_compra propias no ligadas a una licitación). No hay "perdiste esta
+-- compra ágil" verificable: Mercado Público no publica la lista de oferentes
+-- de una compra ágil.
+--
+-- El código de la orden de compra NO es el id del proceso que la originó —
+-- son numeraciones distintas (ej. una orden "1224957-474-CM26" viene del
+-- Convenio Marco "2239-8-LR25", un número de licitación real, guardado en
+-- ordenes_compra.convenio_codigo). El sufijo de 2 letras antes del año en el
+-- código de la OC (-AG-, -CM-, -TD-, ...) sí identifica de forma confiable el
+-- tipo real (AG=Compra Ágil, CM=Convenio Marco, TD=Trato Directo): antes esta
+-- función asumía "compra ágil" para cualquier orden sin numero_licitacion, lo
+-- que etiquetaba mal las de Convenio Marco (hallazgo de Evaristo revisando
+-- datos reales). Para Convenio Marco se usa ese código de licitación real
+-- como "oportunidad" (cuando está disponible) y el número de OC va aparte.
 create or replace function public.mis_compras_agiles_ganadas()
 returns jsonb
 language sql
@@ -89,28 +101,44 @@ as $$
     from public.clientes c
     where c.user_id = auth.uid()
     limit 1
+  ),
+  base as (
+    select
+      oc.*,
+      upper((regexp_match(oc.codigo, '-([A-Za-z]+)\d{2}$'))[1]) as sufijo
+    from public.ordenes_compra oc, cli
+    where cli.rut is not null
+      and oc.rut_proveedor = cli.rut
+      and (oc.numero_licitacion is null or oc.numero_licitacion = '')
   )
   select coalesce(jsonb_agg(x order by x.fecha_cierre desc nulls last), '[]'::jsonb)
   from (
     select
-      oc.codigo,
-      oc.demandante as institucion,
-      oc.rut_demandante as rut_institucion,
-      oc.fecha_envio_oc as fecha_publicacion,
-      oc.fecha_emision as fecha_cierre,
-      coalesce(oc.total, oc.monto_total, 0) as monto_estimado,
-      'compra_agil'::text as tipo,
+      case
+        when b.sufijo = 'CM' and b.convenio_codigo is not null and b.convenio_codigo <> ''
+          then b.convenio_codigo
+        else b.codigo
+      end as codigo,
+      b.codigo as orden_compra_codigo,
+      b.link_oficial as orden_compra_link,
+      b.demandante as institucion,
+      b.rut_demandante as rut_institucion,
+      b.fecha_envio_oc as fecha_publicacion,
+      b.fecha_emision as fecha_cierre,
+      coalesce(b.total, b.monto_total, 0) as monto_estimado,
+      case b.sufijo
+        when 'AG' then 'compra_agil'
+        when 'CM' then 'convenio_marco'
+        when 'TD' then 'trato_directo'
+        else 'otro'
+      end::text as tipo,
       true as gano,
-      oc.proveedor as ganador_nombre,
+      b.proveedor as ganador_nombre,
       null::text as estado_award,
       i.conducta_pago,
-      i.pago_promedio_dias,
-      oc.link_oficial
-    from public.ordenes_compra oc
-    left join public.instituciones i on i.rut = oc.rut_demandante, cli
-    where cli.rut is not null
-      and oc.rut_proveedor = cli.rut
-      and (oc.numero_licitacion is null or oc.numero_licitacion = '')
+      i.pago_promedio_dias
+    from base b
+    left join public.instituciones i on i.rut = b.rut_demandante
   ) x;
 $$;
 

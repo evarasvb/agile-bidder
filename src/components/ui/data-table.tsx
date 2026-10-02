@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, Search, X } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -186,6 +186,41 @@ export function DataTable<T>({
   const [pageSizeLocal, setPageSizeLocal] = useState<number>(() => leerPreferencia(storageKey, 'pageSize', defaultPageSize));
   const [pageLocal, setPageLocal] = useState(1);
 
+  // Barra deslizadora horizontal explícita bajo la tabla: la scrollbar nativa
+  // (aunque ya se intentó hacer visible con `.scrollbar-x-visible`) queda
+  // oculta en reposo con "overlay scrollbars" (Mac, algunos Windows/Linux),
+  // así que en esas máquinas nadie nota que hay más columnas al costado
+  // (hallazgo de Evaristo en Histórico de postulaciones). Este control es
+  // siempre visible cuando el contenido no cabe, sin depender del SO.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [scrollInfo, setScrollInfo] = useState({ max: 0, left: 0 });
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    // Sin array de dependencias fijo (montaje único): si se re-ejecutara en
+    // cada render, setScrollInfo() siempre crea un objeto nuevo y dispara
+    // otro render → vuelve a ejecutar el efecto → bucle infinito (hallazgo
+    // de Codex). La función que falta en el array (`setScrollInfo`) es
+    // estable (la da React), así que [] es seguro. Para notar cambios de
+    // ANCHO DEL CONTENIDO (más/menos columnas, texto más largo) sin volver a
+    // correr el efecto completo, se observa también el <table> interno
+    // (crece con `min-w-max`), no solo el contenedor con scroll.
+    const medir = () => {
+      const max = Math.max(0, el.scrollWidth - el.clientWidth);
+      const left = el.scrollLeft;
+      setScrollInfo((prev) => (prev.max === max && prev.left === left ? prev : { max, left }));
+    };
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    el.addEventListener('scroll', medir, { passive: true });
+    return () => {
+      ro.disconnect();
+      el.removeEventListener('scroll', medir);
+    };
+  }, []);
+
   // En modo servidor el orden, la página y el tamaño vienen de la página.
   const sort = manual ? manual.sort : sortLocal;
   const pageSize = manual ? manual.pageSize : pageSizeLocal;
@@ -306,7 +341,7 @@ export function DataTable<T>({
       {/* Tabla con scroll interno y encabezado fijo. min-w-max: si las columnas
           no caben, la tabla crece a su ancho real en vez de comprimirse, y
           scrollbar-x-visible hace evidente que hay una barra para deslizar. */}
-      <div className="rounded-lg border overflow-auto scrollbar-x-visible" style={{ maxHeight }}>
+      <div ref={scrollRef} className="rounded-lg border overflow-auto scrollbar-x-visible" style={{ maxHeight }}>
         <Table className="text-sm min-w-max">
           {/* sticky va en cada th (en thead no funciona en todos los navegadores) */}
           <TableHeader className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-muted [&_th]:shadow-[inset_0_-1px_0_hsl(var(--border))] [&_tr]:border-b">
@@ -420,6 +455,30 @@ export function DataTable<T>({
           </TableBody>
         </Table>
       </div>
+
+      {/* Barra deslizadora horizontal: solo aparece si la tabla no cabe
+          completa (scrollInfo.max > 0). Arrastrarla mueve el scroll real de
+          la tabla, y viceversa (el listener de scroll de arriba la sincroniza). */}
+      {scrollInfo.max > 0 && (
+        <div className="flex items-center gap-2 px-1 text-muted-foreground">
+          <span className="text-xs shrink-0" aria-hidden="true">◂</span>
+          <input
+            type="range"
+            min={0}
+            max={scrollInfo.max}
+            value={scrollInfo.left}
+            onChange={(e) => {
+              const left = Number(e.target.value);
+              setScrollInfo((s) => ({ ...s, left }));
+              if (scrollRef.current) scrollRef.current.scrollLeft = left;
+            }}
+            className="w-full h-2 accent-primary cursor-pointer"
+            aria-label="Desplazar la tabla horizontalmente"
+            title="Desplazar la tabla hacia los lados"
+          />
+          <span className="text-xs shrink-0" aria-hidden="true">▸</span>
+        </div>
+      )}
 
       {/* Pie: tamaño de página + paginación */}
       {total > 0 && (

@@ -4,7 +4,11 @@ import { supabase } from '@/integrations/supabase/client';
 // El RPC garantias_de_bases es reciente y aún no está en los tipos generados
 // de Supabase; se llama vía un wrapper tipado hasta regenerar los types.
 type RpcFn = <T = unknown>(fn: string, args?: Record<string, unknown>) => Promise<{ data: T | null; error: { message: string } | null }>;
-const rpc = supabase.rpc as unknown as RpcFn;
+// Mismo problema que en useMarketEstado.ts: `supabase.rpc as unknown as
+// RpcFn` desenchufa el método de su objeto y pierde el `this` interno
+// (this.rest) — revienta con "Cannot read properties of undefined (reading
+// 'rest')". Se envuelve en una función que invoca supabase.rpc como método.
+const rpc = ((fn: string, args?: Record<string, unknown>) => supabase.rpc(fn, args)) as unknown as RpcFn;
 
 export interface GarantiaBases {
   seriedad: string | null;
