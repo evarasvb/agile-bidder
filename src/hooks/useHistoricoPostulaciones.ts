@@ -8,6 +8,11 @@ export interface HistoricoPostulacion {
   codigo: string;
   nombre: string | null;
   institucion: string | null;
+  /** Área/unidad de compra dentro de la institución (ej. "CMDS Nivel
+   *  Central"), cuando es distinta del nombre de la institución. Solo
+   *  disponible para órdenes de compra (compra ágil/convenio marco/trato
+   *  directo); en licitaciones no se tiene ese dato. */
+  area_compradora: string | null;
   rut_institucion: string | null;
   fecha_publicacion: string | null;
   fecha_cierre: string | null;
@@ -29,6 +34,7 @@ function mapMia(row: any, nombreFallback: string): HistoricoPostulacion {
     codigo: row.codigo,
     nombre: row.nombre ?? nombreFallback,
     institucion: row.institucion ?? null,
+    area_compradora: row.area_compradora ?? null,
     rut_institucion: row.rut_institucion ?? null,
     fecha_publicacion: row.fecha_publicacion ?? null,
     fecha_cierre: row.fecha_cierre ?? null,
@@ -81,6 +87,7 @@ export function useOportunidadesNoTomadas(limite = 40) {
         codigo: row.codigo,
         nombre: row.nombre ?? null,
         institucion: row.institucion ?? null,
+        area_compradora: null,
         rut_institucion: row.rut_institucion ?? null,
         fecha_publicacion: row.fecha_publicacion ?? null,
         fecha_cierre: row.fecha_cierre ?? null,

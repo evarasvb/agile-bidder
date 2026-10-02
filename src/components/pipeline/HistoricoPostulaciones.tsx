@@ -139,10 +139,26 @@ const COLUMNAS: DataTableColumn<HistoricoPostulacion>[] = [
   {
     id: 'institucion',
     header: 'Institución',
-    className: 'text-sm text-gray-600 max-w-[200px] truncate',
+    className: 'text-sm text-gray-600 max-w-[220px] truncate',
     sortValue: (item) => item.institucion,
     exportValue: (item) => item.institucion ?? '',
     cell: (item) => item.institucion || '—',
+  },
+  {
+    id: 'area_compradora',
+    header: 'Área compradora',
+    className: 'text-sm text-gray-500 max-w-[180px] truncate',
+    sortValue: (item) => item.area_compradora,
+    exportValue: (item) => item.area_compradora ?? '',
+    cell: (item) => item.area_compradora || '—',
+  },
+  {
+    id: 'rut_institucion',
+    header: 'RUT Institución',
+    className: 'text-sm text-gray-500 whitespace-nowrap',
+    sortValue: (item) => item.rut_institucion,
+    exportValue: (item) => item.rut_institucion ?? '',
+    cell: (item) => item.rut_institucion || '—',
   },
   {
     id: 'pagador',
@@ -179,14 +195,22 @@ const COLUMNAS: DataTableColumn<HistoricoPostulacion>[] = [
   {
     id: 'orden_compra',
     header: 'Orden de Compra',
-    className: 'text-sm text-gray-600',
+    className: 'text-sm text-gray-600 whitespace-nowrap',
     sortValue: (item) => item.orden_compra_codigo,
     exportValue: (item) => item.orden_compra_codigo ?? '',
     cell: (item) => {
-      if (!item.orden_compra_codigo) return <span className="text-gray-400">—</span>;
-      return item.orden_compra_link ? (
+      // Si la OC y la oportunidad son el mismo número (compra ágil, trato
+      // directo: no hay un id de proceso distinto), repetirlo acá no suma
+      // información nueva.
+      if (!item.orden_compra_codigo || item.orden_compra_codigo === item.codigo) {
+        return <span className="text-gray-400">—</span>;
+      }
+      // El link guardado (ordenes_compra.link_oficial) casi nunca está: se
+      // arma igual que el de "Oportunidad", desde el propio número de OC.
+      const link = item.orden_compra_link || linkProcesoMp(item.orden_compra_codigo);
+      return link ? (
         <a
-          href={item.orden_compra_link}
+          href={link}
           target="_blank"
           rel="noreferrer"
           className="inline-flex items-center gap-1 text-blue-700 hover:underline"
@@ -222,8 +246,16 @@ const COLUMNAS: DataTableColumn<HistoricoPostulacion>[] = [
   },
   {
     id: 'accion',
-    header: '',
-    cell: (item) => <BotonTrabajar item={item} />,
+    header: 'Acción',
+    // Ganada o perdida son resultados ya cerrados: no hay nada que "trabajar"
+    // (y mostrar el botón ahí confundía). Solo tiene sentido para las
+    // oportunidades de tu industria a las que todavía no postulaste.
+    cell: (item) =>
+      item.resultado === 'sin_tomar' ? (
+        <BotonTrabajar item={item} />
+      ) : (
+        <span className="text-gray-400">—</span>
+      ),
   },
 ];
 
@@ -254,7 +286,9 @@ export function HistoricoPostulaciones() {
       rowKey={(item) => `${item.tipo}-${item.orden_compra_codigo ?? item.codigo}`}
       columns={COLUMNAS}
       itemLabel="procesos"
-      searchText={(item) => `${item.nombre ?? ''} ${item.institucion ?? ''} ${item.codigo} ${item.ganador_nombre ?? ''}`}
+      searchText={(item) =>
+        `${item.nombre ?? ''} ${item.institucion ?? ''} ${item.area_compradora ?? ''} ${item.rut_institucion ?? ''} ${item.codigo} ${item.orden_compra_codigo ?? ''} ${item.ganador_nombre ?? ''}`
+      }
       searchPlaceholder="Buscar por oportunidad, institución o ganador…"
       defaultSort={{ id: 'cierre', dir: 'desc' }}
       exportFileName="historico-postulaciones"
