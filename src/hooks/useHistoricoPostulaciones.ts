@@ -27,6 +27,16 @@ export interface HistoricoPostulacion {
    *  usa la numeración de la licitación que lo originó, no la de la OC. */
   orden_compra_codigo?: string | null;
   orden_compra_link?: string | null;
+  /** Solo "no tomadas" v2: qué tan bien matchea el rubro del cliente (motor
+   *  de embeddings de Oportunidades), 0-100. */
+  score?: number | null;
+}
+
+export interface ResumenMercado {
+  tamano_mercado: number;
+  en_pipeline: number;
+  no_tomadas: number;
+  tiene_inventario: boolean;
 }
 
 function mapMia(row: any, nombreFallback: string): HistoricoPostulacion {
@@ -75,13 +85,20 @@ export function useMisPostulaciones() {
   });
 }
 
-export function useOportunidadesNoTomadas(limite = 40) {
+// v2: usa el motor de matching por embeddings que ya corre para
+// "Oportunidades" (lic_item_matches/ca_item_matches, precalculado por cron)
+// en vez de un ILIKE por palabra clave sobre toda licitaciones_bi/
+// compras_agiles — esa versión (v1, mis_oportunidades_no_tomadas) escaneaba
+// la tabla completa por cada una de las ~20 palabras clave del cliente y
+// nunca alcanzaba a responder a tiempo (el filtro se veía vacío sin avisar
+// que en realidad había caído por timeout).
+export function useOportunidadesNoTomadas(limite = 40, umbral = 0.3) {
   const { user } = useAuth();
   return useQuery({
-    queryKey: ['historico-no-tomadas', user?.id, limite],
+    queryKey: ['historico-no-tomadas-v2', user?.id, limite, umbral],
     enabled: !!user?.id,
     queryFn: async (): Promise<HistoricoPostulacion[]> => {
-      const { data, error } = await (supabase.rpc as any)('mis_oportunidades_no_tomadas', { p_limite: limite });
+      const { data, error } = await (supabase.rpc as any)('mis_oportunidades_no_tomadas_v2', { p_limite: limite, p_umbral: umbral });
       if (error) throw error;
       return ((data ?? []) as any[]).map((row) => ({
         codigo: row.codigo,
@@ -97,7 +114,25 @@ export function useOportunidadesNoTomadas(limite = 40) {
         ganador_nombre: row.ganador_nombre ?? null,
         conducta_pago: row.conducta_pago ?? null,
         pago_promedio_dias: row.pago_promedio_dias ?? null,
+        score: row.score != null ? Number(row.score) : null,
       }));
+    },
+    staleTime: 5 * 60_000,
+  });
+}
+
+// "Tamaño del mercado": cuántas oportunidades de su rubro matchean en total
+// (postuladas o no), para que el cliente vea el panorama completo, no solo
+// la lista acotada de "no tomadas".
+export function useResumenMercado(umbral = 0.3) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['resumen-mercado', user?.id, umbral],
+    enabled: !!user?.id,
+    queryFn: async (): Promise<ResumenMercado> => {
+      const { data, error } = await (supabase.rpc as any)('mis_oportunidades_resumen_mercado', { p_umbral: umbral });
+      if (error) throw error;
+      return (data ?? { tamano_mercado: 0, en_pipeline: 0, no_tomadas: 0, tiene_inventario: false }) as ResumenMercado;
     },
     staleTime: 5 * 60_000,
   });
