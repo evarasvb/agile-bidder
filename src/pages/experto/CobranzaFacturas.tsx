@@ -49,6 +49,7 @@ import {
   useSeguimientoCobranza, useAgregarSeguimiento, useEliminarSeguimiento,
   CANAL_LABEL, type CanalSeguimiento,
 } from '@/hooks/useSeguimientoCobranza';
+import { useContactosInstitucion, useAgregarContactoInstitucion } from '@/hooks/useInstitucionContactos';
 
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string;
 const ANON = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
@@ -682,6 +683,101 @@ function InstitucionCombobox({ value, onSelect }: { value: string; onSelect: (no
   );
 }
 
+// Directorio compartido de contactos por institución (venta, cobranza...):
+// muestra los ya cargados por cualquier cliente de FirmaVB y deja agregar uno
+// nuevo sin salir del formulario. Al elegir uno se autocompleta su correo.
+function ContactoInstitucionCombobox({
+  rut, nombreInstitucion, value, onPick,
+}: {
+  rut: string;
+  nombreInstitucion: string;
+  value: string;
+  onPick: (c: { nombre: string; email: string | null }) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [nuevo, setNuevo] = useState(false);
+  const { data: contactos = [], isLoading } = useContactosInstitucion(rut || null);
+  const agregar = useAgregarContactoInstitucion();
+  const [fNombre, setFNombre] = useState('');
+  const [fEmail, setFEmail] = useState('');
+  const [fTelefono, setFTelefono] = useState('');
+  const [fCargo, setFCargo] = useState('');
+
+  const guardarNuevo = async () => {
+    if (!fNombre.trim()) { toast.error('Escribe el nombre del contacto'); return; }
+    if (!rut) { toast.error('Falta el RUT de la institución'); return; }
+    try {
+      const c = await agregar.mutateAsync({
+        institucion_rut: rut, institucion_nombre: nombreInstitucion || null,
+        nombre_contacto: fNombre.trim(), email: fEmail, telefono: fTelefono, cargo: fCargo,
+        etiquetas: ['cobranza'],
+      });
+      onPick({ nombre: c.nombre_contacto, email: c.email });
+      setNuevo(false); setFNombre(''); setFEmail(''); setFTelefono(''); setFCargo('');
+      setOpen(false);
+      toast.success('Contacto guardado. Queda disponible para la próxima vez.');
+    } catch (e) {
+      toast.error((e as Error).message || 'No se pudo guardar el contacto');
+    }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setNuevo(false); }}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between font-normal">
+          <span className={cn('truncate text-left', !value && 'text-muted-foreground')}>{value || 'Elige o agrega un contacto…'}</span>
+          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[min(92vw,420px)] p-0" align="start">
+        {!rut ? (
+          <div className="p-3 text-sm text-muted-foreground">Primero elige la institución (o la OC) para ver sus contactos.</div>
+        ) : nuevo ? (
+          <div className="space-y-2 p-3">
+            <p className="text-xs font-medium text-muted-foreground">Nuevo contacto para {nombreInstitucion || rut}</p>
+            <Input value={fNombre} onChange={(e) => setFNombre(e.target.value)} placeholder="Nombre" autoFocus />
+            <Input value={fEmail} onChange={(e) => setFEmail(e.target.value)} placeholder="Correo" type="email" />
+            <div className="grid grid-cols-2 gap-2">
+              <Input value={fTelefono} onChange={(e) => setFTelefono(e.target.value)} placeholder="Teléfono" />
+              <Input value={fCargo} onChange={(e) => setFCargo(e.target.value)} placeholder="Cargo" />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button type="button" variant="ghost" size="sm" onClick={() => setNuevo(false)}>Cancelar</Button>
+              <Button type="button" size="sm" disabled={agregar.isPending} onClick={guardarNuevo}>
+                {agregar.isPending && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />} Guardar contacto
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {isLoading ? (
+              <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Buscando contactos…</div>
+            ) : contactos.length === 0 ? (
+              <div className="p-3 text-sm text-muted-foreground">Todavía no hay contactos guardados para esta institución.</div>
+            ) : (
+              <div className="max-h-64 overflow-auto">
+                {contactos.map((c) => (
+                  <button key={c.id} type="button"
+                    onClick={() => { onPick({ nombre: c.nombre_contacto, email: c.email }); setOpen(false); }}
+                    className="flex w-full flex-col items-start gap-0.5 border-b px-3 py-2 text-left text-sm hover:bg-muted/50 last:border-b-0">
+                    <span className="font-medium">{c.nombre_contacto}{c.cargo && <span className="font-normal text-muted-foreground"> · {c.cargo}</span>}</span>
+                    <span className="text-xs text-muted-foreground">{c.email || 'sin correo'}{c.telefono ? ` · ${c.telefono}` : ''}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="border-t p-2">
+              <Button type="button" variant="ghost" size="sm" className="w-full gap-1.5" onClick={() => setNuevo(true)}>
+                <Plus className="h-3.5 w-3.5" /> Agregar contacto nuevo
+              </Button>
+            </div>
+          </>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // Autocompletado de OC propias ya ACEPTADAS por el organismo (nunca borradores
 // ni canceladas): al elegir una se completan RUT, monto y fecha de emisión
 // solos, con datos reales de Mercado Público.
@@ -1053,8 +1149,16 @@ function NuevaFacturaDialog() {
             <Input id="f-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="pagos@organismo.cl" />
           </div>
           <div className="col-span-2">
-            <Label htmlFor="f-contacto">Nombre de contacto (opcional)</Label>
-            <Input id="f-contacto" value={nombreContacto} onChange={(e) => setNombreContacto(e.target.value)} placeholder="Quién gestiona el pago en el organismo/cliente" />
+            <Label>Contacto (opcional)</Label>
+            <ContactoInstitucionCombobox
+              rut={rut}
+              nombreInstitucion={nombre}
+              value={nombreContacto}
+              onPick={(c) => { setNombreContacto(c.nombre); if (c.email) setEmail(c.email); }}
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Directorio compartido: el correo que agregues acá queda para la próxima vez que alguien (de FirmaVB) le cobre a esta institución.
+            </p>
           </div>
           <div>
             <Label htmlFor="f-num">N° de factura</Label>
