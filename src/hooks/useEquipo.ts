@@ -12,6 +12,8 @@ export interface Vendedor {
   nombre: string;
   email: string;
   rol: string;
+  // Módulos permitidos (claves de src/lib/modulosPermisos). null = acceso a todo.
+  permisos: string[] | null;
   avatar_url: string | null;
   telefono: string | null;
   activo: boolean;
@@ -253,18 +255,21 @@ export function useInvitarMiembro() {
       email,
       rol,
       telefono,
+      permisos,
     }: {
       nombre: string;
       email: string;
       rol: string;
       telefono?: string;
+      // Lista de claves de módulo permitidas, o null = acceso a todo.
+      permisos?: string[] | null;
     }): Promise<InvitacionResultado> => {
       // La edge function crea el miembro (pendiente + token), envía el email de
       // activación y devuelve el enlace para compartir. Pasamos el origin actual
       // para construir el enlace correcto (localhost/preview/producción).
       const appUrl = typeof window !== 'undefined' ? window.location.origin : '';
       const { data, error } = await supabase.functions.invoke('invitar-miembro', {
-        body: { nombre, email, rol, telefono, app_url: appUrl },
+        body: { nombre, email, rol, telefono, permisos: permisos ?? null, app_url: appUrl },
       });
       if (error) {
         // El mensaje útil de la función (p. ej. "Esa persona ya tiene una cuenta

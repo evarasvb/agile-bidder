@@ -39,6 +39,8 @@ import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import logoFirmavbBlanco from "@/assets/logo-firmavb-blanco.png";
 import { useState, useEffect } from "react";
+import { usePermisosModulos } from "@/hooks/usePermisosModulos";
+import { moduloDeRuta } from "@/lib/modulosPermisos";
 
 interface NavItem {
   title: string;
@@ -179,6 +181,19 @@ export function AppSidebar({ open = false, onClose, collapsed = false, onToggleC
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
   const esAdmin = (user?.email || "").toLowerCase() === "evaras@firmavb.cl";
+  const { puede } = usePermisosModulos();
+
+  // Un hijo es visible si no es adminOnly (o lo es y soy admin) y el permiso de
+  // su módulo lo permite (las rutas libres devuelven null ⇒ permitidas). Un
+  // ítem con hijos se muestra si al menos un hijo es visible; un ítem simple,
+  // según el permiso de su propia ruta.
+  const hijoVisible = (c: { url: string; adminOnly?: boolean }) =>
+    (!c.adminOnly || esAdmin) && puede(moduloDeRuta(c.url));
+  const itemVisible = (item: NavItem) => {
+    if (item.adminOnly && !esAdmin) return false;
+    if (item.children && item.children.length > 0) return item.children.some(hijoVisible);
+    return puede(moduloDeRuta(item.url));
+  };
 
   // Destino activo = la URL de nav MÁS ESPECÍFICA que calza con la ruta actual
   // (por igualdad o como prefijo de sub-ruta). Usar el match más largo evita que
@@ -303,7 +318,7 @@ export function AppSidebar({ open = false, onClose, collapsed = false, onToggleC
       {/* Navigation */}
       <nav aria-label="Navegación principal" className="flex-1 px-3 py-4 overflow-y-auto scrollbar-thin">
         <ul className="space-y-1">
-          {navItems.filter((item) => !item.adminOnly || esAdmin).map((item) => {
+          {navItems.filter(itemVisible).map((item) => {
             const hasChildren = item.children && item.children.length > 0;
             const isExpanded = expandedItems.includes(item.title);
             const isItemActive = hasChildren
@@ -338,7 +353,7 @@ export function AppSidebar({ open = false, onClose, collapsed = false, onToggleC
                     </button>
                     {isExpanded && (
                       <ul className={cn("mt-1 ml-4 space-y-1", collapsed && "lg:hidden")}>
-                        {item.children?.filter((child) => !child.adminOnly || esAdmin).map((child) => {
+                        {item.children?.filter(hijoVisible).map((child) => {
                           const ChildIcon = child.icon;
                           const isChildActive = child.url === bestUrl && bestLen >= 0;
                           return (

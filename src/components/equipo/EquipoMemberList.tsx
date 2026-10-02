@@ -17,16 +17,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useEquipoMembers, useUpdateVendedor, useToggleVendedorActivo, type Vendedor } from '@/hooks/useEquipo';
+import { SelectorPermisosModulos } from '@/components/equipo/SelectorPermisosModulos';
+import type { ModuloKey } from '@/lib/modulosPermisos';
 import { useAuth } from '@/hooks/useAuth';
 
 const rolColors: Record<string, string> = {
   admin: 'bg-purple-100 text-purple-700 border-purple-200',
+  cobranza: 'bg-emerald-100 text-emerald-700 border-emerald-200',
   vendedor: 'bg-blue-100 text-blue-700 border-blue-200',
   viewer: 'bg-gray-100 text-gray-600 border-gray-200',
 };
 
 const rolLabels: Record<string, string> = {
   admin: 'Admin',
+  cobranza: 'Cobranza',
   vendedor: 'Vendedor',
   viewer: 'Viewer',
 };
@@ -39,6 +43,7 @@ export function EquipoMemberList() {
   const toggleActivoMutation = useToggleVendedorActivo();
   const [editingMember, setEditingMember] = useState<Vendedor | null>(null);
   const [editForm, setEditForm] = useState({ nombre: '', email: '', rol: '', telefono: '' });
+  const [editPermisos, setEditPermisos] = useState<ModuloKey[] | null>(null);
 
   // Gestionar (editar / activar / desactivar) es solo del dueño que invitó
   // esa fila (invitado_por = mi auth.uid()) — no basta con que sea mi propia
@@ -57,6 +62,7 @@ export function EquipoMemberList() {
       rol: member.rol || 'vendedor',
       telefono: member.telefono || '',
     });
+    setEditPermisos(Array.isArray(member.permisos) ? (member.permisos as ModuloKey[]) : null);
   };
 
   const handleSaveEdit = () => {
@@ -68,6 +74,7 @@ export function EquipoMemberList() {
         email: editForm.email,
         rol: editForm.rol,
         telefono: editForm.telefono || null,
+        permisos: editPermisos,
       },
       { onSuccess: () => setEditingMember(null) }
     );
@@ -254,10 +261,15 @@ export function EquipoMemberList() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">Admin (acceso completo)</SelectItem>
+                  <SelectItem value="cobranza">Cobranza (enfocado en cobros)</SelectItem>
                   <SelectItem value="vendedor">Vendedor (pipeline + asignaciones)</SelectItem>
                   <SelectItem value="viewer">Viewer (solo lectura)</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Módulos a los que puede entrar</Label>
+              <SelectorPermisosModulos value={editPermisos} onChange={setEditPermisos} />
             </div>
           </div>
           <DialogFooter>
