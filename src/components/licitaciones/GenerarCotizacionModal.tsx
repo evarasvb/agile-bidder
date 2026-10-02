@@ -29,12 +29,22 @@ import {
   AlertTriangle,
   CheckCircle2,
   Building2,
-  Calendar
+  Calendar,
+  Mail
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useInventory } from '@/hooks/useInventory';
 import { useCliente } from '@/hooks/useCliente';
+import { useProfile } from '@/hooks/useProfile';
+import { gmailCrearBorrador } from '@/hooks/useGmail';
+import {
+  descargarCotizacionPDF,
+  cotizacionBase64,
+  cuerpoCorreoCotizacionHtml,
+  type DatosCotizacion,
+} from '@/services/pdfGenerator';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Licitacion } from '@/hooks/useLicitaciones';
@@ -71,12 +81,100 @@ export function GenerarCotizacionModal({
 }: GenerarCotizacionModalProps) {
   const { data: inventario, isLoading: inventarioLoading } = useInventory();
   const { data: cliente } = useCliente();
+  const { primaryRole } = useProfile();
+  const navigate = useNavigate();
   const [productosOfertados, setProductosOfertados] = useState<ProductoOfertado[]>([]);
   const [observaciones, setObservaciones] = useState('');
   const [plazoEntrega, setPlazoEntrega] = useState(5);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isDrafting, setIsDrafting] = useState(false);
+  const [emailDestino, setEmailDestino] = useState('');
+  const [mensajeCorreo, setMensajeCorreo] = useState(
+    `Estimados:\n\nJunto con saludar, adjuntamos nuestra cotización en respuesta a ${licitacion.titulo} (${licitacion.id_licitacion}), de ${licitacion.organismo}.\n\nQuedamos atentos a sus comentarios.`
+  );
   const [searchProduct, setSearchProduct] = useState('');
+
+  // El perfil de solo lectura (visor) no deja borradores de cotización.
+  const puedeCotizar = primaryRole !== 'visor';
+
+  // Arma los datos del PDF de cotización a partir del formulario y la empresa.
+  const construirDatosCotizacion = (numero: string): DatosCotizacion | null => {
+    if (!cliente) return null;
+    return {
+      numero,
+      fecha: new Date(),
+      validezDias: 15,
+      compra: {
+        codigo: licitacion.id_licitacion,
+        organismo: licitacion.organismo,
+        nombre: licitacion.titulo,
+      },
+      items: productosOfertados.map((p) => ({
+        itemRequerido: p.nombre,
+        productoOfertado: p.nombre,
+        sku: p.sku,
+        cantidad: p.cantidad,
+        unidad: 'UN',
+        precioUnitario: p.precioOferta,
+        total: p.precioOferta * p.cantidad,
+        imagenUrl: p.imagen_url,
+      })),
+      empresa: {
+        nombre: cliente.empresa_nombre || 'Mi empresa',
+        rut: cliente.rut || '',
+        direccion: cliente.direccion || '',
+        telefono: cliente.telefono || '',
+        email: cliente.email_contacto || cliente.email || '',
+        logo: cliente.logo_url || undefined,
+      },
+      observaciones,
+      tiempoEntrega: `${plazoEntrega} días hábiles`,
+    };
+  };
+
+  // Deja un borrador de cotización en el Gmail del usuario con el PDF adjunto.
+  const handleDejarBorrador = async () => {
+    if (productosOfertados.length === 0) {
+      toast.error('Agrega al menos un producto a la cotización');
+      return;
+    }
+    if (!emailDestino.trim()) {
+      toast.error('Indica el correo del destinatario para dejar el borrador');
+      return;
+    }
+    if (!cliente) {
+      toast.error('No se pudo identificar tu cuenta. Vuelve a intentar en unos segundos.');
+      return;
+    }
+    setIsDrafting(true);
+    try {
+      const datos = construirDatosCotizacion(Date.now().toString().slice(-6));
+      if (!datos) throw new Error('Faltan datos de la empresa');
+      const pdf = await cotizacionBase64(datos);
+      const subject = `Cotización ${datos.compra.codigo} — ${datos.empresa.nombre}`;
+      const r = await gmailCrearBorrador({
+        to: emailDestino.trim(),
+        subject,
+        bodyHtml: cuerpoCorreoCotizacionHtml(datos, mensajeCorreo),
+        adjuntos: [{ ...pdf, mimeType: 'application/pdf' }],
+      });
+      toast.success(
+        'Borrador de cotización creado en tu Gmail',
+        r.link ? { action: { label: 'Abrir Gmail', onClick: () => window.open(r.link!, '_blank') } } : undefined,
+      );
+    } catch (e: any) {
+      if (e?.code === 'no_conectado') {
+        toast.error('Conecta tu Gmail primero.', {
+          action: { label: 'Ir a Integraciones', onClick: () => navigate('/configuracion/integraciones') },
+        });
+      } else {
+        toast.error(e?.message || 'No se pudo crear el borrador');
+      }
+    } finally {
+      setIsDrafting(false);
+    }
+  };
 
   // Calculate totals
   const totalOferta = productosOfertados.reduce((sum, p) => sum + (p.precioOferta * p.cantidad), 0);
@@ -177,31 +275,13 @@ export function GenerarCotizacionModal({
 
       if (error) throw error;
 
-      // Generate PDF content (in real app, this would call an edge function)
-      const pdfContent = {
-        licitacion: {
-          codigo: licitacion.id_licitacion,
-          titulo: licitacion.titulo,
-          organismo: licitacion.organismo,
-          fecha_cierre: licitacion.fecha_cierre,
-        },
-        productos: productosOfertados,
-        totales: {
-          subtotal: totalOferta,
-          margen: margenPromedio,
-        },
-        plazoEntrega,
-        observaciones,
-      };
+      // Genera y descarga el PDF profesional de la cotización.
+      const datos = construirDatosCotizacion(oferta.id.slice(0, 8).toUpperCase());
+      if (datos) await descargarCotizacionPDF(datos);
 
-      console.log('PDF Content:', pdfContent);
-      
-      toast.success('Cotización generada exitosamente', {
+      toast.success('Cotización generada y descargada', {
         description: `Oferta ID: ${oferta.id.slice(0, 8)}...`
       });
-
-      // For now, show success - in production would trigger PDF download
-      
     } catch (error) {
       console.error('Error generating PDF:', error);
       toast.error('Error al generar la cotización');
@@ -527,6 +607,32 @@ export function GenerarCotizacionModal({
               </div>
             </div>
 
+            {/* Correo del destinatario: solo para dejar el borrador en Gmail */}
+            {puedeCotizar && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Mail className="h-4 w-4" />
+                  Correo del destinatario (para dejar la cotización en borrador de Gmail)
+                </Label>
+                <Input
+                  type="email"
+                  placeholder="contacto@organismo.cl"
+                  value={emailDestino}
+                  onChange={(e) => setEmailDestino(e.target.value)}
+                />
+                <Label>Mensaje del correo (editable)</Label>
+                <Textarea
+                  placeholder="Escribe el mensaje que acompañará la cotización..."
+                  value={mensajeCorreo}
+                  onChange={(e) => setMensajeCorreo(e.target.value)}
+                  rows={6}
+                />
+                <p className="text-xs text-muted-foreground">
+                  El total, la validez y la firma se agregan automáticamente al final del correo.
+                </p>
+              </div>
+            )}
+
             {/* Totales */}
             <Card className="bg-primary/5 border-primary/20">
               <CardContent className="pt-4">
@@ -581,7 +687,21 @@ export function GenerarCotizacionModal({
             )}
             Generar PDF
           </Button>
-          <Button 
+          {puedeCotizar && (
+            <Button
+              variant="secondary"
+              onClick={handleDejarBorrador}
+              disabled={productosOfertados.length === 0 || isDrafting}
+            >
+              {isDrafting ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Mail className="h-4 w-4 mr-2" />
+              )}
+              Dejar en borrador (Gmail)
+            </Button>
+          )}
+          <Button
             onClick={handleEnviarMercadoPublico}
             disabled={productosOfertados.length === 0 || isSending}
           >
