@@ -318,9 +318,13 @@ export default function LibroLicitacion() {
     terminar('chat'); terminar(`experto-${tipo}`);
   };
 
-  const generar = async (tipo: Entregable) => {
+  const generar = async (tipo: Entregable, mantenerTab = false) => {
     if (generandoEntregable) return;
-    setTab(tipo); empezar(tipo);
+    // "Anexos" ya no genera texto: completa los Word OFICIALES de la licitación.
+    if (tipo === 'anexos') { await anexosOficiales(); return; }
+    // mantenerTab: al profundizar (estudio/bajo_agua) desde el Estudio, no se cambia de pestaña;
+    // el contenido se agrega dentro del mismo Estudio de la licitación.
+    if (!mantenerTab) setTab(tipo); empezar(tipo);
     try {
       if (tipo === 'mapa') {
         const r = await fetch(`${SUPA}/functions/v1/experto-mapa`, { method: 'POST', headers: auth, body: JSON.stringify({ codigo: cod }) });
@@ -335,11 +339,6 @@ export default function LibroLicitacion() {
         if (j.documentos) toast.success(`Matriz hecha con tus ${j.documentos} documento(s) de trabajo`);
       } else if (tipo === 'infografia') {
         setEntregables((e) => ({ ...e, infografia: 'ok' }));
-      } else if (tipo === 'anexos') {
-        const r = await fetch(`${SUPA}/functions/v1/experto-anexos`, { method: 'POST', headers: auth, body: JSON.stringify({ codigo: cod }) });
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(j.mensaje || j.error || `Error ${r.status}`);
-        setEntregables((e) => ({ ...e, anexos: j.contenido })); setFaltantes(j.faltantes ?? []);
       } else {
         await pedir({ modo: tipo, codigo: cod, pregunta: '', huella: 'libro' }, tipo === 'estudio' ? 'experto-estudio' : tipo === 'bajo_agua' ? 'experto-bajo-agua' : 'experto-consultar', (t) => setEntregables((e) => ({ ...e, [tipo]: t })));
         // Bajo el Agua gasta cuota: se refresca el libro para mostrar cuántos informes quedan.
@@ -517,6 +516,15 @@ export default function LibroLicitacion() {
     empezar('word:todos');
     try { for (const d of lista) { if (!(await completarUno(d))) break; } } catch (e: any) { toast.error(e.message); } finally { terminar('word:todos'); }
   };
+  // "Anexos" = completar los Word OFICIALES de la licitación (formato intacto), no un
+  // borrador de texto. Si aún no hay Word cargado, se intentan separar de las bases.
+  const anexosOficiales = async () => {
+    setFaltantes([]);
+    if (!escritorio) setVista('fuentes');
+    if (wordsUnicos().length) { await completarTodos(); return; }
+    if (bases.length) { await extraerAnexos(); toast.info('Separé los anexos de las bases. Pulsa "Completar" en Fuentes para rellenarlos con los datos de tu empresa.', { duration: 9000 }); return; }
+    toast.info('Primero trae o sube las bases en la columna Fuentes; con ellas puedo completar los anexos oficiales.', { duration: 9000 });
+  };
   const descargarDocumento = async (id: string) => {
     empezar('descargar:' + id);
     try {
@@ -586,7 +594,7 @@ export default function LibroLicitacion() {
   // Cómo lo hacemos en FirmaVB: cuándo se pide cada herramienta. Se muestra al pasar el mouse y se le entrega al Experto para que guíe.
   const GUIA_EVARISTO: Record<Entregable, string> = {
     sala: 'Tu tablero: plan de postulación con fechas y responsables, bases, veredicto, requisitos, anexos y aprobación. Es el camino guiado; si sigues sus pasos no te saltas nada.',
-    informe: 'Primero. Informe de trabajo con veredicto: postular, con reservas o descartar. Si dice descartar, no gastes nada más.',
+    informe: 'El estudio de la licitación: veredicto (postular, con reservas o descartar), fechas, admisibilidad, cómo se ganan los puntos, riesgos y próximos pasos. Desde aquí profundizas en las bases o vas Bajo el Agua. Si dice descartar, no gastes nada más.',
     matriz: 'Cuando el informe dice postular. Criterios y pesos sacados de las bases, con simulación de tu puntaje y del rival. Se usa antes de fijar el precio.',
     estudio: 'Solo licitaciones grandes (sobre 1.000 UTM) o con bases enredadas. Análisis completo de bases y anexos, trampas y puntos de puntaje.',
     bajo_agua: 'Cuando vas en serio. Historial del organismo, proveedor recurrente, compras ágiles paralelas, reclamos de pago, lobby y noticias. Cambia precio y plazo.',
@@ -595,10 +603,10 @@ export default function LibroLicitacion() {
     infografia: 'Para compartir por WhatsApp o LinkedIn. No usa IA; se arma con lo que ya generaste.',
   };
   const generadas = ENTREGABLES.filter((k) => k !== 'sala' && entregables[k]);
-  const siguiente: Entregable | null = !entregables.informe ? 'informe' : !entregables.matriz ? 'matriz' : !entregables.bajo_agua ? 'bajo_agua' : !entregables.anexos ? 'anexos' : null;
+  const siguiente: Entregable | null = !entregables.informe ? 'informe' : !entregables.matriz ? 'matriz' : !entregables.anexos ? 'anexos' : null;
   // Texto que se le pasa al Experto como primer turno para que recomiende la herramienta correcta.
   const guiaLibro = () => `Guía del Libro de licitación de FirmaVB (cómo lo hacemos): ${ENTREGABLES.map((k) => `${nombresEntregable[k]}: ${GUIA_EVARISTO[k]}`).join(' | ')}. Estado del Libro ${cod}: ${ENTREGABLES.map((k) => `${nombresEntregable[k]} ${k === 'sala' || entregables[k] ? 'lista' : 'sin generar'}`).join(', ')}. Bases cargadas: ${bases.length ? 'sí' : 'no'}. Si te preguntan qué herramienta usar, recomienda la siguiente del camino y explica por qué, como lo haría Evaristo.`;
-  const nombresEntregable: Record<Entregable, string> = { sala: 'Sala de postulación', informe: 'Informe de trabajo', matriz: 'Matriz de postulación', estudio: 'Estudio profundo', bajo_agua: 'Bajo el Agua', anexos: 'Anexos', mapa: 'Mapa conceptual', infografia: 'Infografía' };
+  const nombresEntregable: Record<Entregable, string> = { sala: 'Sala de postulación', informe: 'Estudio de la licitación', matriz: 'Matriz de postulación', estudio: 'Análisis profundo de bases', bajo_agua: 'Bajo el Agua', anexos: 'Anexos', mapa: 'Mapa conceptual', infografia: 'Infografía' };
   const compartirEntregable = async () => {
     const nombres = nombresEntregable;
     const titulo = `${nombres[tab]} · ${cod}${f?.nombre ? ' · ' + f.nombre : ''}`;
@@ -946,7 +954,7 @@ export default function LibroLicitacion() {
             <div className="flex items-center justify-between gap-2">
               <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Herramientas de decisión</CardTitle>
               <button type="button" onClick={() => setHerramientasAbiertas((v) => !v)} aria-expanded={herramientasAbiertas} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-                {herramientasAbiertas ? <><ChevronUp className="h-3.5 w-3.5" aria-hidden="true" />Ocultar</> : <><ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />Ver las {ENTREGABLES.length}</>}
+                {herramientasAbiertas ? <><ChevronUp className="h-3.5 w-3.5" aria-hidden="true" />Ocultar</> : <><ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />Ver herramientas</>}
               </button>
             </div>
             {/* Discretas por diseño: son clave para decidir, pero no todos saben usarlas. Evaristo guía cuál pedir y cuándo. */}
@@ -958,13 +966,11 @@ export default function LibroLicitacion() {
             {herramientasAbiertas && <div className="grid grid-cols-2 gap-2 pt-1">
               {([
                 ['sala', 'Sala de postulación', '', BookOpen, 'bg-indigo-100 text-indigo-700'],
-                ['informe', 'Informe de trabajo', '', FileText, 'bg-blue-100 text-blue-700'],
+                ['informe', 'Estudio de la licitación', '', FileText, 'bg-blue-100 text-blue-700'],
                 ['matriz', 'Matriz de postulación', 'Experto Pro', ClipboardList, 'bg-amber-100 text-amber-700'],
-                ['estudio', 'Estudio profundo', 'Experto Pro', Sparkles, 'bg-violet-100 text-violet-700'],
-                ['bajo_agua', 'Bajo el Agua', cuotaBajoAgua.etiqueta, Waves, 'bg-sky-100 text-sky-700'],
                 ['mapa', 'Mapa conceptual', '', MapIcon, 'bg-emerald-100 text-emerald-700'],
                 ['infografia', 'Infografía', '', ImageIcon, 'bg-pink-100 text-pink-700'],
-                ['anexos', 'Anexos completados', 'Experto Plus', Paperclip, 'bg-cyan-100 text-cyan-700'],
+                ['anexos', 'Anexos oficiales (Word)', 'Experto Plus', Paperclip, 'bg-cyan-100 text-cyan-700'],
               ] as [Entregable, string, string, typeof FileText, string][]).map(([k, n, tag, Icono, color]) => (
                 <button
                   key={k}
@@ -1024,6 +1030,24 @@ export default function LibroLicitacion() {
                       </div>
                     )}
                     <div className="prose-experto" dangerouslySetInnerHTML={{ __html: conCitas(expertoMd(entregables[tab])) }} />
+                    {tab === 'informe' && (
+                      <div className="mt-4 space-y-3 border-t pt-3">
+                        <div>
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-medium flex items-center gap-1"><Sparkles className="h-4 w-4 text-violet-600" />Análisis profundo de las bases</p>
+                            {!entregables.estudio && <Button size="sm" variant="outline" onClick={() => generar('estudio', true)} disabled={generandoEntregable || !esPro} title={esPro ? 'Lee bases y anexos: trampas, puntos de puntaje y requisitos' : 'Requiere Experto Pro'}>{ocupados.has('estudio') ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}Profundizar{!esPro ? ' (Pro)' : ''}</Button>}
+                          </div>
+                          {entregables.estudio && <div className="prose-experto mt-1" dangerouslySetInnerHTML={{ __html: conCitas(expertoMd(entregables.estudio)) }} />}
+                        </div>
+                        <div>
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-medium flex items-center gap-1"><Waves className="h-4 w-4 text-sky-600" />Bajo el Agua</p>
+                            {!entregables.bajo_agua && <Button size="sm" variant="outline" onClick={() => generar('bajo_agua', true)} disabled={generandoEntregable || cuotaBajoAgua.agotada} title={cuotaBajoAgua.texto}>{ocupados.has('bajo_agua') ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Waves className="h-4 w-4 mr-1" />}Ver Bajo el Agua{cuotaBajoAgua.etiqueta ? ` (${cuotaBajoAgua.etiqueta})` : ''}</Button>}
+                          </div>
+                          {entregables.bajo_agua && <div className="prose-experto mt-1" dangerouslySetInnerHTML={{ __html: conCitas(expertoMd(entregables.bajo_agua)) }} />}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1032,7 +1056,7 @@ export default function LibroLicitacion() {
                 <p>{tab === 'mapa' && 'Mapa conceptual navegable: qué compran, fechas, cómo se gana, requisitos, garantías, organismo, competencia, riesgos y tu jugada. Cada nodo se abre y se le puede preguntar al Experto.'}
                    {tab === 'infografia' && 'Lámina con marca FirmaVB: presupuesto, cierre, riesgo de pago, quién gana y quién vende. Para WhatsApp, LinkedIn o PDF.'}
                    {tab === 'matriz' && 'Matriz de postulación (Pro): checklist de admisibilidad, cómo se puntúa, anexos, reglas especiales y plan de tareas con responsable y plazo. Se edita aquí, se exporta a Excel, Word o PDF, y usa tus documentos de trabajo para marcar lo que ya tienes listo.'}
-                   {tab === 'informe' && 'Informe de trabajo: veredicto, fechas, checklist de admisibilidad, cómo se ganan los puntos, riesgos, competencia y próximos pasos.'}
+                   {tab === 'informe' && 'Estudio de la licitación: veredicto (postular, con reservas o descartar), fechas, admisibilidad, cómo se ganan los puntos, riesgos y próximos pasos. Adentro puedes profundizar en las bases y ver Bajo el Agua.'}
                    {tab === 'estudio' && 'Estudio profundo (Pro): historial de compras parecidas del organismo, quién ganó y con cuánto, precio objetivo.'}
                    {tab === 'bajo_agua' && `Bajo el Agua: lo que no se ve en la ficha. A quién le compra siempre este organismo y por qué vía, consultas al mercado (RFI) previas, compras ágiles y convenio marco del mismo producto, desiertas, quién lleva el proceso y sus audiencias de lobby, reclamos, precio real del producto en el Estado, noticias y dictámenes, matriz de adjudicación con simulación y, si ya está adjudicada, por dónde se renueva. ${cuotaBajoAgua.texto}`}
                    {tab === 'anexos' && 'Anexos (Plus): un borrador en texto de lo que piden los anexos, con los datos de tu empresa. Para rellenar los Word OFICIALES de la licitación conservando su formato, usa el botón "Completar" en la columna Fuentes.'}</p>
