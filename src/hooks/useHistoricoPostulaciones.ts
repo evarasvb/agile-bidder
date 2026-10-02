@@ -12,13 +12,16 @@ export interface HistoricoPostulacion {
   fecha_publicacion: string | null;
   fecha_cierre: string | null;
   monto_estimado: number | null;
-  tipo: 'licitacion' | 'compra_agil';
+  tipo: 'licitacion' | 'compra_agil' | 'convenio_marco' | 'trato_directo' | 'otro';
   resultado: HistoricoResultado;
   ganador_nombre: string | null;
   conducta_pago: string | null;
   pago_promedio_dias: number | null;
-  /** Solo compras ágiles ganadas: ordenes_compra.link_oficial, el link real. */
-  link_oficial?: string | null;
+  /** Solo compras/convenio ganados: el número real de la orden de compra —
+   *  distinto del código del proceso (`codigo`) cuando es Convenio Marco, que
+   *  usa la numeración de la licitación que lo originó, no la de la OC. */
+  orden_compra_codigo?: string | null;
+  orden_compra_link?: string | null;
 }
 
 function mapMia(row: any, nombreFallback: string): HistoricoPostulacion {
@@ -35,7 +38,8 @@ function mapMia(row: any, nombreFallback: string): HistoricoPostulacion {
     ganador_nombre: row.gano ? null : (row.ganador_nombre ?? null),
     conducta_pago: row.conducta_pago ?? null,
     pago_promedio_dias: row.pago_promedio_dias ?? null,
-    link_oficial: row.link_oficial ?? null,
+    orden_compra_codigo: row.orden_compra_codigo ?? null,
+    orden_compra_link: row.orden_compra_link ?? null,
   };
 }
 

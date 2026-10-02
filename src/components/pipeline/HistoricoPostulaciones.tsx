@@ -34,6 +34,9 @@ function formatCLP(amount: number): string {
 const TIPO_LABEL: Record<string, string> = {
   licitacion: 'Licitación',
   compra_agil: 'Compra Ágil',
+  convenio_marco: 'Convenio Marco',
+  trato_directo: 'Trato Directo',
+  otro: 'Otro',
 };
 
 const RESULTADO_CONFIG: Record<HistoricoResultado, { label: string; className: string }> = {
@@ -85,6 +88,17 @@ function FilaOportunidad({ item }: FilaProps) {
   );
 }
 
+// La tabla pipeline solo acepta oportunidad_tipo 'compra_agil' | 'licitacion' |
+// 'manual' (CHECK constraint): convenio marco, trato directo y "otro" se
+// registran como compra_agil, la categoría más cercana que sí acepta.
+const PIPELINE_TIPO: Record<HistoricoPostulacion['tipo'], 'compra_agil' | 'licitacion'> = {
+  licitacion: 'licitacion',
+  compra_agil: 'compra_agil',
+  convenio_marco: 'compra_agil',
+  trato_directo: 'compra_agil',
+  otro: 'compra_agil',
+};
+
 function BotonTrabajar({ item }: FilaProps) {
   const createItem = useCreatePipelineItem();
   const handleClick = () => {
@@ -92,7 +106,7 @@ function BotonTrabajar({ item }: FilaProps) {
     createItem.mutate(
       {
         oportunidad_id: item.codigo,
-        oportunidad_tipo: item.tipo,
+        oportunidad_tipo: PIPELINE_TIPO[item.tipo],
         titulo: item.nombre || item.codigo,
         institucion: item.institucion || undefined,
         monto_estimado: item.monto_estimado || undefined,
@@ -163,6 +177,29 @@ const COLUMNAS: DataTableColumn<HistoricoPostulacion>[] = [
     cell: (item) => item.ganador_nombre || (item.resultado === 'ganada' ? 'Tú' : '—'),
   },
   {
+    id: 'orden_compra',
+    header: 'Orden de Compra',
+    className: 'text-sm text-gray-600',
+    sortValue: (item) => item.orden_compra_codigo,
+    exportValue: (item) => item.orden_compra_codigo ?? '',
+    cell: (item) => {
+      if (!item.orden_compra_codigo) return <span className="text-gray-400">—</span>;
+      return item.orden_compra_link ? (
+        <a
+          href={item.orden_compra_link}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 text-blue-700 hover:underline"
+        >
+          {item.orden_compra_codigo}
+          <ExternalLink className="h-3 w-3 shrink-0" />
+        </a>
+      ) : (
+        item.orden_compra_codigo
+      );
+    },
+  },
+  {
     id: 'monto',
     header: 'Monto',
     align: 'right',
@@ -214,7 +251,7 @@ export function HistoricoPostulaciones() {
     <DataTable<HistoricoPostulacion>
       storageKey="historico-postulaciones"
       rows={filtrados}
-      rowKey={(item) => `${item.tipo}-${item.codigo}`}
+      rowKey={(item) => `${item.tipo}-${item.orden_compra_codigo ?? item.codigo}`}
       columns={COLUMNAS}
       itemLabel="procesos"
       searchText={(item) => `${item.nombre ?? ''} ${item.institucion ?? ''} ${item.codigo} ${item.ganador_nombre ?? ''}`}
@@ -232,6 +269,9 @@ export function HistoricoPostulaciones() {
               <SelectItem value="todas">Todos los tipos</SelectItem>
               <SelectItem value="licitacion">Licitación</SelectItem>
               <SelectItem value="compra_agil">Compra Ágil</SelectItem>
+              <SelectItem value="convenio_marco">Convenio Marco</SelectItem>
+              <SelectItem value="trato_directo">Trato Directo</SelectItem>
+              <SelectItem value="otro">Otro</SelectItem>
             </SelectContent>
           </Select>
           <Select value={resultado} onValueChange={setResultado}>
