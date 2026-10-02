@@ -11,6 +11,7 @@ import {
   FileText,
   Landmark,
   ArrowRight,
+  ListChecks,
 } from "lucide-react";
 import { Boxes } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -46,6 +47,7 @@ const reports: {
   { title: "¿Quién le vende al Estado?", description: "Ranking de proveedores por monto adjudicado y participación de mercado", icon: Users, href: "/reportes/proveedores", accent: "blue" },
   { title: "¿Cómo se mueve el mercado?", description: "Tendencias, regiones, volúmenes y tipos de compra pública", icon: TrendingUp, href: "/reportes/mercado", accent: "violet" },
   { title: "¿Qué compró el Estado (y a mí)?", description: "Cubo de órdenes de compra: cruza tipo, institución, producto y mes. Filtra por «Mis OC» para ver lo que vendiste", icon: FileText, href: "/reportes/ordenes-compra", accent: "orange" },
+  { title: "¿Qué criterios pesan más?", description: "Los factores de evaluación que más se repiten entre licitaciones (de los Libros de licitación ya generados), para saber en qué enfocarte al postular", icon: ListChecks, href: "/reportes/criterios-evaluacion", accent: "violet" },
 ];
 
 export default function ReportesHub() {
