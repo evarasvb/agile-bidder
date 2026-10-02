@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   HandCoins, Plus, Trash2, FileText, Copy, Download, Loader2, Building2, User, AlertTriangle, Scale,
@@ -36,7 +36,7 @@ import {
   cuerpoCorreoCobroHtml, type DatosNotaCobranza,
 } from '@/services/notasCobranzaPdf';
 import { gmailCrearBorrador } from '@/hooks/useGmail';
-import { useOpcionesOC, useMisOcAceptadas, useOcLinksPorCodigos, useSyncMisOC, useOrdenCompra, etiquetaEstado, ESTADOS_OC_ACEPTADA } from '@/hooks/useOrdenesCompra';
+import { useOpcionesOC, useMisOcAceptadas, useOcLinksPorCodigos, useSyncMisOC, etiquetaEstado, ESTADOS_OC_ACEPTADA } from '@/hooks/useOrdenesCompra';
 import {
   useFacturasCobrar, useCrearFactura, useActualizarFactura, useEliminarFactura, useTasasMora,
   diasAtraso, interesMoraReal, diasDiferenciaPago, hechosCobranza, fechasConsistentes, fechaPago, fechaPagoReal,
@@ -434,7 +434,8 @@ function FilaFactura({
             {f.deudor_tipo === 'estado' ? <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" /> : <User className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />}
             <div className="min-w-0">
               <p className="max-w-[220px] truncate font-medium">{f.deudor_nombre}</p>
-              {f.oc_codigo && <p className="text-xs text-muted-foreground">OC {f.oc_codigo}</p>}
+              {f.oc_codigo && <p className="text-xs text-muted-foreground">OC {f.oc_codigo}{f.oc_fecha && ` · ${fFecha(f.oc_fecha)}`}</p>}
+              {f.nombre_contacto && <p className="text-xs text-muted-foreground">Contacto: {f.nombre_contacto}</p>}
             </div>
           </div>
         </TableCell>
@@ -619,10 +620,12 @@ function DetalleFactura({ f, interes, abrirArchivo }: { f: FacturaCobrar; intere
     <div className="space-y-2 text-sm">
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Detalle</p>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-1">
-        <dt className="text-muted-foreground">Emisión</dt><dd>{fFecha(f.fecha_emision)}</dd>
+        {f.oc_codigo && (<><dt className="text-muted-foreground">Fecha de la OC</dt><dd>{fFecha(f.oc_fecha)}</dd></>)}
+        <dt className="text-muted-foreground">Emisión (factura)</dt><dd>{fFecha(f.fecha_emision)}</dd>
         <dt className="text-muted-foreground">Recepción conforme</dt><dd>{fFecha(f.fecha_recepcion)}</dd>
         <dt className="text-muted-foreground">Debe pagarse</dt><dd>{fFechaD(fechaPago(f))}</dd>
         {f.deudor_rut && (<><dt className="text-muted-foreground">RUT deudor</dt><dd>{f.deudor_rut}</dd></>)}
+        {f.nombre_contacto && (<><dt className="text-muted-foreground">Contacto</dt><dd>{f.nombre_contacto}</dd></>)}
         {f.estado === 'pagada' && (<><dt className="text-muted-foreground">Pagado</dt><dd>{fFecha(f.fecha_pago_real)}{f.monto_pagado != null ? ` · ${CLP(f.monto_pagado)}` : ''}</dd></>)}
         {interes.interes > 0 && (<><dt className="text-muted-foreground">Interés mora</dt><dd className="text-amber-700">{CLP(interes.interes)} ({interes.diasAtraso}d)</dd></>)}
       </dl>
@@ -857,6 +860,8 @@ function NuevaFacturaDialog() {
   const [rut, setRut] = useState('');
   const [email, setEmail] = useState('');
   const [oc, setOc] = useState('');
+  const [ocFecha, setOcFecha] = useState('');
+  const [nombreContacto, setNombreContacto] = useState('');
   const [numero, setNumero] = useState('');
   const [monto, setMonto] = useState('');
   const [emision, setEmision] = useState('');
@@ -870,33 +875,10 @@ function NuevaFacturaDialog() {
   const [subiendo, setSubiendo] = useState(false);
   const facturaInput = useRef<HTMLInputElement | null>(null);
   const guiaInput = useRef<HTMLInputElement | null>(null);
-  const [ocBusqueda, setOcBusqueda] = useState('');
-  const [codigoBuscar, setCodigoBuscar] = useState<string | null>(null);
-  const ocQuery = useOrdenCompra(codigoBuscar, false);
-  const buscandoOc = ocQuery.isFetching && !!codigoBuscar;
-
-  // Atajo "pega la OC": cuando la búsqueda por número termina, autocompleta
-  // organismo, RUT, monto y fecha desde Mercado Público (o avisa si no está).
-  useEffect(() => {
-    if (!codigoBuscar || !ocQuery.isSuccess) return;
-    const d = ocQuery.data;
-    if (d) {
-      setTipo('estado');
-      setNombre(d.institucion_nombre || '');
-      setRut(d.institucion_rut || '');
-      setMonto(d.total != null ? String(d.total) : '');
-      setEmision(d.fecha_creacion ? d.fecha_creacion.slice(0, 10) : '');
-      setOc(d.codigo);
-      toast.success('Datos de la OC cargados. Agrega tu N° de factura y la guía.');
-    } else {
-      toast.error('No encontramos esa OC en Mercado Público. Revisa el número o complétala a mano.');
-    }
-    setCodigoBuscar(null);
-  }, [ocQuery.isSuccess, ocQuery.data, codigoBuscar]);
 
   const limpiar = () => {
-    setNombre(''); setRut(''); setEmail(''); setOc(''); setNumero(''); setMonto(''); setEmision(''); setRecepcion(''); setVencimiento(''); setNotas('');
-    setFacturaFile(null); setGuiaFile(null); setOcBusqueda(''); setCodigoBuscar(null);
+    setNombre(''); setRut(''); setEmail(''); setOc(''); setOcFecha(''); setNombreContacto(''); setNumero(''); setMonto(''); setEmision(''); setRecepcion(''); setVencimiento(''); setNotas('');
+    setFacturaFile(null); setGuiaFile(null);
     leerReqId.current++;
   };
 
@@ -970,7 +952,8 @@ function NuevaFacturaDialog() {
       try {
         await crear.mutateAsync({
           deudor_tipo: tipo, deudor_nombre: nombre.trim(), deudor_rut: rut.trim() || null, deudor_email: email.trim() || null,
-          oc_codigo: oc.trim() || null, numero_factura: numero.trim() || null, monto: m || 0,
+          oc_codigo: oc.trim() || null, oc_fecha: ocFecha || null, nombre_contacto: nombreContacto.trim() || null,
+          numero_factura: numero.trim() || null, monto: m || 0,
           fecha_emision: emision || null, fecha_recepcion: recepcion || null, fecha_vencimiento: vencimiento || null,
           fecha_pago_real: null, monto_pagado: null,
           notas: notas.trim() || null,
@@ -1005,7 +988,7 @@ function NuevaFacturaDialog() {
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2">
             <Label>¿A quién le cobras?</Label>
-            <Select value={tipo} onValueChange={(v) => { setTipo(v as DeudorTipo); setNombre(''); setRut(''); setOc(''); setMonto(''); setEmision(''); }}>
+            <Select value={tipo} onValueChange={(v) => { setTipo(v as DeudorTipo); setNombre(''); setRut(''); setOc(''); setOcFecha(''); setMonto(''); setEmision(''); }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="estado">Institución del Estado</SelectItem>
@@ -1015,19 +998,6 @@ function NuevaFacturaDialog() {
           </div>
           {tipo === 'estado' ? (
             <>
-              <div className="col-span-2 rounded-md border border-dashed p-3 space-y-2">
-                <Label className="text-xs">Atajo: pega tu N° de OC de Mercado Público</Label>
-                <div className="flex gap-2">
-                  <Input value={ocBusqueda} onChange={(e) => setOcBusqueda(e.target.value)}
-                    placeholder="Ej: 1509-1234-SE26"
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (ocBusqueda.trim()) setCodigoBuscar(ocBusqueda.trim()); } }} />
-                  <Button type="button" variant="secondary" className="shrink-0 gap-1"
-                    disabled={buscandoOc || !ocBusqueda.trim()} onClick={() => setCodigoBuscar(ocBusqueda.trim())}>
-                    {buscandoOc ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Traer datos
-                  </Button>
-                </div>
-                <p className="text-[11px] text-muted-foreground">Trae organismo, RUT, monto y fecha desde MP. Tú agregas tu N° de factura y la guía.</p>
-              </div>
               <div className="col-span-2">
                 <Label>Elige la OC de tus órdenes</Label>
                 <OcAceptadaCombobox institucion={nombre} value={oc} onSelect={(o) => {
@@ -1035,13 +1005,17 @@ function NuevaFacturaDialog() {
                   setNombre(o.organismo_comprador || '');
                   setRut(o.rut_demandante || '');
                   setMonto(o.total ? String(o.total) : '');
-                  setEmision(o.fecha_emision ? o.fecha_emision.slice(0, 10) : '');
+                  setOcFecha(o.fecha_emision ? o.fecha_emision.slice(0, 10) : '');
                 }} />
-                <p className="mt-1 text-[11px] text-muted-foreground">Lista todas tus OC aceptadas (por tu RUT). Al elegir una se autocompletan organismo, RUT, monto y fecha.</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Lista todas tus OC aceptadas (por tu RUT), traídas de Mercado Público. Al elegir una se autocompletan organismo, RUT, monto y fecha de la OC.
+                  {oc && ocFecha && <> La OC <strong>{oc}</strong> es del {fFecha(ocFecha)}.</>}
+                  {' '}¿No aparece la que buscas? Usa el botón de actualizar junto al desplegable.
+                </p>
               </div>
               <div className="col-span-2">
                 <Label>Organismo <span className="font-normal text-muted-foreground">(opcional, para filtrar)</span></Label>
-                <InstitucionCombobox value={nombre} onSelect={(v) => { setNombre(v); setOc(''); setRut(''); setMonto(''); setEmision(''); }} />
+                <InstitucionCombobox value={nombre} onSelect={(v) => { setNombre(v); setOc(''); setOcFecha(''); setRut(''); setMonto(''); }} />
               </div>
             </>
           ) : (
@@ -1053,9 +1027,12 @@ function NuevaFacturaDialog() {
                   setNombre(o.organismo_comprador || '');
                   setRut(o.rut_demandante || '');
                   setMonto(o.total ? String(o.total) : '');
-                  setEmision(o.fecha_emision ? o.fecha_emision.slice(0, 10) : '');
+                  setOcFecha(o.fecha_emision ? o.fecha_emision.slice(0, 10) : '');
                 }} />
-                <p className="mt-1 text-[11px] text-muted-foreground">Si el cobro nace de una OC tuya, elígela y se autocompleta todo. Si no, completa a mano.</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Si el cobro nace de una OC tuya, elígela y se autocompleta todo. Si no, completa a mano.
+                  {oc && ocFecha && <> La OC <strong>{oc}</strong> es del {fFecha(ocFecha)}.</>}
+                </p>
               </div>
               <div className="col-span-2">
                 <Label htmlFor="f-nombre">Nombre del deudor</Label>
@@ -1074,6 +1051,10 @@ function NuevaFacturaDialog() {
           <div>
             <Label htmlFor="f-email">Correo de cobro (opcional)</Label>
             <Input id="f-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="pagos@organismo.cl" />
+          </div>
+          <div className="col-span-2">
+            <Label htmlFor="f-contacto">Nombre de contacto (opcional)</Label>
+            <Input id="f-contacto" value={nombreContacto} onChange={(e) => setNombreContacto(e.target.value)} placeholder="Quién gestiona el pago en el organismo/cliente" />
           </div>
           <div>
             <Label htmlFor="f-num">N° de factura</Label>
