@@ -340,9 +340,19 @@ export function DataTable<T>({
 
       {/* Tabla con scroll interno y encabezado fijo. min-w-max: si las columnas
           no caben, la tabla crece a su ancho real en vez de comprimirse, y
-          scrollbar-x-visible hace evidente que hay una barra para deslizar. */}
-      <div ref={scrollRef} className="rounded-lg border overflow-auto scrollbar-x-visible" style={{ maxHeight }}>
-        <Table className="text-sm min-w-max">
+          scrollbar-x-visible hace evidente que hay una barra para deslizar.
+          El que de verdad scrollea es el div interno de <Table> (containerRef),
+          no este div externo: Table ya trae su propio overflow-auto, así que
+          medir o engancharse al externo siempre daba "no hay overflow"
+          (hallazgo de Codex) — por eso el maxHeight/overflow/scrollRef van en
+          el contenedor real vía containerStyle/containerClassName/containerRef. */}
+      <div className="rounded-lg border">
+        <Table
+          className="text-sm min-w-max"
+          containerClassName="overflow-auto scrollbar-x-visible rounded-lg"
+          containerStyle={{ maxHeight }}
+          containerRef={scrollRef}
+        >
           {/* sticky va en cada th (en thead no funciona en todos los navegadores) */}
           <TableHeader className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-muted [&_th]:shadow-[inset_0_-1px_0_hsl(var(--border))] [&_tr]:border-b">
             <TableRow className="hover:bg-transparent">
