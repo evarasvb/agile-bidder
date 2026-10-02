@@ -31,10 +31,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { useCliente } from '@/hooks/useCliente';
 import { supabase } from '@/integrations/supabase/client';
 import { descargarCartaAbogadoPDF } from '@/services/cartaAbogadoPdf';
+import { descargarNotaCobroPDF, descargarNotaDebitoExentaPDF, type DatosNotaCobranza } from '@/services/notasCobranzaPdf';
 import { useOpcionesOC, useMisOcAceptadas, useOcLinksPorCodigos, useSyncMisOC, useOrdenCompra, etiquetaEstado } from '@/hooks/useOrdenesCompra';
 import {
   useFacturasCobrar, useCrearFactura, useActualizarFactura, useEliminarFactura, useTasasMora,
-  diasAtraso, interesMoraReal, diasDiferenciaPago, hechosCobranza, fechasConsistentes, fechaPago,
+  diasAtraso, interesMoraReal, diasDiferenciaPago, hechosCobranza, fechasConsistentes, fechaPago, fechaPagoReal,
   subirAdjuntoCobranza, CLP, ESTADO_COBRO_LABEL,
   type FacturaCobrar, type DeudorTipo, type EstadoCobro,
 } from '@/hooks/useCobranza';
@@ -165,6 +166,32 @@ export default function CobranzaFacturas() {
     setDoc((d) => ({ ...d, generando: false }));
   };
 
+  // Nota de cobro / nota de débito exenta (borradores para el ERP del cliente),
+  // con el interés moratorio real y la glosa técnica/legal.
+  const generarNota = (f: FacturaCobrar, tipo: 'cobro' | 'debito') => {
+    const interes = interesMoraReal(f, tasas);
+    if (tipo === 'debito' && interes.interes <= 0) {
+      toast.error('Esta factura no tiene interés por mora que cobrar (está en plazo o sin fecha suficiente).');
+      return;
+    }
+    const datos: DatosNotaCobranza = {
+      empresa: {
+        nombre: cliente?.empresa_nombre || 'FirmaVB',
+        rut: (cliente as any)?.rut || '',
+        direccion: (cliente as any)?.direccion || '',
+        telefono: (cliente as any)?.telefono || '',
+        email: (cliente as any)?.email_contacto || (cliente as any)?.email || '',
+      },
+      deudor: { nombre: f.deudor_nombre, rut: f.deudor_rut, email: f.deudor_email, tipo: f.deudor_tipo },
+      numeroFactura: f.numero_factura, oc: f.oc_codigo, capital: f.monto,
+      fechaEmision: f.fecha_emision, fechaRecepcion: f.fecha_recepcion,
+      fechaVencimiento: fechaPago(f), fechaCalculo: fechaPagoReal(f) ?? new Date(),
+      interes,
+    };
+    if (tipo === 'cobro') descargarNotaCobroPDF(datos); else descargarNotaDebitoExentaPDF(datos);
+    toast.success(tipo === 'cobro' ? 'Nota de cobro descargada' : 'Nota de débito exenta descargada');
+  };
+
   const descargarPDF = () => {
     if (!doc.texto) return;
     descargarCartaAbogadoPDF({
@@ -292,6 +319,7 @@ export default function CobranzaFacturas() {
                       catch (e) { toast.error((e as Error).message); }
                     }}
                     onGenerar={generar}
+                    onNota={generarNota}
                     generando={doc.generando}
                     abrirArchivo={abrirArchivo}
                   />
@@ -337,7 +365,7 @@ export default function CobranzaFacturas() {
 // Fila de la tabla (una factura) + fila expandible con el detalle del CRM.
 // ---------------------------------------------------------------------------
 function FilaFactura({
-  f, tasas, ocLink, expandido, onToggle, onEstado, onMarcarPagada, onReabrir, onEliminar, onGenerar, generando, abrirArchivo,
+  f, tasas, ocLink, expandido, onToggle, onEstado, onMarcarPagada, onReabrir, onEliminar, onGenerar, onNota, generando, abrirArchivo,
 }: {
   f: FacturaCobrar;
   tasas: TasaMora[];
@@ -349,6 +377,7 @@ function FilaFactura({
   onReabrir: () => void;
   onEliminar: () => void;
   onGenerar: (f: FacturaCobrar, tipo: 'carta_cobranza' | 'requerimiento_pago') => void;
+  onNota: (f: FacturaCobrar, tipo: 'cobro' | 'debito') => void;
   generando: boolean;
   abrirArchivo: (path: string) => void;
 }) {
@@ -423,6 +452,13 @@ function FilaFactura({
               </DropdownMenuItem>
               <DropdownMenuItem disabled={generando} onClick={() => onGenerar(f, 'requerimiento_pago')}>
                 <Scale className="mr-2 h-4 w-4" /> Requerimiento de pago
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onNota(f, 'cobro')}>
+                <HandCoins className="mr-2 h-4 w-4" /> Nota de cobro (PDF)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onNota(f, 'debito')}>
+                <CircleDollarSign className="mr-2 h-4 w-4" /> Nota de débito exenta (PDF)
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               {f.factura_archivo_url && (
