@@ -484,7 +484,7 @@ export function useMisOcAceptadas(rut: string | null, nombre: string | null, ins
         .select('codigo, organismo_comprador, rut_demandante, total, fecha_emision, link_oficial, estado')
         .in('estado', ESTADOS_OC_ACEPTADA)
         .order('fecha_emision', { ascending: false, nullsFirst: false })
-        .limit(60);
+        .limit(300);
       // El RUT ya identifica al proveedor sin ambigüedad; si además viene el
       // nombre no hace falta cruzarlo con un .or() de texto crudo, que se
       // rompe con nombres de empresa que traen coma o paréntesis (delimitadores

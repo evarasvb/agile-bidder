@@ -706,29 +706,43 @@ function OcAceptadaCombobox({
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button variant="outline" role="combobox" aria-expanded={open} className="flex-1 justify-between font-normal">
-            <span className={cn('truncate text-left', !value && 'text-muted-foreground')}>{value || 'Elige una OC aceptada…'}</span>
+            <span className={cn('truncate text-left', !value && 'text-muted-foreground')}>{value || 'Elige una OC de tus órdenes…'}</span>
             <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <PopoverContent className="w-[min(92vw,780px)] p-0" align="start">
           <Command>
             <CommandInput placeholder="Filtra por código u organismo…" />
-            <CommandList>
+            <CommandList className="max-h-[340px]">
               {isLoading ? (
                 <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Buscando tus OC…</div>
               ) : (
                 <>
                   <CommandEmpty>
-                    No tienes OC aceptadas{institucion ? ' de este organismo' : ''} aún. Prueba "Actualizar mis OC".
+                    No tienes OC{institucion ? ' de este organismo' : ''} aún. Prueba "Actualizar mis OC".
                   </CommandEmpty>
                   <CommandGroup>
+                    <div className="grid grid-cols-[1.4fr_0.9fr_0.8fr_1.7fr_0.9fr] gap-2 px-2 pb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                      <span>Código</span><span>Estado</span><span>Emisión</span><span>Organismo</span><span className="text-right">Monto</span>
+                    </div>
                     {ocs.map((o) => (
                       <CommandItem key={o.codigo} value={`${o.codigo} ${o.organismo_comprador ?? ''}`} onSelect={() => { onSelect(o); setOpen(false); }} className="cursor-pointer">
-                        <Check className={cn('mr-2 h-4 w-4 shrink-0', value === o.codigo ? 'opacity-100' : 'opacity-0')} />
-                        <span className="flex min-w-0 flex-col">
-                          <span className="truncate font-medium">{o.codigo} · {CLP(o.total || 0)}</span>
-                          {o.organismo_comprador && <span className="truncate text-xs text-muted-foreground">{o.organismo_comprador}</span>}
-                        </span>
+                        <div className="grid w-full grid-cols-[1.4fr_0.9fr_0.8fr_1.7fr_0.9fr] items-center gap-2 text-xs">
+                          <span className="flex items-center gap-1 font-medium">
+                            <Check className={cn('h-3.5 w-3.5 shrink-0', value === o.codigo ? 'opacity-100' : 'opacity-0')} />
+                            <span className="truncate">{o.codigo}</span>
+                            {o.link_oficial && (
+                              <a href={o.link_oficial} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
+                                 className="shrink-0 text-firmavb-blue hover:underline" title="Ver OC en Mercado Público">
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
+                            )}
+                          </span>
+                          <span className="truncate text-muted-foreground">{etiquetaEstado(o.estado) ?? '—'}</span>
+                          <span className="truncate text-muted-foreground">{fFecha(o.fecha_emision ? o.fecha_emision.slice(0, 10) : null)}</span>
+                          <span className="truncate text-muted-foreground">{o.organismo_comprador ?? '—'}</span>
+                          <span className="truncate text-right font-medium">{CLP(o.total || 0)}</span>
+                        </div>
                       </CommandItem>
                     ))}
                   </CommandGroup>
@@ -994,6 +1008,17 @@ function NuevaFacturaDialog() {
             </>
           ) : (
             <>
+              <div className="col-span-2">
+                <Label>Elige la OC de tus órdenes <span className="font-normal text-muted-foreground">(opcional)</span></Label>
+                <OcAceptadaCombobox institucion="" value={oc} onSelect={(o) => {
+                  setOc(o.codigo);
+                  setNombre(o.organismo_comprador || '');
+                  setRut(o.rut_demandante || '');
+                  setMonto(o.total ? String(o.total) : '');
+                  setEmision(o.fecha_emision ? o.fecha_emision.slice(0, 10) : '');
+                }} />
+                <p className="mt-1 text-[11px] text-muted-foreground">Si el cobro nace de una OC tuya, elígela y se autocompleta todo. Si no, completa a mano.</p>
+              </div>
               <div className="col-span-2">
                 <Label htmlFor="f-nombre">Nombre del deudor</Label>
                 <Input id="f-nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Comercial XYZ SpA" />
