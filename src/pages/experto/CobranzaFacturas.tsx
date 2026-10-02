@@ -701,6 +701,14 @@ function OcAceptadaCombobox({
   );
   const sync = useSyncMisOC();
 
+  const filtradas = useMemo(() => {
+    const term = filtro.trim().toLowerCase();
+    if (!term) return ocs;
+    return ocs.filter((o) =>
+      [o.codigo, o.organismo_comprador, o.rut_demandante, o.numero_licitacion]
+        .some((v) => (v || '').toLowerCase().includes(term)));
+  }, [ocs, filtro]);
+
   return (
     <div className="flex gap-1.5">
       <Popover open={open} onOpenChange={setOpen}>
@@ -710,46 +718,69 @@ function OcAceptadaCombobox({
             <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[min(92vw,780px)] p-0" align="start">
-          <Command>
-            <CommandInput placeholder="Filtra por código u organismo…" />
-            <CommandList className="max-h-[340px]">
-              {isLoading ? (
-                <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Buscando tus OC…</div>
-              ) : (
-                <>
-                  <CommandEmpty>
-                    No tienes OC{institucion ? ' de este organismo' : ''} aún. Prueba "Actualizar mis OC".
-                  </CommandEmpty>
-                  <CommandGroup>
-                    <div className="grid grid-cols-[1.4fr_0.9fr_0.8fr_1.7fr_0.9fr] gap-2 px-2 pb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      <span>Código</span><span>Estado</span><span>Emisión</span><span>Organismo</span><span className="text-right">Monto</span>
-                    </div>
-                    {ocs.map((o) => (
-                      <CommandItem key={o.codigo} value={`${o.codigo} ${o.organismo_comprador ?? ''}`} onSelect={() => { onSelect(o); setOpen(false); }} className="cursor-pointer">
-                        <div className="grid w-full grid-cols-[1.4fr_0.9fr_0.8fr_1.7fr_0.9fr] items-center gap-2 text-xs">
-                          <span className="flex items-center gap-1 font-medium">
-                            <Check className={cn('h-3.5 w-3.5 shrink-0', value === o.codigo ? 'opacity-100' : 'opacity-0')} />
-                            <span className="truncate">{o.codigo}</span>
-                            {o.link_oficial && (
-                              <a href={o.link_oficial} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
-                                 className="shrink-0 text-firmavb-blue hover:underline" title="Ver OC en Mercado Público">
-                                <ExternalLink className="h-3.5 w-3.5" />
-                              </a>
-                            )}
-                          </span>
-                          <span className="truncate text-muted-foreground">{etiquetaEstado(o.estado) ?? '—'}</span>
-                          <span className="truncate text-muted-foreground">{fFecha(o.fecha_emision ? o.fecha_emision.slice(0, 10) : null)}</span>
-                          <span className="truncate text-muted-foreground">{o.organismo_comprador ?? '—'}</span>
-                          <span className="truncate text-right font-medium">{CLP(o.total || 0)}</span>
-                        </div>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </>
-              )}
-            </CommandList>
-          </Command>
+        <PopoverContent className="w-[min(96vw,980px)] p-0" align="start">
+          <div className="border-b p-2">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input value={filtro} onChange={(e) => setFiltro(e.target.value)} placeholder="Filtra por código, organismo, RUT o N° licitación…" className="h-9 pl-8" />
+            </div>
+          </div>
+          {isLoading ? (
+            <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Buscando tus OC…</div>
+          ) : filtradas.length === 0 ? (
+            <div className="p-4 text-sm text-muted-foreground">
+              No tienes OC{institucion ? ' de este organismo' : ''} {filtro ? 'que coincidan con el filtro' : 'aún'}. Prueba "Actualizar mis OC".
+            </div>
+          ) : (
+            <div className="max-h-[360px] overflow-auto">
+              <table className="w-full border-collapse text-xs">
+                <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
+                  <tr className="text-left text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <th className="px-2 py-1.5 font-medium">Código</th>
+                    <th className="px-2 py-1.5 font-medium">Estado</th>
+                    <th className="px-2 py-1.5 font-medium">N° licitación</th>
+                    <th className="px-2 py-1.5 font-medium">Organismo</th>
+                    <th className="px-2 py-1.5 font-medium">RUT deudor</th>
+                    <th className="px-2 py-1.5 font-medium">Emisión</th>
+                    <th className="px-2 py-1.5 font-medium">Aceptación</th>
+                    <th className="px-2 py-1.5 text-right font-medium">Monto</th>
+                    <th className="px-2 py-1.5"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtradas.map((o) => (
+                    <tr key={o.codigo} className={cn('border-t hover:bg-muted/50', value === o.codigo && 'bg-firmavb-blue/5')}>
+                      <td className="whitespace-nowrap px-2 py-1.5 font-medium">
+                        <span className="flex items-center gap-1">
+                          {o.codigo}
+                          {o.link_oficial && (
+                            <a href={o.link_oficial} target="_blank" rel="noreferrer" className="text-firmavb-blue hover:underline" title="Ver OC en Mercado Público">
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                          )}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-2 py-1.5 text-muted-foreground">{etiquetaEstado(o.estado) ?? '—'}</td>
+                      <td className="whitespace-nowrap px-2 py-1.5 text-muted-foreground">{o.numero_licitacion || '—'}</td>
+                      <td className="max-w-[220px] truncate px-2 py-1.5 text-muted-foreground" title={o.organismo_comprador || ''}>{o.organismo_comprador || '—'}</td>
+                      <td className="whitespace-nowrap px-2 py-1.5 text-muted-foreground">{o.rut_demandante || '—'}</td>
+                      <td className="whitespace-nowrap px-2 py-1.5 text-muted-foreground">{fFecha(o.fecha_emision ? o.fecha_emision.slice(0, 10) : null)}</td>
+                      <td className={cn('whitespace-nowrap px-2 py-1.5', o.fecha_aceptacion ? 'text-muted-foreground' : 'font-medium text-red-600')}>
+                        {o.fecha_aceptacion ? fFecha(o.fecha_aceptacion.slice(0, 10)) : 'Sin aceptar'}
+                      </td>
+                      <td className="whitespace-nowrap px-2 py-1.5 text-right font-medium">{CLP(o.total || 0)}</td>
+                      <td className="whitespace-nowrap px-2 py-1.5 text-right">
+                        <Button type="button" size="sm" variant="secondary" className="h-7"
+                          onClick={() => { onSelect(o); setOpen(false); }}>
+                          {value === o.codigo ? <Check className="h-3.5 w-3.5" /> : 'Elegir'}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </PopoverContent>
       </Popover>
       <Button type="button" variant="outline" size="icon" className="shrink-0" disabled={sync.isPending || isFetching}

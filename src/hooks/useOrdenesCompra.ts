@@ -481,7 +481,10 @@ export function useMisOcAceptadas(rut: string | null, nombre: string | null, ins
     queryFn: async () => {
       let query = supabase
         .from('ordenes_compra')
-        .select('codigo, organismo_comprador, rut_demandante, total, fecha_emision, link_oficial, estado')
+        // fecha_aceptacion y fecha_envio_mp salen del JSON crudo de Mercado
+        // Público (no hay columna propia): 'raw_json.Fechas.FechaAceptacion' es
+        // null hasta que el proveedor acepta la OC.
+        .select('codigo, organismo_comprador, rut_demandante, total, fecha_emision, link_oficial, estado, numero_licitacion, fecha_aceptacion:raw_json->Fechas->>FechaAceptacion, fecha_envio_mp:raw_json->Fechas->>FechaEnvio')
         .in('estado', ESTADOS_OC_ACEPTADA)
         .order('fecha_emision', { ascending: false, nullsFirst: false })
         .limit(300);
@@ -494,7 +497,7 @@ export function useMisOcAceptadas(rut: string | null, nombre: string | null, ins
       if (institucion) query = query.ilike('organismo_comprador', `%${institucion}%`);
       const { data, error } = await query;
       if (error) throw error;
-      return (data || []) as { codigo: string; organismo_comprador: string | null; rut_demandante: string | null; total: number | null; fecha_emision: string | null; link_oficial: string | null; estado: string | null }[];
+      return (data || []) as { codigo: string; organismo_comprador: string | null; rut_demandante: string | null; total: number | null; fecha_emision: string | null; link_oficial: string | null; estado: string | null; numero_licitacion: string | null; fecha_aceptacion: string | null; fecha_envio_mp: string | null }[];
     },
     staleTime: 30000,
   });
