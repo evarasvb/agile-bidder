@@ -421,19 +421,20 @@ export default function LibroLicitacion() {
   // separados sino embebidos dentro del PDF. Reutiliza el mismo motor de "Anexos completados"
   // (Plus/ERP) y entrega cada uno como un .docx aparte en "Mis documentos de trabajo" — quedan
   // con el botón "Completar" disponible por si se quieren volver a rellenar.
-  const extraerAnexos = async () => {
+  const extraerAnexos = async (): Promise<boolean> => {
     empezar('extraer-anexos');
     try {
       const r = await fetch(`${SUPA}/functions/v1/experto-extraer-anexos`, { method: 'POST', headers: auth, body: JSON.stringify({ codigo: cod }) });
       const j = await r.json().catch(() => ({}));
-      if (r.status === 402) { toast.error(j.mensaje || 'Requiere Experto Plus', { action: { label: 'Ver planes', onClick: () => navigate('/cuenta') }, duration: 9000 }); return; }
-      if (r.status === 428) { toast.error(j.mensaje, { action: { label: 'Mi empresa', onClick: () => navigate('/configuracion/empresa') }, duration: 9000 }); return; }
-      if (!r.ok) { toast.error(j.mensaje || j.error || 'No pude extraer los anexos'); return; }
-      if (!j.anexos?.length) { toast.info('No encontré anexos identificables en las bases.'); return; }
+      if (r.status === 402) { toast.error(j.mensaje || 'Requiere Experto Plus', { action: { label: 'Ver planes', onClick: () => navigate('/cuenta') }, duration: 9000 }); return false; }
+      if (r.status === 428) { toast.error(j.mensaje, { action: { label: 'Mi empresa', onClick: () => navigate('/configuracion/empresa') }, duration: 9000 }); return false; }
+      if (!r.ok) { toast.error(j.mensaje || j.error || 'No pude extraer los anexos'); return false; }
+      if (!j.anexos?.length) { toast.info('No encontré anexos identificables en las bases.'); return false; }
       toast.success(`${j.anexos.length} anexo(s) extraído(s) a "Mis documentos de trabajo"${j.omitidos_por_cupo ? `, ${j.omitidos_por_cupo} sin espacio en tu plan` : ''}.`, { duration: 8000 });
       qc.invalidateQueries({ queryKey: ['experto_libro', cod] });
       qc.invalidateQueries({ queryKey: ['experto_anexos_word', cod] });
-    } catch (e: any) { toast.error(e.message); } finally { terminar('extraer-anexos'); }
+      return true;
+    } catch (e: any) { toast.error(e.message); return false; } finally { terminar('extraer-anexos'); }
   };
   // PowerPoint de la matriz de postulación (plan Pro): portada, resumen, admisibilidad,
   // evaluación, tareas por fase, garantías y pendientes. Reutiliza experto-matriz, así que
@@ -522,7 +523,7 @@ export default function LibroLicitacion() {
     setFaltantes([]);
     if (!escritorio) setVista('fuentes');
     if (wordsUnicos().length) { await completarTodos(); return; }
-    if (bases.length) { await extraerAnexos(); toast.info('Separé los anexos de las bases. Pulsa "Completar" en Fuentes para rellenarlos con los datos de tu empresa.', { duration: 9000 }); return; }
+    if (bases.length) { const ok = await extraerAnexos(); if (ok) toast.info('Separé los anexos de las bases. Pulsa "Completar" en Fuentes para rellenarlos con los datos de tu empresa.', { duration: 9000 }); return; }
     toast.info('Primero trae o sube las bases en la columna Fuentes; con ellas puedo completar los anexos oficiales.', { duration: 9000 });
   };
   const descargarDocumento = async (id: string) => {
@@ -603,14 +604,23 @@ export default function LibroLicitacion() {
     infografia: 'Para compartir por WhatsApp o LinkedIn. No usa IA; se arma con lo que ya generaste.',
   };
   const generadas = ENTREGABLES.filter((k) => k !== 'sala' && entregables[k]);
-  const siguiente: Entregable | null = !entregables.informe ? 'informe' : !entregables.matriz ? 'matriz' : !entregables.anexos ? 'anexos' : null;
+  const siguiente: Entregable | null = !entregables.informe ? 'informe' : !entregables.matriz ? 'matriz' : !anexosWord.length ? 'anexos' : null;
   // Texto que se le pasa al Experto como primer turno para que recomiende la herramienta correcta.
   const guiaLibro = () => `Guía del Libro de licitación de FirmaVB (cómo lo hacemos): ${ENTREGABLES.map((k) => `${nombresEntregable[k]}: ${GUIA_EVARISTO[k]}`).join(' | ')}. Estado del Libro ${cod}: ${ENTREGABLES.map((k) => `${nombresEntregable[k]} ${k === 'sala' || entregables[k] ? 'lista' : 'sin generar'}`).join(', ')}. Bases cargadas: ${bases.length ? 'sí' : 'no'}. Si te preguntan qué herramienta usar, recomienda la siguiente del camino y explica por qué, como lo haría Evaristo.`;
   const nombresEntregable: Record<Entregable, string> = { sala: 'Sala de postulación', informe: 'Estudio de la licitación', matriz: 'Matriz de postulación', estudio: 'Análisis profundo de bases', bajo_agua: 'Bajo el Agua', anexos: 'Anexos', mapa: 'Mapa conceptual', infografia: 'Infografía' };
+  // Para exportar/compartir el Estudio: une el veredicto con lo profundizado (bases) y Bajo el Agua,
+  // que ahora se muestran anidados dentro del mismo Estudio en vez de pestañas aparte.
+  const contenidoEntregable = (k: Entregable): string => {
+    if (k !== 'informe') return entregables[k] ?? '';
+    let t = entregables.informe ?? '';
+    if (entregables.estudio) t += `\n\n## Análisis profundo de las bases\n\n${entregables.estudio}`;
+    if (entregables.bajo_agua) t += `\n\n## Bajo el Agua\n\n${entregables.bajo_agua}`;
+    return t;
+  };
   const compartirEntregable = async () => {
     const nombres = nombresEntregable;
     const titulo = `${nombres[tab]} · ${cod}${f?.nombre ? ' · ' + f.nombre : ''}`;
-    await compartirTexto(tab, titulo, tab === 'infografia' ? JSON.stringify(datosInfografia()) : entregables[tab]);
+    await compartirTexto(tab, titulo, tab === 'infografia' ? JSON.stringify(datosInfografia()) : contenidoEntregable(tab));
   };
   const f = libro?.ficha; const o = f?.organismo ?? {};
   const bases: any[] = libro?.bases ?? [];
@@ -960,7 +970,7 @@ export default function LibroLicitacion() {
             {/* Discretas por diseño: son clave para decidir, pero no todos saben usarlas. Evaristo guía cuál pedir y cuándo. */}
             <p className="text-xs text-muted-foreground">
               {generadas.length ? `${generadas.length} generada${generadas.length > 1 ? 's' : ''}: ${generadas.map((k) => nombresEntregable[k]).join(', ')}. ` : 'Ninguna generada todavía. '}
-              {siguiente && <>Evaristo sugiere ahora: <button type="button" className="font-medium text-firmavb-blue hover:underline" disabled={generandoEntregable} onClick={() => entregables[siguiente] ? setTab(siguiente) : generar(siguiente)}>{nombresEntregable[siguiente]}</button>. </>}
+              {siguiente && <>Evaristo sugiere ahora: <button type="button" className="font-medium text-firmavb-blue hover:underline" disabled={generandoEntregable} onClick={() => siguiente === 'anexos' ? generar('anexos') : entregables[siguiente] ? setTab(siguiente) : generar(siguiente)}>{nombresEntregable[siguiente]}</button>. </>}
               <button type="button" className="underline" onClick={() => { setPregunta('¿Qué herramienta del Libro me conviene ahora y cómo la usarías tú?'); if (!escritorio) setVista('chat'); }}>Preguntarle a Evaristo</button>
             </p>
             {herramientasAbiertas && <div className="grid grid-cols-2 gap-2 pt-1">
@@ -975,7 +985,7 @@ export default function LibroLicitacion() {
                 <button
                   key={k}
                   title={GUIA_EVARISTO[k]}
-                  onClick={() => entregables[k] ? setTab(k) : generar(k)}
+                  onClick={() => k === 'anexos' ? generar('anexos') : entregables[k] ? setTab(k) : generar(k)}
                   disabled={generandoEntregable && !ocupados.has(k)}
                   className={`flex items-center gap-2 rounded-xl border p-2.5 text-left transition-colors disabled:opacity-50 ${tab === k ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/60'}`}
                 >
@@ -1008,9 +1018,9 @@ export default function LibroLicitacion() {
                 <div className="flex flex-wrap gap-1 mb-2">
                   <Button size="sm" variant="outline" onClick={compartirEntregable}><Share2 className="h-3.5 w-3.5 mr-1" />Compartir · PDF · WhatsApp</Button>
                   {tab !== 'mapa' && tab !== 'infografia' && tab !== 'matriz' && <>
-                    <Button size="sm" variant="ghost" onClick={() => aWord(nombresEntregable[tab], entregables[tab])}><FileText className="h-3.5 w-3.5 mr-1" />Word</Button>
-                    <Button size="sm" variant="ghost" onClick={() => aPdf(nombresEntregable[tab], entregables[tab])}><Printer className="h-3.5 w-3.5 mr-1" />PDF</Button>
-                    <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(entregables[tab]); toast.success('Copiado'); }}><Copy className="h-3.5 w-3.5 mr-1" />Copiar</Button></>}
+                    <Button size="sm" variant="ghost" onClick={() => aWord(nombresEntregable[tab], contenidoEntregable(tab))}><FileText className="h-3.5 w-3.5 mr-1" />Word</Button>
+                    <Button size="sm" variant="ghost" onClick={() => aPdf(nombresEntregable[tab], contenidoEntregable(tab))}><Printer className="h-3.5 w-3.5 mr-1" />PDF</Button>
+                    <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(contenidoEntregable(tab)); toast.success('Copiado'); }}><Copy className="h-3.5 w-3.5 mr-1" />Copiar</Button></>}
                   <Button size="sm" variant="ghost" onClick={() => generar(tab)} disabled={generandoEntregable}>Volver a generar</Button>
                 </div>
                 {tab === 'anexos' && faltantes.length > 0 && <p className="text-xs text-yellow-800 bg-yellow-50 border border-yellow-200 rounded px-2 py-1 mb-2">Completa a mano: {faltantes.join(', ')}</p>}
