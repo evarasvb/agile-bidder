@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   Dialog, 
   DialogContent, 
@@ -42,7 +42,7 @@ import { useInventory } from '@/hooks/useInventory';
 import { useCliente } from '@/hooks/useCliente';
 import { useProfile } from '@/hooks/useProfile';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { useMarketBuscar, useMarketSolicitar, type MarketProveedor } from '@/hooks/useMarketEstado';
+import { useMarketBuscar, useMarketSolicitar, useMisSolicitudes, type MarketProveedor } from '@/hooks/useMarketEstado';
 import { gmailCrearBorrador } from '@/hooks/useGmail';
 import {
   descargarCotizacionPDF,
@@ -95,6 +95,43 @@ export function GenerarCotizacionModal({
   const mkQ = useDebouncedValue(mkInput.trim(), 400);
   const { data: mkProveedores = [], isLoading: mkLoading } = useMarketBuscar(mkQ);
   const solicitarMk = useMarketSolicitar();
+  // Respuestas de proveedores: cotizaciones que llegaron a solicitudes ligadas
+  // a esta licitación. El precio vuelve solo a la línea de la oferta.
+  const { data: misSolicitudes = [] } = useMisSolicitudes();
+  const respuestasProveedor = useMemo(() => {
+    return misSolicitudes
+      .filter((s) => s.rol === 'comprador'
+        && s.oportunidad_codigo === licitacion.id_licitacion
+        && !!s.producto
+        && s.cotizaciones.some((c) => (c.precio ?? 0) > 0))
+      .map((s) => {
+        const precios = s.cotizaciones.map((c) => c.precio).filter((p): p is number => !!p && p > 0);
+        return { id: s.id, proveedor: s.contraparte, producto: s.producto as string, precio: Math.min(...precios) };
+      });
+  }, [misSolicitudes, licitacion.id_licitacion]);
+
+  // Lleva el precio que respondió el proveedor a la línea de la oferta (actualiza
+  // el costo y recalcula el precio de oferta con el margen actual). Si el producto
+  // no está en la oferta todavía, lo agrega con ese precio.
+  const aplicarPrecioProveedor = (producto: string, precio: number) => {
+    const p = Math.round(precio);
+    setProductosOfertados((prev) => {
+      const idx = prev.findIndex((l) => l.inventoryId.startsWith('mk:') && l.nombre === producto);
+      if (idx >= 0) {
+        const next = [...prev];
+        const linea = { ...next[idx], precioUnitario: p };
+        linea.precioOferta = Math.round(p * (1 + linea.margen / 100));
+        next[idx] = linea;
+        return next;
+      }
+      return [...prev, { inventoryId: `mk:resp:${producto}`, nombre: producto, sku: '', cantidad: 1, precioUnitario: p, margen: 0, precioOferta: p, imagen_url: null }];
+    });
+    toast.success(`Precio de "${producto}" actualizado a ${formatCurrency(p)}.`);
+  };
+
+  const aplicarTodasLasRespuestas = () => {
+    respuestasProveedor.forEach((r) => aplicarPrecioProveedor(r.producto, r.precio));
+  };
   const [observaciones, setObservaciones] = useState('');
   const [plazoEntrega, setPlazoEntrega] = useState(5);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -630,6 +667,31 @@ export function GenerarCotizacionModal({
                 </div>
               )}
             </div>
+
+            {/* Respuestas de proveedores: el precio cotizado vuelve a la oferta */}
+            {respuestasProveedor.length > 0 && (
+              <div className="space-y-2 rounded-lg border border-firmavb-green/40 bg-firmavb-green/5 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="font-semibold text-sm flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-firmavb-green" /> Respuestas de proveedores (Market)
+                  </h4>
+                  <Button size="sm" variant="outline" onClick={aplicarTodasLasRespuestas}>Aplicar todas</Button>
+                </div>
+                <ul className="space-y-1">
+                  {respuestasProveedor.map((r) => (
+                    <li key={r.id} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="truncate" title={r.producto}>
+                        {r.producto}{r.proveedor ? ` · ${r.proveedor}` : ''}
+                      </span>
+                      <span className="flex items-center gap-2 shrink-0">
+                        <b className="tabular-nums">{formatCurrency(r.precio)}</b>
+                        <Button size="sm" variant="secondary" onClick={() => aplicarPrecioProveedor(r.producto, r.precio)}>Aplicar</Button>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* Market del Estado: buscar productos que te faltan y pedir cotización al proveedor */}
             <div className="space-y-3 rounded-lg border border-dashed p-3">
