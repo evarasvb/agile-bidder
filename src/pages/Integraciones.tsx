@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Loader2, HardDrive, CheckCircle2, Link2, Unlink, FolderOpen, Paperclip, Sparkles } from 'lucide-react';
+import { Loader2, HardDrive, CheckCircle2, Link2, Unlink, FolderOpen, Paperclip, Sparkles, Mail } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -9,19 +9,26 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { useDriveEstado, driveConectar, useDriveDesconectar } from '@/hooks/useGoogleDrive';
+import { useGmailEstado, gmailConectar, useGmailDesconectar } from '@/hooks/useGmail';
 
 export default function Integraciones() {
   const [params, setParams] = useSearchParams();
   const { data: estado, isLoading } = useDriveEstado();
   const desconectar = useDriveDesconectar();
   const [conectando, setConectando] = useState(false);
+  const { data: gmail, isLoading: gmailCargando } = useGmailEstado();
+  const gmailDesconectar = useGmailDesconectar();
+  const [gmailConectando, setGmailConectando] = useState(false);
 
   // Resultado del OAuth al volver de Google.
   useEffect(() => {
     const r = params.get('drive');
     if (r === 'ok') toast.success('Google Drive conectado');
     else if (r === 'error') toast.error('No se pudo conectar Google Drive. Intenta de nuevo.');
-    if (r) { params.delete('drive'); setParams(params, { replace: true }); }
+    const g = params.get('gmail');
+    if (g === 'ok') toast.success('Gmail conectado');
+    else if (g === 'error') toast.error('No se pudo conectar Gmail. Intenta de nuevo.');
+    if (r || g) { params.delete('drive'); params.delete('gmail'); setParams(params, { replace: true }); }
   }, [params, setParams]);
 
   const conectar = async () => {
@@ -30,6 +37,16 @@ export default function Integraciones() {
       await driveConectar(); // redirige a Google
     } catch (e) {
       setConectando(false);
+      toast.error(e instanceof Error ? e.message : 'No se pudo iniciar la conexión');
+    }
+  };
+
+  const conectarGmail = async () => {
+    setGmailConectando(true);
+    try {
+      await gmailConectar(); // redirige a Google
+    } catch (e) {
+      setGmailConectando(false);
       toast.error(e instanceof Error ? e.message : 'No se pudo iniciar la conexión');
     }
   };
@@ -136,6 +153,74 @@ export default function Integraciones() {
           <p className="text-xs text-muted-foreground">
             Pedimos permiso de <strong>solo lectura</strong> a tus archivos. Tú eliges qué documentos adjuntar;
             no accedemos a nada más y puedes revocar el acceso cuando quieras.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Mail className="h-5 w-5" />
+            Gmail (cobranza)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Conecta tu Gmail para que, desde <strong>Cobranza de facturas</strong>, dejes listo un
+            <strong> borrador de cobro</strong> en tu correo: con la nota de cobro, la nota de débito exenta
+            y la factura/guía adjuntas. Tú lo revisas y lo envías.
+          </p>
+
+          {gmailCargando ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Cargando…
+            </div>
+          ) : gmail?.conectado ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/30 p-3">
+              <div className="flex items-center gap-2 text-sm">
+                <CheckCircle2 className="h-5 w-5 text-[hsl(var(--success))]" />
+                <span>
+                  Conectado{gmail.email ? <> como <strong className="text-foreground">{gmail.email}</strong></> : ''}.
+                </span>
+              </div>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm" disabled={gmailDesconectar.isPending} className="gap-1.5">
+                    <Unlink className="h-4 w-4" /> Desconectar
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>¿Desconectar Gmail?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      FirmaVB dejará de poder crear borradores en tu Gmail. Los borradores ya creados se
+                      conservan en tu correo. Puedes volver a conectarlo cuando quieras.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => gmailDesconectar.mutate(undefined, {
+                        onSuccess: () => toast.success('Gmail desconectado'),
+                        onError: (e) => toast.error(e instanceof Error ? e.message : 'No se pudo desconectar'),
+                      })}
+                    >
+                      Desconectar
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          ) : (
+            <Button onClick={conectarGmail} disabled={gmailConectando} className="gap-2">
+              {gmailConectando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
+              Conectar Gmail
+            </Button>
+          )}
+
+          <p className="text-xs text-muted-foreground">
+            Solo creamos <strong>borradores</strong> (no enviamos correos por ti). Tú revisas y envías cada
+            cobranza. Puedes revocar el acceso cuando quieras.
           </p>
         </CardContent>
       </Card>

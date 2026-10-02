@@ -38,6 +38,8 @@ export function institutionPath(rut: string): string {
   return `/instituciones?${new URLSearchParams({ rut })}`;
 }
 export function noticeHref(a: InstitutionNotice): string | null {
+  // Recordatorio del plan de postulación: lleva directo al Libro de esa licitación.
+  if (a.tipo === 'plan_postulacion' && a.licitacion_id) return `/experto/libro/${encodeURIComponent(a.licitacion_id)}`;
   const rut = noticeInstitutionId(a);
   if (rut || a.tipo.endsWith('_institucion')) {
     const params = new URLSearchParams(rut ? { rut } : {});

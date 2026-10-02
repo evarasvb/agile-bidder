@@ -23,6 +23,8 @@ import { Infografia, type InfografiaDatos } from '@/components/experto/Infografi
 import { MapaConceptual, type Nodo } from '@/components/experto/MapaConceptual';
 import { compartirPdfExperto } from '@/services/expertoPdf';
 import { MatrizPostulacion, type Matriz } from '@/components/experto/MatrizPostulacion';
+import { PlanPostulacion } from '@/components/experto/PlanPostulacion';
+import { planAutomatico, fusionarPlan, type PasoPlan } from '@/lib/planPostulacion';
 import { descargarWord } from '@/services/exportar';
 import { SalaPostulacion } from '@/components/experto/SalaPostulacion';
 import { ExpertoLibroModal } from '@/components/experto/ExpertoLibroModal';
@@ -79,6 +81,7 @@ interface LibroExperto {
   top_adjudicatarios?: any[];
   licitaciones_similares?: { codigo: string; titulo?: string; adjudicatario?: string; monto_adjudicado?: number | null; monto_estimado?: number | null }[];
   plan?: string;
+  plan_postulacion?: { pasos?: PasoPlan[]; actualizado_en?: string } | null;
   bajo_agua_cuota?: { plan?: string; usados?: number; maximo?: number | null; periodo?: string };
 }
 
@@ -198,6 +201,35 @@ export default function LibroLicitacion() {
     setMsgs((libro.chat ?? []).flatMap((c: any) => [{ rol: 'yo', texto: c.pregunta }, { rol: 'exp', texto: c.respuesta }]));
     setEntregables({ sala: 'ok', informe: libro.informe?.texto ?? '', matriz: libro.matriz?.texto ?? '', estudio: libro.estudio?.texto ?? '', bajo_agua: libro.bajo_agua?.texto ?? '', anexos: libro.anexos?.texto ?? '', mapa: libro.mapa?.texto ?? '', infografia: libro.ficha ? 'ok' : '' });
     setFaltantes(libro.anexos?.faltantes ?? []);
+  }, [libro]);
+
+  // Plan de postulación: pasos con fecha y responsable calculados desde las fechas de
+  // Mercado Público y mezclados con lo guardado (hecho, responsables, fechas manuales).
+  const [planPasos, setPlanPasos] = useState<PasoPlan[]>([]);
+  const [planGuardando, setPlanGuardando] = useState(false);
+  const planGuardarRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const guardarPlan = (pasos: PasoPlan[]) => {
+    if (!cod || !token) return;
+    if (planGuardarRef.current) clearTimeout(planGuardarRef.current);
+    planGuardarRef.current = setTimeout(async () => {
+      setPlanGuardando(true);
+      const { error } = await (supabase as unknown as { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ error: { message: string } | null }> })
+        .rpc('experto_libro_plan_guardar', { p_codigo: cod, p_pasos: pasos });
+      setPlanGuardando(false);
+      if (error) toast.error('No se pudo guardar el plan. Revisa tu conexión.');
+    }, 600);
+  };
+  const cambiarPlan = (pasos: PasoPlan[]) => { setPlanPasos(pasos); guardarPlan(pasos); };
+  const recalcularPlan = () => { if (!libro?.ficha) return; cambiarPlan(fusionarPlan(planPasos, planAutomatico(libro.ficha))); toast.success('Fechas recalculadas desde Mercado Público'); };
+  useEffect(() => {
+    if (!libro) return;
+    const previos = libro.plan_postulacion?.pasos ?? [];
+    const auto = planAutomatico(libro.ficha);
+    const fusion = previos.length ? fusionarPlan(previos, auto) : auto;
+    setPlanPasos(fusion);
+    // Se guarda la primera vez (y cuando cambian las fechas) para que la campanita pueda avisar.
+    if (fusion.length && JSON.stringify(fusion) !== JSON.stringify(previos)) guardarPlan(fusion);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [libro]);
   useEffect(() => { chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight }); }, [msgs]);
   const entregableRef = useRef(false);
@@ -553,7 +585,7 @@ export default function LibroLicitacion() {
   });
   // Cómo lo hacemos en FirmaVB: cuándo se pide cada herramienta. Se muestra al pasar el mouse y se le entrega al Experto para que guíe.
   const GUIA_EVARISTO: Record<Entregable, string> = {
-    sala: 'Tu tablero: bases, veredicto, requisitos, anexos y aprobación. Es el camino guiado; si sigues sus pasos no te saltas nada.',
+    sala: 'Tu tablero: plan de postulación con fechas y responsables, bases, veredicto, requisitos, anexos y aprobación. Es el camino guiado; si sigues sus pasos no te saltas nada.',
     informe: 'Primero. Informe de trabajo con veredicto: postular, con reservas o descartar. Si dice descartar, no gastes nada más.',
     matriz: 'Cuando el informe dice postular. Criterios y pesos sacados de las bases, con simulación de tu puntaje y del rival. Se usa antes de fijar el precio.',
     estudio: 'Solo licitaciones grandes (sobre 1.000 UTM) o con bases enredadas. Análisis completo de bases y anexos, trampas y puntos de puntaje.',
@@ -946,7 +978,11 @@ export default function LibroLicitacion() {
           </CardHeader>
           <CardContent className="text-sm flex-1">
             {tab === 'sala' ? (
-              <div className="max-h-[70vh] overflow-y-auto pr-1">
+              <div className="max-h-[70vh] overflow-y-auto pr-1 space-y-4">
+                {planPasos.length > 0 && (
+                  <PlanPostulacion cod={cod} nombre={f?.nombre} fechaCierre={f?.fecha_cierre} pasos={planPasos} onChange={cambiarPlan} onRecalcular={recalcularPlan} guardando={planGuardando}
+                    onIr={(d) => { if (d === 'postular') { if (f) navigate(String(f.tipo ?? '').toLowerCase().includes('gil') ? `/compras-agiles/${cod}` : `/oportunidades/licitacion/${cod}`); return; } if (entregables[d]) setTab(d); else generar(d); }} />
+                )}
                 <SalaPostulacion cod={cod} ficha={f} bases={bases} documentos={documentos} plan={libro?.plan} informe={entregables.informe}
                   matriz={entregables.matriz ? JSON.parse(entregables.matriz) : null} anexos={entregables.anexos} faltantes={faltantes} veredicto={veredictoDe(entregables.informe)}
                   onGenerar={(t) => generar(t)} onIr={(t) => setTab(t)} onMatriz={matrizCambio} onPreguntar={(q) => { setPregunta(q); if (!escritorio) setVista('chat'); }}
