@@ -49,11 +49,24 @@ function fecha(s: string | null | undefined): string {
   return new Date(s).toLocaleDateString("es-CL");
 }
 
+// Regiones de Chile para el select de entrega (mismo listado que Configuración).
+const REGIONES = [
+  "Arica y Parinacota", "Tarapacá", "Antofagasta", "Atacama", "Coquimbo",
+  "Valparaíso", "Metropolitana", "O'Higgins", "Maule", "Ñuble", "Biobío",
+  "La Araucanía", "Los Ríos", "Los Lagos", "Aysén", "Magallanes",
+];
+const hoyISO = () => new Date().toISOString().slice(0, 10);
+const maxFechaISO = () => new Date(Date.now() + 365 * 86_400_000).toISOString().slice(0, 10);
+
 // ── Pedir cotización ─────────────────────────────────────────────
-function SolicitarDialog({ proveedor, productoInicial, onClose }: {
+function SolicitarDialog({ proveedor, productoInicial, precioRef, onClose, onAbrirChat }: {
   proveedor: MarketProveedor | null;
   productoInicial: string;
+  /** Precio mediano de referencia del producto elegido (Mercado Público). */
+  precioRef: number | null;
   onClose: () => void;
+  /** Al pedir a un proveedor que está en FirmaVB, se abre el chat de la solicitud. */
+  onAbrirChat: (s: MarketSolicitud) => void;
 }) {
   const solicitar = useMarketSolicitar();
   const [producto, setProducto] = useState(productoInicial);
@@ -66,23 +79,46 @@ function SolicitarDialog({ proveedor, productoInicial, onClose }: {
   const abierto = !!proveedor;
   const enFirmaVB = !!proveedor?.es_firmavb && !!proveedor?.acepta_solicitudes;
 
+  // El diálogo se mantiene montado y solo se alterna `proveedor`; sin esto el
+  // `useState` inicial nunca volvería a correr y el producto/campos quedaban
+  // con lo de la vez anterior (hallazgo de Evaristo: no registraba el producto).
+  useEffect(() => {
+    if (!proveedor) return;
+    setProducto(productoInicial);
+    setCantidad("");
+    setUnidad("");
+    setRegion("");
+    setFechaEntrega("");
+    setMensaje("");
+  }, [proveedor, productoInicial]);
+
   const enviar = async () => {
     if (!proveedor) return;
     if (producto.trim().length < 2) { toast.error("Escribe qué producto necesitas cotizar."); return; }
+    const cant = Number(cantidad);
+    if (!cantidad || !Number.isFinite(cant) || cant <= 0) { toast.error("Indica cuántas unidades necesitas (mayor que 0)."); return; }
+    if (fechaEntrega && fechaEntrega < hoyISO()) { toast.error("La fecha necesaria no puede ser anterior a hoy."); return; }
     try {
-      await solicitar.mutateAsync({
+      const id = await solicitar.mutateAsync({
         rut_proveedor: proveedor.rut,
         producto: producto.trim(),
-        cantidad: cantidad ? Number(cantidad) : null,
+        cantidad: cant,
         unidad: unidad.trim() || null,
-        region: region.trim() || null,
+        region: region || null,
         fecha: fechaEntrega || null,
         mensaje: mensaje.trim() || null,
       });
-      toast.success(enFirmaVB
-        ? "Solicitud enviada. Le llegará el aviso al proveedor."
-        : "Solicitud registrada. Mercado Público no publica su correo, así que avísale tú: en \"Mis solicitudes\" tienes un mensaje listo para copiar y mandarle.");
-      onClose();
+      if (enFirmaVB) {
+        toast.success("Solicitud enviada. Le llegará el aviso al proveedor; abrimos el chat.");
+        const nombre = proveedor.proveedor;
+        const prod = producto.trim();
+        onClose();
+        // ChatDialog solo usa id/contraparte/producto/cantidad de la solicitud.
+        if (id) onAbrirChat({ id, contraparte: nombre, producto: prod, cantidad: cant } as MarketSolicitud);
+      } else {
+        toast.success("Solicitud registrada. Mercado Público no publica su correo, así que avísale tú: en \"Mis solicitudes\" tienes un mensaje listo para copiar y mandarle.");
+        onClose();
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo enviar la solicitud.");
     }
@@ -99,29 +135,50 @@ function SolicitarDialog({ proveedor, productoInicial, onClose }: {
             {!enFirmaVB && " — todavía no está en FirmaVB. No tenemos su correo (Mercado Público no lo publica), así que la solicitud queda guardada y en \"Mis solicitudes\" te dejamos un mensaje listo para que tú se lo mandes."}
           </DialogDescription>
         </DialogHeader>
+
+        {enFirmaVB && (
+          <div className="flex items-center gap-2 rounded-md bg-firmavb-green/10 text-firmavb-green text-sm px-3 py-2">
+            <MessageCircle className="h-4 w-4 shrink-0" />
+            Este proveedor está en FirmaVB. Al enviar, se abre un chat directo con él.
+          </div>
+        )}
+
         <div className="space-y-3">
           <div>
             <Label htmlFor="mk-producto">Producto</Label>
             <Input id="mk-producto" value={producto} onChange={(e) => setProducto(e.target.value)} placeholder="Ej: resma papel carta" />
+            {precioRef != null && precioRef > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Precio de referencia (mediana Mercado Público): <b className="text-foreground">{clp(precioRef)}</b>
+              </p>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="mk-cant">Cantidad</Label>
-              <Input id="mk-cant" type="number" min="0" value={cantidad} onChange={(e) => setCantidad(e.target.value)} placeholder="Ej: 100" />
+              <Input id="mk-cant" type="number" min="1" step="1" value={cantidad} onChange={(e) => setCantidad(e.target.value)} placeholder="Ej: 100" />
             </div>
             <div>
               <Label htmlFor="mk-unidad">Unidad</Label>
-              <Input id="mk-unidad" value={unidad} onChange={(e) => setUnidad(e.target.value)} placeholder="Ej: cajas, unidades" />
+              <Input id="mk-unidad" value={unidad} onChange={(e) => setUnidad(e.target.value)} placeholder="Ej: cajas, resmas, unidades" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="mk-region">Región / entrega</Label>
-              <Input id="mk-region" value={region} onChange={(e) => setRegion(e.target.value)} placeholder="Ej: RM, Biobío" />
+              <select
+                id="mk-region"
+                value={region}
+                onChange={(e) => setRegion(e.target.value)}
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Sin especificar</option>
+                {REGIONES.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
             </div>
             <div>
               <Label htmlFor="mk-fecha">Fecha necesaria</Label>
-              <Input id="mk-fecha" type="date" value={fechaEntrega} onChange={(e) => setFechaEntrega(e.target.value)} />
+              <Input id="mk-fecha" type="date" min={hoyISO()} max={maxFechaISO()} value={fechaEntrega} onChange={(e) => setFechaEntrega(e.target.value)} />
             </div>
           </div>
           <div>
@@ -202,7 +259,8 @@ function CotizarDialog({ solicitud, onClose }: { solicitud: MarketSolicitud | nu
 }
 
 // ── Tarjeta de proveedor ─────────────────────────────────────────
-function ProveedorCard({ p, onPedir }: { p: MarketProveedor; onPedir: (prod: string) => void }) {
+function ProveedorCard({ p, termino, onPedir }: { p: MarketProveedor; termino: string; onPedir: (prod: string, precioRef: number | null) => void }) {
+  const precioTop = p.productos[0]?.precio_mediana ?? p.productos[0]?.precio ?? p.precio_mediana ?? null;
   return (
     <Card className="flex flex-col">
       <CardContent className="pt-5 flex-1 flex flex-col">
@@ -231,20 +289,25 @@ function ProveedorCard({ p, onPedir }: { p: MarketProveedor; onPedir: (prod: str
         </div>
 
         {p.productos.length > 0 && (
-          <ul className="mt-3 space-y-1 text-sm text-muted-foreground flex-1">
+          <ul className="mt-3 space-y-1 text-sm flex-1">
             {p.productos.slice(0, 4).map((x, i) => (
-              <li key={i} className="flex justify-between gap-2">
-                <span className="truncate" title={x.producto}>
-                  {x.producto}{x.catalogo ? " · catálogo" : ""}
-                </span>
-                <span className="shrink-0 tabular-nums">{clp(x.precio_mediana ?? x.precio)}</span>
+              <li key={i}>
+                <button
+                  type="button"
+                  onClick={() => onPedir(x.producto, x.precio_mediana ?? x.precio ?? null)}
+                  className="w-full flex justify-between gap-2 rounded px-1 -mx-1 py-0.5 text-left text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  title={`Pedir cotización de: ${x.producto}`}
+                >
+                  <span className="truncate">{x.producto}{x.catalogo ? " · catálogo" : ""}</span>
+                  <span className="shrink-0 tabular-nums">{clp(x.precio_mediana ?? x.precio)}</span>
+                </button>
               </li>
             ))}
           </ul>
         )}
 
         <Button
-          onClick={() => onPedir(p.productos[0]?.producto ?? "")}
+          onClick={() => onPedir(termino.trim() || p.productos[0]?.producto || "", precioTop)}
           className="mt-4 w-full gap-2"
           variant={p.es_firmavb ? "default" : "secondary"}
         >
@@ -595,7 +658,7 @@ export default function MarketEstado() {
   const [input, setInput] = useState("");
   const q = useDebouncedValue(input.trim(), 400);
   const { data: proveedores = [], isLoading, isError } = useMarketBuscar(q);
-  const [pedirA, setPedirA] = useState<{ prov: MarketProveedor; producto: string } | null>(null);
+  const [pedirA, setPedirA] = useState<{ prov: MarketProveedor; producto: string; precioRef: number | null } | null>(null);
   const [responder, setResponder] = useState<MarketSolicitud | null>(null);
   const [chatSolicitud, setChatSolicitud] = useState<MarketSolicitud | null>(null);
   const [contactoDe, setContactoDe] = useState<MarketSolicitud | null>(null);
@@ -663,7 +726,7 @@ export default function MarketEstado() {
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {proveedores.map((p) => (
-                  <ProveedorCard key={p.rut} p={p} onPedir={(prod) => setPedirA({ prov: p, producto: prod })} />
+                  <ProveedorCard key={p.rut} p={p} termino={q} onPedir={(prod, precioRef) => setPedirA({ prov: p, producto: prod, precioRef })} />
                 ))}
               </div>
             )}
@@ -678,7 +741,9 @@ export default function MarketEstado() {
       <SolicitarDialog
         proveedor={pedirA?.prov ?? null}
         productoInicial={pedirA?.producto ?? ""}
+        precioRef={pedirA?.precioRef ?? null}
         onClose={() => setPedirA(null)}
+        onAbrirChat={(s) => setChatSolicitud(s)}
       />
       <CotizarDialog solicitud={responder} onClose={() => setResponder(null)} />
       <ChatDialog solicitud={chatSolicitud} onClose={() => setChatSolicitud(null)} />
