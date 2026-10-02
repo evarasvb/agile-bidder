@@ -789,6 +789,9 @@ function OcAceptadaCombobox({
   onSelect: (oc: { codigo: string; organismo_comprador: string | null; rut_demandante: string | null; total: number | null; fecha_emision: string | null }) => void;
 }) {
   const [open, setOpen] = useState(false);
+  // Búsqueda LOCAL del selector (antes usaba por error el `filtro` de la lista
+  // principal, que vale 'activas' por defecto y dejaba el desplegable siempre vacío).
+  const [buscaOc, setBuscaOc] = useState('');
   const { data: cliente } = useCliente();
   // Lista TODAS mis OC aceptadas por mi RUT (el "cubo"): ya no exige elegir el
   // organismo primero. Si viene `institucion` se usa solo como filtro extra.
@@ -801,12 +804,12 @@ function OcAceptadaCombobox({
   const sync = useSyncMisOC();
 
   const filtradas = useMemo(() => {
-    const term = filtro.trim().toLowerCase();
+    const term = buscaOc.trim().toLowerCase();
     if (!term) return ocs;
     return ocs.filter((o) =>
       [o.codigo, o.organismo_comprador, o.rut_demandante, o.numero_licitacion]
         .some((v) => (v || '').toLowerCase().includes(term)));
-  }, [ocs, filtro]);
+  }, [ocs, buscaOc]);
 
   return (
     <div className="flex gap-1.5">
@@ -821,14 +824,14 @@ function OcAceptadaCombobox({
           <div className="border-b p-2">
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input value={filtro} onChange={(e) => setFiltro(e.target.value)} placeholder="Filtra por código, organismo, RUT o N° licitación…" className="h-9 pl-8" />
+              <Input value={buscaOc} onChange={(e) => setBuscaOc(e.target.value)} placeholder="Filtra por código, organismo, RUT o N° licitación…" className="h-9 pl-8" />
             </div>
           </div>
           {isLoading ? (
             <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Buscando tus OC…</div>
           ) : filtradas.length === 0 ? (
             <div className="p-4 text-sm text-muted-foreground">
-              No tienes OC{institucion ? ' de este organismo' : ''} {filtro ? 'que coincidan con el filtro' : 'aún'}. Prueba "Actualizar mis OC".
+              No tienes OC{institucion ? ' de este organismo' : ''} {buscaOc ? 'que coincidan con el filtro' : 'aún'}. Prueba "Actualizar mis OC".
             </div>
           ) : (
             <div className="max-h-[360px] overflow-auto">
