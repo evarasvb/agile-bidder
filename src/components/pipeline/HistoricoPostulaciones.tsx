@@ -78,13 +78,17 @@ interface FilaProps {
 function FilaOportunidad({ item }: FilaProps) {
   const link = linkProcesoMp(item.codigo);
   const titulo = item.nombre || item.codigo;
+  // Antes se cortaba con line-clamp-1 sin importar el ancho real de la
+  // columna: para una tabla que se le muestra al cliente, un nombre cortado
+  // se ve descuidado. Ahora queda completo (whitespace-nowrap) y la columna
+  // crece; la barra deslizadora horizontal de DataTable deja verla entera.
   return link ? (
-    <a href={link} target="_blank" rel="noreferrer" className="flex items-center gap-1 font-medium text-blue-700 hover:underline">
-      <span className="line-clamp-1">{titulo}</span>
+    <a href={link} target="_blank" rel="noreferrer" className="flex items-center gap-1 font-medium text-blue-700 hover:underline whitespace-nowrap">
+      <span>{titulo}</span>
       <ExternalLink className="h-3 w-3 shrink-0" />
     </a>
   ) : (
-    <span className="line-clamp-1 font-medium">{titulo}</span>
+    <span className="whitespace-nowrap font-medium">{titulo}</span>
   );
 }
 
@@ -139,7 +143,7 @@ const COLUMNAS: DataTableColumn<HistoricoPostulacion>[] = [
   {
     id: 'institucion',
     header: 'Institución',
-    className: 'text-sm text-gray-600 max-w-[220px] truncate',
+    className: 'text-sm text-gray-600 whitespace-nowrap',
     sortValue: (item) => item.institucion,
     exportValue: (item) => item.institucion ?? '',
     cell: (item) => item.institucion || '—',
@@ -147,7 +151,7 @@ const COLUMNAS: DataTableColumn<HistoricoPostulacion>[] = [
   {
     id: 'area_compradora',
     header: 'Área compradora',
-    className: 'text-sm text-gray-500 max-w-[180px] truncate',
+    className: 'text-sm text-gray-500 whitespace-nowrap',
     sortValue: (item) => item.area_compradora,
     exportValue: (item) => item.area_compradora ?? '',
     cell: (item) => item.area_compradora || '—',
@@ -187,7 +191,7 @@ const COLUMNAS: DataTableColumn<HistoricoPostulacion>[] = [
   {
     id: 'ganador',
     header: 'Se la adjudicó',
-    className: 'text-sm text-gray-600 max-w-[220px] truncate',
+    className: 'text-sm text-gray-600 whitespace-nowrap',
     sortValue: (item) => item.ganador_nombre,
     exportValue: (item) => item.ganador_nombre ?? '',
     cell: (item) => item.ganador_nombre || (item.resultado === 'ganada' ? 'Tú' : '—'),
