@@ -58,9 +58,10 @@ verify_jwt = true
 [functions.gmail-callback]
 verify_jwt = false
 
-# sync-tasas-cmf: la dispara un cron con bearer service_role (JWT válido).
+# sync-tasas-cmf: la dispara un cron; se autentica con un secreto propio
+# (TMC_SYNC_SECRET en app_config), no con JWT de usuario.
 [functions.sync-tasas-cmf]
-verify_jwt = true
+verify_jwt = false
 
 # crear-pago-curso: la Academia es pública; el comprador puede no tener cuenta
 [functions.crear-pago-curso]
