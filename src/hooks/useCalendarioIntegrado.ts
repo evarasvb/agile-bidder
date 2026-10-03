@@ -198,6 +198,8 @@ export function useCalendarioIntegrado() {
 
       return events;
     },
+    // Successful calendar data remains fresh for one minute; explicit refresh still runs.
+    staleTime: 60_000,
     enabled: !!user?.id,
   });
 
