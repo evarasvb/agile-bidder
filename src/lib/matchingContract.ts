@@ -36,9 +36,9 @@ export function assessMatch(input: MatchInput) {
   if (!quantityKnown) reasons.push('Cantidad o unidad por confirmar');
   if (!specificationsKnown) reasons.push('Especificaciones pendientes: leer el documento adjunto');
   if (penalty < 0) reasons.push('Especificaciones incompatibles o ambiguas');
-  if (input.exceedsBudget) reasons.push('Subtotal supera el presupuesto');
+  if (input.exceedsBudget) reasons.push('Advertencia comercial: subtotal supera el presupuesto; revisar bases');
   const suggested = !!input.product && !input.discarded && (input.selectedByUser || (score ?? 0) >= SUGGESTION_FLOOR);
-  const technicallyEligible = suggested && quantityKnown && compatibility === 'no_detected_conflict' && !input.exceedsBudget && (input.selectedByUser || (score ?? 0) >= UMBRAL_MATCH);
+  const technicallyEligible = suggested && quantityKnown && compatibility === 'no_detected_conflict' && (input.selectedByUser || (score ?? 0) >= UMBRAL_MATCH);
   const selected = technicallyEligible && !!input.selectedByUser;
   const state = !suggested ? 'Sin producto' : selected ? 'Seleccionado por ti' : technicallyEligible ? 'Sugerencia alta: confirmar' : 'Revisar';
   return { score, suggested, technicallyEligible, selected, state, reasons, quantity, quantityKnown, compatibility, documents: 'not_verified' as const, compliance: 'unknown' as const };

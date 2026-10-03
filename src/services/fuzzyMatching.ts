@@ -217,15 +217,42 @@ export function validateSpecifications(itemRequerido: ItemRequerido, producto: P
   // Ej: 15.8cm ≠ 5.5" (139.7mm) → REVISAR, no validado
 
   // CRÍTICO: Extraer TODAS las dimensiones (no solo la primera)
-  const dimensionPatternGlobal = /(\d+(?:[.,]\d+)?)\s*(cm|mm|metros|metro|m|pulgadas|pulgada|pulg|"|inch)(?!\w)/gi;
-  const dimensions = (text: string) => Array.from(text.matchAll(dimensionPatternGlobal), m => {
-    const value = Number(m[1].replace(',', '.'));
-    const unit = m[2].toLowerCase();
-    return value * (unit === 'm' || unit.includes('metro') ? 1000 : unit === 'cm' ? 10 : unit.includes('pulg') || unit === '"' || unit === 'inch' ? 25.4 : 1);
-  });
-  const reqDims = mergeValues(dimensions(itemRequerido.nombre), dimensions(itemRequerido.descripcion || ''));
-  const prodDims = mergeValues(dimensions(producto.nombre_producto), dimensions(producto.descripcion || ''));
-  if (reqDims.length && prodDims.length && (reqDims.length !== prodDims.length || reqDims.some((v,i)=>Math.abs(v-prodDims[i]) >= 1e-10))) return -35;
+  const dimensionPatternGlobal = /(\d+(?:[.,]\d+)?(?:\s*(?:x|×)\s*\d+(?:[.,]\d+)?)*)\s*(cm|mm|metros|metro|m|pulgadas|pulgada|pulg|"|inch)(?!\w)/gi;
+  const roles: Record<string, string> = {largo:'length',longitud:'length',ancho:'width',alto:'height',altura:'height',diametro:'diameter',espesor:'thickness',profundidad:'depth'};
+  type Dimension = {value:number; role:string | null};
+  const dimensions = (text: string): Dimension[] => {
+    const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    return Array.from(normalized.matchAll(dimensionPatternGlobal), m => {
+      // Only a directly preceding label associates a measurement with a role.
+      const label = normalized.slice(0,m.index).match(/(largo|longitud|ancho|alto|altura|diametro|espesor|profundidad)\s*(?:del|de|es)?\s*[:=]?\s*$/)?.[1];
+      const unit = m[2];
+      const factor = unit === 'm' || unit.includes('metro') ? 1000 : unit === 'cm' ? 10 : unit.includes('pulg') || unit === '"' || unit === 'inch' ? 25.4 : 1;
+      return m[1].split(/\s*(?:x|×)\s*/).map(value => ({value:Number(value.replace(',', '.')) * factor,role:label ? roles[label] : null}));
+    }).flat();
+  };
+  const mergeDimensions = (title: Dimension[], description: Dimension[]) => {
+    const merged = title.map(d=>({...d}));
+    const matched = new Set<number>();
+    for (const d of description) {
+      const index = merged.findIndex((t,i)=>i<title.length && !matched.has(i) && Math.abs(t.value-d.value)<1e-10 && (!t.role || !d.role || t.role===d.role));
+      if (index>=0) {
+        matched.add(index);
+        merged[index].role ||= d.role;
+      } else merged.push({...d});
+    }
+    return merged;
+  };
+  const reqDims = mergeDimensions(dimensions(itemRequerido.nombre), dimensions(itemRequerido.descripcion || ''));
+  const prodDims = mergeDimensions(dimensions(producto.nombre_producto), dimensions(producto.descripcion || ''));
+  if (reqDims.length) {
+    if (reqDims.length !== prodDims.length) return -35; // Missing measurements require review.
+    // Explicit roles may be written in a different order. Unlabelled vectors keep
+    // their order: equal multisets do not establish dimensional equivalence.
+    const allLabelled = reqDims.every(d=>d.role) && prodDims.every(d=>d.role);
+    const ordered = (dims: Dimension[]) => allLabelled ? [...dims].sort((a,b)=>a.role!.localeCompare(b.role!)) : dims;
+    const reqOrdered=ordered(reqDims), prodOrdered=ordered(prodDims);
+    if (reqOrdered.some((d,i)=>Math.abs(d.value-prodOrdered[i].value)>=1e-10 || (d.role && d.role!==prodOrdered[i].role && (prodOrdered[i].role || reqDims.length>1)))) return -35;
+  }
 
   return 0; // Compatible
 }

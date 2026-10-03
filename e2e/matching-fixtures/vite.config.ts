@@ -9,5 +9,6 @@ export default defineConfig({plugins:[react()],optimizeDeps:{entries:['e2e/match
 {find:'@/integrations/supabase/client',replacement:path.resolve('e2e/matching-fixtures/supabase.ts')},
 {find:'@/lib/supabaseClient',replacement:path.resolve('e2e/matching-fixtures/supabase.ts')},
 {find:'./PrecioMercadoHint',replacement:path.resolve('e2e/matching-fixtures/stubs.tsx')},
+{find:'@/services/pdfGenerator',replacement:path.resolve('e2e/matching-fixtures/pdf.ts')},
 {find:'@',replacement:path.resolve('src')}
 ]},server:{host:'127.0.0.1',port:5188}});

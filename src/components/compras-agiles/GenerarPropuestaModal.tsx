@@ -267,6 +267,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
     product:item.match ? {nombre_producto:item.match.nombre, descripcion:item.match.descripcion} : item.manualOffer ? {nombre_producto:item.nombre} : null,
     score:item.esManual || item.market || item.manualOffer ? null : item.match?.matchScore,
     selectedByUser:selecting,
+    exceedsBudget: !!compra?.monto && item.precioUnitario * item.cantidad > compra.monto,
   });
   const handleToggleItem = (itemId: string) => {
     setItemsSeleccionados(prev =>
@@ -316,6 +317,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
     const nuevoItem: ItemSeleccionado = {
       itemId: `manual-${Date.now()}`,
       nombre: 'Producto manual',
+      manualOffer: true,
       descripcion: '',
       cantidadSolicitada: 1,
       unidadMedida: 'UN',
@@ -517,7 +519,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
         unidad_medida: item.unidadMedida,
         match_id: item.match?.id,
         sku_match: item.match?.sku,
-        nombre_match: item.match?.nombre,
+        nombre_match: item.match?.nombre ?? (item.manualOffer ? item.nombre : undefined),
         cantidad_propuesta: item.cantidad,
         precio_unitario: item.precioUnitario || 0,
         subtotal: (item.precioUnitario || 0) * item.cantidad,
@@ -556,7 +558,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
           const productos_ofertados = itemsActivos.map((item) => ({
             codigo_producto: (item as any).codigoProducto ?? null,
             nombre_solicitado: item.nombre,
-            nombre_producto: item.match?.nombre ?? null,
+            nombre_producto: item.match?.nombre ?? (item.manualOffer ? item.nombre : null),
             sku: item.match?.sku ?? null,
             cantidad: item.cantidad,
             precio_unitario: item.precioUnitario || 0,
@@ -827,7 +829,8 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                         </>
                       ) : (
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs text-amber-700">Sin producto en tu inventario</span>
+                          <span className="text-xs text-amber-700">{item.manualOffer ? "Oferta manual" : "Sin producto en tu inventario"}</span>
+                          <MatchAssessmentSummary assessment={assessmentFor(item)} />
                           {selector}
                           <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setMarketPara(item.itemId)} title="Buscar este producto en el Market del Estado">
                             <Store className="h-3 w-3 mr-1" /> Market
@@ -1047,6 +1050,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
             <Button variant="outline" onClick={() => setMostrarAgregarManual(false)}>
               Cancelar
             </Button>
+            <Button onClick={handleAgregarProductoManual}>Agregar producto nuevo</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

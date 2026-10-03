@@ -39,6 +39,25 @@ describe('separate similarity, suggestion coverage, technical eligibility and do
     expect(assessMatch({...input,requested:{nombre:'Cinta 50mm',cantidad:2,unidad:'UN'},product:{nombre_producto:'Cinta',descripcion:'Ancho 33mm'}}).selected).toBe(false);
     expect(knownUnit('abc')).toBe(false);
   });
+  it('preserves dimensional roles, compound order, equivalents and missing data',()=>{
+    const check=(nombre:string,descripcion:string,productName:string,productDescription:string)=>assessMatch({requested:{nombre,descripcion,cantidad:1,unidad:'UN'},product:{nombre_producto:productName,descripcion:productDescription},score:100,selectedByUser:true});
+    expect(check('Tubo largo 2m','Diámetro 50mm','Tubo largo 50mm','Diámetro 2m').selected).toBe(false);
+    expect(check('Tubo largo 2m','Diámetro 50mm','Tubo diámetro de 2m','Largo de 50mm').selected).toBe(false);
+    expect(check('Tubo largo 2m','Diámetro 50mm','Tubo 2m','50mm').selected).toBe(false);
+    expect(check('Tubo 2m','Largo 2m','Tubo 2000mm','').selected).toBe(true);
+    expect(check('Tubo largo 2m','Diámetro 50mm','Tubo diámetro 5cm','Largo 2000mm').selected).toBe(true);
+    expect(check('Panel 20 x 30cm','','Panel 200mm x 300mm','').selected).toBe(true);
+    expect(check('Panel 20 x 30cm','','Panel 30 x 20cm','').selected).toBe(false);
+    expect(check('Panel 20 x 20cm','','Panel 200mm x 200mm','').selected).toBe(true);
+    expect(check('Tubo largo 2m','Diámetro 50mm','Tubo largo 2m','').selected).toBe(false);
+    expect(check('Tubo 50mm','','Tubo','').selected).toBe(false);
+  });
+  it('uses budget as a commercial warning without overriding technical conflicts',()=>{
+    const input={requested:{nombre:'Cable HDMI 2m',cantidad:2,unidad:'UN'},product:{nombre_producto:'Cable HDMI 2000mm'},score:85,selectedByUser:true};
+    expect(assessMatch({...input,exceedsBudget:true}).selected).toBe(true);
+    expect(assessMatch({...input,exceedsBudget:true}).reasons).toContain('Advertencia comercial: subtotal supera el presupuesto; revisar bases');
+    expect(assessMatch({...input,exceedsBudget:true,product:{nombre_producto:'Cable HDMI 1m'}}).selected).toBe(false);
+  });
   it('deduplicates known item ids, rejects orphan ids and keeps unknown denominators unknown',()=>{
     expect(suggestionCoverage(['a','a','orphan'],['a','b'])).toEqual({suggested:1,total:2,percentage:50});
     expect(suggestionCoverage(['orphan'],[]).percentage).toBeNull();
