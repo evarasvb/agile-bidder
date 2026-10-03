@@ -15,7 +15,7 @@ export function patchAcademiaRows(input: unknown): unknown {
       ...modulo, lecciones: modulo.lecciones.map(leccion => {
         let changed = false;
         const replace = (v: unknown): unknown => {
-          if (typeof v === 'string' && Object.hasOwn(ACADEMIA_REEMPLAZOS, v)) { changed = true; return ACADEMIA_REEMPLAZOS[v]; }
+          if (typeof v === 'string' && Object.prototype.hasOwnProperty.call(ACADEMIA_REEMPLAZOS, v)) { changed = true; return ACADEMIA_REEMPLAZOS[v]; }
           if (Array.isArray(v)) return v.map(replace);
           if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, val]) => [k, replace(val)]));
           return v;
