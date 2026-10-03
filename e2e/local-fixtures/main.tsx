@@ -8,8 +8,8 @@ import { CalendarBoundary } from '../../src/components/CalendarBoundary';
 import '../../src/index.css';
 
 let shouldCrash = false;
-function Crashable() { if (shouldCrash) throw new Error('isolated simulated render failure'); return <p>Contenido recuperado</p>; }
-function Harness() {
+export function Crashable() { if (shouldCrash) throw new Error('isolated simulated render failure'); return <p>Contenido recuperado</p>; }
+export function Harness() {
   const [failed, setFailed] = useState(true);
   const [crashed, setCrashed] = useState(false);
   return <>

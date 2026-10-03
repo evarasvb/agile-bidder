@@ -1,0 +1,11 @@
+{
+  "name": "firmavb-inventory-rls-fixture",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:rls": "node run_pglite.mjs ./node_modules/@electric-sql/pglite/dist/index.js ./rls-evidence.json"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "0.5.8"
+  }
+}
