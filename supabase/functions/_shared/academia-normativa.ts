@@ -22,4 +22,9 @@ export const ACADEMIA_REEMPLAZOS: Record<string, string> = {
   "Mito \"el Estado paga tarde y mal\": FALSO. El Estado paga en plazos definidos por ley (30 días). Es más predecible que muchos clientes privados.": ACADEMIA_NORMATIVA.pago,
   "10 a 100 UTM: licitación privada o convenio (aquí vive la Compra Ágil, hasta 100 UTM ≈ $6,5 millones).": ACADEMIA_NORMATIVA.licitacion,
   "El Estado paga en 30 días por ley, pero no todos los organismos se comportan igual. Ganar no sirve si te pagan tarde: revisa el comportamiento histórico antes de comprometer capital.": ACADEMIA_NORMATIVA.pago,
+  "Mito 1: «el Estado paga tarde y mal». Realidad: paga en plazos definidos por ley (habitualmente 30 días desde la recepción conforme de la factura) y existe ProntoPago para adelantar el cobro. Es más predecible que muchos clientes privados.": ACADEMIA_NORMATIVA.pago,
+  "Compra Ágil: hasta 100 UTM. Rápida, con 1 o más cotizaciones. Es la puerta de entrada ideal para partir.": ACADEMIA_NORMATIVA.compraAgil,
+  "Licitación Pública: sobre 100 UTM (con tramos LE, LP, LR según monto). Con bases, criterios de evaluación y plazos formales. Aquí se juega la pega grande.": ACADEMIA_NORMATIVA.licitacion,
+  "Plazo legal habitual: 30 días desde la recepción conforme de la factura.": ACADEMIA_NORMATIVA.pago,
+  "Trato Directo: excepcional y fundado (proveedor único, urgencia, montos menores). No cuentes con él para crecer.": "Trato Directo: excepcional; revisa la causal legal y su fundamentación para el proceso. El monto menor por sí solo no identifica una causal.",
 };

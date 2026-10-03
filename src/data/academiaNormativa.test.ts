@@ -43,4 +43,15 @@ describe('Academia: reglas de compra y pago verificadas 2026-10-03', () => {
     expect(result[0].modulos[0].lecciones[0].bloques).toHaveLength(3);
     expect(() => patchAcademiaRows({})).toThrow();
   });
+  it('conserva claves del prototipo y textos desconocidos tras serializar, sin añadir fuentes', () => {
+    const words = ['constructor', 'toString', '__proto__', 'texto sin coincidencia'];
+    const fixture = [{ slug: 'programa-pro-adjudica-al-estado', modulos: [{ titulo: 'M', lecciones: [{ titulo: 'L', bloques: [
+      ...words.map(texto => ({ tipo: 'parrafo', texto })), { tipo: 'lista', items: words },
+    ] }] }] }];
+    const result = JSON.parse(JSON.stringify(patchAcademiaRows(fixture)));
+    expect(result).toEqual(fixture);
+    expect(JSON.parse(JSON.stringify(patchAcademiaRows(result)))).toEqual(fixture);
+    expect(result[0].modulos[0].lecciones[0].bloques).toHaveLength(5);
+  });
+
 });
