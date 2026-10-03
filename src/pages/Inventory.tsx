@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useInventarioPagina, useInventarioResumen, cargarInventarioCompleto, useUpdateInventoryItem, useDeleteInventoryItem, useDeleteInventoryItems, useCreateInventoryItem, InventoryItem, InventoryInput, type InventarioOrdenColumna } from "@/hooks/useInventory";
+import { QueryFeedback } from "@/components/QueryFeedback";
 import { DataTable, type DataTableSort } from "@/components/ui/data-table";
 
 import { useEnriquecerInventario } from "@/hooks/useEnriquecerInventario";
@@ -86,12 +87,12 @@ export default function Inventory() {
     return () => clearTimeout(t);
   }, [searchQuery]);
   // Una página a la vez desde el servidor (antes bajaba todo el catálogo).
-  const { data: pagina, isLoading, refetch } = useInventarioPagina({
+  const { data: pagina, isLoading, error: pageError, isFetching, refetch } = useInventarioPagina({
     page: currentPage, pageSize, q: qServidor, soloIncompletos, orderBy,
   });
   const inventario: InventoryItem[] = pagina?.items ?? [];
   const totalFiltrado = pagina?.total ?? 0;
-  const { data: resumen } = useInventarioResumen();
+  const { data: resumen, error: summaryError, isFetching: summaryFetching, refetch: refetchSummary } = useInventarioResumen();
   const { data: cliente } = useCliente();
   const enriquecer = useEnriquecerInventario();
   const [oportunidadesProducto, setOportunidadesProducto] = useState<InventoryItem | null>(null);
@@ -160,7 +161,7 @@ export default function Inventory() {
 
   const handleRefresh = () => {
     toast.info('Actualizando inventario...');
-    refetch();
+    void Promise.all([refetch(), refetchSummary()]);
   };
 
   const handleEdit = async (data: Partial<InventoryItem> & { id: string }) => {
@@ -315,10 +316,10 @@ export default function Inventory() {
     return <Badge className="bg-success/10 text-success border-0">Activo</Badge>;
   };
 
-  const totalProducts = resumen?.total ?? 0;
-  const activeProducts = resumen?.activos ?? 0;
-  const lowStockProducts = resumen?.stock_bajo ?? 0;
-  const outOfStockProducts = resumen?.sin_stock ?? 0;
+  const totalProducts = resumen?.total ?? "—";
+  const activeProducts = resumen?.activos ?? "—";
+  const lowStockProducts = resumen?.stock_bajo ?? "—";
+  const outOfStockProducts = resumen?.sin_stock ?? "—";
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -389,6 +390,7 @@ export default function Inventory() {
         </div>
       </div>
 
+      {summaryError && <QueryFeedback error={summaryError} retrying={summaryFetching} onRetry={() => void refetchSummary()} label="el resumen del inventario" />}
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="rounded-lg border border-border bg-card p-4">
@@ -442,6 +444,7 @@ export default function Inventory() {
 
       {/* Tabla: orden, página y tamaño se resuelven en el servidor (modo manual
           de la DataTable) porque el inventario puede tener miles de filas. */}
+      <QueryFeedback error={pageError} loading={isLoading} retrying={isFetching} onRetry={handleRefresh} label="el inventario">
       <DataTable<InventoryItem>
         rows={filteredInventory}
         rowKey={(item) => item.id}
@@ -498,7 +501,7 @@ export default function Inventory() {
           </>
         }
         emptyMessage={
-          totalProducts === 0 ? (
+          resumen?.total === 0 && pagina?.total === 0 ? (
             // Inventario realmente vacío: CTA de onboarding.
             <span className="inline-flex flex-col items-center gap-3">
               <Inbox className="h-12 w-12 opacity-50" />
@@ -679,6 +682,7 @@ export default function Inventory() {
           },
         ]}
       />
+      </QueryFeedback>
 
       {/* Buscar fotos (banco) */}
       <BuscarFotosDialog
