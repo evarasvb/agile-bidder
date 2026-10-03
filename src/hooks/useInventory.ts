@@ -12,7 +12,7 @@ async function resolverClienteOwnerId(): Promise<string | null> {
   const { data, error } = await supabase.rpc('cliente_owner_id');
   if (error) {
     console.error('[inventory] cliente_owner_id error:', error);
-    return null;
+    throw error;
   }
   return (data as string) ?? null;
 }
@@ -124,7 +124,7 @@ export function useInventarioPagina(opts: InventarioPaginaOpts) {
       const from = (opts.page - 1) * opts.pageSize;
       let query = supabase
         .from('cliente_inventario')
-        .select('*', { count: 'exact' })
+        .select('id,cliente_id,sku,nombre,descripcion,categoria,palabras_clave,precio_unitario,margen_minimo,stock_disponible,unidad_medida,marca,tiempo_entrega,imagen_url,created_at,updated_at', { count: 'exact' })
         .eq('cliente_id', ownerId);
       if (q) {
         const t = valorIlike(q);
