@@ -1,6 +1,7 @@
 // Matriz de postulación en Excel "de verdad": entradas del usuario, fórmulas de cumplimiento y de puntaje,
 // listas desplegables y formato condicional (rojo/verde/amarillo). Se carga ExcelJS solo al exportar.
 import type { Matriz } from '@/components/experto/MatrizPostulacion';
+import { estadoAdmisibilidad, formulaAdmisibilidad, numeroAdmisibilidad } from '@/lib/admisibilidad';
 
 const NAVY = 'FF1B2540';
 const num = (v: any): number | null => { if (v == null || v === '') return null; const n = Number(String(v).replace(/[^0-9.,-]/g, '').replace(/\.(?=\d{3})/g, '').replace(',', '.')); return Number.isFinite(n) ? n : null; };
@@ -36,26 +37,23 @@ export async function matrizAExcelPro(m: Matriz) {
   cab(ws, 4, ['Requisito', 'Regla de las bases', 'ENTRADA (tu dato)', 'Estado', 'Fuente', 'Nota'], [34, 48, 18, 16, 16, 40]);
   const adm = m.admisibilidad ?? [];
   adm.forEach((r: any, i: number) => {
-    const f = 5 + i; const ch = r.chequeo ?? {}; const tipo = String(ch.tipo ?? (/^(s[ií]|no)$/i.test(String(r.entrada ?? '')) ? 'si_no' : 'texto'));
-    const u = num(ch.umbral), u2 = num(ch.umbral2);
+    const f = 5 + i; const ch = r.chequeo ?? {}; const tipo = String(ch.tipo ?? 'texto');
     // La condición ("solo línea 2", "solo si postula como UTP", etc.) se agrega a la regla en vez de
     // una columna nueva: así no se corren las fórmulas de cumplimiento, que apuntan a columnas fijas.
     const regla = r.condicion && !/^siempre$/i.test(String(r.condicion)) ? `${r.regla ?? ''} (${r.condicion})` : (r.regla ?? '');
-    const row = ws.getRow(f); row.values = [r.requisito ?? '', regla, r.entrada ?? '', '', r.fuente ?? '', r.nota ?? '']; row.alignment = { vertical: 'top', wrapText: true };
+    const dato = ['minimo', 'maximo', 'rango'].includes(tipo) ? numeroAdmisibilidad(r.entrada) ?? r.entrada ?? '' : r.entrada ?? '';
+    const row = ws.getRow(f); row.values = [r.requisito ?? '', regla, dato, '', r.fuente ?? '', r.nota ?? '']; row.alignment = { vertical: 'top', wrapText: true };
     const c = row.getCell(3); entrada(c);
-    let formula: string;
-    if (tipo === 'si_no') { const esp = /^no$/i.test(String(ch.esperado ?? '')) ? 'NO' : 'SÍ'; c.dataValidation = { type: 'list', allowBlank: true, formulae: ['"SÍ,NO"'] }; formula = `IF(C${f}="","PENDIENTE",IF(UPPER(C${f})="${esp}","CUMPLE","NO CUMPLE"))`; }
-    else if (tipo === 'minimo' && u != null) formula = `IF(C${f}="","PENDIENTE",IF(C${f}>=${u},"CUMPLE","NO CUMPLE"))`;
-    else if (tipo === 'maximo' && u != null) formula = `IF(C${f}="","PENDIENTE",IF(C${f}<=${u},"CUMPLE","NO CUMPLE"))`;
-    else if (tipo === 'rango' && u != null && u2 != null) formula = `IF(C${f}="","PENDIENTE",IF(AND(C${f}>=${u},C${f}<=${u2}),"CUMPLE","NO CUMPLE"))`;
-    else formula = `IF(C${f}="","PENDIENTE","CUMPLE")`;
+    if (tipo === 'si_no') c.dataValidation = { type: 'list', allowBlank: true, formulae: ['"SÍ,NO"'] };
     if (tipo !== 'si_no' && tipo !== 'texto') { c.dataValidation = { type: 'decimal', allowBlank: true, formulae: [], showErrorMessage: true, errorTitle: 'Número', error: 'Escribe un número' + (ch.unidad ? ` (${ch.unidad})` : '') }; }
-    row.getCell(4).value = { formula, result: r.entrada ? undefined : 'PENDIENTE' } as any;
+    const estado = estadoAdmisibilidad(r);
+    const labels: Record<string, string> = { cumple: 'CUMPLE', ok: 'CUMPLE', no_cumple: 'NO CUMPLE', no_aplica: 'NO APLICA', solo_si_adjudica: 'SOLO SI ADJUDICA' };
+    row.getCell(4).value = { formula: formulaAdmisibilidad(r, `C${f}`), result: labels[estado] ?? estado.toUpperCase() } as any;
   });
   const fin = 4 + adm.length;
   const res = fin + 2;
   ws.getCell(`A${res}`).value = 'RESULTADO DE ADMISIBILIDAD'; ws.getCell(`A${res}`).font = { bold: true };
-  ws.getCell(`D${res}`).value = { formula: `IF(COUNTIF(D5:D${fin},"NO CUMPLE")>0,"INADMISIBLE",IF(COUNTIF(D5:D${fin},"PENDIENTE")>0,"FALTAN DATOS","ADMISIBLE"))`, result: 'FALTAN DATOS' } as any;
+  ws.getCell(`D${res}`).value = adm.length ? { formula: `IF(COUNTIF(D5:D${fin},"NO CUMPLE")>0,"INADMISIBLE",IF(COUNTIF(D5:D${fin},"CUMPLE")+COUNTIF(D5:D${fin},"NO APLICA")=${adm.length},"ADMISIBLE","FALTAN DATOS"))`, result: 'FALTAN DATOS' } as any : 'FALTAN DATOS';
   ws.getCell(`D${res}`).font = { bold: true };
   semaforo(ws, `D5:D${res}`);
 

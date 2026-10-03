@@ -8,19 +8,10 @@ import { compartirPdfExperto } from '@/services/expertoPdf';
 import { matrizAExcelPro } from '@/services/matrizExcel';
 import { ESTADO_LABEL, colorEstadoRequisito } from '@/lib/estadoRequisito';
 import { downloadSpreadsheetWorkbook, type SpreadsheetSheet } from '@/lib/excelFiles';
+import { actualizarEntradaAdmisibilidad, confirmarEstadoAdmisibilidad, estadoAdmisibilidad } from '@/lib/admisibilidad';
+export { evaluarEntrada } from '@/lib/admisibilidad';
 
 export interface Matriz { titulo?: string; resumen?: string; codigo?: string; generada_en?: string; umbral_adjudicacion?: any; admisibilidad?: any[]; evaluacion?: any[]; anexos?: any[]; reglas_especiales?: any[]; tareas?: any[]; fechas?: any[]; garantias?: any[]; secuencia_carga?: any[]; pendientes_humanos?: any[] }
-// Misma lógica que las fórmulas del Excel: la entrada del usuario define el estado.
-const aNum = (v: any): number | null => { if (v == null || v === '') return null; const n = Number(String(v).replace(/[^0-9.,-]/g, '').replace(/\.(?=\d{3})/g, '').replace(',', '.')); return Number.isFinite(n) ? n : null; };
-export function evaluarEntrada(r: any): string {
-  const e = String(r.entrada ?? '').trim(); if (!e) return 'pendiente';
-  const ch = r.chequeo ?? {}; const tipo = ch.tipo ?? 'texto'; const u = aNum(ch.umbral), u2 = aNum(ch.umbral2), n = aNum(e);
-  if (tipo === 'si_no') { const esp = /^no$/i.test(String(ch.esperado ?? '')) ? 'NO' : 'SÍ'; const v = /^s[ií]$/i.test(e) ? 'SÍ' : /^no$/i.test(e) ? 'NO' : ''; return !v ? 'revisar' : v === esp ? 'cumple' : 'no_cumple'; }
-  if (tipo === 'minimo') return n == null || u == null ? 'revisar' : n >= u ? 'cumple' : 'no_cumple';
-  if (tipo === 'maximo') return n == null || u == null ? 'revisar' : n <= u ? 'cumple' : 'no_cumple';
-  if (tipo === 'rango') return n == null || u == null || u2 == null ? 'revisar' : n >= u && n <= u2 ? 'cumple' : 'no_cumple';
-  return 'cumple';
-}
 type Seccion = { clave: keyof Matriz; titulo: string; cols: [string, string][] };
 const SECCIONES: Seccion[] = [
   { clave: 'admisibilidad', titulo: '1. Admisibilidad (si falla una, quedas fuera)', cols: [['requisito', 'Requisito'], ['regla', 'Regla'], ['condicion', 'Cuándo aplica'], ['entrada', 'Tu dato'], ['estado', 'Estado'], ['nota', 'Nota'], ['fuente', 'Fuente']] },
@@ -36,7 +27,10 @@ const SECCIONES: Seccion[] = [
 export const ESTADOS = ESTADO_LABEL;
 const colorEstado = colorEstadoRequisito;
 // Las listas de texto (pendientes) se muestran como filas de una columna.
-const filas = (m: Matriz, k: keyof Matriz) => (Array.isArray(m[k]) ? (m[k] as any[]).map((r) => (typeof r === 'string' ? { texto: r } : r)) : []);
+const filas = (m: Matriz, k: keyof Matriz) => (Array.isArray(m[k]) ? (m[k] as any[]).map((r) => {
+  const row = typeof r === 'string' ? { texto: r } : r;
+  return k === 'admisibilidad' ? { ...row, estado: estadoAdmisibilidad(row) } : row;
+}) : []);
 const txt = (v: any) => v == null ? '' : typeof v === 'boolean' ? (v ? 'Sí' : 'No') : String(v);
 
 export async function matrizAExcel(m: Matriz) {
@@ -76,7 +70,16 @@ export function matrizAWord(m: Matriz) {
 export function MatrizPostulacion({ m, onChange, empresa, url }: { m: Matriz; onChange?: (m: Matriz) => void; empresa?: string | null; url?: string }) {
   const [filtro, setFiltro] = useState('');
   const editable = !!onChange;
-  const set = (k: keyof Matriz, i: number, campo: string, v: string) => { const f = filas(m, k).map((r, j) => j === i ? (campo === 'entrada' ? { ...r, entrada: v, estado: evaluarEntrada({ ...r, entrada: v }) } : { ...r, [campo]: v }) : r); onChange?.({ ...m, [k]: f }); };
+  const set = (k: keyof Matriz, i: number, campo: string, v: string) => {
+    // El índice visible debe apuntar a la fila original incluso con filtro.
+    const f = (Array.isArray(m[k]) ? m[k] as any[] : []).map((r, j) => {
+      if (j !== i) return r;
+      if (k === 'admisibilidad' && campo === 'entrada') return actualizarEntradaAdmisibilidad(r, v);
+      if (k === 'admisibilidad' && campo === 'estado') return confirmarEstadoAdmisibilidad(r, v);
+      return { ...r, [campo]: v };
+    });
+    onChange?.({ ...m, [k]: f });
+  };
   const pdf = async () => { const r = await compartirPdfExperto({ titulo: m.titulo ?? 'Matriz de postulación', empresa, contenido: matrizAMarkdown(m), url }, `${m.codigo ?? 'licitacion'}-matriz.pdf`); if (r === 'descargado') toast.success('PDF descargado'); };
   const total = filas(m, 'admisibilidad').length, ok = filas(m, 'admisibilidad').filter((r) => r.estado === 'cumple').length;
   return (
@@ -92,21 +95,21 @@ export function MatrizPostulacion({ m, onChange, empresa, url }: { m: Matriz; on
         <input id="matriz-search" type="text" placeholder="Buscar por requisito, criterio o anexo…" value={filtro} onChange={(e) => setFiltro(e.target.value.toLowerCase())} className="flex-1 rounded border px-3 py-1 text-sm focus:ring-2 focus:ring-primary focus:outline-none" />
       </div>
       {m.resumen && <p className="text-muted-foreground">{m.resumen}</p>}
-      {SECCIONES.map((s) => { const f = filas(m, s.clave); const fFiltrado = filtro ? f.filter((r) => s.cols.some((c) => String(r[c[0]] ?? '').toLowerCase().includes(filtro))) : f; if (!f.length) return null; if (filtro && !fFiltrado.length) return null; return (
+      {SECCIONES.map((s) => { const f = filas(m, s.clave); const fFiltrado = f.map((r, indice) => ({ r, indice })).filter(({ r }) => !filtro || s.cols.some((c) => String(r[c[0]] ?? '').toLowerCase().includes(filtro))); if (!f.length) return null; if (filtro && !fFiltrado.length) return null; return (
         <div key={s.clave}>
           <p className="font-semibold mb-2">{s.titulo}</p>
           <div className="overflow-x-auto rounded border">
             <table className="w-full text-sm">
               <thead className="bg-muted/60"><tr>{s.cols.map((c) => <th key={c[0]} scope="col" className="text-left px-3 py-2 font-semibold whitespace-nowrap text-xs">{c[1]}</th>)}</tr></thead>
-              <tbody>{fFiltrado.map((r, i) => (
+              <tbody>{fFiltrado.map(({ r, indice: i }) => (
                 <tr key={i} className="border-t align-top">{s.cols.map((c) => (
                   <td key={c[0]} className="px-3 py-2">
                     {c[0] === 'estado' ? (editable
-                      ? <select value={r.estado ?? 'pendiente'} onChange={(e) => set(s.clave, i, 'estado', e.target.value)} className={`rounded px-1 py-0.5 text-xs ${colorEstado(r.estado)}`}>{Object.entries(ESTADOS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+                      ? <select value={r.estado ?? 'pendiente'} onChange={(e) => set(s.clave, i, 'estado', e.target.value)} title="Confirmación manual para esta entrada" aria-label={`Estado para ${r.requisito ?? r.documento ?? 'requisito'}`} className={`rounded px-1 py-0.5 text-xs ${colorEstado(r.estado)}`}>{r.estado && !ESTADOS[r.estado] && <option value={r.estado}>{r.estado}</option>}{Object.entries(ESTADOS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
                       : <span className={`rounded px-1.5 py-0.5 ${colorEstado(r.estado)}`}>{ESTADOS[r.estado] ?? txt(r.estado)}</span>)
                     : c[0] === 'nota' && editable ? <input value={txt(r.nota)} onChange={(e) => set(s.clave, i, 'nota', e.target.value)} className="w-full min-w-[160px] bg-transparent border-b border-dashed border-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary text-sm" placeholder="anota aquí" aria-label={`Nota para ${r.requisito}`} />
                     : c[0] === 'entrada' ? (editable
-                      ? (r.chequeo?.tipo === 'si_no' || !r.chequeo?.tipo
+                      ? (r.chequeo?.tipo === 'si_no'
                         ? <select value={txt(r.entrada)} onChange={(e) => set(s.clave, i, 'entrada', e.target.value)} className="rounded border bg-yellow-50 px-2 py-1 text-sm" aria-label={`Entrada para ${r.requisito}`}><option value="">—</option><option value="SÍ">SÍ</option><option value="NO">NO</option></select>
                         : <><input value={txt(r.entrada)} onChange={(e) => set(s.clave, i, 'entrada', e.target.value)} className="min-w-[100px] rounded border bg-yellow-50 px-2 py-1 text-sm" placeholder={r.chequeo?.unidad ?? 'valor'} aria-label={`Entrada ${r.chequeo?.unidad ?? 'valor'} para ${r.requisito}`} aria-describedby={r.chequeo?.umbral != null ? `regla-${s.clave}-${i}` : undefined} />{r.chequeo?.umbral != null && <span id={`regla-${s.clave}-${i}`} className="sr-only">Regla de validación: ${r.chequeo.tipo} ${r.chequeo.umbral}${r.chequeo.umbral2 != null ? ' a ' + r.chequeo.umbral2 : ''} ${r.chequeo.unidad ?? ''}</span>}</>)
                       : <span>{txt(r.entrada)}</span>)
