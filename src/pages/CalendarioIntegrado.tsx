@@ -95,7 +95,7 @@ const hoyLocal = () => format(new Date(), "yyyy-MM-dd");
 export default function CalendarioIntegrado() {
   const navigate = useNavigate();
   const calendarRef = useRef<FullCalendar>(null);
-  const { events, isLoading, error, refetch, isFetching, createEvent, deleteEvent } = useCalendarioIntegrado();
+  const { events, isLoading, error, refetch, isFetching, isStale, hasPreviousData, createEvent, deleteEvent } = useCalendarioIntegrado();
   const deletePipelineItem = useDeletePipelineItem();
   const queryClient = useQueryClient();
 
@@ -290,13 +290,14 @@ export default function CalendarioIntegrado() {
         </div>
       </div>
 
+      {/* One query state covers calendar, counters and both event lists. */}
+      <QueryFeedback error={error} loading={isLoading} retrying={isFetching} refreshing={isFetching} stale={isStale} hasPreviousData={hasPreviousData} onRetry={() => void refetch()} label="el calendario">
+      <CalendarBoundary>
       {/* Main layout: Calendar + Sidebar */}
       <div className="flex flex-col lg:flex-row gap-4">
         {/* Calendar */}
         <Card className={cn("flex-1 min-w-0", showSidebar ? "" : "")}>
           <CardContent className="p-4">
-            <QueryFeedback error={error} loading={isLoading} retrying={isFetching} onRetry={() => void refetch()} label="el calendario">
-              <CalendarBoundary>
               <FullCalendar
                 ref={calendarRef}
                 plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
@@ -343,8 +344,6 @@ export default function CalendarioIntegrado() {
                   hour12: false,
                 }}
               />
-              </CalendarBoundary>
-            </QueryFeedback>
           </CardContent>
         </Card>
 
@@ -467,8 +466,11 @@ export default function CalendarioIntegrado() {
         )}
       </div>
 
+      </CalendarBoundary>
+      </QueryFeedback>
+
       {/* ── Event Detail Modal ─────────────────────────────────── */}
-      <Dialog open={!!selectedEvent} onOpenChange={() => setSelectedEvent(null)}>
+      <Dialog open={!!selectedEvent && !error && !isLoading} onOpenChange={() => setSelectedEvent(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="pr-6">Detalle del Evento</DialogTitle>

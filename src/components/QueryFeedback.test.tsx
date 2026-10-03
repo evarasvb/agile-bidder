@@ -15,6 +15,15 @@ describe('query failure presentation', () => {
     expect(html).not.toContain('No hay productos');
     expect(html).not.toContain('private SQL');
   });
+  it('hides cached values and explains refresh failures', () => {
+    const html = render({ error: new Error(), hasPreviousData: true });
+    expect(html).toContain('desactualizados');
+    expect(html).not.toContain('No hay productos');
+  });
+  it('marks previous data during refresh and stale periods', () => {
+    expect(render({ refreshing: true })).toContain('última consulta');
+    expect(render({ stale: true })).toContain('pendientes de actualización');
+  });
   it('distinguishes loading from successful empty results', () => {
     expect(render({ loading: true })).toContain('Cargando');
     expect(render({ loading: true })).not.toContain('No hay productos');

@@ -252,6 +252,8 @@ export function useCalendarioIntegrado() {
     error: eventsQuery.error,
     refetch: eventsQuery.refetch,
     isFetching: eventsQuery.isFetching,
+    isStale: eventsQuery.isStale,
+    hasPreviousData: eventsQuery.data !== undefined,
     createEvent,
     deleteEvent,
   };

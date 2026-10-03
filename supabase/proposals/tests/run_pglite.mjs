@@ -42,12 +42,24 @@ async function phase() {
     assert.deepEqual(read.ids.map(Number),expected,name);
     scenarios[name]={read,writes};
   }
+  const columns='id,cliente_id,sku,nombre,descripcion,categoria,palabras_clave,precio_unitario,margen_minimo,stock_disponible,unidad_medida,marca,tiempo_entrega,imagen_url,created_at,updated_at';
+  const tenant=`cliente_id='${uid(101)}'`;
+  const search="(nombre_producto ilike '%Producto 10%' or sku ilike '%Producto 10%' or proveedor ilike '%Producto 10%')";
+  const incomplete="(descripcion is null or descripcion='' or imagen_url is null or imagen_url='')";
   const queries={
-    page_offset_0:`select id from cliente_inventario where cliente_id='${uid(101)}' order by created_at desc,id limit 100 offset 0`,
-    page_offset_100:`select id from cliente_inventario where cliente_id='${uid(101)}' order by created_at desc,id limit 100 offset 100`,
-    count_exact:`select count(*) from cliente_inventario where cliente_id='${uid(101)}'`,
+    page_offset_0:`select ${columns} from cliente_inventario where ${tenant} order by created_at desc nulls last,id limit 100 offset 0`,
+    page_offset_100:`select ${columns} from cliente_inventario where ${tenant} order by created_at desc nulls last,id limit 100 offset 100`,
+    count_exact:`select count(*) from cliente_inventario where ${tenant}`,
+    page_search:`select ${columns} from cliente_inventario where ${tenant} and ${search} order by nombre_producto asc nulls last,id limit 100 offset 0`,
+    count_search:`select count(*) from cliente_inventario where ${tenant} and ${search}`,
+    page_incomplete:`select ${columns} from cliente_inventario where ${tenant} and ${incomplete} order by created_at desc nulls last,id limit 100 offset 100`,
+    count_incomplete:`select count(*) from cliente_inventario where ${tenant} and ${incomplete}`,
+    page_search_incomplete:`select ${columns} from cliente_inventario where ${tenant} and ${search} and ${incomplete} order by nombre_producto asc nulls last,id limit 100 offset 0`,
+    count_search_incomplete:`select count(*) from cliente_inventario where ${tenant} and ${search} and ${incomplete}`,
     summary:'select public.cliente_inventario_resumen()',
   };
+  const queryResults={};
+  for(const [key,query] of Object.entries(queries)) queryResults[key]=await session(1,query);
   const plans={};
   for(const [key,query] of Object.entries(queries)) {
     plans[key]=[];
@@ -59,7 +71,7 @@ async function phase() {
       plans[key].push({repeat,execution_ms:explain[0]['Execution Time'],planning_ms:explain[0]['Planning Time'],initplans:nodes.filter(n=>n['Subplan Name']?.startsWith('InitPlan')),nodes,explain});
     }
   }
-  return {scenarios,plans};
+  return {scenarios,queryResults,plans};
 }
 try {
   await db.exec(fixture.setup);
@@ -67,6 +79,11 @@ try {
   await db.exec(fixture.proposal);
   const after=await phase();
   assert.deepEqual(after.scenarios,before.scenarios,'Before/after authorization and results');
-  writeFileSync(output,JSON.stringify({engine:'PGlite in-memory PostgreSQL Wasm',fixture:'Partial dependency schema; exact helper bodies, inventory RLS enabled, authenticated/anon NOBYPASSRLS; nine scenarios. Three warm measurements; not production workload.',equivalent:true,before,after},null,2));
+  assert.deepEqual(after.queryResults,before.queryResults,'Before/after page/filter/count');
+  await db.exec(fixture.rollback);
+  const restored=await phase();
+  assert.deepEqual(restored.scenarios,before.scenarios,'Committed rollback authorization and results');
+  assert.deepEqual(restored.queryResults,before.queryResults,'Committed rollback page/filter/count');
+  writeFileSync(output,JSON.stringify({engine:'PGlite in-memory PostgreSQL Wasm',fixture:'Partial dependency schema; exact helper bodies, inventory RLS enabled, authenticated/anon NOBYPASSRLS; nine scenarios. Three warm measurements; not production workload.',equivalent:true,rollbackRestored:true,before,after,restored},null,2));
   console.log(`PASS: nine scenarios, read/write equivalence; ${output}`);
 } finally { await db.close(); }

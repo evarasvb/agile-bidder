@@ -35,7 +35,7 @@ create table users_extended(id uuid primary key, role text);
 create table user_roles(user_id uuid, role text);
 create table clientes(id uuid primary key,user_id uuid,created_at timestamptz default now());
 create table vendedores(user_id uuid,invitado_por uuid,activo boolean,permisos jsonb,updated_at timestamptz);
-create table cliente_inventario(id bigint primary key,cliente_id uuid,created_at timestamptz default now(),categoria text,stock_disponible numeric,precio_unitario numeric,descripcion text,imagen_url text);
+create table cliente_inventario(id bigint primary key,cliente_id uuid,created_at timestamptz default now(),categoria text,stock_disponible numeric,precio_unitario numeric,descripcion text,imagen_url text,sku text,nombre text,palabras_clave text[],margen_minimo numeric,unidad_medida text,marca text,tiempo_entrega integer,updated_at timestamptz default now(),nombre_producto text,proveedor text);
 create index idx_cliente_inventario_cliente_created on cliente_inventario(cliente_id,created_at desc);
 alter table cliente_inventario enable row level security;
 grant usage on schema public,auth to authenticated,anon;
@@ -58,13 +58,13 @@ for n,permissions in [(2,'["inventario"]'),(3,'["cobranza"]'),(4,'null')]:
 for n,role in [(5,'admin'),(6,'super_admin')]:
     setup+=f"insert into user_roles values('{uid(n)}','{role}');"
 setup+=f"insert into users_extended values('{uid(7)}','super_admin');"
-setup+=f"insert into cliente_inventario select n,'{uid(101)}',now(),'A',1,2,'desc','image' from generate_series(1,16359) n;"
+setup+=f"insert into cliente_inventario(id,cliente_id,created_at,categoria,stock_disponible,precio_unitario,descripcion,imagen_url) select n,'{uid(101)}',now(),'A',1,2,'desc','image' from generate_series(1,16359) n;"
 for n in range(1,9):
-    setup+=f"insert into cliente_inventario values({20000+n},'{uid(100+n)}',now(),'own',1,2,'desc','image'),({30000+n},'{uid(n)}',now(),'legacy',1,2,'desc','image');"
-setup+='analyze cliente_inventario;'
+    setup+=f"insert into cliente_inventario(id,cliente_id,created_at,categoria,stock_disponible,precio_unitario,descripcion,imagen_url) values({20000+n},'{uid(100+n)}',now(),'own',1,2,'desc','image'),({30000+n},'{uid(n)}',now(),'legacy',1,2,'desc','image');"
+setup+="update cliente_inventario set sku='SKU-'||id,nombre='Producto '||id,nombre_producto='Producto '||id,proveedor='Proveedor '||(id%3),palabras_clave=array['producto'],margen_minimo=10,unidad_medida='unidad',marca='fixture',tiempo_entrega=3; update cliente_inventario set descripcion=null where id%7=0; update cliente_inventario set imagen_url='' where id%11=0; analyze cliente_inventario;"
 scenarios={'owner':1,'member_operational':2,'member_cobranza':3,'member_null':4,'admin':5,'superadmin_role':6,'superadmin_extended':7,'other_owner':8,'anon':None}
 if args.emit_fixture:
-    print(json.dumps({'setup':setup,'proposal':(root/'proposals'/'inventario_initplan.sql').read_text(),'scenarios':scenarios}))
+    print(json.dumps({'setup':setup,'proposal':(root/'proposals'/'inventario_initplan.sql').read_text(),'rollback':(root/'proposals'/'inventario_initplan_rollback.sql').read_text(),'scenarios':scenarios}))
     raise SystemExit(0)
 sql(setup)
 def session(n):
