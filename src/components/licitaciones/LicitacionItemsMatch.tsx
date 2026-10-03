@@ -1,3 +1,5 @@
+import { assessMatch, requestedQuantity, knownUnit } from '@/lib/matchingContract';
+import { MatchAssessmentSummary, MatchEvidenceNotice } from '@/components/MatchEvidence';
 import { useMemo } from "react";
 import { Package, TrendingUp, CheckCircle, Repeat2, Ban, PackageSearch } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,8 +42,8 @@ export function LicitacionItemsMatch({ codigo, items }: Props) {
       id: String(it.id ?? `idx-${idx}`),
       nombre: it.nombre_producto || it.nombre || "",
       descripcion: it.descripcion || "",
-      cantidad: it.cantidad ?? 1,
-      unidad: it.unidad || "unidad",
+      cantidad: it.cantidad,
+      unidad: it.unidad,
     }));
   }, [items]);
   const { itemsConMatch, isLoading: invLoading } = useLicitacionItemsConMatch(codigo, mapped);
@@ -73,6 +75,7 @@ export function LicitacionItemsMatch({ codigo, items }: Props) {
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
+        <MatchEvidenceNotice />
         {invLoading ? (
           <div className="space-y-2">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 w-full" />)}</div>
         ) : itemsConMatch.length === 0 ? (
@@ -83,12 +86,13 @@ export function LicitacionItemsMatch({ codigo, items }: Props) {
         ) : (
           itemsConMatch.map((item: any) => {
             const { estado, match } = resolver(item);
+            const assessment = assessMatch({requested:item, product:match?.inventoryItem, score:estado === 'reasignado' ? null : match?.score, selectedByUser:estado === 'confirmado' || estado === 'reasignado', discarded:estado === 'descartado'});
             const descartado = estado === "descartado";
             const tone =
               descartado ? "border-dashed border-border bg-muted/30 opacity-70"
               : estado === "reasignado" ? "border-firmavb-blue/40 bg-firmavb-blue/5"
               : estado === "confirmado" ? "border-green-300 bg-green-50/70"
-              : match ? "border-green-200 bg-green-50/40"
+              : assessment.selected ? "border-green-200 bg-green-50/40"
               : "border-amber-200 bg-amber-50/40";
             return (
               <div key={item.id} className={`border rounded-xl p-4 transition-colors ${tone}`}>
@@ -99,8 +103,8 @@ export function LicitacionItemsMatch({ codigo, items }: Props) {
                     <p className={`font-medium text-sm mt-0.5 ${descartado ? "line-through" : ""}`}>{item.nombre}</p>
                     {item.descripcion && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{item.descripcion}</p>}
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-muted-foreground">
-                      {item.cantidad != null && <span>Cantidad: {item.cantidad}</span>}
-                      {item.unidad && <span>Unidad: {item.unidad}</span>}
+                      <span>Cantidad: {requestedQuantity(item.cantidad) ?? 'Por confirmar'}</span>
+                      <span>Unidad: {knownUnit(item.unidad) ? item.unidad : 'Por confirmar'}</span>
                     </div>
                   </div>
 
@@ -109,7 +113,7 @@ export function LicitacionItemsMatch({ codigo, items }: Props) {
                     <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
                       {match ? (
                         <Badge className={`text-xs ${badgeColor(match.score)}`}>
-                          <TrendingUp className="h-3 w-3 mr-1" />{Math.round(match.score)}% match
+                          <TrendingUp className="h-3 w-3 mr-1" />{estado === 'reasignado' ? 'Selección manual' : `Similitud ${match.score}/100`}
                         </Badge>
                       ) : !descartado ? (
                         <Badge variant="outline" className="text-xs text-amber-700 border-amber-300">Sin match — corrige →</Badge>
@@ -118,6 +122,7 @@ export function LicitacionItemsMatch({ codigo, items }: Props) {
                       {estado === "reasignado" && <Badge variant="outline" className="text-xs text-firmavb-blue border-firmavb-blue/40"><Repeat2 className="h-3 w-3 mr-1" />Elegido por ti</Badge>}
                       {descartado && <Badge variant="outline" className="text-xs text-muted-foreground"><Ban className="h-3 w-3 mr-1" />Descartado</Badge>}
                     </div>
+                    {!descartado && <MatchAssessmentSummary assessment={assessment} />}
                     {!descartado && match && (
                       <div className="p-2.5 bg-background rounded-lg border border-border/70">
                         <div className="flex items-center justify-between gap-2">

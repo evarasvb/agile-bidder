@@ -1,0 +1,8 @@
+import { matchingRegressionMatrix } from '../../src/lib/matchingFixtures';
+const name = new URLSearchParams(window.location.search).get('case') || '744835-601-COT26';
+export const row = matchingRegressionMatrix().find(r=>r.process===name && r.profile===('3537-61-L126'===name ? 'papeleria' : 'fixture-CA-05'===name ? 'ti':'papeleria'))!;
+if(new URLSearchParams(location.search).has('descriptionConflict')) row.inputs[0]={requested:{nombre:'Cinta adhesiva 50mm',descripcion:'Cinta adhesiva 50mm',cantidad:2,unidad:'UN'},product:{nombre_producto:'Cinta adhesiva',descripcion:'Ancho 33mm'},score:100};
+export const inventory = row.inputs.map((input,i)=>({id:`product-${i}`,sku:`FIXTURE-${i}`,nombre_producto:input.product?.nombre_producto||'',descripcion:input.product?.descripcion??null,precio_unitario:100,stock_disponible:100,cliente_id:'fixture-owner'}));
+export const items = row.inputs.map((input,i)=>({id:`item-${i}`,nombre_producto:input.requested.nombre,descripcion_producto:input.requested.descripcion,descripcion:input.requested.descripcion,cantidad:input.requested.cantidad,unidad:input.requested.unidad}));
+export const matches = row.inputs.flatMap((input,i)=>input.product ? [{item_id:`item-${i}`,inventario_id:`product-${i}`,nombre_producto:input.product.nombre_producto,sku:`FIXTURE-${i}`,precio_unitario:100,score:input.score}]:[]);
+export const purchase = {id:'fixture-purchase',codigo:row.process,nombre:row.process,items,descripcion:row.inputs[0].requested.descripcion,monto:100000,moneda:'CLP',fecha_cierre:'2026-11-01T12:00:00Z',estado:'Publicada',nombre_organismo:'Organismo ficticio'};

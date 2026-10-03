@@ -1,0 +1,54 @@
+import {chromium} from '@playwright/test';
+import assert from 'node:assert/strict';
+const browser = await chromium.launch({executablePath:process.env.PW_CHROMIUM});
+const page = await browser.newPage({viewport:{width:1300,height:1000}});
+page.setDefaultTimeout(15000);
+const errors=[], external=[], localRequests=[];
+page.on('response',r=>{if(r.status()>=400) console.log('HTTP ERROR',r.status(),r.url());});
+page.on('pageerror',e=>{errors.push(e.message);console.log('PAGE ERROR',e.message);});
+await page.route('**/*',route=>{
+ const url=new URL(route.request().url());
+ if(url.hostname!=='127.0.0.1'){external.push(url.origin);return route.abort();}
+ if(url.pathname.startsWith('/test-supabase')){localRequests.push(url.pathname);return route.fulfill({json:[]});}
+ return route.continue();
+});
+try {
+ await page.goto('http://127.0.0.1:5188/e2e/matching-fixtures/index.html');
+ await page.getByRole('heading',{name:'Sugerencias, producto por producto'}).waitFor();
+ await page.getByText('0 de 1 seleccionados').waitFor();
+ assert.equal(await page.getByText('Similitud 45.5/100',{exact:true}).count()>0,true);
+ assert.equal(await page.getByText('Especificaciones pendientes: leer el documento adjunto',{exact:true}).count()>0,true);
+ await page.screenshot({path:'../evidence/matching-ca.png',fullPage:true});
+ await page.goto('http://127.0.0.1:5188/e2e/matching-fixtures/index.html?case=3537-61-L126');
+ await page.getByText('Productos Solicitados (3)').waitFor();
+ assert.equal(await page.getByText('Compatibilidad: incompatible o ambigua',{exact:true}).count(),2);
+ await page.screenshot({path:'../evidence/matching-lic.png',fullPage:true});
+ await page.goto('http://127.0.0.1:5188/e2e/matching-fixtures/index.html?case=fixture-CA-05&proposal=1');
+ const dialog=page.getByRole('dialog');await dialog.waitFor();
+ assert.equal(await dialog.getByText(/cantidad por confirmar/).count()>0,true);
+ assert.equal(await dialog.getByRole('checkbox').first().isChecked(),false);
+ assert.equal(await dialog.getByRole('checkbox').first().isDisabled(),true);
+ await dialog.getByText('0 items seleccionados').waitFor();
+ await page.screenshot({path:'../evidence/matching-proposal-invalid.png',fullPage:true});
+ await dialog.getByRole('spinbutton',{name:'Cantidad ofertada de Teclado USB'}).fill('2');
+ await dialog.getByRole('textbox',{name:'Unidad ofertada de Teclado USB'}).pressSequentially('UN');
+ assert.equal(await dialog.getByRole('checkbox').first().isDisabled(),false);
+ await dialog.getByRole('checkbox').first().click();
+ await dialog.getByText('1 items seleccionados').waitFor();
+ await page.goto('http://127.0.0.1:5188/e2e/matching-fixtures/index.html?case=fixture-CA-03&proposal=1&descriptionConflict=1&confirmed=1');
+ await page.getByRole('dialog').waitFor();
+ await page.getByRole('dialog').getByText('Compatibilidad: incompatible o ambigua').waitFor();
+ assert.equal(await page.getByRole('dialog').getByRole('checkbox').first().isDisabled(),true);
+ assert.equal(await page.getByRole('dialog').getByRole('checkbox').first().isChecked(),false);
+ await page.goto('http://127.0.0.1:5188/e2e/matching-fixtures/index.html?case=fixture-CA-03&proposal=1');
+ await page.getByRole('dialog').waitFor();
+ const checkbox=page.getByRole('dialog').getByRole('checkbox').first();
+ assert.equal(await checkbox.isChecked(),false);
+ await checkbox.click();
+ await page.getByRole('dialog').getByText('1 items seleccionados').waitFor();
+ await checkbox.click();
+ await page.getByRole('dialog').getByText('0 items seleccionados').waitFor();
+ assert.deepEqual(errors,[]);
+ assert.ok(!localRequests.some(path=>path.includes('/functions/')), 'no IA invocation');
+ console.log('PASS real CA detail, lic items and proposal components: weak/unread annex, persisted dimensional/mass conflict, invalid000quantity/unit, explicit selection→deselection affects totals; simulated hooks/identity/auxiliary panels, all external traffic blocked.');
+} finally {await browser.close();}

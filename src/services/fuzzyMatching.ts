@@ -161,7 +161,7 @@ function extractKeywords(text: string): string[] {
  * Retorna penalty score (0 = compatible, <0 = incompatible para rechazar)
  * CRÍTICO: Extrae TODAS las dimensiones, no solo la primera
  */
-function validateSpecifications(itemRequerido: ItemRequerido, producto: InventoryItem): number {
+export function validateSpecifications(itemRequerido: ItemRequerido, producto: Pick<InventoryItem, 'nombre_producto' | 'descripcion'>): number {
   // Extraer dimensiones ANTES de normalizar (porque normalizeText reemplaza puntos por espacios)
   // Soporta: 15.8, 15,8 (decimal comma), excluye mass units (mg/g/kg no matched)
 
@@ -198,64 +198,34 @@ function validateSpecifications(itemRequerido: ItemRequerido, producto: Inventor
     }
   }
 
+  // Mass is independent of dimensions: 40g does not satisfy an 8g product.
+  const massPattern = /(\d+(?:[.,]\d+)?)\s*(kg|mg|g|gramos|gramo)(?!\w)/gi;
+  const masses = (text: string) => Array.from(text.matchAll(massPattern), m => Number(m[1].replace(',', '.')) * (m[2].toLowerCase() === 'kg' ? 1000 : m[2].toLowerCase() === 'mg' ? 0.001 : 1));
+  // Merge duplicated title/description measurements without losing a distinct one.
+  const mergeValues = (title: number[], description: number[]) => {
+    const counts = (values: number[]) => values.reduce((m, v) => m.set(v, (m.get(v) || 0) + 1), new Map<number, number>());
+    const titles = counts(title), descriptions = counts(description);
+    return [...new Set([...titles.keys(), ...descriptions.keys()])].sort((a,b)=>a-b).flatMap(v => Array(Math.max(titles.get(v) || 0, descriptions.get(v) || 0)).fill(v) as number[]);
+  };
+  const requestedMass = mergeValues(masses(itemRequerido.nombre), masses(itemRequerido.descripcion || ''));
+  const productMass = mergeValues(masses(producto.nombre_producto), masses(producto.descripcion || ''));
+  if (requestedMass.length && productMass.length && (requestedMass.length !== productMass.length || requestedMass.some((m, i) => Math.abs(m - productMass[i]) >= 1e-10))) return -35;
+
   // Validar especificaciones de unidad/dimensión si las hay
   // CRÍTICO: Solo acepta equivalencia matemática exacta (epsilon), no reglas de negocio
   // Ej: 2m = 2000mm (exacto), 2.0m = 2000.00mm (epsilon ~1e-10)
   // Ej: 15.8cm ≠ 5.5" (139.7mm) → REVISAR, no validado
 
   // CRÍTICO: Extraer TODAS las dimensiones (no solo la primera)
-  const dimensionPatternGlobal = /(\d+(?:[.,]\d+)?)\s*(cm|mm|metros|metro|m|pulgadas|pulgada|pulg|"|inch)(?!\w)/g;
-  const reqDims = Array.from(reqFullText.matchAll(dimensionPatternGlobal));
-  const prodDims = Array.from(prodFullText.matchAll(dimensionPatternGlobal));
-
-  if (reqDims.length > 0 && prodDims.length > 0) {
-    // Si hay diferente cantidad de dimensiones → ambiguo, penalizar
-    if (reqDims.length !== prodDims.length) {
-      return -35; // Multidimensional mismatch: diferente cantidad
-    }
-
-    // Normalizar a mm (conversión real)
-    const toMm = (val: number, unit: string): number => {
-      const u = unit.toLowerCase();
-      // Metros: 1m = 1000mm
-      if (u === 'm' || u.includes('metro')) return val * 1000;
-      // Centímetros: 1cm = 10mm
-      if (u.includes('cm')) return val * 10;
-      // Pulgadas: 1" = 25.4mm
-      if (u.includes('"') || u.includes('pulg') || u.includes('inch')) return val * 25.4;
-      // Si no se reconoce, asumir mm
-      return val;
-    };
-
-    // Comparar TODAS las dimensiones
-    let allMatch = true;
-    for (let i = 0; i < reqDims.length; i++) {
-      const reqVal = parseFloat(reqDims[i][1].replace(',', '.'));
-      const reqUnit = reqDims[i][2].toLowerCase();
-      const prodVal = parseFloat(prodDims[i][1].replace(',', '.'));
-      const prodUnit = prodDims[i][2].toLowerCase();
-
-      const reqMm = toMm(reqVal, reqUnit);
-      const prodMm = toMm(prodVal, prodUnit);
-
-      // Usar epsilon para equivalencia matemática
-      const epsilon = 1e-10;
-      const diff = Math.abs(reqMm - prodMm);
-
-      if (diff >= epsilon) {
-        allMatch = false;
-        break;
-      }
-    }
-
-    if (allMatch) {
-      return 0; // Todas las dimensiones coinciden exactamente
-    }
-
-    // Si alguna dimensión difiere → REVISAR (score <60)
-    // Penalidad -35 asegura: score 85 → 50 (<60), score 75 → 40 (<60)
-    return -35; // Penalidad dimensional: garantiza REVISAR
-  }
+  const dimensionPatternGlobal = /(\d+(?:[.,]\d+)?)\s*(cm|mm|metros|metro|m|pulgadas|pulgada|pulg|"|inch)(?!\w)/gi;
+  const dimensions = (text: string) => Array.from(text.matchAll(dimensionPatternGlobal), m => {
+    const value = Number(m[1].replace(',', '.'));
+    const unit = m[2].toLowerCase();
+    return value * (unit === 'm' || unit.includes('metro') ? 1000 : unit === 'cm' ? 10 : unit.includes('pulg') || unit === '"' || unit === 'inch' ? 25.4 : 1);
+  });
+  const reqDims = mergeValues(dimensions(itemRequerido.nombre), dimensions(itemRequerido.descripcion || ''));
+  const prodDims = mergeValues(dimensions(producto.nombre_producto), dimensions(producto.descripcion || ''));
+  if (reqDims.length && prodDims.length && (reqDims.length !== prodDims.length || reqDims.some((v,i)=>Math.abs(v-prodDims[i]) >= 1e-10))) return -35;
 
   return 0; // Compatible
 }

@@ -60,7 +60,7 @@ export function LicitacionesConMatch() {
               Oportunidades con Match
             </CardTitle>
             <CardDescription>
-              Licitaciones que coinciden con tu inventario - listas para ofertar
+              Licitaciones con sugerencias de inventario; revisa especificaciones, bases y anexos antes de ofertar
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">

@@ -296,7 +296,7 @@ export default function LicitacionDetalle() {
               {licitacion.match_score !== null && licitacion.match_score > 0 && (
                 <Badge className="bg-firmavb-blue/10 text-firmavb-blue border-firmavb-blue/30">
                   <Target className="h-3 w-3 mr-1" />
-                  {licitacion.match_score.toFixed(0)}% Match
+                  Score de referencia {licitacion.match_score}/100
                 </Badge>
               )}
             </div>

@@ -100,14 +100,14 @@ export function OpportunityCard({ licitacion, onGenerarOferta }: OpportunityCard
           
           {/* Win Score */}
           <div className="flex items-center gap-2">
-            <span className="text-white/70 text-xs">Win %</span>
+            <span className="text-white/70 text-xs">Score de referencia</span>
             <div className={cn(
               "font-mono font-bold text-2xl px-3 py-1 rounded",
               winScore >= 80 ? "bg-risk-low text-white" :
               winScore >= 60 ? "bg-risk-medium text-white" :
               "bg-risk-high text-white"
             )}>
-              {winScore}%
+              {winScore}/100
             </div>
           </div>
         </div>

@@ -12,7 +12,8 @@ import type { CompraAgil } from "@/hooks/useComprasAgiles";
 import { useUpdateCompraAgil } from "@/hooks/useComprasAgiles";
 import { formatCurrency } from "@/utils/clasificacion";
 import { unidadLabel } from "@/utils/unidades";
-import { estadoMatch } from "@/services/fuzzyMatching";
+import { assessMatch, requestedQuantity, knownUnit } from "@/lib/matchingContract";
+import { MatchAssessmentSummary, MatchEvidenceNotice } from "@/components/MatchEvidence";
 import { PrecioMercadoHint } from "./PrecioMercadoHint";
 import { MarketPickerDialog, type MarketSeleccion } from "./MarketPickerDialog";
 import { useMarketSolicitar } from "@/hooks/useMarketEstado";
@@ -32,6 +33,8 @@ import { useCreatePipelineItem } from "@/hooks/usePipeline";
 import { supabase } from "@/integrations/supabase/client";
 
 interface ItemParaPropuesta {
+  confirmedSelection?: boolean;
+  esManual?: boolean;
   itemId: string;
   itemIndex: number;
   nombre: string;
@@ -42,6 +45,7 @@ interface ItemParaPropuesta {
     id: string;
     sku: string;
     nombre: string;
+    descripcion?: string | null;
     precio_unitario: number;
     stock: number | null;
     matchScore: number;
@@ -64,10 +68,12 @@ interface ItemSeleccionado {
   unidadMedida: string;
   cantidad: number;
   selected: boolean;
+  manualOffer?: boolean;
   match?: {
     id: string;
     sku: string;
     nombre: string;
+    descripcion?: string | null;
     precio_unitario: number;
     stock?: number;
     matchScore: number;
@@ -177,15 +183,17 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
       
       return {
         itemId: producto.itemId,
+        esManual: producto.esManual,
         nombre: producto.nombre,
         descripcion: producto.descripcion,
         cantidadSolicitada: producto.cantidadSolicitada,
         unidadMedida: producto.unidadMedida,
-        cantidad: producto.cantidadSolicitada,
+        cantidad: requestedQuantity(producto.cantidadSolicitada) ?? 0,
         match: producto.match ? {
           id: producto.match.id,
           sku: producto.match.sku,
           nombre: producto.match.nombre,
+          descripcion: producto.match.descripcion,
           precio_unitario: producto.match.precio_unitario,
           stock: producto.match.stock || undefined,
           matchScore: producto.match.matchScore,
@@ -193,7 +201,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
         } : undefined,
         precioUnitario: precioConRecargo,
         margen: margen,
-        selected: producto.match !== null && (producto.match.matchScore >= 50 || precioBase > 0)
+        selected: !!producto.confirmedSelection && assessMatch({requested:{nombre:producto.nombre, descripcion:producto.descripcion, cantidad:producto.cantidadSolicitada, unidad:producto.unidadMedida},product:producto.match ? {nombre_producto:producto.match.nombre, descripcion:producto.match.descripcion} : null, score:producto.match?.matchScore, selectedByUser:producto.confirmedSelection}).selected
       };
     })
   );
@@ -202,8 +210,8 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
     setItemsSeleccionados(prev =>
       prev.map(item => {
         if (item.itemId === itemId) {
-          const nuevaCantidad = Math.max(1, Math.min(cantidad, item.cantidadSolicitada * 2));
-          return { ...item, cantidad: nuevaCantidad };
+          const nuevaCantidad = requestedQuantity(cantidad) === null ? 0 : Math.min(cantidad, (!item.esManual && requestedQuantity(item.cantidadSolicitada) !== null) ? item.cantidadSolicitada * 2 : Infinity);
+          return { ...item, cantidad: nuevaCantidad, selected:item.selected && nuevaCantidad > 0 };
         }
         return item;
       })
@@ -254,14 +262,24 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
     );
   };
 
+  const assessmentFor = (item: ItemSeleccionado, selecting = item.selected) => assessMatch({
+    requested: {nombre:item.nombre, descripcion:item.descripcion, cantidad:item.cantidad, unidad:item.unidadMedida},
+    product:item.match ? {nombre_producto:item.match.nombre, descripcion:item.match.descripcion} : item.manualOffer ? {nombre_producto:item.nombre} : null,
+    score:item.esManual || item.market || item.manualOffer ? null : item.match?.matchScore,
+    selectedByUser:selecting,
+  });
   const handleToggleItem = (itemId: string) => {
     setItemsSeleccionados(prev =>
       prev.map(item => 
-        item.itemId === itemId ? { ...item, selected: !item.selected } : item
+        item.itemId === itemId ? { ...item, selected: !item.selected && assessmentFor(item, true).selected } : item
       )
     );
   };
 
+  const handleManualOffer = (itemId: string) => {
+    setItemsSeleccionados(prev => prev.map(item => item.itemId === itemId
+      ? {...item, manualOffer:true, selected:assessmentFor({...item,manualOffer:true},true).selected} : item));
+  };
   const handleCambiarProducto = (itemId: string, nuevoProducto: any) => {
     const precioConRecargo = calcularPrecioConRecargo(nuevoProducto.precio_unitario || 0);
     const margen = nuevoProducto.precio_unitario > 0 
@@ -277,6 +295,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
               id: nuevoProducto.id,
               sku: nuevoProducto.sku,
               nombre: nuevoProducto.nombre_producto || nuevoProducto.nombre,
+              descripcion: nuevoProducto.descripcion,
               precio_unitario: nuevoProducto.precio_unitario,
               stock: nuevoProducto.stock_disponible || nuevoProducto.stock,
               matchScore: 100, // Manual selection
@@ -314,8 +333,8 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
     setItemsSeleccionados(prev => prev.filter(item => item.itemId !== itemId));
   };
 
-  const itemsActivos = itemsSeleccionados.filter(item => item.precioUnitario > 0);
-  const { subtotal: subtotalItems, iva, total: montoTotal } = calcularDesgloseOferta(itemsSeleccionados);
+  const itemsActivos = itemsSeleccionados.filter(item => item.selected && item.precioUnitario > 0 && assessmentFor(item).selected);
+  const { subtotal: subtotalItems, iva, total: montoTotal } = calcularDesgloseOferta(itemsActivos);
   
   // Función para obtener badge de buen pagador
   const getBuenPagadorBadge = (buenPagador: boolean | null) => {
@@ -544,12 +563,12 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
             precio_total: (item.precioUnitario || 0) * item.cantidad,
             match_score: item.match?.matchScore ?? 0,
           }));
-          const conMatch = productos_ofertados.filter((p) => p.sku).length;
+
           const ofertaData = {
             cliente_id: cliente.id,
             licitacion_id: compra.codigo,
             estado: 'pendiente',
-            match_score: itemsActivos.length ? Math.round((conMatch / itemsActivos.length) * 100) : 0,
+            match_score: compra.match_score ?? 0,
             productos_ofertados,
             valor_total: subtotalItems,
             notas: 'Propuesta preparada manualmente en firmavb.',
@@ -756,7 +775,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                     }`}
                   >
                     <div className="flex items-center gap-2 sm:block">
-                      <Checkbox checked={item.selected} onCheckedChange={() => handleToggleItem(item.itemId)} className="mt-0.5" />
+                      <Checkbox disabled={!item.selected && !assessmentFor(item, true).selected} checked={item.selected} onCheckedChange={() => handleToggleItem(item.itemId)} className="mt-0.5" />
                       <span className="sm:hidden text-xs text-muted-foreground">{item.selected ? 'Incluido' : 'No incluido'}</span>
                     </div>
 
@@ -770,7 +789,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                         className="h-7 text-sm font-medium px-1.5 -ml-1.5 border-transparent bg-transparent hover:border-input focus-visible:border-input focus-visible:bg-background"
                       />
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Piden {item.cantidadSolicitada} {unidadLabel(item.unidadMedida)}
+                        Piden {requestedQuantity(item.cantidadSolicitada) ?? 'cantidad por confirmar'} {knownUnit(item.unidadMedida) ? unidadLabel(item.unidadMedida) : '(unidad por confirmar)'}
                         {categoria ? ` · ${categoria}` : ''}
                       </p>
                       {item.esManual && (
@@ -794,9 +813,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                             />
                           </div>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <Badge variant={estadoMatch(item.match.matchScore, true) === 'listo' ? 'success' : 'warning'} className="text-[10px] px-1.5 py-0" title={`${item.match.matchScore}% de coincidencia`}>
-                              {estadoMatch(item.match.matchScore, true) === 'listo' ? 'Listo' : 'Revisar'}
-                            </Badge>
+                            <MatchAssessmentSummary assessment={assessmentFor(item)} />
                             {selector}
                             <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setMarketPara(item.itemId)} title="Buscar este producto en el Market del Estado">
                               <Store className="h-3 w-3 mr-1" /> Market
@@ -816,7 +833,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                             <Store className="h-3 w-3 mr-1" /> Market
                           </Button>
                           {!item.selected && (
-                            <Button variant="secondary" size="sm" className="h-7 px-2 text-xs" onClick={() => handleToggleItem(item.itemId)} title="Ofrecer este ítem con tu propio precio">
+                            <Button variant="secondary" size="sm" className="h-7 px-2 text-xs" onClick={() => handleManualOffer(item.itemId)} title="Ofrecer este ítem con tu propio precio">
                               <Plus className="h-3 w-3 mr-1" />Ofertar manual
                             </Button>
                           )}
@@ -826,15 +843,15 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
 
                     <div>
                       <Label className="sm:hidden text-xs">Cantidad</Label>
+                      <Input aria-label={`Unidad ofertada de ${item.nombre}`} placeholder="Confirma unidad" value={item.unidadMedida === '000' ? '' : item.unidadMedida || ''} onChange={e => setItemsSeleccionados(prev => prev.map(i => i.itemId === item.itemId ? {...i,unidadMedida:e.target.value,selected:i.selected && knownUnit(e.target.value)} : i))} />
                       <Input
                         type="number"
                         min={1}
-                        max={item.cantidadSolicitada * 2}
-                        value={item.cantidad}
-                        onChange={(e) => handleCantidadChange(item.itemId, parseInt(e.target.value) || 1)}
-                        disabled={!item.selected}
+                        max={item.esManual || requestedQuantity(item.cantidadSolicitada) === null ? undefined : item.cantidadSolicitada * 2}
+                        value={item.cantidad || ''}
+                        aria-label={`Cantidad ofertada de ${item.nombre}`}
+                        onChange={(e) => handleCantidadChange(item.itemId, Number(e.target.value))}
                         className="h-8 text-sm text-right"
-                        aria-label="Cantidad a ofertar"
                       />
                     </div>
 
@@ -933,6 +950,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <MatchEvidenceNotice />
             {itemsSeleccionados.some((i) => i.selected && i.market) && (
               <Button
                 variant="secondary"

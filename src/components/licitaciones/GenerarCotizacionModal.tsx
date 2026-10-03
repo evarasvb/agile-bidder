@@ -492,7 +492,7 @@ export function GenerarCotizacionModal({
                       </Badge>
                       {licitacion.match_score && (
                         <Badge className="bg-primary">
-                          Match {licitacion.match_score}%
+                          Score de referencia {licitacion.match_score}/100 · bases sin validar
                         </Badge>
                       )}
                     </div>

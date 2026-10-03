@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { similarityScore, suggestionCoverage, SUGGESTION_FLOOR } from '@/lib/matchingContract';
 import { useQuery } from '@tanstack/react-query';
 import { supabaseClient as supabase } from '@/lib/supabaseClient';
 
@@ -32,7 +33,7 @@ export interface CompraAgilMatch {
 // =============================================================================
 
 // Piso de match: mismo umbral que el panel de oportunidades (src/hooks/useOportunidadesPanel.ts).
-const PISO_MATCH = 40;
+const PISO_MATCH = SUGGESTION_FLOOR;
 
 /**
  * Match entre compras ágiles y el inventario del cliente.
@@ -90,9 +91,7 @@ export function useComprasAgilesMatch(clienteId: string | null) {
         const c: any = byCodigo.get(cod) || {};
         const organismo = c.nombre_organismo ?? null;
         const itemsCount = c.compras_agiles_items?.length || 0;
-        // % de match = COBERTURA (productos que calzan / productos pedidos),
-        // no el mejor score individual: 5 de 10 productos calzados es 50%.
-        const matchScore = itemsCount > 0 ? Math.round((g.items.size / itemsCount) * 100) : Math.round(g.best);
+        const coverage = suggestionCoverage(g.items, (c.compras_agiles_items || []).map((it: {id: string}) => String(it.id)));
         return {
           id: c.id ?? cod,
           codigo: cod,
@@ -108,9 +107,9 @@ export function useComprasAgilesMatch(clienteId: string | null) {
           fecha_cierre: c.fecha_cierre ?? null,
           descripcion: c.descripcion ?? null,
           match_encontrado: true,
-          match_score: matchScore,
+          match_score: similarityScore(g.best) ?? 0,
           items_count: itemsCount,
-          matched_items: g.items.size,
+          matched_items: coverage.suggested,
           matched_product_ids: Array.from(g.ids),
         };
       });

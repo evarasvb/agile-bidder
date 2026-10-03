@@ -28,7 +28,9 @@ import { MatchItemActions } from '@/components/compras-agiles/MatchItemActions';
 import { AgregarProductoManual } from '@/components/compras-agiles/AgregarProductoManual';
 import { AccionesCompartir } from '@/components/oportunidades/AccionesCompartir';
 import { DetalleCompraAgil } from '@/components/compras-agiles/DetalleCompraAgil';
-import { estadoMatch, isIncompatibleMatch, type EstadoMatch } from '@/services/fuzzyMatching';
+import { isIncompatibleMatch, type EstadoMatch } from '@/services/fuzzyMatching';
+import { assessMatch, requestedQuantity, knownUnit } from '@/lib/matchingContract';
+import { MatchAssessmentSummary, MatchEvidenceNotice } from '@/components/MatchEvidence';
 import { unidadLabel } from '@/utils/unidades';
 
 const clp = (n: number) => `$${Math.round(n || 0).toLocaleString('es-CL')}`;
@@ -38,7 +40,7 @@ const clp = (n: number) => `$${Math.round(n || 0).toLocaleString('es-CL')}`;
 // "REVISAR" y los tres cortes de color que convivían.
 const estadoChip = (est: EstadoMatch): { txt: string; cls: string } =>
   est === 'listo'
-    ? { txt: 'Listo', cls: 'bg-firmavb-green/15 text-firmavb-green border-firmavb-green/30' }
+    ? { txt: 'Seleccionado por ti', cls: 'bg-firmavb-green/15 text-firmavb-green border-firmavb-green/30' }
     : est === 'revisar'
       ? { txt: 'Revisar', cls: 'bg-amber-100 text-amber-800 border-amber-300' }
       : { txt: 'Sin producto', cls: 'bg-muted text-muted-foreground border-border' };
@@ -153,7 +155,7 @@ export default function CompraAgilDetalle() {
   // Filas de la compra con su match (para la tabla producto-a-producto).
   const filasItems = (compra.items || []).map((it: any, idx: number) => {
     const m = matchByItem.get(it.id);
-    const cantidad = it.cantidad || 1;
+    const cantidad = requestedQuantity(it.cantidad);
     // El match guardado en ca_item_matches pudo calcularse con una corrida
     // anterior del motor y nunca pasar por validateSpecifications(): se
     // revalida acá contra el producto real del inventario antes de confiar
@@ -164,10 +166,10 @@ export default function CompraAgilDetalle() {
       productoInventario,
     ));
     const matchAuto = m && !matchPersistidoInvalido
-      ? { inventarioId: m.inventario_id, nombre: m.nombre_producto, sku: m.sku, precio: m.precio_unitario, score: Math.round(Number(m.score) || 0) }
+      ? { inventarioId: m.inventario_id, nombre: m.nombre_producto, sku: m.sku, precio: m.precio_unitario, score: Number(m.score) || 0 }
       : null;
     const { match, estado, override } = resolverMatch(String(it.id), matchAuto);
-    const subtotal = (match?.precio || 0) * cantidad;
+    const subtotal = cantidad !== null ? (match?.precio || 0) * cantidad : null;
     const score = match?.score ?? 0;
     // Estado único del match. Si el solo subtotal de un ítem ya supera TODO el
     // presupuesto de la compra, es señal de match equivocado (caso real:
@@ -175,24 +177,23 @@ export default function CompraAgilDetalle() {
     // que baja a "Revisar" aunque el score sea alto. "Revisar" y "Sin producto"
     // no se suman al total ni van precargados a la propuesta.
     const superaPresupuesto = !!compra.monto && subtotal > compra.monto;
-    // Si el usuario confirmó o eligió el producto, su decisión manda: queda
-    // "listo". Solo las sugerencias automáticas dependen del umbral de score (y
-    // bajan a "revisar" si su solo subtotal ya supera todo el presupuesto).
-    let em: EstadoMatch;
-    if (estado === 'descartado') em = 'sin_producto';
-    else if (estado === 'confirmado' || estado === 'reasignado') em = match ? 'listo' : 'sin_producto';
-    else {
-      em = estadoMatch(score, !!match);
-      if (em === 'listo' && superaPresupuesto) em = 'revisar';
-    }
+    const assessment = assessMatch({
+      requested: {nombre: it.nombre_producto || '', descripcion: it.descripcion_producto || '', cantidad: it.cantidad, unidad: it.unidad},
+      product: match ? {nombre_producto: match.nombre || '', descripcion: inventarioById.get(match.inventarioId)?.descripcion} : null,
+      score: estado === 'reasignado' ? null : score,
+      selectedByUser: estado === 'confirmado' || estado === 'reasignado',
+      discarded: estado === 'descartado', exceedsBudget: superaPresupuesto,
+    });
+    const em: EstadoMatch = assessment.selected ? 'listo' : assessment.suggested ? 'revisar' : 'sin_producto';
     return {
       idx,
+      assessment,
       id: it.id,
       itemRef: String(it.id),
       solicitado: it.nombre_producto,
       descripcion: it.descripcion_producto || '',
       cantidad,
-      unidad: it.unidad || 'UN',
+      unidad: it.unidad,
       estado,
       override,
       manual: false,
@@ -229,7 +230,7 @@ export default function CompraAgilDetalle() {
   const filasTotal = [...filasItems, ...filasManuales];
 
   // Resumen único de cobertura (mismo criterio que los chips de cada fila).
-  const itemsConsiderados = filasItems.filter((f) => f.estado !== 'descartado');
+  const itemsConsiderados = filasItems;
   const totalItems = itemsConsiderados.length;
   const listos = itemsConsiderados.filter((f) => f.estadoM === 'listo').length;
   const porRevisar = totalItems - listos; // "revisar" + "sin producto"
@@ -253,10 +254,11 @@ export default function CompraAgilDetalle() {
         itemIndex: f.idx,
         nombre: f.solicitado,
         descripcion: f.descripcion,
-        cantidadSolicitada: f.cantidad,
+        cantidadSolicitada: f.cantidad ?? 0,
+        confirmedSelection: f.assessment.selected,
         unidadMedida: f.unidad,
         match: f.estadoM === 'listo' && f.match
-          ? { id: f.match.inventarioId, sku: f.match.sku, nombre: f.match.nombre, precio_unitario: f.match.precio || 0, stock: null, matchScore: f.match.score, margen_estimado: 0 }
+          ? { id: f.match.inventarioId, sku: f.match.sku, nombre: f.match.nombre, descripcion: inventarioById.get(f.match.inventarioId)?.descripcion, precio_unitario: f.match.precio || 0, stock: null, matchScore: f.match.score, margen_estimado: 0 }
           : null,
       })),
     ...filasManuales
@@ -266,13 +268,11 @@ export default function CompraAgilDetalle() {
         itemIndex: 9999,
         nombre: f.match.nombre,
         descripcion: '',
-        // Un producto agregado a mano no tiene una cantidad "pedida" por el
-        // organismo que limite cuánto se puede ofrecer (a diferencia de los
-        // ítems del listado, el modal capea la cantidad a 2x lo solicitado).
-        // Se deja un tope generoso en vez de 1 para no bloquear ofertas reales.
-        cantidadSolicitada: 999,
+        cantidadSolicitada: f.cantidad,
+        esManual: true,
         unidadMedida: f.unidad,
-        match: { id: f.match.inventarioId, sku: f.match.sku, nombre: f.match.nombre, precio_unitario: f.match.precio || 0, stock: null, matchScore: f.match.score, margen_estimado: 0 },
+        confirmedSelection: true,
+        match: { id: f.match.inventarioId, sku: f.match.sku, nombre: f.match.nombre, descripcion: inventarioById.get(f.match.inventarioId)?.descripcion, precio_unitario: f.match.precio || 0, stock: null, matchScore: f.match.score, margen_estimado: 0 },
       })),
   ];
 
@@ -402,13 +402,13 @@ export default function CompraAgilDetalle() {
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-firmavb-blue" />
-              <h2 className="text-lg font-semibold">Tu match, producto por producto</h2>
+              <h2 className="text-lg font-semibold">Sugerencias, producto por producto</h2>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               {totalItems > 0 && (
                 <>
                   <Badge variant="outline" className={`font-normal ${completa ? 'bg-firmavb-green/15 text-firmavb-green border-firmavb-green/30' : 'bg-amber-100 text-amber-800 border-amber-200'}`}>
-                    {listos} de {totalItems} listos
+                    {listos} de {totalItems} seleccionados
                   </Badge>
                   {porRevisar > 0 && (
                     <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300 font-normal">
@@ -422,6 +422,7 @@ export default function CompraAgilDetalle() {
           </div>
         </CardHeader>
         <CardContent>
+          <MatchEvidenceNotice />
           {filasTotal.length > 0 ? (
             <div>
               {/* Móvil: una tarjeta por ítem ("Piden X → Ofreces Y") en vez de
@@ -442,7 +443,7 @@ export default function CompraAgilDetalle() {
                       <div className="flex items-center gap-1 shrink-0">
                         {f.estado !== 'descartado' && (
                           <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${estadoChip(f.estadoM).cls}`} title={f.match ? `${f.match.score}% de coincidencia` : undefined}>
-                            {estadoChip(f.estadoM).txt}
+                            {f.assessment ? f.assessment.state : estadoChip(f.estadoM).txt}
                           </span>
                         )}
                         <MatchItemActions
@@ -454,15 +455,16 @@ export default function CompraAgilDetalle() {
                         />
                       </div>
                     </div>
+                    {f.assessment && <MatchAssessmentSummary assessment={f.assessment} />}
                     {f.match ? (
                       <div className="mt-1.5 text-sm">
                         <p className="text-firmavb-blue font-medium">→ {f.match.nombre}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          {f.cantidad} {unidadLabel(f.unidad)} × {clp(f.match.precio || 0)} = <span className="font-semibold text-foreground">{clp(f.match.subtotal)}</span>
+                          {f.cantidad ?? 'Por confirmar'} {knownUnit(f.unidad) ? unidadLabel(f.unidad) : '(unidad por confirmar)'} × {clp(f.match.precio || 0)} = <span className="font-semibold text-foreground">{f.match.subtotal !== null ? clp(f.match.subtotal) : 'Por confirmar'}</span>
                         </p>
                       </div>
                     ) : f.estado !== 'descartado' ? (
-                      <p className="mt-1 text-xs text-muted-foreground">Sin match en tu inventario · {f.cantidad} {unidadLabel(f.unidad)}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Sin match en tu inventario · {f.cantidad ?? 'Por confirmar'} {knownUnit(f.unidad) ? unidadLabel(f.unidad) : '(unidad por confirmar)'}</p>
                     ) : (
                       <p className="mt-1 text-xs text-muted-foreground">No aparecerá en la cotización.</p>
                     )}
@@ -498,7 +500,8 @@ export default function CompraAgilDetalle() {
                         <EstadoBadge estado={f.estado} />
                       </TableCell>
                       <TableCell className="align-top">
-                        {f.match ? (
+                        {f.assessment && <MatchAssessmentSummary assessment={f.assessment} />}
+                    {f.match ? (
                           <div>
                             <p className="font-medium">{f.match.nombre}</p>
                             {f.match.sku && <p className="text-xs font-mono text-muted-foreground">{f.match.sku}</p>}
@@ -513,15 +516,16 @@ export default function CompraAgilDetalle() {
                             className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${estadoChip(f.estadoM).cls}`}
                             title={f.match ? `${f.match.score}% de coincidencia${f.estadoM === 'revisar' ? ' · revisa especificaciones o precio' : ''}` : 'Sin producto en tu inventario'}
                           >
-                            {estadoChip(f.estadoM).txt}
+                            {f.assessment ? f.assessment.state : estadoChip(f.estadoM).txt}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
+                        {f.assessment && <MatchAssessmentSummary assessment={f.assessment} />}
                       </TableCell>
-                      <TableCell className="text-right align-top">{f.cantidad} {unidadLabel(f.unidad)}</TableCell>
+                      <TableCell className="text-right align-top">{f.cantidad ?? 'Por confirmar'} {knownUnit(f.unidad) ? unidadLabel(f.unidad) : '(unidad por confirmar)'}</TableCell>
                       <TableCell className="text-right align-top">{f.match?.precio ? clp(f.match.precio) : '—'}</TableCell>
-                      <TableCell className="text-right align-top font-medium">{f.match?.precio ? clp(f.match.subtotal) : '—'}</TableCell>
+                      <TableCell className="text-right align-top font-medium">{f.match?.precio && f.match.subtotal !== null ? clp(f.match.subtotal) : 'Por confirmar'}</TableCell>
                       <TableCell className="align-top">
                         <MatchItemActions
                           codigo={compra.codigo}
@@ -540,7 +544,7 @@ export default function CompraAgilDetalle() {
               {/* Resumen único: tu oferta vs presupuesto */}
               <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border bg-muted/30 p-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Tu oferta {completa ? '(completa)' : `(${listos}/${totalItems} listos)`}</p>
+                  <p className="text-sm text-muted-foreground">Tu oferta {completa ? '(todos los ítems seleccionados; bases sin validar)'  : `(${listos}/${totalItems} seleccionados)`}</p>
                   <p className="text-2xl font-bold text-firmavb-blue">{clp(totalOferta)}</p>
                 </div>
                 {compra.monto ? (
@@ -556,7 +560,7 @@ export default function CompraAgilDetalle() {
               </div>
               {totalItems > 0 && listos === 0 && (
                 <p className="mt-3 text-sm text-muted-foreground text-center">
-                  Aún no hay productos listos. Confirma o cambia los que están "por revisar", o agrega un producto manual arriba.
+                  Aún no hay productos seleccionados con cantidad y especificaciones conocidas. Confirma o cambia los que están "por revisar", o agrega un producto manual arriba.
                 </p>
               )}
             </div>

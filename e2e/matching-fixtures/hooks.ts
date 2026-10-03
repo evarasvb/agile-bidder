@@ -1,0 +1,16 @@
+import { row, inventory, items, matches, purchase } from './data';
+export const useCompraAgil = () => ({data:purchase,isLoading:false});
+export const useInventoryActivo = () => ({data:inventory});
+export const useTodoElInventario = useInventoryActivo;
+export const useCliente = () => ({data:{id:'fixture-owner',nombre_empresa:'Empresa ficticia'}});
+export const useClienteOwner = useCliente;
+export const useAuthUser = () => ({user:{id:'fixture-user'}});
+export const getClienteId = () => 'fixture-owner';
+export const useCaItemMatches = () => ({data:matches});
+export const useMatchOverrides = () => ({data:{}});
+export const useLicitacionItemsConMatch = () => ({isLoading:false,itemsConMatch:items.map((item,i)=>({...item,nombre:item.nombre_producto,bestMatch:row.inputs[i].product?{inventoryItem:inventory[i],score:row.inputs[i].score}:null}))});
+const mutation = () => ({isPending:false,mutate:()=>{throw Error('fixture write prohibited')},mutateAsync:async()=>{throw Error('fixture write prohibited')}});
+export const useUpdateCompraAgil = mutation;
+export const useFichaTecnica = mutation;
+export const useCreatePipelineItem = mutation;
+export const useUserSettings = () => ({data:{}});
