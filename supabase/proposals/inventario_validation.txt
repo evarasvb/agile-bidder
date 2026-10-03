@@ -24,4 +24,12 @@ acceso, detener: esta propuesta no autoriza cambios de lógica ni privilegios.
 Pruebas estáticas disponibles: src/lib/inventarioRlsProposal.test.ts.
 Conservan literalmente políticas, cuerpo RPC y grants al quitar SELECT escalares.
 Estas pruebas NO demuestran rendimiento ni aislamiento efectivo del esquema real.
-No hay Postgres/Docker local disponible; no se ejecutó esta matriz.
+PostgreSQL nativo17.11 fue compilado dentro del workspace, pero initdb falló
+por shmget: Operation not permitted del sandbox. No se ampliaron permisos.
+La matriz parcial de nueve perfiles se ejecutó con PostgreSQL18.3/PGlite0.5.8
+en memoria (tests/run_pglite.mjs), manteniendo RLS habilitado. Pasó equivalencia
+de filas/resumen/CRUD y transferencias. Tres mediciones por consulta registran
+InitPlans (loops=1) en página/count y menor tiempo relativo en el fixture.
+Las tablas auxiliares son sintéticas y no reproducen sus políticas RLS,
+concurrencia, configuración ni datos reales de Supabase. Por eso sigue pendiente
+la matriz completa en una copia representativa y confirmar SQL57014 real.
