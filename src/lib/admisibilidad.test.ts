@@ -2,6 +2,25 @@ import { describe, expect, it } from 'vitest';
 import { actualizarEntradaAdmisibilidad, confirmarEstadoAdmisibilidad, estadoAdmisibilidad, evaluarEntrada, formulaAdmisibilidad, numeroAdmisibilidad } from './admisibilidad';
 
 describe('admisibilidad requiere verificación explícita', () => {
+  it.each([0.001, 1.001, -0.001, -1.001, 0, -0])('preserva tipo y valor numérico %s en evaluación y estado UI', (entrada) => {
+    const row = { entrada, chequeo: { tipo: 'minimo', umbral: 1 } };
+    const expected = entrada >= 1 ? 'cumple' : 'no_cumple';
+    expect(numeroAdmisibilidad(entrada)).toBe(entrada);
+    expect(evaluarEntrada(row)).toBe(expected);
+    expect(estadoAdmisibilidad({ ...row, estado: 'cumple' })).toBe(expected);
+    const edit = actualizarEntradaAdmisibilidad(row, String(entrada));
+    expect(typeof edit.entrada).toBe('number');
+    expect(evaluarEntrada(edit)).toBe(expected);
+  });
+  it.each(['0.001', '1.001', '-0.001', '-1.234'])('cadena ambigua %s requiere revisión, no cumplimiento automático', (entrada) => {
+    expect(numeroAdmisibilidad(entrada)).toBeNull();
+    expect(evaluarEntrada({ entrada, chequeo: { tipo: 'minimo', umbral: 0 } })).toBe('revisar');
+    expect(evaluarEntrada({ entrada: 5, chequeo: { tipo: 'minimo', umbral: entrada } })).toBe('revisar');
+  });
+  it.each([['0,001', 0.001], ['-0,001', -0.001], ['1.234,5', 1234.5], ['1.234.567', 1234567], ['0', 0], ['-1,001', -1.001]] as const)('cadena explícita %s se normaliza a %s', (entrada, expected) => {
+    expect(numeroAdmisibilidad(entrada)).toBe(expected);
+    expect(evaluarEntrada({ entrada, chequeo: { tipo: 'minimo', umbral: 1 } })).toBe(expected >= 1 ? 'cumple' : 'no_cumple');
+  });
   it.each(['Certificado pendiente de obtener', 'Tengo certificado', 'NO', 'SÍ', '<b>cumple</b>'])('texto libre %s nunca acredita cumplimiento', (entrada) => {
     expect(evaluarEntrada({ entrada })).toBe('revisar');
     expect(estadoAdmisibilidad({ entrada, estado: 'cumple' })).toBe('revisar');

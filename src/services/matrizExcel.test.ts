@@ -20,6 +20,29 @@ describe('exportación real xlsx de admisibilidad con fixtures', () => {
     await workbook.xlsx.load(Buffer.from(await blob.arrayBuffer()));
     return workbook.getWorksheet('Admisibilidad')!;
   }
+  it.each([0.001, 1.001, -0.001, -1.001, 0, -0])('valor %s: evaluación, celda, fórmula y caché coherentes', async (entrada) => {
+    await matrizAExcelPro({ admisibilidad: [{ requisito: 'Decimal', entrada, chequeo: { tipo: 'minimo', umbral: 1 } }] });
+    const ws = await exported();
+    expect(ws.getCell('C5').value).toBe(entrada === 0 ? 0 : entrada);
+    const value = ws.getCell('D5').value as ExcelJS.CellFormulaValue;
+    expect(value.result).toBe(entrada >= 1 ? 'CUMPLE' : 'NO CUMPLE');
+    expect(value.formula).toContain('ISNUMBER(C5)');
+    expect(value.formula).toContain('C5>=1');
+  });
+  it.each([['0,001', 0.001], ['-0,001', -0.001], ['1.234,5', 1234.5], ['1.234.567', 1234567], ['0', 0]] as const)('cadena explícita %s: valor y caché XLSX coherentes', async (entrada, numero) => {
+    await matrizAExcelPro({ admisibilidad: [{ requisito: 'Cadena explícita', entrada, chequeo: { tipo: 'minimo', umbral: 1 } }] });
+    const ws = await exported();
+    expect(ws.getCell('C5').value).toBe(numero);
+    expect((ws.getCell('D5').value as ExcelJS.CellFormulaValue).result).toBe(numero >= 1 ? 'CUMPLE' : 'NO CUMPLE');
+  });
+  it.each(['0.001', '1.001', '-1.234'])('cadena ambigua %s: texto exportado, fórmula numérica protegida y cache REVISAR', async (entrada) => {
+    await matrizAExcelPro({ admisibilidad: [{ requisito: 'Ambigua', entrada, chequeo: { tipo: 'minimo', umbral: 0 } }] });
+    const ws = await exported();
+    expect(ws.getCell('C5').value).toBe(entrada);
+    const value = ws.getCell('D5').value as ExcelJS.CellFormulaValue;
+    expect(value.result).toBe('REVISAR');
+    expect(value.formula).toContain('IF(ISNUMBER(C5)');
+  });
   it('texto pendiente no sale como cumple y el resumen exige todas las filas verificadas', async () => {
     await matrizAExcelPro({ codigo: 'FIXTURE', admisibilidad: [{ requisito: 'Certificado', entrada: 'Certificado pendiente de obtener', estado: 'cumple' }] });
     const ws = await exported();

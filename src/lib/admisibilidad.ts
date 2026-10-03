@@ -13,9 +13,15 @@ const ESTADOS_EXCEL: Record<string, string> = { pendiente: 'PENDIENTE', cumple: 
 // No extraer números de frases ni convertir texto sin dígitos en cero.
 export function numeroAdmisibilidad(value: unknown): number | null {
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value !== 'string') return null;
   const input = texto(value);
-  if (!/^-?(?:\d+(?:[.,]\d+)?|\d{1,3}(?:\.\d{3})+(?:,\d+)?)$/.test(input)) return null;
-  const normalized = input.replace(/\.(?=\d{3}(?:\.|,|$))/g, '').replace(',', '.');
+  // Una sola agrupación con tres cifras ("1.234", "0.001") puede ser
+  // decimal o miles: no elegir una interpretación que acredite cumplimiento.
+  if (/^-?\d+\.\d{3}$/.test(input)) return null;
+  const chileno = /^-?\d{1,3}(?:\.\d{3})+(?:,\d+)$/.test(input)
+    || /^-?\d{1,3}(?:\.\d{3}){2,}$/.test(input);
+  if (!chileno && !/^-?\d+(?:[.,]\d+)?$/.test(input)) return null;
+  const normalized = (chileno ? input.replace(/\./g, '') : input).replace(',', '.');
   const n = Number(normalized);
   return Number.isFinite(n) ? n : null;
 }
@@ -31,7 +37,7 @@ export function evaluarEntrada(r: RequisitoAdmisibilidad): string {
     const esperado = respuesta(ch.esperado), valor = respuesta(e);
     return !esperado || !valor ? 'revisar' : valor === esperado ? 'cumple' : 'no_cumple';
   }
-  const n = numeroAdmisibilidad(e), u = numeroAdmisibilidad(ch.umbral), u2 = numeroAdmisibilidad(ch.umbral2);
+  const n = numeroAdmisibilidad(r.entrada), u = numeroAdmisibilidad(ch.umbral), u2 = numeroAdmisibilidad(ch.umbral2);
   if (n == null || u == null) return 'revisar';
   if (ch.tipo === 'minimo') return n >= u ? 'cumple' : 'no_cumple';
   if (ch.tipo === 'maximo') return n <= u ? 'cumple' : 'no_cumple';
@@ -51,7 +57,9 @@ export function estadoAdmisibilidad(r: RequisitoAdmisibilidad): string {
 }
 
 export function actualizarEntradaAdmisibilidad<T extends RequisitoAdmisibilidad>(r: T, entrada: string): T {
-  if (texto(entrada) === texto(r.entrada)) return { ...r, entrada };
+  // Un input HTML devuelve string incluso cuando el dato original es number.
+  // Sin cambio de representación, preservar el tipo y la revisión originales.
+  if (texto(entrada) === texto(r.entrada)) return { ...r };
   const changed = { ...r, entrada, estado_origen: undefined, entrada_verificada: undefined };
   return { ...changed, estado: evaluarEntrada(changed) };
 }
