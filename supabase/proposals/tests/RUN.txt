@@ -1,0 +1,13 @@
+Prueba local sin credenciales ni servicios externos.
+Desde esta carpeta: npm ci --ignore-scripts --no-audit --no-fund; npm run test:rls.
+PGlite0.5.8 queda limitado a este paquete de pruebas; no es dependencia de la aplicación.
+Python3 estándar genera fixtures a partir de cuerpos SQL originales del repo.
+El motor Postgres Wasm vive en memoria y se cierra en finally.
+RLS habilitado; roles de prueba NOSUPERUSER/NOBYPASSRLS; SET LOCAL ROLE y JWT sintético.
+Cada mutación se revierte incluso cuando falla. No hay sockets/red/contraseñas.
+Esquema PARCIAL: tablas auxiliares sintéticas sin sus propias políticas RLS.
+Verifica políticas de inventario, helpers exactos y resumen, sin reproducir toda Supabase.
+Los tiempos son comparativos dentro de Wasm; no son estimaciones de producción.
+Runner nativo opcional: run_rls.py --psql PATH --output RESULTADO con PGHOST socket Unix
+y cluster nuevo dedicado. En este Mac initdb nativo17.11 fue bloqueado por shmget
+(Operation not permitted) del sandbox; no se ampliaron permisos para solucionarlo.
