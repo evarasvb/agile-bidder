@@ -87,12 +87,12 @@ export default function Inventory() {
     return () => clearTimeout(t);
   }, [searchQuery]);
   // Una página a la vez desde el servidor (antes bajaba todo el catálogo).
-  const { data: pagina, isLoading, error: pageError, isFetching, refetch } = useInventarioPagina({
+  const { data: pagina, isLoading, error: pageError, isFetching, isStale: pageStale, refetch } = useInventarioPagina({
     page: currentPage, pageSize, q: qServidor, soloIncompletos, orderBy,
   });
   const inventario: InventoryItem[] = pagina?.items ?? [];
   const totalFiltrado = pagina?.total ?? 0;
-  const { data: resumen, error: summaryError, isFetching: summaryFetching, refetch: refetchSummary } = useInventarioResumen();
+  const { data: resumen, error: summaryError, isLoading: summaryLoading, isStale: summaryStale, isFetching: summaryFetching, refetch: refetchSummary } = useInventarioResumen();
   const { data: cliente } = useCliente();
   const enriquecer = useEnriquecerInventario();
   const [oportunidadesProducto, setOportunidadesProducto] = useState<InventoryItem | null>(null);
@@ -205,7 +205,7 @@ export default function Inventory() {
     const faltaFoto = !item.imagen_url;
     return faltaDesc && faltaFoto ? 'Falta descripción y foto' : faltaDesc ? 'Falta descripción' : 'Falta foto';
   };
-  const incompleteCount = resumen?.incompletos ?? 0;
+  const incompleteCount = summaryError ? null : resumen?.incompletos ?? 0;
 
   // La búsqueda y el filtro de incompletos ya vienen aplicados del servidor.
   const filteredInventory = inventario;
@@ -390,7 +390,7 @@ export default function Inventory() {
         </div>
       </div>
 
-      {summaryError && <QueryFeedback error={summaryError} retrying={summaryFetching} onRetry={() => void refetchSummary()} label="el resumen del inventario" />}
+      <QueryFeedback error={summaryError} loading={summaryLoading} retrying={summaryFetching} refreshing={summaryFetching} stale={summaryStale} hasPreviousData={resumen !== undefined} onRetry={() => void refetchSummary()} label="el resumen del inventario">
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="rounded-lg border border-border bg-card p-4">
@@ -439,12 +439,14 @@ export default function Inventory() {
         </div>
       </div>
 
+      </QueryFeedback>
+
       {/* Import History Panel */}
       <ImportHistoryPanel />
 
       {/* Tabla: orden, página y tamaño se resuelven en el servidor (modo manual
           de la DataTable) porque el inventario puede tener miles de filas. */}
-      <QueryFeedback error={pageError} loading={isLoading} retrying={isFetching} onRetry={handleRefresh} label="el inventario">
+      <QueryFeedback error={pageError} loading={isLoading} retrying={isFetching} refreshing={isFetching} stale={pageStale} hasPreviousData={pagina !== undefined} onRetry={handleRefresh} label="el inventario">
       <DataTable<InventoryItem>
         rows={filteredInventory}
         rowKey={(item) => item.id}
@@ -487,10 +489,10 @@ export default function Inventory() {
               size="sm"
               className="gap-2"
               onClick={() => { setSoloIncompletos((v) => !v); setCurrentPage(1); }}
-              disabled={incompleteCount === 0 && !soloIncompletos}
+              disabled={!!summaryError || (incompleteCount === 0 && !soloIncompletos)}
             >
               <Info className="h-4 w-4" />
-              {soloIncompletos ? 'Ver todos' : `Incompletos (${incompleteCount})`}
+              {soloIncompletos ? 'Ver todos' : `Incompletos (${incompleteCount ?? "—"})`}
             </Button>
             {selectedIds.size > 0 && (
               <Button variant="destructive" size="sm" className="gap-2" onClick={() => setBulkDeleteOpen(true)}>
@@ -501,7 +503,7 @@ export default function Inventory() {
           </>
         }
         emptyMessage={
-          resumen?.total === 0 && pagina?.total === 0 ? (
+          !summaryError && !summaryLoading && resumen?.total === 0 && pagina?.total === 0 ? (
             // Inventario realmente vacío: CTA de onboarding.
             <span className="inline-flex flex-col items-center gap-3">
               <Inbox className="h-12 w-12 opacity-50" />
