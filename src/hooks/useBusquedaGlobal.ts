@@ -67,7 +67,8 @@ export function useBusquedaGlobal(query: string) {
 
       const resultados: ResultadoBusqueda[] = [];
 
-      for (const o of (Array.isArray(oportunidadesRes.data) ? oportunidadesRes.data.filter(isOportunidadRow) : [])) {
+      const opportunityRows: unknown[] = Array.isArray(oportunidadesRes.data) ? oportunidadesRes.data : [];
+      for (const o of opportunityRows.filter(isOportunidadRow)) {
         resultados.push({
           tipo: o.tipo,
           id: o.codigo,

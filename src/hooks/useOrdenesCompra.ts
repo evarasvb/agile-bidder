@@ -490,7 +490,6 @@ export function useMisOcAceptadas(rut: string | null, nombre: string | null, ins
         // Público (no hay columna propia): 'raw_json.Fechas.FechaAceptacion' es
         // null hasta que el proveedor acepta la OC.
         .select(columns)
-        .overrideTypes<MisOcAceptada[], { merge: false }>()
         // Sin filtro de estado: trae TODAS las OC del cliente (el "cubo"). El
         // estado real de cada una se muestra tal cual en el selector; las OC
         // mutan (se aceptan/rechazan) y se refrescan con "Actualizar mis OC".
@@ -503,7 +502,7 @@ export function useMisOcAceptadas(rut: string | null, nombre: string | null, ins
       if (rut) query = query.eq('rut_proveedor', rut);
       else query = query.eq('proveedor_nombre', nombre!);
       if (institucion) query = query.ilike('organismo_comprador', `%${institucion}%`);
-      const { data, error } = await query;
+      const { data, error } = await query.overrideTypes<MisOcAceptada[], { merge: false }>();
       if (error) throw error;
       return data || [];
     },
