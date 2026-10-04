@@ -8,6 +8,7 @@ import {
   sha256Hex,
 } from '../_shared/academia-security.ts';
 import {
+  buildAccessRedemptionUpdate,
   attachPrivatePlanillasUrl,
   containsPrivatePlanillasDownload,
   normalizeCourseSlug,
@@ -256,17 +257,24 @@ Deno.serve(async (req) => {
       }
 
       const { data, error } = await admin.from('academia_accesos')
-        .select('id, estado').eq('curso_slug', slug).eq('codigo', code).maybeSingle();
+        .select('id, estado, email, mp_payment_id').eq('curso_slug', slug).eq('codigo', code).maybeSingle();
       if (error) return json({ ok: false, error: 'Error validando el código.' }, 500);
       if (!data || data.estado === 'revocado') return json({ ok: false, error: 'Código inválido. Revísalo o escríbenos.' }, 200);
 
       const contenidoAutorizado = await authorizedContent(admin, contenido);
       if (!contenidoAutorizado) return json({ ok: false, error: 'Material temporalmente no disponible.' }, 503);
       if (data.estado === 'disponible') {
-        const { error: updateError } = await admin.from('academia_accesos')
-          .update({ estado: 'usado', asignado_at: new Date().toISOString(), email: email || null })
-          .eq('id', data.id).neq('estado', 'revocado');
-        if (updateError) return json({ ok: false, error: 'Error validando el código.' }, 500);
+        let redemption = admin.from('academia_accesos')
+          .update(buildAccessRedemptionUpdate(data, email, new Date().toISOString()))
+          .eq('id', data.id).eq('estado', 'disponible');
+        redemption = data.mp_payment_id === null
+          ? redemption.is('mp_payment_id', null)
+          : redemption.eq('mp_payment_id', data.mp_payment_id);
+        redemption = data.email === null
+          ? redemption.is('email', null)
+          : redemption.eq('email', data.email);
+        const { data: redeemed, error: updateError } = await redemption.select('id').maybeSingle();
+        if (updateError || !redeemed) return json({ ok: false, error: 'Error validando el código.' }, 500);
       }
       return json({ ok: true, modulos: contenidoAutorizado });
     }
