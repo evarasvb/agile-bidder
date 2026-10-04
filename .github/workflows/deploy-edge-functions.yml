@@ -127,10 +127,10 @@ jobs:
               echo "Saltando '$fn' (no existe en el repo)."
               continue
             fi
-            # PROD lacks the payment-hardening schema and Inbox worker. A type-only
-            # change must not activate that backend; rollout needs a reviewed plan.
-            if [ "$fn" = "procesar-academia-mp-inbox" ] || [ "$fn" = "mp-curso-webhook" ]; then
-              echo "Saltando backend de pagos: migración/rollout pendiente de revisión explícita."
+            # PROD lacks the Academia hardening schema, rate-limit RPC and Inbox.
+            # These source changes must not activate an incompatible backend.
+            if [ "$fn" = "procesar-academia-mp-inbox" ] || [ "$fn" = "mp-curso-webhook" ] || [ "$fn" = "academia-premium" ]; then
+              echo "Saltando backend Academia: migración/rollout pendiente de revisión explícita."
               continue
             fi
             echo "== Desplegando $fn =="
