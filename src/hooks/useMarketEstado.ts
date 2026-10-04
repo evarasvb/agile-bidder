@@ -14,7 +14,7 @@ type RpcFn = <T = unknown>(fn: string, args?: Record<string, unknown>) => Promis
 // read properties of undefined (reading 'rest')" en cualquier búsqueda
 // (hallazgo de Evaristo en Market del Estado). Por eso se envuelve en una
 // función que sí lo invoca como método de supabase (conserva el `this`).
-const rpc = ((fn: string, args?: Record<string, unknown>) => supabase.rpc(fn, args)) as unknown as RpcFn;
+const rpc = supabase.rpc.bind(supabase) as unknown as RpcFn;
 // Mismo motivo que `rpc`: tablas mk_* recientes, aún no están en los tipos
 // generados de Supabase.
 const sb = supabase as unknown as { from: (t: string) => any };

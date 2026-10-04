@@ -1,0 +1,35 @@
+PROPUESTA SIN APLICAR — validación pendiente en PostgreSQL aislado.
+No ejecutar contra producción. No contiene credenciales ni cambios de roles/permisos.
+
+Requisitos: copia de esquema vigente (09ff1cb), funciones y políticas reales;
+usuarios sintéticos de dos empresas, con relaciones clientes/vendedores/user_roles
+coherentes. Sembrar 16.359 productos de empresa A y productos de empresa B.
+
+Matriz: dueño, miembro operativo, miembro solo cobranza, miembro con permisos null,
+admin, super_admin y anónimo. Incluir productos bajo cliente_owner_id y auth.uid.
+Para cada identidad, fijar rol authenticated (anon para anónimo) y JWT sub local.
+Guardar resultados anteriores; aplicar inventario_initplan.sql solo en esa copia.
+Comparar resultados posteriores de SELECT IDs + cliente_inventario_resumen(), y
+permitidos/denegados de INSERT, UPDATE y DELETE. Intentar reasignar cliente_id a
+otra empresa. Ejecutar mutaciones en transacciones con rollback para no contaminar
+los resultados. La matriz debe conservar exactamente la autorización previa;
+no suponer que super_admin ve todas las empresas: conservar el predicado dueño.
+
+EXPLAIN (ANALYZE, BUFFERS) de página (100 filas, offset 0 y 100, orden estable),
+COUNT exacto y RPC resumen antes/después bajo cada identidad. Comprobar InitPlan
+para helpers sin parámetros, reducción de loops/coste y ausencia de SQL57014.
+Medir sin cambiar statement_timeout ni desactivar RLS. Si existen diferencias de
+acceso, detener: esta propuesta no autoriza cambios de lógica ni privilegios.
+
+Pruebas estáticas disponibles: src/lib/inventarioRlsProposal.test.ts.
+Conservan literalmente políticas, cuerpo RPC y grants al quitar SELECT escalares.
+Estas pruebas NO demuestran rendimiento ni aislamiento efectivo del esquema real.
+PostgreSQL nativo17.11 fue compilado dentro del workspace, pero initdb falló
+por shmget: Operation not permitted del sandbox. No se ampliaron permisos.
+La matriz parcial de nueve perfiles se ejecutó con PostgreSQL18.3/PGlite0.5.8
+en memoria (tests/run_pglite.mjs), manteniendo RLS habilitado. Pasó equivalencia
+de filas/resumen/CRUD y transferencias. Tres mediciones por consulta registran
+InitPlans (loops=1) en página/count y menor tiempo relativo en el fixture.
+Las tablas auxiliares son sintéticas y no reproducen sus políticas RLS,
+concurrencia, configuración ni datos reales de Supabase. Por eso sigue pendiente
+la matriz completa en una copia representativa y confirmar SQL57014 real.

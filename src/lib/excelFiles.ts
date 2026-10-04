@@ -352,7 +352,7 @@ export async function validateSpreadsheetArchive(buffer: ArrayBuffer): Promise<A
       | { ok: false; code: 'archive_too_large' | 'invalid_file'; message: string }
     >) => {
       cleanup();
-      if (data.ok) resolve(data.buffer);
+      if (data.ok === true) resolve(data.buffer);
       else reject(new SpreadsheetReadError(data.message, data.code));
     };
     worker.onerror = () => {

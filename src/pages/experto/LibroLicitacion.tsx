@@ -1,3 +1,4 @@
+import { assessMatch } from '@/lib/matchingContract';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 // Escritorio: tres paneles ajustables (arrastra el separador). Celular/tablet: pestañas Fuentes · Chat · Entregables.
@@ -121,8 +122,8 @@ export default function LibroLicitacion() {
     id: String(it.id ?? `idx-${idx}`),
     nombre: it.nombre_producto || '',
     descripcion: it.descripcion || '',
-    cantidad: it.cantidad ?? 1,
-    unidad: it.unidad || 'unidad',
+    cantidad: it.cantidad,
+    unidad: it.unidad,
   })), [licItems]);
   const { itemsConMatch: licItemsConMatch, isLoading: licMatchLoading } = useLicitacionItemsConMatch(cod, licItemsMapeados);
   const { data: matchOverrides = {} } = useMatchOverrides(cod, 'licitacion');
@@ -465,7 +466,7 @@ export default function LibroLicitacion() {
           const prod = inventarioById.get(ov.inventario_id);
           if (prod) match = { inventoryItem: prod, score: ov.score_manual ?? 100 };
         }
-        if (!match) return null;
+        if (!match || !assessMatch({requested:item, product:match.inventoryItem, score:ov?.accion === 'reasignado' ? null : match.score, selectedByUser:ov?.accion === 'confirmado' || ov?.accion === 'reasignado'}).selected) return null;
         return {
           itemRequerido: item.nombre,
           productoOfertado: match.inventoryItem.nombre_producto,

@@ -53,3 +53,14 @@ export function attachPrivatePlanillasUrl<T>(value: T, signedUrl: string): T {
   }
   return value;
 }
+
+// A paid access keeps the buyer identity verified by the payment provider.
+export function buildAccessRedemptionUpdate(
+  access: { email: string | null; mp_payment_id: string | null },
+  submittedEmail: string | undefined,
+  redeemedAt: string,
+): { estado: string; asignado_at: string; email?: string | null } {
+  const update = { estado: 'usado', asignado_at: redeemedAt };
+  if (access.mp_payment_id) return update;
+  return { ...update, email: access.email || submittedEmail || null };
+}

@@ -1,3 +1,4 @@
+import type { Database } from '@/integrations/supabase/types';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabaseClient as supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/hooks/useAuth';
@@ -12,7 +13,7 @@ async function resolverClienteOwnerId(): Promise<string | null> {
   const { data, error } = await supabase.rpc('cliente_owner_id');
   if (error) {
     console.error('[inventory] cliente_owner_id error:', error);
-    return null;
+    throw error;
   }
   return (data as string) ?? null;
 }
@@ -124,7 +125,7 @@ export function useInventarioPagina(opts: InventarioPaginaOpts) {
       const from = (opts.page - 1) * opts.pageSize;
       let query = supabase
         .from('cliente_inventario')
-        .select('*', { count: 'exact' })
+        .select('id,cliente_id,sku,nombre,descripcion,categoria,palabras_clave,precio_unitario,margen_minimo,stock_disponible,unidad_medida,marca,tiempo_entrega,imagen_url,created_at,updated_at', { count: 'exact' })
         .eq('cliente_id', ownerId);
       if (q) {
         const t = valorIlike(q);
@@ -454,7 +455,7 @@ export function useUpdateInventoryItem() {
       if (!clienteId) throw new Error('No se encontró tu empresa.');
 
       // Map InventoryItem fields to cliente_inventario fields
-      const updateData: Record<string, any> = {};
+      const updateData: Database['public']['Tables']['cliente_inventario']['Update'] = {};
       // Mantener `nombre` y `nombre_producto` en sincronía (ambos NOT NULL; el
       // trigger de búsqueda/nombre_norm se alimenta de nombre_producto).
       if (updates.nombre_producto !== undefined) { updateData.nombre = updates.nombre_producto; updateData.nombre_producto = updates.nombre_producto; }

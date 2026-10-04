@@ -1,0 +1,1467 @@
+{
+  "fixtureOnly": true,
+  "realDocumentsRead": 0,
+  "additionalAiCalls": 0,
+  "additionalPaidServices": 0,
+  "measurement": "synthetic catalog candidate classification, not real-process relevance or compliance",
+  "before": {
+    "tp": 6,
+    "fp": 4,
+    "tn": 20,
+    "fn": 0,
+    "precision": 0.6,
+    "recall": 1
+  },
+  "after": {
+    "tp": 5,
+    "fp": 0,
+    "tn": 24,
+    "fn": 1,
+    "precision": 1,
+    "recall": 0.8333333333333334
+  },
+  "cases": [
+    {
+      "process": "744835-601-COT26",
+      "type": "compra_agil",
+      "profile": "papeleria",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": false,
+      "before": true,
+      "after": false,
+      "coverage": {
+        "suggested": 1,
+        "total": 1,
+        "percentage": 100
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Tuberías",
+            "descripcion": "Ver documento adjunto",
+            "cantidad": 1,
+            "unidad": "UN"
+          },
+          "product": {
+            "nombre_producto": "Carpeta oficio"
+          },
+          "score": 45.5
+        }
+      ],
+      "assessments": [
+        {
+          "score": 45.5,
+          "suggested": true,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Revisar",
+          "reasons": [
+            "Especificaciones pendientes: leer el documento adjunto"
+          ],
+          "quantity": 1,
+          "quantityKnown": true,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "744835-601-COT26",
+      "type": "compra_agil",
+      "profile": "medico",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": false,
+      "before": false,
+      "after": false,
+      "coverage": {
+        "suggested": 0,
+        "total": 1,
+        "percentage": 0
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Tuberías",
+            "descripcion": "Ver documento adjunto",
+            "cantidad": 1,
+            "unidad": "UN"
+          },
+          "product": null,
+          "score": null
+        }
+      ],
+      "assessments": [
+        {
+          "score": null,
+          "suggested": false,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Sin producto",
+          "reasons": [
+            "Especificaciones pendientes: leer el documento adjunto"
+          ],
+          "quantity": 1,
+          "quantityKnown": true,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "744835-601-COT26",
+      "type": "compra_agil",
+      "profile": "ti",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": false,
+      "before": false,
+      "after": false,
+      "coverage": {
+        "suggested": 0,
+        "total": 1,
+        "percentage": 0
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Tuberías",
+            "descripcion": "Ver documento adjunto",
+            "cantidad": 1,
+            "unidad": "UN"
+          },
+          "product": null,
+          "score": null
+        }
+      ],
+      "assessments": [
+        {
+          "score": null,
+          "suggested": false,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Sin producto",
+          "reasons": [
+            "Especificaciones pendientes: leer el documento adjunto"
+          ],
+          "quantity": 1,
+          "quantityKnown": true,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "3537-61-L126",
+      "type": "licitacion",
+      "profile": "papeleria",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": false,
+      "before": true,
+      "after": false,
+      "coverage": {
+        "suggested": 2,
+        "total": 3,
+        "percentage": 67
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Regla 50mm",
+            "descripcion": "Regla 50mm",
+            "cantidad": 2,
+            "unidad": "UN"
+          },
+          "product": {
+            "nombre_producto": "Regla 33mm"
+          },
+          "score": 100
+        },
+        {
+          "requested": {
+            "nombre": "Pegamento 40g",
+            "descripcion": "Pegamento 40g",
+            "cantidad": 2,
+            "unidad": "UN"
+          },
+          "product": {
+            "nombre_producto": "Pegamento 8g"
+          },
+          "score": 100
+        },
+        {
+          "requested": {
+            "nombre": "Resma A4",
+            "descripcion": "Resma A4",
+            "cantidad": 2,
+            "unidad": "UN"
+          },
+          "product": null,
+          "score": 0
+        }
+      ],
+      "assessments": [
+        {
+          "score": 100,
+          "suggested": true,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Revisar",
+          "reasons": [
+            "Especificaciones incompatibles o ambiguas"
+          ],
+          "quantity": 2,
+          "quantityKnown": true,
+          "compatibility": "incompatible",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        },
+        {
+          "score": 100,
+          "suggested": true,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Revisar",
+          "reasons": [
+            "Especificaciones incompatibles o ambiguas"
+          ],
+          "quantity": 2,
+          "quantityKnown": true,
+          "compatibility": "incompatible",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        },
+        {
+          "score": 0,
+          "suggested": false,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Sin producto",
+          "reasons": [],
+          "quantity": 2,
+          "quantityKnown": true,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "3537-61-L126",
+      "type": "licitacion",
+      "profile": "medico",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": false,
+      "before": false,
+      "after": false,
+      "coverage": {
+        "suggested": 0,
+        "total": 3,
+        "percentage": 0
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Regla 50mm",
+            "descripcion": "Regla 50mm",
+            "cantidad": 2,
+            "unidad": "UN"
+          },
+          "product": null,
+          "score": null
+        },
+        {
+          "requested": {
+            "nombre": "Pegamento 40g",
+            "descripcion": "Pegamento 40g",
+            "cantidad": 2,
+            "unidad": "UN"
+          },
+          "product": null,
+          "score": null
+        },
+        {
+          "requested": {
+            "nombre": "Resma A4",
+            "descripcion": "Resma A4",
+            "cantidad": 2,
+            "unidad": "UN"
+          },
+          "product": null,
+          "score": null
+        }
+      ],
+      "assessments": [
+        {
+          "score": null,
+          "suggested": false,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Sin producto",
+          "reasons": [],
+          "quantity": 2,
+          "quantityKnown": true,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        },
+        {
+          "score": null,
+          "suggested": false,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Sin producto",
+          "reasons": [],
+          "quantity": 2,
+          "quantityKnown": true,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        },
+        {
+          "score": null,
+          "suggested": false,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Sin producto",
+          "reasons": [],
+          "quantity": 2,
+          "quantityKnown": true,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "3537-61-L126",
+      "type": "licitacion",
+      "profile": "ti",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": false,
+      "before": false,
+      "after": false,
+      "coverage": {
+        "suggested": 0,
+        "total": 3,
+        "percentage": 0
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Regla 50mm",
+            "descripcion": "Regla 50mm",
+            "cantidad": 2,
+            "unidad": "UN"
+          },
+          "product": null,
+          "score": null
+        },
+        {
+          "requested": {
+            "nombre": "Pegamento 40g",
+            "descripcion": "Pegamento 40g",
+            "cantidad": 2,
+            "unidad": "UN"
+          },
+          "product": null,
+          "score": null
+        },
+        {
+          "requested": {
+            "nombre": "Resma A4",
+            "descripcion": "Resma A4",
+            "cantidad": 2,
+            "unidad": "UN"
+          },
+          "product": null,
+          "score": null
+        }
+      ],
+      "assessments": [
+        {
+          "score": null,
+          "suggested": false,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Sin producto",
+          "reasons": [],
+          "quantity": 2,
+          "quantityKnown": true,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        },
+        {
+          "score": null,
+          "suggested": false,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Sin producto",
+          "reasons": [],
+          "quantity": 2,
+          "quantityKnown": true,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        },
+        {
+          "score": null,
+          "suggested": false,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Sin producto",
+          "reasons": [],
+          "quantity": 2,
+          "quantityKnown": true,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "fixture-CA-03",
+      "type": "compra_agil",
+      "profile": "papeleria",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": true,
+      "before": true,
+      "after": true,
+      "coverage": {
+        "suggested": 1,
+        "total": 1,
+        "percentage": 100
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Resma A4 75g",
+            "descripcion": "Papel A4 75g",
+            "cantidad": 2,
+            "unidad": "UN"
+          },
+          "product": {
+            "nombre_producto": "Resma A4 75g"
+          },
+          "score": 85
+        }
+      ],
+      "assessments": [
+        {
+          "score": 85,
+          "suggested": true,
+          "technicallyEligible": true,
+          "selected": false,
+          "state": "Sugerencia alta: confirmar",
+          "reasons": [],
+          "quantity": 2,
+          "quantityKnown": true,
+          "compatibility": "no_detected_conflict",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "fixture-CA-03",
+      "type": "compra_agil",
+      "profile": "medico",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": false,
+      "before": false,
+      "after": false,
+      "coverage": {
+        "suggested": 0,
+        "total": 1,
+        "percentage": 0
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Resma A4 75g",
+            "descripcion": "Papel A4 75g",
+            "cantidad": 2,
+            "unidad": "UN"
+          },
+          "product": null,
+          "score": null
+        }
+      ],
+      "assessments": [
+        {
+          "score": null,
+          "suggested": false,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Sin producto",
+          "reasons": [],
+          "quantity": 2,
+          "quantityKnown": true,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "fixture-CA-03",
+      "type": "compra_agil",
+      "profile": "ti",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": false,
+      "before": false,
+      "after": false,
+      "coverage": {
+        "suggested": 0,
+        "total": 1,
+        "percentage": 0
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Resma A4 75g",
+            "descripcion": "Papel A4 75g",
+            "cantidad": 2,
+            "unidad": "UN"
+          },
+          "product": null,
+          "score": null
+        }
+      ],
+      "assessments": [
+        {
+          "score": null,
+          "suggested": false,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Sin producto",
+          "reasons": [],
+          "quantity": 2,
+          "quantityKnown": true,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "fixture-CA-04",
+      "type": "compra_agil",
+      "profile": "papeleria",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": false,
+      "before": false,
+      "after": false,
+      "coverage": {
+        "suggested": 0,
+        "total": 1,
+        "percentage": 0
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Mascarilla quirúrgica",
+            "descripcion": "Mascarilla quirúrgica",
+            "cantidad": 10,
+            "unidad": "UN"
+          },
+          "product": null,
+          "score": null
+        }
+      ],
+      "assessments": [
+        {
+          "score": null,
+          "suggested": false,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Sin producto",
+          "reasons": [],
+          "quantity": 10,
+          "quantityKnown": true,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "fixture-CA-04",
+      "type": "compra_agil",
+      "profile": "medico",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": true,
+      "before": true,
+      "after": true,
+      "coverage": {
+        "suggested": 1,
+        "total": 1,
+        "percentage": 100
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Mascarilla quirúrgica",
+            "descripcion": "Mascarilla quirúrgica",
+            "cantidad": 10,
+            "unidad": "UN"
+          },
+          "product": {
+            "nombre_producto": "Mascarilla quirúrgica"
+          },
+          "score": 90
+        }
+      ],
+      "assessments": [
+        {
+          "score": 90,
+          "suggested": true,
+          "technicallyEligible": true,
+          "selected": false,
+          "state": "Sugerencia alta: confirmar",
+          "reasons": [],
+          "quantity": 10,
+          "quantityKnown": true,
+          "compatibility": "no_detected_conflict",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "fixture-CA-04",
+      "type": "compra_agil",
+      "profile": "ti",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": false,
+      "before": false,
+      "after": false,
+      "coverage": {
+        "suggested": 0,
+        "total": 1,
+        "percentage": 0
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Mascarilla quirúrgica",
+            "descripcion": "Mascarilla quirúrgica",
+            "cantidad": 10,
+            "unidad": "UN"
+          },
+          "product": null,
+          "score": null
+        }
+      ],
+      "assessments": [
+        {
+          "score": null,
+          "suggested": false,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Sin producto",
+          "reasons": [],
+          "quantity": 10,
+          "quantityKnown": true,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "fixture-CA-05",
+      "type": "compra_agil",
+      "profile": "papeleria",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": false,
+      "before": false,
+      "after": false,
+      "coverage": {
+        "suggested": 0,
+        "total": 1,
+        "percentage": 0
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Teclado USB",
+            "descripcion": "Teclado USB",
+            "cantidad": "000",
+            "unidad": "000"
+          },
+          "product": null,
+          "score": null
+        }
+      ],
+      "assessments": [
+        {
+          "score": null,
+          "suggested": false,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Sin producto",
+          "reasons": [
+            "Cantidad o unidad por confirmar"
+          ],
+          "quantity": null,
+          "quantityKnown": false,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "fixture-CA-05",
+      "type": "compra_agil",
+      "profile": "medico",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": false,
+      "before": false,
+      "after": false,
+      "coverage": {
+        "suggested": 0,
+        "total": 1,
+        "percentage": 0
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Teclado USB",
+            "descripcion": "Teclado USB",
+            "cantidad": "000",
+            "unidad": "000"
+          },
+          "product": null,
+          "score": null
+        }
+      ],
+      "assessments": [
+        {
+          "score": null,
+          "suggested": false,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Sin producto",
+          "reasons": [
+            "Cantidad o unidad por confirmar"
+          ],
+          "quantity": null,
+          "quantityKnown": false,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "fixture-CA-05",
+      "type": "compra_agil",
+      "profile": "ti",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": false,
+      "before": true,
+      "after": false,
+      "coverage": {
+        "suggested": 1,
+        "total": 1,
+        "percentage": 100
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Teclado USB",
+            "descripcion": "Teclado USB",
+            "cantidad": "000",
+            "unidad": "000"
+          },
+          "product": {
+            "nombre_producto": "Teclado USB"
+          },
+          "score": 100
+        }
+      ],
+      "assessments": [
+        {
+          "score": 100,
+          "suggested": true,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Revisar",
+          "reasons": [
+            "Cantidad o unidad por confirmar"
+          ],
+          "quantity": null,
+          "quantityKnown": false,
+          "compatibility": "no_detected_conflict",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "fixture-CA-06",
+      "type": "compra_agil",
+      "profile": "papeleria",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": false,
+      "before": false,
+      "after": false,
+      "coverage": {
+        "suggested": 0,
+        "total": 1,
+        "percentage": 0
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Teclado USB",
+            "descripcion": "Teclado USB",
+            "cantidad": 1,
+            "unidad": "UN"
+          },
+          "product": null,
+          "score": null
+        }
+      ],
+      "assessments": [
+        {
+          "score": null,
+          "suggested": false,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Sin producto",
+          "reasons": [],
+          "quantity": 1,
+          "quantityKnown": true,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "fixture-CA-06",
+      "type": "compra_agil",
+      "profile": "medico",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": false,
+      "before": false,
+      "after": false,
+      "coverage": {
+        "suggested": 0,
+        "total": 1,
+        "percentage": 0
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Teclado USB",
+            "descripcion": "Teclado USB",
+            "cantidad": 1,
+            "unidad": "UN"
+          },
+          "product": null,
+          "score": null
+        }
+      ],
+      "assessments": [
+        {
+          "score": null,
+          "suggested": false,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Sin producto",
+          "reasons": [],
+          "quantity": 1,
+          "quantityKnown": true,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "fixture-CA-06",
+      "type": "compra_agil",
+      "profile": "ti",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": true,
+      "before": true,
+      "after": true,
+      "coverage": {
+        "suggested": 1,
+        "total": 1,
+        "percentage": 100
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Teclado USB",
+            "descripcion": "Teclado USB",
+            "cantidad": 1,
+            "unidad": "UN"
+          },
+          "product": {
+            "nombre_producto": "Teclado USB"
+          },
+          "score": 85
+        }
+      ],
+      "assessments": [
+        {
+          "score": 85,
+          "suggested": true,
+          "technicallyEligible": true,
+          "selected": false,
+          "state": "Sugerencia alta: confirmar",
+          "reasons": [],
+          "quantity": 1,
+          "quantityKnown": true,
+          "compatibility": "no_detected_conflict",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "fixture-LIC-07",
+      "type": "licitacion",
+      "profile": "papeleria",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": false,
+      "before": false,
+      "after": false,
+      "coverage": {
+        "suggested": 0,
+        "total": 1,
+        "percentage": 0
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Cable HDMI 2m",
+            "descripcion": "Cable HDMI 2m",
+            "cantidad": 1,
+            "unidad": "UN"
+          },
+          "product": null,
+          "score": null
+        }
+      ],
+      "assessments": [
+        {
+          "score": null,
+          "suggested": false,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Sin producto",
+          "reasons": [],
+          "quantity": 1,
+          "quantityKnown": true,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "fixture-LIC-07",
+      "type": "licitacion",
+      "profile": "medico",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": false,
+      "before": false,
+      "after": false,
+      "coverage": {
+        "suggested": 0,
+        "total": 1,
+        "percentage": 0
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Cable HDMI 2m",
+            "descripcion": "Cable HDMI 2m",
+            "cantidad": 1,
+            "unidad": "UN"
+          },
+          "product": null,
+          "score": null
+        }
+      ],
+      "assessments": [
+        {
+          "score": null,
+          "suggested": false,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Sin producto",
+          "reasons": [],
+          "quantity": 1,
+          "quantityKnown": true,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "fixture-LIC-07",
+      "type": "licitacion",
+      "profile": "ti",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": true,
+      "before": true,
+      "after": true,
+      "coverage": {
+        "suggested": 1,
+        "total": 1,
+        "percentage": 100
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Cable HDMI 2m",
+            "descripcion": "Cable HDMI 2m",
+            "cantidad": 1,
+            "unidad": "UN"
+          },
+          "product": {
+            "nombre_producto": "Cable HDMI 2000mm"
+          },
+          "score": 85
+        }
+      ],
+      "assessments": [
+        {
+          "score": 85,
+          "suggested": true,
+          "technicallyEligible": true,
+          "selected": false,
+          "state": "Sugerencia alta: confirmar",
+          "reasons": [],
+          "quantity": 1,
+          "quantityKnown": true,
+          "compatibility": "no_detected_conflict",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "fixture-LIC-08",
+      "type": "licitacion",
+      "profile": "papeleria",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": false,
+      "before": false,
+      "after": false,
+      "coverage": {
+        "suggested": 0,
+        "total": 1,
+        "percentage": 0
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Guantes nitrilo talla M",
+            "descripcion": "Guantes nitrilo talla M",
+            "cantidad": 4,
+            "unidad": "CAJA"
+          },
+          "product": null,
+          "score": null
+        }
+      ],
+      "assessments": [
+        {
+          "score": null,
+          "suggested": false,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Sin producto",
+          "reasons": [],
+          "quantity": 4,
+          "quantityKnown": true,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "fixture-LIC-08",
+      "type": "licitacion",
+      "profile": "medico",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": true,
+      "before": true,
+      "after": true,
+      "coverage": {
+        "suggested": 1,
+        "total": 1,
+        "percentage": 100
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Guantes nitrilo talla M",
+            "descripcion": "Guantes nitrilo talla M",
+            "cantidad": 4,
+            "unidad": "CAJA"
+          },
+          "product": {
+            "nombre_producto": "Guantes nitrilo talla M"
+          },
+          "score": 72
+        }
+      ],
+      "assessments": [
+        {
+          "score": 72,
+          "suggested": true,
+          "technicallyEligible": true,
+          "selected": false,
+          "state": "Sugerencia alta: confirmar",
+          "reasons": [],
+          "quantity": 4,
+          "quantityKnown": true,
+          "compatibility": "no_detected_conflict",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "fixture-LIC-08",
+      "type": "licitacion",
+      "profile": "ti",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": false,
+      "before": false,
+      "after": false,
+      "coverage": {
+        "suggested": 0,
+        "total": 1,
+        "percentage": 0
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Guantes nitrilo talla M",
+            "descripcion": "Guantes nitrilo talla M",
+            "cantidad": 4,
+            "unidad": "CAJA"
+          },
+          "product": null,
+          "score": null
+        }
+      ],
+      "assessments": [
+        {
+          "score": null,
+          "suggested": false,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Sin producto",
+          "reasons": [],
+          "quantity": 4,
+          "quantityKnown": true,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "fixture-LIC-09",
+      "type": "licitacion",
+      "profile": "papeleria",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": true,
+      "before": true,
+      "after": false,
+      "coverage": {
+        "suggested": 1,
+        "total": 1,
+        "percentage": 100
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Resma A4 75g",
+            "descripcion": "Papel A4 75g",
+            "cantidad": 2,
+            "unidad": "UN"
+          },
+          "product": {
+            "nombre_producto": "Resma A4 75g"
+          },
+          "score": 65
+        }
+      ],
+      "assessments": [
+        {
+          "score": 65,
+          "suggested": true,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Revisar",
+          "reasons": [],
+          "quantity": 2,
+          "quantityKnown": true,
+          "compatibility": "no_detected_conflict",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "fixture-LIC-09",
+      "type": "licitacion",
+      "profile": "medico",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": false,
+      "before": false,
+      "after": false,
+      "coverage": {
+        "suggested": 0,
+        "total": 1,
+        "percentage": 0
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Resma A4 75g",
+            "descripcion": "Papel A4 75g",
+            "cantidad": 2,
+            "unidad": "UN"
+          },
+          "product": null,
+          "score": null
+        }
+      ],
+      "assessments": [
+        {
+          "score": null,
+          "suggested": false,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Sin producto",
+          "reasons": [],
+          "quantity": 2,
+          "quantityKnown": true,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "fixture-LIC-09",
+      "type": "licitacion",
+      "profile": "ti",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": false,
+      "before": false,
+      "after": false,
+      "coverage": {
+        "suggested": 0,
+        "total": 1,
+        "percentage": 0
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Resma A4 75g",
+            "descripcion": "Papel A4 75g",
+            "cantidad": 2,
+            "unidad": "UN"
+          },
+          "product": null,
+          "score": null
+        }
+      ],
+      "assessments": [
+        {
+          "score": null,
+          "suggested": false,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Sin producto",
+          "reasons": [],
+          "quantity": 2,
+          "quantityKnown": true,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "fixture-LIC-10",
+      "type": "licitacion",
+      "profile": "papeleria",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": false,
+      "before": false,
+      "after": false,
+      "coverage": {
+        "suggested": 0,
+        "total": 1,
+        "percentage": 0
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Insumos según anexo",
+            "descripcion": "Especificaciones en documento adjunto",
+            "cantidad": 1,
+            "unidad": "UN"
+          },
+          "product": null,
+          "score": null
+        }
+      ],
+      "assessments": [
+        {
+          "score": null,
+          "suggested": false,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Sin producto",
+          "reasons": [
+            "Especificaciones pendientes: leer el documento adjunto"
+          ],
+          "quantity": 1,
+          "quantityKnown": true,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "fixture-LIC-10",
+      "type": "licitacion",
+      "profile": "medico",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": false,
+      "before": true,
+      "after": false,
+      "coverage": {
+        "suggested": 1,
+        "total": 1,
+        "percentage": 100
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Insumos según anexo",
+            "descripcion": "Especificaciones en documento adjunto",
+            "cantidad": 1,
+            "unidad": "UN"
+          },
+          "product": {
+            "nombre_producto": "Mascarilla quirúrgica"
+          },
+          "score": 88
+        }
+      ],
+      "assessments": [
+        {
+          "score": 88,
+          "suggested": true,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Revisar",
+          "reasons": [
+            "Especificaciones pendientes: leer el documento adjunto"
+          ],
+          "quantity": 1,
+          "quantityKnown": true,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    },
+    {
+      "process": "fixture-LIC-10",
+      "type": "licitacion",
+      "profile": "ti",
+      "fixtureOnly": true,
+      "documentsRead": [],
+      "gold": false,
+      "before": false,
+      "after": false,
+      "coverage": {
+        "suggested": 0,
+        "total": 1,
+        "percentage": 0
+      },
+      "inputs": [
+        {
+          "requested": {
+            "nombre": "Insumos según anexo",
+            "descripcion": "Especificaciones en documento adjunto",
+            "cantidad": 1,
+            "unidad": "UN"
+          },
+          "product": null,
+          "score": null
+        }
+      ],
+      "assessments": [
+        {
+          "score": null,
+          "suggested": false,
+          "technicallyEligible": false,
+          "selected": false,
+          "state": "Sin producto",
+          "reasons": [
+            "Especificaciones pendientes: leer el documento adjunto"
+          ],
+          "quantity": 1,
+          "quantityKnown": true,
+          "compatibility": "unknown",
+          "documents": "not_verified",
+          "compliance": "unknown"
+        }
+      ]
+    }
+  ]
+}

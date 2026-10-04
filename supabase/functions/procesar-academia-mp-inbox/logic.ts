@@ -70,7 +70,7 @@ export async function processAcademyChargeback(
   if (!row) throw new AcademyInboxProcessingError('payment_row_pending', true);
 
   const identity = validateAcademyPaymentIdentity(payment, merchantOrder, row);
-  if (!identity.ok) {
+  if (identity.ok === false) {
     throw new AcademyInboxProcessingError(
       identity.code,
       identity.code === 'payment_not_in_order',

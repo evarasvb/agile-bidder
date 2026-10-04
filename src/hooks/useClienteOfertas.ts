@@ -1,3 +1,4 @@
+import type { Database } from '@/integrations/supabase/types';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { getClienteId } from '@/hooks/useCliente';
@@ -146,7 +147,7 @@ export function useActualizarEstadoOfertaCliente() {
       estado: ClienteOferta['estado'];
       notas?: string;
     }) => {
-      const updateData: Record<string, unknown> = { estado };
+      const updateData: Database['public']['Tables']['cliente_ofertas']['Update'] = { estado };
       if (notas) {
         updateData.notas = notas;
       }

@@ -1,3 +1,4 @@
+import { suggestionCoverage, similarityScore } from '@/lib/matchingContract';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { DetalleCompraAgilDatos } from '@/components/compras-agiles/DetalleCompraAgil';
 import { supabase } from '@/integrations/supabase/client';
@@ -362,7 +363,8 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       // abierta (pocas filas). Antes se pedían en serie con un `.in(...)` de 300
       // códigos: URLs enormes y dos idas y vueltas extra que hacían lento el panel.
       const bestMatchByCodigo: Record<string, { score: number; producto: string | null; count: number }> = {};
-      const itemMatchCountByCodigo: Record<string, number> = {};
+      const itemMatchesByCodigo: Record<string, Set<string>> = {};
+      const itemScoreByCodigo: Record<string, number> = {};
       let itemMatchesFallaron = false;
       // Si el RPC de empresa dueña no resolvió (p. ej. un usuario recién
       // registrado que todavía no tiene fila en `clientes`), NO se muestran
@@ -379,7 +381,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
           .gte('fecha_cierre', nowIso);
         const itemQuery = supabase
           .from('ca_item_matches')
-          .select('compra_agil_codigo')
+          .select('compra_agil_codigo, item_id, score')
           .eq('cliente_id', clienteIdPanel)
           .gte('fecha_cierre', nowIso)
           .gte('score', PISO_MATCH);
@@ -409,24 +411,17 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         // Cobertura ÍTEM POR ÍTEM: cuántos ítems de cada compra calzan.
         for (const im of (((itemMatchesRes as any)?.data) || []) as any[]) {
           const k = im.compra_agil_codigo as string;
-          itemMatchCountByCodigo[k] = (itemMatchCountByCodigo[k] || 0) + 1;
+          if (im.item_id) (itemMatchesByCodigo[k] ??= new Set()).add(String(im.item_id));
+          itemScoreByCodigo[k] = Math.max(itemScoreByCodigo[k] ?? 0, similarityScore(im.score) ?? 0);
         }
       }
 
       // Map compras_agiles
       const compras: OportunidadPanel[] = (comprasRaw || []).map((c: any) => {
         const itemsCount = c.compras_agiles_items?.length || 0;
-        const itemsMatched = itemMatchCountByCodigo[c.codigo] ?? 0;
-        // El % que se muestra es COBERTURA (cuántos de los productos pedidos
-        // calzan con tu inventario), no el mejor score individual: si la
-        // compra pide 10 productos y calzan 5, es 50% de match, no el 100%
-        // del ítem que mejor calzó. Si aún no hay desglose por ítem para ESTA
-        // compra en particular (0 matches: puede ser que de verdad no calce
-        // nada, o que el cron todavía no la procesó) — o si la consulta de
-        // ca_item_matches falló para todo el panel — se cae al mejor score a
-        // nivel de compra (ca_matches) como respaldo, en vez de forzar 0%.
-        const coverageScore = !itemMatchesFallaron && itemsCount > 0 && itemsMatched > 0 ? Math.round((itemsMatched / itemsCount) * 100) : null;
-        const fallbackScore = bestMatchByCodigo[c.codigo]?.score ?? (c.match_score >= PISO_MATCH ? c.match_score : null);
+        const coverage = suggestionCoverage(itemMatchesByCodigo[c.codigo] ?? [], (c.compras_agiles_items || []).map((it: {id: string}) => String(it.id)));
+        const itemsMatched = itemMatchesFallaron ? 0 : coverage.suggested;
+        const referenceScore = itemScoreByCodigo[c.codigo] || bestMatchByCodigo[c.codigo]?.score || (c.match_score >= PISO_MATCH ? c.match_score : null);
         return {
           id: c.id,
           codigo: c.codigo,
@@ -440,7 +435,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
           estado: c.estado,
           tipo: 'compra_agil' as const,
           link_oficial: c.url_ficha || c.link_oficial || null,
-          match_score: coverageScore ?? fallbackScore,
+          match_score: similarityScore(referenceScore),
           match_encontrado: (itemsMatched > 0) || !!bestMatchByCodigo[c.codigo] ? true : ((c.match_encontrado && c.match_score >= PISO_MATCH) || false),
           items_count: itemsCount,
           // Ítems que calzan producto-a-producto (ca_item_matches). Antes era el

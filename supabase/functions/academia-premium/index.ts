@@ -1,3 +1,4 @@
+import { ACADEMIA_NORMATIVA, ACADEMIA_FUENTES } from '../_shared/academia-normativa.ts';
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 import { getAcademyProduct } from '../_shared/academia-products.ts';
 import {
@@ -7,6 +8,7 @@ import {
   sha256Hex,
 } from '../_shared/academia-security.ts';
 import {
+  buildAccessRedemptionUpdate,
   attachPrivatePlanillasUrl,
   containsPrivatePlanillasDownload,
   normalizeCourseSlug,
@@ -28,14 +30,15 @@ const FUNDADORES = ['evaras@firmavb.cl'];
 const CONTENIDO: Record<string, unknown> = {
   'programa-pro-adjudica-al-estado': [
     { titulo: 'Módulo 1 · El terreno de juego (y cómo pensar)', lecciones: [
-      { titulo: 'Los 3 mitos que matan al proveedor nuevo', bloques: [
-        { tipo: 'parrafo', texto: 'Antes de lo técnico: tu mentalidad determina tu éxito. Hay 3 mitos que destruyen a los nuevos proveedores. Derríbalos.' },
-        { tipo: 'lista', items: ['Mito "el Estado paga tarde y mal": FALSO. El Estado paga en plazos definidos por ley (30 días). Es más predecible que muchos clientes privados.','Mito "solo ganan los que tienen pituto": FALSO. ChileCompra es de los sistemas más transparentes del mundo. Todo queda registrado. Gana quien hace la mejor oferta.','Mito "necesitas ser grande": FALSO. El 70% de las compras del Estado son de menos de 100 UTM. Ahí está tu oportunidad.'] },
+      { titulo: 'Pago y otras ideas frecuentes del proveedor nuevo', bloques: [
+        { tipo: 'parrafo', texto: 'Antes de ofertar, distingue las reglas legales de la experiencia de cada comprador.' },
+        { tipo: 'lista', items: [ACADEMIA_NORMATIVA.pago,'Mito "solo ganan los que tienen pituto": FALSO. ChileCompra es de los sistemas más transparentes del mundo. Todo queda registrado. Gana quien hace la mejor oferta.','Mito "necesitas ser grande": FALSO. El 70% de las compras del Estado son de menos de 100 UTM. Ahí está tu oportunidad.'] },
         { tipo: 'tip', texto: 'Mentalidad de Surfista de Licitaciones: persistencia (no ganas la primera ni la segunda, pero aprendes), profesionalismo (cumple siempre) y visión de largo plazo (es un negocio, no un golpe de suerte).' } ] },
       { titulo: 'Compra Ágil, Licitación, Convenio Marco y Trato Directo', bloques: [
         { tipo: 'parrafo', texto: 'Según el monto (en UTM) y la urgencia, el Estado usa distintos mecanismos. Elegir bien dónde competir es media adjudicación. Base legal: Ley 19.886 y sus principios: libre concurrencia, igualdad, transparencia y probidad.' },
-        { tipo: 'subtitulo', texto: 'Umbrales por monto (UTM ≈ $65.000; verifica el valor vigente)' },
-        { tipo: 'lista', items: ['Menos de 3 UTM: compra directa, sin cotizar.','3 a 10 UTM: mínimo 3 cotizaciones.','10 a 100 UTM: licitación privada o convenio (aquí vive la Compra Ágil, hasta 100 UTM ≈ $6,5 millones).','100 a 1.000 UTM: licitación pública.','Más de 1.000 UTM: licitación pública con más requisitos y garantías.'] },
+        { tipo: 'subtitulo', texto: 'Monto y procedimiento: revisa ambos' },
+        { tipo: 'lista', items: [ACADEMIA_NORMATIVA.fueraSistema, ACADEMIA_NORMATIVA.compraAgil, ACADEMIA_NORMATIVA.licitacion, ACADEMIA_NORMATIVA.utm] },
+        ...ACADEMIA_FUENTES,
         { tipo: 'lista', items: ['Compra Ágil: rápida, sin garantías. Tu puerta de entrada y tu fábrica de flujo de caja.','Licitación pública: bases formales, criterios de evaluación, a veces garantías.','Convenio Marco: el "santo grial" — catálogo donde te compran directo, sin licitar cada vez.','Trato Directo: excepcional, solo con causal justificada por ley.'] },
         { tipo: 'tip', texto: 'Si estás partiendo, la Compra Ágil es tu mejor cancha: menos fricción, ciclos cortos, aprendes rápido.' },
         { tipo: 'descarga', texto: 'Descarga el Kit de Planillas de Control (Excel)', url: PLANILLAS } ] },
@@ -63,8 +66,9 @@ const CONTENIDO: Record<string, unknown> = {
         { tipo: 'lista', items: ['Situación pública actual: noticias, presupuesto, prioridades del momento.','LinkedIn: quiénes deciden las compras y qué publican.','Su historial en Mercado Público: qué compra, cada cuánto y a quién.','Comentarios y señales en redes sobre la institución.'] } ] } ] },
     { titulo: 'Módulo 3 · Inteligencia competitiva (tu diferencial)', lecciones: [
       { titulo: 'Conductas de pago: ¿este comprador paga bien?', bloques: [
-        { tipo: 'parrafo', texto: 'El Estado paga en 30 días por ley, pero no todos los organismos se comportan igual. Ganar no sirve si te pagan tarde: revisa el comportamiento histórico antes de comprometer capital.' },
-        { tipo: 'subtitulo', texto: 'Semáforo de conducta de pago' },
+        { tipo: 'parrafo', texto: ACADEMIA_NORMATIVA.pago },
+        ...ACADEMIA_FUENTES,
+        { tipo: 'subtitulo', texto: 'Semáforo orientativo de flujo de caja: no determina incumplimiento legal' },
         { tipo: 'lista', items: ['🟢 Bueno: paga en 30 días o menos.','🟡 Regular: entre 31 y 60 días.','🔴 Lento: más de 60 días — ajusta tu precio o evita.'] },
         { tipo: 'tip', texto: 'Un buen margen con pago lento puede quebrarte. Prioriza a los 🟢 para cuidar tu flujo de caja.' },
         { tipo: 'descarga', texto: 'Usa la planilla "5. Conductas de Pago" del Kit', url: PLANILLAS } ] },
@@ -253,17 +257,24 @@ Deno.serve(async (req) => {
       }
 
       const { data, error } = await admin.from('academia_accesos')
-        .select('id, estado').eq('curso_slug', slug).eq('codigo', code).maybeSingle();
+        .select('id, estado, email, mp_payment_id').eq('curso_slug', slug).eq('codigo', code).maybeSingle();
       if (error) return json({ ok: false, error: 'Error validando el código.' }, 500);
       if (!data || data.estado === 'revocado') return json({ ok: false, error: 'Código inválido. Revísalo o escríbenos.' }, 200);
 
       const contenidoAutorizado = await authorizedContent(admin, contenido);
       if (!contenidoAutorizado) return json({ ok: false, error: 'Material temporalmente no disponible.' }, 503);
       if (data.estado === 'disponible') {
-        const { error: updateError } = await admin.from('academia_accesos')
-          .update({ estado: 'usado', asignado_at: new Date().toISOString(), email: email || null })
-          .eq('id', data.id).neq('estado', 'revocado');
-        if (updateError) return json({ ok: false, error: 'Error validando el código.' }, 500);
+        let redemption = admin.from('academia_accesos')
+          .update(buildAccessRedemptionUpdate(data, email, new Date().toISOString()))
+          .eq('id', data.id).eq('estado', 'disponible');
+        redemption = data.mp_payment_id === null
+          ? redemption.is('mp_payment_id', null)
+          : redemption.eq('mp_payment_id', data.mp_payment_id);
+        redemption = data.email === null
+          ? redemption.is('email', null)
+          : redemption.eq('email', data.email);
+        const { data: redeemed, error: updateError } = await redemption.select('id').maybeSingle();
+        if (updateError || !redeemed) return json({ ok: false, error: 'Error validando el código.' }, 500);
       }
       return json({ ok: true, modulos: contenidoAutorizado });
     }

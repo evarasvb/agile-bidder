@@ -36,6 +36,7 @@ import {
   requestRateLimitHash,
 } from '../../supabase/functions/_shared/academia-security';
 import {
+  buildAccessRedemptionUpdate,
   attachPrivatePlanillasUrl,
   containsPrivatePlanillasDownload,
   PRIVATE_PLANILLAS_PLACEHOLDER,
@@ -417,7 +418,7 @@ describe('entrega del webhook', () => {
     let allocations = 0;
     const deliveries = new Map<string, AcademyAccess[]>();
     const notification = vi.fn(async () => undefined);
-    const email = vi.fn(async () => undefined);
+    const email = vi.fn(async (_input: { idempotencyKey: string }) => undefined);
     const dependencies = {
       assignAccesses: async (input: { paymentId: string; courseSlugs: readonly string[] }) => {
         const existing = deliveries.get(input.paymentId);
@@ -785,5 +786,16 @@ describe('recuperación segura', () => {
     expect(JSON.stringify(authorized)).not.toContain('/media/academia/');
     expect(() => attachPrivatePlanillasUrl(premiumContent, '/public/planilla.xlsx'))
       .toThrow('invalid_signed_url');
+  });
+});
+
+describe('access redemption preserves payment identity', () => {
+  it.each([undefined, 'different@example.invalid'])('never updates a paid buyer email (%s)', (submitted) => {
+    expect(buildAccessRedemptionUpdate({ email: 'buyer@example.invalid', mp_payment_id: '10001' }, submitted, 'now'))
+      .toEqual({ estado: 'usado', asignado_at: 'now' });
+  });
+  it('preserves a legacy email and fills only an unassigned legacy email', () => {
+    expect(buildAccessRedemptionUpdate({ email: 'existing@example.invalid', mp_payment_id: null }, 'different@example.invalid', 'now').email).toBe('existing@example.invalid');
+    expect(buildAccessRedemptionUpdate({ email: null, mp_payment_id: null }, 'new@example.invalid', 'now').email).toBe('new@example.invalid');
   });
 });

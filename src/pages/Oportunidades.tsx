@@ -124,7 +124,7 @@ function OpportunityCard({
                 (Antes decía "N/A": parecía que el match no funcionaba.) */}
             {op.match_score && op.match_score >= PISO_MATCH ? (
               <Badge className={getScoreColor(op.match_score)}>
-                {op.match_score}% match
+                {op.tipo === 'compra_agil' ? 'Similitud' : 'Score de referencia'} {op.match_score}/100
               </Badge>
             ) : op.rubro_match ? (
               <Badge variant="outline" className="border-firmavb-blue/40 text-firmavb-blue bg-firmavb-blue/5">
@@ -211,7 +211,7 @@ function OpportunityCard({
               // inventario. Es el atajo del panel para decidir dónde postular.
               <span className={`flex items-center gap-1 ${op.items_matched > 0 ? "text-firmavb-blue font-medium" : "text-muted-foreground"}`}>
                 <Package className="h-3 w-3" />
-                {op.items_matched > 0 ? `${op.items_matched}/${op.items_count} ítems calzan` : `${op.items_count} ítems`}
+                {op.items_matched > 0 ? `${op.items_matched}/${op.items_count} ítems con sugerencia` : `${op.items_count} ítems`}
               </span>
             ) : op.items_count > 0 ? (
               <span className="text-muted-foreground flex items-center gap-1">
@@ -522,7 +522,7 @@ export default function Oportunidades() {
               <SelectValue placeholder="Ordenar" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="match_score">Mayor match</SelectItem>
+              <SelectItem value="match_score">Mayor similitud</SelectItem>
               <SelectItem value="fecha_cierre">Fecha cierre</SelectItem>
               <SelectItem value="monto">Monto estimado</SelectItem>
             </SelectContent>

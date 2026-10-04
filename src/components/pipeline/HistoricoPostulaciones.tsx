@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { cn } from '@/lib/utils';
 import { linkProcesoMp } from '@/lib/procesoMp';
+import { admiteAnalisisHistorico } from '@/lib/historicoResultado';
 import { useCreatePipelineItem } from '@/hooks/usePipeline';
 import {
   useMisPostulaciones,
@@ -46,6 +47,10 @@ const RESULTADO_CONFIG: Record<HistoricoResultado, { label: string; className: s
   ganada: { label: 'Ganada', className: 'bg-green-100 text-green-700' },
   perdida: { label: 'Perdida', className: 'bg-rose-100 text-rose-700' },
   sin_tomar: { label: 'No postulaste', className: 'bg-blue-100 text-blue-700' },
+  en_curso: { label: 'Postulación en curso', className: 'bg-amber-100 text-amber-700' },
+  pendiente_resultado: { label: 'Resultado pendiente de verificar', className: 'bg-amber-100 text-amber-700' },
+  abierta: { label: 'Abierta · puedes postular', className: 'bg-blue-100 text-blue-700' },
+  sin_registro: { label: 'Participación sin verificar', className: 'bg-gray-100 text-gray-700' },
 };
 
 function BadgePagador({ conducta }: { conducta: string | null }) {
@@ -72,6 +77,10 @@ const ETAPA_POR_RESULTADO: Record<HistoricoResultado, 'adjudicada' | 'perdida' |
   ganada: 'adjudicada',
   perdida: 'perdida',
   sin_tomar: 'descubierta',
+  en_curso: 'descubierta',
+  pendiente_resultado: 'descubierta',
+  abierta: 'descubierta',
+  sin_registro: 'descubierta',
 };
 
 interface FilaProps {
@@ -110,6 +119,10 @@ const RESUMEN_POR_RESULTADO: Record<HistoricoResultado, string> = {
   ganada: 'Por qué probablemente ganamos este proceso.',
   perdida: 'Por qué probablemente lo perdimos (y quién se lo adjudicó).',
   sin_tomar: 'Quién se lo adjudicó y qué tan competitivos hubiéramos sido.',
+  en_curso: 'La postulación sigue en curso.',
+  pendiente_resultado: 'Falta verificar el resultado definitivo.',
+  abierta: 'El plazo para postular sigue abierto.',
+  sin_registro: 'No hay información suficiente para confirmar tu participación.',
 };
 
 // Post-mortem de IA (pedido de Evaristo): un botón compacto por fila que
@@ -119,8 +132,13 @@ const RESUMEN_POR_RESULTADO: Record<HistoricoResultado, string> = {
 function AnalisisIABoton({ item }: FilaProps) {
   const tipoRpc: 'licitacion' | 'compra_agil' = item.tipo === 'licitacion' ? 'licitacion' : 'compra_agil';
   const [open, setOpen] = useState(false);
-  const { data: analisis, isLoading } = useAnalisisPostulacion(open ? tipoRpc : null, open ? item.codigo : null);
-  const generar = useGenerarAnalisisPostulacion(tipoRpc, item.codigo, item.resultado);
+  const resultadoFinal = admiteAnalisisHistorico(item.resultado) ? item.resultado : null;
+  const { data: analisis, isLoading } = useAnalisisPostulacion(open && resultadoFinal ? tipoRpc : null, open && resultadoFinal ? item.codigo : null);
+  const generar = useGenerarAnalisisPostulacion(tipoRpc, item.codigo, resultadoFinal);
+
+  // El endpoint existente solo analiza resultados definitivos. No enviarle
+  // una postulación pendiente ni mostrar un post-mortem cacheado de ella.
+  if (!resultadoFinal) return null;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -323,7 +341,7 @@ const COLUMNAS: DataTableColumn<HistoricoPostulacion>[] = [
         <AnalisisIABoton item={item} />
         {/* Ganada o perdida son resultados ya cerrados: "Trabajar" solo tiene
             sentido para oportunidades de tu industria aún sin postular. */}
-        {item.resultado === 'sin_tomar' && <BotonTrabajar item={item} />}
+        {item.resultado === 'abierta' && <BotonTrabajar item={item} />}
       </div>
     ),
   },
@@ -340,7 +358,7 @@ function ResumenMercado() {
   if (!data.tiene_inventario) {
     return (
       <p className="rounded-md border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-        Para ver "No postulaste" con IA, primero carga tu inventario de productos/servicios en el módulo Inventario — el motor de matching lo necesita para comparar contra las licitaciones.
+        Para ver oportunidades de tu rubro, primero carga tu inventario de productos/servicios en el módulo Inventario — el motor de matching lo necesita para comparar contra las licitaciones.
       </p>
     );
   }
@@ -350,7 +368,7 @@ function ResumenMercado() {
       <span className="text-muted-foreground">·</span>
       <span><strong className="font-semibold">{data.en_pipeline}</strong> ya en tu pipeline</span>
       <span className="text-muted-foreground">·</span>
-      <span><strong className="font-semibold text-blue-700">{data.no_tomadas}</strong> sin postular</span>
+      <span><strong className="font-semibold text-blue-700">{data.no_tomadas}</strong> sin registro en tu pipeline</span>
     </div>
   );
 }
@@ -415,6 +433,10 @@ export function HistoricoPostulaciones() {
               <SelectItem value="ganada">Ganadas</SelectItem>
               <SelectItem value="perdida">Perdidas</SelectItem>
               <SelectItem value="sin_tomar">No postulaste</SelectItem>
+              <SelectItem value="en_curso">Postulación en curso</SelectItem>
+              <SelectItem value="pendiente_resultado">Resultado pendiente de verificar</SelectItem>
+              <SelectItem value="abierta">Abiertas para postular</SelectItem>
+              <SelectItem value="sin_registro">Participación sin verificar</SelectItem>
             </SelectContent>
           </Select>
         </>

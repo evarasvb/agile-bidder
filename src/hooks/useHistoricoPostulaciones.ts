@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabaseClient as supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/hooks/useAuth';
-
-export type HistoricoResultado = 'ganada' | 'perdida' | 'sin_tomar';
+import { resultadoHistorico, type HistoricoResultado } from '@/lib/historicoResultado';
+export type { HistoricoResultado } from '@/lib/historicoResultado';
 
 export interface HistoricoPostulacion {
   codigo: string;
@@ -19,6 +19,7 @@ export interface HistoricoPostulacion {
   monto_estimado: number | null;
   tipo: 'licitacion' | 'compra_agil' | 'convenio_marco' | 'trato_directo' | 'otro';
   resultado: HistoricoResultado;
+  estado_award?: string | null;
   ganador_nombre: string | null;
   conducta_pago: string | null;
   pago_promedio_dias: number | null;
@@ -50,7 +51,8 @@ function mapMia(row: any, nombreFallback: string): HistoricoPostulacion {
     fecha_cierre: row.fecha_cierre ?? null,
     monto_estimado: row.monto_estimado != null ? Number(row.monto_estimado) : null,
     tipo: row.tipo,
-    resultado: row.gano ? 'ganada' : 'perdida',
+    resultado: resultadoHistorico(row, true),
+    estado_award: row.estado_award ?? null,
     ganador_nombre: row.gano ? null : (row.ganador_nombre ?? null),
     conducta_pago: row.conducta_pago ?? null,
     pago_promedio_dias: row.pago_promedio_dias ?? null,
@@ -110,7 +112,8 @@ export function useOportunidadesNoTomadas(limite = 40, umbral = 0.3) {
         fecha_cierre: row.fecha_cierre ?? null,
         monto_estimado: row.monto_estimado != null ? Number(row.monto_estimado) : null,
         tipo: row.tipo,
-        resultado: 'sin_tomar' as const,
+        resultado: resultadoHistorico(row, false),
+        estado_award: row.estado_award ?? null,
         ganador_nombre: row.ganador_nombre ?? null,
         conducta_pago: row.conducta_pago ?? null,
         pago_promedio_dias: row.pago_promedio_dias ?? null,
