@@ -97,12 +97,9 @@ jobs:
             # 1) Funciones cuya propia carpeta cambió (excluye _shared).
             echo "$CHANGED" | grep -E '^supabase/functions/[^_/][^/]*/' | sed -E 's#^supabase/functions/([^/]+)/.*#\1#' >> /tmp/funcs.txt || true
 
-            # 2) Si cambió _shared, agregar las funciones que importan de ../_shared.
-            if echo "$CHANGED" | grep -q '^supabase/functions/_shared/'; then
-              echo "Cambió _shared: agrego las funciones que lo importan."
-              grep -rlE '\.\./_shared/' supabase/functions --include='*.ts' 2>/dev/null \
-                | sed -E 's#^supabase/functions/([^/]+)/.*#\1#' | grep -v '^_shared$' >> /tmp/funcs.txt || true
-            fi
+            # 2) Dependencias relativas transitivas: desplegar solamente las
+            # funciones que importan los archivos realmente modificados.
+            echo "$CHANGED" | python3 scripts/affected-edge-functions.py >> /tmp/funcs.txt
 
             # 3) Si cambió config.toml, agregar las funciones cuyo bloque [functions.X]
             #    tuvo un cambio de verify_jwt (líneas +/- de verify_jwt dentro del bloque).
