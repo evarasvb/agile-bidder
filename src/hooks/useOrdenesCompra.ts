@@ -474,17 +474,22 @@ export function useRutProveedor(nombre: string | null) {
 // OC propias del cliente (donde es proveedor) que ya están aceptadas/recibidas
 // por el organismo — para la cobranza: solo se puede cobrar lo que el Estado
 // ya aceptó. Opcionalmente filtradas por institución.
+type MisOcAceptada = { codigo: string; organismo_comprador: string | null; rut_demandante: string | null; total: number | null; fecha_emision: string | null; link_oficial: string | null; estado: string | null; numero_licitacion: string | null; fecha_aceptacion: string | null; fecha_envio_mp: string | null };
+
 export function useMisOcAceptadas(rut: string | null, nombre: string | null, institucion?: string) {
   return useQuery({
     queryKey: ['mis-oc-aceptadas', rut, nombre, institucion],
     enabled: !!(rut || nombre),
     queryFn: async () => {
+      // Explicit response type for text JSON projections avoids recursive
+      // PostgREST type inference; the selected columns and request are unchanged.
+      const columns: string = 'codigo, organismo_comprador, rut_demandante, total, fecha_emision, link_oficial, estado, numero_licitacion, fecha_aceptacion:raw_json->Fechas->>FechaAceptacion, fecha_envio_mp:raw_json->Fechas->>FechaEnvio';
       let query = supabase
         .from('ordenes_compra')
         // fecha_aceptacion y fecha_envio_mp salen del JSON crudo de Mercado
         // Público (no hay columna propia): 'raw_json.Fechas.FechaAceptacion' es
         // null hasta que el proveedor acepta la OC.
-        .select('codigo, organismo_comprador, rut_demandante, total, fecha_emision, link_oficial, estado, numero_licitacion, fecha_aceptacion:raw_json->Fechas->>FechaAceptacion, fecha_envio_mp:raw_json->Fechas->>FechaEnvio')
+        .select(columns)
         // Sin filtro de estado: trae TODAS las OC del cliente (el "cubo"). El
         // estado real de cada una se muestra tal cual en el selector; las OC
         // mutan (se aceptan/rechazan) y se refrescan con "Actualizar mis OC".
@@ -497,9 +502,9 @@ export function useMisOcAceptadas(rut: string | null, nombre: string | null, ins
       if (rut) query = query.eq('rut_proveedor', rut);
       else query = query.eq('proveedor_nombre', nombre!);
       if (institucion) query = query.ilike('organismo_comprador', `%${institucion}%`);
-      const { data, error } = await query;
+      const { data, error } = await query.overrideTypes<MisOcAceptada[], { merge: false }>();
       if (error) throw error;
-      return (data || []) as { codigo: string; organismo_comprador: string | null; rut_demandante: string | null; total: number | null; fecha_emision: string | null; link_oficial: string | null; estado: string | null; numero_licitacion: string | null; fecha_aceptacion: string | null; fecha_envio_mp: string | null }[];
+      return data || [];
     },
     staleTime: 30000,
   });

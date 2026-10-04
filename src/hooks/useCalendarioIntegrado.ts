@@ -107,11 +107,12 @@ export function useCalendarioIntegrado() {
       // calendario con cientos de cierres ajenos. Es lo mismo que pasa al
       // sincronizar con Google Calendar: solo se manda lo que el cliente
       // asignó, y si ya no le interesa lo quita (ver "Quitar del calendario").
-      const { data: pipelineItems } = await supabase
+      const { data: pipelineItems, error: pipelineError } = await supabase
         .from('pipeline')
         .select('id, titulo, etapa, fecha_cierre, institucion, monto_estimado, asignado_a, oportunidad_id, oportunidad_tipo')
         .eq('user_id', user.id);
 
+      if (pipelineError) throw pipelineError;
       if (pipelineItems) {
         for (const p of pipelineItems) {
           if (!p.fecha_cierre) continue;
@@ -149,12 +150,13 @@ export function useCalendarioIntegrado() {
       }
 
       // 4. Custom events (eventos_calendario)
-      try {
-        const { data: customEvents } = await supabase
+      {
+        const { data: customEvents, error: customError } = await supabase
           .from('eventos_calendario')
           .select('*')
           .eq('user_id', user.id);
 
+        if (customError) throw customError;
         if (customEvents) {
           for (const e of customEvents as EventoCalendarioRow[]) {
             const tipoBadgeMap: Record<TipoEventoCalendario, string> = {
@@ -192,12 +194,12 @@ export function useCalendarioIntegrado() {
             });
           }
         }
-      } catch {
-        // Table may not exist yet – ignore
       }
 
       return events;
     },
+    // Successful calendar data remains fresh for one minute; explicit refresh still runs.
+    staleTime: 60_000,
     enabled: !!user?.id,
   });
 
@@ -250,6 +252,10 @@ export function useCalendarioIntegrado() {
     events: eventsQuery.data || [],
     isLoading: eventsQuery.isLoading,
     error: eventsQuery.error,
+    refetch: eventsQuery.refetch,
+    isFetching: eventsQuery.isFetching,
+    isStale: eventsQuery.isStale,
+    hasPreviousData: eventsQuery.data !== undefined,
     createEvent,
     deleteEvent,
   };

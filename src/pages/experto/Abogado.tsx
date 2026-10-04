@@ -12,17 +12,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { useCliente } from '@/hooks/useCliente';
 import { toast } from 'sonner';
 import { descargarCartaAbogadoPDF } from '@/services/cartaAbogadoPdf';
+import { MensajeLegal } from '@/components/experto/MensajeLegal';
+import type { FuenteLegal } from '@/lib/legalHtml';
 
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string;
 const ANON = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
 
-type Msg = { rol: 'yo' | 'exp'; texto: string; fuentes?: any[] };
-
-const conCitas = (html: string, fuentes?: any[]) => html.replace(/\[(\d{1,2})\]/g, (_m, n) => {
-  const f = fuentes?.find((x) => String(x.n) === n);
-  const titulo = String(f?.fuente ?? `Fuente ${n}`).replace(/"/g, '&quot;');
-  return `<sup><a class="cita text-primary font-semibold no-underline hover:underline" href="${f?.url ?? '#'}" title="${titulo}"${f?.url ? ' target="_blank" rel="noreferrer"' : ''}>[${n}]</a></sup>`;
-});
+type Msg = { rol: 'yo' | 'exp'; texto: string; fuentes?: FuenteLegal[] };
 
 const TIPOS_DOCUMENTO = [
   { value: 'defensa_tcp', label: 'Defensa ante el Tribunal de Contratación Pública (adjudicatario)' },
@@ -281,8 +277,7 @@ export default function Abogado() {
               )}
               {msgs.map((m, i) => (
                 <div key={i} className={m.rol === 'yo' ? 'text-right' : 'text-left'}>
-                  <div className={`inline-block rounded-lg px-3 py-2 text-sm max-w-[85%] ${m.rol === 'yo' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
-                    dangerouslySetInnerHTML={{ __html: m.rol === 'exp' ? conCitas(m.texto || '…', m.fuentes) : m.texto }} />
+                  <MensajeLegal rol={m.rol} texto={m.texto} fuentes={m.fuentes} />
                 </div>
               ))}
               {limite && <div className="rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-900">

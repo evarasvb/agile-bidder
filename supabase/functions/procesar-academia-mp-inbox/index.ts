@@ -11,6 +11,7 @@ import {
   AcademyInboxProcessingError,
   academyInboxErrorDetails,
   processAcademyChargeback,
+  academyPreflightReady,
 } from './logic.ts';
 
 interface ClaimedInboxEvent {
@@ -101,9 +102,42 @@ Deno.serve(async (req) => {
       .eq('key', 'MERCADOPAGO_ACCESS_TOKEN').maybeSingle();
     mercadoPagoToken = data?.value;
   }
-  if (!mercadoPagoToken) return new Response('unavailable', { status: 503 });
 
   const payload = await req.json().catch(() => ({} as Record<string, unknown>));
+  // Read-only diagnostic, authenticated by the same exact bearer as processing.
+  // Never claim events, generate downloads, send emails or write payment rows.
+  if ((payload as Record<string, unknown>).action === 'preflight') {
+    const mpAccepted = mercadoPagoToken
+      ? await fetch('https://api.mercadopago.com/users/me', {
+        headers: { Authorization: `Bearer ${mercadoPagoToken}` },
+        signal: AbortSignal.timeout(10_000),
+      }).then((response) => response.status === 200).catch(() => false)
+      : false;
+    const bucket = await db.storage.getBucket('academia-premium');
+    const objects = await db.storage.from('academia-premium')
+      .list('', { limit: 100, search: 'planillas-programa-pro.xlsx' });
+    const schemaChecks = await Promise.all([
+      'academia_pago_accesos', 'academia_recuperaciones', 'academia_rate_limits',
+      'academia_mp_inbox', 'academia_eventos',
+    ].map((table) => db.from(table).select('*', { head: true }).limit(0)));
+    const checks = {
+      mpAccepted,
+      bucketPrivate: !bucket.error && bucket.data?.public === false,
+      assetPresent: !objects.error && !!objects.data?.some((object) =>
+        object.name === 'planillas-programa-pro.xlsx'
+        && Number(object.metadata?.size) > 0
+        && Number(object.metadata?.size) <= 10 * 1024 * 1024
+        && object.metadata?.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
+      schemaReady: schemaChecks.every((result) => !result.error),
+      signatureSecretPresent: !!Deno.env.get('MERCADOPAGO_WEBHOOK_SECRET'),
+    };
+    const ready = academyPreflightReady(checks);
+    return new Response(JSON.stringify({ action: 'preflight', authenticated: true, ready, checks }), {
+      status: ready ? 200 : 503,
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+    });
+  }
+  if (!mercadoPagoToken) return new Response('unavailable', { status: 503 });
   const requestedLimit = Number((payload as Record<string, unknown>).limit ?? 10);
   const limit = Number.isInteger(requestedLimit) && requestedLimit >= 1 && requestedLimit <= 20
     ? requestedLimit

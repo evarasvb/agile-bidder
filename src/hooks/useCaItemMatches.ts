@@ -1,3 +1,4 @@
+import { SUGGESTION_FLOOR } from '@/lib/matchingContract';
 import { useQuery } from '@tanstack/react-query';
 import { supabaseClient } from '@/lib/supabaseClient';
 
@@ -46,13 +47,16 @@ export function useCaItemMatchCounts(codigos: string[]) {
     queryFn: async (): Promise<Record<string, number>> => {
       const { data, error } = await supabaseClient
         .from('ca_item_matches')
-        .select('compra_agil_codigo')
-        .in('compra_agil_codigo', codigos);
+        .select('compra_agil_codigo, item_id')
+        .in('compra_agil_codigo', codigos)
+        .gte('score', SUGGESTION_FLOOR);
       if (error) throw error;
       const counts: Record<string, number> = {};
-      for (const row of (data || []) as { compra_agil_codigo: string }[]) {
-        counts[row.compra_agil_codigo] = (counts[row.compra_agil_codigo] || 0) + 1;
+      const ids: Record<string, Set<string>> = {};
+      for (const row of (data || []) as { compra_agil_codigo: string; item_id: string }[]) {
+        if (row.item_id) (ids[row.compra_agil_codigo] ??= new Set()).add(row.item_id);
       }
+      for (const [codigo, items] of Object.entries(ids)) counts[codigo] = items.size;
       return counts;
     },
     staleTime: 60_000,

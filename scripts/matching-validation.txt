@@ -1,0 +1,35 @@
+Matching FirmaVB — contrato y validación local
+Base main09ff1cb; rama fix/matching-contract-local. Solo edición y pruebas locales. PR476 y Libraryv2 no modificados. Archivos de PR474/475 intactos. Sin SQL/migraciones, push, PR nuevos, publicación, deploy o llamadas IA.
+
+Contrato
+1. Score de similitud por ítem: número0..100 del motor existente, útil para ordenar sugerencias;40 incluye candidatos,70 orienta sugerencia alta. Nunca es probabilidad de ganar, cobertura o cumplimiento.
+2. Cobertura de sugerencias: ítems solicitados distintos con candidato / total conocido de ítems solicitados, deduplicando y excluyendo ids huérfanos. Denominador desconocido permanece desconocido. Los faltantes no desaparecen del denominador.
+3. Compatibilidad: incompatible/ambigua, desconocida o sin conflicto detectado en el texto disponible. Se comprueban medidas y masa de nombre+descripción y equivalencias matemáticas. Sin conflicto detectado no significa validación integral.
+4. Seleccionado por ti: confirmación/reasignación/checkbox explícito, cantidad/unidad conocidas y sin conflicto detectado. Presupuesto excedido es advertencia comercial para revisar bases, no rechazo automático ni veredicto legal; detalle y modal aplican la misma política. Sugerencia alta automática nunca basta. Una confirmación no omite incompatibilidades, cantidad inválida o especificación remitida a anexo no leído.
+5. Bases/anexos: siempre sin validar en este contrato; cumplimiento desconocido. No se inventa un veredicto documental. Scores agregados legacy de licitación se etiquetan score de referencia: su algoritmo de origen no se certifica como similitud ni cobertura.
+
+Cambios
+Bandeja deja de sustituir similitud por porcentaje de cobertura. Conserva45.5 y muestra ítems con sugerencia separadamente. Conteo usa ids únicos sobre piso40. Detalles CA/lic y propuesta comparten assessMatch y lenguaje. No se fabrica cantidad1/unidad ante000 o ausencia. Modal permite corregir cantidad/unidad antes de seleccionar. Descripción técnica viaja al modal/reasignación y se revalida al calcular/exportar. Ítems con precio pero no seleccionados dejan de entrar al total/PDF/guardado. Libro excluye sugerencias no confirmadas e incompatibles al preparar cotización. Productos manuales usan cantidad editable, no el tope ficticio999 como cantidad inicial. Agregar producto nuevo establece oferta manual explícita; nombre, cantidad, precio y subtotal viajan a PDF y guardado. Dimensiones conservan roles largo/diámetro/etc. y orden de vectores sin etiqueta: no basta un multiset igual. Medidas requeridas faltantes exigen revisión.
+
+Reproducción
+npm ci --ignore-scripts --no-audit --no-fund
+npm test
+node scripts/simulate-matching.mjs /tmp/matching-matrix.json
+npm run build
+npx tsc -p tsconfig.app.json --noEmit
+Browser: servidor separado e2e/matching-fixtures/vite.config.ts puerto5188 + verify.mjs, Chromium ya disponible; PW_CHROMIUM indica ejecutable. Hooks, identidad, acciones de escritura y paneles auxiliares simulados/etiquetados; componentes reales de CA detalle, lic ítems y propuesta. Todo tráfico externo bloqueado. PDF captura su payload sin renderizar el documento; guardado captura el primer payload y se detiene antes de persistir o generar ficha IA. No es login/flujo integral de Supabase.
+
+Matriz de regresión
+30 casos sintéticos =10 oportunidades de fixture (5CA+5LIC) ×3catálogos ficticios: papelería, médico, TI. Incluye reconstrucciones mínimas de los síntomas reportados744835-601-COT26 y3537-61-L126; NO son snapshots certificados de sus fichas reales. Ocho oportunidades usan ids fixture. No se descargaron anexos ni se leyó documentación pública real. Todas las salidas declaran documentosRead=[] y compliance=unknown.
+Gold manual fijado en fixture mide candidato técnico admisible con catálogo disponible, NO relevancia real de mercado ni cumplimiento. Before simula inclusión score>=40; after pide>=70+texto/medidas/cantidad conocidos. Antes TP6 FP4 TN20 FN0 precisión0.60 recall1.00. Después TP5 FP0 TN24 FN1 precisión1.00 recall0.8333. Falso negativo conservado: candidato válido conscore65; permanece visible como sugerencia para revisión/confirmación. No generalizar estos números fuera de la matriz.
+
+Costos
+Llamadas IA adicionales0; modelos/dependencias nuevas0; cron/SQL/infraestructura nueva0. Coste incremental de APIs IA por1000procesos:0, por construcción. No se recalculan embeddings ni se tocan generadores/umbrales remotos. Consultas existentes conservan número de llamadas, filtros de empresa/RLS; seleccionan algunos campos adicionales para separar ids/score. Payload/CPU del navegador no benchmarkeados, no se promete costo total de operación idéntico al centavo.
+
+Pendiente issue398
+Esto no completa su auditoría de10procesos públicos recientes con5anexos descargados y citas de página/sección. Requiere recopilar snapshot público trazable, documentos y etiquetas humanas independientes. Aquí no existe esa evidencia; no se afirma CAPTCHA/bloqueo de acceso sin haberlo probado. La regresión sintética prepara contrato y medición reproducible, no un veredicto sobre los procesos reales.
+
+Verificación y riesgos
+Pruebas finales y build registrados en evidencia; deuda TypeScript de base se compara ignorando solo desplazamientos de línea. Main09ff1cb con su lock original FullCalendarreact7/core6 tiene44errores baseline, distinto del checkoutPR476 con dependencias corregidas que tenía38. No arrastrar arreglo de calendario a esta rama ni afirmar tipos integrales verdes.
+Revisión independiente detectó4defectos (edición000 bloqueada, pérdida de descripción, omisión de medidas del nombre, unidad inventada en Libro) y un checkbox inicial inconsistente; corregidos y cubiertos por tests/navegador. La revisión posterior del root encontró dos P1 adicionales: manual seleccionado excluido del total/PDF/guardado y medidas con roles intercambiados aceptadas. Se corrigieron en esta revisión; no se presenta la revisión anterior como garantía de ausencia de fallos. Política de presupuesto unificada como advertencia comercial. Nueva revisión independiente encontró variante de roles con de/del/es y duplicación de medidas equivalentes título/descripción; corregidas y cubiertas. Segunda revisión no detectó otro defecto importante en el diff, con límites de extracción textual expresos.
+Cambio deliberado: sugerencias automáticas dejan de seleccionarse como oferta completa; el usuario debe confirmar. No cambia la persistencia existente de overrides ni mensajes de PR474. Selección comercial no certifica admisibilidad documental.

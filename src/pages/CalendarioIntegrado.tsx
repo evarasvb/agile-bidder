@@ -1,3 +1,5 @@
+import { CalendarBoundary } from "@/components/CalendarBoundary";
+import { QueryFeedback } from "@/components/QueryFeedback";
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import FullCalendar from "@fullcalendar/react";
@@ -93,7 +95,7 @@ const hoyLocal = () => format(new Date(), "yyyy-MM-dd");
 export default function CalendarioIntegrado() {
   const navigate = useNavigate();
   const calendarRef = useRef<FullCalendar>(null);
-  const { events, isLoading, error, createEvent, deleteEvent } = useCalendarioIntegrado();
+  const { events, isLoading, error, refetch, isFetching, isStale, hasPreviousData, createEvent, deleteEvent } = useCalendarioIntegrado();
   const deletePipelineItem = useDeletePipelineItem();
   const queryClient = useQueryClient();
 
@@ -288,25 +290,14 @@ export default function CalendarioIntegrado() {
         </div>
       </div>
 
+      {/* One query state covers calendar, counters and both event lists. */}
+      <QueryFeedback error={error} loading={isLoading} retrying={isFetching} refreshing={isFetching} stale={isStale} hasPreviousData={hasPreviousData} onRetry={() => void refetch()} label="el calendario">
+      <CalendarBoundary>
       {/* Main layout: Calendar + Sidebar */}
       <div className="flex flex-col lg:flex-row gap-4">
         {/* Calendar */}
         <Card className={cn("flex-1 min-w-0", showSidebar ? "" : "")}>
           <CardContent className="p-4">
-            {isLoading ? (
-              <div className="flex items-center justify-center h-[600px]">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : error ? (
-              // Antes, si la carga fallaba, se veía un calendario vacío sin aviso.
-              <div className="flex flex-col items-center justify-center h-[600px] text-center gap-2 px-6">
-                <CalendarIcon className="h-8 w-8 text-muted-foreground/60" />
-                <p className="text-sm font-medium">No pudimos cargar el calendario</p>
-                <p className="text-xs text-muted-foreground">
-                  Revisa tu conexión e inténtalo de nuevo en unos segundos.
-                </p>
-              </div>
-            ) : (
               <FullCalendar
                 ref={calendarRef}
                 plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
@@ -353,7 +344,6 @@ export default function CalendarioIntegrado() {
                   hour12: false,
                 }}
               />
-            )}
           </CardContent>
         </Card>
 
@@ -476,8 +466,11 @@ export default function CalendarioIntegrado() {
         )}
       </div>
 
+      </CalendarBoundary>
+      </QueryFeedback>
+
       {/* ── Event Detail Modal ─────────────────────────────────── */}
-      <Dialog open={!!selectedEvent} onOpenChange={() => setSelectedEvent(null)}>
+      <Dialog open={!!selectedEvent && !error && !isLoading} onOpenChange={() => setSelectedEvent(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="pr-6">Detalle del Evento</DialogTitle>

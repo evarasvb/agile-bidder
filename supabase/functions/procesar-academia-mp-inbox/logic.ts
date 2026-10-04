@@ -70,7 +70,7 @@ export async function processAcademyChargeback(
   if (!row) throw new AcademyInboxProcessingError('payment_row_pending', true);
 
   const identity = validateAcademyPaymentIdentity(payment, merchantOrder, row);
-  if (!identity.ok) {
+  if (identity.ok === false) {
     throw new AcademyInboxProcessingError(
       identity.code,
       identity.code === 'payment_not_in_order',
@@ -86,4 +86,17 @@ export async function processAcademyChargeback(
     status: payment.status,
   });
   return { paymentReference: row.id, revoked };
+}
+
+export interface AcademyPreflightChecks {
+  mpAccepted: boolean;
+  bucketPrivate: boolean;
+  assetPresent: boolean;
+  schemaReady: boolean;
+  signatureSecretPresent: boolean;
+}
+
+export function academyPreflightReady(checks: AcademyPreflightChecks): boolean {
+  return checks.mpAccepted && checks.bucketPrivate && checks.assetPresent
+    && checks.schemaReady && checks.signatureSecretPresent;
 }

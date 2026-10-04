@@ -1,3 +1,5 @@
+import { assessMatch, requestedQuantity, knownUnit } from '@/lib/matchingContract';
+import { MatchAssessmentSummary } from '@/components/MatchEvidence';
 import { useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { presupuestoTexto } from "@/lib/organismoPago";
@@ -64,9 +66,9 @@ function formatCurrency(value: number | null) {
 
 function getScoreBadge(score: number | null) {
   if (!score) return <Badge variant="secondary">N/A</Badge>;
-  if (score >= 80) return <Badge className="bg-green-500 text-white text-lg px-3 py-1">{score}%</Badge>;
-  if (score >= 50) return <Badge className="bg-yellow-500 text-white text-lg px-3 py-1">{score}%</Badge>;
-  return <Badge variant="secondary" className="text-lg px-3 py-1">{score}%</Badge>;
+  if (score >= 80) return <Badge className="bg-green-500 text-white text-lg px-3 py-1">Score de referencia {score}/100</Badge>;
+  if (score >= 50) return <Badge className="bg-yellow-500 text-white text-lg px-3 py-1">Score de referencia {score}/100</Badge>;
+  return <Badge variant="secondary" className="text-lg px-3 py-1">Score de referencia {score}/100</Badge>;
 }
 
 function getDeadlineInfo(fechaCierre: string | null) {
@@ -439,6 +441,7 @@ export default function OportunidadDetalle() {
                     <TableBody>
                       {oportunidad.items.map((item) => {
                         const m = matchPorItem.get(item.id);
+                        const assessment = assessMatch({requested:{nombre:item.nombre_producto,descripcion:item.descripcion ?? '',cantidad:item.cantidad,unidad:item.unidad},product:m?.nombre_producto ? {nombre_producto:m.nombre_producto} : null,score:m?.score});
                         const tieneMatch = !!m && (m.score ?? 0) >= 40;
                         return (
                         <TableRow key={item.id}>
@@ -446,15 +449,16 @@ export default function OportunidadDetalle() {
                           <TableCell className="text-sm text-muted-foreground max-w-xs truncate" title={item.descripcion || ""}>
                             {item.descripcion || "-"}
                           </TableCell>
-                          <TableCell className="text-right">{item.cantidad || "-"}</TableCell>
-                          <TableCell>{item.unidad || "-"}</TableCell>
+                          <TableCell className="text-right">{requestedQuantity(item.cantidad) ?? 'Por confirmar'}</TableCell>
+                          <TableCell>{knownUnit(item.unidad) ? item.unidad : 'Por confirmar'}</TableCell>
                           <TableCell className="text-right">
                             {item.precio_unitario ? formatCurrency(item.precio_unitario) : "-"}
                           </TableCell>
                           {oportunidad.tipo === "licitacion" && (
                             <TableCell>
                               {tieneMatch ? (
-                                <div className="flex items-center gap-2">
+                                <div className="space-y-1">
+                                  <MatchAssessmentSummary assessment={assessment} />
                                   <Badge
                                     className={
                                       (m!.score ?? 0) >= 80
@@ -462,7 +466,7 @@ export default function OportunidadDetalle() {
                                         : "bg-yellow-500 text-white"
                                     }
                                   >
-                                    {Math.round(m!.score ?? 0)}%
+                                    Similitud {m!.score}/100
                                   </Badge>
                                   <span className="text-sm truncate max-w-[200px]" title={m!.nombre_producto || ""}>
                                     {m!.nombre_producto}
@@ -585,8 +589,8 @@ export default function OportunidadDetalle() {
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
                 <TrendingUp className="h-4 w-4" />
-                Match Score
-                <InfoHint text="Mide qué tan parecidos son los productos de esta oportunidad a los de tu inventario (por código ONU exacto o similitud de nombre, ignorando acentos). 100% = producto idéntico en tu inventario." />
+                Score de referencia
+                <InfoHint text="Score del motor de coincidencias. No mide cobertura ni acredita compatibilidad, producto idéntico o cumplimiento. Bases y anexos pendientes de validación." />
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">

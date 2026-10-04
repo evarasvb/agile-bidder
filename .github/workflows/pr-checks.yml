@@ -29,7 +29,10 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Type-check + build
+      - name: Type-check application
+        run: npm run type-check
+
+      - name: Build
         run: npm run build
 
       - name: Unit tests

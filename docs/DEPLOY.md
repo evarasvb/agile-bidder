@@ -146,7 +146,9 @@ ventana de ventas y notificaciones, y recién después cambiar la base.
 5. Esperar a que terminen las invocaciones iniciadas antes del corte y revisar
    en Mercado Pago todos los pagos desde la hora guardada. Registrar sus ids;
    si aparece un pago aprobado no conciliado, no seguir hasta identificarlo.
-6. Aplicar las migraciones de Academia. Su preflight debe ejecutarse nuevamente
+6. Aplicar las migraciones de Academia y el fix forward de reclamación de Inbox
+   en una única transacción que deje el job `academia-mp-inbox-worker` inactivo.
+   Activarlo solo después de validar el worker y la firma. Su preflight debe ejecutarse nuevamente
    con el checkout cerrado. La primera crea el bucket privado
    `academia-premium`; la de seguridad crea el cron de la bandeja cada 5 minutos.
 7. La planilla histórica estuvo en Git público y **no se puede vender como
@@ -156,7 +158,12 @@ ventana de ventas y notificaciones, y recién después cambiar la base.
 8. Desplegar `procesar-academia-mp-inbox`, `academia-premium` y la versión final
    de `mp-curso-webhook`. Desactivar solo
    `ACADEMIA_WEBHOOK_MAINTENANCE`, manteniendo el checkout cerrado. El worker
-   acepta únicamente el bearer `service_role`.
+   acepta únicamente el bearer `service_role`. Con checkout y cron cerrados,
+   enviar `{ "action": "preflight" }` usando el JWT de Vault desde el servidor.
+   Exigir `authenticated=true` y `ready=true`: el diagnóstico comprueba MP,
+   bucket privado, archivo, tablas y presencia del secreto de firma sin reclamar
+   eventos ni devolver credenciales. La presencia del secreto no sustituye la
+   comprobación de firma real del simulador.
 9. En Mercado Pago, activar el tópico `topic_chargebacks_wh` sobre
    `https://juiskeeutbaipwbeeezw.supabase.co/functions/v1/mp-curso-webhook` y
    ejecutar el simulador. Confirmar HTTP 200, una sola fila firmada en
@@ -178,3 +185,15 @@ con 503. Todo contracargo sin firma válida se rechaza con 401 y nunca entra a l
 bandeja ni consulta la API de MP. Solo los avisos antiguos de pago pueden llegar
 sin firma: se limitan por red y pago, y antes de entregar verifican Payment y
 Merchant Order directamente en MP.
+
+### Reversión segura de Academia
+
+Ante cualquier fallo, cerrar checkout, dejar webhook en 503 con `Retry-After`
+para conservar los reintentos del proveedor y desactivar el job de Inbox.
+Mantener todas las tablas, pagos, códigos, vínculos y eventos; no restaurar un
+dump sobre ventas posteriores ni eliminar DDL con datos dependientes.
+Si el handler premium no es seguro, sustituirlo temporalmente por un handler
+503 sin consultas ni entrega de contenido. La fuente legacy respaldada sirve
+para diagnóstico: no es un rollback ejecutable de recuperación por email.
+Restaurar el deployment frontend previo no revierte el backend; mantener las
+compras cerradas hasta una corrección revisada y la conciliación completa.

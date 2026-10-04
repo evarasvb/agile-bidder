@@ -85,7 +85,7 @@ function MatchBadge({ score, matchEncontrado }: { score: number | null; matchEnc
       {level === 'high' && <CheckCircle className="h-3 w-3" />}
       {level === 'medium' && <TrendingUp className="h-3 w-3" />}
       {level === 'low' && <XCircle className="h-3 w-3" />}
-      {score}% - {label}
+      Referencia {score}/100 - {label}
     </Badge>
   );
 }

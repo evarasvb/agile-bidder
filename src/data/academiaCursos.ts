@@ -1,3 +1,5 @@
+import { ACADEMIA_NORMATIVA, ACADEMIA_FUENTES } from "../../supabase/functions/_shared/academia-normativa";
+
 // =============================================================================
 //  CURSOS DE LA ACADEMIA FIRMAVB
 // -----------------------------------------------------------------------------
@@ -130,12 +132,12 @@ export const CURSOS: Curso[] = [
               },
               {
                 tipo: "subtitulo",
-                texto: "Los 3 mitos que frenan a todos",
+                texto: "Pago y otras ideas frecuentes",
               },
               {
                 tipo: "lista",
                 items: [
-                  "\"El Estado paga tarde y mal\": falso. Paga en plazos definidos por ley (30 días); suele ser más predecible que un cliente privado.",
+                  ACADEMIA_NORMATIVA.pago,
                   "\"Solo ganan los que tienen pituto\": falso. ChileCompra es de los sistemas más transparentes del mundo; todo queda registrado y gana la mejor oferta.",
                   "\"Necesitas ser grande\": falso. El 70% de las compras del Estado son de menos de 100 UTM. Ahí está tu oportunidad.",
                 ],
@@ -158,13 +160,14 @@ export const CURSOS: Curso[] = [
               {
                 tipo: "lista",
                 items: [
-                  "Menos de 3 UTM: compra directa, sin cotizar.",
-                  "3 a 10 UTM: mínimo 3 cotizaciones.",
-                  "10 a 100 UTM: licitación privada o convenio (aquí vive la Compra Ágil).",
-                  "100 a 1.000 UTM: licitación pública. Más de 1.000 UTM: con más requisitos y garantías.",
-                  "Referencia: la UTM vale aprox. $65.000, así que 100 UTM ≈ $6,5 millones (verifica el valor vigente).",
+                  ACADEMIA_NORMATIVA.fueraSistema,
+                  ACADEMIA_NORMATIVA.compraAgil,
+                  ACADEMIA_NORMATIVA.licitacion,
+                  "Licitación pública: los tipos y requisitos varían por monto; revisa las bases del proceso.",
+                  ACADEMIA_NORMATIVA.utm,
                 ],
               },
+              ...ACADEMIA_FUENTES,
               {
                 tipo: "subtitulo",
                 texto: "1. Compra Ágil",
@@ -172,7 +175,7 @@ export const CURSOS: Curso[] = [
               {
                 tipo: "parrafo",
                 texto:
-                  "Para compras de bajo monto (hasta 100 UTM). Es rápida y simple: el organismo pide cotizaciones y compara. Es la mejor puerta de entrada para empezar.",
+                  ACADEMIA_NORMATIVA.compraAgil,
               },
               {
                 tipo: "subtitulo",
@@ -181,7 +184,7 @@ export const CURSOS: Curso[] = [
               {
                 tipo: "parrafo",
                 texto:
-                  "Para montos mayores. Tiene bases formales, plazos y criterios de evaluación. Según el monto en UTM se clasifican en distintos tipos (LE, LP, LR…) con más o menos exigencias y, a veces, garantías.",
+                  "Puede usarse incluso bajo 100 UTM. Revisa las bases, plazos, criterios de evaluación y garantías que correspondan al proceso.",
               },
               {
                 tipo: "subtitulo",
@@ -341,7 +344,7 @@ export const CURSOS: Curso[] = [
               {
                 tipo: "parrafo",
                 texto:
-                  "La Compra Ágil es un mecanismo simple y rápido para compras de bajo monto (hasta 100 UTM ≈ $6,5 millones). El organismo publica lo que necesita, los proveedores cotizan, y se adjudica a la mejor oferta. Sin bases complejas ni garantías. Dato clave: el 70% de las compras del Estado son bajo 100 UTM, así que aquí está la mayor cantidad de oportunidades.",
+                  "La Compra Ágil es un mecanismo simple y rápido para compras de bajo monto (hasta 100 UTM inclusive). El organismo publica lo que necesita, los proveedores cotizan, y se adjudica a la mejor oferta. Sin bases complejas ni garantías. Dato clave: el 70% de las compras del Estado son bajo 100 UTM, así que aquí está la mayor cantidad de oportunidades.",
               },
               {
                 tipo: "lista",

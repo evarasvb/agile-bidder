@@ -104,7 +104,7 @@ function TabExperto() {
       <DataTable<ExpertoConsulta>
         storageKey="admin-experto-consultas"
         rows={consultas ?? []}
-        rowKey={(c) => c.id}
+        rowKey={(c) => String(c.id)}
         itemLabel="consultas"
         columns={columnas}
         loading={isLoading}
@@ -191,7 +191,7 @@ function TabEvaristo() {
       <DataTable<EvaristoConversacion>
         storageKey="admin-evaristo-conversaciones"
         rows={conversaciones ?? []}
-        rowKey={(c) => c.id}
+        rowKey={(c) => String(c.id)}
         itemLabel="conversaciones"
         columns={columnas}
         loading={isLoading}
