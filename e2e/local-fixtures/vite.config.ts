@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import path from 'node:path';
-export default defineConfig({
+export default defineConfig({cacheDir:'node_modules/.vite-inventory-integration',
   plugins: [react()],
   optimizeDeps: { entries: ['e2e/local-fixtures/index.html'] },
   resolve: { alias: [

@@ -10,9 +10,11 @@ imports = re.compile(r"(?:from\s+|import\s*\(\s*|import\s+)[\"']([^\"']+)[\"']")
 
 def dependencies(file, seen):
     file = file.resolve()
-    if file in seen or not file.is_file():
+    if file in seen:
         return
     seen.add(file)
+    if not file.is_file():
+        return
     for name in imports.findall(file.read_text()):
         if not name.startswith('.'):
             continue
