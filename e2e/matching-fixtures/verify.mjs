@@ -1,3 +1,4 @@
+const evidenceDir = process.env.EVIDENCE_DIR ?? '../evidence';
 import {chromium} from '@playwright/test';
 import assert from 'node:assert/strict';
 const browser = await chromium.launch({executablePath:process.env.PW_CHROMIUM});
@@ -18,18 +19,18 @@ try {
  await page.getByText('0 de 1 seleccionados').waitFor();
  assert.equal(await page.getByText('Similitud 45.5/100',{exact:true}).count()>0,true);
  assert.equal(await page.getByText('Especificaciones pendientes: leer el documento adjunto',{exact:true}).count()>0,true);
- await page.screenshot({path:'../evidence/matching-ca.png',fullPage:true});
+ await page.screenshot({path:evidenceDir + '/matching-ca.png',fullPage:true});
  await page.goto('http://127.0.0.1:5188/e2e/matching-fixtures/index.html?case=3537-61-L126');
  await page.getByText('Productos Solicitados (3)').waitFor();
  assert.equal(await page.getByText('Compatibilidad: incompatible o ambigua',{exact:true}).count(),2);
- await page.screenshot({path:'../evidence/matching-lic.png',fullPage:true});
+ await page.screenshot({path:evidenceDir + '/matching-lic.png',fullPage:true});
  await page.goto('http://127.0.0.1:5188/e2e/matching-fixtures/index.html?case=fixture-CA-05&proposal=1');
  const dialog=page.getByRole('dialog');await dialog.waitFor();
  assert.equal(await dialog.getByText(/cantidad por confirmar/).count()>0,true);
  assert.equal(await dialog.getByRole('checkbox').first().isChecked(),false);
  assert.equal(await dialog.getByRole('checkbox').first().isDisabled(),true);
  await dialog.getByText('0 items seleccionados').waitFor();
- await page.screenshot({path:'../evidence/matching-proposal-invalid.png',fullPage:true});
+ await page.screenshot({path:evidenceDir + '/matching-proposal-invalid.png',fullPage:true});
  await dialog.getByRole('spinbutton',{name:'Cantidad ofertada de Teclado USB'}).fill('2');
  await dialog.getByRole('textbox',{name:'Unidad ofertada de Teclado USB'}).pressSequentially('UN');
  assert.equal(await dialog.getByRole('checkbox').first().isDisabled(),false);
@@ -79,7 +80,7 @@ try {
  await proposal.getByText('Advertencia comercial: subtotal supera el presupuesto; revisar bases',{exact:true}).waitFor();
  await proposal.getByText('1 items seleccionados').waitFor();
  assert.equal(await proposal.getByRole('checkbox').last().isChecked(),true);
- await page.screenshot({path:'../evidence/matching-proposal-manual.png',fullPage:true});
+ await page.screenshot({path:evidenceDir + '/matching-proposal-manual.png',fullPage:true});
  await page.goto('http://127.0.0.1:5188/e2e/matching-fixtures/index.html?case=fixture-CA-03&proposal=1&rolesConflict=1&confirmed=1');
  await page.getByRole('dialog').getByText('Compatibilidad: incompatible o ambigua',{exact:true}).waitFor();
  assert.equal(await page.getByRole('dialog').getByRole('checkbox').first().isChecked(),false);

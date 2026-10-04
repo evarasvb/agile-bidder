@@ -32,6 +32,12 @@ interface ProductoRow { id: string; nombre_producto: string; sku: string | null 
 interface FacturaRow { id: string; deudor_nombre: string; numero_factura: string | null; monto: number }
 interface ProductoSemanticoRow { id: string; nombre_producto: string; sku: string | null; similitud: number }
 
+function isOportunidadRow(value: unknown): value is OportunidadRow {
+  if (!value || typeof value !== 'object') return false;
+  const row = value as Record<string, unknown>;
+  return (row.tipo === 'licitacion' || row.tipo === 'compra_agil') && typeof row.codigo === 'string' && typeof row.nombre === 'string' && (row.institucion === null || typeof row.institucion === 'string');
+}
+
 const CLP = (v: number) => '$' + Math.round(v || 0).toLocaleString('es-CL');
 
 // Buscador único (Cmd+K): cruza oportunidades, inventario y facturas en un
@@ -61,7 +67,7 @@ export function useBusquedaGlobal(query: string) {
 
       const resultados: ResultadoBusqueda[] = [];
 
-      for (const o of ((oportunidadesRes.data as OportunidadRow[] | null) || [])) {
+      for (const o of (Array.isArray(oportunidadesRes.data) ? oportunidadesRes.data.filter(isOportunidadRow) : [])) {
         resultados.push({
           tipo: o.tipo,
           id: o.codigo,

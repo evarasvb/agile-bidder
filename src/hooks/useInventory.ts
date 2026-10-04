@@ -1,3 +1,4 @@
+import type { Database } from '@/integrations/supabase/types';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabaseClient as supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/hooks/useAuth';
@@ -454,7 +455,7 @@ export function useUpdateInventoryItem() {
       if (!clienteId) throw new Error('No se encontró tu empresa.');
 
       // Map InventoryItem fields to cliente_inventario fields
-      const updateData: Record<string, any> = {};
+      const updateData: Database['public']['Tables']['cliente_inventario']['Update'] = {};
       // Mantener `nombre` y `nombre_producto` en sincronía (ambos NOT NULL; el
       // trigger de búsqueda/nombre_norm se alimenta de nombre_producto).
       if (updates.nombre_producto !== undefined) { updateData.nombre = updates.nombre_producto; updateData.nombre_producto = updates.nombre_producto; }

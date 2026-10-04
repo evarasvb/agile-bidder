@@ -417,7 +417,7 @@ describe('entrega del webhook', () => {
     let allocations = 0;
     const deliveries = new Map<string, AcademyAccess[]>();
     const notification = vi.fn(async () => undefined);
-    const email = vi.fn(async () => undefined);
+    const email = vi.fn(async (_input: { idempotencyKey: string }) => undefined);
     const dependencies = {
       assignAccesses: async (input: { paymentId: string; courseSlugs: readonly string[] }) => {
         const existing = deliveries.get(input.paymentId);

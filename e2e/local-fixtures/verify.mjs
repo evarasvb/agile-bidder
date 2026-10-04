@@ -1,3 +1,4 @@
+const evidenceDir = process.env.EVIDENCE_DIR ?? '../evidence';
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM });

@@ -8,7 +8,7 @@ type RpcFn = <T = unknown>(fn: string, args?: Record<string, unknown>) => Promis
 // RpcFn` desenchufa el método de su objeto y pierde el `this` interno
 // (this.rest) — revienta con "Cannot read properties of undefined (reading
 // 'rest')". Se envuelve en una función que invoca supabase.rpc como método.
-const rpc = ((fn: string, args?: Record<string, unknown>) => supabase.rpc(fn, args)) as unknown as RpcFn;
+const rpc = supabase.rpc.bind(supabase) as unknown as RpcFn;
 
 export interface GarantiaBases {
   seriedad: string | null;

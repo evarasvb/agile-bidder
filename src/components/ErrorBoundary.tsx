@@ -64,8 +64,8 @@ export class ErrorBoundary extends Component<Props, State> {
       await supabase.from('error_logs').insert({
         error_message: error.message,
         error_stack: error.stack,
-        component_stack: errorInfo.componentStack,
-        timestamp: new Date().toISOString(),
+        component_name: errorInfo.componentStack,
+        created_at: new Date().toISOString(),
       });
     } catch (logError) {
       console.error('Failed to log error:', logError);

@@ -128,14 +128,14 @@ export function ImportScriptDialog({ open, onOpenChange, onSuccess }: ImportScri
         cliente_id: clienteId,
         sku: generateSKU(product.nombre, index),
         nombre: product.nombre,
+        nombre_producto: product.nombre,
         descripcion: product.descripcion || null,
         categoria: product.categoria || "General",
         precio_unitario: product.precio_unitario || 0,
         margen_minimo: 10,
-        stock: product.stock_disponible || 0,
-        tiempo_entrega_dias: 5,
+        stock_disponible: product.stock_disponible || 0,
+        tiempo_entrega: 5,
         palabras_clave: product.nombre.toLowerCase().split(" ").filter(w => w.length > 2),
-        activo: true,
       }));
 
       // Batch insert

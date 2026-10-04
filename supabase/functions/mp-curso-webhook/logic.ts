@@ -327,7 +327,7 @@ export function validateAcademyPayment(
   row: AcademyPaymentRow,
 ): AcademyPaymentValidation {
   const identity = validateAcademyPaymentIdentity(payment, merchantOrder, row);
-  if (!identity.ok) return identity;
+  if (identity.ok === false) return identity;
   if (payment.status !== 'approved') return { ok: false, code: 'not_approved' };
 
   const buyerEmail = String(payment.payer?.email || row.email || '').trim().toLowerCase();
@@ -430,7 +430,7 @@ export async function revokeAcademyPayment(
   }
 
   const identity = validateAcademyPaymentIdentity(payment, merchantOrder, row);
-  if (!identity.ok) throw new Error(identity.code);
+  if (identity.ok === false) throw new Error(identity.code);
 
   const revoked = await dependencies.revokeAccesses({
     paymentId: row.id,

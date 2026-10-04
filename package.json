@@ -11,7 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "preview": "vite preview",
-    "type-check": "tsc --noEmit",
+    "type-check": "tsc -p tsconfig.app.json --noEmit",
     "evaristo": "python evaristo/evaristo_manager.py revisar",
     "evaristo:mision": "python evaristo/evaristo_manager.py mision",
     "e2e": "playwright test"
