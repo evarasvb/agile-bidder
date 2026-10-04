@@ -17,8 +17,8 @@ export default function ChatIA() {
   const navigate = useNavigate();
 
   const licitacionId = id || '';
-  const { data: documents = [], isLoading: docsLoading } = useDocumentosLicitacion(licitacionId);
-  const { data: chat, isLoading: chatLoading } = useChatLicitacion(licitacionId);
+  const { data: documents = [], isLoading: docsLoading, error: docsError, refetch: retryDocuments } = useDocumentosLicitacion(licitacionId);
+  const { data: chat, isLoading: chatLoading, error: chatError, refetch: retryChat } = useChatLicitacion(licitacionId);
 
   const readyDocs = documents.filter(d => d.status === 'ready');
   const hasDocuments = readyDocs.length > 0;
@@ -55,6 +55,12 @@ export default function ChatIA() {
         )}
       </div>
 
+      {docsError || chatError ? (
+        <Card role="alert"><CardContent className="py-6 space-y-3">
+          <p>Chat IA no está disponible. No se pudieron cargar los documentos o la conversación.</p>
+          <Button variant="outline" onClick={() => { void retryDocuments(); void retryChat(); }}>Reintentar</Button>
+        </CardContent></Card>
+      ) : <>
       {/* Main layout: sidebar (docs) + chat */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 h-[calc(100%-4rem)]">
         {/* Documents sidebar */}
@@ -169,6 +175,7 @@ export default function ChatIA() {
           </div>
         </Card>
       </div>
+      </>}
     </div>
   );
 }

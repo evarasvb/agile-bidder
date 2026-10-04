@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { chatIaRequest, isRecord } from '@/lib/chatIaTransport';
 
 // ============================================================================
 // TYPES
@@ -36,6 +37,31 @@ export interface ChatLicitacion {
   updated_at: string;
 }
 
+function nullableString(value: unknown): boolean { return value === null || typeof value === 'string'; }
+function nullableNumber(value: unknown): boolean { return value === null || typeof value === 'number' && Number.isFinite(value); }
+function isSummary(value: unknown): boolean {
+  if (value === null) return true;
+  if (!isRecord(value)) return false;
+  if (!['objeto', 'presupuesto'].every(k => value[k] === undefined || value[k] === null || typeof value[k] === 'string')) return false;
+  if (value.requisitos_tecnicos !== undefined && value.requisitos_tecnicos !== null
+    && (!Array.isArray(value.requisitos_tecnicos) || !value.requisitos_tecnicos.every(r => typeof r === 'string'))) return false;
+  return value.garantias === undefined || value.garantias === null || isRecord(value.garantias)
+    && ['seriedad', 'fiel_cumplimiento'].every(k => value.garantias[k] === undefined || value.garantias[k] === null || typeof value.garantias[k] === 'string');
+}
+export function isDocumentoLicitacion(value: unknown): value is DocumentoLicitacion {
+  return isRecord(value) && ['id', 'licitacion_id', 'filename', 'storage_path', 'created_at'].every(k => typeof value[k] === 'string')
+    && nullableNumber(value.file_size) && nullableNumber(value.total_pages)
+    && ['uploading', 'processing', 'ready', 'error'].includes(String(value.status))
+    && nullableString(value.error_message) && nullableString(value.processed_at)
+    && isSummary(value.resumen_automatico);
+}
+export function isChatLicitacion(value: unknown): value is ChatLicitacion {
+  return isRecord(value) && ['id', 'licitacion_id', 'created_at', 'updated_at'].every(k => typeof value[k] === 'string')
+    && Array.isArray(value.mensajes) && value.mensajes.every(m => isRecord(m)
+      && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && typeof m.timestamp === 'string'
+      && (m.pages_referenced === undefined || Array.isArray(m.pages_referenced) && m.pages_referenced.every(p => typeof p === 'number' && Number.isFinite(p))));
+}
+
 // ============================================================================
 // DOCUMENTS HOOK
 // ============================================================================
@@ -46,14 +72,14 @@ export function useDocumentosLicitacion(licitacionId: string | null) {
     queryFn: async (): Promise<DocumentoLicitacion[]> => {
       if (!licitacionId) return [];
 
-      const { data, error } = await supabase
-        .from('documentos_licitacion')
-        .select('id, licitacion_id, filename, storage_path, file_size, total_pages, status, error_message, resumen_automatico, processed_at, created_at')
-        .eq('licitacion_id', licitacionId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data || [];
+      const data = await chatIaRequest('documentos_licitacion', {
+        select: 'id,licitacion_id,filename,storage_path,file_size,total_pages,status,error_message,resumen_automatico,processed_at,created_at',
+        licitacion_id: `eq.${licitacionId}`, order: 'created_at.asc',
+      });
+      if (!Array.isArray(data) || !data.every(isDocumentoLicitacion)) {
+        throw new Error('La respuesta de documentos de Chat IA no es válida.');
+      }
+      return data;
     },
     enabled: !!licitacionId,
     refetchInterval: (query) => {
@@ -92,20 +118,16 @@ export function useUploadDocument(licitacionId: string) {
       if (uploadError) throw uploadError;
 
       // 2. Create document record
-      const { data: doc, error: insertError } = await supabase
-        .from('documentos_licitacion')
-        .insert({
-          licitacion_id: licitacionId,
-          user_id: user.id,
-          filename: file.name,
-          storage_path: storagePath,
-          file_size: file.size,
-          status: 'processing',
-        })
-        .select('id')
-        .single();
-
-      if (insertError) throw insertError;
+      const created = await chatIaRequest('documentos_licitacion', { select: 'id' }, {
+        method: 'POST', body: {
+          licitacion_id: licitacionId, user_id: user.id, filename: file.name,
+          storage_path: storagePath, file_size: file.size, status: 'processing',
+        },
+      });
+      if (!Array.isArray(created) || created.length !== 1 || !isRecord(created[0]) || typeof created[0].id !== 'string') {
+        throw new Error('No se pudo confirmar el documento de Chat IA.');
+      }
+      const doc = { id: created[0].id };
 
       // 3. Trigger processing edge function
       const { data: { session } } = await supabase.auth.getSession();
@@ -155,12 +177,7 @@ export function useDeleteDocument(licitacionId: string) {
       await supabase.storage.from('bases-licitacion').remove([storagePath]);
 
       // Delete from DB
-      const { error } = await supabase
-        .from('documentos_licitacion')
-        .delete()
-        .eq('id', documentId);
-
-      if (error) throw error;
+      await chatIaRequest('documentos_licitacion', { id: `eq.${documentId}` }, { method: 'DELETE' });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['documentos-licitacion', licitacionId] });
@@ -182,17 +199,15 @@ export function useChatLicitacion(licitacionId: string | null) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
 
-      const { data, error } = await supabase
-        .from('chat_licitacion')
-        .select('*')
-        .eq('licitacion_id', licitacionId)
-        .eq('user_id', user.id)
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data;
+      const data = await chatIaRequest('chat_licitacion', {
+        select: 'id,licitacion_id,mensajes,created_at,updated_at',
+        licitacion_id: `eq.${licitacionId}`, user_id: `eq.${user.id}`,
+        order: 'updated_at.desc', limit: '1',
+      });
+      if (!Array.isArray(data) || data.length > 1 || !data.every(isChatLicitacion)) {
+        throw new Error('La respuesta de conversación de Chat IA no es válida.');
+      }
+      return data[0] || null;
     },
     enabled: !!licitacionId,
   });
@@ -246,11 +261,7 @@ export function useClearChat(licitacionId: string) {
 
   return useMutation({
     mutationFn: async (chatId: string) => {
-      const { error } = await supabase
-        .from('chat_licitacion')
-        .delete()
-        .eq('id', chatId);
-      if (error) throw error;
+      await chatIaRequest('chat_licitacion', { id: `eq.${chatId}` }, { method: 'DELETE' });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['chat-licitacion', licitacionId] });

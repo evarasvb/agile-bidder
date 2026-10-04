@@ -127,6 +127,12 @@ jobs:
               echo "Saltando '$fn' (no existe en el repo)."
               continue
             fi
+            # This worker is not deployed in PROD; a transitive import must not create it.
+            # Its initial rollout requires a separately reviewed operational/rollback plan.
+            if [ "$fn" = "procesar-academia-mp-inbox" ]; then
+              echo "Saltando worker Inbox: alta pendiente de revisión explícita."
+              continue
+            fi
             echo "== Desplegando $fn =="
             if ! supabase functions deploy "$fn" --project-ref "$PROJECT_REF"; then
               FAILED="$FAILED $fn"
