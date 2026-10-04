@@ -87,3 +87,16 @@ export async function processAcademyChargeback(
   });
   return { paymentReference: row.id, revoked };
 }
+
+export interface AcademyPreflightChecks {
+  mpAccepted: boolean;
+  bucketPrivate: boolean;
+  assetPresent: boolean;
+  schemaReady: boolean;
+  signatureSecretPresent: boolean;
+}
+
+export function academyPreflightReady(checks: AcademyPreflightChecks): boolean {
+  return checks.mpAccepted && checks.bucketPrivate && checks.assetPresent
+    && checks.schemaReady && checks.signatureSecretPresent;
+}

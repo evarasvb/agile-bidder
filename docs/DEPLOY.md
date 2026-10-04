@@ -158,7 +158,12 @@ ventana de ventas y notificaciones, y recién después cambiar la base.
 8. Desplegar `procesar-academia-mp-inbox`, `academia-premium` y la versión final
    de `mp-curso-webhook`. Desactivar solo
    `ACADEMIA_WEBHOOK_MAINTENANCE`, manteniendo el checkout cerrado. El worker
-   acepta únicamente el bearer `service_role`.
+   acepta únicamente el bearer `service_role`. Con checkout y cron cerrados,
+   enviar `{ "action": "preflight" }` usando el JWT de Vault desde el servidor.
+   Exigir `authenticated=true` y `ready=true`: el diagnóstico comprueba MP,
+   bucket privado, archivo, tablas y presencia del secreto de firma sin reclamar
+   eventos ni devolver credenciales. La presencia del secreto no sustituye la
+   comprobación de firma real del simulador.
 9. En Mercado Pago, activar el tópico `topic_chargebacks_wh` sobre
    `https://juiskeeutbaipwbeeezw.supabase.co/functions/v1/mp-curso-webhook` y
    ejecutar el simulador. Confirmar HTTP 200, una sola fila firmada en

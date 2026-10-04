@@ -44,6 +44,7 @@ import {
 } from '../../supabase/functions/academia-premium/logic';
 import {
   AcademyInboxProcessingError,
+  academyPreflightReady,
   academyInboxErrorDetails,
   academyInboxRetryDelaySeconds,
   processAcademyChargeback,
@@ -797,5 +798,13 @@ describe('access redemption preserves payment identity', () => {
   it('preserves a legacy email and fills only an unassigned legacy email', () => {
     expect(buildAccessRedemptionUpdate({ email: 'existing@example.invalid', mp_payment_id: null }, 'different@example.invalid', 'now').email).toBe('existing@example.invalid');
     expect(buildAccessRedemptionUpdate({ email: null, mp_payment_id: null }, 'new@example.invalid', 'now').email).toBe('new@example.invalid');
+  });
+});
+
+describe('private worker readiness', () => {
+  const ready = { mpAccepted: true, bucketPrivate: true, assetPresent: true, schemaReady: true, signatureSecretPresent: true };
+  it('requires all readiness checks', () => expect(academyPreflightReady(ready)).toBe(true));
+  it.each(Object.keys(ready) as (keyof typeof ready)[])('fails closed when %s is missing', (key) => {
+    expect(academyPreflightReady({ ...ready, [key]: false })).toBe(false);
   });
 });
