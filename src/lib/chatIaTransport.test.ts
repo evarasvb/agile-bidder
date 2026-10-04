@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const auth = vi.hoisted(() => ({ getSession: vi.fn() }));
+const query = vi.hoisted(() => ({ run: null as null | (() => Promise<unknown>) }));
+vi.mock('@tanstack/react-query', () => ({ useQuery: (options: { queryFn: () => Promise<unknown> }) => { query.run = options.queryFn; return {}; }, useMutation: () => ({}), useQueryClient: () => ({}) }));
 vi.mock('@/integrations/supabase/client', () => ({ supabase: { auth } }));
 import { chatIaRequest, CHAT_IA_UNAVAILABLE } from './chatIaTransport';
-import { isChatLicitacion, isDocumentoLicitacion } from '@/hooks/useChatIA';
+import { isChatLicitacion, isDocumentoLicitacion, useDocumentosLicitacion } from '@/hooks/useChatIA';
 const fetchMock = vi.fn();
 beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock); fetchMock.mockReset();
@@ -11,6 +13,12 @@ beforeEach(() => {
   auth.getSession.mockResolvedValue({ data: { session: { access_token: 'synthetic-jwt' } }, error: null });
 });
 describe('optional legacy ChatIA boundary', () => {
+  it('retains newest-first document order from the original query', async () => {
+    fetchMock.mockResolvedValue(new Response('[]', { status: 200 }));
+    useDocumentosLicitacion('synthetic');
+    expect(await query.run!()).toEqual([]);
+    expect(new URL(fetchMock.mock.calls[0][0]).searchParams.get('order')).toBe('created_at.desc');
+  });
   it('does not turn a missing table into empty documents', async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ code: 'PGRST205' }), { status: 404 }));
     await expect(chatIaRequest('documentos_licitacion', { select: 'id' })).rejects.toThrow(CHAT_IA_UNAVAILABLE);

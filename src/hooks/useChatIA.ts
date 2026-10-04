@@ -74,7 +74,7 @@ export function useDocumentosLicitacion(licitacionId: string | null) {
 
       const data = await chatIaRequest('documentos_licitacion', {
         select: 'id,licitacion_id,filename,storage_path,file_size,total_pages,status,error_message,resumen_automatico,processed_at,created_at',
-        licitacion_id: `eq.${licitacionId}`, order: 'created_at.asc',
+        licitacion_id: `eq.${licitacionId}`, order: 'created_at.desc',
       });
       if (!Array.isArray(data) || !data.every(isDocumentoLicitacion)) {
         throw new Error('La respuesta de documentos de Chat IA no es válida.');
