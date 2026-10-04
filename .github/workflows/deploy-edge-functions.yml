@@ -127,10 +127,10 @@ jobs:
               echo "Saltando '$fn' (no existe en el repo)."
               continue
             fi
-            # This worker is not deployed in PROD; a transitive import must not create it.
-            # Its initial rollout requires a separately reviewed operational/rollback plan.
-            if [ "$fn" = "procesar-academia-mp-inbox" ]; then
-              echo "Saltando worker Inbox: alta pendiente de revisión explícita."
+            # PROD lacks the payment-hardening schema and Inbox worker. A type-only
+            # change must not activate that backend; rollout needs a reviewed plan.
+            if [ "$fn" = "procesar-academia-mp-inbox" ] || [ "$fn" = "mp-curso-webhook" ]; then
+              echo "Saltando backend de pagos: migración/rollout pendiente de revisión explícita."
               continue
             fi
             echo "== Desplegando $fn =="
