@@ -1,5 +1,5 @@
 import {
-  Stethoscope, FileText, UtensilsCrossed, Laptop, Wrench, Armchair,
+  Stethoscope, FileText, UtensilsCrossed, Laptop, GraduationCap, Wrench, Armchair,
   SprayCan, HardHat, Car, Shirt, HelpCircle, type LucideIcon,
 } from 'lucide-react';
 
@@ -21,6 +21,8 @@ export const INDUSTRIAS: Industria[] = [
     keywords: ['alimento', 'abarrote', 'comida', 'fruta', 'verdura', 'carne'] },
   { id: 'tecnologia', label: 'Tecnología', icon: Laptop,
     keywords: ['computador', 'notebook', 'impresora', 'software', 'licencia', 'tecnología', 'servidor'] },
+  { id: 'educacion', label: 'Educación', icon: GraduationCap,
+    keywords: ['educación', 'educativo', 'escolar', 'colegio', 'establecimiento educacional', 'plataforma educativa', 'software educativo', 'material didáctico', 'capacitación'] },
   { id: 'servicios', label: 'Servicios / Contratista', icon: Wrench,
     keywords: ['servicio', 'mantención', 'contratista', 'reparación'] },
   { id: 'mobiliario', label: 'Mobiliario', icon: Armchair,
