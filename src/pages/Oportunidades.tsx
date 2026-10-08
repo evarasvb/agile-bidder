@@ -118,7 +118,7 @@ function OpportunityCard({
       <CardContent className="p-4 space-y-3">
         {/* Top row: Score + Type + Deadline */}
         <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {/* La tarjeta dice POR QUÉ está aquí: % si calza con tu inventario,
                 "Tu rubro" si coincide con tus palabras clave del onboarding.
                 (Antes decía "N/A": parecía que el match no funcionaba.) */}
@@ -134,6 +134,9 @@ function OpportunityCard({
             <Badge variant="outline" className="text-xs">
               {op.tipo === "compra_agil" ? "Compra Ágil" : "Licitación"}
             </Badge>
+            {op.estado && !/^(publicada|activa)$/i.test(op.estado.trim()) && (
+              <Badge variant="secondary" className="text-xs">{op.estado}</Badge>
+            )}
           </div>
           <div className="flex items-center gap-1 text-xs shrink-0">
             <Clock className={`h-3 w-3 ${deadline.urgent ? "text-red-500" : deadline.closed ? "text-muted-foreground" : "text-muted-foreground"}`} />
@@ -294,7 +297,7 @@ export default function Oportunidades() {
     return () => clearTimeout(t);
   }, [busqueda]);
 
-  const { data, isLoading, refetch } = useOportunidadesPanel(filters);
+  const { data, isLoading, isError, isFetching, refetch } = useOportunidadesPanel(filters);
   const descartar = useDescartarOportunidad();
   const registrarSenal = useRegistrarSenal();
 
@@ -545,13 +548,19 @@ export default function Oportunidades() {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-muted-foreground">
-            {isLoading
+            {isError
+              ? oportunidades.length ? "Mostrando resultados anteriores; la búsqueda no está confirmada." : "No pudimos confirmar los resultados de la búsqueda."
+              : isLoading
               ? "Buscando tus oportunidades…"
               : stats.totalActivas > oportunidades.length
                 ? `Mostrando ${oportunidades.length.toLocaleString("es-CL")} de ${stats.totalActivas.toLocaleString("es-CL")} oportunidades (ajusta los filtros para ver otras)`
                 : `${oportunidades.length.toLocaleString("es-CL")} oportunidades encontradas`}
           </p>
-          {stats.busqueda && (
+          {stats.busqueda?.codigoExacto ? (
+            <p className="text-xs text-muted-foreground">
+              Búsqueda por ID exacto: incluye oportunidades cerradas y omite los filtros de recomendación solo para esta consulta. Tus preferencias siguen guardadas.
+            </p>
+          ) : !isError && stats.busqueda && (
             <p className="text-xs text-muted-foreground">
               El servidor encontró {stats.busqueda.coincidencias} coincidencia{stats.busqueda.coincidencias === 1 ? "" : "s"} para
               &quot;{stats.busqueda.texto}&quot; ({stats.busqueda.licitaciones} licitaciones, {stats.busqueda.comprasAgiles} compras ágiles)
@@ -562,6 +571,17 @@ export default function Oportunidades() {
           )}
         </div>
       </div>
+
+      {isError && (
+        <Card role="alert">
+          <CardContent className="p-6 space-y-3">
+            <p>No pudimos completar la búsqueda. Reintenta para confirmar los resultados.</p>
+            <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
+              {isFetching ? "Reintentando…" : "Reintentar búsqueda"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Card Grid */}
       {isLoading ? (
@@ -577,11 +597,18 @@ export default function Oportunidades() {
             </Card>
           ))}
         </div>
-      ) : paginatedOps.length === 0 ? (
+      ) : isError && paginatedOps.length === 0 ? null : paginatedOps.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 px-4 text-center space-y-4">
             <Package className="h-16 w-16 text-muted-foreground/40 mb-2" />
-            {stats.totalActivas > 0 || hasActiveFilters || tieneFiltrosRubro ? (
+            {stats.busqueda?.codigoExacto ? (
+              <>
+                <h3 className="text-xl font-semibold text-foreground">No encontramos ese ID</h3>
+                <p className="text-base text-muted-foreground max-w-md">
+                  Revisa el código completo. Esta búsqueda ya incluye las oportunidades cerradas y no aplica tus filtros de recomendación.
+                </p>
+              </>
+            ) : stats.totalActivas > 0 || hasActiveFilters || tieneFiltrosRubro ? (
               // Hay oportunidades activas en el mercado (o filtros aplicados),
               // pero la vista actual quedó vacía. NO es que no haya nada: son los
               // filtros (de vista o de rubro) los que están ocultando todo.

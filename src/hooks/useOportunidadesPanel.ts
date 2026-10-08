@@ -127,7 +127,7 @@ export interface PanelStats {
   cierranEstaSemana: number;
   valorTotal: number;
   /** Solo con búsqueda por texto: lo que encontró el servidor y cuánto ocultaron los filtros. */
-  busqueda?: { texto: string; coincidencias: number; licitaciones: number; comprasAgiles: number; ocultas: number };
+  busqueda?: { texto: string; coincidencias: number; licitaciones: number; comprasAgiles: number; ocultas: number; codigoExacto?: boolean };
 }
 
 // =============================================================================
@@ -147,10 +147,15 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       // (hay ~4.600 licitaciones abiertas) y sin los ítems de licitaciones, así
       // que una licitación con "resma" en su lista de productos nunca salía.
       const textoBusqueda = (filters.search || '').trim();
+      // Un ID completo es una consulta directa, no una recomendación. Solo en
+      // esta consulta se omiten los filtros; las preferencias no se modifican.
+      const codigoExacto = /^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}$/i.test(textoBusqueda)
+        ? textoBusqueda.toUpperCase()
+        : null;
       const coincidenciaPorCodigo: Record<string, string | null> = {};
       let codigosCA: string[] | null = null;
       let codigosLic: string[] | null = null;
-      if (textoBusqueda.length >= 2) {
+      if (textoBusqueda.length >= 2 && !codigoExacto) {
         const { data: hits, error: errBusqueda } = await supabase.rpc('buscar_oportunidades', {
           p_texto: textoBusqueda,
           p_incluir_cerradas: incluirCerradas,
@@ -168,7 +173,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
           }
         }
       }
-      const busquedaEnServidor = codigosCA !== null;
+      const busquedaEnServidor = !!codigoExacto || codigosCA !== null;
 
       // Fetch compras_agiles with items count.
       // Por defecto solo activas (Publicada + cierre futuro). Con "incluir
@@ -186,7 +191,9 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
 
       // Con búsqueda en servidor solo se traen los códigos que calzaron.
       if (codigosCA) comprasQuery = comprasQuery.in('codigo', codigosCA.length ? codigosCA : ['-']);
-      if (incluirCerradas) {
+      if (codigoExacto) {
+        comprasQuery = comprasQuery.eq('codigo', codigoExacto).limit(1);
+      } else if (incluirCerradas) {
         comprasQuery = comprasQuery.limit(MAX_CERRADAS);
       } else {
         // "Activa" = estado abierto Y con fecha de cierre futura REAL. Antes se
@@ -215,7 +222,9 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         .order('fecha_publicacion', { ascending: false, nullsFirst: false });
 
       if (codigosLic) licitacionesQuery = licitacionesQuery.in('codigo', codigosLic.length ? codigosLic : ['-']);
-      if (incluirCerradas) {
+      if (codigoExacto) {
+        licitacionesQuery = licitacionesQuery.eq('codigo', codigoExacto).limit(1);
+      } else if (incluirCerradas) {
         licitacionesQuery = licitacionesQuery.limit(MAX_CERRADAS);
       } else {
         // Igual que compras: exigir fecha de cierre futura real. Sin esto,
@@ -315,8 +324,8 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         rubroLicQuery,
         afinidadQuery,
         Promise.resolve(supabase.rpc('cliente_owner_id')).then((r: any) => r).catch(() => ({ data: null })),
-        incluirCerradas ? Promise.resolve(null) : licCountQuery,
-        incluirCerradas ? Promise.resolve(null) : caCountQuery,
+        incluirCerradas || codigoExacto ? Promise.resolve(null) : licCountQuery,
+        incluirCerradas || codigoExacto ? Promise.resolve(null) : caCountQuery,
       ]);
 
       const { data: comprasBase, error: caError } = comprasRes as any;
@@ -327,6 +336,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       const { data: licitacionesBase, error: licError } = licitacionesRes as any;
       if (licError) {
         console.error('[OportunidadesPanel] Error fetching licitaciones:', licError);
+        if (codigoExacto) throw licError;
       }
       // Se suman las que calzaron por palabra del rubro (sin repetir código).
       const unirPorCodigo = (base: any[] | null, extra: any[]) => {
@@ -497,7 +507,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
           o.rubro_palabra = palabraPorCodigo[o.codigo];
         }
       }
-      if (filtrosRow) {
+      if (filtrosRow && !codigoExacto) {
         // Si el usuario ESCRIBIÓ una búsqueda, manda lo que buscó: no se exige
         // además que calce con las palabras del rubro (antes buscar "resma" con
         // rubro "google" botaba casi todo). Se mantienen exclusiones, regiones y monto.
@@ -523,16 +533,16 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       }
 
       // Apply filters
-      if (filters.tipo && filters.tipo !== 'all') {
+      if (!codigoExacto && filters.tipo && filters.tipo !== 'all') {
         all = all.filter(o => o.tipo === filters.tipo);
       }
-      if (filters.scoreMin) {
+      if (!codigoExacto && filters.scoreMin) {
         all = all.filter(o => (o.match_score || 0) >= filters.scoreMin!);
       }
-      if (filters.estado && filters.estado !== 'all') {
+      if (!codigoExacto && filters.estado && filters.estado !== 'all') {
         all = all.filter(o => o.estado === filters.estado);
       }
-      if (filters.institucion) {
+      if (!codigoExacto && filters.institucion) {
         const search = filters.institucion.toLowerCase();
         all = all.filter(o => o.organismo.toLowerCase().includes(search));
       }
@@ -580,10 +590,17 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         return sortAsc ? valA - valB : valB - valA;
       });
 
+      if (codigoExacto) {
+        codigosCA = compras.map(o => o.codigo);
+        codigosLic = licitaciones.map(o => o.codigo);
+      }
+
       // Stats
       const now = Date.now();
       const oneWeek = 7 * 24 * 60 * 60 * 1000;
-      const activas = all.filter(o => o.fecha_cierre && new Date(o.fecha_cierre).getTime() > now);
+      // Una revocada/adjudicada encontrada por ID puede conservar un cierre futuro.
+      const activas = all.filter(o => o.fecha_cierre && new Date(o.fecha_cierre).getTime() > now
+        && (!o.estado || /^(publicada|activa)$/i.test(o.estado.trim())));
 
       // El total real de activas puede superar el límite renderizado (MAX_ACTIVAS).
       // Los conteos ya vinieron en el lote paralelo inicial (head:true).
@@ -599,7 +616,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         avgMatchScore: all.length > 0
           ? Math.round(all.reduce((sum, o) => sum + (o.match_score || 0), 0) / all.length)
           : 0,
-        cierranEstaSemana: all.filter(o => {
+        cierranEstaSemana: activas.filter(o => {
           if (!o.fecha_cierre) return false;
           const t = new Date(o.fecha_cierre).getTime();
           return t > now && t < now + oneWeek;
@@ -608,6 +625,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         busqueda: busquedaEnServidor
           ? {
               texto: textoBusqueda,
+              codigoExacto: !!codigoExacto,
               coincidencias: (codigosLic?.length ?? 0) + (codigosCA?.length ?? 0),
               licitaciones: codigosLic?.length ?? 0,
               comprasAgiles: codigosCA?.length ?? 0,
@@ -623,7 +641,9 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
     // cada 3 min sobra y evita que la pantalla "piense" a cada rato.
     staleTime: 120_000,
     refetchInterval: 180_000,
-    placeholderData: (prev: any) => prev,
+    // No mostrar el resultado de otra búsqueda mientras llega la nueva.
+    placeholderData: (prev, previousQuery) =>
+      (previousQuery?.queryKey[1] as PanelFilters | undefined)?.search === filters.search ? prev : undefined,
   });
 }
 
