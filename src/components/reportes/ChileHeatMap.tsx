@@ -112,7 +112,7 @@ export function ChileHeatMap({ data, capa, regionActiva, onSelectRegion }: Props
       <div className="relative flex-1 flex justify-center">
         <svg
           viewBox={`0 0 ${ancho} ${alto}`}
-          className="w-full max-w-[280px] h-auto"
+          className="w-auto h-auto max-w-[200px] max-h-[560px]"
           role="img"
           aria-label="Mapa de calor de Chile por región"
         >
@@ -122,6 +122,7 @@ export function ChileHeatMap({ data, capa, regionActiva, onSelectRegion }: Props
             const fill = colorPorIntensidad(monto, maxMonto);
             const esActiva = regionActiva && r?.region === regionActiva;
             const esHover = hover === geoKey;
+            const seleccionar = () => r && onSelectRegion(r.region);
             return (
               <path
                 key={geoKey}
@@ -130,10 +131,21 @@ export function ChileHeatMap({ data, capa, regionActiva, onSelectRegion }: Props
                 stroke={esActiva ? '#242f66' : '#ffffff'}
                 strokeWidth={esActiva ? 1.5 : 0.6}
                 opacity={esHover ? 0.85 : 1}
-                className="cursor-pointer transition-opacity"
+                className="cursor-pointer transition-opacity outline-none focus-visible:stroke-[2] focus-visible:stroke-[#242f66]"
+                tabIndex={0}
+                role="button"
+                aria-label={r ? `${r.region}: ${formatNumber(valorDe(r, capa).count)} procesos, ${formatCompact(valorDe(r, capa).monto)}` : geoKey}
                 onMouseEnter={() => setHover(geoKey)}
                 onMouseLeave={() => setHover((h) => (h === geoKey ? null : h))}
-                onClick={() => r && onSelectRegion(r.region)}
+                onFocus={() => setHover(geoKey)}
+                onBlur={() => setHover((h) => (h === geoKey ? null : h))}
+                onClick={seleccionar}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    seleccionar();
+                  }
+                }}
               />
             );
           })}

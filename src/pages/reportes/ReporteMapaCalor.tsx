@@ -18,7 +18,7 @@ export default function ReporteMapaCalor() {
   const { data = [], isLoading } = useMapaCalorRegiones();
   const [capa, setCapa] = useState<Capa>('todas');
   const [region, setRegion] = useState<string | null>(null);
-  const { data: detalle, isLoading: cargandoDetalle } = useMapaCalorDetalle(region);
+  const { data: detalle, isLoading: cargandoDetalle } = useMapaCalorDetalle(region, capa);
 
   const totales = useMemo(() => {
     const countLic = data.reduce((a, r) => a + r.count_lic, 0);

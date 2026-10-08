@@ -48,12 +48,15 @@ export function useMapaCalorRegiones() {
 
 // Al hacer zoom/clic en una región: ranking de instituciones y, cuando hay
 // comuna registrada (hoy solo en licitaciones), el desglose por comuna —
-// el máximo detalle geográfico que guarda la base para esa región.
-export function useMapaCalorDetalle(region: string | null) {
+// el máximo detalle geográfico que guarda la base para esa región. El
+// ranking de instituciones se filtra y ordena por la misma capa elegida en
+// el mapa (si no, una institución fuerte en la otra fuente tapaba el ranking
+// de la capa que se está mirando).
+export function useMapaCalorDetalle(region: string | null, capa: 'todas' | 'lic' | 'ca') {
   return useQuery({
-    queryKey: ['mapa-calor-detalle', region],
+    queryKey: ['mapa-calor-detalle', region, capa],
     queryFn: async (): Promise<RegionDetalle> => {
-      const { data, error } = await (supabase.rpc as any)('mapa_calor_region_detalle', { p_region: region });
+      const { data, error } = await (supabase.rpc as any)('mapa_calor_region_detalle_v2', { p_region: region, p_capa: capa });
       if (error) throw error;
       return (data ?? { instituciones: [], comunas: [] }) as RegionDetalle;
     },
