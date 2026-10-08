@@ -13,6 +13,8 @@ const cors = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 const BUCKET = "documentos-trabajo";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SAVE_ERROR = { error: "guardar", mensaje: "No se pudo guardar el PowerPoint. Intenta nuevamente." };
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...cors, "Content-Type": "application/json" } });
 const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -259,7 +261,7 @@ Deno.serve(async (req) => {
     if (!r.ok) return json(j, r.status);
     const matriz = j.matriz;
     if (!matriz) return json({ error: "sin_matriz", mensaje: "No se pudo generar la matriz para este PowerPoint." }, 422);
-    const ficha = await sb.rpc("experto_ficha_licitacion", { p_codigo: codigo }).then((x) => x.data).catch(() => null);
+    const ficha = await Promise.resolve(sb.rpc("experto_ficha_licitacion", { p_codigo: codigo })).then((x) => x.data).catch(() => null);
 
     // 2. Arma las slides.
     const slides = [
@@ -275,20 +277,56 @@ Deno.serve(async (req) => {
 
     // 3. Guarda en "Mis documentos de trabajo" (mismo cupo y convención que los Word extraídos).
     const nombre = `Matriz_${codigo}.pptx`;
-    const { data: cupoData } = await sb.rpc("experto_documentos_cupo", { p_user_id: userId, p_codigo: codigo });
-    const cupo = cupoData?.[0] ?? { plan: "free", usados: 0, maximo: 2 };
-    const { data: existentes } = await sb.rpc("experto_documentos_listar", { p_user_id: userId, p_codigo: codigo });
-    const previo = (existentes ?? []).find((d: any) => d.nombre === nombre);
-    if (!previo && Number(cupo.usados) >= Number(cupo.maximo)) {
+    const { data: cupoData, error: cupoError } = await sb.rpc("experto_documentos_cupo", { p_user_id: userId, p_codigo: codigo });
+    const cupo = cupoData?.[0];
+    if (cupoError || !cupo || !Number.isInteger(cupo.usados) || cupo.usados < 0 || !Number.isInteger(cupo.maximo) || cupo.maximo < 0) {
+      console.error("[experto-pptx] quota_lookup_failed");
+      return json(SAVE_ERROR, 500);
+    }
+    const { data: existentes, error: listarError } = await sb.rpc("experto_documentos_listar", { p_user_id: userId, p_codigo: codigo });
+    if (listarError || !Array.isArray(existentes)) {
+      console.error("[experto-pptx] document_lookup_failed");
+      return json(SAVE_ERROR, 500);
+    }
+    const previo = existentes.find((d: { id: string; nombre: string }) => d.nombre === nombre);
+    if (!previo && cupo.usados >= cupo.maximo) {
       return json({ error: "cupo", mensaje: "Tu plan no tiene más espacio en \"Mis documentos de trabajo\". Borra alguno para generar el PowerPoint." }, 422);
     }
-    if (previo) { try { const { data: path } = await sb.rpc("experto_documento_borrar", { p_user_id: userId, p_id: previo.id }); if (path) await sb.storage.from(BUCKET).remove([String(path)]); } catch { /* sigue igual */ } }
 
-    const storage_path = `${userId}/${codigo}/${nombre}`;
-    const up = await sb.storage.from(BUCKET).upload(storage_path, bytes, { contentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation", upsert: true });
-    if (up.error) return json({ error: "storage", mensaje: up.error.message }, 500);
-    const { data: id } = await sb.rpc("experto_documento_insertar", { p_user_id: userId, p_codigo: codigo, p_nombre: nombre, p_tipo: "pptx", p_storage_path: storage_path, p_texto: String(matriz.resumen ?? "").slice(0, 4000) });
+    // Cada intento tiene su propio archivo: no sobrescribir ni borrar la versión previa
+    // hasta que el nuevo documento esté registrado con un ID válido.
+    const storage_path = `${userId}/${codigo}/${crypto.randomUUID()}_${nombre}`;
+    const up = await sb.storage.from(BUCKET).upload(storage_path, bytes, { contentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation", upsert: false });
+    if (up.error) {
+      console.error("[experto-pptx] upload_failed");
+      return json({ error: "storage", mensaje: "No se pudo subir el PowerPoint. Intenta nuevamente." }, 500);
+    }
+    const { data: id, error: insertError } = await sb.rpc("experto_documento_insertar", { p_user_id: userId, p_codigo: codigo, p_nombre: nombre, p_tipo: "pptx", p_storage_path: storage_path, p_texto: String(matriz.resumen ?? "").slice(0, 4000) });
+    if (insertError || typeof id !== "string" || !UUID.test(id)) {
+      console.error("[experto-pptx] document_insert_failed");
+      // Una respuesta perdida puede ocultar un INSERT confirmado. Conservar el archivo
+      // evita dejar un registro válido apuntando a un objeto borrado.
+      return json(SAVE_ERROR, 500);
+    }
 
-    return json({ ok: true, codigo, documento_id: String(id), nombre, slides: slides.length });
-  } catch (e) { return json({ error: String((e as Error)?.message ?? e) }, 500); }
+    if (previo && previo.id !== id) {
+      try {
+        const { data: path, error: borrarError } = await sb.rpc("experto_documento_borrar", { p_user_id: userId, p_id: previo.id });
+        if (borrarError) {
+          console.warn("[experto-pptx] previous_document_cleanup_failed");
+        } else if (typeof path === "string" && path && path !== storage_path) {
+          const { error: removeError } = await sb.storage.from(BUCKET).remove([path]);
+          if (removeError) console.warn("[experto-pptx] previous_file_cleanup_failed");
+        }
+      } catch {
+        // La nueva versión ya está guardada; una falla al limpiar la anterior no la invalida.
+        console.warn("[experto-pptx] previous_version_cleanup_failed");
+      }
+    }
+
+    return json({ ok: true, codigo, documento_id: id, nombre, slides: slides.length });
+  } catch {
+    console.error("[experto-pptx] generation_or_save_failed");
+    return json({ error: "pptx", mensaje: "No se pudo generar o guardar el PowerPoint. Intenta nuevamente." }, 500);
+  }
 });

@@ -15,7 +15,7 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-const INDUSTRIAS = ["medico", "oficina", "alimentos", "tecnologia", "servicios", "mobiliario", "aseo", "construccion", "automotriz", "textil", "otro"];
+const INDUSTRIAS = ["medico", "oficina", "alimentos", "tecnologia", "educacion", "servicios", "mobiliario", "aseo", "construccion", "automotriz", "textil", "otro"];
 
 const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
 
@@ -68,11 +68,13 @@ serve(async (req) => {
     // 2) IA: traduce descripción + historial al vocabulario del Estado.
     const prompt = `Eres experto en compras públicas de Chile (Mercado Público).
 Una empresa describe lo que vende así: """${desc}"""
-${vendidos.length ? `Según sus órdenes de compra, ya le ha vendido al Estado: ${vendidos.join("; ")}.` : "No registra ventas al Estado."}
+${vendidos.length ? `Como referencia, sus órdenes de compra históricas mencionan: ${vendidos.join("; ")}.` : "No registra ventas al Estado."}
+
+REGLA CLAVE: básate SOBRE TODO en la descripción de la empresa. El historial es solo referencia: usa de él únicamente lo que sea COHERENTE con lo que la empresa dice vender, e IGNORA cualquier producto del historial que no tenga relación con su rubro (p. ej. una empresa de software educativo no debe recibir palabras de aseo o alimentos aunque aparezcan en su historial).
 
 Devuelve el perfil de búsqueda para encontrarle licitaciones y compras ágiles:
-- "palabras": 12 a 20 palabras o frases cortas (1 a 3 palabras) de PRODUCTOS o SERVICIOS concretos, como los escribe un organismo público en el título de una compra. Minúsculas, sin marcas, sin modelos, sin números, sin genéricos sueltos ("insumos", "servicios", "materiales", "equipos").
-- "industrias": 1 a 3 ids de esta lista exacta: ${INDUSTRIAS.join(", ")}.
+- "palabras": 12 a 20 palabras o frases cortas (1 a 3 palabras) de PRODUCTOS o SERVICIOS concretos del rubro de la empresa, como los escribe un organismo público en el título de una compra. Todas deben ser plausibles para esta empresa según su descripción. Minúsculas, sin marcas, sin modelos, sin números, sin genéricos sueltos ("insumos", "servicios", "materiales", "equipos").
+- "industrias": 1 a 3 ids de esta lista exacta: ${INDUSTRIAS.join(", ")}. Elige la(s) que de verdad calcen; si ninguna calza bien, usa "otro".
 - "resumen": una frase de máximo 25 palabras que describa a la empresa para un comprador público.
 Responde SOLO JSON: {"palabras": [...], "industrias": [...], "resumen": "..."}`;
 
@@ -84,9 +86,14 @@ Responde SOLO JSON: {"palabras": [...], "industrias": [...], "resumen": "..."}`;
       }
     }
 
-    // 3) Limpieza final (la IA a veces se cuela con ruido).
+    // 3) Limpieza final. Antes se mezclaban SIEMPRE los productos históricos del
+    //    RUT con las palabras de la IA, lo que ensuciaba el perfil (p. ej. un SaaS
+    //    educativo recibía palabras de rubros ajenos que figuraban en su historial).
+    //    Ahora la IA (que ya recibe el historial como referencia) manda; el historial
+    //    crudo solo se usa de respaldo si la IA no devolvió nada.
+    const base = Array.isArray(ia?.palabras) && ia.palabras.length ? ia.palabras : vendidos;
     const palabras = Array.from(new Set(
-      [...(ia?.palabras || []), ...vendidos].map((p: unknown) => norm(String(p))).filter((p) => p && !esRuido(p) && p.split(" ").length <= 4),
+      base.map((p: unknown) => norm(String(p))).filter((p) => p && !esRuido(p) && p.split(" ").length <= 4),
     )).slice(0, 20);
     const industrias = (ia?.industrias || []).filter((i: string) => INDUSTRIAS.includes(i)).slice(0, 3);
 
