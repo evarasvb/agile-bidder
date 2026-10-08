@@ -133,14 +133,15 @@ export function DocumentosEmpresaCard() {
       completed = result.ok;
       if (result.ok === true) {
         qc.setQueryData<Doc[]>(['cliente_documentos', clienteId], (current = []) => current.filter((doc) => doc.id !== d.id));
-        toast.success('Documento eliminado');
+        if (result.warning) toast.info('Documento retirado de la lista');
+        else toast.success('Documento eliminado');
       } else {
         toast.error(result.message);
       }
       if (result.warning) toast.warning(result.warning);
       await refreshDocuments(clienteId);
     } catch {
-      toast.error(completed ? 'Documento eliminado. No se pudo actualizar la lista; recarga la página.' : 'No se pudo completar la operación. Actualiza la lista antes de reintentar.');
+      toast.error(completed ? 'Documento retirado de la lista. No se pudo actualizar la lista; recarga la página.' : 'No se pudo completar la operación. Actualiza la lista antes de reintentar.');
     } finally {
       operationGuard.current.finish(scope, undefined, completed);
       setSubiendo(null);

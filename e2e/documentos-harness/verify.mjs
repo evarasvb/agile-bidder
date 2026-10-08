@@ -11,11 +11,12 @@ const page = await browser.newPage();
 page.setDefaultTimeout(15000);
 const owner = '00000000-0000-0000-0000-000000000001';
 const client = '00000000-0000-0000-0000-000000000003';
-const original = { id: '00000000-0000-0000-0000-000000000005', tipo: 'carpeta_tributaria', nombre: 'previous-synthetic.pdf', archivo_url: `${owner}/previous-synthetic.pdf`, created_at: '2026-10-08T00:00:00Z' };
+const original = { tipo_codigo: null, storage_path: null, fecha_emision: null, fecha_vencimiento: null, texto_extraido: null, usado_en: [], avisado: true, id: '00000000-0000-0000-0000-000000000005', tipo: 'carpeta_tributaria', nombre: 'previous-synthetic.pdf', archivo_url: `${owner}/previous-synthetic.pdf`, created_at: '2026-10-08T00:00:00Z' };
 let document = { ...original };
 let rejectWrite = true;
 let releaseUpload;
 let holdUpload = true;
+let emptyCleanup = false;
 let resolveUploadStarted;
 const uploadStarted = new Promise(resolve => { resolveUploadStarted = resolve; });
 const events = [];
@@ -31,7 +32,7 @@ await page.route('**/*', async route => {
   if (url.pathname.endsWith('/rest/v1/cliente_documentos')) {
     if (method === 'GET') {
       assert.equal(url.searchParams.get('cliente_id'), `eq.${client}`);
-      return route.fulfill({ json: [document] });
+      return route.fulfill({ json: document ? [document] : [] });
     }
     if (method === 'PATCH') {
       events.push({ type: 'update', path: url.searchParams.get('archivo_url') });
@@ -39,8 +40,20 @@ await page.route('**/*', async route => {
       assert.equal(url.searchParams.get('cliente_id'), `eq.${client}`);
       assert.equal(url.searchParams.get('archivo_url'), `eq.${original.archivo_url}`);
       if (rejectWrite) return route.fulfill({ status: 400, json: { code: '23514', message: 'synthetic CHECK rejection' } });
-      document = { ...document, ...request.postDataJSON() };
+      const values = request.postDataJSON();
+      assert.equal(values.avisado, false);
+      assert.notEqual(values.created_at, original.created_at);
+      assert.equal(url.searchParams.get('tipo_codigo'), 'is.null');
+      assert.equal(url.searchParams.get('texto_extraido'), 'is.null');
+      assert.equal(url.searchParams.get('usado_en'), 'eq.{}');
+      document = { ...document, ...values };
       return route.fulfill({ json: [document] });
+    }
+    if (method === 'DELETE') {
+      assert.equal(url.searchParams.get('archivo_url'), `eq.${document.archivo_url}`);
+      events.push({ type: 'delete-row', path: document.archivo_url });
+      document = null;
+      return route.fulfill({ json: [{ id: original.id }] });
     }
     throw new Error(`Unexpected synthetic database method: ${method}`);
   }
@@ -54,7 +67,7 @@ await page.route('**/*', async route => {
     if (method === 'DELETE') {
       const { prefixes } = request.postDataJSON();
       events.push(...prefixes.map(path => ({ type: 'remove', path })));
-      return route.fulfill({ json: prefixes.map(name => ({ name })) });
+      return route.fulfill({ json: emptyCleanup ? [] : prefixes.map(name => ({ name })) });
     }
     throw new Error(`Unexpected synthetic storage method: ${method}`);
   }
@@ -95,6 +108,13 @@ try {
   await page.locator('input[type=file]').first().setInputFiles(uploadPath);
   await page.getByText(/Este archivo ya se guardó/).waitFor();
   assert.equal(events.filter(event => event.type === 'upload').length, count, 'repeat upload is blocked after refetch');
+  emptyCleanup = true;
+  await page.getByRole('button', { name: 'Eliminar Carpeta tributaria', exact: true }).click();
+  await page.getByRole('button', { name: 'Eliminar', exact: true }).click();
+  await page.getByText('Documento retirado de la lista', { exact: true }).waitFor();
+  await page.getByText('Documento retirado de la lista. No se pudo confirmar que se eliminó su archivo; solicita una revisión.', { exact: true }).waitFor();
+  assert.equal(await page.getByText('Documento eliminado', { exact: true }).count(), 0, 'empty Storage response must not claim file deletion');
+  assert.equal(document, null);
   assert.deepEqual(errors, [], 'no browser runtime errors');
   assert.ok(external.every(origin => origin === 'https://fonts.googleapis.com'), 'all external data requests blocked');
   await page.screenshot({ path: '/tmp/firmavb-documentos-verified.png', fullPage: true });

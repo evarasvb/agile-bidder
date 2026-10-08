@@ -11,6 +11,10 @@ const previous: EmpresaDocument = {
   id: 'doc-previo', tipo: 'carpeta_tributaria', nombre: 'anterior.pdf',
   archivo_url: 'propietario/anterior.pdf', created_at: '2026-10-01T10:00:00Z',
 };
+const simplePrevious = {
+  ...previous, tipo_codigo: null, storage_path: null, fecha_emision: null,
+  fecha_vencimiento: null, texto_extraido: null, usado_en: [] as string[],
+};
 const file = new File(['archivo de prueba'], 'nuevo.pdf', { type: 'application/pdf', lastModified: 123 });
 const input = { clienteId: 'cliente', userId: 'propietario', tipo: previous.tipo, descripcion: 'Carpeta tributaria', file };
 type Response = { data: unknown; error: { code?: string; message?: string } | null; status: number };
@@ -19,7 +23,7 @@ type Options = {
   read?: Response | Error;
   upload?: { error: { message: string } | null } | Error;
   write?: Response | Error;
-  cleanup?: { error: { message: string } | null } | Error;
+  cleanup?: { data?: { name: string }[] | null; error: { message: string } | null } | Error;
 };
 
 function supabaseDouble(options: Options = {}) {
@@ -30,7 +34,7 @@ function supabaseDouble(options: Options = {}) {
   const remove = vi.fn(async (paths: string[]) => {
     events.push(`remove:${paths[0]}`);
     if (options.cleanup instanceof Error) throw options.cleanup;
-    return options.cleanup ?? { error: null };
+    return options.cleanup ?? { data: paths.map((name) => ({ name })), error: null };
   });
   const upload = vi.fn(async (path: string) => {
     events.push('upload');
@@ -45,6 +49,8 @@ function supabaseDouble(options: Options = {}) {
     let operation = 'lookup';
     const query = {
       select: vi.fn(() => query),
+      is: vi.fn((column: string, value: unknown) => { filters.push([column, value]); return query; }),
+      filter: vi.fn((column: string, _operator: string, value: unknown) => { filters.push([column, value]); return query; }),
       eq: vi.fn((column: string, value: unknown) => { filters.push([column, value]); return query; }),
       order: vi.fn(() => query),
       limit: vi.fn(() => query),
@@ -54,7 +60,7 @@ function supabaseDouble(options: Options = {}) {
       then: (resolve: (value: Response) => unknown, reject: (error: Error) => unknown) => {
         events.push(operation);
         const response = operation === 'lookup'
-          ? options.read ?? { data: options.previous === null ? [] : [options.previous ?? previous], error: null, status: 200 }
+          ? options.read ?? { data: options.previous === null ? [] : [{ ...simplePrevious, ...(options.previous ?? previous) }], error: null, status: 200 }
           : options.write ?? {
             data: operation === 'delete' ? [{ id: previous.id }]
               : [{ ...previous, ...values, id: operation === 'insert' ? 'doc-nuevo' : previous.id }],
@@ -123,6 +129,9 @@ describe('documentos de empresa: confirmar registro antes de retirar archivos', 
     expect(db.insert).toHaveBeenCalledWith(expect.objectContaining({ cliente_id: input.clienteId, tipo: input.tipo }));
     expect(db.remove).not.toHaveBeenCalled();
     expect(db.upload).toHaveBeenCalledWith(db.path, file, { contentType: file.type, upsert: false });
+    // Initial uploads keep the database defaults for date and pending notification.
+    expect(db.insert.mock.calls[0][0]).not.toHaveProperty('created_at');
+    expect(db.insert.mock.calls[0][0]).not.toHaveProperty('avisado');
   });
 
   it('no borra el documento anterior ante cero filas por permisos o cambio concurrente', async () => {
@@ -230,5 +239,116 @@ describe('bloqueo inmediato y reintentos en la tarjeta', () => {
     expect(guard.tryStart('cliente:carpeta')).toBe('started');
     guard.finish('cliente:carpeta', undefined, true);
     expect(guard.tryStart('cliente:carpeta', 'archivo-a')).toBe('started');
+  });
+});
+
+describe('confirmación de Storage y metadatos del reemplazo', () => {
+  it.each([
+    { data: [], error: null },
+    { data: null, error: null },
+    { error: null },
+    { data: [{ name: 'otro/archivo.pdf' }], error: null },
+  ])('advierte si no confirma el objeto retirado en reemplazo, compensación y borrado (%j)', async (cleanup) => {
+    const replacement = supabaseDouble({ cleanup });
+    expect(await saveEmpresaDocument(replacement.client, input)).toMatchObject({
+      ok: true, warning: 'Documento guardado. No se pudo confirmar que se retiró el archivo anterior; solicita una revisión.',
+    });
+    expect(replacement.remove).toHaveBeenCalledExactlyOnceWith([previous.archivo_url]);
+
+    const rejected = supabaseDouble({
+      cleanup, write: { data: null, error: { code: '23514' }, status: 400 },
+    });
+    expect(await saveEmpresaDocument(rejected.client, input)).toMatchObject({
+      ok: false, warning: expect.stringContaining('No se pudo confirmar'),
+    });
+    expect(rejected.remove).toHaveBeenCalledExactlyOnceWith([rejected.path]);
+
+    const deletion = supabaseDouble({ cleanup });
+    expect(await deleteEmpresaDocument(deletion.client, input.clienteId, previous)).toMatchObject({
+      ok: true, warning: 'Documento retirado de la lista. No se pudo confirmar que se eliminó su archivo; solicita una revisión.',
+    });
+  });
+
+  it('renueva fecha de subida y deja pendiente el aviso al reemplazar la misma fila', async () => {
+    vi.useFakeTimers();
+    const uploadedAt = new Date('2026-10-08T12:34:56Z');
+    vi.setSystemTime(uploadedAt);
+    try {
+      const previouslyNotified = { ...simplePrevious, avisado: true };
+      const db = supabaseDouble({ previous: previouslyNotified });
+      const result = await saveEmpresaDocument(db.client, input);
+      expect(result).toMatchObject({
+        ok: true, document: { id: previous.id, created_at: uploadedAt.toISOString() },
+      });
+      expect(db.update).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+        avisado: false, created_at: uploadedAt.toISOString(),
+      }));
+      expect(db.insert).not.toHaveBeenCalled();
+      expect(db.deleted).not.toHaveBeenCalled();
+      expect(db.events).toEqual(['lookup', 'upload', 'update', `remove:${previous.archivo_url}`]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('reemplazo conservador de evidencia y resultados desconocidos', () => {
+  it.each([
+    { code: '40003', status: 400 },
+    { code: '40003', status: 500 },
+    { code: '08007', status: 400 },
+  ])('conserva ambos objetos si SQLSTATE informa resultado desconocido (%j)', async ({ code, status }) => {
+    const db = supabaseDouble({ write: { data: null, error: { code }, status } });
+    expect(await saveEmpresaDocument(db.client, input)).toMatchObject({
+      ok: false, message: expect.stringContaining('No se pudo confirmar'),
+    });
+    expect(db.remove).not.toHaveBeenCalled();
+    expect(db.deleted).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { usado_en: ['licitacion-historica'] },
+    { texto_extraido: 'OCR del documento anterior' },
+    { texto_extraido: '' },
+    { fecha_emision: '2026-01-01' },
+    { fecha_vencimiento: '2026-12-31' },
+    { tipo_codigo: 'carpeta_tributaria' },
+    { storage_path: 'otra/ruta-anterior.pdf' },
+  ])('bloquea antes de cargar si existen usos o datos derivados (%j)', async (metadata) => {
+    const evidence = { ...simplePrevious, ...metadata };
+    const db = supabaseDouble({ previous: evidence });
+    expect(await saveEmpresaDocument(db.client, input)).toMatchObject({
+      ok: false, message: expect.stringContaining('historial o datos extraídos'),
+    });
+    expect(db.upload).not.toHaveBeenCalled();
+    expect(db.update).not.toHaveBeenCalled();
+    expect(db.remove).not.toHaveBeenCalled();
+  });
+
+  it('actualiza el alias Storage únicamente cuando apuntaba al mismo archivo', async () => {
+    const evidence = { ...simplePrevious, storage_path: previous.archivo_url };
+    const db = supabaseDouble({ previous: evidence });
+    expect((await saveEmpresaDocument(db.client, input)).ok).toBe(true);
+    expect(db.update).toHaveBeenCalledWith(expect.objectContaining({ storage_path: db.path }));
+    expect(db.filters).toEqual(expect.arrayContaining([['storage_path', previous.archivo_url]]));
+    expect(db.update.mock.calls[0][0]).not.toHaveProperty('usado_en');
+    expect(db.update.mock.calls[0][0]).not.toHaveProperty('tipo_codigo');
+    expect(db.update.mock.calls[0][0]).not.toHaveProperty('fecha_vencimiento');
+  });
+
+  it('vuelve a comprobar historial y datos derivados en el UPDATE', async () => {
+    const db = supabaseDouble();
+    await saveEmpresaDocument(db.client, input);
+    expect(db.filters).toEqual(expect.arrayContaining([
+      ['tipo_codigo', null], ['texto_extraido', null], ['fecha_emision', null],
+      ['fecha_vencimiento', null], ['usado_en', '{}'], ['storage_path', null],
+    ]));
+  });
+
+  it('no modifica evidencia añadida durante la carga si UPDATE devuelve cero filas', async () => {
+    const db = supabaseDouble({ write: { data: [], error: null, status: 200 } });
+    expect((await saveEmpresaDocument(db.client, input)).ok).toBe(false);
+    expect(db.remove).toHaveBeenCalledExactlyOnceWith([db.path]);
+    expect(db.remove).not.toHaveBeenCalledWith([previous.archivo_url]);
   });
 });
