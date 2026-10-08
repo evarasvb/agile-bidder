@@ -12,6 +12,7 @@ import {
   Landmark,
   ArrowRight,
   ListChecks,
+  Flame,
 } from "lucide-react";
 import { Boxes } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -48,6 +49,7 @@ const reports: {
   { title: "¿Cómo se mueve el mercado?", description: "Tendencias, regiones, volúmenes y tipos de compra pública", icon: TrendingUp, href: "/reportes/mercado", accent: "violet" },
   { title: "¿Qué compró el Estado (y a mí)?", description: "Cubo de órdenes de compra: cruza tipo, institución, producto y mes. Filtra por «Mis OC» para ver lo que vendiste", icon: FileText, href: "/reportes/ordenes-compra", accent: "orange" },
   { title: "¿Qué criterios pesan más?", description: "Los factores de evaluación que más se repiten entre licitaciones (de los Libros de licitación ya generados), para saber en qué enfocarte al postular", icon: ListChecks, href: "/reportes/criterios-evaluacion", accent: "violet" },
+  { title: "¿Dónde se concentra el mercado?", description: "Mapa de calor de Chile por región — licitaciones y compra ágil por capas, con zoom a instituciones y comunas", icon: Flame, href: "/reportes/mapa-calor", accent: "red" },
 ];
 
 export default function ReportesHub() {
