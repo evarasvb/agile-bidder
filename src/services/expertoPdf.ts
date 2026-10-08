@@ -77,14 +77,19 @@ export async function crearPdfExperto(d: DatosPdfExperto): Promise<Blob> {
   const espacio = (h: number) => { if (y + h > PIE - 10) salto(); };
   // Escribe texto con negritas inline, con salto de línea por palabra y de página si hace falta.
   const rico = (t: string, size: number, color: [number, number, number], x: number, ancho: number, alto: number, negritaBase = false) => {
-    doc.setFontSize(size); doc.setTextColor(...color);
+    const continuar = () => {
+      espacio(alto);
+      // Cabecera/pie cambian el estilo al saltar de página. Restáuralo antes
+      // de medir o escribir el contenido que continúa (incluidas sus negritas).
+      doc.setFontSize(size); doc.setTextColor(...color);
+    };
     const palabras: Run[] = [];
     for (const r of runs(t)) for (const w of r.t.split(/(\s+)/)) if (w) palabras.push({ t: w, b: r.b || negritaBase });
-    let cx = x; espacio(alto);
+    let cx = x; continuar();
     const medir = (w: Run) => { doc.setFont('helvetica', w.b ? 'bold' : 'normal'); return doc.getTextWidth(w.t); };
     for (const w of palabras) {
       const esEspacio = /^\s+$/.test(w.t); const ancho_w = medir(w);
-      if (!esEspacio && cx + ancho_w > x + ancho && cx > x) { y += alto; espacio(alto); cx = x; }
+      if (!esEspacio && cx + ancho_w > x + ancho && cx > x) { y += alto; continuar(); cx = x; }
       if (esEspacio && cx === x) continue;
       doc.setFont('helvetica', w.b ? 'bold' : 'normal'); doc.text(w.t, cx, y); cx += ancho_w;
     }

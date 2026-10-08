@@ -6,10 +6,10 @@ import { CheckCircle2, Circle, AlertTriangle, Sparkles, ExternalLink, ShieldChec
 import type { Matriz } from '@/components/experto/MatrizPostulacion';
 import { pagoOrganismo, presupuestoTexto } from '@/lib/organismoPago';
 import { colorEstadoRequisito, labelEstadoRequisito } from '@/lib/estadoRequisito';
+import { admisibilidadResuelta, estadoAdmisibilidad, numeroMatriz } from '@/lib/matrizValidation';
+import { evaluarPreparacion } from '@/lib/matrizReadiness';
 
 type Paso = { k: string; t: string; listo: boolean; accion?: () => void; ayuda?: string };
-const pond = (r: any): number => { const n = r.ponderacion_num != null ? Number(r.ponderacion_num) : Number(String(r.ponderacion ?? '').replace(/[^0-9.,]/g, '').replace(',', '.')); if (!Number.isFinite(n) || n === 0) return 0; return n > 1 ? n / 100 : n; };
-const num = (v: any): number | null => { const n = Number(String(v ?? '').replace(/[^0-9.,-]/g, '').replace(/\.(?=\d{3})/g, '').replace(',', '.')); return v == null || v === '' || !Number.isFinite(n) ? null : n; };
 const Chip = ({ e }: { e?: string }) => <span className={`rounded px-1.5 py-0.5 text-[11px] ${colorEstadoRequisito(e)}`}>{labelEstadoRequisito(e)}</span>;
 
 export interface SalaProps {
@@ -21,24 +21,26 @@ export interface SalaProps {
 
 export function SalaPostulacion(p: SalaProps) {
   const m = p.matriz; const f = p.ficha ?? {}; const o = f.organismo ?? {};
-  const adm = m?.admisibilidad ?? []; const ev = m?.evaluacion ?? []; const tareas = m?.tareas ?? [];
-  const noCumple = adm.filter((r) => r.estado === 'no_cumple'); const pend = adm.filter((r) => !r.estado || r.estado === 'pendiente' || r.estado === 'revisar'); const cumple = adm.filter((r) => r.estado === 'cumple');
-  const total = ev.reduce((a, r) => a + (num(r.puntaje_estimado) ?? 0) * pond(r), 0);
-  const umbral = num(m?.umbral_adjudicacion);
+  const adm = (Array.isArray(m?.admisibilidad) ? m.admisibilidad : []).map(r => ({ ...r, estado: estadoAdmisibilidad(r) })); const tareas = m?.tareas ?? [];
+  const noCumple = adm.filter((r) => r.estado === 'no_cumple'); const pend = adm.filter((r) => r.estado !== 'no_cumple' && !admisibilidadResuelta(r)); const cumple = adm.filter((r) => r.estado === 'cumple');
+  const readiness = evaluarPreparacion({ codigo: p.cod, matriz: m, bases: p.bases, documentos: p.documentos, cierre: f.fecha_cierre, informe: p.informe, anexos: p.anexos, faltantes: p.faltantes });
+  const total = readiness.fresh ? readiness.score.total : null;
+  const rawThreshold = numeroMatriz(m?.umbral_adjudicacion);
+  const umbral = rawThreshold != null && rawThreshold >= 0 ? rawThreshold : null;
   const dias = f.fecha_cierre ? Math.ceil((new Date(f.fecha_cierre).getTime() - Date.now()) / 86400000) : null;
   const campos = (p.anexos.match(/\[\[[^\]]+\]\]/g) ?? []).length;
-  const aprob = (m as any)?.aprobacion as { por?: string; en?: string } | undefined;
+  const aprob = readiness.approvalCurrent ? m?.aprobacion : undefined;
   const proxima = tareas.find((t) => !['ok', 'no_aplica', 'solo_si_adjudica'].includes(t.estado));
   const garantias = (m as any)?.garantias ?? []; const carga = (m as any)?.secuencia_carga ?? []; const pendHum = ((m as any)?.pendientes_humanos ?? []) as any[];
   const pasos: Paso[] = [
-    { k: 'bases', t: 'Bases leídas', listo: p.bases.length > 0, ayuda: 'Sube el PDF de las bases en Fuentes' },
+    { k: 'bases', t: 'Fuentes sin cambios', listo: readiness.fresh, ayuda: 'Sube el PDF de las bases en Fuentes' },
     { k: 'informe', t: 'Veredicto', listo: !!p.informe, accion: () => p.onGenerar('informe') },
-    { k: 'matriz', t: 'Requisitos y puntaje', listo: !!m, accion: () => p.onGenerar('matriz') },
-    { k: 'evidencias', t: 'Admisibilidad completa', listo: !!m && adm.length > 0 && noCumple.length === 0 && pend.length === 0, accion: () => p.onIr('matriz') },
-    { k: 'anexos', t: 'Anexos completados', listo: !!p.anexos && campos === 0, accion: () => p.anexos ? p.onIr('anexos') : p.onGenerar('anexos') },
+    { k: 'matriz', t: 'Requisitos y puntaje', listo: readiness.fresh && readiness.score.complete && readiness.thresholdValid, accion: () => p.onGenerar('matriz') },
+    { k: 'evidencias', t: 'Admisibilidad completa', listo: readiness.admissible, accion: () => p.onIr('matriz') },
+    { k: 'anexos', t: 'Anexos completados', listo: !!p.anexos && campos === 0 && p.faltantes.length === 0, accion: () => p.anexos ? p.onIr('anexos') : p.onGenerar('anexos') },
     { k: 'revision', t: 'Revisada y aprobada', listo: !!aprob?.en, accion: p.aprobar },
   ];
-  const listaParaPostular = pasos.every((s) => s.listo);
+  const listaParaPostular = readiness.open && readiness.thresholdValid && pasos.every((s) => s.listo);
   const setTarea = (i: number, campo: string, v: string) => { if (!m) return; p.onMatriz({ ...m, tareas: tareas.map((t, j) => j === i ? { ...t, [campo]: v } : t) }); };
 
   return (
@@ -52,6 +54,8 @@ export function SalaPostulacion(p: SalaProps) {
         ))}
       </div>
 
+      {readiness.warnings.length > 0 && <div role="status" className="rounded border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900"><p className="font-semibold">Revisión pendiente</p><ul className="list-disc ml-4">{readiness.warnings.map(warning => <li key={warning}>{warning}</li>)}</ul></div>}
+
       {/* 1. Resumen ejecutivo */}
       <div className="rounded-lg border p-3 space-y-2">
         <div className="flex items-center gap-2 flex-wrap">
@@ -60,11 +64,11 @@ export function SalaPostulacion(p: SalaProps) {
           {listaParaPostular && <span className="rounded bg-green-600 text-white px-2 py-0.5 text-xs font-medium">Lista para postular</span>}
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
-          {[['Presupuesto', presupuestoTexto(f.presupuesto, f.codigo), ''], ['Cierre', dias == null ? 's/i' : dias < 0 ? 'cerrada' : `en ${dias} días`, ''], ['Pago del organismo', pagoOrganismo(o).valor, pagoOrganismo(o).detalle], ['Puntaje estimado', m && ev.length ? `${total.toFixed(1)}${umbral != null ? ` / umbral ${umbral}` : ''}` : 's/i', '']].map(([k, v, d]) => (
+          {[['Presupuesto', presupuestoTexto(f.presupuesto, f.codigo), ''], ['Cierre', dias == null ? 's/i' : !readiness.open ? 'cerrada' : `en ${dias} días`, ''], ['Pago del organismo', pagoOrganismo(o).valor, pagoOrganismo(o).detalle], ['Puntaje estimado', total != null ? `${total.toFixed(1)}${umbral != null ? ` / umbral ${umbral}` : ''}` : 's/i', '']].map(([k, v, d]) => (
             <div key={k} className="rounded-md border bg-muted/30 px-3 py-2" title={`${k}: ${v}${d ? ' (' + d + ')' : ''}`}><p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium">{k}</p><p className="font-semibold text-sm break-words">{v}</p>{d && <p className="text-[10px] text-muted-foreground mt-0.5">{d}</p>}</div>
           ))}
         </div>
-        {m && ev.length > 0 && umbral != null && <p className={`text-xs ${total >= umbral ? 'text-green-700' : 'text-red-700'}`}>{total >= umbral ? 'Con tu puntaje estimado superas el umbral de adjudicación.' : `Te faltan ${(umbral - total).toFixed(1)} puntos para el umbral: revisa qué criterios puedes subir en Requisitos y puntaje.`}</p>}
+        {total != null && umbral != null && <p className={`text-xs ${total >= umbral ? 'text-green-700' : 'text-red-700'}`}>{total >= umbral ? 'Con tu puntaje estimado superas el umbral de adjudicación.' : `Te faltan ${(umbral - total).toFixed(1)} puntos para el umbral: revisa qué criterios puedes subir en Requisitos y puntaje.`}</p>}
         {proxima && <p className="text-xs"><span className="font-medium">Próxima acción:</span> {proxima.accion} <span className="text-muted-foreground">({proxima.responsable ?? 'sin responsable'}{proxima.plazo ? ` · ${proxima.plazo}` : ''})</span></p>}
       </div>
 
@@ -75,7 +79,7 @@ export function SalaPostulacion(p: SalaProps) {
         {noCumple.map((r, i) => <p key={'n' + i} className="text-sm flex items-start gap-2"><AlertTriangle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" /><span><b>{r.requisito}</b>: {r.nota || r.regla} {r.fuente && <span className="text-muted-foreground text-xs" title={r.fuente}>({r.fuente})</span>}</span></p>)}
         {pend.slice(0, 8).map((r, i) => <p key={'p' + i} className="text-xs flex items-center gap-2"><Chip e={r.estado} /><span className="flex-1 min-w-0"><span title={`${r.requisito} · ${r.fuente}`}>{r.requisito}</span></span></p>)}
         {pend.length > 8 && <p className="text-xs text-muted-foreground">+{pend.length - 8} más por revisar. Abre la matriz para detalles.</p>}
-        {m && noCumple.length === 0 && pend.length === 0 && <p className="text-xs text-green-700 flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5" />Todos los requisitos de admisibilidad están cumplidos.</p>}
+        {readiness.admissible && <p className="text-xs text-green-700 flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5" />Requisitos de admisibilidad revisados, sin pendientes.</p>}
       </div>
 
       {/* 3. Equipo y tareas */}
@@ -97,7 +101,7 @@ export function SalaPostulacion(p: SalaProps) {
         <p className="font-semibold">Documentos</p>
         <p className="text-xs"><b>Bases:</b> {p.bases.length ? p.bases.map((b) => `${b.archivo} (${b.paginas} pág.)`).join(', ') : <span className="text-amber-700">faltan, súbelas en Fuentes</span>}</p>
         <p className="text-xs"><b>Mis documentos:</b> {p.documentos.length ? p.documentos.map((d) => d.nombre).join(', ') : 'ninguno todavía'}</p>
-        <p className="text-xs"><b>Anexos:</b> {p.anexos ? (campos ? <span className="text-amber-700">{campos} campos por completar a mano ({p.faltantes.slice(0, 4).join(', ')}{p.faltantes.length > 4 ? '…' : ''})</span> : <span className="text-green-700">completos, listos para firmar</span>) : <button className="underline" onClick={() => p.onGenerar('anexos')}>generar con los datos de tu empresa (Plus)</button>}</p>
+        <p className="text-xs"><b>Anexos:</b> {p.anexos ? (campos || p.faltantes.length ? <span className="text-amber-700">{Math.max(campos, p.faltantes.length)} campos por completar a mano ({p.faltantes.slice(0, 4).join(', ')}{p.faltantes.length > 4 ? '…' : ''})</span> : <span className="text-green-700">completos, listos para firmar</span>) : <button className="underline" onClick={() => p.onGenerar('anexos')}>generar con los datos de tu empresa (Plus)</button>}</p>
       </div>
 
       {/* 4b. Garantías, secuencia de carga y pendientes de la empresa (vienen de la matriz) */}
@@ -117,7 +121,7 @@ export function SalaPostulacion(p: SalaProps) {
           {pasos.map((s) => <li key={s.k} className="flex items-center gap-1">{s.listo ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600" /> : <Circle className="h-3.5 w-3.5 text-muted-foreground" />}{s.t}</li>)}
         </ul>
         {aprob?.en ? <p className="text-xs text-green-700">Aprobada por {aprob.por ?? 'el usuario'} el {new Date(aprob.en).toLocaleString('es-CL')}.</p>
-          : <Button size="sm" variant="outline" onClick={p.aprobar} disabled={!m}><ShieldCheck className="h-3.5 w-3.5 mr-1" />Marcar como revisada y aprobada</Button>}
+          : <Button size="sm" variant="outline" onClick={p.aprobar} disabled={!m || !readiness.fresh}><ShieldCheck className="h-3.5 w-3.5 mr-1" />Marcar como revisada y aprobada</Button>}
         <div className="flex flex-wrap gap-1">
           {p.irOportunidad && <Button size="sm" onClick={p.irOportunidad}><ExternalLink className="h-3.5 w-3.5 mr-1" />Ir a postular</Button>}
           <Button size="sm" variant="ghost" onClick={p.onAbrirExpertoModal || (() => p.onPreguntar(`Sobre ${p.cod}: revisa mi postulación completa. ¿Qué me falta o qué riesgo ves antes de enviarla?`))}>Pedir revisión final al Experto</Button>
