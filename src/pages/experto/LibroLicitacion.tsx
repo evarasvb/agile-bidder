@@ -23,6 +23,7 @@ import { Infografia, type InfografiaDatos } from '@/components/experto/Infografi
 import { MapaConceptual, type Nodo } from '@/components/experto/MapaConceptual';
 import { compartirPdfExperto } from '@/services/expertoPdf';
 import { MatrizPostulacion, type Matriz } from '@/components/experto/MatrizPostulacion';
+import { evaluarPreparacion, mismoCodigoMatriz, revisionPostulacion, sinAprobacion } from '@/lib/matrizReadiness';
 import { PlanPostulacion } from '@/components/experto/PlanPostulacion';
 import { planAutomatico, fusionarPlan, type PasoPlan } from '@/lib/planPostulacion';
 import { descargarWord } from '@/services/exportar';
@@ -68,6 +69,7 @@ interface Msg { rol: 'yo' | 'exp'; texto: string; fuentes?: any[]; pedirBases?: 
 type Entregable = 'sala' | 'informe' | 'matriz' | 'estudio' | 'bajo_agua' | 'anexos' | 'mapa' | 'infografia';
 // Forma del jsonb que devuelve la RPC experto_libro (un blob con todo el libro).
 interface LibroExperto {
+  codigo?: string;
   chat?: { pregunta: string; respuesta: string }[];
   informe?: { texto: string } | null;
   matriz?: { texto: string } | null;
@@ -195,9 +197,14 @@ export default function LibroLicitacion() {
   const fileRef = useRef<HTMLInputElement>(null);
   const guardarRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => { setMsgs([]); setLimite(null); setCompartido(null); }, [cod]);
+  const activeCode = useRef(cod);
+  activeCode.current = cod;
   useEffect(() => {
-    if (!libro) return;
+    setMsgs([]); setLimite(null); setCompartido(null); setFaltantes([]);
+    setEntregables({ sala: 'ok', informe: '', matriz: '', estudio: '', bajo_agua: '', anexos: '', mapa: '', infografia: '' });
+  }, [cod]);
+  useEffect(() => {
+    if (!libro || !mismoCodigoMatriz(libro.codigo, cod)) return;
     setMsgs((libro.chat ?? []).flatMap((c: any) => [{ rol: 'yo', texto: c.pregunta }, { rol: 'exp', texto: c.respuesta }]));
     setEntregables({ sala: 'ok', informe: libro.informe?.texto ?? '', matriz: libro.matriz?.texto ?? '', estudio: libro.estudio?.texto ?? '', bajo_agua: libro.bajo_agua?.texto ?? '', anexos: libro.anexos?.texto ?? '', mapa: libro.mapa?.texto ?? '', infografia: libro.ficha ? 'ok' : '' });
     setFaltantes(libro.anexos?.faltantes ?? []);
@@ -330,22 +337,25 @@ export default function LibroLicitacion() {
         const r = await fetch(`${SUPA}/functions/v1/experto-mapa`, { method: 'POST', headers: auth, body: JSON.stringify({ codigo: cod }) });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(j.mensaje || j.error || `Error ${r.status}`);
+        if (activeCode.current !== cod) return;
         setEntregables((e) => ({ ...e, mapa: JSON.stringify(j.mapa) }));
       } else if (tipo === 'matriz') {
         const r = await fetch(`${SUPA}/functions/v1/experto-matriz`, { method: 'POST', headers: auth, body: JSON.stringify({ codigo: cod }) });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) throw Object.assign(new Error(j.mensaje || j.error || `Error ${r.status}`), { status: r.status });
+        if (activeCode.current !== cod) return;
+        if (!mismoCodigoMatriz(j.matriz?.codigo, cod)) throw new Error('La matriz recibida no corresponde a esta licitación.');
         setEntregables((e) => ({ ...e, matriz: JSON.stringify(j.matriz) }));
         if (j.documentos) toast.success(`Matriz hecha con tus ${j.documentos} documento(s) de trabajo`);
       } else if (tipo === 'infografia') {
         setEntregables((e) => ({ ...e, infografia: 'ok' }));
       } else {
-        await pedir({ modo: tipo, codigo: cod, pregunta: '', huella: 'libro' }, tipo === 'estudio' ? 'experto-estudio' : tipo === 'bajo_agua' ? 'experto-bajo-agua' : 'experto-consultar', (t) => setEntregables((e) => ({ ...e, [tipo]: t })));
+        await pedir({ modo: tipo, codigo: cod, pregunta: '', huella: 'libro' }, tipo === 'estudio' ? 'experto-estudio' : tipo === 'bajo_agua' ? 'experto-bajo-agua' : 'experto-consultar', (t) => { if (activeCode.current === cod) setEntregables((e) => ({ ...e, [tipo]: t })); });
         // Bajo el Agua gasta cuota: se refresca el libro para mostrar cuántos informes quedan.
         if (tipo === 'bajo_agua') qc.invalidateQueries({ queryKey: ['experto_libro', cod] });
       }
-    } catch (e: any) { toast.error(e.message, e.status === 402 ? { action: { label: 'Ver planes', onClick: () => navigate('/cuenta') } } : undefined); }
-    terminar(tipo);
+    } catch (e: any) { if (activeCode.current === cod) toast.error(e.message, e.status === 402 ? { action: { label: 'Ver planes', onClick: () => navigate('/cuenta') } } : undefined); }
+    finally { terminar(tipo); }
   };
 
   // Fuentes subidas (una sola entrada): PDF de bases (se reconocen solos y quedan para todos), Excel, Word,
@@ -543,15 +553,22 @@ export default function LibroLicitacion() {
     await fetch(`${SUPA}/functions/v1/experto-documentos?id=${id}`, { method: 'DELETE', headers: auth });
     qc.invalidateQueries({ queryKey: ['experto_libro', cod] });
   };
-  const matrizCambio = (m: Matriz) => {
-    setEntregables((e) => ({ ...e, matriz: JSON.stringify(m) }));
+  const matrizCambio = (m: Matriz, reviewed = false) => {
+    if (!mismoCodigoMatriz(m.codigo, cod) || activeCode.current !== cod) {
+      toast.error('La matriz no corresponde a esta licitación. No se guardaron cambios.'); return;
+    }
+    const updated = reviewed ? m : sinAprobacion(m);
+    setEntregables((e) => ({ ...e, matriz: JSON.stringify(updated) }));
     if (guardarRef.current) clearTimeout(guardarRef.current);
-    guardarRef.current = setTimeout(async () => { const { error } = await supabase.rpc('experto_matriz_guardar', { p_codigo: cod, p_matriz: m as any }); if (error) toast.error('No pude guardar la matriz'); }, 1200);
+    guardarRef.current = setTimeout(async () => { const { error } = await supabase.rpc('experto_matriz_guardar', { p_codigo: cod, p_matriz: updated as any }); if (error) toast.error('No pude guardar la matriz'); }, 1200);
   };
   const aprobarPostulacion = () => {
     if (!entregables.matriz) { toast.error('Genera primero la matriz de postulación'); return; }
-    const m = JSON.parse(entregables.matriz); m.aprobacion = { por: session?.user?.email ?? 'usuario', en: new Date().toISOString() };
-    matrizCambio(m); toast.success('Postulación marcada como revisada y aprobada');
+    const m = JSON.parse(entregables.matriz) as Matriz;
+    const context = { codigo: cod, matriz: m, bases, documentos, cierre: f?.fecha_cierre, informe: entregables.informe, anexos: entregables.anexos, faltantes };
+    if (!evaluarPreparacion(context).fresh) { toast.error('Revisa la licitación, las fuentes y la vigencia de la matriz antes de aprobarla.'); return; }
+    m.aprobacion = { por: session?.user?.email ?? 'usuario', en: new Date().toISOString(), revision: revisionPostulacion(context) };
+    matrizCambio(m, true); toast.success('Revisión registrada para esta versión. Los pendientes siguen visibles en la sala.');
   };
   // Word / PDF de cualquier texto del Experto (informe, estudio, anexos, respuesta del chat)
   const aWord = (titulo: string, md: string) => descargarWord(titulo, expertoMd(md), `${cod || 'experto'}-${titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}.doc`);
@@ -1027,7 +1044,7 @@ export default function LibroLicitacion() {
                 {tab === 'mapa' ? (
                   <div className="max-h-[62vh] overflow-y-auto pr-1"><MapaConceptual raiz={JSON.parse(entregables.mapa) as Nodo} onPreguntar={(t) => setPregunta(`Sobre ${cod}: explícame "${t}" y qué debo hacer con eso`)} /></div>
                 ) : tab === 'matriz' ? (
-                  <div className="max-h-[62vh] overflow-y-auto pr-1"><MatrizPostulacion m={JSON.parse(entregables.matriz) as Matriz} onChange={matrizCambio} url={`${window.location.origin}/experto/libro/${cod}`} /></div>
+                  <div className="max-h-[62vh] overflow-y-auto pr-1"><MatrizPostulacion m={JSON.parse(entregables.matriz) as Matriz} onChange={matrizCambio} contexto={{ codigo: cod, bases, documentos, cierre: f?.fecha_cierre, informe: entregables.informe, anexos: entregables.anexos, faltantes }} url={`${window.location.origin}/experto/libro/${cod}`} /></div>
                 ) : tab === 'infografia' ? (
                   <div className="max-h-[62vh] overflow-y-auto pr-1"><Infografia d={datosInfografia()} /></div>
                 ) : (
