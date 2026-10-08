@@ -409,12 +409,14 @@ export default function LibroLicitacion() {
     empezar('word:' + d.id);
     try { await completarUno(d); } catch (e: any) { toast.error(e.message); } finally { terminar('word:' + d.id); }
   };
+  // Nombre "raíz" de un anexo sin el sufijo de copia que agrega la descarga/extracción
+  // ("Anexo_N_3 (6)" / "(7)" / "(8)" -> "anexo_n_3"), para agrupar las copias del mismo anexo.
+  const baseAnexo = (n: string) => n.replace(/\s*\(\d+\)/g, '').replace(/\.docx$/i, '').trim().toLowerCase();
   // Todos los Word de la licitación, uno tras otro. Si hay varias copias del mismo anexo
   // ("Anexo_N_3 (6)", "(7)", "(8)") se usa la última subida.
   const wordsUnicos = () => {
-    const base = (n: string) => n.replace(/\s*\(\d+\)/g, '').replace(/\.docx$/i, '').trim().toLowerCase();
     const m = new Map<string, any>();
-    for (const d of documentos.filter((x: any) => x.tipo === 'docx')) { const k = base(d.nombre); if (!m.has(k) || new Date(d.creado_en) > new Date(m.get(k).creado_en)) m.set(k, d); }
+    for (const d of documentos.filter((x: any) => x.tipo === 'docx')) { const k = baseAnexo(d.nombre); if (!m.has(k) || new Date(d.creado_en) > new Date(m.get(k).creado_en)) m.set(k, d); }
     return Array.from(m.values());
   };
   // Extraer anexos de las bases: comodidad para cuando los anexos NO vienen como Word
@@ -625,6 +627,23 @@ export default function LibroLicitacion() {
   const f = libro?.ficha; const o = f?.organismo ?? {};
   const bases: any[] = libro?.bases ?? [];
   const documentos: any[] = libro?.documentos ?? [];
+  // Al traer o extraer las bases más de una vez se acumulan copias del mismo anexo oficial
+  // ("Anexo_N_1 (5)" dos veces, "Anexo_N_3 (6)/(7)/(8)"...) y el libro aparecía "pegado" de
+  // duplicados al abrirlo. En la lista mostramos solo la última copia de cada anexo Word; el
+  // resto de documentos (Excel, PDF, PowerPoint) se muestra completo. No borra nada del archivo.
+  const documentosVista = useMemo(() => {
+    const ultima = new Map<string, any>();
+    const out: any[] = [];
+    for (const d of documentos) {
+      if (d.tipo !== 'docx') { out.push(d); continue; }
+      const k = baseAnexo(d.nombre);
+      const prev = ultima.get(k);
+      if (!prev) { ultima.set(k, d); out.push(d); }
+      else if (new Date(d.creado_en) > new Date(prev.creado_en)) { const i = out.indexOf(prev); if (i >= 0) out[i] = d; ultima.set(k, d); }
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documentos]);
   // Apenas se abre el libro, si nadie ha subido bases todavía se intenta traerlas solo desde
   // Mercado Público (silencioso, sin toasts): la mayoría de las veces el cliente ni se entera
   // de que hizo falta un paso, las bases ya están cuando pregunta. Un intento por código.
@@ -770,7 +789,7 @@ export default function LibroLicitacion() {
                 <Button size="sm" variant="outline" className="mt-1 mb-1 w-full sm:w-auto" onClick={generarCotizacion} disabled={ocupado('cotizacion') || licMatchLoading} title="Cotización en PDF con los productos de tu inventario que hacen match, lista para subir como oferta comercial">
                   {ocupado('cotizacion') ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Receipt className="h-4 w-4 mr-1" />}Generar cotización comercial
                 </Button>
-                {documentos.map((d: any) => (
+                {documentosVista.map((d: any) => (
                   <div key={d.id} className="flex items-center gap-1 text-muted-foreground">
                     <span className="truncate flex-1" title={d.nombre}>{d.nombre} <span className="text-[10px] uppercase">{d.tipo}</span></span>
                     {d.tipo === 'docx' && (
@@ -785,7 +804,7 @@ export default function LibroLicitacion() {
                     <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground" onClick={() => borrarDocumento(d.id)} title="Quitar"><Trash2 className="h-3.5 w-3.5" /></Button>
                   </div>
                 ))}
-                {documentos.filter((x: any) => x.tipo === 'docx').length > 1 && (
+                {documentosVista.filter((x: any) => x.tipo === 'docx').length > 1 && (
                   <Button size="sm" variant="outline" className="mt-1 w-full sm:w-auto" onClick={completarTodos} disabled={algunWord}>
                     {ocupado('word:todos') ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}Completar todos los anexos Word
                   </Button>
