@@ -12,7 +12,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useInventoryActivo, type InventoryItem } from "@/hooks/useInventory";
-import { useUpsertMatchOverride, useClearMatchOverride, type MatchOverride } from "@/hooks/useMatchOverrides";
+import { useUpsertMatchOverride, useClearMatchOverride, mensajeErrorOverride, type MatchOverride } from "@/hooks/useMatchOverrides";
 import { formatCurrency } from "@/utils/clasificacion";
 import { toast } from "sonner";
 
@@ -35,10 +35,9 @@ export function MatchItemActions({ codigo, itemRef, itemNombre, hasSuggestion, o
   const upsert = useUpsertMatchOverride();
   const clear = useClearMatchOverride();
 
-  // Antes el error se tragaba en silencio (clic y "no pasa nada"); ahora se
-  // muestra el motivo real (hallazgo de Evaristo).
-  const mostrarError = (e: unknown) =>
-    toast.error(e instanceof Error ? e.message : "No se pudo guardar el cambio. Intenta de nuevo.");
+  // Antes el error se tragaba en silencio (clic y "no pasa nada") y luego
+  // mostraba un código técnico; ahora muestra una frase clara.
+  const mostrarError = (e: unknown) => toast.error(mensajeErrorOverride(e));
 
   const resultados = useMemo(() => {
     const q = query.trim().toLowerCase();

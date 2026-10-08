@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   HandCoins, Plus, Trash2, FileText, Copy, Download, Loader2, Building2, User, AlertTriangle, Scale,
   Check, ChevronsUpDown, Upload, ExternalLink, RefreshCw, Paperclip, MessageSquare, CalendarClock, Search,
-  ChevronDown, ChevronRight, MoreVertical, CheckCircle2, CircleDollarSign, Info, Mail,
+  ChevronDown, ChevronRight, MoreVertical, CheckCircle2, CircleDollarSign, Info, Mail, Pencil,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -102,6 +102,9 @@ export default function CobranzaFacturas() {
   };
 
   const [doc, setDoc] = useState<{ open: boolean; titulo: string; texto: string; generando: boolean }>({ open: false, titulo: '', texto: '', generando: false });
+  // Editar una factura ya creada (incl. contraparte) y ficha por institución.
+  const [editar, setEditar] = useState<FacturaCobrar | null>(null);
+  const [ficha, setFicha] = useState<FacturaCobrar | null>(null);
 
   const activa = (f: FacturaCobrar) => f.estado !== 'pagada' && f.estado !== 'incobrable';
 
@@ -414,6 +417,8 @@ export default function CobranzaFacturas() {
                     onGenerar={generar}
                     onNota={generarNota}
                     onGmail={enviarBorradorGmail}
+                    onEditar={() => setEditar(f)}
+                    onFicha={() => setFicha(f)}
                     generando={doc.generando}
                     abrirArchivo={abrirArchivo}
                   />
@@ -451,6 +456,16 @@ export default function CobranzaFacturas() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <EditarFacturaDialog factura={editar} onClose={() => setEditar(null)} />
+      <InstitucionFichaDialog
+        deudor={ficha}
+        facturas={facturas}
+        misOcs={misOcs as unknown as OcFicha[]}
+        onClose={() => setFicha(null)}
+        onVerPanel={(rut) => navigate(`/instituciones?rut=${encodeURIComponent(rut)}`)}
+        onEditar={(f) => { setFicha(null); setEditar(f); }}
+      />
     </div>
   );
 }
@@ -459,7 +474,7 @@ export default function CobranzaFacturas() {
 // Fila de la tabla (una factura) + fila expandible con el detalle del CRM.
 // ---------------------------------------------------------------------------
 function FilaFactura({
-  f, tasas, ocLink, expandido, onToggle, onEstado, onMarcarPagada, onReabrir, onEliminar, onGenerar, onNota, onGmail, generando, abrirArchivo,
+  f, tasas, ocLink, expandido, onToggle, onEstado, onMarcarPagada, onReabrir, onEliminar, onGenerar, onNota, onGmail, onEditar, onFicha, generando, abrirArchivo,
 }: {
   f: FacturaCobrar;
   tasas: TasaMora[];
@@ -473,6 +488,8 @@ function FilaFactura({
   onGenerar: (f: FacturaCobrar, tipo: 'carta_cobranza' | 'requerimiento_pago') => void;
   onNota: (f: FacturaCobrar, tipo: 'cobro' | 'debito') => void;
   onGmail: (f: FacturaCobrar) => void;
+  onEditar: () => void;
+  onFicha: () => void;
   generando: boolean;
   abrirArchivo: (path: string) => void;
 }) {
@@ -494,7 +511,7 @@ function FilaFactura({
           <div className="flex items-start gap-1.5">
             {f.deudor_tipo === 'estado' ? <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" /> : <User className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />}
             <div className="min-w-0">
-              <p className="max-w-[220px] truncate font-medium">{f.deudor_nombre}</p>
+              <button type="button" onClick={onFicha} className="max-w-[220px] truncate text-left font-medium hover:text-firmavb-blue hover:underline" title="Ver ficha de la institución">{f.deudor_nombre}</button>
               {f.oc_codigo && <p className="text-xs text-muted-foreground">OC {f.oc_codigo}{f.oc_fecha && ` · ${fFecha(f.oc_fecha)}`}</p>}
               {f.nombre_contacto && <p className="text-xs text-muted-foreground">Contacto: {f.nombre_contacto}</p>}
             </div>
@@ -543,6 +560,13 @@ function FilaFactura({
               <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Acciones"><MoreVertical className="h-4 w-4" /></Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onClick={onEditar}>
+                <Pencil className="mr-2 h-4 w-4" /> Editar datos
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onFicha}>
+                <Building2 className="mr-2 h-4 w-4" /> Ficha de la institución
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem disabled={generando} onClick={() => onGenerar(f, 'carta_cobranza')}>
                 <FileText className="mr-2 h-4 w-4" /> Carta de cobro
               </DropdownMenuItem>
@@ -1370,5 +1394,209 @@ function SeguimientoFactura({ factura }: { factura: FacturaCobrar }) {
         </ul>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Editar una factura ya registrada: corregir o COMPLETAR los datos de la
+// contraparte (nombre, RUT, contacto, correo), el N° de factura, el monto y las
+// fechas. Antes la contraparte solo se podía fijar al crear la factura.
+// ---------------------------------------------------------------------------
+function EditarFacturaDialog({ factura, onClose }: { factura: FacturaCobrar | null; onClose: () => void }) {
+  const actualizar = useActualizarFactura();
+  const [tipo, setTipo] = useState<DeudorTipo>('estado');
+  const [nombre, setNombre] = useState('');
+  const [rut, setRut] = useState('');
+  const [email, setEmail] = useState('');
+  const [contacto, setContacto] = useState('');
+  const [numero, setNumero] = useState('');
+  const [monto, setMonto] = useState('');
+  const [emision, setEmision] = useState('');
+  const [recepcion, setRecepcion] = useState('');
+  const [vencimiento, setVencimiento] = useState('');
+  const [notas, setNotas] = useState('');
+
+  useEffect(() => {
+    if (!factura) return;
+    setTipo(factura.deudor_tipo);
+    setNombre(factura.deudor_nombre ?? '');
+    setRut(factura.deudor_rut ?? '');
+    setEmail(factura.deudor_email ?? '');
+    setContacto(factura.nombre_contacto ?? '');
+    setNumero(factura.numero_factura ?? '');
+    setMonto(factura.monto ? String(factura.monto) : '');
+    setEmision(factura.fecha_emision ?? '');
+    setRecepcion(factura.fecha_recepcion ?? '');
+    setVencimiento(factura.fecha_vencimiento ?? '');
+    setNotas(factura.notas ?? '');
+  }, [factura]);
+
+  const guardar = async () => {
+    if (!factura) return;
+    if (!nombre.trim()) { toast.error('Pon el nombre de la contraparte.'); return; }
+    const err = fechasConsistentes(emision, recepcion, vencimiento);
+    if (err) { toast.error(err); return; }
+    try {
+      await actualizar.mutateAsync({
+        id: factura.id,
+        deudor_tipo: tipo,
+        deudor_nombre: nombre.trim(),
+        deudor_rut: rut.trim() || null,
+        deudor_email: email.trim() || null,
+        nombre_contacto: contacto.trim() || null,
+        numero_factura: numero.trim() || null,
+        monto: monto ? Number(monto) : factura.monto,
+        fecha_emision: emision || null,
+        fecha_recepcion: recepcion || null,
+        fecha_vencimiento: vencimiento || null,
+        notas: notas.trim() || null,
+      });
+      toast.success('Factura actualizada');
+      onClose();
+    } catch (e) { toast.error((e as Error).message); }
+  };
+
+  return (
+    <Dialog open={!!factura} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Editar factura</DialogTitle>
+          <DialogDescription>Corrige o completa los datos de la contraparte y de la factura.</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-3">
+          <div className="grid gap-1.5">
+            <Label>Tipo de contraparte</Label>
+            <Select value={tipo} onValueChange={(v) => setTipo(v as DeudorTipo)}>
+              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="estado">Organismo del Estado</SelectItem>
+                <SelectItem value="privado">Cliente privado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Nombre de la contraparte</Label>
+            <Input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Municipalidad de Maipú" />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-1.5"><Label>RUT</Label><Input value={rut} onChange={(e) => setRut(e.target.value)} placeholder="12.345.678-9" /></div>
+            <div className="grid gap-1.5"><Label>Correo de cobro</Label><Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="pagos@institucion.cl" /></div>
+          </div>
+          <div className="grid gap-1.5"><Label>Persona de contacto</Label><Input value={contacto} onChange={(e) => setContacto(e.target.value)} placeholder="Quien gestiona el pago" /></div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-1.5"><Label>N° de factura</Label><Input value={numero} onChange={(e) => setNumero(e.target.value)} /></div>
+            <div className="grid gap-1.5"><Label>Monto</Label><Input type="number" value={monto} onChange={(e) => setMonto(e.target.value)} /></div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-1.5"><Label className="text-xs">Emisión</Label><Input type="date" value={emision} onChange={(e) => setEmision(e.target.value)} /></div>
+            <div className="grid gap-1.5"><Label className="text-xs">Recepción</Label><Input type="date" value={recepcion} onChange={(e) => setRecepcion(e.target.value)} /></div>
+            <div className="grid gap-1.5"><Label className="text-xs">Vencimiento</Label><Input type="date" value={vencimiento} onChange={(e) => setVencimiento(e.target.value)} /></div>
+          </div>
+          <div className="grid gap-1.5"><Label>Notas / comentarios</Label><Textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={2} placeholder="Ej: acordaron pago en 2 cuotas" /></div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button onClick={guardar} disabled={actualizar.isPending}>{actualizar.isPending ? 'Guardando…' : 'Guardar cambios'}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Ficha por institución (CRM): todas las facturas que te debe, sus totales y
+// sus OC, con salto al panel completo de la institución (licitaciones, reclamos).
+// ---------------------------------------------------------------------------
+type OcFicha = { codigo: string; organismo_comprador: string | null; rut_demandante: string | null; total: number | null; link_oficial?: string | null };
+
+function InstitucionFichaDialog({
+  deudor, facturas, misOcs, onClose, onVerPanel, onEditar,
+}: {
+  deudor: FacturaCobrar | null;
+  facturas: FacturaCobrar[];
+  misOcs: OcFicha[];
+  onClose: () => void;
+  onVerPanel: (rut: string) => void;
+  onEditar: (f: FacturaCobrar) => void;
+}) {
+  const norm = (s: string | null) => (s || '').trim().toLowerCase();
+  const suyas = useMemo(() => {
+    if (!deudor) return [] as FacturaCobrar[];
+    return facturas.filter((f) =>
+      deudor.deudor_rut ? f.deudor_rut === deudor.deudor_rut : norm(f.deudor_nombre) === norm(deudor.deudor_nombre));
+  }, [facturas, deudor]);
+  const ocs = useMemo(() => {
+    if (!deudor) return [] as OcFicha[];
+    return misOcs.filter((o) =>
+      deudor.deudor_rut ? o.rut_demandante === deudor.deudor_rut : norm(o.organismo_comprador) === norm(deudor.deudor_nombre));
+  }, [misOcs, deudor]);
+
+  const esActiva = (f: FacturaCobrar) => f.estado !== 'pagada' && f.estado !== 'incobrable';
+  const porCobrar = suyas.filter(esActiva).reduce((s, f) => s + (f.monto || 0), 0);
+  const pagado = suyas.filter((f) => f.estado === 'pagada').reduce((s, f) => s + (f.monto_pagado ?? f.monto ?? 0), 0);
+  const atrasadas = suyas.filter((f) => esActiva(f) && (diasAtraso(f) ?? 0) > 0);
+
+  return (
+    <Dialog open={!!deudor} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {deudor?.deudor_tipo === 'privado' ? <User className="h-5 w-5" /> : <Building2 className="h-5 w-5" />}
+            {deudor?.deudor_nombre}
+          </DialogTitle>
+          <DialogDescription>{deudor?.deudor_rut || 'Sin RUT registrado'} · Ficha de cobranza</DialogDescription>
+        </DialogHeader>
+
+        <div className="grid grid-cols-3 gap-2">
+          <Card><CardContent className="py-3"><p className="text-[11px] text-muted-foreground">Te debe</p><p className="text-lg font-bold">{CLP(porCobrar)}</p></CardContent></Card>
+          <Card><CardContent className="py-3"><p className="text-[11px] text-muted-foreground">Atrasadas</p><p className="text-lg font-bold text-red-600">{atrasadas.length}</p></CardContent></Card>
+          <Card><CardContent className="py-3"><p className="text-[11px] text-muted-foreground">Ya pagó</p><p className="text-lg font-bold text-green-700">{CLP(pagado)}</p></CardContent></Card>
+        </div>
+
+        <div className="space-y-1.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Facturas ({suyas.length})</p>
+          <div className="max-h-[200px] overflow-auto rounded-md border">
+            {suyas.map((f) => (
+              <div key={f.id} className="flex items-center justify-between gap-2 border-b px-3 py-1.5 text-sm last:border-0">
+                <div className="min-w-0 truncate">
+                  <span className="font-medium">{f.numero_factura || 's/n'}</span>
+                  <span className="text-muted-foreground"> · {ESTADO_COBRO_LABEL[f.estado]}</span>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="tabular-nums">{CLP(f.monto)}</span>
+                  <Button variant="ghost" size="sm" className="h-7" onClick={() => onEditar(f)}>Editar</Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {ocs.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Órdenes de compra ({ocs.length})</p>
+            <div className="max-h-[160px] overflow-auto rounded-md border">
+              {ocs.map((o) => (
+                <div key={o.codigo} className="flex items-center justify-between gap-2 border-b px-3 py-1.5 text-sm last:border-0">
+                  <span className="font-medium">{o.codigo}</span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span className="tabular-nums">{CLP(o.total || 0)}</span>
+                    {o.link_oficial && <a href={o.link_oficial} target="_blank" rel="noreferrer" className="text-firmavb-blue"><ExternalLink className="h-3.5 w-3.5" /></a>}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <DialogFooter>
+          {deudor?.deudor_rut && deudor.deudor_tipo === 'estado' && (
+            <Button variant="outline" onClick={() => onVerPanel(deudor.deudor_rut!)}>
+              <Building2 className="mr-1 h-4 w-4" /> Ver panel de la institución
+            </Button>
+          )}
+          <Button onClick={onClose}>Cerrar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
