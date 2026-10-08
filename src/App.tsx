@@ -92,6 +92,7 @@ const ReporteMercado = lazy(() => import("./pages/reportes/ReporteMercado"));
 const ReporteCompetidores = lazy(() => import("./pages/reportes/ReporteCompetidores"));
 const ReporteConvenioMarco = lazy(() => import("./pages/reportes/ReporteConvenioMarco"));
 const ReporteCriteriosEvaluacion = lazy(() => import("./pages/reportes/ReporteCriteriosEvaluacion"));
+const ReporteMapaCalor = lazy(() => import("./pages/reportes/ReporteMapaCalor"));
 const ConsultaLibre = lazy(() => import("./pages/reportes/ConsultaLibre"));
 const ConvenioMarcoGestion = lazy(() => import("./pages/ConvenioMarcoGestion"));
 
@@ -273,6 +274,7 @@ const App = () => (
             <Route path="/reportes/competidores" element={<ReporteCompetidores />} />
             <Route path="/reportes/convenio-marco" element={<ReporteConvenioMarco />} />
             <Route path="/reportes/criterios-evaluacion" element={<ReporteCriteriosEvaluacion />} />
+            <Route path="/reportes/mapa-calor" element={<ReporteMapaCalor />} />
             <Route path="/reportes/consulta" element={<ConsultaLibre />} />
             <Route path="/reportes/ordenes-compra" element={<ReporteOrdenesCompra />} />
 
