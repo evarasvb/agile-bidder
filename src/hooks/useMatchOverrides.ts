@@ -4,6 +4,30 @@ import { useAuth } from '@/hooks/useAuth';
 
 export type MatchAccion = 'descartado' | 'confirmado' | 'reasignado';
 
+/**
+ * Traduce el error de guardar un override a una frase clara para el usuario
+ * (que no programa): NUNCA mostrar un código técnico crudo. Hallazgo de
+ * Evaristo: al fallar, la app mostraba un código en vez de una descripción.
+ */
+export function mensajeErrorOverride(e: unknown): string {
+  const err = e as { message?: string; code?: string; details?: string } | null;
+  const code = String(err?.code ?? '');
+  const texto = `${code} ${err?.message ?? ''} ${err?.details ?? ''}`.toLowerCase();
+  if (code === '42501' || texto.includes('row-level security') || texto.includes('permission denied') || texto.includes('not authorized')) {
+    return 'No tienes permiso para guardar este cambio en esta compra. Si eres parte de un equipo, pídele a tu administrador acceso al módulo de oportunidades.';
+  }
+  if (code === '23505' || texto.includes('duplicate key')) {
+    return 'Ese producto ya está agregado a la oferta.';
+  }
+  if (code === 'PGRST116' || texto.includes('rows returned') || texto.includes('0 rows')) {
+    return 'El cambio se guardó, pero no pudimos refrescar la vista. Recarga la página para verlo.';
+  }
+  if (texto.includes('failed to fetch') || texto.includes('network') || texto.includes('fetch')) {
+    return 'No pudimos conectar con el servidor. Revisa tu conexión e intenta de nuevo.';
+  }
+  return 'No se pudo guardar el cambio. Intenta de nuevo; si sigue, recarga la página.';
+}
+
 export interface MatchOverride {
   id: string;
   cliente_id: string;

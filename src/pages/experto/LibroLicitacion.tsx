@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 // Escritorio: tres paneles ajustables (arrastra el separador). Celular/tablet: pestañas Fuentes · Chat · Entregables.
 function useEscritorio() {
@@ -23,6 +23,7 @@ import { Infografia, type InfografiaDatos } from '@/components/experto/Infografi
 import { MapaConceptual, type Nodo } from '@/components/experto/MapaConceptual';
 import { compartirPdfExperto } from '@/services/expertoPdf';
 import { MatrizPostulacion, type Matriz } from '@/components/experto/MatrizPostulacion';
+import { evaluarPreparacion, mismoCodigoMatriz, revisionPostulacion, sinAprobacion } from '@/lib/matrizReadiness';
 import { PlanPostulacion } from '@/components/experto/PlanPostulacion';
 import { planAutomatico, fusionarPlan, type PasoPlan } from '@/lib/planPostulacion';
 import { descargarWord } from '@/services/exportar';
@@ -39,6 +40,8 @@ import { useInventoryActivo } from '@/hooks/useInventory';
 import { useCliente } from '@/hooks/useCliente';
 import { descargarCotizacionPDF, type ItemCotizacion, type DatosCotizacion } from '@/services/pdfGenerator';
 import { useExtensionStatus } from '@/hooks/useExtensionStatus';
+import { LibroDownloadFeedback, LibroQueryFeedback } from '@/components/experto/LibroQueryFeedback';
+import { createLibroActionScope, readLibroDownload, readLibroResult, readSavedPptx, type LibroDownload } from '@/lib/libroRequests';
 
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string;
 const ANON = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
@@ -68,6 +71,7 @@ interface Msg { rol: 'yo' | 'exp'; texto: string; fuentes?: any[]; pedirBases?: 
 type Entregable = 'sala' | 'informe' | 'matriz' | 'estudio' | 'bajo_agua' | 'anexos' | 'mapa' | 'infografia';
 // Forma del jsonb que devuelve la RPC experto_libro (un blob con todo el libro).
 interface LibroExperto {
+  codigo?: string;
   chat?: { pregunta: string; respuesta: string }[];
   informe?: { texto: string } | null;
   matriz?: { texto: string } | null;
@@ -100,12 +104,15 @@ export default function LibroLicitacion() {
   const token = session?.access_token ?? '';
   const auth = { 'Content-Type': 'application/json', apikey: ANON, Authorization: 'Bearer ' + (token || ANON) };
 
-  const { data: libro, isLoading } = useQuery({
-    queryKey: ['experto_libro', cod],
+  const { data: libro, isPending: libroPending, isFetching: libroFetching, error: libroError, refetch: retryLibro } = useQuery({
+    queryKey: ['experto_libro', cod, session?.user.id],
     enabled: !!cod && !!token,
     // La RPC devuelve un jsonb con todo el libro; tipamos acá el único punto
     // de entrada en vez de castear cada lectura de libro.* más abajo.
-    queryFn: async () => (await supabase.rpc('experto_libro', { p_codigo: cod })).data as LibroExperto | null,
+    retry: false,
+    queryFn: async ({ signal }) => readLibroResult<LibroExperto>(
+      await supabase.rpc('experto_libro', { p_codigo: cod }).abortSignal(signal), cod,
+    ),
   });
 
   // Productos solicitados de la licitación con match contra el inventario (para
@@ -131,7 +138,7 @@ export default function LibroLicitacion() {
 
   const [buscarLibro, setBuscarLibro] = useState('');
   const [verArchivados, setVerArchivados] = useState(false);
-  const { data: libros = [] } = useQuery({ queryKey: ['experto_mis_libros', verArchivados, buscarLibro], enabled: !!token, queryFn: async () => ((await supabase.rpc('experto_mis_libros', { p_archivados: verArchivados, p_buscar: buscarLibro || null })).data ?? []) as any[] });
+  const { data: libros = [] } = useQuery({ queryKey: ['experto_mis_libros', verArchivados, buscarLibro, session?.user.id], enabled: !!token, queryFn: async () => ((await supabase.rpc('experto_mis_libros', { p_archivados: verArchivados, p_buscar: buscarLibro || null })).data ?? []) as any[] });
 
   // Leyes de compras públicas relevantes para la licitación actual.
   // Espera a que cargue `libro` para buscar por su tipo; el término va en la clave de caché.
@@ -177,6 +184,18 @@ export default function LibroLicitacion() {
   // matriz). Ahora cada acción tiene su propia llave y solo se bloquea a sí
   // misma o a lo que de verdad comparte con ella.
   const [ocupados, setOcupados] = useState<Set<string>>(new Set());
+  // Cada visita/cuenta invalida solo sus tareas de PowerPoint y descarga.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const requestScope = useMemo(() => createLibroActionScope(), [cod, session?.user.id]);
+  const [downloadLinks, setDownloadLinks] = useState<Record<string, LibroDownload>>({});
+  const [downloadErrors, setDownloadErrors] = useState<Record<string, string>>({});
+  useLayoutEffect(() => {
+    requestScope.activate();
+    setDownloadLinks({});
+    setDownloadErrors({});
+    setOcupados((prev) => new Set([...prev].filter((key) => key !== 'pptx' && !key.startsWith('descargar:'))));
+    return () => requestScope.close();
+  }, [requestScope]);
   const ocupado = (k: string) => ocupados.has(k);
   const empezar = (k: string) => setOcupados((prev) => new Set(prev).add(k));
   const terminar = (k: string) => setOcupados((prev) => { const n = new Set(prev); n.delete(k); return n; });
@@ -195,9 +214,14 @@ export default function LibroLicitacion() {
   const fileRef = useRef<HTMLInputElement>(null);
   const guardarRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => { setMsgs([]); setLimite(null); setCompartido(null); }, [cod]);
+  const activeCode = useRef(cod);
+  activeCode.current = cod;
   useEffect(() => {
-    if (!libro) return;
+    setMsgs([]); setLimite(null); setCompartido(null); setFaltantes([]);
+    setEntregables({ sala: 'ok', informe: '', matriz: '', estudio: '', bajo_agua: '', anexos: '', mapa: '', infografia: '' });
+  }, [cod]);
+  useEffect(() => {
+    if (!libro || !mismoCodigoMatriz(libro.codigo, cod)) return;
     setMsgs((libro.chat ?? []).flatMap((c: any) => [{ rol: 'yo', texto: c.pregunta }, { rol: 'exp', texto: c.respuesta }]));
     setEntregables({ sala: 'ok', informe: libro.informe?.texto ?? '', matriz: libro.matriz?.texto ?? '', estudio: libro.estudio?.texto ?? '', bajo_agua: libro.bajo_agua?.texto ?? '', anexos: libro.anexos?.texto ?? '', mapa: libro.mapa?.texto ?? '', infografia: libro.ficha ? 'ok' : '' });
     setFaltantes(libro.anexos?.faltantes ?? []);
@@ -330,22 +354,25 @@ export default function LibroLicitacion() {
         const r = await fetch(`${SUPA}/functions/v1/experto-mapa`, { method: 'POST', headers: auth, body: JSON.stringify({ codigo: cod }) });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(j.mensaje || j.error || `Error ${r.status}`);
+        if (activeCode.current !== cod) return;
         setEntregables((e) => ({ ...e, mapa: JSON.stringify(j.mapa) }));
       } else if (tipo === 'matriz') {
         const r = await fetch(`${SUPA}/functions/v1/experto-matriz`, { method: 'POST', headers: auth, body: JSON.stringify({ codigo: cod }) });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) throw Object.assign(new Error(j.mensaje || j.error || `Error ${r.status}`), { status: r.status });
+        if (activeCode.current !== cod) return;
+        if (!mismoCodigoMatriz(j.matriz?.codigo, cod)) throw new Error('La matriz recibida no corresponde a esta licitación.');
         setEntregables((e) => ({ ...e, matriz: JSON.stringify(j.matriz) }));
         if (j.documentos) toast.success(`Matriz hecha con tus ${j.documentos} documento(s) de trabajo`);
       } else if (tipo === 'infografia') {
         setEntregables((e) => ({ ...e, infografia: 'ok' }));
       } else {
-        await pedir({ modo: tipo, codigo: cod, pregunta: '', huella: 'libro' }, tipo === 'estudio' ? 'experto-estudio' : tipo === 'bajo_agua' ? 'experto-bajo-agua' : 'experto-consultar', (t) => setEntregables((e) => ({ ...e, [tipo]: t })));
+        await pedir({ modo: tipo, codigo: cod, pregunta: '', huella: 'libro' }, tipo === 'estudio' ? 'experto-estudio' : tipo === 'bajo_agua' ? 'experto-bajo-agua' : 'experto-consultar', (t) => { if (activeCode.current === cod) setEntregables((e) => ({ ...e, [tipo]: t })); });
         // Bajo el Agua gasta cuota: se refresca el libro para mostrar cuántos informes quedan.
         if (tipo === 'bajo_agua') qc.invalidateQueries({ queryKey: ['experto_libro', cod] });
       }
-    } catch (e: any) { toast.error(e.message, e.status === 402 ? { action: { label: 'Ver planes', onClick: () => navigate('/cuenta') } } : undefined); }
-    terminar(tipo);
+    } catch (e: any) { if (activeCode.current === cod) toast.error(e.message, e.status === 402 ? { action: { label: 'Ver planes', onClick: () => navigate('/cuenta') } } : undefined); }
+    finally { terminar(tipo); }
   };
 
   // Fuentes subidas (una sola entrada): PDF de bases (se reconocen solos y quedan para todos), Excel, Word,
@@ -389,7 +416,7 @@ export default function LibroLicitacion() {
   };
   // Anexos Word oficiales completados por el Experto (conservan el formato; amarillo = validar).
   const { data: anexosWord = [] } = useQuery({
-    queryKey: ['experto_anexos_word', cod],
+    queryKey: ['experto_anexos_word', cod, session?.user.id],
     enabled: !!cod && !!token,
     queryFn: async () => { const r = await fetch(`${SUPA}/functions/v1/experto-anexo-word?codigo=${cod}`, { headers: auth }); const j = await r.json().catch(() => ({})); return (j.anexos ?? []) as any[]; },
   });
@@ -440,15 +467,21 @@ export default function LibroLicitacion() {
   // evaluación, tareas por fase, garantías y pendientes. Reutiliza experto-matriz, así que
   // pide la misma sesión Pro; queda como .pptx en "Mis documentos de trabajo".
   const generarPptx = async () => {
+    const task = requestScope.start('pptx', 240_000);
+    if (!task) return;
     empezar('pptx');
     try {
-      const r = await fetch(`${SUPA}/functions/v1/experto-pptx`, { method: 'POST', headers: auth, body: JSON.stringify({ codigo: cod }) });
-      const j = await r.json().catch(() => ({}));
-      if (r.status === 402) { toast.error(j.mensaje || 'Requiere Experto Pro', { action: { label: 'Ver planes', onClick: () => navigate('/cuenta') }, duration: 9000 }); return; }
-      if (!r.ok) { toast.error(j.mensaje || j.error || 'No pude generar el PowerPoint'); return; }
-      toast.success(`PowerPoint listo en "Mis documentos de trabajo" (${j.slides} láminas).`, { duration: 7000 });
-      qc.invalidateQueries({ queryKey: ['experto_libro', cod] });
-    } catch (e: any) { toast.error(e.message); } finally { terminar('pptx'); }
+      const r = await fetch(`${SUPA}/functions/v1/experto-pptx`, { method: 'POST', headers: auth, body: JSON.stringify({ codigo: cod }), signal: task.signal });
+      const j: unknown = await r.json().catch(() => null);
+      if (!task.isCurrent()) return;
+      if (r.status === 402) { toast.error('Requiere Experto Pro', { action: { label: 'Ver planes', onClick: () => navigate('/cuenta') }, duration: 9000 }); return; }
+      if (!r.ok) throw new Error('No pude generar y guardar el PowerPoint. Intenta nuevamente.');
+      const saved = readSavedPptx(j, cod);
+      toast.success(`PowerPoint listo en "Mis documentos de trabajo" (${saved.slides} láminas).`, { duration: 7000 });
+      qc.invalidateQueries({ queryKey: ['experto_libro', cod, session?.user.id] });
+    } catch (e: unknown) {
+      if (task.isCurrent()) toast.error(task.signal.aborted ? 'La generación tardó demasiado. Revisa los documentos antes de reintentar.' : e instanceof Error ? e.message : 'No pude generar el PowerPoint');
+    } finally { if (task.finish()) terminar('pptx'); }
   };
   // Ítems de la licitación con match confirmado o sugerido contra el inventario
   // (mismo criterio que la sección "Productos Solicitados" de más arriba): se
@@ -527,13 +560,25 @@ export default function LibroLicitacion() {
     toast.info('Primero trae o sube las bases en la columna Fuentes; con ellas puedo completar los anexos oficiales.', { duration: 9000 });
   };
   const descargarDocumento = async (id: string) => {
-    empezar('descargar:' + id);
+    const key = 'descargar:' + id;
+    const task = requestScope.start(key, 30_000);
+    if (!task) return;
+    empezar(key);
+    setDownloadErrors((prev) => ({ ...prev, [id]: '' }));
+    setDownloadLinks((prev) => { const next = { ...prev }; delete next[id]; return next; });
     try {
-      const r = await fetch(`${SUPA}/functions/v1/experto-documentos?id=${id}`, { headers: auth });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j.url) { toast.error(j.mensaje || 'No pude preparar la descarga'); return; }
-      window.open(j.url, '_blank');
-    } catch (e: any) { toast.error(e.message); } finally { terminar('descargar:' + id); }
+      const r = await fetch(`${SUPA}/functions/v1/experto-documentos?id=${encodeURIComponent(id)}`, { headers: auth, signal: task.signal });
+      const j: unknown = await r.json().catch(() => null);
+      if (!task.isCurrent()) return;
+      if (!r.ok) throw new Error(r.status === 401 ? 'Tu sesión venció. Vuelve a iniciar sesión para descargar.' : r.status === 404 ? 'El archivo ya no está disponible. Actualiza el libro.' : 'No pude preparar la descarga. Intenta nuevamente.');
+      const download = readLibroDownload(j, SUPA);
+      setDownloadLinks((prev) => ({ ...prev, [id]: download }));
+      // Aunque el navegador bloquee esta apertura asíncrona, el enlace queda visible
+      // para un clic directo. Nunca se anuncia que el archivo ya se descargó.
+      try { window.open(download.url, '_blank', 'noopener,noreferrer'); } catch { /* enlace de respaldo disponible */ }
+    } catch (e: unknown) {
+      if (task.isCurrent()) setDownloadErrors((prev) => ({ ...prev, [id]: task.signal.aborted ? 'La descarga tardó demasiado. Intenta nuevamente.' : e instanceof Error ? e.message : 'No pude preparar la descarga. Intenta nuevamente.' }));
+    } finally { if (task.finish()) terminar(key); }
   };
   const borrarAnexoWord = async (id: string) => {
     await fetch(`${SUPA}/functions/v1/experto-anexo-word?id=${id}`, { method: 'DELETE', headers: auth });
@@ -543,15 +588,22 @@ export default function LibroLicitacion() {
     await fetch(`${SUPA}/functions/v1/experto-documentos?id=${id}`, { method: 'DELETE', headers: auth });
     qc.invalidateQueries({ queryKey: ['experto_libro', cod] });
   };
-  const matrizCambio = (m: Matriz) => {
-    setEntregables((e) => ({ ...e, matriz: JSON.stringify(m) }));
+  const matrizCambio = (m: Matriz, reviewed = false) => {
+    if (!mismoCodigoMatriz(m.codigo, cod) || activeCode.current !== cod) {
+      toast.error('La matriz no corresponde a esta licitación. No se guardaron cambios.'); return;
+    }
+    const updated = reviewed ? m : sinAprobacion(m);
+    setEntregables((e) => ({ ...e, matriz: JSON.stringify(updated) }));
     if (guardarRef.current) clearTimeout(guardarRef.current);
-    guardarRef.current = setTimeout(async () => { const { error } = await supabase.rpc('experto_matriz_guardar', { p_codigo: cod, p_matriz: m as any }); if (error) toast.error('No pude guardar la matriz'); }, 1200);
+    guardarRef.current = setTimeout(async () => { const { error } = await supabase.rpc('experto_matriz_guardar', { p_codigo: cod, p_matriz: updated as any }); if (error) toast.error('No pude guardar la matriz'); }, 1200);
   };
   const aprobarPostulacion = () => {
     if (!entregables.matriz) { toast.error('Genera primero la matriz de postulación'); return; }
-    const m = JSON.parse(entregables.matriz); m.aprobacion = { por: session?.user?.email ?? 'usuario', en: new Date().toISOString() };
-    matrizCambio(m); toast.success('Postulación marcada como revisada y aprobada');
+    const m = JSON.parse(entregables.matriz) as Matriz;
+    const context = { codigo: cod, matriz: m, bases, documentos, cierre: f?.fecha_cierre, informe: entregables.informe, anexos: entregables.anexos, faltantes };
+    if (!evaluarPreparacion(context).fresh) { toast.error('Revisa la licitación, las fuentes y la vigencia de la matriz antes de aprobarla.'); return; }
+    m.aprobacion = { por: session?.user?.email ?? 'usuario', en: new Date().toISOString(), revision: revisionPostulacion(context) };
+    matrizCambio(m, true); toast.success('Revisión registrada para esta versión. Los pendientes siguen visibles en la sala.');
   };
   // Word / PDF de cualquier texto del Experto (informe, estudio, anexos, respuesta del chat)
   const aWord = (titulo: string, md: string) => descargarWord(titulo, expertoMd(md), `${cod || 'experto'}-${titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}.doc`);
@@ -679,7 +731,6 @@ export default function LibroLicitacion() {
         {f && <Badge variant="outline">cierra {fecha(f.fecha_cierre)}</Badge>}
         {oportunidadLibro && <AccionesCompartir oportunidad={oportunidadLibro} extraEmail={extraEmailLibro} />}
         {(() => { const v = veredictoDe(entregables.informe); return v ? <Badge variant="outline" className={v.c} title="Veredicto del informe de trabajo">{v.t}</Badge> : null; })()}
-        {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
       </div>
       {compartido && (
         <div className="flex items-center gap-1 flex-wrap text-xs rounded-md border border-primary/30 bg-primary/5 px-2 py-1">
@@ -693,7 +744,8 @@ export default function LibroLicitacion() {
           <Button size="icon" variant="ghost" className="ml-auto h-8 w-8 text-muted-foreground" onClick={() => setCompartido(null)}><X className="h-4 w-4" /></Button>
         </div>
       )}
-      {!isLoading && cod && libro && !f && (
+      <LibroQueryFeedback codigo={cod} loading={libroPending} fetching={libroFetching} error={libroError} hasData={!!libro} onRetry={() => { void retryLibro(); }}>
+      {!libroPending && !libroError && cod && libro && !f && (
         <p className="text-sm text-yellow-800 bg-yellow-50 border border-yellow-200 rounded-md px-3 py-2">No encontré {cod} en la base de Mercado Público. Revisa el ID o sube las bases para trabajar igual.</p>
       )}
 
@@ -771,7 +823,7 @@ export default function LibroLicitacion() {
                   {ocupado('cotizacion') ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Receipt className="h-4 w-4 mr-1" />}Generar cotización comercial
                 </Button>
                 {documentos.map((d: any) => (
-                  <div key={d.id} className="flex items-center gap-1 text-muted-foreground">
+                  <div key={d.id} className="flex flex-wrap items-center gap-1 text-muted-foreground">
                     <span className="truncate flex-1" title={d.nombre}>{d.nombre} <span className="text-[10px] uppercase">{d.tipo}</span></span>
                     {d.tipo === 'docx' && (
                       // Anexo oficial en Word: el Experto lo completa en el mismo archivo (formato intacto).
@@ -779,10 +831,11 @@ export default function LibroLicitacion() {
                         {ocupado('word:' + d.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}<span className="hidden sm:inline">Completar</span>
                       </Button>
                     )}
-                    <Button variant="outline" onClick={() => descargarDocumento(d.id)} disabled={ocupado('descargar:' + d.id)} title="Descargar" className="h-auto gap-0.5 rounded border px-1.5 py-0.5 text-[11px] text-firmavb-blue hover:bg-muted">
-                      {ocupado('descargar:' + d.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}<span className="hidden sm:inline">Descargar</span>
+                    <Button variant="outline" onClick={() => descargarDocumento(d.id)} disabled={ocupado('descargar:' + d.id)} title={downloadLinks[d.id] ? "Renovar enlace de descarga" : "Preparar descarga"} aria-label={`${downloadLinks[d.id] ? "Renovar enlace" : "Descargar"} ${d.nombre}`} className="h-auto gap-0.5 rounded border px-1.5 py-0.5 text-[11px] text-firmavb-blue hover:bg-muted">
+                      {ocupado('descargar:' + d.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}<span className="hidden sm:inline">{downloadLinks[d.id] ? 'Renovar enlace' : 'Descargar'}</span>
                     </Button>
                     <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground" onClick={() => borrarDocumento(d.id)} title="Quitar"><Trash2 className="h-3.5 w-3.5" /></Button>
+                    <LibroDownloadFeedback download={downloadLinks[d.id]} error={downloadErrors[d.id]} />
                   </div>
                 ))}
                 {documentos.filter((x: any) => x.tipo === 'docx').length > 1 && (
@@ -1027,7 +1080,7 @@ export default function LibroLicitacion() {
                 {tab === 'mapa' ? (
                   <div className="max-h-[62vh] overflow-y-auto pr-1"><MapaConceptual raiz={JSON.parse(entregables.mapa) as Nodo} onPreguntar={(t) => setPregunta(`Sobre ${cod}: explícame "${t}" y qué debo hacer con eso`)} /></div>
                 ) : tab === 'matriz' ? (
-                  <div className="max-h-[62vh] overflow-y-auto pr-1"><MatrizPostulacion m={JSON.parse(entregables.matriz) as Matriz} onChange={matrizCambio} url={`${window.location.origin}/experto/libro/${cod}`} /></div>
+                  <div className="max-h-[62vh] overflow-y-auto pr-1"><MatrizPostulacion m={JSON.parse(entregables.matriz) as Matriz} onChange={matrizCambio} contexto={{ codigo: cod, bases, documentos, cierre: f?.fecha_cierre, informe: entregables.informe, anexos: entregables.anexos, faltantes }} url={`${window.location.origin}/experto/libro/${cod}`} /></div>
                 ) : tab === 'infografia' ? (
                   <div className="max-h-[62vh] overflow-y-auto pr-1"><Infografia d={datosInfografia()} /></div>
                 ) : (
@@ -1098,6 +1151,7 @@ export default function LibroLicitacion() {
         </>
       );
       })()}
+      </LibroQueryFeedback>
     </div>
   );
 }
