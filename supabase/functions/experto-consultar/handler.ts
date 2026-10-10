@@ -1,0 +1,553 @@
+// Copyright © 2024-2026 Firma VB SpA. Todos los derechos reservados.
+// Don Evaristo — chat y análisis de licitaciones con fuentes reales.
+// Busca en Postgres (normativa, jurisprudencia, datos de Mercado Público) y
+// responde con Gemini en streaming (SSE). Límites por plan.
+import { createClient } from "jsr:@supabase/supabase-js@2";
+import { evidenceGateLicitacion, crearEstadoDocumentacionLicitacion } from "../_shared/evidenceGateHelper.ts";
+import { textoPanorama, REGLAS_PANORAMA } from "../_shared/panorama.ts";
+import { fetchClaudeComoOpenAI } from "./claudeFallback.ts";
+import { guardarTurnoEvaristo } from "../_shared/evaristoMemoria.ts";
+import { readExpertSource, expertSourceWarning, expertCriticalSourceReply, expertRequiredDocumentReply, hasDocumentSourceError, EXPERT_MISSING_SUMMARY_RULE, type ExpertSourceStates, type ExpertQueryResult } from "../_shared/expertSourceState.ts";
+
+const cors = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+// Gratis con cuenta: 3 preguntas y 1 informe al mes. Comodín sin cuenta: 1 pregunta por navegador y 3 por IP al día.
+const LIMITES_FREE = { chat: 3, informe: 1 };
+const LIMITES_ANON = { chat: 1, informe: 0 };
+const MAX_IP_ANON_24H = 3;
+// Topes que el cliente no controla (el limite mensual por huella se reinicia en incognito):
+//  - por IP y hora: frena loops
+//  - anonimas en 24h rodantes: techo de costo en Gemini cuando se viraliza
+// Si la consulta de cuota falla, se deja pasar (fail-open): es una red de seguridad, no auth.
+const MAX_IP_HORA = Number(Deno.env.get("EXPERTO_MAX_IP_HORA") ?? 20);
+const MAX_ANON_24H = Number(Deno.env.get("EXPERTO_MAX_ANON_24H") ?? 500);
+// Chat: prioridad velocidad (lite responde en <1 s). Informe: prioridad calidad.
+const MODELOS_CHAT = [Deno.env.get("GEMINI_MODEL_CHAT"), "gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-3.6-flash"].filter(Boolean) as string[];
+const MODELOS_INFORME = [Deno.env.get("GEMINI_MODEL_INFORME"), "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.5-flash-lite", "gemini-flash-lite-latest"].filter(Boolean) as string[];
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+// Respaldo si Gemini falla en TODOS sus modelos (ej. cuota de la cuenta agotada): Claude.
+const CLAUDE_MODELO_CHAT = "claude-haiku-4-5-20251001";
+const CLAUDE_MODELO_INFORME = "claude-sonnet-5";
+
+const STOP = new Set("de la el los las un una unos unas y o u que en para por con sin sobre al del se su sus es son fue ser hay como cuando donde qué que cual cuál cuáles quien quién cómo cuánto cuánta cuántos cuántas mi mis me tu tus le les lo nos si no más muy este esta estos estas ese esa eso aquel puedo puede pueden podemos debo debe deben hacer tiene tienen tengo hay está están estoy ese esa alguna algun algún alguno algunos algunas alguien algo otra otro otras otros".split(" "));
+
+const GENERICAS = new Set("licitacion licitaciones licitacio compra compras agil agiles abierta abiertas abierto abiertos semana semanas hoy ahora vigente vigentes oportunidad oportunidades estado mercado publico publicas publica dame dime muestrame busca buscar quiero necesito hay existen existe cuales cuantas cuantos tipo tipos vende venden vender precio precios quien quienes competencia proveedor proveedores organismo organismos entiende cual sobre respecto tema".split(" "));
+function palabrasClave(t: string): string[] {
+  return [...new Set(t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9ñ\- ]/g, " ").split(/\s+/)
+    .filter((w) => w.length > 3 && !STOP.has(w)))].slice(0, 10);
+}
+// Palabras de contenido (sin genéricas) para consultar datos de mercado
+function palabrasDatos(t: string): string[] {
+  return palabrasClave(t).filter((w) => !GENERICAS.has(w)).slice(0, 4);
+}
+function ipCliente(req: Request): string | null {
+  // X-Forwarded-For puede traer valores forjados por el cliente al inicio; el gateway
+  // agrega la IP real AL FINAL. Se toma la ultima para que el tope por IP no se pueda esquivar.
+  const xff = (req.headers.get("x-forwarded-for") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const ip = xff.length ? xff[xff.length - 1] : (req.headers.get("x-real-ip") ?? req.headers.get("cf-connecting-ip") ?? "").trim();
+  return ip ? ip.slice(0, 64) : null;
+}
+const fmt = (n: any) => n == null ? "s/i" : "$" + Math.round(Number(n)).toLocaleString("es-CL");
+const fecha = (d: any) => d ? new Date(d).toLocaleDateString("es-CL", { day: "2-digit", month: "short", year: "numeric" }) : "s/i";
+
+function textoFragmentos(frs: any[]) {
+  return frs.map((f, i) => `[${i + 1}] ${f.fuente}${f.seccion ? " — " + f.seccion : ""}\n${String(f.texto).slice(0, 1800)}`).join("\n\n");
+}
+function textoOrganismo(o: any) {
+  const top = (o.top_proveedores ?? []).slice(0, 5).map((p: any) => `${p.proveedor} (${p.ordenes} OC, ${fmt(p.monto)})`).join("; ");
+  const recl = o.reclamos == null ? "sin dato" : `${o.reclamos} reclamos por incumplir plazo de pago en los últimos 12 meses (ficha Mercado Público leída el ${o.dato_pago_al ?? "s/i"}${o.reclamos_hace_90d != null ? `; hace 90 días eran ${o.reclamos_hace_90d}` : ""})`;
+  const desglose = o.reclamos_pago_12m == null ? "sin dato" :
+    `${o.reclamos_pago_12m} por pago no oportuno y ${o.reclamos_proceso_12m ?? 0} por irregularidad en el proceso (buscador de reclamos MP desde ${o.reclamos_desde ?? "s/i"}); ${o.reclamos_pago_90d ?? 0} de pago en los últimos 90 días; ${o.reclamantes_pago_12m ?? 0} reclamantes distintos${o.top_reclamante ? `, el mayor (${o.top_reclamante}) concentra el ${o.top_reclamante_pct}%` : ""}; procesos publicados 12 meses: ${o.procesos_12m ?? 0} → ${o.reclamos_pago_por_100_procesos ?? "s/i"} reclamos de pago por cada 100 procesos`;
+  return `${o.institucion} (RUT ${o.rut ?? "s/i"}, ${o.region ?? "s/i"})
+Reclamos por no pago (ficha MP): ${recl}
+Reclamos desglosados: ${desglose}
+Plazo de pago declarado en sus licitaciones: ${o.plazo_pago ?? "s/i"} | Conducta de pago histórica: ${o.conducta_pago ?? "s/i"} (${o.pago_promedio_dias ?? "s/i"} días promedio)
+Órdenes de compra últimos 12 meses: ${o.oc_12m ?? 0} por ${fmt(o.monto_12m)} | Licitaciones abiertas hoy: ${o.licitaciones_abiertas ?? 0}
+Top proveedores 12 meses: ${top || "s/i"}`;
+}
+function textoFicha(f: any) {
+  if (!f) return "";
+  const items = (f.items ?? []).slice(0, 25).map((i: any) => `- ${i.producto}${i.cantidad ? ` (${i.cantidad} ${i.unidad ?? ""})` : ""}${i.descripcion ? ": " + i.descripcion : ""}`).join("\n");
+  const o = f.organismo ?? {};
+  const top = (o.top_proveedores ?? []).slice(0, 5).map((p: any) => `${p.proveedor} (${p.ordenes} OC, ${fmt(p.monto)})`).join("; ");
+  const comp = (f.competencia ?? []).slice(0, 6).map((c: any) => `${c.proveedor}: ${c.ordenes} OC, ${fmt(c.monto)}, precio unit. mediano ${fmt(c.precio_unit_mediano)}`).join("\n");
+  const sim = (f.licitaciones_similares_del_organismo ?? []).map((s: any) => `${s.codigo} (${s.estado}, ${fecha(s.publicada)}, ${fmt(s.presupuesto)}): ${s.nombre}`).join("\n");
+  return `LICITACIÓN ${f.codigo}: ${f.nombre}
+Organismo: ${f.institucion} (${f.unidad_compra ?? ""}) — ${f.comuna ?? ""}, ${f.region ?? ""}
+Estado: ${f.estado} | Tipo: ${f.tipo ?? "s/i"} | Presupuesto: ${fmt(f.presupuesto)} ${f.moneda ?? ""} | Modalidad: ${f.modalidad ?? "s/i"} | Pago: ${f.tipo_pago ?? "s/i"} | Duración contrato: ${f.duracion_contrato ?? "s/i"}
+Publicada: ${fecha(f.fecha_publicacion)} | Cierre: ${fecha(f.fecha_cierre)} | Adjudicación estimada: ${fecha(f.fecha_adjudicacion)}
+Fechas API: ${JSON.stringify(f.fechas_api ?? {})}
+Descripción: ${(f.descripcion ?? "").slice(0, 1500)}
+Link: ${f.url}
+ÍTEMS:\n${items || "(sin ítems)"}
+ORGANISMO: conducta de pago ${o.conducta_pago ?? "s/i"}, ${o.pago_promedio_dias ?? "s/i"} días promedio; reclamos por no pagar a tiempo (12 meses, ficha Mercado Público al ${o.dato_pago_al ?? "s/i"}): ${o.reclamos ?? "s/i"}${o.reclamos_hace_90d != null ? ` (hace 90 días: ${o.reclamos_hace_90d})` : ""}; plazo de pago declarado: ${o.plazo_pago ?? "s/i"}; OC últimos 12 meses ${o.oc_12m ?? 0} por ${fmt(o.monto_12m)}; licitaciones abiertas ${o.licitaciones_abiertas ?? 0}. Top proveedores: ${top || "s/i"}
+COMPETENCIA (quién vende estos productos al Estado, 12 meses):\n${comp || "s/i"}
+LICITACIONES SIMILARES DEL MISMO ORGANISMO:\n${sim || "ninguna"}`;
+}
+
+// Bases subidas por usuarios: resumen estructurado + secciones más afines a la pregunta.
+// El resumen JSON de las bases se pasa como texto plano para que el modelo no hable de "null" ni de "JSON".
+function resumenPlano(r: any): string {
+  const v = (x: any): string => x == null || x === "" ? "no indicado" : Array.isArray(x) ? (x.length ? x.map(v).join("; ") : "ninguno indicado") : typeof x === "object" ? Object.entries(x).map(([k, y]) => `${k.replace(/_/g, " ")}: ${v(y)}`).join(", ") : String(x);
+  return Object.entries(r).map(([k, y]) => `- ${k.replace(/_/g, " ")}: ${v(y)}`).join("\n");
+}
+function textoBases(bases: any[], pregunta: string, maxChars: number, nDesde: number, codigo: string): string {
+  const claves = [...palabrasClave(pregunta), "evaluacion", "criterio", "puntaje", "ponderacion", "garantia", "multa", "pago", "admisibilidad", "anexo", "plazo"]
+    .map((w) => w.normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
+  const norm = (t: string) => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const out: string[] = [];
+  bases.forEach((b, i) => {
+    const n = nDesde + i + 1;
+    let presupuesto = Math.max(2500, Math.floor(maxChars / bases.length));
+    const secs: any[] = Array.isArray(b.secciones) ? b.secciones : [];
+    const puntuadas = secs.map((s, idx) => { const t = norm(String(s.texto ?? "")); return { idx, s, p: claves.reduce((a, k) => a + (t.split(k).length - 1), 0) }; })
+      .sort((x, y) => y.p - x.p || x.idx - y.idx);
+    const elegidas: any[] = [];
+    for (const c of puntuadas) { const len = String(c.s.texto ?? "").length + 40; if (len > presupuesto) continue; elegidas.push(c); presupuesto -= len; }
+    elegidas.sort((x, y) => x.idx - y.idx);
+    out.push(`[${n}] BASES DE LA LICITACIÓN ${codigo} — archivo "${b.archivo}" (${b.paginas ?? "?"} páginas, subido por un usuario de FirmaVB)
+RESUMEN DE LAS BASES (extraído del PDF; ${EXPERT_MISSING_SUMMARY_RULE}):
+${b.resumen ? resumenPlano(b.resumen) : "(sin resumen)"}
+SECCIONES DE LAS BASES MÁS RELACIONADAS CON LA PREGUNTA:
+${elegidas.map((c) => `## ${c.s.titulo}\n${c.s.texto}`).join("\n\n") || "(sin secciones)"}`);
+  });
+  return out.join("\n\n");
+}
+// Anexos y demás adjuntos vivos de la licitación (formularios, actas, declaraciones): no llevan
+// resumen (no se les gasta cuota de IA), solo las secciones del texto más relacionadas con la pregunta.
+function textoAnexos(anexos: any[], pregunta: string, maxChars: number, nDesde: number, codigo: string): string {
+  const claves = palabrasClave(pregunta).map((w) => w.normalize("NFD").replace(/[̀-ͯ]/g, ""));
+  const norm = (t: string) => t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const out: string[] = [];
+  anexos.forEach((a, i) => {
+    const n = nDesde + i + 1;
+    let presupuesto = Math.max(1500, Math.floor(maxChars / anexos.length));
+    const secs: any[] = Array.isArray(a.secciones) ? a.secciones : [];
+    const puntuadas = secs.map((s, idx) => { const t = norm(String(s.texto ?? "")); return { idx, s, p: claves.length ? claves.reduce((acc, k) => acc + (t.split(k).length - 1), 0) : 0 }; })
+      .sort((x, y) => y.p - x.p || x.idx - y.idx);
+    const elegidas: any[] = [];
+    for (const c of puntuadas) { const len = String(c.s.texto ?? "").length + 40; if (len > presupuesto) continue; elegidas.push(c); presupuesto -= len; if (!claves.length && elegidas.length >= 2) break; }
+    elegidas.sort((x, y) => x.idx - y.idx);
+    out.push(`[${n}] ANEXO/ADJUNTO DE LA LICITACIÓN ${codigo} — archivo "${a.archivo}" (${a.paginas ?? "?"} páginas; documento vivo en el sistema, no es el cuerpo principal de las bases)
+${elegidas.map((c) => `## ${c.s.titulo}\n${c.s.texto}`).join("\n\n") || "(sin contenido relevante para esta pregunta)"}`);
+  });
+  return out.join("\n\n");
+}
+
+const SYS_CHAT = `Eres Don Evaristo, asesor con 17 años vendiéndole al Estado chileno por Mercado Público / ChileCompra.
+Hablas como Evaristo Varas en su libro "Véndele al Estado y No Mueras en el Intento": de tú, cercano, directo, como un amigo que ya pasó por esto y te lo cuenta sin adornos. Frases cortas. Nada de "estimado", "revisor en mano" ni saludos largos; entra al grano en la primera línea. Ejemplos concretos de la calle antes que teoría. Cuando toca, un empujón honesto ("no hay atajos", "no basta con querer ganar, hay que poder cumplir"). Si algo es riesgoso, dilo sin rodeos. Cierra siempre con el paso concreto que daría hoy.
+Reglas:
+- Responde SOLO con lo que respaldan las FUENTES y DATOS entregados. Cita entre corchetes [n] la fuente usada después de cada afirmación que provenga de ella. Con ley o reglamento nombra el artículo en la frase; con directivas su número; con dictámenes de Contraloría número y año (advierte si es anterior a dic-2024: puede citar el reglamento antiguo D.250/2004, reemplazado por el D.661/2024); con sentencias del TCP rol y fecha; con el libro, dilo como criterio práctico del autor.
+- Con datos de Mercado Público entrega código, organismo, monto, cierre y link.
+- Si hay FICHA ORGANISMO, úsala para evaluar el riesgo de venderle. Distingue reclamos por pago no oportuno (riesgo de caja) de los por irregularidad en el proceso (riesgo de evaluación). Pondera por volumen: usa "reclamos de pago por cada 100 procesos" (menos de 1 bajo, 1 a 5 medio, más de 5 alto) antes que el número bruto; si un solo reclamante concentra más del 50%, adviértelo (puede ser un proveedor reclamando en masa). Compara con la cifra de hace 90 días si existe. Cítalo como "Datos Mercado Público vía FirmaVB". Si el dato dice "sin dato", dilo así.
+- Con LICITACIONES PARECIDAS YA ADJUDICADAS y QUIÉN LE GANA A ESTE ORGANISMO, di quién gana, a qué precio respecto del presupuesto y cuántos oferentes compiten; cítalo como "Datos Mercado Público vía FirmaVB (OCDS)".
+- Si hay BASES DE LA LICITACIÓN (PDF subido por un usuario), son la fuente principal para criterios de evaluación, ponderaciones, garantías, plazos, multas, anexos y cláusulas: responde con esos datos exactos, cita [n] y nombra la sección o numeral. Nunca digas "null", "JSON", "resumen estructurado" ni "texto resumen": ${EXPERT_MISSING_SUMMARY_RULE} Si el contexto dice NO HAY BASES CARGADAS y la pregunta las necesita, responde lo que sí sabes y pide que las suban con el botón "Subir bases (PDF)"; no mandes al usuario a descargarlas de Mercado Público.
+- Si hay DOCUMENTOS DE TRABAJO DEL USUARIO, son sus propios formatos (matriz, checklist, anexos): revísalos contra las bases, dile qué está bien, qué falta y cómo completarlo, campo por campo si te lo pide.
+- Si hay NOTICIAS RECIENTES, úsalas como fuente externa: di "según la prensa" o "según ChileCompra" con el medio y la fecha, cita [n], y sepáralo de lo que dicen nuestros datos ("según nuestros datos de Mercado Público"). Con ambos puedes dar tu opinión, marcándola como opinión.
+${REGLAS_PANORAMA}
+- Si las fuentes no cubren la pregunta, dilo ("No tengo fuente en mi base para eso") y señala qué documento consultar. No inventes artículos, plazos, cifras ni licitaciones.
+- Montos en pesos con separador de miles ($1.234.567). Máximo 250 palabras salvo que pidan detalle (con panorama o bases, hasta 400). Párrafos cortos; lista corta solo para varias licitaciones. Formato Markdown simple.`;
+
+const SYS_INFORME = `Eres Don Evaristo, asesor con 17 años vendiéndole al Estado chileno. Vas a entregar a un proveedor pyme un INFORME DE TRABAJO para una licitación concreta, usando SOLO la ficha, fuentes y datos entregados. Hablas como Evaristo Varas en su libro "Véndele al Estado y No Mueras en el Intento": de tú, cercano, directo, como un amigo que ya pasó por esto y te lo cuenta sin adornos. Frases cortas. Nada de "estimado", "revisor en mano" ni saludos largos; entra al grano en la primera línea. Ejemplos concretos de la calle antes que teoría. Cuando toca, un empujón honesto ("no hay atajos", "no basta con querer ganar, hay que poder cumplir"). Si algo es riesgoso, dilo sin rodeos. Cierra siempre con el paso concreto que daría hoy. Formato Markdown con estas secciones exactas:
+
+## 1. Resumen ejecutivo
+Qué se compra, quién, cuánto, cuándo cierra, y tu veredicto en una línea: ¿vale la pena postular? (sí / con reservas / no) y por qué.
+## 2. Panorama completo
+Antecedentes del organismo (licitaciones anteriores parecidas: código, fecha, quién ganó, oferentes), compras ágiles del mismo tema (fragmentación o compra puente), qué dice la prensa, qué reclaman los proveedores y, si hay match, qué ítems puede ofertar el usuario. Si hay documentos de otra licitación subidos aquí, dilo. Termina con lo que FALTA y pídelo: bases o anexos de la licitación anterior N° X, documentos, precio o capacidad del usuario.
+## 3. Fechas clave y plan de trabajo
+Cronograma hacia atrás desde el cierre: preguntas/aclaraciones, garantía, preparación de anexos, subida de oferta. Con días.
+## 4. Checklist de admisibilidad
+Lista de verificación de lo que deja fuera una oferta (documentos, garantía de seriedad si aplica, inhabilidades art. 4 Ley 19.886, registro de proveedores, formato de anexos). Marca lo que la ficha permite confirmar y lo que hay que revisar en las bases.
+## 5. Cómo se ganan los puntos
+Qué criterios de evaluación suelen aplicarse a este tipo de compra y dónde poner el esfuerzo (precio vs. técnico vs. plazo vs. experiencia). Si la ficha no trae criterios, dilo y explica cómo leerlos en las bases.
+## 6. Riesgos, multas y jurisprudencia aplicable
+Errores que en casos parecidos Contraloría o el TCP ya sancionaron o validaron (cita [n]). Riesgos del organismo (pago, reclamos). Multas cuantificadas frente al monto del contrato: cuáles se asumen como parte del negocio y cuáles son riesgo real.
+## 7. Competencia y precio de referencia
+Quién le vende esto al Estado y a qué precio mediano; quién ganó licitaciones parecidas y con qué monto respecto del presupuesto; quién le gana habitualmente a este organismo; presupuesto vs. mercado; recomendación de estrategia de precio.
+## 8. Próximos 3 pasos
+Acciones concretas para hoy.
+## Fuentes
+Lista numerada de las fuentes citadas (norma y artículo, directiva, dictamen, sentencia, capítulo del libro, "Datos Mercado Público vía FirmaVB").
+
+Reglas: ${EXPERT_MISSING_SUMMARY_RULE} cita [n] tras cada afirmación con fuente; si hay BASES DE LA LICITACIÓN en el contexto, la sección 5 usa sus criterios y ponderaciones reales y las secciones 3, 4 y 6 sus plazos, garantías, multas y anexos, citando la sección; no inventes criterios ni plazos que no estén en la ficha, las bases o las fuentes (si no están, di "revisar en bases" y sugiere subirlas con el botón "Subir bases (PDF)"); montos con separador de miles; máximo 1.100 palabras.
+${REGLAS_PANORAMA}`;
+
+/** Internal callers may suppress duplicate chat memory; these options never come from the request body. */
+export async function handleExpertRequest(req: Request, options: {
+  persistConversation?: boolean;
+  documentRequirement?: 'requirements' | 'commercial_terms' | 'forum';
+} = {}): Promise<Response> {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  const t0 = Date.now();
+  try {
+    const body = await req.json();
+    const modo: "chat" | "informe" = body.modo === "informe" ? "informe" : "chat";
+    const pregunta: string = String(body.pregunta ?? "").trim();
+    const huella: string = String(body.huella ?? "").slice(0, 80);
+    const historial: { role: string; content: string }[] = Array.isArray(body.historial) ? body.historial.slice(-6) : [];
+    let codigo: string | null = body.codigo ? String(body.codigo).trim().toUpperCase() : null;
+
+    const ip = ipCliente(req);
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const sb = createClient(Deno.env.get("SUPABASE_URL")!, serviceRoleKey);
+    const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+    let userId: string | null = null;
+
+    // La clave de servicio solo puede actuar en nombre de un usuario si coincide exactamente.
+    if (token && token === serviceRoleKey && body.user_id) {
+      userId = String(body.user_id);
+    } else if (token && token !== anonKey) {
+      // Solo la credencial pública configurada exacta conserva el comodín sin usuario.
+      // Un JWT inválido nunca puede degradar a comodín anónimo.
+      const unauthorized = () => new Response(JSON.stringify({ error: "no_autorizado", mensaje: "Tu sesión no es válida. Inicia sesión de nuevo para consultar el Experto." }), { status: 401, headers: { ...cors, "Content-Type": "application/json" } });
+      try {
+        const { data, error } = await sb.auth.getUser(token);
+        if (error || !data?.user?.id) return unauthorized();
+        userId = data.user.id;
+      } catch { return unauthorized(); }
+    }
+
+    // Cliente con el JWT del usuario (cuando lo hay): permite leer/escribir la
+    // memoria compartida de Don Evaristo (evaristo_contexto, evaristo_conversaciones)
+    // respetando su RLS, igual que hace evaristo-soporte (chat).
+    const sbUser = userId && token && token !== serviceRoleKey
+      ? createClient(Deno.env.get("SUPABASE_URL")!, anonKey, { global: { headers: { Authorization: `Bearer ${token}` } } })
+      : null;
+
+    // Límites
+    let u: { consultas: number; informes: number; plan: string };
+    try {
+      const { data: uso, error } = await sb.rpc("experto_uso_mes", { p_user_id: userId, p_huella: huella || "anon" });
+      const row = Array.isArray(uso) && uso.length === 1 ? uso[0] : null;
+      if (error || !row || !Number.isSafeInteger(row.consultas) || row.consultas < 0
+        || !Number.isSafeInteger(row.informes) || row.informes < 0
+        || typeof row.plan !== "string" || !row.plan.trim() || row.plan !== row.plan.trim()) {
+        throw new Error("invalid_expert_usage");
+      }
+      u = row;
+    } catch {
+      console.error("experto_uso_mes no verificable");
+      return new Response(JSON.stringify({ error: "cuota_no_disponible", mensaje: "No pude verificar tu plan y las consultas disponibles. Reintenta en unos minutos; no se generó una respuesta de IA." }), { status: 503, headers: { ...cors, "Content-Type": "application/json" } });
+    }
+    const esPro = u.plan && u.plan !== "free";
+    if (!esPro) {
+      // Topes que el cliente no puede reiniciar (IP y global). Fail-open si la consulta falla.
+      try {
+        const { data: cq, error: cqErr } = await sb.rpc("experto_cuota", { p_ip: ip });
+        const c = cq?.[0];
+        if (!cqErr && c) {
+          if (ip && c.ip_hora >= MAX_IP_HORA) {
+            return new Response(JSON.stringify({ error: "ritmo", mensaje: "Demasiadas preguntas seguidas desde tu conexión. Espera un rato e intenta de nuevo.", uso: u }), { status: 429, headers: { ...cors, "Content-Type": "application/json", "Retry-After": "900" } });
+          }
+          if (!userId && ip && (c.ip_anon_24h ?? 0) >= MAX_IP_ANON_24H) {
+            return new Response(JSON.stringify({ error: "comodin_usado", registro: true, mensaje: "El comodín gratis ya se usó desde esta conexión. Crea tu cuenta gratis en FirmaVB y tienes 3 preguntas y 1 informe al mes.", uso: u }), { status: 402, headers: { ...cors, "Content-Type": "application/json" } });
+          }
+          if (c.anon_24h >= MAX_ANON_24H) {
+            return new Response(JSON.stringify({ error: "cupo_diario", mensaje: "El cupo gratuito de hoy ya se agotó. Vuelve mañana, o con el plan Pro de FirmaVB no hay límite.", plan: u.plan, uso: u }), { status: 402, headers: { ...cors, "Content-Type": "application/json" } });
+          }
+        } else if (cqErr) console.error("experto_cuota", cqErr.message);
+      } catch (e) { console.error("experto_cuota", String(e)); }
+
+      const usado = modo === "chat" ? u.consultas : u.informes;
+      const lim = (userId ? LIMITES_FREE : LIMITES_ANON)[modo];
+      if (usado >= lim) {
+        if (!userId) return new Response(JSON.stringify({ error: "comodin_usado", registro: true, mensaje: modo === "chat" ? "Usaste tu comodín telefónico. Crea tu cuenta gratis en FirmaVB: 3 preguntas y 1 informe al mes." : "El informe de una licitación es para usuarios con cuenta. Créala gratis: incluye 1 informe al mes.", plan: u.plan, uso: u }), { status: 402, headers: { ...cors, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ error: "limite", mensaje: `Llegaste al límite gratuito de ${lim} ${modo === "chat" ? "preguntas" : "informe"} al mes. Con el plan Pro de FirmaVB es ilimitado.`, plan: u.plan, uso: u }), { status: 402, headers: { ...cors, "Content-Type": "application/json" } });
+      }
+    }
+
+    // Detección de código de licitación en la pregunta
+    const m = (pregunta + " " + (codigo ?? "")).match(/\b\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}\b/i);
+    if (m) codigo = m[0].toUpperCase();
+    if (modo === "informe" && !codigo) {
+      return new Response(JSON.stringify({ error: "falta_codigo", mensaje: "Indica el ID de la licitación (ej. 2699-35-LE26)." }), { status: 400, headers: { ...cors, "Content-Type": "application/json" } });
+    }
+
+    // Recolección en paralelo
+    const kws = palabrasClave(modo === "chat" ? pregunta : "");
+    const kd = palabrasDatos(modo === "chat" ? pregunta : "");
+    const qOr = (kd.length ? kd : kws.slice(0, 3)).join(" or ");
+    const qDatos = kd.length > 1 ? kd.slice(0, 2).join(" ") + (kd[2] ? " or " + kd[2] : "") : (kd[0] ?? "");
+    const res: Record<string, any> = {};
+    const tiempos: Record<string, number> = {};
+    const estadosFuentes: ExpertSourceStates = {};
+    async function leerFuente<T, U = T>(fuente: string, operation: () => PromiseLike<ExpertQueryResult<T>>, project?: (data: T) => U | null | undefined): Promise<void> {
+      const ti = Date.now();
+      const result = await readExpertSource(operation, project);
+      res[fuente] = result.data;
+      estadosFuentes[fuente] = result.state;
+      tiempos[fuente] = Date.now() - ti;
+      if (result.state.estado === "error") console.error("experto fuente no verificable", fuente);
+    }
+    const tareas: Record<string, Promise<void>> = {};
+    if (codigo) tareas.ficha = leerFuente("ficha", () => sb.rpc("experto_ficha_licitacion", { p_codigo: codigo }));
+    if (codigo) tareas.bases = leerFuente("bases", () => sb.rpc("experto_bases_texto", { p_codigo: codigo }));
+    if (codigo) tareas.anexos = leerFuente("anexos", () => sb.rpc("experto_anexos_texto", { p_codigo: codigo }));
+    if (codigo) tareas.fragmentacion = leerFuente("fragmentacion", () => sb.rpc("experto_fragmentacion_organismo", { p_codigo_licitacion: codigo, p_dias_ventana: 90 }));
+    if (codigo) tareas.patrones = leerFuente("patrones", () => sb.rpc("experto_patrones_licitacion", { p_codigo_licitacion: codigo, p_anos_atras: 3 }));
+    // Panorama completo: documentos ajenos, antecedentes, compras ágiles del tema, reclamos y match del usuario.
+    if (codigo) tareas.panorama = leerFuente("panorama", () => sb.rpc("experto_panorama_licitacion", { p_codigo: codigo, p_user_id: userId }));
+    if (codigo && userId) tareas.docs = leerFuente("docs", () => sb.rpc("experto_documentos_texto", { p_user_id: userId, p_codigo: codigo, p_max: 8000 }));
+    if (modo === "chat") {
+      if (kws.length) {
+        tareas.normOr = leerFuente("normOr", () => sb.rpc("experto_buscar_or", { consulta: qOr, cantidad: 8 }));
+        tareas.normAnd = leerFuente("normAnd", () => sb.rpc("experto_buscar_texto", { consulta: (kd.length ? kd : kws).slice(0, 3).join(" "), cantidad: 4 }));
+      }
+      const p = pregunta.toLowerCase();
+      if (/licitaci|compra|oportunidad|abiert|postular|hay .* (de|para)/.test(p) && qDatos) {
+        tareas.lic = leerFuente("lic", () => sb.rpc("experto_licitaciones", { texto: qDatos, dias: 60, solo_abiertas: true, p_region: null, cantidad: 8 }));
+        tareas.ca = leerFuente("ca", () => sb.rpc("experto_compras_agiles", { texto: qDatos, dias: 30, solo_abiertas: true, p_region: null, cantidad: 6 }));
+      }
+      if (/competencia|qui[eé]n (le )?vende|precio|proveedor/.test(p) && qDatos) {
+        tareas.comp = leerFuente("comp", () => sb.rpc("experto_competencia", { texto: qDatos, meses: 12, cantidad: 8 }));
+      }
+      if (/cu[aá]nt[ao]s|panorama|mercado|demanda/.test(p) && qDatos) {
+        tareas.pan = leerFuente("pan", () => sb.rpc("experto_panorama", { texto: qDatos, dias: 90 }), data => data?.[0]);
+      }
+      if (/adjudic|qui[eé]n (se )?gan|ganador|ganan|competidor|compet[ií]|precio/.test(p) && qDatos) {
+        tareas.adj = leerFuente("adj", () => sb.rpc("experto_adjudicaciones", { texto: qDatos, p_rut: null, meses: 12, cantidad: 8 }));
+      }
+      // Organismo: "municipalidad de X" o, si viene desordenado ("puerto montt la municipalidad"),
+      // se busca por las palabras de contenido (sin las de pago/riesgo) vía experto_buscar_organismo.
+      const org = pregunta.match(/((?:i\.?\s*)?municipalidad|hospital|ministerio|servicio de salud|servicio local|universidad|gobierno regional|subsecretar[ií]a|direcci[oó]n|instituto|carabineros|ej[eé]rcito|armada|junaeb|junji|sename|cenabast|serviu|corfo|sence|fonasa)\s+(?:de\s+)?([a-záéíóúñ\s]{3,40})/i);
+      const tipoOrg = /municipalidad|hospital|ministerio|servicio de|universidad|gobierno regional|subsecretar|direcci[oó]n de|instituto|carabineros|ej[eé]rcito|armada|junaeb|junji|sename|cenabast|serviu|corfo|sence|fonasa/i.test(pregunta);
+      const hablaDePago = /paga[nr]?\b|pago|reclamo|riesgo|conducta/i.test(pregunta);
+      if (org || tipoOrg || hablaDePago) {
+        const palabras = palabrasClave(pregunta).filter((w) => !GENERICAS.has(w) && !/^(pag\w*|reclam\w*|riesg\w*|conduct\w*|demor\w*|atras\w*|cumpl\w*|deud\w*|vender\w*|organismo)$/.test(w)).slice(0, 5);
+        // Sin "municipalidad de X" explícito se exige un tipo de organismo o al menos dos palabras (evita buscar "garantía" como organismo).
+        const texto = org ? org[0].replace(/[?¿.,]/g, "").trim().slice(0, 60) : (tipoOrg || palabras.length >= 2) ? palabras.join(" ") : "";
+        if (texto) tareas.org = (async () => {
+          await leerFuente("orgBusqueda", () => sb.rpc("experto_buscar_organismo", { p_texto: texto }));
+          if (estadosFuentes.orgBusqueda.estado === "ok") {
+            await leerFuente("org", () => sb.rpc("experto_organismo", { nombre_o_rut: res.orgBusqueda }), data => data?.[0]);
+          }
+        })();
+      }
+    } else {
+      // Informe: fuentes por temas fijos + el organismo
+      const temas = ["inadmisibilidad oferta requisitos bases", "garantia seriedad oferta", "criterios evaluacion puntaje precio experiencia", "foro inverso subsanacion errores formales", "pago oportuno proveedores 30 dias", "inhabilidades articulo 4 ley 19886"];
+      temas.forEach((t, i) => tareas["tema" + i] = leerFuente("tema" + i, () => sb.rpc("experto_buscar_texto", { consulta: t, cantidad: 3 })));
+    }
+    // Noticias recientes (fuente externa): prensa y ChileCompra, para opinar con datos internos y externos.
+    if (modo === "chat" && kws.length) tareas.noticias = leerFuente("noticias", () => sb.rpc("experto_noticias", { consulta: (kd.length ? kd : kws).slice(0, 3).join(" or "), cantidad: 3 }));
+    // Perfil del usuario (qué vende, rubro, región) y memoria (lo que pidió mejorar antes): personalizan la respuesta.
+    if (userId) tareas.perfil = leerFuente("perfil", () => sb.from("clientes").select("empresa_nombre, categoria_negocio, industrias, palabras_clave_busqueda, region").eq("user_id", userId).maybeSingle());
+    tareas.memoria = leerFuente("memoria", () => sb.rpc("experto_memoria", { p_user_id: userId, p_huella: huella || "anon" }));
+    // Memoria compartida entre los 3 Evaristos: lo último que este cliente
+    // conversó en cualquier modo (chat/abogado/experto), últimas 48h.
+    if (sbUser) tareas.memoriaEvaristo = leerFuente("memoriaEvaristo", () => sbUser.rpc("evaristo_contexto", { p_codigo: codigo ?? null }), data => data?.conversaciones_recientes ?? []);
+    await Promise.all(Object.values(tareas));
+    // Con código y sin noticias aún (informe, o chat sin palabras clave): prensa sobre el tema de la licitación.
+    if (codigo && res.ficha?.nombre && !res.noticias?.length) {
+      const q = String(res.ficha.nombre).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9ñ ]/g, " ").split(/\s+/).filter((w: string) => w.length > 4 && !GENERICAS.has(w)).slice(0, 3).join(" or ");
+      if (q) {
+        await leerFuente("noticiasTema", () => sb.rpc("experto_noticias", { consulta: q, cantidad: 3 }));
+        res.noticias = res.noticiasTema;
+      }
+    }
+
+    // Adjudicaciones: quién le gana al organismo (chat e informe) y licitaciones parecidas ya adjudicadas (informe)
+    const rutOrg = res.org?.rut ?? res.ficha?.organismo?.rut ?? null;
+    if (rutOrg) await leerFuente("topadj", () => sb.rpc("experto_top_adjudicatarios", { p_rut: rutOrg, meses: 12, cantidad: 6 }));
+    if (modo === "informe" && res.ficha?.nombre) await leerFuente("adj", () => sb.rpc("experto_adjudicaciones", { texto: String(res.ficha.nombre).slice(0, 120), p_rut: null, meses: 12, cantidad: 6 }));
+
+    // Ensamblar contexto
+    let fragmentos: any[] = [];
+    if (modo === "chat") {
+      const vistos = new Set<number>();
+      for (const f of [...(res.normAnd ?? []), ...(res.normOr ?? [])]) if (!vistos.has(f.id)) { vistos.add(f.id); fragmentos.push(f); }
+      fragmentos = fragmentos.slice(0, 8);
+    } else {
+      const vistos = new Set<number>();
+      for (let i = 0; i < 6; i++) for (const f of (res["tema" + i] ?? [])) if (!vistos.has(f.id)) { vistos.add(f.id); fragmentos.push(f); }
+      if (res.ficha?.institucion) {
+        await leerFuente("normaOrg", () => sb.rpc("experto_buscar_texto", { consulta: String(res.ficha.institucion).replace(/[^a-záéíóúñ ]/gi, " ").split(/\s+/).filter((w: string) => w.length > 3).slice(0, 3).join(" "), cantidad: 3 }));
+        for (const f of (res.normaOrg ?? [])) if (!vistos.has(f.id)) { vistos.add(f.id); fragmentos.push(f); }
+      }
+    }
+    const tBusq = Date.now() - t0;
+    const partes: string[] = [];
+    if (fragmentos.length) partes.push("FUENTES:\n" + textoFragmentos(fragmentos));
+    if (res.ficha) partes.push("FICHA DE LICITACIÓN (Datos Mercado Público vía FirmaVB):\n" + textoFicha(res.ficha));
+    else if (codigo && estadosFuentes.ficha?.estado === "empty") partes.push(`No encontré la licitación ${codigo} en la base (puede ser antigua o el código estar mal).`);
+    if (codigo && res.panorama) partes.push(textoPanorama(res.panorama, codigo));
+    const bases: any[] = Array.isArray(res.bases) ? res.bases : [];
+    let pedirBases: string | null = null;
+    if (codigo && bases.length) partes.push(textoBases(bases, modo === "chat" ? pregunta : "criterios evaluacion ponderacion garantia plazo multa admisibilidad anexos pago", modo === "chat" ? 20000 : 24000, fragmentos.length, codigo));
+    else if (codigo && estadosFuentes.bases?.estado === "empty" && (modo === "informe" || /ponder|criterio|evalua|puntaj|garant|cl[aá]usul|multa|anexo|requisit|admisib|plazo de entrega|forma de pago|bases|pliego|t[eé]cnic/i.test(pregunta))) {
+      pedirBases = codigo;
+      partes.push(`NO HAY BASES CARGADAS para ${codigo}. Si la respuesta requiere las bases (criterios, ponderación, garantías, multas, cláusulas, anexos), dile al usuario que las suba con el botón "Subir bases (PDF)" que aparece bajo esta respuesta: las leerás al instante y quedarán disponibles para todos.`);
+    }
+    const anexos: any[] = Array.isArray(res.anexos) ? res.anexos : [];
+    if (codigo && anexos.length) partes.push(textoAnexos(anexos, modo === "chat" ? pregunta : "criterios requisitos plazos garantia formulario declaracion", modo === "chat" ? 8000 : 10000, fragmentos.length + bases.length, codigo));
+    if (res.docs?.length) partes.push("DOCUMENTOS DE TRABAJO DEL USUARIO (Excel, Word o PDF que él subió: su matriz, checklist o anexos a medio llenar; úsalos para anotar qué le falta, corregir y ayudarle a completarlos):\n" + res.docs.map((d: any) => `### ${d.nombre} (${d.tipo})\n${d.texto}`).join("\n\n"));
+    const noticias: any[] = Array.isArray(res.noticias) ? res.noticias : [];
+    if (noticias.length) partes.push("NOTICIAS RECIENTES (fuente externa, prensa y ChileCompra; distingue lo que dice la prensa de nuestros datos):\n" + noticias.map((n, i) => `[${fragmentos.length + bases.length + anexos.length + i + 1}] ${n.fuente} — ${n.seccion}\n${String(n.texto).slice(0, 700)}`).join("\n\n"));
+    if (res.perfil) partes.push(`PERFIL DEL USUARIO (personaliza con esto, sin repetirlo): empresa ${res.perfil.empresa_nombre ?? "s/i"}; rubro ${res.perfil.categoria_negocio ?? "s/i"}; industrias ${(res.perfil.industrias ?? []).join(", ") || "s/i"}; vende/busca: ${(res.perfil.palabras_clave_busqueda ?? []).slice(0, 12).join(", ") || "s/i"}; región ${res.perfil.region ?? "s/i"}.`);
+    if (res.memoria?.length) partes.push("LO QUE ESTE USUARIO PIDIÓ MEJORAR EN RESPUESTAS ANTERIORES (tenlo en cuenta):\n" + res.memoria.map((m: any) => `- ${m.util === false ? "No le sirvió" : "Comentó"} en "${String(m.pregunta ?? "").slice(0, 80)}": ${m.comentario}`).join("\n"));
+    if (Array.isArray(res.memoriaEvaristo) && res.memoriaEvaristo.length && modo === "chat") {
+      partes.push("MEMORIA (lo último que este cliente conversó con Don Evaristo en otros modos, últimas 48h — úsalo solo si es relevante, no lo repitas si no viene al caso):\n" +
+        res.memoriaEvaristo.map((m: any) => `[${m.canal}, ${m.rol === "user" ? "preguntó" : "Evaristo respondió"}] ${m.texto}`).join("\n"));
+    }
+    if (estadosFuentes.lic?.estado === "empty") partes.push(`BÚSQUEDA DE LICITACIONES ABIERTAS para "${qDatos}": sin resultados en títulos, descripciones ni ítems de los últimos 180 días (Datos Mercado Público vía FirmaVB). Dilo así (no digas que no tienes fuente) y sugiere otras palabras o el rubro.`);
+    if (res.lic?.length) partes.push("LICITACIONES ABIERTAS (Datos Mercado Público vía FirmaVB):\n" + res.lic.map((l: any) => `${l.codigo} | ${l.nombre} | ${l.institucion} | ${l.region ?? ""} | ${fmt(l.presupuesto)} | cierra ${fecha(l.cierra)} | ${l.url}${l.coincidencia ? " | coincide en el ítem: " + l.coincidencia : ""}`).join("\n"));
+    if (res.ca?.length) partes.push("COMPRAS ÁGILES ABIERTAS:\n" + res.ca.map((l: any) => `${l.codigo} | ${l.nombre} | ${l.organismo} | ${fmt(l.monto)} | cierra ${fecha(l.cierra)} | pago: ${l.conducta_pago ?? "s/i"} ${l.pago_dias ? l.pago_dias + " días" : ""} | ${l.url ?? ""}`).join("\n"));
+    if (res.comp?.length) partes.push(`COMPETENCIA para "${qDatos}" (proveedores que le vendieron exactamente ese producto al Estado en los últimos 12 meses, según los ítems de sus órdenes de compra; son datos confirmados, úsalos con confianza):\n` + res.comp.map((c: any) => `${c.proveedor} (${c.rut ?? ""}): ${c.ordenes} OC, ${fmt(c.monto)}, precio unitario mediano ${fmt(c.precio_unit_mediano)}, ${c.compradores} compradores`).join("\n"));
+    if (res.pan) partes.push("PANORAMA (90 días): " + JSON.stringify(res.pan));
+    if (res.adj?.length) partes.push("LICITACIONES PARECIDAS YA ADJUDICADAS (API OCDS de Mercado Público, 12 meses; quién ganó y con cuánto):\n" + res.adj.map((a: any) => `${a.codigo} | ${a.titulo} | ${a.comprador} | adjudicada ${fecha(a.fecha_adjudicacion)} a ${a.adjudicatario ?? "s/i"} por ${fmt(a.monto_adjudicado)} (presupuesto ${fmt(a.monto_estimado)}) | ${a.num_oferentes ?? "s/i"} oferentes: ${a.oferentes ?? "s/i"}`).join("\n"));
+    if (res.topadj?.length) partes.push("QUIÉN LE GANA A ESTE ORGANISMO (API OCDS, 12 meses):\n" + res.topadj.map((t: any) => `${t.adjudicatario} (${t.rut ?? "s/i"}): ${t.licitaciones} licitaciones ganadas por ${fmt(t.monto)}, participó en ${t.participaciones}`).join("\n"));
+    if (res.org) partes.push("FICHA ORGANISMO (Datos Mercado Público vía FirmaVB):\n" + textoOrganismo(res.org));
+    if (res.fragmentacion?.length) partes.push("ANÁLISIS: FRAGMENTACIÓN DETECTADA\nEste organismo está licitando múltiples compras del mismo rubro en corto plazo. Señales:\n" + res.fragmentacion.map((f: any) => `- ${f.codigo} (${f.estado}, ${fecha(f.fecha_publicacion)}): ${fmt(f.presupuesto_estimado)} ${f.moneda} — ${f.señal}`).join("\n") + "\n💡 Oportunidad: Negocia volumen directo o espera consolidación; competencia fragmentada = precios altos.");
+    if (res.patrones?.length) partes.push("ANÁLISIS: PATRÓN RECURRENTE\nEste organismo licita esto cada cierto tiempo (compra estructural predecible):\n" + res.patrones.map((p: any) => `- ${p.codigo} (${p.estado}, ${fecha(p.fecha_publicacion)}): ${fmt(p.presupuesto_estimado)} ${p.moneda} — ${p.señal}`).join("\n") + "\n💡 Estrategia: Prepara proceso estándar, optimiza el precio de entrada, revisa cambios en criterios de adjudicación.");
+    const advertenciaFuentes = expertSourceWarning(estadosFuentes);
+    if (advertenciaFuentes) partes.unshift(`FUENTES NO VERIFICABLES: ${advertenciaFuentes} No deduzcas ausencia, cumplimiento ni documentación completa de una consulta fallida.`);
+    const respuestaErrorFuente = expertCriticalSourceReply(codigo, estadosFuentes);
+    const respuestaSinDocumentos = expertRequiredDocumentReply(codigo, options.documentRequirement, bases, anexos);
+    const respuestaSegura = respuestaErrorFuente ?? respuestaSinDocumentos;
+    const contexto = partes.join("\n\n") || "(sin fuentes ni datos para esta pregunta)";
+
+    // Evidence Gate: NO bloquea la respuesta (el gate es conservador por diseño y nunca
+    // da "verde", así que cortar aquí dejaba al Experto mudo en toda licitación). Se le
+    // entrega a la IA como regla: responde con lo que hay y deja claro qué falta.
+    let notaGate = "";
+    let estadoDocumental: string | null = null;
+    if (codigo && respuestaSinDocumentos && !hasDocumentSourceError(estadosFuentes)) {
+      estadoDocumental = "no_verificable";
+      notaGate = "\n\nESTADO DOCUMENTAL: no verificable para esta pregunta con las fuentes recuperadas.";
+    } else if (codigo && hasDocumentSourceError(estadosFuentes)) {
+      estadoDocumental = "no_verificable";
+      notaGate = "\n\nESTADO DOCUMENTAL: no verificable por un error de consulta. No afirmes que falten documentos ni que estén completos. No recomiendes postular hasta verificar las fuentes que fallaron.";
+    } else if (codigo) {
+      const gate = evidenceGateLicitacion(crearEstadoDocumentacionLicitacion(res.ficha, bases, anexos));
+      estadoDocumental = gate.veredicto;
+      notaGate = `\n\nESTADO DOCUMENTAL (regla determinista de FirmaVB, veredicto: ${gate.veredicto}): ${gate.razon}${gate.faltantes.length ? ` Faltantes: ${gate.faltantes.join("; ")}.` : ""} Responde igual con lo que tienes (bases, anexos, ficha, fuentes), pero NUNCA recomiendes postular como algo seguro: si falta documentación dilo explícitamente y qué debe subir o revisar el usuario.`;
+    }
+
+    const userMsg = modo === "chat" ? `${contexto}${notaGate}\n\nPREGUNTA: ${pregunta}` : `${contexto}${notaGate}\n\nGenera el informe de trabajo para la licitación ${codigo}.${pregunta ? " Contexto del proveedor: " + pregunta : ""}`;
+    const messages = [
+      { role: "system", content: modo === "chat" ? SYS_CHAT : SYS_INFORME },
+      ...historial.filter((h) => h && (h.role === "user" || h.role === "assistant") && h.content).map((h) => ({ role: h.role, content: String(h.content).slice(0, 2000) })),
+      { role: "user", content: userMsg },
+    ];
+
+    const key = Deno.env.get("GEMINI_API_KEY");
+
+    // Llamada a Gemini con streaming; probamos modelos en orden. Cada intento tiene un
+    // tope de tiempo corto: si un modelo se cuelga, no puede consumir todo el tiempo que
+    // el navegador espera antes de cortar la conexión, dejando sin turno al respaldo de Claude.
+    let upstream: Response | null = null; let modelo: string | null = null;
+    let cleanupUpstream: (() => void) | null = null;
+    let abortUpstream: (() => void) | null = null;
+    if (!respuestaSegura && key && !req.signal.aborted) {
+      for (const mdl of (modo === "chat" ? MODELOS_CHAT : MODELOS_INFORME)) {
+        if (req.signal.aborted) break;
+        const controller = new AbortController();
+        const abort = () => controller.abort();
+        req.signal.addEventListener("abort", abort, { once: true });
+        if (req.signal.aborted) abort();
+        const timer = setTimeout(abort, 8000);
+        const cleanup = () => { clearTimeout(timer); req.signal.removeEventListener("abort", abort); };
+        try {
+          const r = await fetch(GEMINI_URL, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ model: mdl, messages, temperature: 0.3, max_tokens: modo === "chat" ? 2500 : 4000, stream: true, reasoning_effort: "low" }),
+            signal: controller.signal,
+          });
+          if (!req.signal.aborted && r.ok && r.body) { upstream = r; modelo = mdl; cleanupUpstream = cleanup; abortUpstream = abort; break; }
+          if (req.signal.aborted) { await r.body?.cancel(); break; }
+          console.error("gemini", mdl, r.status, (await r.text()).slice(0, 200));
+        } catch (e) { console.error("gemini fetch", mdl, String(e)); }
+        finally { if (!upstream) cleanup(); }
+      }
+    }
+    if (!respuestaSegura && !upstream && !req.signal.aborted) {
+      const claude = await fetchClaudeComoOpenAI(messages, { modelo: modo === "chat" ? CLAUDE_MODELO_CHAT : CLAUDE_MODELO_INFORME, maxTokens: modo === "chat" ? 2500 : 4000, temperature: 0.3, signal: req.signal });
+      if (claude) { upstream = claude.resp; modelo = claude.modelo; }
+    }
+    if (req.signal.aborted) {
+      abortUpstream?.(); cleanupUpstream?.();
+      try { await upstream?.body?.cancel(); } catch { /* request already cancelled */ }
+      return new Response(JSON.stringify({ error: "consulta_cancelada" }), { status: 499, headers: { ...cors, "Content-Type": "application/json" } });
+    }
+    if (!respuestaSegura && !upstream) return new Response(JSON.stringify({ error: "ia_no_disponible" }), { status: 502, headers: cors });
+
+    const fuentesMeta = [
+      ...fragmentos.map((f, i) => ({ n: i + 1, fuente: f.fuente, seccion: f.seccion, url: f.url })),
+      ...bases.map((b, i) => ({ n: fragmentos.length + i + 1, fuente: `Bases de la licitación ${codigo}: ${b.archivo}`, seccion: `${b.paginas ?? "?"} páginas, PDF subido por un usuario de FirmaVB el ${fecha(b.creado_en)}`, url: null })),
+      ...anexos.map((a, i) => ({ n: fragmentos.length + bases.length + i + 1, fuente: `Anexo/adjunto de la licitación ${codigo}: ${a.archivo}`, seccion: `${a.paginas ?? "?"} páginas`, url: null })),
+      ...noticias.map((n, i) => ({ n: fragmentos.length + bases.length + anexos.length + i + 1, fuente: n.fuente, seccion: n.seccion, url: n.url })),
+    ];
+    const enc = new TextEncoder(); const dec = new TextDecoder();
+    let respuesta = "";
+    let cancelled = false;
+    let upstreamReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+    const stream = new ReadableStream({
+      async start(ctrl) {
+        ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ meta: { modelo, fuentes: fuentesMeta, estados_fuentes: estadosFuentes, estado_respuesta: advertenciaFuentes ? "source_error" : respuestaSinDocumentos ? "needs_evidence" : "ok", estado_documental: estadoDocumental, codigo, pedir_bases: respuestaErrorFuente ? null : pedirBases, bases: bases.map((b) => ({ archivo: b.archivo, paginas: b.paginas })), uso: u, ms_busqueda: tBusq, ms_ia_inicio: respuestaSegura ? null : Date.now() - t0, tiempos, kws, kd } })}\n\n`));
+        const prefijo = respuestaSegura ?? (advertenciaFuentes ? `${advertenciaFuentes}\n\n` : "");
+        if (prefijo) {
+          respuesta = prefijo;
+          ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ delta: prefijo })}\n\n`));
+        }
+        if (respuestaSegura) {
+          ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ finish: "stop" })}\n\n`));
+        } else {
+          const reader = upstream!.body!.getReader(); upstreamReader = reader; let buf = "";
+          try {
+            while (!cancelled) {
+              const { done, value } = await reader.read();
+              if (done || cancelled) break;
+              buf += dec.decode(value, { stream: true });
+              const lines = buf.split("\n"); buf = lines.pop() ?? "";
+              for (const ln of lines) {
+                const s = ln.trim(); if (!s.startsWith("data:")) continue;
+                const d = s.slice(5).trim(); if (d === "[DONE]") continue;
+                try {
+                  const j = JSON.parse(d); const delta = j.choices?.[0]?.delta?.content;
+                  if (delta) { respuesta += delta; ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ delta })}\n\n`)); }
+                  const fr = j.choices?.[0]?.finish_reason; if (fr) ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ finish: fr })}\n\n`));
+                } catch { /* ignorar */ }
+              }
+            }
+          } catch (e) { if (!cancelled) ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ error: String(e) })}\n\n`)); }
+          finally { reader.releaseLock(); cleanupUpstream?.(); }
+        }
+        if (!cancelled) {
+          ctrl.enqueue(enc.encode(`data: ${JSON.stringify({ done: true, ms: Date.now() - t0 })}\n\n`));
+        }
+        try { await sb.rpc("experto_registrar_uso", { p_user_id: userId, p_huella: huella || "anon", p_modo: modo, p_pregunta: pregunta || `informe ${codigo}`, p_respuesta: respuesta, p_fuentes: fuentesMeta, p_licitacion: codigo, p_ms: Date.now() - t0, p_ip: ip }); } catch { /* no bloquear */ }
+        if (userId && options.persistConversation !== false) {
+          await guardarTurnoEvaristo(sbUser ?? sb, {
+            userId,
+            canal: "experto",
+            pregunta: pregunta || `[Informe] ${codigo}`,
+            respuesta,
+            meta: { modo, codigo, modelo, estados_fuentes: estadosFuentes, estado_documental: estadoDocumental },
+          });
+        }
+        // Medidor de costo real de IA (estimado desde tokens ~ chars/4), para calibrar créditos.
+        if (modelo) try {
+          const tin = Math.ceil(userMsg.length / 4), tout = Math.ceil(respuesta.length / 4);
+          const rin = /claude-sonnet/.test(modelo) ? 3e-6 : /claude-haiku/.test(modelo) ? 1e-6 : 1.5e-7;
+          const rout = /claude-sonnet/.test(modelo) ? 15e-6 : /claude-haiku/.test(modelo) ? 5e-6 : 6e-7;
+          const costo = Number((tin * rin + tout * rout).toFixed(6));
+          await sb.rpc("registrar_uso_ia", { p_funcion: `experto-${modo}`, p_modelo: modelo, p_tokens_in: tin, p_tokens_out: tout, p_costo_usd: costo, p_user_id: userId, p_creditos_cobrados: null, p_referencia: codigo });
+        } catch { /* no bloquear */ }
+        // EOF waits for the existing quota, memory and cost bookkeeping to settle.
+        if (!cancelled) ctrl.close();
+      },
+      async cancel() {
+        cancelled = true;
+        abortUpstream?.(); cleanupUpstream?.();
+        try { await upstreamReader?.cancel(); } catch { /* upstream already stopped */ }
+      },
+    });
+    return new Response(stream, { headers: { ...cors, "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
+  } catch (e) {
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }), { status: 500, headers: { ...cors, "Content-Type": "application/json" } });
+  }
+}

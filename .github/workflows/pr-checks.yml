@@ -34,3 +34,30 @@ jobs:
 
       - name: Unit tests
         run: npm run test
+
+      - name: Edge deployment selection tests
+        run: python3 -B -m unittest discover -s scripts -p 'test_select_edge_functions.py'
+
+      - name: Install Chromium for mocked chat tests
+        run: npx --no-install playwright install --with-deps chromium
+
+      - name: Browser regression gate
+        env:
+          EVARISTO_BROWSER_TESTS: '1'
+        run: |
+          export PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH="$(node --input-type=module -e 'import { chromium } from "@playwright/test"; process.stdout.write(chromium.executablePath())')"
+          test -x "$PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"
+          npm run test -- src/lib/evaristoContext.ui.test.ts --reporter=default --reporter=json --outputFile.json=/tmp/evaristo-browser-results.json
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const r = JSON.parse(fs.readFileSync("/tmp/evaristo-browser-results.json", "utf8"));
+            if (!r.success || r.numPassedTests < 5 || r.numPendingTests !== 0 || r.numTodoTests !== 0) process.exit(1);
+            console.log(`${r.numPassedTests} browser tests passed; none skipped`);
+          '
+
+      - name: Deno entrypoint type gate
+        if: ${{ !cancelled() }}
+        run: |
+          npm exec --yes --package=deno@2.9.6 -- deno check --no-lock --node-modules-dir=auto \
+            supabase/functions/evaristo-soporte/index.ts \
+            supabase/functions/experto-consultar/index.ts

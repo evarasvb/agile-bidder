@@ -1,6 +1,7 @@
 # Auto-deploy de las Edge Functions de Supabase al hacer merge a main.
 # Despliega SOLO las funciones cuya carpeta cambió en el push, más las que importan
-# un _shared modificado, más aquellas cuyo verify_jwt cambió en supabase/config.toml.
+# un módulo relativo modificado (también de forma transitiva), más aquellas cuyo
+# verify_jwt cambió en supabase/config.toml.
 # No hace un "deploy de todo": el radio de impacto es exactamente lo que se modificó.
 # El verify_jwt de cada función lo controla supabase/config.toml (no tocarlo a mano).
 #
@@ -38,6 +39,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0  # historial completo: diffs correctos incluso en push de varios commits
+
+      - name: Probar selector local de funciones
+        run: python3 -B -m unittest discover -s scripts -p 'test_select_edge_functions.py'
 
       - name: Verificar secreto SUPABASE_ACCESS_TOKEN
         env:
@@ -79,41 +83,18 @@ jobs:
           set -euo pipefail
 
           if [ -n "${MANUAL:-}" ]; then
-            printf '%s\n' $MANUAL | sort -u > /tmp/funcs.txt
+            python3 scripts/select-edge-functions.py --after "$EVENT_AFTER" --manual "$MANUAL" > /tmp/funcs.txt
           else
             AFTER="$EVENT_AFTER"
             BEFORE="$EVENT_BEFORE"
-            # En un push nuevo/forzado o si el before no está, usar el padre del commit.
+            # Conserva el fallback existente para push inicial/manual o before no disponible.
             if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
               BEFORE="$(git rev-parse "${AFTER}^" 2>/dev/null || echo "$AFTER")"
             fi
             echo "Diff $BEFORE..$AFTER"
-
-            CHANGED="$(git diff --name-only "$BEFORE" "$AFTER" -- supabase/functions/ supabase/config.toml || true)"
-            echo "Archivos cambiados:"; echo "$CHANGED"
-
-            : > /tmp/funcs.txt
-
-            # 1) Funciones cuya propia carpeta cambió (excluye _shared).
-            echo "$CHANGED" | grep -E '^supabase/functions/[^_/][^/]*/' | sed -E 's#^supabase/functions/([^/]+)/.*#\1#' >> /tmp/funcs.txt || true
-
-            # 2) Si cambió _shared, agregar las funciones que importan de ../_shared.
-            if echo "$CHANGED" | grep -q '^supabase/functions/_shared/'; then
-              echo "Cambió _shared: agrego las funciones que lo importan."
-              grep -rlE '\.\./_shared/' supabase/functions --include='*.ts' 2>/dev/null \
-                | sed -E 's#^supabase/functions/([^/]+)/.*#\1#' | grep -v '^_shared$' >> /tmp/funcs.txt || true
-            fi
-
-            # 3) Si cambió config.toml, agregar las funciones cuyo bloque [functions.X]
-            #    tuvo un cambio de verify_jwt (líneas +/- de verify_jwt dentro del bloque).
-            if echo "$CHANGED" | grep -q '^supabase/config.toml$'; then
-              echo "Cambió config.toml: agrego las funciones cuyo verify_jwt cambió."
-              git diff -U3 "$BEFORE" "$AFTER" -- supabase/config.toml | awk '
-                { pfx = substr($0, 1, 1); rest = substr($0, 2) }
-                rest ~ /^\[functions\./ { cur = rest; gsub(/[][]/, "", cur); sub(/^functions\./, "", cur) }
-                (pfx == "+" || pfx == "-") && rest ~ /verify_jwt/ { if (cur != "") print cur }
-              ' >> /tmp/funcs.txt || true
-            fi
+            # Revisa ambos árboles: renombrados y borrados conservan los consumidores
+            # anteriores. Un helper no agrega otras funciones que usan helpers ajenos.
+            python3 scripts/select-edge-functions.py --before "$BEFORE" --after "$AFTER" > /tmp/funcs.txt
           fi
 
           FUNCS="$(sort -u /tmp/funcs.txt | grep -v '^$' || true)"

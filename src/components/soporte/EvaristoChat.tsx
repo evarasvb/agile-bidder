@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Sparkles, Send, X, ImagePlus, Loader2, Bot, MessageCircle, LifeBuoy, CheckCircle2, Zap, XCircle, Clock } from "lucide-react";
+import { Sparkles, Send, X, ImagePlus, Loader2, Bot, MessageCircle, LifeBuoy, CheckCircle2, Zap, XCircle, Clock, Mic, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { useInventoryStats } from "@/hooks/useInventory";
 import { useExtensionStatus } from "@/hooks/useExtensionStatus";
+import { contextAfterResponse, emptyEvaristoContext, evaristoStorageKey, processCodeFromHistory, processCodeInRoute, processContextForRequest, readEvaristoContext } from "@/lib/evaristoContext";
+import { readEvaristoAccessDeniedResponse, readEvaristoEvidence, type EvaristoEvidence } from "@/lib/evaristoSources";
+import { appendEvaristoTranscript, canShareEvaristoImage, createEvaristoDictation, emptyEvaristoImageDraft, getEvaristoRecognition, reduceEvaristoImageDraft, type EvaristoDictation, type EvaristoRecognitionConstructor } from "@/lib/evaristoInput";
 
 // Acción que Don Evaristo dejó en cola y la extensión de Chrome ejecuta en Mercado Público.
 interface AccionChat {
@@ -16,7 +19,7 @@ interface AccionChat {
   error?: string | null;
   resultado?: Record<string, unknown> | null;
 }
-interface Msg { role: "user" | "assistant"; content: string; img?: string; acciones?: AccionChat[] }
+interface Msg extends EvaristoEvidence { role: "user" | "assistant"; content: string; img?: string; acciones?: AccionChat[] }
 
 const NOMBRE_ACCION: Record<string, string> = {
   sincronizar_licitacion: "Sincronizar licitación y bases",
@@ -80,21 +83,12 @@ function AccionCard({ a, onDecidir }: { a: AccionChat; onDecidir: (id: string, c
   );
 }
 
-const LS_MSGS = "fvb_evaristo_msgs";
 const LS_OPEN = "fvb_evaristo_open";
-const LS_CONV = "fvb_evaristo_conv";
 
 const SALUDO: Msg = {
   role: "assistant",
   content:
     "¡Hola! 👋 Soy Don Evaristo, tu experto en Mercado Público y en FirmaVB. Cuéntame en qué estás y te ayudo al tiro. Por ejemplo: “¿cómo bajo la extensión?” o “¿me conviene esta licitación?”. Si algo te da error, mándame un print. 📸",
-};
-
-// Código de licitación o compra ágil en la URL (ej: /licitaciones/1234-56-LE26).
-const RE_CODIGO = /^\d{1,7}-\d{1,6}-[A-Z]{1,3}\d{2,3}$/i;
-const codigoEnRuta = (path: string): string | null => {
-  const hit = path.split("/").filter(Boolean).map(decodeURIComponent).find((s) => RE_CODIGO.test(s));
-  return hit ? hit.toUpperCase() : null;
 };
 
 // Tablas de memoria de Don Evaristo (aún no están en los tipos generados).
@@ -143,6 +137,43 @@ function Rico({ text, onInternal }: { text: string; onInternal: (path: string) =
   );
 }
 
+function FuentesRespuesta({ message }: { message: EvaristoEvidence }) {
+  const { fuentes, estados_fuentes, estado_respuesta } = message;
+  const aviso = estado_respuesta === "answered_with_sources" ? "Basado en extractos disponibles. Revisa la última versión y sus aclaraciones antes de enviar."
+    : estado_respuesta === "access_denied" ? "No se pudo acceder a las fuentes necesarias."
+    : estado_respuesta === "needs_evidence" ? "Falta evidencia para una respuesta respaldada."
+    : estado_respuesta === "incomplete" ? "La respuesta está incompleta."
+    : Object.values(estados_fuentes ?? {}).some((state) => state.estado === "error") ? "No se pudieron consultar todas las fuentes."
+    : null;
+  if (!fuentes?.length && !aviso) return null;
+  return (
+    <section aria-label="Fuentes de la respuesta" className="mt-2 border-t border-border/60 pt-2 text-xs space-y-1.5">
+      {aviso && <p className="text-muted-foreground">{aviso}</p>}
+      {fuentes?.length ? (
+        <>
+          <p className="font-semibold">Fuentes</p>
+          <ul className="space-y-1.5">
+            {fuentes.map((source) => (
+              <li key={source.n} className="break-words">
+                <span className="font-medium">[{source.n}] </span>
+                {source.url ? (
+                  <a href={source.url} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer"
+                    className="underline text-firmavb-blue rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-firmavb-blue"
+                    aria-label={`${source.fuente}${source.seccion ? `, ${source.seccion}` : ""} (abre en nueva pestaña)`}>
+                    {source.fuente}
+                  </a>
+                ) : <span>{source.fuente}</span>}
+                {source.seccion && <span className="text-muted-foreground"> · {source.seccion}</span>}
+                {!source.url && <span className="block text-muted-foreground">Sin enlace disponible</span>}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
 const nombrePagina = (path: string): string => {
   const map: Record<string, string> = {
     "/dashboard": "Dashboard", "/inventario": "Inventario", "/mis-oportunidades": "Mis Oportunidades",
@@ -163,14 +194,16 @@ export function EvaristoChat() {
   const [open, setOpen] = useState(() => {
     try { return localStorage.getItem(LS_OPEN) === "1"; } catch { return false; }
   });
-  const [msgs, setMsgs] = useState<Msg[]>(() => {
-    try {
-      const raw = localStorage.getItem(LS_MSGS);
-      return raw ? JSON.parse(raw) : [SALUDO];
-    } catch { return [SALUDO]; }
-  });
+  const [msgs, setMsgs] = useState<Msg[]>([SALUDO]);
   const [input, setInput] = useState("");
-  const [img, setImg] = useState<string | null>(null);
+  const [imageDraft, dispatchImage] = useReducer(reduceEvaristoImageDraft, undefined, emptyEvaristoImageDraft);
+  const img = imageDraft.image;
+  const imageRevision = useRef(0);
+  const [Recognition] = useState<EvaristoRecognitionConstructor | null>(() => getEvaristoRecognition(window));
+  const dictation = useRef<EvaristoDictation | null>(null);
+  const [dictating, setDictating] = useState(false);
+  const [dictationPrompt, setDictationPrompt] = useState(false);
+  const [dictationNotice, setDictationNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -184,28 +217,133 @@ export function EvaristoChat() {
   const [escMensaje, setEscMensaje] = useState("");
   const [enviandoTicket, setEnviandoTicket] = useState(false);
 
-  // Memoria: id de la conversación abierta (se guarda en Supabase, sobrevive al
-  // dispositivo) y último código sobre el que Don Evaristo ya saludó.
-  const [convId, setConvId] = useState<string | null>(() => {
-    try { return localStorage.getItem(LS_CONV); } catch { return null; }
-  });
-  const historialCargado = useRef(false);
+  // Contexto confirmado por el servidor, aislado por cuenta y conversación.
+  const [conversation, setConversation] = useState(emptyEvaristoContext);
+  const convId = conversation.conversationId;
+  const [sessionReady, setSessionReady] = useState(false);
+  const [historyReady, setHistoryReady] = useState(false);
+  const cachedSession = useRef(false);
+  const owner = useRef<string | null | undefined>(undefined);
+  const generation = useRef(0);
   const ultimoSaludo = useRef<string | null>(null);
-  const codigo = codigoEnRuta(location.pathname);
+  const codigo = processCodeInRoute(location.pathname);
+  const previousPath = useRef(location.pathname);
+  const routeRevision = useRef(0);
+
+  const resetImage = useCallback(() => {
+    const revision = ++imageRevision.current;
+    dispatchImage({ type: "clear", revision });
+    return revision;
+  }, []);
+  const cancelDictation = useCallback(() => {
+    dictation.current?.cancel();
+    dictation.current = null;
+    setDictating(false);
+    setDictationPrompt(false);
+    setDictationNotice("");
+  }, []);
+  const startDictation = () => {
+    if (!Recognition || loading || !sessionReady || !historyReady) return;
+    cancelDictation();
+    const requestGeneration = generation.current;
+    try {
+      const session = createEvaristoDictation(Recognition, {
+        isCurrent: () => generation.current === requestGeneration,
+        onText: (text) => setInput((previous) => appendEvaristoTranscript(previous, text)),
+        onState: setDictating,
+        onNotice: setDictationNotice,
+      });
+      dictation.current = session;
+      session.start();
+    } catch {
+      setDictating(false);
+      setDictationNotice("No se pudo iniciar el dictado. Puedes seguir escribiendo.");
+    }
+  };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Sincroniza el motor externo y su indicador al ocultar el chat.
+    if (!open || escalando || location.pathname.startsWith("/experto")) cancelDictation();
+  }, [open, escalando, location.pathname, cancelDictation]);
+
+  useEffect(() => {
+    let disposed = false;
+    let authEventSeen = false;
+    const setUser = (user: { id: string; email?: string } | null) => {
+      if (disposed) return;
+      const userId = user?.id ?? null;
+      if (owner.current !== userId) {
+        owner.current = userId;
+        generation.current += 1;
+        cancelDictation();
+        ultimoSaludo.current = null;
+        cachedSession.current = false;
+        let restored = emptyEvaristoContext();
+        let restoredMsgs: Msg[] = [SALUDO];
+        try {
+          // El caché antiguo no identifica al dueño y no es seguro reutilizarlo.
+          localStorage.removeItem("fvb_evaristo_msgs");
+          localStorage.removeItem("fvb_evaristo_conv");
+          const raw = localStorage.getItem(evaristoStorageKey(userId));
+          if (raw) {
+            const saved = JSON.parse(raw);
+            if (saved?.version === 1) {
+              restored = readEvaristoContext(saved.context);
+              cachedSession.current = true;
+              if (Array.isArray(saved.messages)) {
+                const valid = saved.messages.filter((m: Msg) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string");
+                if (valid.length) restoredMsgs = valid.slice(-30).map((m: Msg) => ({
+                  role: m.role, content: m.content,
+                  img: typeof m.img === "string" ? m.img : undefined,
+                  acciones: Array.isArray(m.acciones) ? m.acciones : undefined,
+                  ...(m.role === "assistant" ? readEvaristoEvidence(m) : {}),
+                }));
+              }
+            }
+          }
+        } catch { /* Sin caché válido: se recupera la memoria de esta cuenta. */ }
+        setConversation(restored);
+        setMsgs(restoredMsgs);
+        setHistoryReady(!userId);
+        setLoading(false);
+        setInput("");
+        resetImage();
+        setEscalando(false);
+        setEscEmail("");
+        setEscNombre("");
+        setEscMensaje("");
+        setEnviandoTicket(false);
+      }
+      setIdentidad(user ? { userId: user.id, email: user.email } : {});
+      setSessionReady(true);
+    };
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      authEventSeen = true;
+      setUser(session?.user ?? null);
+    });
     supabase.auth.getUser().then(({ data }) => {
-      const u = data?.user;
-      if (u) setIdentidad({ userId: u.id, email: u.email ?? undefined });
-    }).catch(() => { /* sin sesión (landing): pediremos el correo en el form) */ });
-  }, []);
+      if (!authEventSeen) setUser(data?.user ?? null);
+    }).catch(() => { if (!authEventSeen) setUser(null); });
+    return () => { disposed = true; generation.current += 1; dictation.current?.cancel(); subscription.unsubscribe(); };
+  }, [cancelDictation, resetImage]);
+
+  useEffect(() => {
+    if (previousPath.current === location.pathname) return;
+    previousPath.current = location.pathname;
+    routeRevision.current += 1;
+    // Volver a una ficha también cuenta como navegación, aunque no se haya
+    // enviado ningún mensaje en la pantalla intermedia.
+    setConversation((prev) => ({ ...prev, lastRoute: null }));
+  }, [location.pathname]);
 
   // Saludo con contexto (sin IA): qué está mirando, qué le urge, qué le falta.
   const saludar = async (codigoActual: string | null, reemplazar: boolean) => {
+    const requestGeneration = generation.current;
+    const requestPath = previousPath.current;
     try {
       const { data } = await supabase.functions.invoke("evaristo-soporte", { body: { modo: "contexto", contexto: { codigo: codigoActual } } });
-      const saludo = (data as any)?.saludo as string | undefined;
-      if (!saludo) return;
+      const saludo = (data as { saludo?: string } | null)?.saludo;
+      if (!saludo || generation.current !== requestGeneration || previousPath.current !== requestPath) return;
       ultimoSaludo.current = codigoActual ?? "";
       setMsgs((prev) => {
         if (reemplazar) return [{ role: "assistant", content: saludo }];
@@ -218,22 +356,28 @@ export function EvaristoChat() {
   // Al entrar con sesión: retomar la última conversación guardada; si no hay,
   // pedir un saludo con contexto en vez del genérico.
   useEffect(() => {
-    if (!identidad.userId || historialCargado.current) return;
-    historialCargado.current = true;
+    if (!sessionReady || !identidad.userId) return;
+    const requestGeneration = generation.current;
+    let cancelled = false;
+    const isCurrent = () => !cancelled && generation.current === requestGeneration;
     (async () => {
       try {
         let id = convId;
-        if (!id) {
+        if (!id && !cachedSession.current) {
           const { data: conv } = await db.from("evaristo_conversaciones").select("id").eq("user_id", identidad.userId)
             .order("actualizado_en", { ascending: false }).limit(1).maybeSingle();
+          if (!isCurrent()) return;
           id = conv?.id ?? null;
         }
         if (id) {
-          const { data: rows } = await db.from("evaristo_mensajes").select("rol, contenido, adjuntos, meta").eq("conversacion_id", id)
+          const { data: rows } = await db.from("evaristo_mensajes").select("rol, contenido, adjuntos, meta").eq("conversacion_id", id).eq("user_id", identidad.userId)
             .order("id", { ascending: false }).limit(30);
-          const cargados: Msg[] = (rows ?? []).reverse().map((r: any) => ({
+          if (!isCurrent()) return;
+          const activeCode = processCodeFromHistory(rows ?? []);
+          const cargados: Msg[] = [...(rows ?? [])].reverse().map((r: { rol: Msg["role"]; contenido: string; meta?: { acciones?: AccionChat[] } }) => ({
             role: r.rol, content: r.contenido,
             acciones: Array.isArray(r.meta?.acciones) && r.meta.acciones.length ? r.meta.acciones : undefined,
+            ...(r.rol === "assistant" ? readEvaristoEvidence(r.meta) : {}),
           }));
           // El estado guardado en el mensaje es el del momento: se refresca con el real.
           const ids = cargados.flatMap((m) => (m.acciones ?? []).map((a) => a.id));
@@ -242,25 +386,28 @@ export function EvaristoChat() {
             const porId = new Map<string, AccionChat>((vivas ?? []).map((v: AccionChat) => [v.id, v]));
             for (const m of cargados) m.acciones = m.acciones?.map((a) => ({ ...a, ...(porId.get(a.id) ?? {}) }));
           }
+          if (!isCurrent()) return;
           if (cargados.length) {
-            setConvId(id);
+            setConversation((prev) => ({ ...prev, conversationId: id, activeCode }));
             setMsgs(cargados);
-            if (open && codigo && codigo !== ultimoSaludo.current) await saludar(codigo, false);
+            if (open && codigo && codigo !== ultimoSaludo.current && conversation.lastRoute !== location.pathname) await saludar(codigo, false);
             return;
           }
         }
-        await saludar(codigo, msgs.length <= 1);
-      } catch { /* sin memoria: seguimos con localStorage */ }
+        if (isCurrent()) await saludar(codigo, msgs.length <= 1);
+      } catch { /* Sin memoria remota: seguimos con el caché de esta cuenta. */ }
+      finally { if (isCurrent()) setHistoryReady(true); }
     })();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [identidad.userId]);
+  }, [sessionReady, identidad.userId]);
 
   // Al abrir el chat mirando una licitación/compra ágil nueva, Don Evaristo la comenta.
   useEffect(() => {
-    if (!open || !identidad.userId || !historialCargado.current || !codigo || codigo === ultimoSaludo.current || loading) return;
+    if (!open || !identidad.userId || !historyReady || !codigo || codigo === ultimoSaludo.current || conversation.lastRoute === location.pathname || loading) return;
     saludar(codigo, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, codigo, identidad.userId]);
+  }, [open, codigo, identidad.userId, historyReady, conversation.lastRoute, location.pathname]);
 
   // Estado en vivo de las acciones: realtime sobre evaristo_acciones y, de respaldo,
   // un sondeo cada 20 s mientras haya alguna en cola o en curso.
@@ -276,7 +423,6 @@ export function EvaristoChat() {
         (p: { new: AccionChat }) => { if (p?.new?.id) actualizarAccion(p.new); })
       .subscribe();
     return () => { db.removeChannel(canal); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identidad.userId]);
   const activasKey = msgs.flatMap((m) => (m.acciones ?? []).filter((a) => ACTIVAS.has(a.estado)).map((a) => a.id)).join(",");
   useEffect(() => {
@@ -287,7 +433,6 @@ export function EvaristoChat() {
       (data ?? []).forEach((f: AccionChat) => actualizarAccion(f));
     }, 20000);
     return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activasKey, identidad.userId]);
 
   const decidirAccion = async (id: string, confirmar: boolean) => {
@@ -296,10 +441,14 @@ export function EvaristoChat() {
     if (data?.id) actualizarAccion(data as AccionChat);
   };
 
-  useEffect(() => { try { localStorage.setItem(LS_MSGS, JSON.stringify(msgs.slice(-30))); } catch { /* noop */ } }, [msgs]);
   useEffect(() => {
-    try { if (convId) localStorage.setItem(LS_CONV, convId); else localStorage.removeItem(LS_CONV); } catch { /* noop */ }
-  }, [convId]);
+    if (!sessionReady || !historyReady) return;
+    try {
+      localStorage.setItem(evaristoStorageKey(identidad.userId ?? null), JSON.stringify({
+        version: 1, context: conversation, messages: msgs.slice(-30),
+      }));
+    } catch { /* El chat sigue funcionando si el almacenamiento no está disponible. */ }
+  }, [sessionReady, historyReady, identidad.userId, conversation, msgs]);
   useEffect(() => { try { localStorage.setItem(LS_OPEN, open ? "1" : "0"); } catch { /* noop */ } }, [open]);
   useEffect(() => {
     if (open && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -308,8 +457,14 @@ export function EvaristoChat() {
   const cargarArchivo = (f: File | null | undefined) => {
     if (!f || !f.type.startsWith("image/")) return;
     if (f.size > 4 * 1024 * 1024) { alert("La imagen es muy grande (máx 4MB)."); return; }
+    const revision = resetImage();
     const reader = new FileReader();
-    reader.onload = () => setImg(String(reader.result));
+    const requestGeneration = generation.current;
+    reader.onload = () => {
+      if (generation.current === requestGeneration && imageRevision.current === revision && typeof reader.result === "string") {
+        dispatchImage({ type: "loaded", revision, image: reader.result });
+      }
+    };
     reader.readAsDataURL(f);
   };
 
@@ -329,56 +484,76 @@ export function EvaristoChat() {
 
   const enviar = async () => {
     const texto = input.trim();
-    if ((!texto && !img) || loading) return;
+    if ((!texto && !img) || loading || !sessionReady || !historyReady) return;
+    const requestGeneration = ++generation.current;
+    cancelDictation();
+    const requestPath = location.pathname;
+    const requestRouteRevision = routeRevision.current;
 
     const userMsg: Msg = { role: "user", content: texto || "Te mando una captura 📸", img: img || undefined };
     const historial = [...msgs, userMsg];
     setMsgs(historial);
     setInput("");
     const imagen = img;
-    setImg(null);
+    const adjuntarImagenTicket = canShareEvaristoImage(imageDraft);
+    resetImage();
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke("evaristo-soporte", {
+      const { data: responseData, error } = await supabase.functions.invoke("evaristo-soporte", {
         body: {
           messages: historial.map((m) => ({ role: m.role, content: m.content })),
           contexto: {
             page: nombrePagina(location.pathname),
             ruta: location.pathname,
-            codigo,
+            ...processContextForRequest(conversation, requestPath),
             tieneInventario: (invStats?.total ?? 0) > 0,
             extensionConectada: !!isConnected,
           },
           identidad,
           imagen,
+          adjuntar_imagen_ticket: adjuntarImagenTicket,
           conversacion_id: convId,
         },
       });
-      if (error) throw error;
-      const reply = (data as any)?.reply || "No te entendí bien 😅 ¿me lo repites?";
-      const nuevoId = (data as any)?.conversacion_id;
-      if (typeof nuevoId === "string" && nuevoId !== convId) setConvId(nuevoId);
-      const acciones = (data as any)?.acciones as AccionChat[] | undefined;
-      setMsgs((prev) => [...prev, { role: "assistant", content: reply, acciones: acciones?.length ? acciones : undefined }]);
+      if (generation.current !== requestGeneration) return;
+      const data = error ? await readEvaristoAccessDeniedResponse(error) : responseData;
+      if (generation.current !== requestGeneration) return;
+      if (error && !data) throw error;
+      const reply = (data as { reply?: string } | null)?.reply || "No te entendí bien 😅 ¿me lo repites?";
+      setConversation((prev) => ({
+        ...contextAfterResponse(prev, data, requestPath),
+        lastRoute: routeRevision.current === requestRouteRevision ? requestPath : null,
+      }));
+      const acciones = (data as { acciones?: AccionChat[] } | null)?.acciones;
+      setMsgs((prev) => [...prev, {
+        role: "assistant", content: reply, acciones: acciones?.length ? acciones : undefined,
+        ...readEvaristoEvidence(data),
+      }]);
     } catch {
-      setMsgs((prev) => [...prev, { role: "assistant", content: "Uf, no pude responderte. Reintenta en un ratito 🙏" }]);
+      if (generation.current === requestGeneration) setMsgs((prev) => [...prev, { role: "assistant", content: "Uf, no pude responderte. Reintenta en un ratito 🙏" }]);
     } finally {
-      setLoading(false);
+      if (generation.current === requestGeneration) setLoading(false);
     }
   };
 
   // Nueva conversación: la anterior queda guardada en la memoria de Don Evaristo.
   const limpiar = () => {
+    generation.current += 1;
+    cancelDictation();
+    cachedSession.current = true;
     setMsgs([SALUDO]);
-    setImg(null);
-    setConvId(null);
+    setInput("");
+    resetImage();
+    setLoading(false);
+    setConversation(emptyEvaristoContext());
     ultimoSaludo.current = null;
     if (identidad.userId) saludar(codigo, true);
   };
 
   // Abre el formulario para dejar el caso al equipo, prellenando lo que sabemos.
   const abrirEscalar = () => {
+    cancelDictation();
     setEscEmail((prev) => prev || identidad.email || "");
     // Prellenamos el mensaje con la última duda escrita por el usuario.
     const ultimaDuda = [...msgs].reverse().find((m) => m.role === "user" && m.content && !m.img);
@@ -391,7 +566,11 @@ export function EvaristoChat() {
     const mensaje = escMensaje.trim();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { alert("Escribe un correo válido para poder responderte."); return; }
     if (!mensaje) { alert("Cuéntanos brevemente tu caso."); return; }
+    cancelDictation();
+    const imagenTicket = canShareEvaristoImage(imageDraft) ? img : undefined;
+    resetImage();
     setEnviandoTicket(true);
+    const requestGeneration = generation.current;
     try {
       const { data, error } = await supabase.functions.invoke("soporte-ticket", {
         body: {
@@ -401,13 +580,15 @@ export function EvaristoChat() {
           canal: identidad.userId ? "app" : "landing",
           pantalla: nombrePagina(location.pathname),
           mensaje,
+          ...(imagenTicket ? { imagen: imagenTicket } : {}),
           conversacion: msgs
             .filter((m) => m.content)
             .map((m) => ({ role: m.role, content: m.content })),
         },
       });
       if (error) throw error;
-      const numero = (data as any)?.numero;
+      if (generation.current !== requestGeneration) return;
+      const numero = (data as { numero?: number | string } | null)?.numero;
       setEscalando(false);
       setEscMensaje("");
       setMsgs((prev) => [
@@ -421,9 +602,9 @@ export function EvaristoChat() {
         },
       ]);
     } catch {
-      alert("No pude enviar tu caso ahora. Reintenta en un ratito o escríbenos a contacto@firmavb.cl.");
+      if (generation.current === requestGeneration) alert("No pude enviar tu caso ahora. Reintenta en un ratito o escríbenos a contacto@firmavb.cl.");
     } finally {
-      setEnviandoTicket(false);
+      if (generation.current === requestGeneration) setEnviandoTicket(false);
     }
   };
 
@@ -461,7 +642,7 @@ export function EvaristoChat() {
               <div className="leading-tight">
                 <p className="font-semibold text-sm">Don Evaristo</p>
                 <p className="text-[11px] text-white/80 flex items-center gap-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-firmavb-green inline-block" /> Experto en Mercado Público · firmavb
+                  <span className="h-1.5 w-1.5 rounded-full bg-firmavb-green inline-block" /> {conversation.activeCode ? `Proceso: ${conversation.activeCode}` : "Experto en Mercado Público · firmavb"}
                 </p>
               </div>
             </div>
@@ -475,8 +656,8 @@ export function EvaristoChat() {
               >
                 <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" /> Humano
               </a>
-              <Button variant="ghost" size="sm" onClick={limpiar} title="Empezar una conversación nueva (la anterior queda guardada)" className="text-white/80 hover:text-white hover:bg-white/10 h-7 px-2 text-xs">Nueva</Button>
-              <Button variant="ghost" size="icon" onClick={() => setOpen(false)} className="text-white hover:bg-white/10 h-7 w-7"><X className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="sm" onClick={limpiar} disabled={!sessionReady || !historyReady} title="Empezar una conversación nueva (la anterior queda guardada)" className="text-white/80 hover:text-white hover:bg-white/10 h-7 px-2 text-xs">Nueva</Button>
+              <Button variant="ghost" size="icon" onClick={() => { cancelDictation(); setOpen(false); }} className="text-white hover:bg-white/10 h-7 w-7"><X className="h-4 w-4" /></Button>
             </div>
           </div>
 
@@ -492,28 +673,40 @@ export function EvaristoChat() {
                 }`}>
                   {m.img && <img src={m.img} alt="captura" className="rounded-lg mb-1.5 max-h-40 w-auto" />}
                   <Rico text={m.content} onInternal={(path) => { navigate(path); if (window.innerWidth < 640) setOpen(false); }} />
+                  {m.role === "assistant" && <FuentesRespuesta message={m} />}
                   {m.acciones?.map((a) => <AccionCard key={a.id} a={a} onDecidir={decidirAccion} />)}
                 </div>
               </div>
             ))}
-            {loading && (
+            {(loading || !historyReady) && (
               <div className="flex justify-start">
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-firmavb-blue/10 text-firmavb-blue mr-2"><Sparkles className="h-4 w-4" /></span>
                 <div className="bg-card border border-border/60 rounded-2xl rounded-bl-sm px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Don Evaristo está escribiendo…
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> {historyReady ? "Don Evaristo está escribiendo…" : "Recuperando tu conversación…"}
                 </div>
               </div>
             )}
           </div>
 
           {/* Preview imagen */}
-          {!escalando && img && (
-            <div className="px-3 pt-2 flex items-center gap-2">
-              <div className="relative">
-                <img src={img} alt="adjunto" className="h-12 w-12 rounded-lg object-cover border" />
-                <button onClick={() => setImg(null)} className="absolute -top-1.5 -right-1.5 bg-destructive text-white rounded-full h-4 w-4 flex items-center justify-center"><X className="h-2.5 w-2.5" /></button>
+          {img && (
+            <div className="px-3 py-2 space-y-2">
+              <div className="flex items-center gap-2">
+                <img src={img} alt="Vista previa de la captura" className="h-12 w-12 rounded-lg object-cover border" />
+                <span className="text-xs text-muted-foreground">Captura lista para enviar</span>
+                <Button type="button" variant="ghost" size="sm" onClick={resetImage} aria-label="Quitar captura" className="ml-auto text-xs">
+                  <X className="h-3.5 w-3.5 mr-1" aria-hidden="true" /> Quitar
+                </Button>
               </div>
-              <span className="text-xs text-muted-foreground">Captura lista para enviar</span>
+              <p className="text-xs text-muted-foreground">
+                {escalando
+                  ? "Si marcas la casilla, esta captura se adjuntará al caso para que la revise el equipo FirmaVB. Quita claves y datos sensibles antes de enviarla."
+                  : "Al enviar este mensaje, la captura irá a la IA para ayudarte. Si se abre un ticket, solo se compartirá con el equipo si marcas esta casilla. Quita claves y datos sensibles antes de enviarla."}
+              </p>
+              <label className="flex items-start gap-2 text-xs cursor-pointer">
+                <input type="checkbox" checked={imageDraft.shareWithTeam} onChange={(e) => dispatchImage({ type: "share", checked: e.target.checked })} className="mt-0.5 accent-blue-700" />
+                Incluir esta captura en el ticket para el equipo FirmaVB
+              </label>
             </div>
           )}
 
@@ -563,22 +756,43 @@ export function EvaristoChat() {
                 <LifeBuoy className="h-3.5 w-3.5" aria-hidden="true" /> ¿Prefieres que te contacte el equipo?
               </button>
 
+              {dictationPrompt && Recognition && (
+                <div className="border-t border-border px-3 py-2 space-y-2">
+                  <p className="text-xs text-muted-foreground">El motor de voz de tu navegador puede enviar el audio a un servicio remoto. No dictes claves ni datos sensibles. Podrás revisar y editar el texto antes de enviarlo.</p>
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" onClick={startDictation} disabled={loading || !sessionReady || !historyReady}>Iniciar dictado</Button>
+                    <Button type="button" size="sm" variant="ghost" onClick={cancelDictation}>Cancelar</Button>
+                  </div>
+                </div>
+              )}
+              <p role="status" aria-live="polite" className="px-3 pt-1 text-xs text-muted-foreground">
+                {dictationNotice || (!Recognition ? "Dictado no disponible en este navegador. Puedes escribir." : "")}
+              </p>
+
               {/* Input */}
               <div className="border-t border-border p-2.5 flex items-end gap-2 bg-card">
                 <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickImg} />
                 <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => fileRef.current?.click()} aria-label="Adjuntar captura">
                   <ImagePlus className="h-5 w-5" aria-hidden="true" />
                 </Button>
+                {Recognition && (
+                  <Button type="button" variant="ghost" size="icon" className="h-9 w-9 shrink-0" disabled={loading || !sessionReady || !historyReady}
+                    onClick={() => { if (dictating) dictation.current?.stop(); else setDictationPrompt(true); }}
+                    aria-label={dictating ? "Detener dictado" : "Dictar mensaje"} aria-pressed={dictating}>
+                    {dictating ? <Square className="h-4 w-4 text-destructive" aria-hidden="true" /> : <Mic className="h-5 w-5" aria-hidden="true" />}
+                  </Button>
+                )}
                 <textarea
+                  aria-label="Mensaje para Don Evaristo"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); } }}
                   onPaste={onPaste}
                   placeholder="Escribe tu duda… (puedes pegar un print)"
                   rows={1}
-                  className="flex-1 resize-none max-h-24 rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-firmavb-blue/30"
+                  className="min-w-0 flex-1 resize-none max-h-24 rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-firmavb-blue/30"
                 />
-                <Button size="icon" className="h-9 w-9 shrink-0 bg-firmavb-blue hover:bg-firmavb-blue/90" onClick={enviar} disabled={loading || (!input.trim() && !img)} aria-label="Enviar">
+                <Button size="icon" className="h-9 w-9 shrink-0 bg-firmavb-blue hover:bg-firmavb-blue/90" onClick={enviar} disabled={loading || !sessionReady || !historyReady || (!input.trim() && !img)} aria-label="Enviar">
                   <Send className="h-4 w-4" aria-hidden="true" />
                 </Button>
               </div>
