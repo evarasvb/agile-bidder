@@ -4,7 +4,7 @@
  * Ley 19.912 - Protección de Derechos de Autor (Chile)
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { chromium, type Browser } from "@playwright/test";
+import { chromium, expect as browserExpect, type Browser } from "@playwright/test";
 import { createServer, type ViteDevServer } from "vite";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -226,23 +226,25 @@ describe.skipIf(process.env.EVARISTO_BROWSER_TESTS !== "1" || !existsSync(execut
     };
     const consent = page.getByRole("checkbox", { name: "Incluir esta captura en el ticket para el equipo FirmaVB" });
     await choose("primera.png");
-    expect(await consent.isChecked()).toBe(false);
+    await browserExpect(consent).not.toBeChecked();
     await consent.check();
     await choose("segunda.png");
-    expect(await consent.isChecked()).toBe(false);
+    await browserExpect(consent).not.toBeChecked();
     await consent.check();
     await page.getByRole("button", { name: "Quitar captura" }).click();
-    expect(await consent.count()).toBe(0);
+    await browserExpect(consent).toHaveCount(0);
     await choose("tercera.png");
-    expect(await consent.isChecked()).toBe(false);
+    await browserExpect(consent).not.toBeChecked();
     await consent.check();
     await page.getByRole("button", { name: "Nueva", exact: true }).click();
-    expect(await consent.count()).toBe(0);
+    await browserExpect(consent).toHaveCount(0);
     await choose("cuarta.png");
     await consent.check();
     await page.evaluate(() => window.testChat.changeUser({ id: "user-B", email: "b@example.test" }));
-    await page.getByText("Saludo contextual", { exact: true }).waitFor();
-    expect(await consent.count()).toBe(0);
+    // El saludo anterior tiene el mismo texto: esperamos el estado persistido
+    // de la nueva cuenta y la desaparición del permiso, no un render viejo.
+    await page.waitForFunction(() => localStorage.getItem("fvb_evaristo_session:user-B") !== null);
+    await browserExpect(consent).toHaveCount(0);
     await choose("solo-chat.png");
     const input = page.getByPlaceholder("Escribe tu duda… (puedes pegar un print)");
     await input.fill("Revisa esta captura");
@@ -255,56 +257,64 @@ describe.skipIf(process.env.EVARISTO_BROWSER_TESTS !== "1" || !existsSync(execut
     await page.getByRole("button", { name: "Enviar", exact: true }).click();
     await page.getByText("Respuesta 2", { exact: true }).waitFor();
     expect(await page.evaluate(() => window.testChat.requests[1].adjuntar_imagen_ticket)).toBe(true);
-    expect(await consent.count()).toBe(0);
+    await browserExpect(consent).toHaveCount(0);
     await input.fill("Continúa sin imagen");
     await page.getByRole("button", { name: "Enviar", exact: true }).click();
     await page.getByText("Respuesta 3", { exact: true }).waitFor();
     expect(await page.evaluate(() => window.testChat.requests[2])).toMatchObject({ imagen: null, adjuntar_imagen_ticket: false });
     await choose("ticket-manual.png");
     await page.getByRole("button", { name: "¿Prefieres que te contacte el equipo?" }).click();
-    expect(await page.getByAltText("Vista previa de la captura").count()).toBe(1);
-    expect(await consent.isChecked()).toBe(false);
+    await browserExpect(page.getByAltText("Vista previa de la captura")).toHaveCount(1);
+    await browserExpect(consent).not.toBeChecked();
     await consent.check();
     await page.getByPlaceholder("Cuéntanos tu caso…").fill("Revisa esta captura en mi caso");
     await page.getByRole("button", { name: "Enviar mi caso al equipo", exact: true }).click();
     await page.waitForFunction(() => window.testChat.ticketRequests.length === 1);
     expect(await page.evaluate(() => window.testChat.ticketRequests[0].imagen)).toMatch(/^data:image\/png;base64,/);
-    expect(await consent.count()).toBe(0);
+    await browserExpect(consent).toHaveCount(0);
     await choose("sin-permiso-ticket.png");
     await page.getByRole("button", { name: "¿Prefieres que te contacte el equipo?" }).click();
-    expect(await consent.isChecked()).toBe(false);
+    await browserExpect(consent).not.toBeChecked();
     await page.getByPlaceholder("Cuéntanos tu caso…").fill("Caso sin compartir la captura");
     await page.getByRole("button", { name: "Enviar mi caso al equipo", exact: true }).click();
     await page.waitForFunction(() => window.testChat.ticketRequests.length === 2);
     expect(await page.evaluate(() => window.testChat.ticketRequests[1].imagen)).toBeUndefined();
-    expect(await consent.count()).toBe(0);
+    await browserExpect(consent).toHaveCount(0);
     await page.close();
   }, 30000);
 
   it("activa voz simulada tras el aviso, deja editar y cancela resultados tardíos sin autoenviar", async () => {
     const page = await browser.newPage();
     await page.route("**/*", route => route.request().url().startsWith(base) ? route.continue() : route.abort());
-    await page.addInitScript(() => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", error => pageErrors.push(error.message));
+    // Un string autocontenido evita que esbuild introduzca __name/__publicField
+    // externos al callback que Playwright serializa al contexto del navegador.
+    await page.addInitScript({ content: `
       localStorage.setItem("fvb_evaristo_open", "1");
       class MockRecognition {
-        started = 0;
-        aborted = 0;
-        onresult: ((event: { resultIndex: number; results: Array<{ isFinal: boolean; 0: { transcript: string } }> }) => void) | null = null;
-        onstart: (() => void) | null = null;
-        onend: (() => void) | null = null;
-        onerror: ((event: { error: string }) => void) | null = null;
-        lateResult: MockRecognition["onresult"] = null;
-        constructor() { window.testVoice = this; }
+        constructor() {
+          this.started = 0;
+          this.aborted = 0;
+          this.onresult = this.onstart = this.onend = this.onerror = this.lateResult = null;
+          window.testVoice = this;
+        }
         start() { this.started++; this.lateResult = this.onresult; this.onstart?.(); }
         stop() { this.onend?.(); }
         abort() { this.aborted++; }
-        emit(text: string) { this.lateResult?.({ resultIndex: 0, results: [{ isFinal: true, 0: { transcript: text } }] }); }
-        fail(error: string) { this.onerror?.({ error }); }
+        emit(text) { this.lateResult?.({ resultIndex: 0, results: [{ isFinal: true, 0: { transcript: text } }] }); }
+        fail(error) { this.onerror?.({ error }); }
       }
+      window.testVoiceConstructor = MockRecognition;
       Object.defineProperty(window, "SpeechRecognition", { configurable: true, value: MockRecognition });
-    });
+      Object.defineProperty(window, "webkitSpeechRecognition", { configurable: true, value: MockRecognition });
+    ` });
     await page.goto(`${base}/test-chat`);
     await page.getByText("Saludo contextual", { exact: true }).waitFor();
+    expect(pageErrors).toEqual([]);
+    expect(await page.evaluate(() => typeof window.testVoiceConstructor === "function"
+      && Object.getOwnPropertyDescriptor(window, "SpeechRecognition")?.value === window.testVoiceConstructor
+      && Object.getOwnPropertyDescriptor(window, "webkitSpeechRecognition")?.value === window.testVoiceConstructor)).toBe(true);
     expect(await page.evaluate(() => typeof window.testVoice)).toBe("undefined");
     await page.getByRole("button", { name: "Dictar mensaje" }).click();
     await page.getByText("El motor de voz de tu navegador puede enviar el audio a un servicio remoto.", { exact: false }).waitFor();
@@ -314,7 +324,7 @@ describe.skipIf(process.env.EVARISTO_BROWSER_TESTS !== "1" || !existsSync(execut
     const input = page.getByRole("textbox", { name: "Mensaje para Don Evaristo" });
     await input.fill("Texto escrito");
     await page.evaluate(() => window.testVoice.emit("y dictado"));
-    expect(await input.inputValue()).toBe("Texto escrito y dictado");
+    await browserExpect(input).toHaveValue("Texto escrito y dictado");
     expect(await page.evaluate(() => window.testChat.requests.length)).toBe(0);
     await page.getByRole("button", { name: "Detener dictado" }).click();
     await input.fill("Texto revisado por mí");
@@ -325,7 +335,7 @@ describe.skipIf(process.env.EVARISTO_BROWSER_TESTS !== "1" || !existsSync(execut
     await page.getByRole("button", { name: "Iniciar dictado", exact: true }).click();
     await page.getByRole("button", { name: "Nueva", exact: true }).click();
     await page.evaluate(() => window.testVoice.emit("Texto tardío"));
-    expect(await input.inputValue()).toBe("");
+    await browserExpect(input).toHaveValue("");
     expect(await page.evaluate(() => window.testVoice.aborted)).toBeGreaterThan(0);
     await page.getByRole("button", { name: "Dictar mensaje" }).click();
     await page.getByRole("button", { name: "Iniciar dictado", exact: true }).click();
@@ -333,6 +343,7 @@ describe.skipIf(process.env.EVARISTO_BROWSER_TESTS !== "1" || !existsSync(execut
     await page.getByText("No se autorizó el dictado. Puedes seguir escribiendo.", { exact: true }).waitFor();
     await input.fill("Puedo seguir escribiendo");
     expect(await page.evaluate(() => window.testChat.requests.length)).toBe(1);
+    expect(pageErrors).toEqual([]);
     await page.close();
   }, 30000);
 
@@ -341,6 +352,7 @@ describe.skipIf(process.env.EVARISTO_BROWSER_TESTS !== "1" || !existsSync(execut
 declare global {
   interface Window {
     testNavigate(path: string): void;
+    testVoiceConstructor: unknown;
     testVoice: { started: number; aborted: number; emit(text: string): void; fail(error: string): void };
     testChat: {
       next: unknown;
