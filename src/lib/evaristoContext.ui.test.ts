@@ -129,6 +129,9 @@ describe.skipIf(process.env.EVARISTO_BROWSER_TESTS !== "1" || !existsSync(execut
     await page.goto(`${base}/test-chat`);
     const input = page.getByPlaceholder("Escribe tu duda… (puedes pegar un print)");
     await page.getByText("Saludo contextual", { exact: true }).waitFor();
+    const avatar = page.getByRole("img", { name: "Avatar de Don Evaristo", exact: true });
+    await browserExpect(avatar).toHaveAttribute("src", /evaristo-retrato/);
+    await page.waitForFunction(() => { const img = document.querySelector<HTMLImageElement>('img[alt="Avatar de Don Evaristo"]'); return !!img?.complete && img.naturalWidth > 0; });
     await page.evaluate((code) => { window.testChat.next = { reply: "Respuesta B", conversacion_id: "conv-user-A", codigo_activo: code }; }, B);
     await input.fill(`Analiza ${B}`);
     await page.getByRole("button", { name: "Enviar", exact: true }).click();
