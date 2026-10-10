@@ -78,7 +78,7 @@ interface ItemSeleccionado {
   esManual?: boolean; // Si fue agregado manualmente
   /** Proveedor del Market del Estado si el producto se eligió desde ahí
    *  (para pedirle cotización al final). */
-  market?: { rut: string; proveedor: string };
+  market?: { rut: string; proveedor: string; precioReferencia: number | null };
 }
 
 export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }: GenerarPropuestaModalProps) {
@@ -102,21 +102,20 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
   // Llena una línea de la propuesta con un producto elegido del Market del Estado
   // (deja registrado el proveedor para, al final, poder pedirle cotización).
   const handleElegirDelMarket = (itemId: string, sel: MarketSeleccion) => {
-    const precio = sel.precioRef && sel.precioRef > 0 ? Math.round(sel.precioRef) : 0;
     setItemsSeleccionados((prev) =>
       prev.map((item) =>
         item.itemId === itemId
           ? {
               ...item,
               selected: true,
-              match: { id: `mk:${sel.rut}:${sel.producto}`, sku: '', nombre: sel.producto, precio_unitario: precio, matchScore: 100, margen_estimado: 0 },
-              precioUnitario: precio,
-              market: { rut: sel.rut, proveedor: sel.proveedor },
+              match: { id: `mk:${sel.rut}:${sel.producto}`, sku: '', nombre: sel.producto, precio_unitario: 0, matchScore: 0, margen_estimado: 0 },
+              precioUnitario: 0,
+              market: { rut: sel.rut, proveedor: sel.proveedor, precioReferencia: sel.precioRef },
             }
           : item,
       ),
     );
-    toast.success(`"${sel.producto}" de ${sel.proveedor} agregado a la línea.`);
+    toast.success(`"${sel.producto}" agregado. Pide cotización y luego ingresa tu precio de oferta.`);
   };
 
   // Envía una solicitud de cotización a los proveedores del Market elegidos.
@@ -283,7 +282,8 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
               margen_estimado: margen / 100
             },
             precioUnitario: precioConRecargo,
-            margen: margen
+            margen: margen,
+            market: undefined,
           };
         }
         return item;
@@ -452,6 +452,10 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
   // de cada producto (buscada en el inventario por SKU, igual que la ficha técnica).
   const handleDescargarCotizacion = async () => {
     if (!compra) return;
+    if (itemsSeleccionados.some(item => item.selected && (!Number.isFinite(item.precioUnitario) || item.precioUnitario <= 0))) {
+      toast.error('Ingresa un precio de oferta válido en cada línea antes de descargar la cotización.');
+      return;
+    }
     const invBySku = new Map((inventario || []).map((p: any) => [p.sku, p]));
     const itemsPDF: ItemCotizacion[] = itemsActivos.map(item => ({
       itemRequerido: item.nombre,
@@ -487,6 +491,10 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
 
   const handleGuardarPropuesta = async () => {
     if (!compra) return;
+    if (itemsSeleccionados.some(item => item.selected && (!Number.isFinite(item.precioUnitario) || item.precioUnitario <= 0))) {
+      toast.error('Hay productos seleccionados sin precio de oferta. Cotízalos o exclúyelos antes de guardar.');
+      return;
+    }
 
     const propuesta = {
       fecha_generacion: new Date().toISOString(),
@@ -794,8 +802,8 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                             />
                           </div>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <Badge variant={estadoMatch(item.match.matchScore, true) === 'listo' ? 'success' : 'warning'} className="text-[10px] px-1.5 py-0" title={`${item.match.matchScore}% de coincidencia`}>
-                              {estadoMatch(item.match.matchScore, true) === 'listo' ? 'Listo' : 'Revisar'}
+                            <Badge variant={!item.market && estadoMatch(item.match.matchScore, true) === 'listo' ? 'success' : 'warning'} className="text-[10px] px-1.5 py-0" title={item.market ? 'Confirma producto, precio, stock y entrega con el proveedor' : `${item.match.matchScore}% de coincidencia`}>
+                              {item.market ? 'Confirmar con proveedor' : estadoMatch(item.match.matchScore, true) === 'listo' ? 'Listo' : 'Revisar'}
                             </Badge>
                             {selector}
                             <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setMarketPara(item.itemId)} title="Buscar este producto en el Market del Estado">
@@ -803,7 +811,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                             </Button>
                             {item.market && (
                               <span className="text-[10px] text-firmavb-blue inline-flex items-center gap-1" title={`Elegido del Market: ${item.market.proveedor}`}>
-                                <Store className="h-3 w-3" />{item.market.proveedor}
+                                <Store className="h-3 w-3" />{item.market.proveedor}{item.market.precioReferencia != null ? ` · referencia $${Math.round(item.market.precioReferencia).toLocaleString('es-CL')}, pendiente de cotización` : ' · pendiente de cotización'}
                               </span>
                             )}
                           </div>
@@ -941,7 +949,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                 title="Pide cotización a los proveedores del Market elegidos (correo neutro, sin mencionar la licitación)"
               >
                 {enviandoCotiz ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Store className="h-4 w-4 mr-2" />}
-                Enviar cotización al proveedor
+                Pedir cotización al proveedor
               </Button>
             )}
             <Button

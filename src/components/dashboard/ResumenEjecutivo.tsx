@@ -2,9 +2,9 @@ import { useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Briefcase, DollarSign, Trophy, TrendingUp } from "lucide-react";
 import { usePipeline } from "@/hooks/usePipeline";
+import { pipelineOutcomeMetrics } from "@/lib/pipelineMetrics";
 import { ETAPA_CONFIG, PIPELINE_ETAPAS, type PipelineEtapa } from "@/components/pipeline/pipelineConstants";
 
-const POSTULADAS: PipelineEtapa[] = ["postulada", "evaluacion", "adjudicada", "oc_emitida", "pagada"];
 const GANADAS: PipelineEtapa[] = ["adjudicada", "oc_emitida", "pagada"];
 const ACTIVAS: PipelineEtapa[] = ["preparacion", "postulada", "evaluacion"];
 
@@ -18,17 +18,18 @@ function clp(n: number): string {
  * gerente: monto en juego, adjudicado y tasa de éxito.
  */
 export function ResumenEjecutivo() {
-  const { data: items = [], isLoading } = usePipeline();
+  const { data: items = [], isLoading, error } = usePipeline();
 
   const kpi = useMemo(() => {
     const total = items.length;
-    const postuladas = items.filter((i) => POSTULADAS.includes(i.etapa)).length;
+    const outcomes = pipelineOutcomeMetrics(items);
+    const postuladas = outcomes.submitted;
     const ganadas = items.filter((i) => GANADAS.includes(i.etapa));
     const montoGanado = ganadas.reduce((s, i) => s + (i.monto_estimado || 0), 0);
     const montoEnJuego = items
       .filter((i) => ACTIVAS.includes(i.etapa))
       .reduce((s, i) => s + (i.monto_estimado || 0), 0);
-    const tasa = postuladas > 0 ? Math.round((ganadas.length / postuladas) * 100) : 0;
+    const tasa = outcomes.successRate;
     const porEtapa = PIPELINE_ETAPAS.map((e) => ({
       etapa: e,
       label: ETAPA_CONFIG[e].label,
@@ -40,12 +41,13 @@ export function ResumenEjecutivo() {
   }, [items]);
 
   if (isLoading) return null;
+  if (error) return <Card><CardContent className="p-5 text-sm text-muted-foreground">No pudimos cargar tus resultados. Vuelve a intentar antes de usar estas cifras para decidir.</CardContent></Card>;
 
   const cards = [
     { icon: Briefcase, label: "En tu pipeline", value: String(kpi.total), sub: `${kpi.postuladas} postuladas`, tone: "text-firmavb-blue" },
     { icon: DollarSign, label: "Monto en juego", value: clp(kpi.montoEnJuego), sub: "propuestas activas", tone: "text-[hsl(var(--warning))]" },
-    { icon: Trophy, label: "Adjudicadas", value: String(kpi.ganadas), sub: clp(kpi.montoGanado), tone: "text-[hsl(var(--success))]" },
-    { icon: TrendingUp, label: "Tasa de éxito", value: `${kpi.tasa}%`, sub: "adjudicadas / postuladas", tone: "text-firmavb-blue" },
+    { icon: Trophy, label: "Adjudicadas", value: String(kpi.ganadas), sub: `${clp(kpi.montoGanado)} estimados`, tone: "text-[hsl(var(--success))]" },
+    { icon: TrendingUp, label: "Tasa de éxito", value: kpi.tasa === null ? "Pendiente" : `${kpi.tasa}%`, sub: "ganadas / (ganadas + perdidas)", tone: "text-firmavb-blue" },
   ];
 
   return (

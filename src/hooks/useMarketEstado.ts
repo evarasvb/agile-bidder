@@ -24,6 +24,7 @@ export interface MarketProducto {
   precio_mediana?: number | null;
   precio?: number | null;
   catalogo?: boolean;
+  stock?: number | null;
 }
 
 export interface MarketProveedor {
@@ -64,8 +65,8 @@ export function useMarketBuscar(q: string) {
 }
 
 export interface MarketCotizacion {
-  precio?: number | null;
-  plazo?: number | null;
+  precio_unitario?: number | null;
+  plazo_entrega_dias?: number | null;
   mensaje?: string | null;
   proveedor?: string | null;
   created_at?: string | null;

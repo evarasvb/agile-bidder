@@ -206,7 +206,8 @@ function CotizarDialog({ solicitud, onClose }: { solicitud: MarketSolicitud | nu
 
   const enviar = async () => {
     if (!solicitud) return;
-    if (!precio || Number(precio) <= 0) { toast.error("Ingresa un precio válido."); return; }
+    if (!precio.trim() || !Number.isFinite(Number(precio)) || Number(precio) <= 0) { toast.error("Ingresa un precio por unidad válido."); return; }
+    if (plazo.trim() && (!Number.isInteger(Number(plazo)) || Number(plazo) < 0)) { toast.error("Ingresa un plazo en días enteros, desde cero."); return; }
     try {
       await cotizar.mutateAsync({
         solicitud: solicitud.id,
@@ -234,7 +235,7 @@ function CotizarDialog({ solicitud, onClose }: { solicitud: MarketSolicitud | nu
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="ct-precio">Precio (CLP)</Label>
+              <Label htmlFor="ct-precio">Precio por unidad (CLP)</Label>
               <Input id="ct-precio" type="number" min="0" value={precio} onChange={(e) => setPrecio(e.target.value)} placeholder="Ej: 3000" />
             </div>
             <div>
@@ -517,7 +518,7 @@ function SolicitudCard({ s, esAdmin, onResponder, onChat, onEditarContacto }: {
               <div key={i} className="flex items-center justify-between text-sm gap-2">
                 <span className="truncate">{c.proveedor || "Proveedor"}{c.mensaje ? ` — ${c.mensaje}` : ""}</span>
                 <span className="shrink-0 tabular-nums">
-                  <b>{clp(c.precio)}</b>{c.plazo != null ? ` · ${c.plazo} días` : ""}
+                  <b>{clp(c.precio_unitario)} por unidad</b>{c.plazo_entrega_dias != null ? ` · ${c.plazo_entrega_dias} días` : ""}
                 </span>
               </div>
             ))}
