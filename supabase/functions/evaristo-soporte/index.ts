@@ -9,6 +9,9 @@
 // Usa Gemini vía su endpoint compatible con OpenAI (mismo patrón que el resto).
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, SupabaseClient } from "jsr:@supabase/supabase-js@2";
+import { classifySupportIntent, containsUnsupportedAdvice, evidenceRequiredReply, INCOMPLETE_REPLY, isIncompleteReply, normalizeTenderCode, PURCHASE_AGILE_LIMIT_UTM, PURCHASE_AGILE_RULE_SOURCE, resolveActiveTender, type SupportStatus } from "../_shared/evaristoSafety.ts";
+import { consultExpertForSupport, type SupportSource, type SupportSourceStates } from "../_shared/expertSupportBridge.ts";
+import { handleExpertRequest } from "../experto-consultar/handler.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,7 +27,10 @@ const SYSTEM_PROMPT = `Eres **Don Evaristo**, el experto de FirmaVB: 17 años ve
 TU ROL: no eres un bot de preguntas frecuentes, eres un asesor. Guías, aconsejas, anticipas y resuelves. Usas el CONTEXTO EN VIVO (abajo) para hablar de lo que el cliente tiene en pantalla y de su situación real (su inventario, sus matches, sus ofertas, lo que cierra pronto). Si ves una oportunidad o un riesgo, lo dices sin que te lo pregunten.
 
 EXPERTO EN MERCADO PÚBLICO (Ley 19.886 y su reglamento, ChileCompra):
-- Tipos de proceso: L1 (≤100 UTM), LE (100–1.000 UTM), LP (>1.000 UTM), LQ/LR (grandes), Compra Ágil (COT, ≤30 UTM: solo cotizar, sin bases pesadas), Convenio Marco, Trato Directo.
+- Tipos de proceso: L1 (≤100 UTM), LE (100–1.000 UTM), LP (>1.000 UTM), LQ/LR (grandes), Compra Ágil (COT, ≤${PURCHASE_AGILE_LIMIT_UTM} UTM; verifica requisitos y condiciones de cada solicitud), Convenio Marco, Trato Directo.
+- Límite de Compra Ágil vigente desde el 12-dic-2024: ${PURCHASE_AGILE_RULE_SOURCE}. No uses el límite antiguo de 30 UTM.
+- Este chat recibe resúmenes operativos, NO el texto de bases o foro. Un contador de documentos procesados no significa que hayas leído sus cláusulas. Nunca digas "ya leí las bases" desde ese contador.
+- Nunca inventes precio, stock, requisitos ni controles de interfaz para completar una oferta. No confundas inscripción en un convenio con operación del catálogo adjudicado. Si falta evidencia, indica el dato que falta y un paso seguro; un bloqueo de plan nunca autoriza una respuesta genérica como si fuera específica.
 - Lo que decide una postulación: cumplir la admisibilidad (anexos firmados, garantía de seriedad si la piden, documentos al día), los criterios de evaluación con su ponderación (precio, plazo, experiencia, servicios adicionales), y no pasarse de la fecha/hora de cierre.
 - Consejos prácticos: leer primero las bases y sus anexos; revisar en la ficha el historial del organismo (a quién le compra, a qué precio, cómo paga); en compra ágil manda el precio y el plazo, responder rápido; en licitación conviene preguntar en el foro si hay dudas; declarar inhabilidades correctamente; adjuntar la garantía cuando corresponde; mantener actualizado el registro de proveedores.
 - Cuando la consulta requiere leer las bases completas o hacer un análisis a fondo (matriz de postulación, estudio del organismo, competencia, "bajo el agua"), llévalo al Libro del Experto de esa licitación: [Abrir el Libro del Experto](/experto/libro/CODIGO) (reemplaza CODIGO por el código real). Ahí lees las bases y armas los entregables.
@@ -99,7 +105,7 @@ function resumirContexto(c: Ctx, extra: Ctx): string {
   if (ex) L.push(`Extensión Chrome: ${ex.claves_activas > 0 ? (ex.ultima_actividad ? `instalada, última actividad ${enCuanto(ex.ultima_actividad, ahora)?.replace("en ", "hace ") ?? ex.ultima_actividad}` : "clave creada pero sin actividad aún") : "no instalada"}`);
   const p = c.en_pantalla;
   if (p) {
-    L.push(`EN PANTALLA: ${p.tipo === "compra_agil" ? "compra ágil" : "licitación"} ${p.codigo} "${p.nombre}" de ${p.organismo}; cierra ${enCuanto(p.fecha_cierre, ahora) ?? "?"}${fmtCLP(p.monto) ? ` · monto ${fmtCLP(p.monto)}` : ""}; ${p.items_con_match} ítems con match${p.bases_leidas != null ? `; bases leídas: ${p.bases_leidas}${p.adjuntos_solo_captcha ? " (las bases están en la sección con captcha)" : ""}` : ""}${p.oferta ? `; oferta ${p.oferta.estado}${fmtCLP(p.oferta.valor_total) ? ` por ${fmtCLP(p.oferta.valor_total)}` : ""}` : "; sin oferta aún"}${p.libro_experto ? "; ya tiene Libro del Experto" : ""}${p.buen_pagador === false ? "; OJO: organismo con mala conducta de pago" : ""}${p.pago_promedio_dias ? `; paga en ~${p.pago_promedio_dias} días` : ""}`);
+    L.push(`PROCESO EN CONTEXTO: ${p.tipo === "compra_agil" ? "compra ágil" : "licitación"} ${p.codigo} "${p.nombre}" de ${p.organismo}; cierra ${enCuanto(p.fecha_cierre, ahora) ?? "?"}${fmtCLP(p.monto) ? ` · monto ${fmtCLP(p.monto)}` : ""}; ${p.items_con_match} ítems con match${p.bases_leidas != null ? `; documentos procesados (sin texto de cláusulas en este chat): ${p.bases_leidas}${p.adjuntos_solo_captcha ? " (las bases están en la sección con captcha)" : ""}` : ""}${p.oferta ? `; oferta ${p.oferta.estado}${fmtCLP(p.oferta.valor_total) ? ` por ${fmtCLP(p.oferta.valor_total)}` : ""}` : "; sin oferta aún"}${p.libro_experto ? "; ya tiene Libro del Experto" : ""}${p.buen_pagador === false ? "; OJO: organismo con mala conducta de pago" : ""}${p.pago_promedio_dias ? `; paga en ~${p.pago_promedio_dias} días` : ""}`);
     const mi = Array.isArray(p.match_items) ? p.match_items.slice(0, 4) : [];
     if (mi.length) L.push(`  Matches: ${mi.map((m: Ctx) => `"${m.pedido}" ↔ "${m.tu_producto}" (${m.score}%${fmtCLP(m.precio) ? `, ${fmtCLP(m.precio)}` : ""})`).join(" · ")}`);
   }
@@ -136,7 +142,7 @@ function saludoProactivo(c: Ctx): string {
     const cierra = enCuanto(p.fecha_cierre, ahora);
     const tipo = p.tipo === "compra_agil" ? "esta compra ágil" : "esta licitación";
     const match = p.items_con_match > 0 ? `Tienes ${p.items_con_match} ítem${p.items_con_match === 1 ? "" : "s"} con match.` : "Todavía no hay match con tu inventario.";
-    const bases = p.tipo === "licitacion" ? (p.bases_leidas > 0 ? " Ya leí las bases." : p.adjuntos_solo_captcha ? " Las bases están en la sección con captcha: con la extensión se suben solas." : "") : "";
+    const bases = p.tipo === "licitacion" ? (p.bases_leidas > 0 ? ` Hay ${p.bases_leidas} documento(s) procesado(s); sus cláusulas se revisan en el Libro.` : p.adjuntos_solo_captcha ? " Las bases están en la sección con captcha: con la extensión se suben solas." : "") : "";
     const accion = p.tipo === "compra_agil" ? "¿Armamos la cotización?" : `¿Revisamos las bases en el [Libro del Experto](/experto/libro/${p.codigo})?`;
     return `Hola${nombre} 👋 Veo que estás en ${tipo} de ${p.organismo}${cierra ? `, cierra **${cierra}**` : ""}. ${match}${bases} ${accion}`;
   }
@@ -169,36 +175,63 @@ serve(async (req) => {
   try {
     const body = await req.json();
     const { messages = [], contexto = {}, imagen, conversacion_id, modo, identidad } = body ?? {};
+    const hasUsableImage = typeof imagen === "string" && imagen.length < 5_600_000
+      && /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/]+=*$/i.test(imagen);
     const auth = req.headers.get("Authorization") ?? "";
     const autenticado = rol(auth) === "authenticated";
     const url = Deno.env.get("SUPABASE_URL")!;
     const anon = Deno.env.get("SUPABASE_ANON_KEY")!;
     // Cliente con el JWT del usuario: la RPC y las tablas de memoria respetan su RLS.
     const sbUser = autenticado ? createClient(url, anon, { global: { headers: { Authorization: auth } } }) : null;
-    const codigo = typeof contexto?.codigo === "string" ? contexto.codigo.trim().toUpperCase() : null;
-    const ctx = await contextoDe(sbUser, codigo);
-
-    if (modo === "contexto") {
-      return json({ contexto: ctx, saludo: ctx && !ctx.anonimo ? saludoProactivo(ctx) : null });
-    }
-
-    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-    if (!GEMINI_API_KEY) {
-      return json({ reply: "Ahora mismo no puedo responder (falta configurar la IA). Escríbele a soporte a contacto@firmavb.cl y te ayudamos al tiro.", error: "GEMINI_API_KEY missing" });
-    }
-
-    // Usuario y tope diario.
+    const requestId = crypto.randomUUID();
+    const t0 = Date.now();
+    const historial = (Array.isArray(messages) ? messages : [])
+      .filter((m: { role?: string; content?: unknown }) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content)
+      .slice(-12) as Array<{ role: "user" | "assistant"; content: string }>;
+    const userQuestions = historial.filter((m) => m.role === "user");
+    const lastQuestion = userQuestions[userQuestions.length - 1]?.content ?? "";
     let userId: string | null = null;
     let userEmail: string | null = null;
     if (sbUser) {
       const { data } = await sbUser.auth.getUser();
       userId = data?.user?.id ?? null;
       userEmail = data?.user?.email ?? null;
+    }
+    // Never read another user's conversation: JWT/RLS plus an explicit owner filter.
+    let convId: string | null = typeof conversacion_id === "string" ? conversacion_id : null;
+    let storedCode: string | null = null;
+    if (sbUser && userId && convId) {
+      const { data: conversation, error } = await sbUser.from("evaristo_conversaciones")
+        .select("id, contexto").eq("id", convId).eq("user_id", userId).maybeSingle();
+      if (error || !conversation) convId = null;
+      else {
+        storedCode = normalizeTenderCode(conversation.contexto?.codigo_activo ?? conversation.contexto?.codigo);
+        if (!storedCode) {
+          // Repair continuity for old conversations whose Dashboard turn overwrote codigo.
+          const { data: previous } = await sbUser.from("evaristo_mensajes").select("meta")
+            .eq("conversacion_id", convId).eq("user_id", userId)
+            .not("meta->>codigo", "is", null).order("id", { ascending: false }).limit(1).maybeSingle();
+          storedCode = normalizeTenderCode(previous?.meta?.codigo_activo ?? previous?.meta?.codigo);
+        }
+      }
+    }
+    const activeTender = resolveActiveTender({ message: lastQuestion, routeCode: contexto?.codigo, storedCode, clientHint: contexto?.codigo_activo });
+    const codigo = activeTender.code;
+    const ctx = await contextoDe(sbUser, codigo);
+
+    if (modo === "contexto") {
+      return json({ contexto: ctx, saludo: ctx && !ctx.anonimo ? saludoProactivo(ctx) : null, codigo_activo: codigo });
+    }
+
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+
+    // Usuario y tope diario.
+    if (sbUser) {
       if (userId) {
         const desde = new Date(Date.now() - 864e5).toISOString();
         const { count } = await sbUser.from("evaristo_mensajes").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("rol", "user").gte("creado_en", desde);
         if ((count ?? 0) >= MAX_MENSAJES_DIA) {
-          return json({ reply: "Hoy ya conversamos harto 😅. Mañana seguimos; si es urgente, escríbeme por WhatsApp https://wa.me/56990996055.", error: "tope_diario" });
+          return json({ reply: "Hoy ya conversamos harto 😅. Mañana seguimos; si es urgente, escríbeme por WhatsApp https://wa.me/56990996055.", error: "tope_diario", codigo_activo: codigo });
         }
       }
     }
@@ -209,6 +242,7 @@ serve(async (req) => {
     const MODELOS = [...(envModel ? [envModel] : []), "gemini-3.6-flash", "gemini-flash-latest", "gemini-flash-lite-latest"].filter((m, i, a) => a.indexOf(m) === i);
 
     let contextoTxt = resumirContexto(ctx ?? {}, contexto ?? {});
+    if (codigo) contextoTxt += `\nProceso activo de esta conversación: ${codigo}. Puede ser distinto de la pantalla actual.`;
     if (contexto?.canal === "landing") {
       contextoTxt += `\n\n[MODO LANDING PÚBLICO: el visitante todavía NO tiene cuenta ni sesión. NO uses links de acción a rutas internas porque no puede entrar. Explica con gancho comercial qué gana con FirmaVB (más adjudicaciones, flujo de caja, IA que encuentra licitaciones que calzan con lo que vende), responde su duda concreta con tu experiencia en Mercado Público, e invítalo a crear su cuenta o a tocar "Configurar mi empresa" / "Ver demostración". Si pide hablar con alguien o cotización, dale el WhatsApp y email del contexto. Sé breve, cercano y vendedor, nunca genérico.]`;
     }
@@ -309,23 +343,72 @@ serve(async (req) => {
       }
     }
 
-    const historial = (messages as Array<{ role: string; content: string }>)
-      .filter((m) => m && (m.role === "user" || m.role === "assistant") && m.content)
-      .slice(-12);
     const chatMessages: any[] = [{ role: "system", content: SYSTEM_PROMPT + contextoTxt }, ...historial.map((m) => ({ role: m.role, content: m.content }))];
 
     // Captura (print): va adjunta al último mensaje del usuario.
-    if (imagen && typeof imagen === "string" && imagen.startsWith("data:")) {
+    if (hasUsableImage) {
+      chatMessages[0].content += "\nCAPTURA VOLUNTARIA: describe solo el título, campos, controles y errores legibles. No deduzcas efectos de un botón, requisitos ni reglas comerciales que no se vean; una captura no reemplaza las bases. Si falta información, pide el dato exacto. No ejecutes acciones desde esta lectura visual.";
       const last = chatMessages[chatMessages.length - 1];
       const userText = last && last.role === "user" ? String(last.content || "") : "Te mando una captura de lo que veo.";
       const contentArr = [{ type: "text", text: userText || "Te mando una captura de lo que veo." }, { type: "image_url", image_url: { url: imagen } }];
       if (last && last.role === "user") last.content = contentArr; else chatMessages.push({ role: "user", content: contentArr });
     }
 
-    const t0 = Date.now();
     let reply = "", diag = "", modeloUsado = "";
-    const conTools = !!(sbUser && userId && contexto?.canal !== "landing");
-    for (const model of MODELOS) {
+    let replyStatus: SupportStatus = "ok";
+    let finishReason: string | null = null;
+    let modelRequests = 0;
+    let lastModelHttpStatus: number | null = null;
+    let responseStatus = 200;
+    let expertHttpStatus: number | null = null;
+    let expertRequests = 0;
+    let fuentes: SupportSource[] = [];
+    let estadosFuentes: SupportSourceStates = {};
+    let documentaryState = "no_consultada";
+    const safetyIntent = classifySupportIntent(lastQuestion, userQuestions[userQuestions.length - 2]?.content ?? "");
+    if (activeTender.ambiguous) {
+      reply = "Veo más de un código en tu mensaje. ¿Cuál quieres revisar ahora? Mantendré el proceso anterior hasta que lo aclaremos.";
+      replyStatus = "clarification";
+      modeloUsado = "deterministic";
+    } else if (imagen && !hasUsableImage) {
+      reply = "No pude leer esa imagen. Adjunta una captura PNG, JPG, WebP o GIF de hasta 4 MB, sin claves ni datos sensibles, o describe la pantalla por texto.";
+      replyStatus = "clarification";
+      modeloUsado = "deterministic";
+    } else if (safetyIntent) {
+      // Reuse the authorized Expert route instead of a second, unsupported model answer.
+      // Its existing plan/quota applies. Never impersonate an owner or use service_role.
+      if (safetyIntent !== "interface" && codigo && userId && sbUser && contexto?.canal !== "landing") {
+        expertRequests = 1;
+        const expert = await consultExpertForSupport({
+          baseUrl: url, anonKey: anon, authorization: auth, code: codigo,
+          question: lastQuestion, intent: safetyIntent, history: historial, requestHeaders: req.headers,
+          fetchImpl: (endpoint, init) => handleExpertRequest(new Request(endpoint, init), { persistConversation: false, documentRequirement: safetyIntent }),
+        });
+        reply = expert.reply;
+        replyStatus = expert.status;
+        responseStatus = expert.httpStatus;
+        expertHttpStatus = expert.upstreamStatus;
+        fuentes = expert.sources;
+        estadosFuentes = expert.sourceStates;
+        modeloUsado = expert.model ?? "deterministic";
+        finishReason = expert.finishReason;
+        documentaryState = expert.status === "answered_with_sources" ? "citada_parcial" : "no_verificable";
+      } else if (safetyIntent === "interface" && hasUsableImage && GEMINI_API_KEY) {
+        // The user already supplied the requested screen: inspect it instead of asking again.
+        // No action tools are available on a visual-only turn below.
+      } else {
+        reply = evidenceRequiredReply(safetyIntent, codigo);
+        replyStatus = "needs_evidence";
+        modeloUsado = "deterministic";
+      }
+    } else if (!GEMINI_API_KEY) {
+      reply = "Ahora mismo no puedo consultar la IA. Puedes pedir que el equipo revise tu caso con el botón de abajo.";
+      replyStatus = "model_error";
+      modeloUsado = "fallback";
+      diag = "missing_model_configuration";
+    }
+    const conTools = !!(sbUser && userId && contexto?.canal !== "landing" && !hasUsableImage);
+    for (const model of reply ? [] : MODELOS) {
       try {
         const msgs = [...chatMessages];
         let texto = "";
@@ -333,15 +416,38 @@ serve(async (req) => {
         // Hasta 2 rondas de herramientas y una respuesta final.
         for (let ronda = 0; ronda < 3; ronda++) {
           const usarTools = conTools && ronda < 2;
+          modelRequests += 1;
           const response = await fetch(GEMINI_URL, {
             method: "POST",
             headers: { Authorization: `Bearer ${GEMINI_API_KEY}`, "Content-Type": "application/json" },
             body: JSON.stringify({ model, messages: msgs, temperature: 0.5, max_tokens: 800, ...(usarTools ? { tools: TOOLS, tool_choice: "auto" } : {}) }),
           });
+          lastModelHttpStatus = response.status;
           if (!response.ok) { diag = `${model}: ${response.status} ${(await response.text()).slice(0, 160)}`; console.error("Gemini error:", diag); fallo = true; break; }
           const data = await response.json();
           const m = data?.choices?.[0]?.message;
+          finishReason = typeof data?.choices?.[0]?.finish_reason === "string" ? data.choices[0].finish_reason : null;
+          if (isIncompleteReply(finishReason, "")) {
+            reply = INCOMPLETE_REPLY;
+            replyStatus = "incomplete";
+            modeloUsado = model;
+            break; // Never execute incomplete or filtered tool arguments.
+          }
+          if (typeof m?.content === "string" && containsUnsupportedAdvice(m.content)) {
+            reply = evidenceRequiredReply("commercial_terms", codigo);
+            replyStatus = "needs_evidence";
+            modeloUsado = model;
+            break; // Unsupported assertions must not accompany a side effect either.
+          }
           const calls = Array.isArray(m?.tool_calls) ? m.tool_calls : [];
+          if (calls.length && !usarTools) {
+            reply = hasUsableImage
+              ? "Esta consulta revisa lo visible en tu captura; no ejecuté acciones desde la imagen. Indica por texto la tarea y el proceso que quieres preparar para revisarla por separado."
+              : "La respuesta intentó usar una herramienta fuera del paso autorizado. No ejecuté esa instrucción; revisa la solicitud antes de reintentar.";
+            replyStatus = "clarification";
+            modeloUsado = model;
+            break;
+          }
           if (calls.length) {
             msgs.push({ role: "assistant", content: m?.content ?? null, tool_calls: calls });
             for (const c of calls) {
@@ -353,8 +459,18 @@ serve(async (req) => {
             continue;
           }
           texto = m?.content ? String(m.content) : "";
+          if (isIncompleteReply(finishReason, texto)) {
+            reply = INCOMPLETE_REPLY;
+            replyStatus = "incomplete";
+            modeloUsado = model;
+          } else if (containsUnsupportedAdvice(texto)) {
+            reply = evidenceRequiredReply("commercial_terms", codigo);
+            replyStatus = "needs_evidence";
+            modeloUsado = model;
+          }
           break;
         }
+        if (reply) break;
         if (fallo) continue;
         if (texto.trim()) { reply = texto; modeloUsado = model; break; }
         diag = `${model}: respuesta vacía`;
@@ -367,6 +483,7 @@ serve(async (req) => {
         ? `Dejé lista la acción de ${NOMBRE[a.tipo] || a.tipo}: aprieta **Confirmar** en la tarjeta de abajo y la extensión parte al tiro.`
         : `Ya dejé en cola ${NOMBRE[a.tipo] || a.tipo}${a.codigo ? ` ${a.codigo}` : ""}. La extensión de Chrome la ejecuta en el próximo minuto; te aviso el resultado en la tarjeta de abajo.`).join("\n\n");
       modeloUsado = "fallback";
+      replyStatus = "action_only";
     }
 
     // Si esto suena a un problema técnico (no a una duda de uso) y sabemos el correo del
@@ -374,17 +491,21 @@ serve(async (req) => {
     // Corre SIEMPRE (aunque Gemini haya fallado arriba): la detección es por regex, no depende
     // de la IA, y si no la corremos acá un "no carga" con Gemini caído nunca se escala.
     let ticket: { numero?: number | string } | null = null;
+    let screenshotSharedWithTicket = false;
     try {
       const ultimo = historial[historial.length - 1];
       const textoUsuario = ultimo && ultimo.role === "user" ? String(ultimo.content || "") : "";
       const RE_PROBLEMA = /no (funciona|anda|carga|sirve|deja|redirige|trae nada|pasa nada|hace nada|abre)|error|falla|se (cae|pilla|traba|congela|rompi[oó])|pantalla (en blanco|vac[ií]a)|\bbug\b|qued[oó] pillad/i;
-      const pareceProblema = !!imagen || RE_PROBLEMA.test(textoUsuario);
+      // An image is not itself a bug report or consent to send it to the team.
+      const pareceProblema = RE_PROBLEMA.test(textoUsuario);
+      const imagenTicket = body?.adjuntar_imagen_ticket === true && hasUsableImage
+        ? imagen : undefined;
       // Si ya se creó un ticket automático antes en esta misma conversación (queda la marca
       // en la respuesta de Evaristo), no generamos uno nuevo por cada mensaje de seguimiento.
       const yaTieneTicket = historial.some(
         (m) => m.role === "assistant" && /caso\s*\*\*#\d+/i.test(String(m.content || "")),
       );
-      const correo = identidad?.email ?? userEmail;
+      const correo = userId ? userEmail : identidad?.email;
       const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
       const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
       if (pareceProblema && !yaTieneTicket && correo && SUPABASE_URL && SERVICE_KEY) {
@@ -394,65 +515,80 @@ serve(async (req) => {
           headers: { Authorization: `Bearer ${SERVICE_KEY}`, apikey: SERVICE_KEY, "Content-Type": "application/json" },
           body: JSON.stringify({
             email: correo,
-            user_id: identidad?.userId ?? userId,
+            user_id: userId,
             canal: "app-auto",
-            pantalla: contexto?.page,
+            pantalla: [contexto?.page, codigo].filter(Boolean).join(" · "),
             asunto: `Bug automático: ${resumen}`,
             mensaje: textoUsuario || "El usuario envió una captura reportando un problema (revisar imagen adjunta).",
-            conversacion: reply ? [...historial, { role: "assistant", content: reply }] : historial,
+            // Do not silently forward previous turns or image-derived assistant text.
+            // The manual support form separately discloses conversation sharing.
+            conversacion: textoUsuario ? [{ role: "user", content: textoUsuario }] : [],
             tipo: "bug",
             origen: "automatico",
-            imagen,
+            ...(imagenTicket ? { imagen: imagenTicket } : {}),
           }),
         });
         const j = await r.json().catch(() => ({}));
-        if (r.ok && j?.numero) ticket = { numero: j.numero };
+        if (r.ok && j?.numero) {
+          ticket = { numero: j.numero };
+          screenshotSharedWithTicket = !!imagenTicket;
+        }
       }
     } catch (e) {
       console.error("evaristo-soporte auto-ticket:", e);
     }
 
     if (!reply) {
-      let fallback = "Uf, tuve un problemita para responderte 🙈. Reintenta en un ratito, o escríbeme por WhatsApp +56 9 9099 6055 / contacto@firmavb.cl.";
-      if (ticket?.numero) fallback += `\n\n✅ Aun así, ya dejé tu problema registrado como caso **#${ticket.numero}**; el equipo técnico te va a responder a **${identidad?.email ?? userEmail}**.`;
-      return json({ reply: fallback, ticket, error: diag || "sin_respuesta" });
+      const fallback = "Uf, tuve un problemita para responderte 🙈. Reintenta en un ratito, o escríbeme por WhatsApp +56 9 9099 6055 / contacto@firmavb.cl.";
+      reply = fallback;
+      replyStatus = "model_error";
+      modeloUsado = "fallback";
+      // Continue into persistence: failed turns must survive reload and support review.
     }
 
     if (ticket?.numero) {
-      reply += `\n\n✅ Ya dejé esto registrado como caso **#${ticket.numero}** para el equipo técnico, no necesitas hacer nada más. Te van a responder a **${identidad?.email ?? userEmail}**.`;
+      reply += `\n\n✅ Ya dejé esto registrado como caso **#${ticket.numero}** para el equipo técnico, no necesitas hacer nada más. Te van a responder a **${userId ? userEmail : identidad?.email}**.`;
+      if (imagen) reply += screenshotSharedWithTicket ? " Incluí la captura que autorizaste compartir." : " No compartí la captura con el equipo.";
     }
 
     // Memoria: guardar la vuelta (solo con sesión). Si falla, la respuesta igual sale.
-    let convId: string | null = typeof conversacion_id === "string" ? conversacion_id : null;
+    let memorySaved = false;
     if (sbUser && userId) {
       try {
         const ultimoUser = [...historial].reverse().find((m) => m.role === "user");
-        const meta = { pantalla: contexto?.page ?? null, ruta: contexto?.ruta ?? null, codigo, canal: contexto?.canal ?? "app" };
+        const meta = { pantalla: contexto?.page ?? null, ruta: contexto?.ruta ?? null, codigo, codigo_activo: codigo, codigo_origen: activeTender.source, canal: contexto?.canal ?? "app", request_id: requestId };
         if (convId) {
-          const { data: c } = await sbUser.from("evaristo_conversaciones").select("id").eq("id", convId).maybeSingle();
+          const { data: c } = await sbUser.from("evaristo_conversaciones").select("id").eq("id", convId).eq("user_id", userId).maybeSingle();
           if (!c) convId = null;
         }
         if (!convId) {
           const titulo = (ultimoUser?.content ?? "Conversación").replace(/\s+/g, " ").slice(0, 80);
-          const { data: c } = await sbUser.from("evaristo_conversaciones")
+          const { data: c, error: createError } = await sbUser.from("evaristo_conversaciones")
             .insert({ user_id: userId, canal: contexto?.canal ?? "app", titulo, contexto: meta })
             .select("id").single();
+          if (createError) throw new Error("conversation_save_failed");
           convId = c?.id ?? null;
         } else {
-          await sbUser.from("evaristo_conversaciones").update({ actualizado_en: new Date().toISOString(), contexto: meta }).eq("id", convId);
+          const { error: updateError } = await sbUser.from("evaristo_conversaciones")
+            .update({ actualizado_en: new Date().toISOString(), ...(activeTender.ambiguous ? {} : { contexto: meta }) })
+            .eq("id", convId).eq("user_id", userId);
+          if (updateError) throw new Error("conversation_update_failed");
         }
         if (convId) {
-          await sbUser.from("evaristo_mensajes").insert([
+          const { error: messageError } = await sbUser.from("evaristo_mensajes").insert([
             { conversacion_id: convId, user_id: userId, rol: "user", contenido: ultimoUser?.content ?? "(captura)", adjuntos: imagen ? [{ tipo: "imagen" }] : null, meta },
-            { conversacion_id: convId, user_id: userId, rol: "assistant", contenido: reply, meta: { ...meta, modelo: modeloUsado, ms: Date.now() - t0, ...(acciones.length ? { acciones: acciones.map((a) => ({ id: a.id, tipo: a.tipo, codigo: a.codigo, estado: a.estado })) } : {}) } },
+            { conversacion_id: convId, user_id: userId, rol: "assistant", contenido: reply, meta: { ...meta, modelo: modeloUsado, ms: Date.now() - t0, estado_respuesta: replyStatus, finish_reason: finishReason, solicitudes_ia: modelRequests, ultimo_http_ia: lastModelHttpStatus, evidencia_documental: documentaryState, fuentes, estados_fuentes: estadosFuentes, solicitudes_experto: expertRequests, experto_http_status: expertHttpStatus, captura_compartida_soporte: screenshotSharedWithTicket, ...(acciones.length ? { acciones: acciones.map((a) => ({ id: a.id, tipo: a.tipo, codigo: a.codigo, estado: a.estado })) } : {}) } },
           ]);
+          if (messageError) throw new Error("message_save_failed");
+          memorySaved = true;
           const sinConv = acciones.filter((a) => a.id).map((a) => a.id);
           if (sinConv.length) await sbUser.from("evaristo_acciones").update({ conversacion_id: convId }).in("id", sinConv).is("conversacion_id", null);
         }
       } catch (e) { console.error("memoria evaristo", String(e).slice(0, 160)); }
     }
 
-    return json({ reply, conversacion_id: convId, ticket, acciones });
+    if (sbUser && userId && !memorySaved) reply += "\n\nNo pude guardar este turno. Conserva esta respuesta si vas a cambiar de pantalla.";
+    return json({ reply, conversacion_id: convId, ticket, acciones, codigo_activo: codigo, contexto_ambiguo: activeTender.ambiguous, estado_respuesta: replyStatus, memoria_guardada: memorySaved, fuentes, estados_fuentes: estadosFuentes, experto_http_status: expertHttpStatus, captura_compartida_soporte: screenshotSharedWithTicket, ...(replyStatus === "model_error" ? { error: "sin_respuesta" } : {}) }, responseStatus);
   } catch (e) {
     console.error("evaristo-soporte error:", e);
     return json({ reply: "Tuve un error inesperado. Reintenta, y si sigue, escríbeme a contacto@firmavb.cl.", error: String(e) });
