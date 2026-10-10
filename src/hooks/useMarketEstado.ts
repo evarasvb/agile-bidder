@@ -328,3 +328,19 @@ export function useMkGuardarContacto() {
     onSuccess: (_, c) => qc.invalidateQueries({ queryKey: ['mk-contacto', c.rut_norm] }),
   });
 }
+
+/** Relación privada para el solicitante; no se envía al chat del proveedor. */
+export function useMarketVincularSolicitud() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { solicitud: string; codigo: string; itemRef: string }) => {
+      const { data, error } = await rpc<string>('mk_vincular_solicitud', {
+        p_solicitud: input.solicitud, p_codigo: input.codigo, p_item_ref: input.itemRef,
+      });
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error('No se pudo vincular la solicitud');
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['mk-mis-solicitudes'] }),
+  });
+}

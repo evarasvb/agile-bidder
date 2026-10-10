@@ -9,7 +9,7 @@ export async function loadLiveContext(rpc: ContextRpc, codigo: string | null): P
     try { return await rpc(name, args); } catch { return { data: null, error: { message: 'consulta_fallida' } }; }
   };
   const [base, business] = await Promise.all([
-    call('evaristo_contexto', { p_codigo: codigo }), call('evaristo_negocio_contexto'),
+    call('evaristo_contexto', { p_codigo: codigo }), call('evaristo_negocio_contexto', { p_codigo: codigo }),
   ]);
   return {
     ...record(base.data),

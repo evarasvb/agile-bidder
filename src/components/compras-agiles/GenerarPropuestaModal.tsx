@@ -14,8 +14,9 @@ import { formatCurrency } from "@/utils/clasificacion";
 import { unidadLabel } from "@/utils/unidades";
 import { PrecioMercadoHint } from "./PrecioMercadoHint";
 import { MarketPickerDialog, type MarketSeleccion } from "./MarketPickerDialog";
-import { useMarketSolicitar } from "@/hooks/useMarketEstado";
+import { useMarketSolicitar, useMarketVincularSolicitud } from "@/hooks/useMarketEstado";
 import { useUserSettings } from "@/hooks/useUserSettings";
+import { registerLinkedMarketRequest } from "@/lib/marketRequestFlow";
 import { calcularDesgloseOferta, seleccionarItemsOferta } from "@/lib/ofertaCalculo";
 import { aplicarRecargoPorRegion, obtenerRecargoRegion } from "@/utils/regiones";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -123,39 +124,48 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
   // Envía una solicitud de cotización a los proveedores del Market elegidos.
   // El mensaje es NEUTRO: no menciona la licitación/compra ágil (el proveedor
   // podría estar compitiendo), solo pide cotizar por una necesidad propia. Por
-  // lo mismo NO se liga a la oportunidad. Si el proveedor está en FirmaVB le
-  // llega el aviso; si no, queda en "Market del Estado → Mis solicitudes".
+  // eso, el vínculo con la oportunidad es privado para el solicitante.
+  // El seguimiento se consulta en "Market del Estado → Mis solicitudes".
   const solicitarMk = useMarketSolicitar();
+  const vincularMk = useMarketVincularSolicitud();
   const [enviandoCotiz, setEnviandoCotiz] = useState(false);
   const [solicitudesRegistradas, setSolicitudesRegistradas] = useState<Record<string, string>>({});
-  const claveSolicitud = (item: ItemSeleccionado) => `${item.itemId}:${item.market?.rut}:${item.match?.nombre}:${item.cantidad}`;
+  const [solicitudesVinculadas, setSolicitudesVinculadas] = useState<Record<string, boolean>>({});
+  const claveSolicitud = (item: ItemSeleccionado) => `${compra?.codigo}:${item.itemId}:${item.market?.rut}:${item.match?.nombre}:${item.cantidad}`;
 
   const handleEnviarCotizacionesMarket = async () => {
-    const lineas = itemsSeleccionados.filter((i) => i.selected && i.market && i.match && !solicitudesRegistradas[claveSolicitud(i)]);
+    if (!compra) return;
+    const lineas = itemsSeleccionados.filter((i) => i.selected && i.market && i.match && !solicitudesVinculadas[claveSolicitud(i)]);
     if (lineas.length === 0) { toast.info('No hay solicitudes pendientes de registrar para los productos seleccionados.'); return; }
     setEnviandoCotiz(true);
     let ok = 0;
     const fallidas: string[] = [];
+    const sinVinculo: string[] = [];
+    let vinculadas = 0;
     const proveedores = new Set<string>();
     for (const l of lineas) {
       const prod = l.match!.nombre;
       const cant = l.cantidad;
       const mensaje = `Hola, vimos que comercializas "${prod}" en Mercado Público. Tengo una necesidad y me gustaría cotizar este producto (${cant} ${unidadLabel(l.unidadMedida)}). ¿Podrías indicarme tu mejor precio y plazo de entrega? Quedo atento, muchas gracias.`;
-      try {
-        const solicitudId = await solicitarMk.mutateAsync({ rut_proveedor: l.market!.rut, producto: prod, cantidad: cant, mensaje });
-        if (!solicitudId) throw new Error("Solicitud sin identificador");
-        setSolicitudesRegistradas(prev => ({ ...prev, [claveSolicitud(l)]: solicitudId }));
-        ok++;
-        proveedores.add(l.market!.proveedor);
-      } catch { fallidas.push(prod); }
+      const clave = claveSolicitud(l);
+      const result = await registerLinkedMarketRequest({
+        registeredId: solicitudesRegistradas[clave],
+        create: () => solicitarMk.mutateAsync({ rut_proveedor: l.market!.rut, producto: prod, cantidad: cant, unidad: l.unidadMedida, mensaje }),
+        link: solicitud => vincularMk.mutateAsync({ solicitud, codigo: compra.codigo, itemRef: String(l.itemId) }),
+        onRegistered: solicitud => setSolicitudesRegistradas(prev => ({ ...prev, [clave]: solicitud })),
+      });
+      if (result.created) { ok++; proveedores.add(l.market!.proveedor); }
+      if (result.status === 'linked') {
+        setSolicitudesVinculadas(prev => ({ ...prev, [clave]: true }));
+        vinculadas++;
+      } else if (result.status === 'registered') sinVinculo.push(prod);
+      else fallidas.push(prod);
     }
     setEnviandoCotiz(false);
-    if (ok > 0) {
-      toast.success(`Solicitud registrada: ${ok} producto${ok === 1 ? '' : 's'} a ${proveedores.size} proveedor${proveedores.size === 1 ? '' : 'es'}. Revisa el seguimiento en "Market del Estado → Mis solicitudes".`);
-      if (fallidas.length > 0) toast.warning(`No se registraron ${fallidas.length} solicitudes: ${fallidas.join(", ")}. Puedes reintentar: las líneas registradas en esta sesión se omitirán.`);
-    } else {
-      toast.error('No se pudo registrar la solicitud de cotización. Intenta nuevamente.');
-    }
+    if (ok > 0) toast.success(`Solicitud registrada: ${ok} producto${ok === 1 ? '' : 's'} a ${proveedores.size} proveedor${proveedores.size === 1 ? '' : 'es'}. Revisa Mis solicitudes.`);
+    if (vinculadas > 0) toast.success(`${vinculadas} solicitud${vinculadas === 1 ? '' : 'es'} vinculada${vinculadas === 1 ? '' : 's'} a esta compra de forma privada.`);
+    if (fallidas.length > 0) toast.error(`No se registraron ${fallidas.length} solicitudes: ${fallidas.join(", ")}. Puedes reintentar las pendientes.`);
+    if (sinVinculo.length > 0) toast.warning(`Solicitudes registradas, pero falta vincular: ${sinVinculo.join(", ")}. Reintenta; no se reenviarán las registradas en esta sesión.`);
   };
 
   // Calcular precio con recargo por región
@@ -836,7 +846,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                                 Confirmo especificaciones{item.market ? ", stock y entrega" : ""}
                               </Button>
                             )}
-                            {solicitudesRegistradas[claveSolicitud(item)] && <span className="text-xs text-muted-foreground">Solicitud registrada · revisa Mis solicitudes</span>}
+                            {solicitudesRegistradas[claveSolicitud(item)] && <span className="text-xs text-muted-foreground">{solicitudesVinculadas[claveSolicitud(item)] ? "Solicitud vinculada de forma privada" : "Solicitud registrada · vínculo pendiente"}</span>}
                             {selector}
                             <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setMarketPara(item.itemId)} title="Buscar este producto en el Market del Estado">
                               <Store className="h-3 w-3 mr-1" /> Market
