@@ -191,6 +191,7 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             from: FROM,
             to: [CONTACTO],
+            cc: ['evaras@firmavb.cl'],
             reply_to: email,
             subject: `${tipo === 'bug' ? '🐞 BUG' : '🎫'} Ticket #${numero} · ${empresa || nombre || email} — ${asunto}`.slice(0, 120),
             html: emailEquipo({ numero, nombre, email, empresa, telefono, canal: String(body.canal || 'app'), pantalla: String(body.pantalla || ''), mensaje, conv, tipo, origen, imagen }),
