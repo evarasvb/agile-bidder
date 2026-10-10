@@ -58,6 +58,6 @@ jobs:
       - name: Deno entrypoint type gate
         if: ${{ !cancelled() }}
         run: |
-          npm exec --yes --package=deno@2.9.6 -- deno check --no-lock \
+          npm exec --yes --package=deno@2.9.6 -- deno check --no-lock --node-modules-dir=auto \
             supabase/functions/evaristo-soporte/index.ts \
             supabase/functions/experto-consultar/index.ts
