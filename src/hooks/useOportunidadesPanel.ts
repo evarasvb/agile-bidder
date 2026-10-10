@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/useAuth';
 import type { DetalleCompraAgilDatos } from '@/components/compras-agiles/DetalleCompraAgil';
 import { supabase } from '@/integrations/supabase/client';
 import { aplicarFiltrosCliente, coincideConcepto, normalizar, palabrasParaFiltrar, type ClienteFiltros } from '@/hooks/useClienteFiltros';
@@ -24,6 +25,7 @@ export interface OportunidadPanel {
   match_encontrado: boolean;
   items_count: number;
   items_matched: number;
+  match_basis?: "coverage" | "similarity";
   created_at: string;
   // Texto concatenado de los productos de la compra, para buscar por ítem
   // (una compra "Insumos de oficina" que en su lista tiene tóner debe calzar).
@@ -135,8 +137,10 @@ export interface PanelStats {
 // =============================================================================
 
 export function useOportunidadesPanel(filters: PanelFilters = {}) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ['oportunidades-panel', filters],
+    queryKey: ['oportunidades-panel', user?.id, filters],
+    enabled: !!user?.id,
     queryFn: async (): Promise<{ data: OportunidadPanel[]; stats: PanelStats }> => {
       const nowIso = new Date().toISOString();
       const incluirCerradas = filters.incluirCerradas ?? false;
@@ -452,6 +456,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
           link_oficial: c.url_ficha || c.link_oficial || null,
           match_score: coverageScore ?? fallbackScore,
           match_encontrado: (itemsMatched > 0) || !!bestMatchByCodigo[c.codigo] ? true : ((c.match_encontrado && c.match_score >= PISO_MATCH) || false),
+          match_basis: coverageScore !== null ? "coverage" : "similarity",
           items_count: itemsCount,
           // Ítems que calzan producto-a-producto (ca_item_matches). Antes era el
           // conteo de filas de ca_matches (match a nivel de compra), poco útil.
@@ -643,7 +648,8 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
     refetchInterval: 180_000,
     // No mostrar el resultado de otra búsqueda mientras llega la nueva.
     placeholderData: (prev, previousQuery) =>
-      (previousQuery?.queryKey[1] as PanelFilters | undefined)?.search === filters.search ? prev : undefined,
+      previousQuery?.queryKey[1] === user?.id &&
+      (previousQuery?.queryKey[2] as PanelFilters | undefined)?.search === filters.search ? prev : undefined,
   });
 }
 

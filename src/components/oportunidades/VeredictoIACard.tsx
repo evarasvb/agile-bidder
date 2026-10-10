@@ -6,9 +6,9 @@ import { CheckCircle2, XCircle, AlertTriangle, Sparkles, RefreshCw } from 'lucid
 import { useVeredictoOportunidad, useGenerarVeredicto, type RecomendacionVeredicto } from '@/hooks/useVeredictoOportunidad';
 
 const ESTILO_RECOMENDACION: Record<RecomendacionVeredicto, { label: string; className: string; Icono: typeof CheckCircle2 }> = {
-  ofertar: { label: 'Conviene ofertar', className: 'bg-green-500 text-white', Icono: CheckCircle2 },
+  ofertar: { label: 'Potencial para ofertar', className: 'bg-green-500 text-white', Icono: CheckCircle2 },
   revisar: { label: 'Revisar antes de ofertar', className: 'bg-yellow-500 text-white', Icono: AlertTriangle },
-  descartar: { label: 'No conviene', className: 'bg-destructive text-destructive-foreground', Icono: XCircle },
+  descartar: { label: 'Revisar dificultades', className: 'bg-destructive text-destructive-foreground', Icono: XCircle },
 };
 
 // Verdicto de IA ("¿me conviene?"): se genera bajo demanda (botón), nunca
@@ -16,7 +16,7 @@ const ESTILO_RECOMENDACION: Record<RecomendacionVeredicto, { label: string; clas
 // queda cacheado en oportunidad_veredictos y se reusa hasta que el usuario
 // pida regenerarlo.
 export function VeredictoIACard({ tipo, codigo }: { tipo: 'licitacion' | 'compra_agil'; codigo: string | null }) {
-  const { data: veredicto, isLoading } = useVeredictoOportunidad(tipo, codigo);
+  const { data: veredicto, isLoading, error } = useVeredictoOportunidad(tipo, codigo);
   const generar = useGenerarVeredicto(tipo, codigo);
 
   return (
@@ -24,10 +24,12 @@ export function VeredictoIACard({ tipo, codigo }: { tipo: 'licitacion' | 'compra
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
           <Sparkles className="h-4 w-4" />
-          ¿Me conviene?
+          Orientación para preparar tu oferta
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
+        <p className="text-xs text-muted-foreground">Evaluación preliminar de catálogo y comprador. Confirma bases, costos, stock y entrega. Si te faltan productos, puedes buscar proveedores en la comunidad.</p>
+        {error && <p role="alert" className="text-sm text-destructive">No pudimos comprobar si existe una evaluación guardada. Intenta nuevamente.</p>}
         {isLoading ? (
           <Skeleton className="h-20 w-full" />
         ) : veredicto ? (
@@ -43,6 +45,7 @@ export function VeredictoIACard({ tipo, codigo }: { tipo: 'licitacion' | 'compra
               );
             })()}
             <p className="text-sm text-muted-foreground">{veredicto.razon}</p>
+            <p className="text-xs text-muted-foreground">Evaluación del {Number.isFinite(Date.parse(veredicto.generado_en)) ? new Intl.DateTimeFormat('es-CL', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Santiago' }).format(new Date(veredicto.generado_en)) : 'fecha no disponible'}. Si cambiaron las bases, precios o disponibilidad, regenera la evaluación.</p>
             {veredicto.puntos_favor.length > 0 && (
               <ul className="space-y-1 text-xs">
                 {veredicto.puntos_favor.map((p, i) => (
@@ -75,7 +78,7 @@ export function VeredictoIACard({ tipo, codigo }: { tipo: 'licitacion' | 'compra
         ) : (
           <>
             <p className="text-sm text-muted-foreground">
-              Pide una recomendación de IA sobre si te conviene postular a esta oportunidad, según tu inventario y el comprador.
+              Revisa el potencial de la oportunidad según tu catálogo y el comprador. Un producto encontrado en la comunidad requiere cotización y confirmación de disponibilidad.
             </p>
             <Button
               variant="outline"

@@ -97,7 +97,8 @@ export default function Dashboard() {
   const handleBuscarParaMi = async () => {
     setIsMatching(true);
     try {
-      await supabase.rpc("generar_matches_ca_para_mi");
+      const { error } = await supabase.rpc("generar_matches_ca_para_mi");
+      if (error) throw error;
       toast({
         title: "¡Listo!",
         description: "Buscamos coincidencias nuevas con tu inventario.",
@@ -106,7 +107,8 @@ export default function Dashboard() {
     } catch {
       toast({
         title: "No se pudo buscar ahora",
-        description: "El robot lo hará automáticamente en unos minutos.",
+        description: "No pudimos completar la búsqueda. Intenta nuevamente o revisa las oportunidades que ya tienes en tu bandeja.",
+        variant: "destructive",
       });
     } finally {
       setIsMatching(false);
@@ -114,7 +116,11 @@ export default function Dashboard() {
   };
 
   const handleForceRefresh = async () => {
-    await refetchKPIs();
+    const { error } = await refetchKPIs();
+    if (error) {
+      toast({ title: "No se pudieron actualizar los datos", description: "Intenta nuevamente antes de usar estas cifras.", variant: "destructive" });
+      return;
+    }
     toast({
       title: "Datos actualizados",
       description: "Se han recargado las métricas del dashboard",

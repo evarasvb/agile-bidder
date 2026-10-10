@@ -49,9 +49,9 @@ export function LicitacionItemsMatch({ codigo, items }: Props) {
   const resolver = (item: any) => {
     const ov = overrides[String(item.id)];
     if (ov?.accion === "descartado") return { estado: "descartado" as const, match: null };
-    if (ov?.accion === "reasignado" && ov.inventario_id) {
+    if ((ov?.accion === "reasignado" || ov?.accion === "confirmado") && ov.inventario_id) {
       const prod = inventarioById.get(ov.inventario_id);
-      if (prod) return { estado: "reasignado" as const, match: { inventoryItem: prod, score: ov.score_manual ?? 100 } };
+      if (prod) return { estado: ov.accion as "reasignado" | "confirmado", match: { inventoryItem: prod, score: ov.score_manual ?? 100 } };
     }
     return {
       estado: (ov?.accion === "confirmado" ? "confirmado" : "auto") as "confirmado" | "auto",

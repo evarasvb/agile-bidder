@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { findMatches, findBestMatch, calculateCoverageMetrics, isIncompatibleMatch, UMBRAL_MATCH, type PropuestaItemRow } from './fuzzyMatching';
+import { findMatches, findBestMatch, calculateCoverageMetrics, estadoMatch, isIncompatibleMatch, UMBRAL_MATCH, type PropuestaItemRow } from './fuzzyMatching';
 import type { InventoryItem } from '@/hooks/useInventory';
 
 function producto(overrides: Partial<InventoryItem> = {}): InventoryItem {
@@ -173,12 +173,12 @@ describe('FV-UX-002 Case 2 (4168-340-COT26): Coverage calculation - weak matches
       {
         id: 'i1',
         match: { inventoryItem: producto(), score: 100, matchType: 'exact', matchedTerms: [] },
-        estado: 'auto',
+        estado: 'confirmado',
       },
       {
         id: 'i2',
         match: { inventoryItem: producto(), score: UMBRAL_MATCH, matchType: 'partial', matchedTerms: [] },
-        estado: 'auto',
+        estado: 'confirmado',
       },
       {
         id: 'i3',
@@ -206,7 +206,7 @@ describe('FV-UX-002 Case 2 (4168-340-COT26): Coverage calculation - weak matches
       {
         id: 'i1',
         match: { inventoryItem: producto(), score: 90, matchType: 'partial', matchedTerms: [] },
-        estado: 'auto',
+        estado: 'confirmado',
       },
       {
         id: 'i2',
@@ -229,7 +229,7 @@ describe('FV-UX-002 Case 2 (4168-340-COT26): Coverage calculation - weak matches
     expect(metrics.propuestaIncompleta).toBe(false);
   });
 
-  it('Umbral único: score == UMBRAL_MATCH valida; uno menos es "por revisar"', () => {
+  it('La similitud alta no valida un producto sin confirmación humana', () => {
     // Score == UMBRAL_MATCH → validado
     const rowListo: PropuestaItemRow = {
       id: 'x',
@@ -237,8 +237,8 @@ describe('FV-UX-002 Case 2 (4168-340-COT26): Coverage calculation - weak matches
       estado: 'auto',
     };
     const metricsListo = calculateCoverageMetrics([rowListo]);
-    expect(metricsListo.itemsConMatchValidado).toBe(1);
-    expect(metricsListo.itemsConMatchDebil).toBe(0);
+    expect(metricsListo.itemsConMatchValidado).toBe(0);
+    expect(metricsListo.itemsConMatchDebil).toBe(1);
 
     // Score == UMBRAL_MATCH - 1 → por revisar (no validado)
     const rowRevisar: PropuestaItemRow = {
@@ -332,7 +332,7 @@ describe('Garantías finales FV-UX-002', () => {
       {
         id: '1',
         match: { inventoryItem: producto(), score: 75, matchType: 'partial', matchedTerms: [] },
-        estado: 'auto',
+        estado: 'confirmado',
       },
     ]);
     expect(metricasCompleta.propuestaIncompleta).toBe(false);
@@ -394,7 +394,7 @@ describe('BLOCKER FIXES: Exact name + dimensions, multidimensional, coverage exc
       {
         id: 'i1',
         match: { inventoryItem: producto(), score: 100, matchType: 'exact', matchedTerms: [] },
-        estado: 'auto',
+        estado: 'confirmado',
       },
       {
         id: 'i2',
@@ -403,8 +403,8 @@ describe('BLOCKER FIXES: Exact name + dimensions, multidimensional, coverage exc
       },
       {
         id: 'i3',
-        match: { inventoryItem: producto(), score: UMBRAL_MATCH, matchType: 'partial', matchedTerms: [] }, // En el umbral
-        estado: 'auto',
+        match: { inventoryItem: producto(), score: UMBRAL_MATCH, matchType: 'partial', matchedTerms: [] }, // Confirmado explícitamente
+        estado: 'confirmado',
       },
     ];
 
@@ -464,5 +464,16 @@ describe('Codex fix: tijeras para papel no se rechazan solo por mencionar "papel
 
     const match = findBestMatch(itemRequerido, [pendrive]);
     expect(match).toBeNull();
+  });
+});
+
+
+describe('Confirmación de especificaciones antes de ofertar', () => {
+  it.each([['HP 79A', 'HP 85A'], ['corchetes 23-17', 'corchetes 23/10'], ['dedal N12', 'dedal N15']])('%s frente a %s no queda listo por similitud', (solicitado, sugerido) => {
+    const row: PropuestaItemRow = { id: solicitado, estado: 'auto', match: { inventoryItem: producto({ nombre_producto: sugerido }), score: 99, matchType: 'partial', matchedTerms: [] } };
+    expect(estadoMatch(99, true)).toBe('revisar');
+    expect(calculateCoverageMetrics([row]).cobertura).toBe(0);
+    expect(calculateCoverageMetrics([{ ...row, estado: 'confirmado' }]).cobertura).toBe(100);
+    expect(estadoMatch(99, false, true)).toBe('sin_producto');
   });
 });

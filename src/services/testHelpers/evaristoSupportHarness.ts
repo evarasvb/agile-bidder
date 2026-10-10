@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import { vi } from 'vitest';
+import * as businessContext from '../../../supabase/functions/evaristo-soporte/businessContext';
 import * as bridge from '../../../supabase/functions/_shared/expertSupportBridge';
 import * as safety from '../../../supabase/functions/_shared/evaristoSafety';
 
@@ -124,7 +125,7 @@ export function createSupportHarness(options: HarnessOptions = {}) {
   }).outputText;
   let handler: ((request: Request) => Promise<Response>) | undefined;
   runInNewContext(compiled, {
-    ...safety, ...bridge,
+    ...safety, ...bridge, ...businessContext,
     handleExpertRequest: async (request: Request, opts: { persistConversation: boolean }) => {
       if (opts.persistConversation !== false) throw new Error('Support must not save a duplicate Expert turn');
       return fetchMock(request.url, { method: request.method, headers: Object.fromEntries(request.headers), body: await request.text(), signal: request.signal });

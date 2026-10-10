@@ -29,7 +29,7 @@ vi.mock('@tanstack/react-query', () => ({
 }));
 vi.mock('@/integrations/supabase/client', () => ({ supabase: { rpc: mocks.rpc, from: mocks.from } }));
 vi.mock('@/lib/supabaseClient', () => ({ supabaseClient: {} }));
-vi.mock('./useAuth', () => ({ useAuth: () => ({}) }));
+vi.mock('./useAuth', () => ({ useAuth: () => ({ user: { id: 'synthetic-user' } }) }));
 import { useOportunidadesPanel } from './useOportunidadesPanel';
 
 const CODE = '9999999-999999-LE99';
@@ -140,8 +140,9 @@ describe('direct opportunity ID lookup', () => {
   it('does not retain the previous ID result while a different search is loading', async () => {
     const previous = await query({ search: CODE });
     useOportunidadesPanel({ search: CA_CODE });
-    expect(mocks.options!.placeholderData(previous, { queryKey: ['oportunidades-panel', { search: CODE }] })).toBeUndefined();
-    expect(mocks.options!.placeholderData(previous, { queryKey: ['oportunidades-panel', { search: CA_CODE }] })).toBe(previous);
+    expect(mocks.options!.placeholderData(previous, { queryKey: ['oportunidades-panel', 'synthetic-user', { search: CODE }] })).toBeUndefined();
+    expect(mocks.options!.placeholderData(previous, { queryKey: ['oportunidades-panel', 'synthetic-user', { search: CA_CODE }] })).toBe(previous);
+    expect(mocks.options!.placeholderData(previous, { queryKey: ['oportunidades-panel', 'another-user', { search: CA_CODE }] })).toBeUndefined();
   });
 });
 

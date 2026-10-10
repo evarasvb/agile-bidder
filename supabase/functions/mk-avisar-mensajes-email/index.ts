@@ -4,6 +4,7 @@
 // alerta-documento-email: junta lo pendiente por destinatario, manda UN
 // correo con todo y lo marca avisado.
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { deliverGroups } from './delivery.ts';
 
 const FROM = "FirmaVB <notificaciones@firmavb.cl>";
 
@@ -29,6 +30,11 @@ Deno.serve(async (req) => {
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    // El cron usa la credencial de servicio; una sesión de cliente no autoriza
+    // procesar ni marcar la cola global de conversaciones.
+    if (!SERVICE || req.headers.get('Authorization') !== `Bearer ${SERVICE}`) {
+      return json({ ok: false, error: 'No autorizado' }, 403);
+    }
     const RESEND = Deno.env.get("RESEND_API_KEY");
     const sb = createClient(SUPABASE_URL, SERVICE);
 
@@ -39,19 +45,7 @@ Deno.serve(async (req) => {
 
     if (!RESEND) return json({ ok: false, error: "RESEND_API_KEY no configurada" }, 500);
 
-    // Agrupa por correo destino: un solo email aunque tenga varios mensajes
-    // nuevos de la misma o de distintas conversaciones.
-    const porDestino = new Map<string, MensajePorAvisar[]>();
-    for (const m of pendientes) {
-      if (!m.destino_email) continue;
-      const lista = porDestino.get(m.destino_email) ?? [];
-      lista.push(m);
-      porDestino.set(m.destino_email, lista);
-    }
-
-    let enviados = 0;
-    const erroresEnvio: string[] = [];
-    for (const [email, mensajes] of porDestino) {
+    const resultado = await deliverGroups(pendientes, async (email, mensajes) => {
       const filasHtml = mensajes.map((m) => `<tr>
           <td style="padding:8px;border-bottom:1px solid #eee"><strong>${esc(m.autor_nombre) || "Un proveedor/cliente"}</strong><br><span style="color:#666">${esc(m.producto)}</span></td>
           <td style="padding:8px;border-bottom:1px solid #eee">${esc(m.mensaje)}</td>
@@ -76,17 +70,12 @@ Deno.serve(async (req) => {
         headers: { Authorization: `Bearer ${RESEND}`, "Content-Type": "application/json" },
         body: JSON.stringify({ from: FROM, to: [email], subject, html }),
       });
-      if (r.ok) enviados++; else erroresEnvio.push(`${email}: http_${r.status}`);
-    }
-
-    // Se marcan TODOS los pendientes como avisados, aun los que no tenían
-    // destino_email resuelto (perfil incompleto): evita reintentarlos para
-    // siempre en cada pasada del cron; es un caso raro y no bloqueante.
-    const ids = pendientes.map((m) => m.id);
-    const { data: marcados, error: errMarcar } = await sb.rpc("mk_mensajes_marcar_avisados", { p_ids: ids });
-    if (errMarcar) throw errMarcar;
-
-    return json({ ok: true, avisos: enviados, marcados, errores: erroresEnvio });
+      return r.ok;
+    }, async ids => {
+      const { error } = await sb.rpc("mk_mensajes_marcar_avisados", { p_ids: ids });
+      if (error) throw error;
+    });
+    return json({ ok: resultado.fallos === 0, ...resultado });
   } catch (e) {
     return json({ ok: false, error: String((e as any)?.message ?? e) }, 500);
   }

@@ -36,7 +36,7 @@ export function MarketPickerDialog({
 }) {
   const [input, setInput] = useState(terminoInicial);
   const q = useDebouncedValue(input.trim(), 400);
-  const { data: proveedores = [], isLoading } = useMarketBuscar(q);
+  const { data: proveedores = [], isLoading, error } = useMarketBuscar(q);
 
   // Al abrir con un ítem distinto, precarga su descripción como término.
   useEffect(() => {
@@ -51,7 +51,7 @@ export function MarketPickerDialog({
             <Store className="h-5 w-5 text-firmavb-blue" /> Buscar en el Market del Estado
           </DialogTitle>
           <DialogDescription>
-            Elige el producto de un proveedor que ya le vende esto al Estado. Se usará para esta línea de la propuesta y, al final, podrás pedirle cotización.
+            Encuentra proveedores para completar tu oferta. Los precios son referencias; confirma especificaciones, stock y entrega mediante una cotización.
           </DialogDescription>
         </DialogHeader>
 
@@ -73,6 +73,8 @@ export function MarketPickerDialog({
             <div className="grid gap-3 sm:grid-cols-2">
               {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-40 w-full rounded-xl" />)}
             </div>
+          ) : error ? (
+            <p role="alert" className="text-sm text-destructive text-center py-10">No pudimos consultar los proveedores. Intenta nuevamente.</p>
           ) : proveedores.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-10">No encontramos proveedores para “{q}”. Prueba con otra palabra.</p>
           ) : (
@@ -108,7 +110,7 @@ function ProveedorCard({ p, onElegir }: { p: MarketProveedor; onElegir: (product
         <span className="inline-flex items-center gap-1"><Receipt className="h-3 w-3" /> {p.n_oc} OC</span>
         <span className="inline-flex items-center gap-1"><Building2 className="h-3 w-3" /> {p.n_organismos} organismos</span>
         {ultima && <span>Última venta {ultima}</span>}
-        <span className="text-foreground">Mediana {clp(p.precio_mediana)}</span>
+        <span className="text-foreground">Mediana histórica {clp(p.precio_mediana)}</span>
       </div>
 
       <div className="mt-2 border-t pt-2 space-y-1">
@@ -128,9 +130,9 @@ function ProveedorCard({ p, onElegir }: { p: MarketProveedor; onElegir: (product
               >
                 <span className="truncate flex items-center gap-1.5">
                   <ShoppingCart className="h-3.5 w-3.5 text-primary shrink-0" />
-                  {x.producto}{x.catalogo ? ' · catálogo' : ''}
+                  <span className="truncate">{x.producto}{x.catalogo ? ' · catálogo' : ''}<span className="block text-[10px] text-muted-foreground">{x.catalogo && x.stock != null ? `Stock informado: ${x.stock}. Confirma disponibilidad.` : 'Disponibilidad por confirmar'}</span></span>
                 </span>
-                <span className="shrink-0 tabular-nums text-muted-foreground">{clp(precioRef)}</span>
+                <span className="shrink-0 tabular-nums text-muted-foreground">{clp(precioRef)} · referencia</span>
               </button>
             );
           })
