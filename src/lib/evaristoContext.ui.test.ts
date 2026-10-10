@@ -23,7 +23,9 @@ import { createRoot } from 'react-dom/client';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { EvaristoChat } from '/src/components/soporte/EvaristoChat.tsx';
 function App() { window.testNavigate = useNavigate(); return React.createElement(EvaristoChat); }
-createRoot(document.getElementById('root')).render(React.createElement(MemoryRouter, {initialEntries:['/licitaciones/${A}']}, React.createElement(App)));
+const root = createRoot(document.getElementById('root'));
+window.testUnmount = () => root.unmount();
+root.render(React.createElement(MemoryRouter, {initialEntries:['/licitaciones/${A}']}, React.createElement(App)));
 `;
 const supabaseMock = `
 const state = window.testChat = { user: JSON.parse(sessionStorage.getItem('test-owner') || '{"id":"user-A","email":"a@example.test"}'), requests:[], ticketRequests:[], rows:[], next:null, pending:false, resolve:null, conversationLookups:0 };
@@ -46,6 +48,34 @@ export const supabase = {
   }},
   from:chain, channel(){const c={on(){return c},subscribe(){return c}};return c}, removeChannel(){},
 };
+`;
+
+// Un string autocontenido evita helpers de esbuild externos al contexto que
+// Playwright serializa. Ambos constructores quedan simulados; no se usa audio.
+const voiceMock = `
+  localStorage.setItem("fvb_evaristo_open", "1");
+  window.testVoices = [];
+  class MockRecognition {
+    constructor() {
+      this.started = this.stopped = this.aborted = 0;
+      this.results = [];
+      this.onresult = this.onstart = this.onend = this.onerror = this.lateResult = null;
+      window.testVoice = this;
+      window.testVoices.push(this);
+    }
+    start() { this.started++; this.lateResult = this.onresult; this.onstart?.(); }
+    stop() { this.stopped++; }
+    end() { this.onend?.(); }
+    abort() { this.aborted++; }
+    emit(text, isFinal = true, index = 0) {
+      this.results[index] = { isFinal, 0: { transcript: text } };
+      this.lateResult?.({ resultIndex: index, results: this.results });
+    }
+    fail(error) { this.onerror?.({ error }); }
+  }
+  window.testVoiceConstructor = MockRecognition;
+  Object.defineProperty(window, "SpeechRecognition", { configurable: true, value: MockRecognition });
+  Object.defineProperty(window, "webkitSpeechRecognition", { configurable: true, value: MockRecognition });
 `;
 
 // Intencionalmente solo este archivo necesita navegador; los helpers siempre se prueban.
@@ -283,32 +313,12 @@ describe.skipIf(process.env.EVARISTO_BROWSER_TESTS !== "1" || !existsSync(execut
     await page.close();
   }, 30000);
 
-  it("activa voz simulada tras el aviso, deja editar y cancela resultados tardíos sin autoenviar", async () => {
+  it("activa voz tras el aviso, conserva frases y ediciones tras una pausa y espera el final sin autoenviar", async () => {
     const page = await browser.newPage();
     await page.route("**/*", route => route.request().url().startsWith(base) ? route.continue() : route.abort());
     const pageErrors: string[] = [];
     page.on("pageerror", error => pageErrors.push(error.message));
-    // Un string autocontenido evita que esbuild introduzca __name/__publicField
-    // externos al callback que Playwright serializa al contexto del navegador.
-    await page.addInitScript({ content: `
-      localStorage.setItem("fvb_evaristo_open", "1");
-      class MockRecognition {
-        constructor() {
-          this.started = 0;
-          this.aborted = 0;
-          this.onresult = this.onstart = this.onend = this.onerror = this.lateResult = null;
-          window.testVoice = this;
-        }
-        start() { this.started++; this.lateResult = this.onresult; this.onstart?.(); }
-        stop() { this.onend?.(); }
-        abort() { this.aborted++; }
-        emit(text) { this.lateResult?.({ resultIndex: 0, results: [{ isFinal: true, 0: { transcript: text } }] }); }
-        fail(error) { this.onerror?.({ error }); }
-      }
-      window.testVoiceConstructor = MockRecognition;
-      Object.defineProperty(window, "SpeechRecognition", { configurable: true, value: MockRecognition });
-      Object.defineProperty(window, "webkitSpeechRecognition", { configurable: true, value: MockRecognition });
-    ` });
+    await page.addInitScript({ content: voiceMock });
     await page.goto(`${base}/test-chat`);
     await page.getByText("Saludo contextual", { exact: true }).waitFor();
     expect(pageErrors).toEqual([]);
@@ -318,42 +328,195 @@ describe.skipIf(process.env.EVARISTO_BROWSER_TESTS !== "1" || !existsSync(execut
     expect(await page.evaluate(() => typeof window.testVoice)).toBe("undefined");
     await page.getByRole("button", { name: "Dictar mensaje" }).click();
     await page.getByText("El motor de voz de tu navegador puede enviar el audio a un servicio remoto.", { exact: false }).waitFor();
+    await page.getByText("No hace falta mantener el botón presionado.", { exact: false }).waitFor();
     expect(await page.evaluate(() => typeof window.testVoice)).toBe("undefined");
     await page.getByRole("button", { name: "Iniciar dictado", exact: true }).click();
-    expect(await page.evaluate(() => window.testVoice.started)).toBe(1);
+    expect(await page.evaluate(() => ({ started: window.testVoice.started, continuous: window.testVoice.continuous,
+      interimResults: window.testVoice.interimResults, lang: window.testVoice.lang }))).toEqual({ started: 1, continuous: true, interimResults: true, lang: "es-CL" });
     const input = page.getByRole("textbox", { name: "Mensaje para Don Evaristo" });
+    const provisional = page.getByRole("textbox", { name: "Texto provisional del dictado" });
+    const send = page.getByRole("button", { name: "Enviar", exact: true });
     await input.fill("Texto escrito");
     await page.evaluate(() => window.testVoice.emit("y dictado"));
     await browserExpect(input).toHaveValue("Texto escrito y dictado");
+    await browserExpect(send).toBeDisabled();
+    await input.fill("Texto corregido y dictado");
+    await page.evaluate(() => window.testVoice.emit("segunda frase provisional", false, 1));
+    await browserExpect(provisional).toHaveValue("segunda frase provisional");
+    await browserExpect(provisional).toHaveAttribute("readonly", "");
+    await browserExpect(input).toHaveValue("Texto corregido y dictado");
+    await browserExpect(page.getByRole("button", { name: "Añadir borrador" })).toHaveCount(0);
+    await input.press("Enter");
     expect(await page.evaluate(() => window.testChat.requests.length)).toBe(0);
+    await page.evaluate(() => {
+      window.testVoice.emit("segunda frase confirmada", true, 1);
+      window.testVoice.emit("tercera frase", true, 2);
+      window.testVoice.emit("segunda frase confirmada", true, 1);
+    });
+    await browserExpect(input).toHaveValue("Texto corregido y dictado segunda frase confirmada tercera frase");
+    await browserExpect(provisional).toHaveCount(0);
+    await page.evaluate(() => window.testVoice.end());
+    await page.waitForFunction(() => window.testVoices.length === 2);
+    await browserExpect(page.getByRole("button", { name: "Detener dictado" })).toBeEnabled();
+    await browserExpect(send).toBeDisabled();
+    await page.evaluate(() => {
+      window.testVoices[0].emit("texto viejo tras reiniciar", true, 3);
+      window.testVoice.emit("cuarta frase tras la pausa");
+    });
+    await browserExpect(input).toHaveValue("Texto corregido y dictado segunda frase confirmada tercera frase cuarta frase tras la pausa");
+    await page.evaluate(() => window.testVoice.emit("último fragmento provisional", false, 1));
     await page.getByRole("button", { name: "Detener dictado" }).click();
+    expect(await page.evaluate(() => window.testVoice.stopped)).toBe(1);
+    await browserExpect(send).toBeDisabled();
+    await browserExpect(page.getByRole("button", { name: "Añadir borrador" })).toHaveCount(0);
+    await input.fill("Texto revisado antes del cierre");
+    await input.press("Enter");
+    await page.evaluate(() => { window.testVoice.emit("cierre confirmado", true, 1); window.testVoice.end(); });
+    await browserExpect(input).toHaveValue("Texto revisado antes del cierre cierre confirmado");
+    await browserExpect(provisional).toHaveCount(0);
+    await browserExpect(send).toBeEnabled();
+    expect(await page.evaluate(() => window.testChat.requests.length)).toBe(0);
     await input.fill("Texto revisado por mí");
-    await page.getByRole("button", { name: "Enviar", exact: true }).click();
+    await send.click();
     await page.getByText("Respuesta 1", { exact: true }).waitFor();
     expect(await page.evaluate(() => window.testChat.requests[0].messages?.at(-1)?.content)).toBe("Texto revisado por mí");
     await page.getByRole("button", { name: "Dictar mensaje" }).click();
     await page.getByRole("button", { name: "Iniciar dictado", exact: true }).click();
+    await page.evaluate(() => window.testVoice.emit("borrador anterior", false));
     await page.getByRole("button", { name: "Nueva", exact: true }).click();
-    await page.evaluate(() => window.testVoice.emit("Texto tardío"));
+    await page.evaluate(() => { window.testVoice.emit("Texto tardío"); window.testVoice.emit("Borrador tardío", false, 1); });
     await browserExpect(input).toHaveValue("");
+    await browserExpect(provisional).toHaveCount(0);
     expect(await page.evaluate(() => window.testVoice.aborted)).toBeGreaterThan(0);
     await page.getByRole("button", { name: "Dictar mensaje" }).click();
     await page.getByRole("button", { name: "Iniciar dictado", exact: true }).click();
     await page.evaluate(() => window.testVoice.fail("not-allowed"));
     await page.getByText("No se autorizó el dictado. Puedes seguir escribiendo.", { exact: true }).waitFor();
     await input.fill("Puedo seguir escribiendo");
+    await browserExpect(send).toBeEnabled();
     expect(await page.evaluate(() => window.testChat.requests.length)).toBe(1);
+    expect(pageErrors).toEqual([]);
+    await page.close();
+  }, 30000);
+
+  it("conserva el provisional sin finales y exige añadirlo editado o descartarlo antes de enviar", async () => {
+    const page = await browser.newPage();
+    await page.route("**/*", route => route.request().url().startsWith(base) ? route.continue() : route.abort());
+    await page.addInitScript({ content: voiceMock });
+    await page.goto(`${base}/test-chat`);
+    await page.getByText("Saludo contextual", { exact: true }).waitFor();
+    const input = page.getByRole("textbox", { name: "Mensaje para Don Evaristo" });
+    const provisional = page.getByRole("textbox", { name: "Texto provisional del dictado" });
+    const send = page.getByRole("button", { name: "Enviar", exact: true });
+    await input.fill("Texto manual");
+    await page.getByRole("button", { name: "Dictar mensaje" }).click();
+    await page.getByRole("button", { name: "Iniciar dictado", exact: true }).click();
+    await page.evaluate(() => { window.testVoice.emit("frase sin finalizar", false); window.testVoice.end(); });
+    await browserExpect(provisional).toHaveValue("frase sin finalizar");
+    await browserExpect(provisional).toBeEditable();
+    await browserExpect(input).toHaveValue("Texto manual");
+    await browserExpect(send).toBeDisabled();
+    await browserExpect(page.getByRole("button", { name: "Dictar mensaje" })).toBeDisabled();
+    expect(await page.evaluate(() => window.testVoice.started)).toBe(1);
+    await input.press("Enter");
+    await provisional.fill("");
+    await browserExpect(page.getByRole("button", { name: "Añadir borrador" })).toBeDisabled();
+    await browserExpect(send).toBeDisabled();
+    await provisional.fill("frase revisada");
+    expect(await page.evaluate(() => window.testChat.requests.length)).toBe(0);
+    await page.getByRole("button", { name: "Añadir borrador" }).click();
+    await browserExpect(input).toHaveValue("Texto manual frase revisada");
+    await browserExpect(provisional).toHaveCount(0);
+    await browserExpect(send).toBeEnabled();
+    expect(await page.evaluate(() => window.testChat.requests.length)).toBe(0);
+    await page.getByRole("button", { name: "Dictar mensaje" }).click();
+    await page.getByRole("button", { name: "Iniciar dictado", exact: true }).click();
+    await page.evaluate(() => window.testVoice.emit("fragmento para descartar", false));
+    await page.getByRole("button", { name: "Detener dictado" }).click();
+    await page.evaluate(() => window.testVoice.end());
+    await browserExpect(provisional).toHaveValue("fragmento para descartar");
+    await browserExpect(send).toBeDisabled();
+    await page.getByRole("button", { name: "Descartar borrador" }).click();
+    await browserExpect(input).toHaveValue("Texto manual frase revisada");
+    await browserExpect(provisional).toHaveCount(0);
+    await send.click();
+    await page.getByText("Respuesta 1", { exact: true }).waitFor();
+    expect(await page.evaluate(() => window.testChat.requests[0].messages?.at(-1)?.content)).toBe("Texto manual frase revisada");
+    expect(await page.evaluate(() => window.testChat.requests.length)).toBe(1);
+    await page.close();
+  }, 30000);
+
+  it("descarta voz y provisional al cerrar, cambiar cuenta, ocultar el chat y desmontar", async () => {
+    const page = await browser.newPage();
+    const pageErrors: string[] = [];
+    page.on("pageerror", error => pageErrors.push(error.message));
+    await page.route("**/*", route => route.request().url().startsWith(base) ? route.continue() : route.abort());
+    await page.addInitScript({ content: voiceMock });
+    await page.goto(`${base}/test-chat`);
+    await page.getByText("Saludo contextual", { exact: true }).waitFor();
+    const input = page.getByRole("textbox", { name: "Mensaje para Don Evaristo" });
+    const provisional = page.getByRole("textbox", { name: "Texto provisional del dictado" });
+    const start = async () => {
+      await page.getByRole("button", { name: "Dictar mensaje" }).click();
+      await page.getByRole("button", { name: "Iniciar dictado", exact: true }).click();
+      await page.evaluate(() => window.testVoice.emit("fragmento privado", false));
+      await browserExpect(provisional).toHaveValue("fragmento privado");
+    };
+    const lateResult = async () => {
+      expect(await page.evaluate(() => window.testVoice.aborted)).toBeGreaterThan(0);
+      await page.evaluate(() => { window.testVoice.emit("Final tardío"); window.testVoice.emit("Provisional tardío", false, 1); });
+    };
+    await start();
+    await page.getByRole("button", { name: "Cerrar ayuda de Don Evaristo" }).click();
+    await lateResult();
+    await page.getByRole("button", { name: "Abrir ayuda de Don Evaristo" }).click();
+    await browserExpect(input).toHaveValue("");
+    await browserExpect(provisional).toHaveCount(0);
+    expect(await page.evaluate(() => window.testVoices.length)).toBe(1);
+    await start();
+    await page.evaluate(() => window.testChat.changeUser({ id: "user-B", email: "b@example.test" }));
+    await page.waitForFunction(() => localStorage.getItem("fvb_evaristo_session:user-B") !== null);
+    await lateResult();
+    await browserExpect(input).toHaveValue("");
+    await browserExpect(provisional).toHaveCount(0);
+    await start();
+    await page.evaluate(() => window.testNavigate("/experto"));
+    await browserExpect(input).toHaveCount(0);
+    await lateResult();
+    await page.evaluate(() => window.testNavigate("/dashboard"));
+    await browserExpect(input).toHaveValue("");
+    await browserExpect(provisional).toHaveCount(0);
+    expect(await page.evaluate(() => window.testVoices.length)).toBe(3);
+    await start();
+    await page.evaluate(() => window.testUnmount());
+    await lateResult();
+    await browserExpect(input).toHaveCount(0);
+    expect(await page.evaluate(() => window.testChat.requests.length)).toBe(0);
     expect(pageErrors).toEqual([]);
     await page.close();
   }, 30000);
 
 });
 
+interface TestVoice {
+  started: number;
+  stopped: number;
+  aborted: number;
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  emit(text: string, isFinal?: boolean, index?: number): void;
+  end(): void;
+  fail(error: string): void;
+}
+
 declare global {
   interface Window {
     testNavigate(path: string): void;
+    testUnmount(): void;
     testVoiceConstructor: unknown;
-    testVoice: { started: number; aborted: number; emit(text: string): void; fail(error: string): void };
+    testVoice: TestVoice;
+    testVoices: TestVoice[];
     testChat: {
       next: unknown;
       ticketRequests: Array<{ imagen?: string }>;
