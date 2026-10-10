@@ -58,8 +58,8 @@ const CONTENIDO = {
   // --- Banner destacado -----------------------------------------------------
   // Imagen grande destacada. Deja imagenUrl en "" para ocultarlo.
   banner: {
-    imagenUrl: "/media/academia/convenio-software.jpg",
-    alt: "Postula al Convenio Marco de Software",
+    imagenUrl: "",
+    alt: "",
     enlaceUrl: "#asesoria", // a dónde lleva al hacer clic (# = sección de esta página)
   },
 
@@ -71,11 +71,11 @@ const CONTENIDO = {
       // Pega el ID de cada video (la parte después de watch?v= o youtu.be/ ).
       {
         id: "oNsOWfAb6cM",
-        titulo: "Cómo postular al Convenio Marco de SaaS (webinar completo)",
+        titulo: "Convenio Marco de SaaS: webinar grabado (recepción de ofertas cerrada)",
         // Capítulos: saltan al minuto exacto del video (segundos).
         capitulos: [
           { t: 20, label: "El error del 99% de descuento" },
-          { t: 141, label: "Postula a las DOS categorías (SaaS + Proyecto)" },
+          { t: 141, label: "Las dos categorías analizadas (SaaS + Proyecto)" },
           { t: 828, label: "Anexo 3: la firma del hosting (AWS/Azure)" },
           { t: 988, label: "Anexo 4: acreditar tu experiencia" },
           { t: 2820, label: "Fórmula pyme: 4 anexos + giro = 66 puntos" },
@@ -111,10 +111,10 @@ const CONTENIDO = {
     // publicación (url). Si no hay url, la tarjeta solo muestra la imagen.
     posts: [
       {
-        titulo: "Postula al Convenio Marco de Software",
-        resumen: "Cómo se vende por Convenio Marco de Software: oportunidades que impulsan la innovación.",
+        titulo: "Convenio Marco de Software: contenido de archivo",
+        resumen: "Material de referencia. La recepción de ofertas de 2239-2-LR26 cerró el 9 de octubre de 2026 a las 15:00 horas, según Mercado Público.",
         url: "https://www.linkedin.com/posts/evaras_como-se-vende-por-convenio-marco-se-software-activity-7490531320801062913-j55j",
-        imagenUrl: "/media/academia/convenio-software.jpg",
+        imagenUrl: null,
       },
       {
         titulo: "¿Tu empresa quiere aterrizar en Chile?",
@@ -147,8 +147,8 @@ const CONTENIDO = {
         imagenUrl: null,
       },
       {
-        titulo: "Se abrió el Convenio Marco de Desarrollo",
-        resumen: "Mi publicación sobre la apertura de este Convenio Marco en Mercado Público.",
+        titulo: "Convenio Marco de Desarrollo: publicación de archivo",
+        resumen: "Publicación histórica sobre la apertura. La recepción de ofertas de 2239-2-LR26 está cerrada.",
         url: "https://www.linkedin.com/posts/evaras_se-abri%C3%B3-el-convenio-marco-de-desarrollo-ugcPost-7485053898337218560-oIVj/",
         imagenUrl: null,
       },
