@@ -202,6 +202,7 @@ export function EvaristoChat() {
   const [Recognition] = useState<EvaristoRecognitionConstructor | null>(() => getEvaristoRecognition(window));
   const dictation = useRef<EvaristoDictation | null>(null);
   const [dictating, setDictating] = useState(false);
+  const [dictationDraft, setDictationDraft] = useState<string | null>(null);
   const [dictationPrompt, setDictationPrompt] = useState(false);
   const [dictationNotice, setDictationNotice] = useState("");
   const [loading, setLoading] = useState(false);
@@ -239,17 +240,19 @@ export function EvaristoChat() {
     dictation.current?.cancel();
     dictation.current = null;
     setDictating(false);
+    setDictationDraft(null);
     setDictationPrompt(false);
     setDictationNotice("");
   }, []);
   const startDictation = () => {
-    if (!Recognition || loading || !sessionReady || !historyReady) return;
+    if (!Recognition || dictating || dictationDraft !== null || loading || !sessionReady || !historyReady) return;
     cancelDictation();
     const requestGeneration = generation.current;
     try {
       const session = createEvaristoDictation(Recognition, {
         isCurrent: () => generation.current === requestGeneration,
         onText: (text) => setInput((previous) => appendEvaristoTranscript(previous, text)),
+        onInterim: (text) => setDictationDraft(text || null),
         onState: setDictating,
         onNotice: setDictationNotice,
       });
@@ -484,7 +487,7 @@ export function EvaristoChat() {
 
   const enviar = async () => {
     const texto = input.trim();
-    if ((!texto && !img) || loading || !sessionReady || !historyReady) return;
+    if (dictating || dictationDraft !== null || (!texto && !img) || loading || !sessionReady || !historyReady) return;
     const requestGeneration = ++generation.current;
     cancelDictation();
     const requestPath = location.pathname;
@@ -657,7 +660,7 @@ export function EvaristoChat() {
                 <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" /> Humano
               </a>
               <Button variant="ghost" size="sm" onClick={limpiar} disabled={!sessionReady || !historyReady} title="Empezar una conversación nueva (la anterior queda guardada)" className="text-white/80 hover:text-white hover:bg-white/10 h-7 px-2 text-xs">Nueva</Button>
-              <Button variant="ghost" size="icon" onClick={() => { cancelDictation(); setOpen(false); }} className="text-white hover:bg-white/10 h-7 w-7"><X className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" onClick={() => { cancelDictation(); setOpen(false); }} aria-label="Cerrar ayuda de Don Evaristo" className="text-white hover:bg-white/10 h-7 w-7"><X className="h-4 w-4" /></Button>
             </div>
           </div>
 
@@ -759,6 +762,8 @@ export function EvaristoChat() {
               {dictationPrompt && Recognition && (
                 <div className="border-t border-border px-3 py-2 space-y-2">
                   <p className="text-xs text-muted-foreground">El motor de voz de tu navegador puede enviar el audio a un servicio remoto. No dictes claves ni datos sensibles. Podrás revisar y editar el texto antes de enviarlo.</p>
+                  <p className="text-xs text-muted-foreground">Haz clic en Iniciar dictado y luego en Detener dictado al terminar. No hace falta mantener el botón presionado.</p>
+                  <p className="text-xs text-muted-foreground">Cada sesión dura hasta 5 minutos. Si el navegador la interrumpe, revisa el borrador y vuelve a iniciar el dictado.</p>
                   <div className="flex gap-2">
                     <Button type="button" size="sm" onClick={startDictation} disabled={loading || !sessionReady || !historyReady}>Iniciar dictado</Button>
                     <Button type="button" size="sm" variant="ghost" onClick={cancelDictation}>Cancelar</Button>
@@ -768,6 +773,37 @@ export function EvaristoChat() {
               <p role="status" aria-live="polite" className="px-3 pt-1 text-xs text-muted-foreground">
                 {dictationNotice || (!Recognition ? "Dictado no disponible en este navegador. Puedes escribir." : "")}
               </p>
+              {dictating && <p className="px-3 pt-1 text-xs text-muted-foreground">Haz clic en Detener dictado y revisa el texto antes de enviar. No hace falta mantener el botón presionado.</p>}
+              {dictationDraft !== null && (
+                <section aria-label="Borrador de dictado" className="border-t border-border px-3 py-2 space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    {dictating
+                      ? "Texto provisional: el navegador todavía puede corregirlo."
+                      : "El navegador no confirmó este fragmento. Revísalo y añade o descarta el borrador antes de enviar."}
+                  </p>
+                  <textarea
+                    aria-label="Texto provisional del dictado"
+                    value={dictationDraft}
+                    onChange={(e) => setDictationDraft(e.target.value)}
+                    readOnly={dictating}
+                    rows={2}
+                    className="w-full resize-none max-h-24 rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-firmavb-blue/30"
+                  />
+                  {!dictating && (
+                    <div className="flex gap-2">
+                      <Button type="button" size="sm" disabled={!dictationDraft.trim()} onClick={() => {
+                        setInput((previous) => appendEvaristoTranscript(previous, dictationDraft));
+                        setDictationDraft(null);
+                        setDictationNotice("Borrador añadido. Revisa el mensaje antes de enviarlo.");
+                      }}>Añadir borrador</Button>
+                      <Button type="button" size="sm" variant="ghost" onClick={() => {
+                        setDictationDraft(null);
+                        setDictationNotice("Borrador descartado. Puedes seguir escribiendo o iniciar otro dictado.");
+                      }}>Descartar borrador</Button>
+                    </div>
+                  )}
+                </section>
+              )}
 
               {/* Input */}
               <div className="border-t border-border p-2.5 flex items-end gap-2 bg-card">
@@ -776,7 +812,7 @@ export function EvaristoChat() {
                   <ImagePlus className="h-5 w-5" aria-hidden="true" />
                 </Button>
                 {Recognition && (
-                  <Button type="button" variant="ghost" size="icon" className="h-9 w-9 shrink-0" disabled={loading || !sessionReady || !historyReady}
+                  <Button type="button" variant="ghost" size="icon" className="h-9 w-9 shrink-0" disabled={loading || !sessionReady || !historyReady || (!dictating && dictationDraft !== null)}
                     onClick={() => { if (dictating) dictation.current?.stop(); else setDictationPrompt(true); }}
                     aria-label={dictating ? "Detener dictado" : "Dictar mensaje"} aria-pressed={dictating}>
                     {dictating ? <Square className="h-4 w-4 text-destructive" aria-hidden="true" /> : <Mic className="h-5 w-5" aria-hidden="true" />}
@@ -792,7 +828,7 @@ export function EvaristoChat() {
                   rows={1}
                   className="min-w-0 flex-1 resize-none max-h-24 rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-firmavb-blue/30"
                 />
-                <Button size="icon" className="h-9 w-9 shrink-0 bg-firmavb-blue hover:bg-firmavb-blue/90" onClick={enviar} disabled={loading || !sessionReady || !historyReady || (!input.trim() && !img)} aria-label="Enviar">
+                <Button size="icon" className="h-9 w-9 shrink-0 bg-firmavb-blue hover:bg-firmavb-blue/90" onClick={enviar} disabled={dictating || dictationDraft !== null || loading || !sessionReady || !historyReady || (!input.trim() && !img)} aria-label="Enviar">
                   <Send className="h-4 w-4" aria-hidden="true" />
                 </Button>
               </div>
