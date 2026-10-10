@@ -12,12 +12,11 @@ import type { CompraAgil } from "@/hooks/useComprasAgiles";
 import { useUpdateCompraAgil } from "@/hooks/useComprasAgiles";
 import { formatCurrency } from "@/utils/clasificacion";
 import { unidadLabel } from "@/utils/unidades";
-import { estadoMatch } from "@/services/fuzzyMatching";
 import { PrecioMercadoHint } from "./PrecioMercadoHint";
 import { MarketPickerDialog, type MarketSeleccion } from "./MarketPickerDialog";
 import { useMarketSolicitar } from "@/hooks/useMarketEstado";
 import { useUserSettings } from "@/hooks/useUserSettings";
-import { calcularDesgloseOferta } from "@/lib/ofertaCalculo";
+import { calcularDesgloseOferta, seleccionarItemsOferta } from "@/lib/ofertaCalculo";
 import { aplicarRecargoPorRegion, obtenerRecargoRegion } from "@/utils/regiones";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useInventoryActivo } from "@/hooks/useInventory";
@@ -38,6 +37,7 @@ interface ItemParaPropuesta {
   descripcion: string;
   cantidadSolicitada: number;
   unidadMedida: string;
+  confirmado?: boolean;
   match: {
     id: string;
     sku: string;
@@ -64,6 +64,7 @@ interface ItemSeleccionado {
   unidadMedida: string;
   cantidad: number;
   selected: boolean;
+  confirmado: boolean;
   match?: {
     id: string;
     sku: string;
@@ -108,6 +109,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
           ? {
               ...item,
               selected: true,
+              confirmado: false,
               match: { id: `mk:${sel.rut}:${sel.producto}`, sku: '', nombre: sel.producto, precio_unitario: 0, matchScore: 0, margen_estimado: 0 },
               precioUnitario: 0,
               market: { rut: sel.rut, proveedor: sel.proveedor, precioReferencia: sel.precioRef },
@@ -125,28 +127,34 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
   // llega el aviso; si no, queda en "Market del Estado → Mis solicitudes".
   const solicitarMk = useMarketSolicitar();
   const [enviandoCotiz, setEnviandoCotiz] = useState(false);
+  const [solicitudesRegistradas, setSolicitudesRegistradas] = useState<Record<string, string>>({});
+  const claveSolicitud = (item: ItemSeleccionado) => `${item.itemId}:${item.market?.rut}:${item.match?.nombre}:${item.cantidad}`;
 
   const handleEnviarCotizacionesMarket = async () => {
-    const lineas = itemsSeleccionados.filter((i) => i.selected && i.market && i.match);
-    if (lineas.length === 0) { toast.info('No hay productos del Market en la oferta.'); return; }
+    const lineas = itemsSeleccionados.filter((i) => i.selected && i.market && i.match && !solicitudesRegistradas[claveSolicitud(i)]);
+    if (lineas.length === 0) { toast.info('No hay solicitudes pendientes de registrar para los productos seleccionados.'); return; }
     setEnviandoCotiz(true);
     let ok = 0;
+    const fallidas: string[] = [];
     const proveedores = new Set<string>();
     for (const l of lineas) {
       const prod = l.match!.nombre;
       const cant = l.cantidad;
       const mensaje = `Hola, vimos que comercializas "${prod}" en Mercado Público. Tengo una necesidad y me gustaría cotizar este producto (${cant} ${unidadLabel(l.unidadMedida)}). ¿Podrías indicarme tu mejor precio y plazo de entrega? Quedo atento, muchas gracias.`;
       try {
-        await solicitarMk.mutateAsync({ rut_proveedor: l.market!.rut, producto: prod, cantidad: cant, mensaje });
+        const solicitudId = await solicitarMk.mutateAsync({ rut_proveedor: l.market!.rut, producto: prod, cantidad: cant, mensaje });
+        if (!solicitudId) throw new Error("Solicitud sin identificador");
+        setSolicitudesRegistradas(prev => ({ ...prev, [claveSolicitud(l)]: solicitudId }));
         ok++;
         proveedores.add(l.market!.proveedor);
-      } catch { /* sigue con los demás */ }
+      } catch { fallidas.push(prod); }
     }
     setEnviandoCotiz(false);
     if (ok > 0) {
-      toast.success(`Cotización enviada: ${ok} producto${ok === 1 ? '' : 's'} a ${proveedores.size} proveedor${proveedores.size === 1 ? '' : 'es'}. A los que están en FirmaVB les llega el aviso; el resto queda en "Market del Estado → Mis solicitudes".`);
+      toast.success(`Solicitud registrada: ${ok} producto${ok === 1 ? '' : 's'} a ${proveedores.size} proveedor${proveedores.size === 1 ? '' : 'es'}. Revisa el seguimiento en "Market del Estado → Mis solicitudes".`);
+      if (fallidas.length > 0) toast.warning(`No se registraron ${fallidas.length} solicitudes: ${fallidas.join(", ")}. Puedes reintentar: las líneas registradas en esta sesión se omitirán.`);
     } else {
-      toast.error('No se pudo enviar la cotización a los proveedores.');
+      toast.error('No se pudo registrar la solicitud de cotización. Intenta nuevamente.');
     }
   };
 
@@ -192,7 +200,8 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
         } : undefined,
         precioUnitario: precioConRecargo,
         margen: margen,
-        selected: producto.match !== null && (producto.match.matchScore >= 50 || precioBase > 0)
+        confirmado: producto.confirmado === true,
+        selected: producto.match !== null && producto.confirmado === true
       };
     })
   );
@@ -202,7 +211,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
       prev.map(item => {
         if (item.itemId === itemId) {
           const nuevaCantidad = Math.max(1, Math.min(cantidad, item.cantidadSolicitada * 2));
-          return { ...item, cantidad: nuevaCantidad };
+          return { ...item, cantidad: nuevaCantidad, confirmado: item.market && nuevaCantidad !== item.cantidad ? false : item.confirmado };
         }
         return item;
       })
@@ -235,20 +244,20 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
   // de cotización, aunque haya salido de un match automático).
   const handleNombreChange = (itemId: string, nombre: string) => {
     setItemsSeleccionados(prev =>
-      prev.map(item => (item.itemId === itemId ? { ...item, nombre } : item))
+      prev.map(item => (item.itemId === itemId ? { ...item, nombre, confirmado: false } : item))
     );
   };
 
   const handleDescripcionChange = (itemId: string, descripcion: string) => {
     setItemsSeleccionados(prev =>
-      prev.map(item => (item.itemId === itemId ? { ...item, descripcion } : item))
+      prev.map(item => (item.itemId === itemId ? { ...item, descripcion, confirmado: false } : item))
     );
   };
 
   const handleNombreOfertadoChange = (itemId: string, nombre: string) => {
     setItemsSeleccionados(prev =>
       prev.map(item =>
-        item.itemId === itemId && item.match ? { ...item, match: { ...item.match, nombre } } : item
+        item.itemId === itemId && item.match ? { ...item, confirmado: false, match: { ...item.match, nombre } } : item
       )
     );
   };
@@ -284,6 +293,8 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
             precioUnitario: precioConRecargo,
             margen: margen,
             market: undefined,
+            confirmado: false,
+            selected: false,
           };
         }
         return item;
@@ -302,6 +313,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
       unidadMedida: 'UN',
       cantidad: 1,
       selected: true,
+      confirmado: false,
       precioUnitario: 0,
       margen: 0,
       esManual: true
@@ -314,8 +326,8 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
     setItemsSeleccionados(prev => prev.filter(item => item.itemId !== itemId));
   };
 
-  const itemsActivos = itemsSeleccionados.filter(item => item.precioUnitario > 0);
-  const { subtotal: subtotalItems, iva, total: montoTotal } = calcularDesgloseOferta(itemsSeleccionados);
+  const itemsActivos = seleccionarItemsOferta(itemsSeleccionados);
+  const { subtotal: subtotalItems, iva, total: montoTotal } = calcularDesgloseOferta(itemsActivos);
   
   // Función para obtener badge de buen pagador
   const getBuenPagadorBadge = (buenPagador: boolean | null) => {
@@ -452,6 +464,10 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
   // de cada producto (buscada en el inventario por SKU, igual que la ficha técnica).
   const handleDescargarCotizacion = async () => {
     if (!compra) return;
+    if (itemsSeleccionados.some(item => item.selected && !item.confirmado)) {
+      toast.error('Confirma las especificaciones de cada producto seleccionado antes de continuar.');
+      return;
+    }
     if (itemsSeleccionados.some(item => item.selected && (!Number.isFinite(item.precioUnitario) || item.precioUnitario <= 0))) {
       toast.error('Ingresa un precio de oferta válido en cada línea antes de descargar la cotización.');
       return;
@@ -491,6 +507,10 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
 
   const handleGuardarPropuesta = async () => {
     if (!compra) return;
+    if (itemsSeleccionados.some(item => item.selected && !item.confirmado)) {
+      toast.error('Confirma las especificaciones de cada producto seleccionado antes de continuar.');
+      return;
+    }
     if (itemsSeleccionados.some(item => item.selected && (!Number.isFinite(item.precioUnitario) || item.precioUnitario <= 0))) {
       toast.error('Hay productos seleccionados sin precio de oferta. Cotízalos o exclúyelos antes de guardar.');
       return;
@@ -582,12 +602,14 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
       // Conectar con el pipeline: al guardar la propuesta la oportunidad avanza
       // a "preparación" en Postulaciones (si no estaba ya). Antes la propuesta
       // quedaba aislada y el pipeline no se enteraba.
+      let pipelineVinculado = false;
       try {
-        const { data: existe } = await supabase
+        const { data: existe, error: pipelineError } = await supabase
           .from('pipeline')
           .select('id')
           .eq('oportunidad_id', compra.codigo)
           .limit(1);
+        if (pipelineError) throw pipelineError;
         if (!existe || existe.length === 0) {
           await crearPipeline.mutateAsync({
             oportunidad_id: compra.codigo,
@@ -600,7 +622,11 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
             etapa: 'preparacion',
           });
         }
-      } catch { /* no bloqueamos el guardado si el pipeline falla */ }
+        pipelineVinculado = true;
+      } catch (error) {
+        console.error("No se pudo vincular la propuesta a Postulaciones:", error);
+        toast.warning("Propuesta guardada; falta vincularla a Postulaciones. Puedes agregar esta compra desde su detalle.");
+      }
 
       // El paso que faltaba: antes la propuesta quedaba guardada y el usuario
       // tenía que adivinar que debía ir a Postulaciones (Pipeline) y abrir la
@@ -610,7 +636,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
       // una URL armada a mano con el código no existe en el sitio real (404).
       const mpUrl = compra.link_oficial;
       toast.success(
-        'Propuesta guardada · en tu pipeline',
+        pipelineVinculado ? 'Propuesta guardada · en Postulaciones' : 'Propuesta guardada',
         mpUrl
           ? {
               duration: 10000,
@@ -802,9 +828,15 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                             />
                           </div>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <Badge variant={!item.market && estadoMatch(item.match.matchScore, true) === 'listo' ? 'success' : 'warning'} className="text-[10px] px-1.5 py-0" title={item.market ? 'Confirma producto, precio, stock y entrega con el proveedor' : `${item.match.matchScore}% de coincidencia`}>
-                              {item.market ? 'Confirmar con proveedor' : estadoMatch(item.match.matchScore, true) === 'listo' ? 'Listo' : 'Revisar'}
+                            <Badge variant={item.confirmado ? "success" : "warning"} className="text-[10px] px-1.5 py-0" title={item.market ? 'Confirma producto, precio, stock y entrega con el proveedor' : `${item.match.matchScore}% de coincidencia`}>
+                              {item.confirmado ? 'Confirmado por ti' : item.market ? 'Confirmar con proveedor' : 'Por validar'}
                             </Badge>
+                            {!item.confirmado && (
+                              <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setItemsSeleccionados(prev => prev.map(row => row.itemId === item.itemId ? { ...row, confirmado: true, selected: true } : row))}>
+                                Confirmo especificaciones{item.market ? ", stock y entrega" : ""}
+                              </Button>
+                            )}
+                            {solicitudesRegistradas[claveSolicitud(item)] && <span className="text-xs text-muted-foreground">Solicitud registrada · revisa Mis solicitudes</span>}
                             {selector}
                             <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setMarketPara(item.itemId)} title="Buscar este producto en el Market del Estado">
                               <Store className="h-3 w-3 mr-1" /> Market
@@ -819,6 +851,9 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                       ) : (
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs text-amber-700">Sin producto en tu inventario</span>
+                          {item.selected && !item.confirmado && (
+                            <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setItemsSeleccionados(prev => prev.map(row => row.itemId === item.itemId ? { ...row, confirmado: true } : row))}>Confirmo la descripción y especificaciones</Button>
+                          )}
                           {selector}
                           <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setMarketPara(item.itemId)} title="Buscar este producto en el Market del Estado">
                             <Store className="h-3 w-3 mr-1" /> Market
@@ -999,6 +1034,7 @@ export function GenerarPropuestaModal({ open, onOpenChange, compra, productos }:
                             unidadMedida: 'UN',
                             cantidad: 1,
                             selected: true,
+              confirmado: false,
                             match: {
                               id: prod.id,
                               sku: prod.sku,

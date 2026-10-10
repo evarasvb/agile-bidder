@@ -22,7 +22,7 @@ export default function Pipeline() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
 
-  const { data: items = [], isLoading } = usePipeline(filters);
+  const { data: items = [], isLoading, isError, isFetching, refetch } = usePipeline(filters);
 
   const handleCardClick = (item: PipelineItem) => {
     setSelectedItem(item);
@@ -64,8 +64,15 @@ export default function Pipeline() {
       {view === 'historico' ? (
         <HistoricoPostulaciones />
       ) : isLoading ? (
-        <div className="flex items-center justify-center py-20">
+        <div role="status" className="flex items-center justify-center gap-2 py-20">
+          <span>Cargando postulaciones…</span>
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : isError ? (
+        <div role="alert" className="rounded-2xl border border-destructive/30 p-10 text-center">
+          <p className="font-medium">No se pudieron cargar tus postulaciones</p>
+          <p className="mt-1 text-sm text-muted-foreground">Intenta nuevamente. Tus filtros se conservan.</p>
+          <Button variant="outline" className="mt-4" onClick={() => void refetch()} disabled={isFetching}>Reintentar</Button>
         </div>
       ) : items.length === 0 && sinFiltros ? (
         // Estado vacío global: antes se veían 9 columnas diciendo "Arrastra aquí".
@@ -73,7 +80,7 @@ export default function Pipeline() {
           <Target className="h-8 w-8 mx-auto text-muted-foreground/60" />
           <p className="mt-3 font-medium">Aún no tienes postulaciones en seguimiento</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Cuando guardes una propuesta en una compra ágil, aparecerá aquí automáticamente.
+            Agrega una oportunidad a seguimiento o vincula tu propuesta para verla aquí.
           </p>
           <Button asChild className="mt-4">
             <Link to="/oportunidades">Ver mis oportunidades</Link>

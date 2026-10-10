@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCompraAgil } from '@/hooks/useComprasAgiles';
 import { GenerarPropuestaModal } from '@/components/compras-agiles/GenerarPropuestaModal';
@@ -38,9 +38,9 @@ const clp = (n: number) => `$${Math.round(n || 0).toLocaleString('es-CL')}`;
 // "REVISAR" y los tres cortes de color que convivían.
 const estadoChip = (est: EstadoMatch): { txt: string; cls: string } =>
   est === 'listo'
-    ? { txt: 'Listo', cls: 'bg-firmavb-green/15 text-firmavb-green border-firmavb-green/30' }
+    ? { txt: 'Confirmado por ti', cls: 'bg-firmavb-green/15 text-firmavb-green border-firmavb-green/30' }
     : est === 'revisar'
-      ? { txt: 'Revisar', cls: 'bg-amber-100 text-amber-800 border-amber-300' }
+      ? { txt: 'Por validar', cls: 'bg-amber-100 text-amber-800 border-amber-300' }
       : { txt: 'Sin producto', cls: 'bg-muted text-muted-foreground border-border' };
 
 // Chip que muestra si el cliente corrigió el match automático a mano.
@@ -60,12 +60,14 @@ function EstadoBadge({ estado }: { estado: 'auto' | 'confirmado' | 'reasignado' 
 export default function CompraAgilDetalle() {
   const { codigo } = useParams<{ codigo: string }>();
   const navigate = useNavigate();
-  const { data: compra, isLoading, error } = useCompraAgil(codigo || null);
+  const { data: compra, isLoading, error, refetch } = useCompraAgil(codigo || null);
   const { data: cliente } = useCliente();
   const { data: itemMatches } = useCaItemMatches(codigo || null);
   const { data: overridesMap = {} } = useMatchOverrides(codigo || null);
   const { data: inventarioActivo = [] } = useInventoryActivo();
   const [propuestaOpen, setPropuestaOpen] = useState(false);
+  const matchByItem = useMemo(() => new Map((itemMatches || []).map(m => [m.item_id, m])), [itemMatches]);
+  const inventarioById = useMemo(() => new Map(inventarioActivo.map(p => [p.id, p])), [inventarioActivo]);
 
   if (isLoading) {
     return (
@@ -82,7 +84,8 @@ export default function CompraAgilDetalle() {
       <div className="p-6">
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">Compra ágil no encontrada</p>
+            <p className="text-muted-foreground">{error ? "No pudimos consultar esta compra ágil. Intenta nuevamente." : "Compra ágil no encontrada"}</p>
+            {error && <Button variant="outline" onClick={() => void refetch()} className="mt-4 mr-2">Reintentar</Button>}
             <Button onClick={() => navigate('/compras-agiles')} className="mt-4">
               <ArrowLeft className="h-4 w-4 mr-2" /> Volver
             </Button>
@@ -121,8 +124,6 @@ export default function CompraAgilDetalle() {
   };
 
   // Match ítem por ítem (precalculado, tabla ca_item_matches) indexado por item_id.
-  const matchByItem = new Map<string, any>((itemMatches || []).map((m: any) => [m.item_id, m]));
-  const inventarioById = new Map<string, any>((inventarioActivo as any[]).map((p) => [p.id, p]));
 
   // Aplica la corrección manual del cliente (confirmar / cambiar producto /
   // descartar, guardada en match_overrides) sobre el match automático.
@@ -131,7 +132,7 @@ export default function CompraAgilDetalle() {
     if (ov?.accion === 'descartado') {
       return { match: null, estado: 'descartado' as const, override: ov };
     }
-    if (ov?.accion === 'reasignado' && ov.inventario_id) {
+    if ((ov?.accion === 'reasignado' || ov?.accion === 'confirmado') && ov.inventario_id) {
       const prod = inventarioById.get(ov.inventario_id);
       if (prod) {
         return {
@@ -142,7 +143,7 @@ export default function CompraAgilDetalle() {
             precio: prod.precio_unitario,
             score: Math.round(ov.score_manual ?? 100),
           },
-          estado: 'reasignado' as const,
+          estado: ov.accion as 'reasignado' | 'confirmado',
           override: ov,
         };
       }
@@ -175,12 +176,11 @@ export default function CompraAgilDetalle() {
     // que baja a "Revisar" aunque el score sea alto. "Revisar" y "Sin producto"
     // no se suman al total ni van precargados a la propuesta.
     const superaPresupuesto = !!compra.monto && subtotal > compra.monto;
-    // Si el usuario confirmó o eligió el producto, su decisión manda: queda
-    // "listo". Solo las sugerencias automáticas dependen del umbral de score (y
-    // bajan a "revisar" si su solo subtotal ya supera todo el presupuesto).
+    // Solo la confirmación explícita acredita que el usuario revisó el producto.
+    // Elegir otro producto o alcanzar una similitud alta deja la revisión pendiente.
     let em: EstadoMatch;
     if (estado === 'descartado') em = 'sin_producto';
-    else if (estado === 'confirmado' || estado === 'reasignado') em = match ? 'listo' : 'sin_producto';
+    else if (estado === 'confirmado') em = match ? 'listo' : 'sin_producto';
     else {
       em = estadoMatch(score, !!match);
       if (em === 'listo' && superaPresupuesto) em = 'revisar';
@@ -216,10 +216,10 @@ export default function CompraAgilDetalle() {
         descripcion: '',
         cantidad: 1,
         unidad: 'UN',
-        estado: (descartado ? 'descartado' : 'reasignado') as const,
+        estado: (descartado ? 'descartado' : ov.accion === 'confirmado' ? 'confirmado' : 'reasignado') as 'descartado' | 'confirmado' | 'reasignado',
         override: ov,
         manual: true,
-        estadoM: (prod ? 'listo' : 'sin_producto') as EstadoMatch,
+        estadoM: estadoMatch(100, !!prod, ov.accion === 'confirmado'),
         match: prod
           ? { inventarioId: prod.id, nombre: prod.nombre_producto, sku: prod.sku, precio: prod.precio_unitario, score: 100, subtotal: prod.precio_unitario }
           : null,
@@ -255,6 +255,7 @@ export default function CompraAgilDetalle() {
         descripcion: f.descripcion,
         cantidadSolicitada: f.cantidad,
         unidadMedida: f.unidad,
+        confirmado: f.estado === 'confirmado',
         match: f.estadoM === 'listo' && f.match
           ? { id: f.match.inventarioId, sku: f.match.sku, nombre: f.match.nombre, precio_unitario: f.match.precio || 0, stock: null, matchScore: f.match.score, margen_estimado: 0 }
           : null,
@@ -272,6 +273,7 @@ export default function CompraAgilDetalle() {
         // Se deja un tope generoso en vez de 1 para no bloquear ofertas reales.
         cantidadSolicitada: 999,
         unidadMedida: f.unidad,
+        confirmado: f.estado === 'confirmado',
         match: { id: f.match.inventarioId, sku: f.match.sku, nombre: f.match.nombre, precio_unitario: f.match.precio || 0, stock: null, matchScore: f.match.score, margen_estimado: 0 },
       })),
   ];

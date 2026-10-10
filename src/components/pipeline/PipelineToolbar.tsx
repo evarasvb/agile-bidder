@@ -183,6 +183,8 @@ export function PipelineToolbar({
           size="sm"
           className="rounded-r-none h-8 px-2.5"
           onClick={() => onViewChange('kanban')}
+          aria-label="Ver postulaciones por etapas"
+          aria-pressed={view === 'kanban'}
         >
           <LayoutGrid className="h-4 w-4" />
         </Button>
@@ -191,6 +193,8 @@ export function PipelineToolbar({
           size="sm"
           className="rounded-none border-x h-8 px-2.5"
           onClick={() => onViewChange('table')}
+          aria-label="Ver postulaciones en tabla"
+          aria-pressed={view === 'table'}
         >
           <Table2 className="h-4 w-4" />
         </Button>
@@ -199,6 +203,7 @@ export function PipelineToolbar({
           size="sm"
           className="rounded-l-none h-8 px-2.5 gap-1.5"
           onClick={() => onViewChange('historico')}
+          aria-pressed={view === 'historico'}
         >
           <History className="h-4 w-4" />
           Histórico

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calcularDesgloseOferta } from './ofertaCalculo';
+import { calcularDesgloseOferta, seleccionarItemsOferta } from './ofertaCalculo';
 
 describe('calcularDesgloseOferta', () => {
   it('calcula subtotal, IVA (19%) y total de una lista simple', () => {
@@ -35,5 +35,22 @@ describe('calcularDesgloseOferta', () => {
   it('total es siempre subtotal + iva', () => {
     const r = calcularDesgloseOferta([{ precioUnitario: 12345, cantidad: 7 }]);
     expect(r.total).toBeCloseTo(r.subtotal + r.iva, 5);
+  });
+});
+
+
+describe('Selección económica de la oferta', () => {
+  it('una línea desmarcada o sin confirmar no llega al total ni al PDF', () => {
+    const items = [
+      { precioUnitario: 1000, cantidad: 2, selected: true, confirmado: true },
+      { precioUnitario: 900000, cantidad: 3, selected: false, confirmado: true },
+      { precioUnitario: 800000, cantidad: 4, selected: true, confirmado: false },
+    ];
+    const incluidos = seleccionarItemsOferta(items);
+    expect(incluidos).toEqual([items[0]]);
+    expect(calcularDesgloseOferta(incluidos).subtotal).toBe(2000);
+  });
+  it.each([0, -1, Infinity, NaN])('no incorpora un precio inválido %s aunque esté confirmado', precioUnitario => {
+    expect(seleccionarItemsOferta([{ precioUnitario, cantidad: 1, selected: true, confirmado: true }])).toEqual([]);
   });
 });

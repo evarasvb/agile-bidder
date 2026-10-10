@@ -53,8 +53,8 @@ export function MatchItemActions({ codigo, itemRef, itemNombre, hasSuggestion, o
 
   const confirmar = () =>
     upsert.mutate(
-      { codigo, itemRef, itemNombre, accion: "confirmado", procesoTipo },
-      { onSuccess: () => toast.success("Match confirmado"), onError: mostrarError }
+      { codigo, itemRef, itemNombre, accion: "confirmado", inventarioId: override?.inventario_id || undefined, scoreManual: override?.score_manual ?? undefined, procesoTipo },
+      { onSuccess: () => toast.success("Producto confirmado por ti"), onError: mostrarError }
     );
 
   const descartar = () =>
@@ -88,8 +88,8 @@ export function MatchItemActions({ codigo, itemRef, itemNombre, hasSuggestion, o
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52">
-          <DropdownMenuItem onClick={confirmar} disabled={!hasSuggestion || override?.accion === "confirmado"}>
-            <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" /> Confirmar match
+          <DropdownMenuItem onClick={confirmar} disabled={(!hasSuggestion && !override?.inventario_id) || override?.accion === "confirmado"}>
+            <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" /> Confirmar especificaciones
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setPickerOpen(true)}>
             <Repeat2 className="h-4 w-4 mr-2 text-firmavb-blue" /> Cambiar producto…

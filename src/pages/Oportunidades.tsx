@@ -8,8 +8,8 @@ function OrigenMatch() {
   if (isLoading) return null;
   const n = inv?.total ?? 0;
   return n > 0
-    ? <p className="text-xs text-muted-foreground">Match calculado con tu inventario ({n.toLocaleString("es-CL")} productos) contra los ítems de cada compra.</p>
-    : <p className="text-xs text-amber-900 font-medium">Sin inventario cargado: el % de match usa tus palabras clave y los ítems publicados. Carga tu inventario para un match por producto.</p>;
+    ? <p className="text-xs text-muted-foreground">Compras ágiles: sugerencias con tu inventario ({n.toLocaleString("es-CL")} productos). Licitaciones: similitud del catálogo general. Revisa especificaciones, stock y bases antes de ofertar.</p>
+    : <p className="text-xs text-amber-900 font-medium">Sin inventario cargado: puedes explorar oportunidades por rubro. Las sugerencias no confirman disponibilidad ni cumplimiento.</p>;
 }
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -124,7 +124,7 @@ function OpportunityCard({
                 (Antes decía "N/A": parecía que el match no funcionaba.) */}
             {op.match_score && op.match_score >= PISO_MATCH ? (
               <Badge className={getScoreColor(op.match_score)}>
-                {op.match_score}% match
+                {op.match_score}% {op.match_basis === "coverage" ? "líneas con sugerencia" : "similitud"}
               </Badge>
             ) : op.rubro_match ? (
               <Badge variant="outline" className="border-firmavb-blue/40 text-firmavb-blue bg-firmavb-blue/5">
@@ -214,7 +214,7 @@ function OpportunityCard({
               // inventario. Es el atajo del panel para decidir dónde postular.
               <span className={`flex items-center gap-1 ${op.items_matched > 0 ? "text-firmavb-blue font-medium" : "text-muted-foreground"}`}>
                 <Package className="h-3 w-3" />
-                {op.items_matched > 0 ? `${op.items_matched}/${op.items_count} ítems calzan` : `${op.items_count} ítems`}
+                {op.items_matched > 0 ? `${op.items_matched}/${op.items_count} ítems con sugerencia` : `${op.items_count} ítems`}
               </span>
             ) : op.items_count > 0 ? (
               <span className="text-muted-foreground flex items-center gap-1">
@@ -387,7 +387,7 @@ export default function Oportunidades() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Oportunidades</h1>
           <p className="text-muted-foreground">
-            Licitaciones y compras ágiles que calzan con tu inventario.
+            Explora oportunidades y valida cuáles puede atender tu empresa.
           </p>
           <OrigenMatch />
         </div>
@@ -410,7 +410,7 @@ export default function Oportunidades() {
               ) : (
                 <p className="text-2xl font-bold">{stats.totalActivas}</p>
               )}
-              <p className="text-xs text-muted-foreground">Matches Activos</p>
+              <p className="text-xs text-muted-foreground">Oportunidades abiertas del mercado</p>
             </div>
           </CardContent>
         </Card>

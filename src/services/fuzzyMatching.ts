@@ -475,24 +475,20 @@ export interface PropuestaItemRow {
   estado: 'auto' | 'confirmado' | 'descartado';
 }
 
-/**
- * Único umbral de match de toda la app: score >= UMBRAL_MATCH = "listo"; por
- * debajo = "revisar". Antes convivían varios cortes (80/50, 75/60, 60) que
- * hacían que un mismo ítem se viera distinto en cada tabla.
- */
+/** Umbral de similitud para sugerencias; nunca acredita cumplimiento. */
 export const UMBRAL_MATCH = 70;
 
 export type EstadoMatch = 'listo' | 'revisar' | 'sin_producto';
 
 /** Estado único de un ítem según su match (sin producto, por revisar o listo). */
-export function estadoMatch(score: number | null | undefined, hayMatch: boolean): EstadoMatch {
+export function estadoMatch(_score: number | null | undefined, hayMatch: boolean, confirmado = false): EstadoMatch {
   if (!hayMatch) return 'sin_producto';
-  return (score ?? 0) >= UMBRAL_MATCH ? 'listo' : 'revisar';
+  return confirmado ? 'listo' : 'revisar';
 }
 
 /**
  * Calcula métricas de cobertura de propuesta.
- * Solo score >= UMBRAL_MATCH cuenta como LISTO; por debajo es "por revisar" y
+ * Solo la confirmación explícita del usuario cuenta como LISTO; sin ella queda "por revisar" y
  * NO cuenta; items descartados NO cuentan.
  */
 export function calculateCoverageMetrics(rows: PropuestaItemRow[]): {
@@ -503,11 +499,10 @@ export function calculateCoverageMetrics(rows: PropuestaItemRow[]): {
   cobertura: number;
   propuestaIncompleta: boolean;
 } {
-  // Un ítem está "listo" si el usuario lo confirmó (su decisión manda) o si el
-  // score automático alcanza el umbral. Por debajo del umbral y sin confirmar
-  // queda "por revisar".
+  // Un ítem está "listo" solo si el usuario lo confirmó; el
+  // score automático nunca acredita cumplimiento. Sin confirmar queda "por revisar".
   const esListo = (f: PropuestaItemRow) =>
-    !!f.match && f.estado !== 'descartado' && (f.estado === 'confirmado' || f.match.score >= UMBRAL_MATCH);
+    !!f.match && f.estado !== 'descartado' && f.estado === 'confirmado';
 
   const itemsConMatchValidado = rows.filter(esListo).length;
   const itemsConMatchDebil = rows.filter(

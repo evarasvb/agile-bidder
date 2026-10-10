@@ -26,3 +26,8 @@ export function calcularDesgloseOferta(items: ItemConPrecio[]): DesgloseOferta {
   const iva = subtotal * IVA_RATE;
   return { subtotal, iva, total: subtotal + iva };
 }
+
+/** Líneas que el usuario incluyó y confirmó; una sugerencia no es una oferta. */
+export function seleccionarItemsOferta<T extends ItemConPrecio & { selected: boolean; confirmado: boolean }>(items: T[]): T[] {
+  return items.filter(item => item.selected && item.confirmado && Number.isFinite(item.precioUnitario) && item.precioUnitario > 0);
+}
