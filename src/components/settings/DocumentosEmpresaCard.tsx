@@ -18,6 +18,14 @@ import {
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useCliente } from '@/hooks/useCliente';
+import {
+  DOCUMENT_COLUMNS,
+  createDocumentOperationGuard,
+  deleteEmpresaDocument,
+  documentFileFingerprint,
+  saveEmpresaDocument,
+  type EmpresaDocument as Doc,
+} from '@/lib/documentosEmpresa';
 
 const TIPOS: { tipo: string; nombre: string; obligatorio: boolean; ayuda: string }[] = [
   { tipo: 'carpeta_tributaria', nombre: 'Carpeta tributaria', obligatorio: true, ayuda: 'PDF del SII, vigente (menos de 60 días).' },
@@ -27,7 +35,6 @@ const TIPOS: { tipo: string; nombre: string; obligatorio: boolean; ayuda: string
   { tipo: 'registro_proveedores', nombre: 'Certificado Registro de Proveedores', obligatorio: false, ayuda: 'Opcional: acredita habilidad en Mercado Público.' },
 ];
 
-interface Doc { id: string; tipo: string; nombre: string; archivo_url: string; created_at: string }
 interface ChecklistItem { item: string; obligatorio: boolean; listo: boolean }
 
 /**
@@ -38,48 +45,107 @@ export function DocumentosEmpresaCard() {
   const { data: cliente } = useCliente();
   const qc = useQueryClient();
   const [subiendo, setSubiendo] = useState<string | null>(null);
+  const operationGuard = useRef(createDocumentOperationGuard());
   const inputs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  const { data: docs = [] } = useQuery({
+  const { data: docs = [], isLoading, isError } = useQuery({
     queryKey: ['cliente_documentos', cliente?.id],
     enabled: !!cliente?.id,
-    queryFn: async () => ((await supabase.from('cliente_documentos').select('id, tipo, nombre, archivo_url, created_at').eq('cliente_id', cliente!.id).order('created_at', { ascending: false })).data ?? []) as Doc[],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('cliente_documentos').select(DOCUMENT_COLUMNS)
+        .eq('cliente_id', cliente!.id).order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as Doc[];
+    },
   });
   const { data: checklist = [] } = useQuery({
-    queryKey: ['experto_plus_checklist', cliente?.id, docs.length],
+    queryKey: ['experto_plus_checklist', cliente?.id],
     enabled: !!cliente?.id,
-    queryFn: async () => ((await supabase.rpc('experto_plus_checklist')).data ?? []) as ChecklistItem[],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('experto_plus_checklist');
+      if (error) throw error;
+      return (data ?? []) as ChecklistItem[];
+    },
   });
   const obligatorios = checklist.filter((c) => c.obligatorio);
   const listos = obligatorios.filter((c) => c.listo).length;
   const faltanDatos = checklist.filter((c) => c.obligatorio && !c.listo && !TIPOS.some((t) => t.tipo === c.item)).map((c) => c.item.replace(/_/g, ' '));
+  const disabled = !!subiendo || isLoading || isError || !cliente?.id;
+
+  const refreshDocuments = async (clienteId: string) => {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ['cliente_documentos', clienteId], exact: true }, { throwOnError: true }),
+      qc.invalidateQueries({ queryKey: ['experto_plus_checklist', clienteId], exact: true }, { throwOnError: true }),
+    ]);
+  };
 
   const subir = async (tipo: string, file: File) => {
     if (!cliente?.id || !cliente.user_id) return;
     if (file.size > 20 * 1024 * 1024) { toast.error('Máximo 20 MB'); return; }
-    setSubiendo(tipo);
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'pdf';
-    const path = `${cliente.user_id}/${tipo}_${Date.now()}.${ext}`;
-    const up = await supabase.storage.from('documentos-empresa').upload(path, file, { contentType: file.type || 'application/pdf' });
-    if (up.error) { setSubiendo(null); toast.error('No se pudo subir: ' + up.error.message); return; }
-    const anterior = docs.find((d) => d.tipo === tipo);
-    if (anterior) {
-      await supabase.storage.from('documentos-empresa').remove([anterior.archivo_url]);
-      await supabase.from('cliente_documentos').delete().eq('id', anterior.id);
+    const clienteId = cliente.id;
+    const scope = `${clienteId}:${tipo}`;
+    const fingerprint = documentFileFingerprint(file);
+    const started = operationGuard.current.tryStart(scope, fingerprint);
+    if (started !== 'started') {
+      toast.info(started === 'repeated' ? 'Este archivo ya se guardó.' : 'Espera a que termine la operación actual.');
+      return;
     }
-    const ins = await supabase.from('cliente_documentos').insert({ cliente_id: cliente.id, tipo, nombre: file.name, archivo_url: path, descripcion: TIPOS.find((t) => t.tipo === tipo)?.nombre ?? tipo });
-    setSubiendo(null);
-    if (ins.error) { toast.error('No se pudo registrar: ' + ins.error.message); return; }
-    toast.success('Documento guardado');
-    qc.invalidateQueries({ queryKey: ['cliente_documentos'] });
+    setSubiendo(tipo);
+    let completed = false;
+    try {
+      await qc.cancelQueries({ queryKey: ['cliente_documentos', clienteId], exact: true });
+      const result = await saveEmpresaDocument(supabase, {
+        clienteId, userId: cliente.user_id, tipo, file,
+        descripcion: TIPOS.find((t) => t.tipo === tipo)?.nombre ?? tipo,
+      });
+      completed = result.ok;
+      if (result.ok === true) {
+        const document = result.document;
+        qc.setQueryData<Doc[]>(['cliente_documentos', clienteId], (current = []) =>
+          [document, ...current.filter((d) => d.id !== document.id)]);
+        toast.success('Documento guardado');
+      } else {
+        toast.error(result.message);
+      }
+      if (result.warning) toast.warning(result.warning);
+      await refreshDocuments(clienteId);
+    } catch {
+      toast.error(completed ? 'Documento guardado. No se pudo actualizar la lista; recarga la página.' : 'No se pudo completar la operación. Actualiza la lista antes de reintentar.');
+    } finally {
+      operationGuard.current.finish(scope, fingerprint, completed);
+      setSubiendo(null);
+    }
   };
 
   const borrar = async (d: Doc) => {
-    const { error: eStorage } = await supabase.storage.from('documentos-empresa').remove([d.archivo_url]);
-    const { error: eDb } = await supabase.from('cliente_documentos').delete().eq('id', d.id);
-    if (eStorage || eDb) { toast.error('No se pudo eliminar el documento. Reintenta.'); return; }
-    toast.success('Documento eliminado');
-    qc.invalidateQueries({ queryKey: ['cliente_documentos'] });
+    if (!cliente?.id) return;
+    const clienteId = cliente.id;
+    const scope = `${clienteId}:${d.tipo}`;
+    if (operationGuard.current.tryStart(scope) !== 'started') {
+      toast.info('Espera a que termine la operación actual.');
+      return;
+    }
+    setSubiendo(d.tipo);
+    let completed = false;
+    try {
+      await qc.cancelQueries({ queryKey: ['cliente_documentos', clienteId], exact: true });
+      const result = await deleteEmpresaDocument(supabase, clienteId, d);
+      completed = result.ok;
+      if (result.ok === true) {
+        qc.setQueryData<Doc[]>(['cliente_documentos', clienteId], (current = []) => current.filter((doc) => doc.id !== d.id));
+        if (result.warning) toast.info('Documento retirado de la lista');
+        else toast.success('Documento eliminado');
+      } else {
+        toast.error(result.message);
+      }
+      if (result.warning) toast.warning(result.warning);
+      await refreshDocuments(clienteId);
+    } catch {
+      toast.error(completed ? 'Documento retirado de la lista. No se pudo actualizar la lista; recarga la página.' : 'No se pudo completar la operación. Actualiza la lista antes de reintentar.');
+    } finally {
+      operationGuard.current.finish(scope, undefined, completed);
+      setSubiendo(null);
+    }
   };
 
   const abrir = async (d: Doc) => {
@@ -110,6 +176,7 @@ export function DocumentosEmpresaCard() {
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
+        {isError && <p role="alert" className="text-sm text-destructive">No se pudo cargar la lista de documentos. Recarga la página antes de realizar cambios.</p>}
         {faltanDatos.length > 0 && (
           <p className="text-sm text-yellow-800 bg-yellow-50 border border-yellow-200 rounded-md px-3 py-2">
             Falta completar en la ficha de arriba: {faltanDatos.join(', ')}.
@@ -124,13 +191,13 @@ export function DocumentosEmpresaCard() {
                 <p className="font-medium">{t.nombre}{!t.obligatorio && <span className="text-xs text-muted-foreground"> · opcional</span>}</p>
                 <p className="text-xs text-muted-foreground truncate">{d ? `${d.nombre} · ${new Date(d.created_at).toLocaleDateString('es-CL')}` : t.ayuda}</p>
               </div>
-              <input type="file" accept="application/pdf,image/jpeg,image/png" className="hidden" ref={(el) => { inputs.current[t.tipo] = el; }}
+              <input type="file" accept="application/pdf,image/jpeg,image/png" disabled={disabled} className="hidden" ref={(el) => { inputs.current[t.tipo] = el; }}
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) subir(t.tipo, f); e.target.value = ''; }} />
               {d && <Button variant="ghost" size="sm" onClick={() => abrir(d)}>Ver</Button>}
               <Button
                 variant={d ? 'ghost' : 'outline'}
                 size="sm"
-                disabled={subiendo === t.tipo}
+                disabled={disabled}
                 onClick={() => inputs.current[t.tipo]?.click()}
                 aria-label={d ? `Reemplazar ${t.nombre}` : `Subir ${t.nombre}`}
               >
@@ -140,7 +207,7 @@ export function DocumentosEmpresaCard() {
               {d && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Eliminar ${t.nombre}`}><Trash2 className="h-4 w-4" aria-hidden="true" /></Button>
+                    <Button variant="ghost" size="icon" disabled={disabled} className="h-8 w-8" aria-label={`Eliminar ${t.nombre}`}><Trash2 className="h-4 w-4" aria-hidden="true" /></Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
@@ -151,7 +218,7 @@ export function DocumentosEmpresaCard() {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => borrar(d)}>Eliminar</AlertDialogAction>
+                      <AlertDialogAction disabled={disabled} onClick={() => borrar(d)}>Eliminar</AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
