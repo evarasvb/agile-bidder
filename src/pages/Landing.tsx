@@ -231,37 +231,30 @@ export default function Landing() {
       {/* Comodín telefónico: primera pregunta al Experto */}
       <ExpertoComodin />
 
-      {/* Banner Validador CM2239 */}
-<section className="py-10 px-6">
-<div className="max-w-4xl mx-auto">
-<Card className="p-8 bg-gradient-to-br from-firmavb-blue/10 to-transparent border-firmavb-blue/30 shadow-md">
-<div className="flex flex-col md:flex-row items-center justify-between gap-6">
-<div>
-<Badge className="mb-3 bg-firmavb-blue/10 text-firmavb-blue border-firmavb-blue/20">
-<Shield className="h-3 w-3 mr-1" />
-Convenio Marco CM 2239-2-LR26
-</Badge>
-<h2 className="text-xl md:text-2xl font-bold text-foreground mb-2">
-Puedes postular al Convenio Marco de Software y Servicios TI?
-</h2>
-<p className="text-muted-foreground">
-Valida en 2 minutos si tu empresa cumple los requisitos de admisibilidad y que puntaje tecnico podrias alcanzar.
-</p>
-</div>
-<Button
-size="lg"
-asChild
-className="bg-firmavb-blue hover:bg-firmavb-blue/90 shadow-lg shadow-firmavb-blue/25 text-base h-12 px-8 whitespace-nowrap transition-all hover:scale-105 active:scale-95"
->
-<a href="/validador-cm2239.html">
-Validar Admisibilidad Gratis
-<ArrowRight className="ml-2 h-5 w-5" />
-</a>
-</Button>
-</div>
-</Card>
-</div>
-</section>
+      {/* Convocatoria destacada: recepción de ofertas de Ferretería */}
+      <section className="py-10 px-4 sm:px-6">
+        <div className="max-w-4xl mx-auto">
+          <Card className="p-5 sm:p-8 bg-gradient-to-br from-firmavb-blue/10 to-transparent border-firmavb-blue/30 shadow-md">
+            <Badge className="mb-3 whitespace-normal bg-firmavb-blue/10 text-firmavb-blue border-firmavb-blue/20">
+              <Shield className="h-3 w-3 mr-1 shrink-0" />
+              Convocatoria destacada · 2239-5-LR26
+            </Badge>
+            <h2 className="text-xl md:text-2xl font-bold text-foreground mb-2">
+              Nuevo Convenio Marco de Productos y Servicios de Ferretería
+            </h2>
+            <p className="text-muted-foreground mb-5">
+              Recepción de ofertas hasta el 13 de octubre de 2026 a las 15:00 horas, según Mercado Público.
+              Revisa las bases y los requisitos en la fuente oficial.
+            </p>
+            <Button size="lg" asChild className="w-full sm:w-auto h-auto min-h-12 whitespace-normal bg-firmavb-blue hover:bg-firmavb-blue/90">
+              <a href="https://www.chilecompra.cl/2026/10/oferta-en-la-licitacion-para-el-nuevo-convenio-marco-de-productos-de-ferreteria-y-servicios/" target="_blank" rel="noopener noreferrer">
+                Ver convocatoria de Ferretería
+                <ArrowRight className="ml-2 h-5 w-5 shrink-0" />
+              </a>
+            </Button>
+          </Card>
+        </div>
+      </section>
 
 {/* Invitación a la Academia FirmaVB */}
       <section className="py-10 px-6">
