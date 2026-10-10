@@ -1,6 +1,7 @@
+import evaristoPortrait from "../../assets/evaristo-retrato.jpg";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Sparkles, Send, X, ImagePlus, Loader2, Bot, MessageCircle, LifeBuoy, CheckCircle2, Zap, XCircle, Clock, Mic, Square } from "lucide-react";
+import { Send, X, ImagePlus, Loader2, MessageCircle, LifeBuoy, CheckCircle2, Zap, XCircle, Clock, Mic, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
@@ -628,7 +629,7 @@ export function EvaristoChat() {
           aria-label="Abrir ayuda de Don Evaristo"
         >
           <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/15">
-            <Sparkles className="h-5 w-5" />
+            <img src={evaristoPortrait} alt="Avatar de Don Evaristo" className="h-8 w-8 rounded-full object-cover object-[50%_35%]" />
             <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-firmavb-green ring-2 ring-firmavb-blue" />
           </span>
           <span className="text-sm font-semibold hidden sm:block">Don Evaristo · ¿Te ayudo?</span>
@@ -641,11 +642,11 @@ export function EvaristoChat() {
           {/* Header */}
           <div className="flex items-center justify-between gap-2 px-4 py-3 bg-gradient-to-r from-firmavb-blue to-indigo-700 text-white">
             <div className="flex items-center gap-2.5">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15"><Bot className="h-5 w-5" /></span>
+              <img src={evaristoPortrait} alt="Avatar de Don Evaristo" className="h-9 w-9 shrink-0 rounded-full object-cover object-[50%_35%] ring-1 ring-white/25" />
               <div className="leading-tight">
                 <p className="font-semibold text-sm">Don Evaristo</p>
                 <p className="text-[11px] text-white/80 flex items-center gap-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-firmavb-green inline-block" /> {conversation.activeCode ? `Proceso: ${conversation.activeCode}` : "Experto en Mercado Público · firmavb"}
+                  <span className="h-1.5 w-1.5 rounded-full bg-firmavb-green inline-block" /> {conversation.activeCode ? `IA · Proceso: ${conversation.activeCode}` : "Asistente IA · Mercado Público"}
                 </p>
               </div>
             </div>
@@ -669,7 +670,7 @@ export function EvaristoChat() {
             {msgs.map((m, i) => (
               <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                 {m.role === "assistant" && (
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-firmavb-blue/10 text-firmavb-blue mr-2 mt-0.5"><Sparkles className="h-4 w-4" /></span>
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-firmavb-blue/10 text-firmavb-blue mr-2 mt-0.5"><img src={evaristoPortrait} alt="" className="h-7 w-7 rounded-full object-cover object-[50%_35%]" /></span>
                 )}
                 <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${
                   m.role === "user" ? "bg-firmavb-blue text-white rounded-br-sm" : "bg-card border border-border/60 rounded-bl-sm"
@@ -683,7 +684,7 @@ export function EvaristoChat() {
             ))}
             {(loading || !historyReady) && (
               <div className="flex justify-start">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-firmavb-blue/10 text-firmavb-blue mr-2"><Sparkles className="h-4 w-4" /></span>
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-firmavb-blue/10 text-firmavb-blue mr-2"><img src={evaristoPortrait} alt="" className="h-7 w-7 rounded-full object-cover object-[50%_35%]" /></span>
                 <div className="bg-card border border-border/60 rounded-2xl rounded-bl-sm px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" /> {historyReady ? "Don Evaristo está escribiendo…" : "Recuperando tu conversación…"}
                 </div>
