@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { mensajeErrorIA } from '@/lib/errorAmigableIA';
 
 // ============================================================================
 // TYPES
@@ -223,7 +224,7 @@ export function useSendChatMessage(licitacionId: string) {
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `Error ${response.status}`);
+        throw Object.assign(new Error(errData.error || errData.mensaje || `Error ${response.status}`), { status: response.status });
       }
 
       return response.json();
@@ -232,7 +233,7 @@ export function useSendChatMessage(licitacionId: string) {
       queryClient.invalidateQueries({ queryKey: ['chat-licitacion', licitacionId] });
     },
     onError: (error) => {
-      toast.error(`Error: ${error instanceof Error ? error.message : 'Error al enviar mensaje'}`);
+      toast.error(mensajeErrorIA(error));
     },
   });
 }

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { dentroDelLimiteIA } from "../_shared/limiteIA.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -93,6 +94,13 @@ serve(async (req) => {
   const { userId } = authResult;
   console.log(`Authenticated user: ${userId}`);
 
+  if (!(await dentroDelLimiteIA(userId, 'matching-ai', 30))) {
+    return new Response(
+      JSON.stringify({ error: 'cupo_alcanzado', mensaje: 'Hiciste muchos análisis de matching en poco tiempo. Espera unos minutos e intenta de nuevo.', results: [] }),
+      { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
   try {
     const { licitaciones, inventario }: MatchingRequest = await req.json();
     
@@ -104,7 +112,14 @@ serve(async (req) => {
     }
     // Endpoint compatible con OpenAI de Google Gemini (soporta tool-calling).
     const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
-    const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-3.6-flash";
+    // Varios modelos candidatos: antes había uno solo hardcodeado, así que una
+    // falla o baja de Gemini (modelo deprecado, 5xx) tumbaba el matching entero.
+    const MODELOS_CANDIDATOS = [
+      Deno.env.get("GEMINI_MODEL") || "",
+      "gemini-3.6-flash",
+      "gemini-2.0-flash",
+      "gemini-flash-latest",
+    ].filter((m, i, arr) => m && arr.indexOf(m) === i);
 
     const results: MatchResult[] = [];
 
@@ -140,18 +155,11 @@ Analiza semánticamente qué productos del inventario coinciden con lo solicitad
 Considera sinónimos, variaciones y productos relacionados.
 Responde usando la función proporcionada.`;
 
-      const response = await fetch(GEMINI_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${GEMINI_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: GEMINI_MODEL,
-          messages: [
-            { 
-              role: "system", 
-              content: `Eres un experto en licitaciones públicas chilenas y análisis de compatibilidad de productos.
+      const cuerpoBase = {
+        messages: [
+          {
+            role: "system",
+            content: `Eres un experto en licitaciones públicas chilenas y análisis de compatibilidad de productos.
 Tu trabajo es determinar qué productos de un inventario pueden satisfacer los requerimientos de una licitación.
 Debes considerar:
 1. Coincidencias exactas de productos
@@ -160,104 +168,119 @@ Debes considerar:
 4. Análisis semántico del texto (sinónimos, variaciones)
 5. Capacidad de stock para cumplir la demanda
 
-Sé riguroso pero no descartes productos que podrían servir con pequeñas variaciones.` 
-            },
-            { role: "user", content: prompt }
-          ],
-          tools: [
-            {
-              type: "function",
-              function: {
-                name: "reportar_match",
-                description: "Reporta el resultado del análisis de compatibilidad entre inventario y licitación",
-                parameters: {
-                  type: "object",
-                  properties: {
-                    match_score: { 
-                      type: "number", 
-                      description: "Porcentaje de compatibilidad general (0-100). 80+ es alta, 50-79 es media, menos de 50 es baja" 
-                    },
-                    productos_match: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          producto_id: { type: "string", description: "ID del producto del inventario" },
-                          sku: { type: "string", description: "SKU del producto" },
-                          nombre: { type: "string", description: "Nombre del producto" },
-                          score: { type: "number", description: "Score de match específico para este producto (0-100)" },
-                          razon: { type: "string", description: "Razón breve de por qué este producto hace match" }
-                        },
-                        required: ["producto_id", "sku", "nombre", "score", "razon"]
-                      },
-                      description: "Lista de productos que coinciden con la licitación"
-                    },
-                    razon_general: { 
-                      type: "string", 
-                      description: "Explicación general de por qué hay o no hay match" 
-                    },
-                    recomendacion: {
-                      type: "string",
-                      enum: ["ofertar", "revisar", "descartar"],
-                      description: "Recomendación: 'ofertar' (score >= 70), 'revisar' (score 40-69), 'descartar' (score < 40)"
-                    }
+Sé riguroso pero no descartes productos que podrían servir con pequeñas variaciones.`
+          },
+          { role: "user", content: prompt }
+        ],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "reportar_match",
+              description: "Reporta el resultado del análisis de compatibilidad entre inventario y licitación",
+              parameters: {
+                type: "object",
+                properties: {
+                  match_score: {
+                    type: "number",
+                    description: "Porcentaje de compatibilidad general (0-100). 80+ es alta, 50-79 es media, menos de 50 es baja"
                   },
-                  required: ["match_score", "productos_match", "razon_general", "recomendacion"],
-                  additionalProperties: false
-                }
+                  productos_match: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        producto_id: { type: "string", description: "ID del producto del inventario" },
+                        sku: { type: "string", description: "SKU del producto" },
+                        nombre: { type: "string", description: "Nombre del producto" },
+                        score: { type: "number", description: "Score de match específico para este producto (0-100)" },
+                        razon: { type: "string", description: "Razón breve de por qué este producto hace match" }
+                      },
+                      required: ["producto_id", "sku", "nombre", "score", "razon"]
+                    },
+                    description: "Lista de productos que coinciden con la licitación"
+                  },
+                  razon_general: {
+                    type: "string",
+                    description: "Explicación general de por qué hay o no hay match"
+                  },
+                  recomendacion: {
+                    type: "string",
+                    enum: ["ofertar", "revisar", "descartar"],
+                    description: "Recomendación: 'ofertar' (score >= 70), 'revisar' (score 40-69), 'descartar' (score < 40)"
+                  }
+                },
+                required: ["match_score", "productos_match", "razon_general", "recomendacion"],
+                additionalProperties: false
               }
             }
-          ],
-          tool_choice: { type: "function", function: { name: "reportar_match" } }
-        }),
-      });
+          }
+        ],
+        tool_choice: { type: "function", function: { name: "reportar_match" } }
+      };
 
-      if (!response.ok) {
-        if (response.status === 429) {
-          console.error("Rate limit exceeded");
-          // Continuar con score 0 para esta licitación
-          results.push({
-            licitacion_id: licitacion.id_licitacion,
-            match_score: 0,
-            productos_match: [],
-            razon_general: "Error de rate limit - reintentar más tarde",
-            recomendacion: 'revisar'
+      // Prueba cada modelo candidato en orden hasta que uno responda bien.
+      // Antes había un solo modelo hardcodeado: cualquier falla de Gemini
+      // tumbaba el matching completo en vez de degradar con un respaldo.
+      let resultadoItem: MatchResult | null = null;
+      let errorFatal: string | null = null;
+      for (const modelo of MODELOS_CANDIDATOS) {
+        let response: Response;
+        try {
+          response = await fetch(GEMINI_URL, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${GEMINI_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ model: modelo, ...cuerpoBase }),
           });
-          continue;
+        } catch (e) {
+          console.error(`Gemini fetch error (modelo ${modelo}):`, String(e));
+          continue; // probamos el siguiente modelo
         }
-        if (response.status === 402 || response.status === 403) {
-          console.error("Gemini API auth/quota error");
-          throw new Error("Error de autenticación o cuota con la API de Gemini");
+
+        if (!response.ok) {
+          if (response.status === 402 || response.status === 403) {
+            console.error("Gemini API auth/quota error");
+            errorFatal = "Error de autenticación o cuota con la API de Gemini";
+            break; // no tiene sentido probar otro modelo, es la cuenta/API key
+          }
+          const errorText = await response.text();
+          console.error(`Gemini API error (modelo ${modelo}):`, response.status, errorText);
+          continue; // 429/5xx/etc: probamos el siguiente modelo
         }
-        const errorText = await response.text();
-        console.error("Gemini API error:", response.status, errorText);
-        continue;
+
+        const data = await response.json();
+        const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+        if (toolCall?.function?.arguments) {
+          try {
+            const result = JSON.parse(toolCall.function.arguments);
+            resultadoItem = {
+              licitacion_id: licitacion.id_licitacion,
+              match_score: result.match_score,
+              productos_match: result.productos_match || [],
+              razon_general: result.razon_general,
+              recomendacion: result.recomendacion
+            };
+            break;
+          } catch (e) {
+            console.error(`No se pudo parsear la respuesta (modelo ${modelo}):`, String(e));
+            continue;
+          }
+        }
+        // Respuesta OK pero sin tool call útil: probamos el siguiente modelo.
       }
 
-      const data = await response.json();
-      console.log("AI Response for", licitacion.id_licitacion, ":", JSON.stringify(data));
+      if (errorFatal) throw new Error(errorFatal);
 
-      // Extract tool call result
-      const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-      if (toolCall?.function?.arguments) {
-        const result = JSON.parse(toolCall.function.arguments);
-        results.push({
-          licitacion_id: licitacion.id_licitacion,
-          match_score: result.match_score,
-          productos_match: result.productos_match || [],
-          razon_general: result.razon_general,
-          recomendacion: result.recomendacion
-        });
-      } else {
-        // Fallback si no hay tool call
-        results.push({
-          licitacion_id: licitacion.id_licitacion,
-          match_score: 0,
-          productos_match: [],
-          razon_general: "No se pudo analizar - respuesta IA inválida",
-          recomendacion: 'revisar'
-        });
-      }
+      results.push(resultadoItem || {
+        licitacion_id: licitacion.id_licitacion,
+        match_score: 0,
+        productos_match: [],
+        razon_general: "No se pudo analizar con ningún modelo de IA disponible",
+        recomendacion: 'revisar'
+      });
     }
 
     console.log(`Matching completado. ${results.filter(r => r.match_score >= 50).length} de ${results.length} con match`);

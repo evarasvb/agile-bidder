@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { dentroDelLimiteIA } from "../_shared/limiteIA.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -86,7 +87,6 @@ async function generarFichasConIA(productos: ProductoInput[]): Promise<FichaProd
     'gemini-3.6-flash',
     'gemini-2.0-flash',
     'gemini-flash-latest',
-    'gemini-3.6-flash',
   ].filter(Boolean);
 
   const systemPrompt = `Eres un ingeniero de producto que redacta FICHAS TÉCNICAS para ofertas en Mercado Público (Chile).
@@ -150,6 +150,13 @@ serve(async (req) => {
 
   const authResult = await verifyAuth(req);
   if (authResult instanceof Response) return authResult;
+
+  if (!(await dentroDelLimiteIA(authResult.userId, 'ficha-tecnica-ia', 20))) {
+    return new Response(
+      JSON.stringify({ error: 'cupo_alcanzado', mensaje: 'Generaste muchas fichas en poco tiempo. Espera unos minutos e intenta de nuevo.' }),
+      { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
 
   try {
     const body = await req.json() as { productos?: ProductoInput[] };

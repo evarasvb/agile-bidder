@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useCliente } from '@/hooks/useCliente';
 import { toast } from 'sonner';
 import { descargarCartaAbogadoPDF } from '@/services/cartaAbogadoPdf';
+import { mensajeErrorIA } from '@/lib/errorAmigableIA';
 
 const SUPA = import.meta.env.VITE_SUPABASE_URL as string;
 const ANON = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
@@ -110,7 +111,7 @@ export default function Abogado() {
         setMsgs((m) => { const c = [...m]; c[c.length - 1] = { rol: 'exp', texto: t, fuentes: meta?.fuentes }; return c; }));
     } catch (e: any) {
       if (e.status === 402 || e.status === 401) setLimite(e.message);
-      setMsgs((m) => { const c = [...m]; c[c.length - 1] = { rol: 'exp', texto: (e.status === 402 ? '' : 'No pude responder: ') + e.message }; return c; });
+      setMsgs((m) => { const c = [...m]; c[c.length - 1] = { rol: 'exp', texto: e.status === 402 ? '' : `No pude responder: ${mensajeErrorIA(e)}` }; return c; });
     }
     setEnviando(false);
   };
@@ -149,7 +150,7 @@ export default function Abogado() {
         } : {}),
       }, (t, meta) => { setDocumento(t); if (meta?.calculo_mora) setCalculoMora(meta.calculo_mora); });
     } catch (e: any) {
-      toast.error(e.message, e.status === 402 ? { action: { label: 'Ver planes', onClick: () => navigate('/cuenta') } } : undefined);
+      toast.error(mensajeErrorIA(e), e.status === 402 ? { action: { label: 'Ver planes', onClick: () => navigate('/cuenta') } } : undefined);
     }
     setGenerando(false);
   };

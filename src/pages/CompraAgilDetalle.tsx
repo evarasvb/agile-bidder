@@ -279,7 +279,7 @@ export default function CompraAgilDetalle() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 flex-wrap">
         <Button variant="ghost" size="icon" onClick={() => navigate('/compras-agiles')} aria-label="Volver a compras ágiles">
           <ArrowLeft className="h-5 w-5" aria-hidden="true" />
         </Button>

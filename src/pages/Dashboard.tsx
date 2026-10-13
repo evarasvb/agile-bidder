@@ -84,10 +84,18 @@ export default function Dashboard() {
     error: kpisError,
     refetch: refetchKPIs,
   } = useDashboardKPIs();
-  const { data: pipelineData, isLoading: pipelineLoading } =
-    usePipelineByStage();
-  const { data: porTipoData, isLoading: porTipoLoading } =
-    useOportunidadesPorTipo();
+  const {
+    data: pipelineData,
+    isLoading: pipelineLoading,
+    error: pipelineError,
+    refetch: refetchPipeline,
+  } = usePipelineByStage();
+  const {
+    data: porTipoData,
+    isLoading: porTipoLoading,
+    error: porTipoError,
+    refetch: refetchPorTipo,
+  } = useOportunidadesPorTipo();
   const { data: noticiasData, isLoading: noticiasLoading } =
     useNoticiasInstituciones();
   // "Buscar oportunidades para mí": corre el match del PROPIO cliente y lleva a
@@ -232,7 +240,15 @@ export default function Dashboard() {
               </p>
             </CardHeader>
             <CardContent>
-              {!pipelineData?.length ? (
+              {pipelineError ? (
+                <div className="h-[280px] flex flex-col items-center justify-center text-muted-foreground gap-2">
+                  <AlertTriangle className="h-10 w-10 mb-1 opacity-50 text-firmavb-red" />
+                  <p className="text-sm">No pudimos cargar esto</p>
+                  <Button variant="outline" size="sm" onClick={() => refetchPipeline()}>
+                    Reintentar
+                  </Button>
+                </div>
+              ) : !pipelineData?.length ? (
                 <div className="h-[280px] flex flex-col items-center justify-center text-muted-foreground">
                   <Inbox className="h-10 w-10 mb-3 opacity-50" />
                   <p className="text-sm">Sin datos de pipeline</p>
@@ -319,7 +335,15 @@ export default function Dashboard() {
               </p>
             </CardHeader>
             <CardContent>
-              {!porTipoData?.length ||
+              {porTipoError ? (
+                <div className="h-[280px] flex flex-col items-center justify-center text-muted-foreground gap-2">
+                  <AlertTriangle className="h-10 w-10 mb-1 opacity-50 text-firmavb-red" />
+                  <p className="text-sm">No pudimos cargar esto</p>
+                  <Button variant="outline" size="sm" onClick={() => refetchPorTipo()}>
+                    Reintentar
+                  </Button>
+                </div>
+              ) : !porTipoData?.length ||
               porTipoData.every((d) => d.count === 0) ? (
                 <div className="h-[280px] flex flex-col items-center justify-center text-muted-foreground">
                   <Inbox className="h-10 w-10 mb-3 opacity-50" />
