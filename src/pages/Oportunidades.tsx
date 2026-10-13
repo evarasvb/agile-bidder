@@ -2,14 +2,14 @@ import { useState, useEffect } from "react";
 import { montoCorto } from "@/lib/formatoMonto";
 import { useInventoryStats } from "@/hooks/useInventory";
 
-// De dónde sale el % de match, para que nunca parezca magia: inventario (por producto) o palabras clave.
+// Las palabras encuentran oportunidades; el inventario identifica ítems compatibles.
 function OrigenMatch() {
   const { data: inv, isLoading } = useInventoryStats();
   if (isLoading) return null;
   const n = inv?.total ?? 0;
   return n > 0
     ? <p className="text-xs text-muted-foreground">Match calculado con tu inventario ({n.toLocaleString("es-CL")} productos) contra los ítems de cada compra.</p>
-    : <p className="text-xs text-amber-900 font-medium">Sin inventario cargado: el % de match usa tus palabras clave y los ítems publicados. Carga tu inventario para un match por producto.</p>;
+    : <p className="text-xs text-amber-900 font-medium">Tus palabras clave encuentran oportunidades. Carga tu inventario para identificar los productos compatibles.</p>;
 }
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,7 +52,6 @@ import {
 import { useRegistrarSenal } from "@/hooks/useSenales";
 import { useClienteFiltros } from "@/hooks/useClienteFiltros";
 import { presupuestoTexto } from "@/lib/organismoPago";
-import { PISO_MATCH } from "@/hooks/useOportunidadesPanel";
 import { format, differenceInDays, differenceInHours } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -122,11 +121,14 @@ function OpportunityCard({
             {/* La tarjeta dice POR QUÉ está aquí: % si calza con tu inventario,
                 "Tu rubro" si coincide con tus palabras clave del onboarding.
                 (Antes decía "N/A": parecía que el match no funcionaba.) */}
-            {op.match_score && op.match_score >= PISO_MATCH ? (
+            {op.match_score != null ? (
               <Badge className={getScoreColor(op.match_score)}>
-                {op.match_score}% match
+                {op.match_score}% de ítems compatibles
               </Badge>
-            ) : op.rubro_match ? (
+            ) : op.match_similarity != null ? (
+              <Badge variant="secondary">{op.match_similarity}% similitud de producto</Badge>
+            ) : null}
+            {op.rubro_match ? (
               <Badge variant="outline" className="border-firmavb-blue/40 text-firmavb-blue bg-firmavb-blue/5">
                 {op.rubro_palabra ? `Tu rubro: ${op.rubro_palabra}` : "Tu rubro ✓"}
               </Badge>
@@ -209,17 +211,12 @@ function OpportunityCard({
                 {presupuestoTexto(op.monto, op.codigo)}
               </span>
             )}
-            {op.tipo === "compra_agil" && op.items_count > 0 ? (
+            {op.items_count > 0 ? (
               // Cobertura producto-a-producto: cuántos ítems pedidos calzan con tu
               // inventario. Es el atajo del panel para decidir dónde postular.
               <span className={`flex items-center gap-1 ${op.items_matched > 0 ? "text-firmavb-blue font-medium" : "text-muted-foreground"}`}>
                 <Package className="h-3 w-3" />
                 {op.items_matched > 0 ? `${op.items_matched}/${op.items_count} ítems calzan` : `${op.items_count} ítems`}
-              </span>
-            ) : op.items_count > 0 ? (
-              <span className="text-muted-foreground flex items-center gap-1">
-                <Package className="h-3 w-3" />
-                {op.items_count} items
               </span>
             ) : null}
           </div>
@@ -387,7 +384,7 @@ export default function Oportunidades() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Oportunidades</h1>
           <p className="text-muted-foreground">
-            Licitaciones y compras ágiles que calzan con tu inventario.
+            Encuentra oportunidades por palabras clave y revisa productos compatibles con tu inventario.
           </p>
           <OrigenMatch />
         </div>

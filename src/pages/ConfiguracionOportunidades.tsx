@@ -89,7 +89,7 @@ export default function ConfiguracionOportunidades() {
     // Si alguien escribió "google , licencia" en un solo chip, se separa.
     const incluirGuardado = separarPalabras((filtros?.palabras_incluir || []).join(','));
     const delOnboarding = (cliente?.palabras_clave_busqueda as string[] | undefined) || [];
-    setPalabrasIncluir(incluirGuardado.length ? incluirGuardado : delOnboarding);
+    setPalabrasIncluir(filtros?.palabras_incluir != null ? incluirGuardado : delOnboarding);
     if (filtros) {
       setPalabrasExcluir(filtros.palabras_excluir || []);
       setRegionesActivas(filtros.regiones_activas || []);
@@ -171,7 +171,7 @@ export default function ConfiguracionOportunidades() {
 
   const handleSave = () => {
     updateFiltros({
-      palabras_incluir: palabrasIncluir.length > 0 ? palabrasIncluir : null,
+      palabras_incluir: palabrasIncluir,
       palabras_excluir: palabrasExcluir.length > 0 ? palabrasExcluir : null,
       regiones_activas: regionesActivas.length > 0 ? regionesActivas : null,
       monto_min: montoMin ? parseFloat(montoMin) : null,

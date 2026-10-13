@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { DetalleCompraAgilDatos } from '@/components/compras-agiles/DetalleCompraAgil';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { aplicarFiltrosCliente, coincideConcepto, normalizar, palabrasParaFiltrar, type ClienteFiltros } from '@/hooks/useClienteFiltros';
 
 // =============================================================================
@@ -20,7 +21,9 @@ export interface OportunidadPanel {
   estado: string | null;
   tipo: 'compra_agil' | 'licitacion';
   link_oficial: string | null;
+  // Porcentaje de ítems compatibles; nunca similitud de un producto.
   match_score: number | null;
+  match_similarity?: number | null;
   match_encontrado: boolean;
   items_count: number;
   items_matched: number;
@@ -135,8 +138,10 @@ export interface PanelStats {
 // =============================================================================
 
 export function useOportunidadesPanel(filters: PanelFilters = {}) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ['oportunidades-panel', filters],
+    queryKey: ['oportunidades-panel', filters, user?.id],
+    enabled: !!user?.id,
     queryFn: async (): Promise<{ data: OportunidadPanel[]; stats: PanelStats }> => {
       const nowIso = new Date().toISOString();
       const incluirCerradas = filters.incluirCerradas ?? false;
@@ -215,7 +220,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       const LIC_COLS =
         'id, codigo, nombre, descripcion, estado, fecha_cierre, fecha_publicacion, ' +
         'institucion_nombre, unidad_compra_region, presupuesto_estimado, created_at, ' +
-        'match_score, match_encontrado';
+        'match_score, match_encontrado, licitaciones_bi_items(id)';
       let licitacionesQuery = supabase
         .from('licitaciones_bi')
         .select(LIC_COLS)
@@ -237,13 +242,32 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
           .limit(MAX_ACTIVAS);
       }
 
-      // Filtros del cliente (onboarding + IA): se piden en paralelo. RLS restringe
-      // la fila al propio cliente, así que un maybeSingle basta.
-      const filtrosRes = await supabase
-        .from('cliente_filtros_oportunidades')
-        .select('palabras_incluir, palabras_incluir_ia, palabras_ia_descartadas, palabras_excluir, regiones_activas, monto_min, monto_max')
-        .maybeSingle();
-      const filtrosRow = (filtrosRes as any)?.data ?? null;
+      // Resolver la empresa antes de leer sus criterios de búsqueda.
+      const { data: clienteIdPanel, error: ownerError } = await supabase.rpc('cliente_owner_id');
+      if (ownerError) throw ownerError;
+      let filtrosRow: Partial<ClienteFiltros> | null = null;
+      if (clienteIdPanel) {
+        const { data, error } = await supabase
+          .from('cliente_filtros_oportunidades')
+          .select('palabras_incluir, palabras_incluir_ia, palabras_ia_descartadas, palabras_excluir, regiones_activas, monto_min, monto_max')
+          .eq('cliente_id', clienteIdPanel)
+          .maybeSingle();
+        if (error) throw error;
+        filtrosRow = data ? {
+          ...data,
+          palabras_incluir_ia: Array.isArray(data.palabras_incluir_ia)
+            ? data.palabras_incluir_ia.filter((word): word is string => typeof word === 'string') : [],
+        } : null;
+        // Perfiles anteriores guardaron las palabras solo en clientes. [] es
+        // una selección vacía explícita; null permite recuperar el onboarding.
+        if (filtrosRow?.palabras_incluir == null) {
+          const { data: perfil, error: perfilError } = await supabase
+            .from('clientes').select('palabras_clave_busqueda')
+            .eq('id', clienteIdPanel).maybeSingle();
+          if (perfilError) throw perfilError;
+          filtrosRow = { ...filtrosRow, palabras_incluir: perfil?.palabras_clave_busqueda ?? [] };
+        }
+      }
 
       // PALABRAS DEL RUBRO en el servidor: por cada palabra del cliente (y los
       // conceptos de la IA encendidos) se buscan en título, descripción e
@@ -310,20 +334,17 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         .or('estado.ilike.publicada,estado.ilike.activa')
         .gt('fecha_cierre', nowIso);
 
-      // TODO EN PARALELO (antes eran 5 etapas secuenciales de red y el panel se
-      // sentía lento): compras, licitaciones, filtros, afinidad, empresa dueña y
-      // los conteos no dependen entre sí.
+      // Las fuentes de oportunidades y los conteos son independientes.
       const rubroLicQuery = porLotes(codigosRubroLic, (lote) =>
         supabase.from('licitaciones_bi').select(LIC_COLS).in('codigo', lote),
       );
 
-      const [comprasRes, licitacionesRes, rubroCA, rubroLic, afinidadRes, ownerRes, licCountRes, caCountRes] = await Promise.all([
+      const [comprasRes, licitacionesRes, rubroCA, rubroLic, afinidadRes, licCountRes, caCountRes] = await Promise.all([
         comprasQuery,
         licitacionesQuery,
         rubroCAQuery,
         rubroLicQuery,
         afinidadQuery,
-        Promise.resolve(supabase.rpc('cliente_owner_id')).then((r: any) => r).catch(() => ({ data: null })),
         incluirCerradas || codigoExacto ? Promise.resolve(null) : licCountQuery,
         incluirCerradas || codigoExacto ? Promise.resolve(null) : caCountQuery,
       ]);
@@ -365,8 +386,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       // IMPORTANTE: ca_matches tiene un match por CLIENTE (score según SU
       // inventario) y su RLS deja leer todas las filas. Filtramos por la empresa
       // DUEÑA (cliente_owner_id: si el usuario es miembro de equipo, la que lo
-      // invitó). El RPC ya vino en el lote paralelo de arriba.
-      const clienteIdPanel: string | null = ((ownerRes as any)?.data as string) ?? null;
+      // invitó).
 
       // Matches del cliente en UNA etapa paralela, filtrados por cliente + compra
       // abierta (pocas filas). Antes se pedían en serie con un `.in(...)` de 300
@@ -374,6 +394,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       const bestMatchByCodigo: Record<string, { score: number; producto: string | null; count: number }> = {};
       const itemMatchCountByCodigo: Record<string, number> = {};
       let itemMatchesFallaron = false;
+      const licMatchedItems: Record<string, Set<string>> = {};
       // Si el RPC de empresa dueña no resolvió (p. ej. un usuario recién
       // registrado que todavía no tiene fila en `clientes`), NO se muestran
       // matches. Antes se caía a leer ca_matches/ca_item_matches de TODOS los
@@ -389,11 +410,28 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
           .gte('fecha_cierre', nowIso);
         const itemQuery = supabase
           .from('ca_item_matches')
-          .select('compra_agil_codigo')
+          .select('compra_agil_codigo, item_id')
           .eq('cliente_id', clienteIdPanel)
           .gte('fecha_cierre', nowIso)
           .gte('score', PISO_MATCH);
-        const [matchesRes, itemMatchesRes] = await Promise.all([matchQuery, itemQuery]);
+        // Paginar: PostgREST limita una respuesta a 1.000 filas; truncar los
+        // matches subestimaría silenciosamente la cobertura de la empresa.
+        const leerLicItems = async () => {
+          const rows: { licitacion_codigo: string; item_id: string }[] = [];
+          for (let offset = 0; ; offset += 500) {
+            const { data, error } = await supabase.from('lic_item_matches')
+              .select('licitacion_codigo, item_id').eq('cliente_id', clienteIdPanel)
+              .gte('score', PISO_MATCH).order('id').range(offset, offset + 499);
+            if (error) return { data: null, error };
+            rows.push(...(data ?? []));
+            if ((data?.length ?? 0) < 500) return { data: rows, error: null };
+          }
+        };
+        const [matchesRes, itemMatchesRes, licItemsRes] = await Promise.all([matchQuery, itemQuery, leerLicItems()]);
+        if (licItemsRes.error) throw licItemsRes.error;
+        for (const row of licItemsRes.data ?? []) {
+          (licMatchedItems[row.licitacion_codigo] ??= new Set()).add(row.item_id);
+        }
         if ((matchesRes as any)?.error) {
           console.error('[OportunidadesPanel] Error fetching ca_matches:', (matchesRes as any).error);
         }
@@ -427,16 +465,9 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       const compras: OportunidadPanel[] = (comprasRaw || []).map((c: any) => {
         const itemsCount = c.compras_agiles_items?.length || 0;
         const itemsMatched = itemMatchCountByCodigo[c.codigo] ?? 0;
-        // El % que se muestra es COBERTURA (cuántos de los productos pedidos
-        // calzan con tu inventario), no el mejor score individual: si la
-        // compra pide 10 productos y calzan 5, es 50% de match, no el 100%
-        // del ítem que mejor calzó. Si aún no hay desglose por ítem para ESTA
-        // compra en particular (0 matches: puede ser que de verdad no calce
-        // nada, o que el cron todavía no la procesó) — o si la consulta de
-        // ca_item_matches falló para todo el panel — se cae al mejor score a
-        // nivel de compra (ca_matches) como respaldo, en vez de forzar 0%.
-        const coverageScore = !itemMatchesFallaron && itemsCount > 0 && itemsMatched > 0 ? Math.round((itemsMatched / itemsCount) * 100) : null;
-        const fallbackScore = bestMatchByCodigo[c.codigo]?.score ?? (c.match_score >= PISO_MATCH ? c.match_score : null);
+        const coverageScore = !itemMatchesFallaron && itemsCount > 0 && itemsMatched > 0
+          ? Math.round((Math.min(itemsMatched, itemsCount) / itemsCount) * 100) : null;
+        const similarity = bestMatchByCodigo[c.codigo]?.score ?? null;
         return {
           id: c.id,
           codigo: c.codigo,
@@ -450,8 +481,9 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
           estado: c.estado,
           tipo: 'compra_agil' as const,
           link_oficial: c.url_ficha || c.link_oficial || null,
-          match_score: coverageScore ?? fallbackScore,
-          match_encontrado: (itemsMatched > 0) || !!bestMatchByCodigo[c.codigo] ? true : ((c.match_encontrado && c.match_score >= PISO_MATCH) || false),
+          match_score: coverageScore,
+          match_similarity: similarity,
+          match_encontrado: itemsMatched > 0 || similarity != null,
           items_count: itemsCount,
           // Ítems que calzan producto-a-producto (ca_item_matches). Antes era el
           // conteo de filas de ca_matches (match a nivel de compra), poco útil.
@@ -481,10 +513,11 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         link_oficial: l.codigo
           ? `https://www.mercadopublico.cl/Procurement/Modules/RFB/DetailsAcquisition.aspx?idlicitacion=${l.codigo}`
           : null,
-        match_score: l.match_score >= PISO_MATCH ? l.match_score : null,
-        match_encontrado: (l.match_encontrado && l.match_score >= PISO_MATCH) || false,
-        items_count: 0,
-        items_matched: 0,
+        match_score: l.licitaciones_bi_items?.length && licMatchedItems[l.codigo]?.size
+          ? Math.round((Math.min(licMatchedItems[l.codigo].size, l.licitaciones_bi_items.length) / l.licitaciones_bi_items.length) * 100) : null,
+        match_encontrado: (licMatchedItems[l.codigo]?.size ?? 0) > 0,
+        items_count: l.licitaciones_bi_items?.length ?? 0,
+        items_matched: licMatchedItems[l.codigo]?.size ?? 0,
         created_at: l.created_at || l.fecha_publicacion,
         coincidencia: coincidenciaPorCodigo[l.codigo] ?? null,
       }));
@@ -643,7 +676,8 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
     refetchInterval: 180_000,
     // No mostrar el resultado de otra búsqueda mientras llega la nueva.
     placeholderData: (prev, previousQuery) =>
-      (previousQuery?.queryKey[1] as PanelFilters | undefined)?.search === filters.search ? prev : undefined,
+      previousQuery?.queryKey[2] === user?.id
+        && (previousQuery?.queryKey[1] as PanelFilters | undefined)?.search === filters.search ? prev : undefined,
   });
 }
 
