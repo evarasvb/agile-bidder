@@ -19,7 +19,7 @@ const VISTO_OPS_KEY = "fvb_paso_oportunidades_visto";
 const SALTADOS_KEY = "fvb_pasos_saltados";
 
 /** Panel "Empieza aquí": lleva de la mano al cliente nuevo por la rutina básica
- *  de firmavb (inventario → oportunidades → primera oferta → extensión).
+ *  de firmavb (búsqueda → oportunidades → inventario → primera oferta).
  *
  *  Reglas de UX (feedback del cliente):
  *  - TODO vinculado: la fila completa de cada paso es un enlace grande y
@@ -109,20 +109,20 @@ export function PrimerosPasos() {
       aviso: "Te muestro cómo conectar la extensión 🔌",
     },
     {
-      id: "inventario", done: tieneInventario, icon: Package,
-      titulo: "Carga tu inventario",
-      desc: "Es lo que firmavb usa para encontrar las oportunidades que puedes ganar. Sin esto, no hay match.",
-      to: "/inventario",
-      aviso: "Vamos a cargar tus productos 📦",
-    },
-    {
       id: "oportunidades", done: revisoOportunidades, icon: Sparkles,
       titulo: "Revisa tus oportunidades",
-      desc: "Mira las licitaciones y compras ágiles que calzan con tus productos, con su % de match.",
+      desc: "Tus palabras clave encuentran licitaciones y compras ágiles. Revisa por qué aparece cada oportunidad.",
       // A la BANDEJA (/oportunidades), donde están sus matches. Antes iba a
       // "Guardadas" (/mis-oportunidades), vacía para un cliente nuevo.
       to: "/oportunidades", onClick: marcarVistoOps,
       aviso: "Estas son las oportunidades que calzan contigo ✨",
+    },
+    {
+      id: "inventario", done: tieneInventario, icon: Package,
+      titulo: "Carga tu inventario",
+      desc: "El inventario identifica qué productos son compatibles con los ítems pedidos. Puedes buscar oportunidades antes de cargarlo.",
+      to: "/inventario",
+      aviso: "Vamos a cargar tus productos 📦",
     },
     {
       id: "oferta", done: tieneOfertas || tieneLibros, icon: FileText,

@@ -245,6 +245,7 @@ export function useActualizarCliente() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cliente'] });
+      queryClient.invalidateQueries({ queryKey: ['oportunidades-panel'] });
     },
     onError: (error: any) => {
       toast({
