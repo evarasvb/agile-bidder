@@ -53,7 +53,19 @@ import { useUpdatePipelineItem, useMovePipelineItem, useDeletePipelineItem } fro
 import { supabaseClient as supabase } from '@/lib/supabaseClient';
 import { useDriveEstado, type DriveFile } from '@/hooks/useGoogleDrive';
 import { DriveFilePicker } from '@/components/drive/DriveFilePicker';
+import { AnalisisIABoton } from './AnalisisIABoton';
+import type { ResultadoAnalisis } from '@/hooks/useAnalisisPostulacion';
 import { toast } from 'sonner';
+
+// A qué "resultado" del post-mortem de IA corresponde cada etapa cerrada del
+// pipeline. Las etapas intermedias (en curso) no tienen análisis: el post-
+// mortem solo tiene sentido cuando el proceso ya terminó.
+const RESULTADO_POR_ETAPA: Partial<Record<PipelineEtapa, ResultadoAnalisis>> = {
+  perdida: 'perdida',
+  adjudicada: 'ganada',
+  oc_emitida: 'ganada',
+  pagada: 'ganada',
+};
 
 // Link real a la ficha en Mercado Público (scrapeado), buscado por código. Antes
 // se armaba a mano con el código y esa URL no existe en el sitio real (404).
@@ -116,6 +128,7 @@ export function PipelineDetailModal({
   if (!item) return null;
 
   const currentConfig = ETAPA_CONFIG[item.etapa];
+  const resultadoCerrado = RESULTADO_POR_ETAPA[item.etapa];
 
   const handleStageChange = (newEtapa: string) => {
     moveItem.mutate(
@@ -322,10 +335,18 @@ export function PipelineDetailModal({
 
           {/* Notes */}
           <div>
-            <h4 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-1">
-              <FileText className="h-4 w-4" />
-              Notas
-            </h4>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-1">
+                <FileText className="h-4 w-4" />
+                Notas
+              </h4>
+              {/* Post-mortem de IA: antes solo se podía pedir desde el
+                  Histórico de Postulaciones, aparte del pipeline donde el
+                  usuario realmente mueve la tarjeta a Perdida/Adjudicada. */}
+              {resultadoCerrado && (item.oportunidad_tipo === 'licitacion' || item.oportunidad_tipo === 'compra_agil') && (
+                <AnalisisIABoton tipo={item.oportunidad_tipo} codigo={item.oportunidad_id} resultado={resultadoCerrado} />
+              )}
+            </div>
             <Textarea
               value={displayNotas}
               onChange={(e) => {
