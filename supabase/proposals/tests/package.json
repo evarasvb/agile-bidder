@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test:rls": "node run_pglite.mjs ./node_modules/@electric-sql/pglite/dist/index.js ./rls-evidence.json"
+    "test:rls": "node run_pglite.mjs ./node_modules/@electric-sql/pglite/dist/index.js ./rls-evidence.json",
+    "test:lic-batches": "node run_lic_batches.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "0.5.8"
