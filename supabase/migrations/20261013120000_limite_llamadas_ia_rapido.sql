@@ -63,4 +63,10 @@ begin
 end;
 $$;
 
+-- Postgres concede EXECUTE a PUBLIC por defecto al crear una función: sin
+-- este revoke, cualquiera sin login podía llamarlas directo por REST
+-- (detectado por el advisor de seguridad de Supabase tras aplicar esto).
+revoke all on function public.chequear_limite_ia(uuid, text, int, int) from public, anon, authenticated;
+revoke all on function public.limpiar_ia_uso_rapido() from public, anon, authenticated;
 grant execute on function public.chequear_limite_ia(uuid, text, int, int) to service_role;
+grant execute on function public.limpiar_ia_uso_rapido() to service_role;
