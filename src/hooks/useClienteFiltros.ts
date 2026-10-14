@@ -70,13 +70,21 @@ export function coincideConcepto(textoNorm: string, palabra: string): boolean {
   return partes.every((w) => coincidePalabra(textoNorm, w));
 }
 
-// Palabras del cliente + conceptos de la IA que siguen encendidos.
-export function palabrasParaFiltrar(filtros?: Partial<ClienteFiltros> | null): string[] {
-  if (!filtros) return [];
-  const apagadas = new Set((filtros.palabras_ia_descartadas || []).map(normalizar));
+// Palabras del cliente + conceptos de la IA que siguen encendidos, más las
+// palabras de los clusters de búsqueda por rubro ACTIVOS (si el cliente usa
+// clusters — ver useClienteClusters.ts). Los clusters SUMAN precisión, nunca
+// reemplazan la bolsa plana: un cliente que solo usa la lista de arriba sigue
+// funcionando exactamente igual que antes.
+export function palabrasParaFiltrar(
+  filtros?: Partial<ClienteFiltros> | null,
+  palabrasClusters: string[] = [],
+): string[] {
+  if (!filtros && !palabrasClusters.length) return [];
+  const apagadas = new Set((filtros?.palabras_ia_descartadas || []).map(normalizar));
   return [
-    ...(filtros.palabras_incluir || []),
-    ...(filtros.palabras_incluir_ia || []).filter((w) => !apagadas.has(normalizar(w))),
+    ...(filtros?.palabras_incluir || []),
+    ...(filtros?.palabras_incluir_ia || []).filter((w) => !apagadas.has(normalizar(w))),
+    ...palabrasClusters,
   ].filter(Boolean);
 }
 
@@ -251,25 +259,27 @@ export interface CompraAgilParaFiltrar {
 // (insensible a acentos/mayúsculas).
 export function pasaFiltrosCliente(
   compra: CompraAgilParaFiltrar,
-  filtros: ClienteFiltros | null
+  filtros: ClienteFiltros | null,
+  palabrasClusters: string[] = [],
 ): boolean {
-  // Si no hay filtros configurados, todas las compras pasan
-  if (!filtros) return true;
+  // Si no hay filtros ni clusters configurados, todas las compras pasan
+  if (!filtros && !palabrasClusters.length) return true;
 
   // Crear texto combinado normalizado para buscar palabras
   const texto = normalizar(`${compra.nombre || ''} ${compra.descripcion || ''}`);
 
   // Filtrar por palabras a incluir (debe coincidir al menos una, por concepto).
-  // Se suman los sinónimos/términos ampliados por IA (palabras_incluir_ia):
-  // buscar "por concepto", no por la palabra exacta que escribió el cliente.
-  const incluirConIA = palabrasParaFiltrar(filtros);
+  // Se suman los sinónimos/términos ampliados por IA (palabras_incluir_ia) y
+  // las palabras de los clusters activos: buscar "por concepto", no por la
+  // palabra exacta que escribió el cliente.
+  const incluirConIA = palabrasParaFiltrar(filtros, palabrasClusters);
   if (incluirConIA.length > 0) {
     const tieneIncluida = incluirConIA.some((palabra) => coincideConcepto(texto, palabra));
     if (!tieneIncluida) return false;
   }
 
   // Filtrar por palabras a excluir (no debe contener ninguna)
-  if (filtros.palabras_excluir && filtros.palabras_excluir.length > 0) {
+  if (filtros?.palabras_excluir && filtros.palabras_excluir.length > 0) {
     const tieneExcluida = filtros.palabras_excluir.some((palabra) =>
       texto.includes(normalizar(palabra))
     );
@@ -277,17 +287,17 @@ export function pasaFiltrosCliente(
   }
 
   // Filtrar por monto mínimo
-  if (filtros.monto_min && compra.monto !== null && compra.monto !== undefined) {
+  if (filtros?.monto_min && compra.monto !== null && compra.monto !== undefined) {
     if (compra.monto < filtros.monto_min) return false;
   }
 
   // Filtrar por monto máximo
-  if (filtros.monto_max && compra.monto !== null && compra.monto !== undefined) {
+  if (filtros?.monto_max && compra.monto !== null && compra.monto !== undefined) {
     if (compra.monto > filtros.monto_max) return false;
   }
 
   // Filtrar por regiones activas
-  if (filtros.regiones_activas && filtros.regiones_activas.length > 0 && compra.region) {
+  if (filtros?.regiones_activas && filtros.regiones_activas.length > 0 && compra.region) {
     const regionNormalizada = normalizar(compra.region);
     const regionActiva = filtros.regiones_activas.some((region) =>
       regionNormalizada.includes(normalizar(region))
@@ -316,16 +326,17 @@ export function aplicarFiltrosCliente<
     // Ya calzó con una palabra del rubro en el servidor (ítems incluidos).
     rubro_match?: boolean;
   }
->(oportunidades: T[], filtros?: Partial<ClienteFiltros> | null): T[] {
-  if (!filtros) return oportunidades;
+>(oportunidades: T[], filtros?: Partial<ClienteFiltros> | null, palabrasClusters: string[] = []): T[] {
+  if (!filtros && !palabrasClusters.length) return oportunidades;
   // Búsqueda por CONCEPTO, no por palabra exacta: se suman los términos que
   // el cliente escribió con los sinónimos/variantes que amplió la IA
-  // (palabras_incluir_ia) — así "consumible de impresión" calza con "toner".
-  const incluir = palabrasParaFiltrar(filtros).map(normalizar).filter(Boolean);
-  const excluir = (filtros.palabras_excluir || []).map(normalizar).filter(Boolean);
-  const regiones = (filtros.regiones_activas || []).map(normalizar).filter(Boolean);
-  const montoMin = filtros.monto_min ?? null;
-  const montoMax = filtros.monto_max ?? null;
+  // (palabras_incluir_ia) y los de sus clusters activos por rubro — así
+  // "consumible de impresión" calza con "toner".
+  const incluir = palabrasParaFiltrar(filtros, palabrasClusters).map(normalizar).filter(Boolean);
+  const excluir = (filtros?.palabras_excluir || []).map(normalizar).filter(Boolean);
+  const regiones = (filtros?.regiones_activas || []).map(normalizar).filter(Boolean);
+  const montoMin = filtros?.monto_min ?? null;
+  const montoMax = filtros?.monto_max ?? null;
 
   if (!incluir.length && !excluir.length && !regiones.length && !montoMin && !montoMax) {
     return oportunidades; // filtros vacíos => no-op

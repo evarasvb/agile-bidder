@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { DetalleCompraAgilDatos } from '@/components/compras-agiles/DetalleCompraAgil';
 import { supabase } from '@/integrations/supabase/client';
 import { aplicarFiltrosCliente, coincideConcepto, normalizar, palabrasParaFiltrar, type ClienteFiltros } from '@/hooks/useClienteFiltros';
+import { palabrasActivasClusters, type ClusterPalabras } from '@/hooks/useClienteClusters';
 
 // =============================================================================
 // INTERFACES
@@ -245,6 +246,14 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
         .maybeSingle();
       const filtrosRow = (filtrosRes as any)?.data ?? null;
 
+      // Clusters de búsqueda por rubro ACTIVOS (si el cliente los usa): suman
+      // palabras ADEMÁS de la bolsa plana de arriba, nunca la reemplazan.
+      const clustersRes = await supabase
+        .from('cliente_cluster_palabras')
+        .select('activo, palabras, palabras_ia, palabras_ia_descartadas')
+        .eq('activo', true);
+      const palabrasClusters = palabrasActivasClusters(((clustersRes as any)?.data ?? []) as ClusterPalabras[]);
+
       // PALABRAS DEL RUBRO en el servidor: por cada palabra del cliente (y los
       // conceptos de la IA encendidos) se buscan en título, descripción e
       // ÍTEMS de TODAS las abiertas, no solo de las 500 más nuevas que baja el
@@ -254,7 +263,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       const codigosRubroCA: string[] = [];
       const codigosRubroLic: string[] = [];
       if (!busquedaEnServidor) {
-        const palabras = palabrasParaFiltrar(filtrosRow as Partial<ClienteFiltros> | null).slice(0, 12);
+        const palabras = palabrasParaFiltrar(filtrosRow as Partial<ClienteFiltros> | null, palabrasClusters).slice(0, 12);
         if (palabras.length) {
           const res = await Promise.all(
             palabras.map((pal) =>
@@ -496,7 +505,7 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
       // Búsqueda por CONCEPTO: se suman las palabras que el cliente escribió con
       // los sinónimos/variantes que la IA amplió (palabras_incluir_ia), para que
       // "consumible de impresión" calce con la palabra "toner" que él definió.
-      const palabrasConIA = palabrasParaFiltrar(filtrosRow as Partial<ClienteFiltros> | null);
+      const palabrasConIA = palabrasParaFiltrar(filtrosRow as Partial<ClienteFiltros> | null, palabrasClusters);
       const tienePalabras = palabrasConIA.length > 0;
       // Lo que calzó en el servidor por palabra del rubro (p. ej. dentro de un
       // ítem de licitación, que el navegador no tiene) se marca ANTES de
@@ -507,14 +516,15 @@ export function useOportunidadesPanel(filters: PanelFilters = {}) {
           o.rubro_palabra = palabraPorCodigo[o.codigo];
         }
       }
-      if (filtrosRow && !codigoExacto) {
+      if ((filtrosRow || palabrasClusters.length) && !codigoExacto) {
         // Si el usuario ESCRIBIÓ una búsqueda, manda lo que buscó: no se exige
         // además que calce con las palabras del rubro (antes buscar "resma" con
         // rubro "google" botaba casi todo). Se mantienen exclusiones, regiones y monto.
-        const filtrosAplicar: Partial<ClienteFiltros> = textoBusqueda.length >= 2
+        const buscandoTexto = textoBusqueda.length >= 2;
+        const filtrosAplicar: Partial<ClienteFiltros> = buscandoTexto
           ? { ...(filtrosRow as Partial<ClienteFiltros>), palabras_incluir: [], palabras_incluir_ia: [] }
           : (filtrosRow as Partial<ClienteFiltros>);
-        all = aplicarFiltrosCliente(all, filtrosAplicar);
+        all = aplicarFiltrosCliente(all, filtrosAplicar, buscandoTexto ? [] : palabrasClusters);
       }
       // Lo que coincide con la definición del cliente lleva la PALABRA que calzó
       // (ej: "toner"), para que la tarjeta explique por qué está aquí. Clave para

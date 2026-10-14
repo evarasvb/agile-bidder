@@ -45,7 +45,11 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const { cliente_id, palabras } = await req.json().catch(() => ({}));
+    // industria (opcional): si viene, es la ampliación de un CLUSTER puntual
+    // (cliente_cluster_palabras) en vez de la bolsa plana legacy
+    // (cliente_filtros_oportunidades), que sigue existiendo para clientes
+    // que no han migrado a clusters de búsqueda por rubro.
+    const { cliente_id, palabras, industria } = await req.json().catch(() => ({}));
     if (!cliente_id) return json({ error: "falta cliente_id" }, 400);
 
     const palabrasLimpias: string[] = Array.isArray(palabras)
@@ -120,12 +124,20 @@ Responde SOLO un JSON con esta forma exacta:
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
-    const { error: upsertError } = await supabase
-      .from("cliente_filtros_oportunidades")
-      .upsert(
-        { cliente_id, palabras_incluir_ia: palabrasIncluirIa, updated_at: new Date().toISOString() },
-        { onConflict: "cliente_id" }
-      );
+
+    const { error: upsertError } = industria
+      ? await supabase
+          .from("cliente_cluster_palabras")
+          .upsert(
+            { cliente_id, industria, palabras_ia: palabrasIncluirIa, updated_at: new Date().toISOString() },
+            { onConflict: "cliente_id,industria" }
+          )
+      : await supabase
+          .from("cliente_filtros_oportunidades")
+          .upsert(
+            { cliente_id, palabras_incluir_ia: palabrasIncluirIa, updated_at: new Date().toISOString() },
+            { onConflict: "cliente_id" }
+          );
     if (upsertError) {
       console.error("expandir-conceptos upsert error:", upsertError);
       return json({ error: "No se pudo guardar la ampliación", detalle: upsertError.message }, 500);

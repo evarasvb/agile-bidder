@@ -24,6 +24,7 @@ import { useCliente } from "@/hooks/useCliente";
 import { RecargosRegion } from '@/components/settings/RecargosRegion';
 import { InfoHint } from "@/components/ui/info-hint";
 import AprendizajeIA from "@/components/oportunidades/AprendizajeIA";
+import { ClustersBusqueda } from "@/components/oportunidades/ClustersBusqueda";
 import { toast } from "sonner";
 
 const REGIONES_CHILE = [
@@ -520,6 +521,8 @@ export default function ConfiguracionOportunidades() {
           </CardContent>
         </Card>
       </div>
+
+      <ClustersBusqueda />
 
       {/* Summary */}
       <Card>
