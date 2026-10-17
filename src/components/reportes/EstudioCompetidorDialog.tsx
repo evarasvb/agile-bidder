@@ -1,11 +1,11 @@
-import { Sparkles, RefreshCw, TrendingUp, Trophy, Target, Building2, Package } from 'lucide-react';
+import { Sparkles, RefreshCw, TrendingUp, Trophy, Target, Building2, Package, Swords, AlertTriangle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { formatCompact, formatNumber } from '@/hooks/useReportes';
-import { useProveedorZoom, useEstudioCompetidor, useGenerarEstudioCompetidor } from '@/hooks/useProveedorZoom';
+import { useProveedorZoom, useProveedorHeadToHead, useEstudioCompetidor, useGenerarEstudioCompetidor } from '@/hooks/useProveedorZoom';
 
 function Kpi({ label, value }: { label: string; value: string }) {
   return (
@@ -19,12 +19,15 @@ function Kpi({ label, value }: { label: string; value: string }) {
 export function EstudioCompetidorDialog({ nombre, open, onOpenChange }: { nombre: string | null; open: boolean; onOpenChange: (v: boolean) => void }) {
   const { data: zoom, isLoading } = useProveedorZoom(nombre, open);
   const rutNorm = zoom?.identidad?.rut_norm ?? null;
+  const { data: h2h } = useProveedorHeadToHead(rutNorm);
   const { data: estudio, isLoading: cargandoEstudio } = useEstudioCompetidor(rutNorm);
   const generar = useGenerarEstudioCompetidor(nombre, rutNorm);
 
   const idn = zoom?.identidad;
   const lr = zoom?.licitaciones_resumen;
   const tasaExito = lr && lr.participo > 0 ? Math.round((lr.gano / lr.participo) * 100) : null;
+  const td = zoom?.trato_directo;
+  const pctTratoDirecto = td && td.ordenes_total > 0 ? Math.round((td.ordenes_td / td.ordenes_total) * 100) : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -50,6 +53,13 @@ export function EstudioCompetidorDialog({ nombre, open, onOpenChange }: { nombre
               <Kpi label="Clientes" value={formatNumber(idn.compradores)} />
               <Kpi label="Tasa de éxito en licitaciones" value={tasaExito != null ? `${tasaExito}% (${lr?.gano}/${lr?.participo})` : '—'} />
             </div>
+
+            {pctTratoDirecto != null && pctTratoDirecto > 0 && (
+              <div className="flex items-start gap-2 text-xs rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/20 px-3 py-2">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" />
+                <p><span className="font-medium">{pctTratoDirecto}% de sus compras son trato directo</span> ({formatNumber(td!.ordenes_td)} de {formatNumber(td!.ordenes_total)} órdenes, {formatCompact(td!.monto_td)}) — compras adjudicadas sin licitación abierta.</p>
+              </div>
+            )}
 
             {zoom && zoom.tendencia_mensual.length > 1 && (
               <div>
@@ -106,6 +116,31 @@ export function EstudioCompetidorDialog({ nombre, open, onOpenChange }: { nombre
                       </div>
                       <Badge variant={l.monto_ganado != null ? 'default' : 'outline'} className="shrink-0">
                         {l.monto_ganado != null ? 'Ganó' : 'Participó'}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {h2h && h2h.resumen.total > 0 && (
+              <div>
+                <p className="text-sm font-medium flex items-center gap-1.5 mb-2"><Swords className="h-4 w-4" /> Cara a cara contra nosotros</p>
+                <div className="flex items-center gap-2 text-xs mb-2">
+                  <Badge variant="outline">Competimos en {h2h.resumen.total}</Badge>
+                  <Badge variant="default">Ganamos {h2h.resumen.gano_cliente}</Badge>
+                  <Badge variant="destructive">Ganó él {h2h.resumen.gano_competidor}</Badge>
+                  {h2h.resumen.nadie > 0 && <Badge variant="secondary">Otro/desierta {h2h.resumen.nadie}</Badge>}
+                </div>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                  {h2h.casos.map((c) => (
+                    <div key={c.codigo} className="flex items-center justify-between gap-2 text-xs rounded-md border px-2 py-1.5">
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{c.titulo || c.codigo}</p>
+                        <p className="text-muted-foreground truncate">{c.comprador_nombre}</p>
+                      </div>
+                      <Badge variant={c.gano_cliente ? 'default' : c.gano_competidor ? 'destructive' : 'secondary'} className="shrink-0">
+                        {c.gano_cliente ? 'Ganamos' : c.gano_competidor ? 'Ganó él' : 'Otro'}
                       </Badge>
                     </div>
                   ))}
