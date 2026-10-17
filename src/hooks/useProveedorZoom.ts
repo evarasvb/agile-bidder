@@ -22,11 +22,13 @@ export interface ProveedorLicitacion {
   monto_estimado: number | null; estado_award: string | null; num_oferentes: number | null;
   monto_ganado: number | null;
 }
+export interface ProveedorTratoDirecto { ordenes_total: number; monto_total: number; ordenes_td: number; monto_td: number }
 export interface ProveedorZoom {
   identidad: ProveedorIdentidad;
   tendencia_mensual: ProveedorTendenciaMes[];
   productos: ProveedorProducto[];
   clientes: ProveedorCliente[];
+  trato_directo: ProveedorTratoDirecto | null;
   licitaciones_resumen: { participo: number; gano: number; monto_adjudicado_total: number };
   licitaciones_recientes: ProveedorLicitacion[];
 }
@@ -43,6 +45,32 @@ export function useProveedorZoom(nombre: string | null, enabled = true) {
       const { data, error } = await (supabase.rpc as any)('proveedor_zoom', { p_nombre: nombre });
       if (error) throw error;
       return data as ProveedorZoom;
+    },
+    staleTime: 10 * 60_000,
+  });
+}
+
+export interface HeadToHeadCaso {
+  codigo: string; titulo: string | null; comprador_nombre: string | null;
+  fecha_adjudicacion: string | null; fecha_publicacion: string | null; estado_award: string | null;
+  gano_cliente: boolean; gano_competidor: boolean;
+}
+export interface HeadToHead {
+  resumen: { total: number; gano_cliente: number; gano_competidor: number; nadie: number };
+  casos: HeadToHeadCaso[];
+}
+
+// "Contra quién perdemos" (pedido de Evaristo): licitaciones donde el
+// cliente Y este competidor ofertaron ambos — requiere que el cliente tenga
+// RUT cargado en su ficha (si no, vuelve con total=0, no es un error).
+export function useProveedorHeadToHead(rutNorm: string | null) {
+  return useQuery({
+    queryKey: ['proveedor-head-to-head', rutNorm],
+    enabled: !!rutNorm,
+    queryFn: async (): Promise<HeadToHead> => {
+      const { data, error } = await (supabase.rpc as any)('proveedor_head_to_head', { p_rut_competidor: rutNorm });
+      if (error) throw error;
+      return data as HeadToHead;
     },
     staleTime: 10 * 60_000,
   });

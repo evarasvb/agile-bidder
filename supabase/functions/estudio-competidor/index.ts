@@ -16,7 +16,7 @@ async function pedirEstudioIA(hechos: Record<string, unknown>): Promise<Estudio 
   const candidatos = [Deno.env.get('GEMINI_MODEL') || '', 'gemini-3.6-flash', 'gemini-2.0-flash', 'gemini-flash-latest'].filter(Boolean);
 
   const systemPrompt = `Eres un analista comercial experto en licitaciones y compras públicas de Mercado Público (Chile).
-Te paso los hechos reales de UN proveedor competidor (identidad, tendencia mensual, productos que vende, instituciones que le compran, y su historial en licitaciones donde participó: cuántas veces ofertó, cuántas ganó, y el detalle de las últimas).
+Te paso los hechos reales de UN proveedor competidor: identidad, tendencia mensual, productos que vende, instituciones que le compran, qué parte de su negocio es trato directo (trato_directo: compras sin licitación abierta — si ordenes_td/monto_td es alto respecto al total, dilo como señal, no lo sobre-interpretes como irregular por sí solo), su historial en licitaciones (cuántas veces ofertó, cuántas ganó), "cara_a_cara_contra_nosotros": las licitaciones donde ESTE competidor y NOSOTROS (el usuario) ofertamos ambos, con quién ganó cada una — este es el dato más valioso para explicar por qué perdemos o ganamos contra él específicamente (si total es 0, dilo explícitamente en vez de inventar un historial); y "negocios_que_dejamos_pasar_y_el_gano": licitaciones de nuestro propio rubro (por palabras clave de nuestras propias licitaciones) que NO postulamos y que este competidor sí se adjudicó — si la lista no está vacía, menciónala como oportunidad concreta que se nos escapó.
 Escribe un estudio breve para que otro proveedor sepa a qué se enfrenta. Usa SIEMPRE condicional ("probablemente", "parece") cuando el dato no es 100% certero. No inventes nada que no esté en los hechos: si falta un dato dilo en vez de inventarlo.
 Responde SOLO un JSON válido, sin texto extra, con esta forma EXACTA:
 { "resumen": "3-5 frases: quién es, en qué rubro compite, qué tan grande/activo es", "fortalezas": ["punto corto 1", "..."], "debilidades": ["punto corto 1", "..."], "recomendacion": "1-2 frases: cómo competirle (precio, nicho, instituciones donde no es fuerte, etc.)" }
@@ -79,7 +79,15 @@ Deno.serve(async (req) => {
     const hechos = (zoom as any)?.identidad;
     if (!hechos?.rut_norm) return json({ error: 'No encontramos RUT para este proveedor — no hay suficientes datos para estudiarlo' }, 404);
 
-    const estudio = await pedirEstudioIA(zoom as Record<string, unknown>);
+    const { data: h2h } = await supabase.rpc('proveedor_head_to_head', { p_rut_competidor: hechos.rut_norm });
+    const { data: perdidas } = await supabase.rpc('oportunidades_perdidas_ante', { p_rut_competidor: hechos.rut_norm });
+    const hechosCompletos = {
+      ...(zoom as Record<string, unknown>),
+      cara_a_cara_contra_nosotros: h2h ?? null,
+      negocios_que_dejamos_pasar_y_el_gano: perdidas ?? [],
+    };
+
+    const estudio = await pedirEstudioIA(hechosCompletos);
     if (!estudio) return json({ error: 'La IA no está disponible ahora, intenta de nuevo en un rato' }, 503);
 
     const { data: guardado, error: errUpsert } = await supabase

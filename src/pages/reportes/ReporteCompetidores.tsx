@@ -1,20 +1,23 @@
 import { useState, useMemo } from "react";
-import { Swords, Download, Search, Building2, Package, Crown, Target, DollarSign, PieChart } from "lucide-react";
+import { Swords, Download, Search, Building2, Package, Crown, Target, DollarSign, PieChart, Trophy } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { ReportHero } from "@/components/reportes/ReportHero";
 import { formatCurrency, formatCompact, formatNumber, exportToCSV } from "@/hooks/useReportes";
 import { useBIStats, useTopProveedores, useProveedorDetalle, rangoDePreset, type BIProveedor, type PeriodoPreset } from "@/hooks/useBI";
 import { PeriodoSelector } from "@/components/reportes/PeriodoSelector";
 import { EstudioCompetidorDialog } from "@/components/reportes/EstudioCompetidorDialog";
+import { useMisPrincipalesCompetidores } from "@/hooks/useMisCompetidores";
 
 export default function ReporteCompetidores() {
   const [search, setSearch] = useState("");
   const [sel, setSel] = useState<BIProveedor | null>(null);
   const [estudioAbierto, setEstudioAbierto] = useState(false);
+  const [nombreEstudioDirecto, setNombreEstudioDirecto] = useState<string | null>(null);
   const [preset, setPreset] = useState<PeriodoPreset>("total");
   const periodo = rangoDePreset(preset);
 
@@ -22,6 +25,13 @@ export default function ReporteCompetidores() {
   const { data, isLoading } = useTopProveedores(search, 60, periodo);
   const items = data?.items ?? [];
   const { data: detalle, isLoading: detalleLoading } = useProveedorDetalle(sel?.proveedor ?? null);
+  const { data: misCompetidores, isLoading: cargandoMisCompetidores } = useMisPrincipalesCompetidores();
+
+  const abrirEstudioDirecto = (nombre: string) => {
+    setSel(null);
+    setNombreEstudioDirecto(nombre);
+    setEstudioAbierto(true);
+  };
 
   // Concentración: participación acumulada del top 5 (sobre el mercado total).
   const top5 = useMemo(() => (search ? null : items.slice(0, 5).reduce((s, p) => s + (p.share ?? 0), 0)), [items, search]);
@@ -46,6 +56,39 @@ export default function ReporteCompetidores() {
         ]}
         right={<PeriodoSelector value={preset} onChange={setPreset} />}
       />
+
+      {!!misCompetidores?.competidores?.length && (
+        <Card className="border-border/50 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2"><Trophy className="h-4 w-4" /> Tus principales competidores</CardTitle>
+            <CardDescription>
+              Por tu propio historial de licitaciones (tu RUT), no por rubro adivinado — competiste con ellos en {misCompetidores.total_procesos_propios} procesos, ganaste {misCompetidores.veces_ganamos}.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {cargandoMisCompetidores ? (
+              <div className="flex gap-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-16 w-40" />)}</div>
+            ) : (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {misCompetidores.competidores.map((c) => (
+                  <button
+                    key={c.rut_otro}
+                    type="button"
+                    onClick={() => abrirEstudioDirecto(c.nombre || c.rut_otro)}
+                    className="shrink-0 w-44 text-left rounded-lg border border-border/60 p-3 hover:border-primary/40 transition-colors"
+                  >
+                    <p className="text-sm font-medium truncate">{c.nombre || c.rut_otro}</p>
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      <Badge variant="outline" className="text-xs">{c.coincidencias} juntos</Badge>
+                      {c.veces_gano > 0 && <Badge variant="destructive" className="text-xs">Ganó {c.veces_gano}</Badge>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="relative max-w-md w-full">
@@ -119,7 +162,7 @@ export default function ReporteCompetidores() {
                     </p>
                   )}
                 </div>
-                <Button size="sm" variant="outline" className="shrink-0" onClick={() => setEstudioAbierto(true)}>
+                <Button size="sm" variant="outline" className="shrink-0" onClick={() => { setNombreEstudioDirecto(null); setEstudioAbierto(true); }}>
                   <Target className="h-4 w-4 mr-1.5" /> Modo estudio
                 </Button>
               </div>
@@ -160,7 +203,7 @@ export default function ReporteCompetidores() {
         </div>
       </div>
 
-      <EstudioCompetidorDialog nombre={sel?.proveedor ?? null} open={estudioAbierto} onOpenChange={setEstudioAbierto} />
+      <EstudioCompetidorDialog nombre={sel?.proveedor ?? nombreEstudioDirecto} open={estudioAbierto} onOpenChange={setEstudioAbierto} />
     </div>
   );
 }
