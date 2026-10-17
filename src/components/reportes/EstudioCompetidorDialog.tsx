@@ -1,4 +1,4 @@
-import { Sparkles, RefreshCw, TrendingUp, Trophy, Target, Building2, Package, Swords, AlertTriangle } from 'lucide-react';
+import { Sparkles, RefreshCw, TrendingUp, Trophy, Target, Building2, Package, Swords, AlertTriangle, Ghost } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { formatCompact, formatNumber } from '@/hooks/useReportes';
 import { useProveedorZoom, useProveedorHeadToHead, useEstudioCompetidor, useGenerarEstudioCompetidor } from '@/hooks/useProveedorZoom';
+import { useOportunidadesPerdidasAnte } from '@/hooks/useMisCompetidores';
 
 function Kpi({ label, value }: { label: string; value: string }) {
   return (
@@ -20,6 +21,7 @@ export function EstudioCompetidorDialog({ nombre, open, onOpenChange }: { nombre
   const { data: zoom, isLoading } = useProveedorZoom(nombre, open);
   const rutNorm = zoom?.identidad?.rut_norm ?? null;
   const { data: h2h } = useProveedorHeadToHead(rutNorm);
+  const { data: perdidas } = useOportunidadesPerdidasAnte(rutNorm);
   const { data: estudio, isLoading: cargandoEstudio } = useEstudioCompetidor(rutNorm);
   const generar = useGenerarEstudioCompetidor(nombre, rutNorm);
 
@@ -142,6 +144,26 @@ export function EstudioCompetidorDialog({ nombre, open, onOpenChange }: { nombre
                       <Badge variant={c.gano_cliente ? 'default' : c.gano_competidor ? 'destructive' : 'secondary'} className="shrink-0">
                         {c.gano_cliente ? 'Ganamos' : c.gano_competidor ? 'Ganó él' : 'Otro'}
                       </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {!!perdidas?.length && (
+              <div>
+                <p className="text-sm font-medium flex items-center gap-1.5 mb-2"><Ghost className="h-4 w-4" /> Negocios que dejamos pasar y que él tomó</p>
+                <p className="text-xs text-muted-foreground mb-2">Licitaciones de tu rubro (por palabras clave de tus propias licitaciones) que no postulaste y que este competidor se adjudicó.</p>
+                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                  {perdidas.map((o) => (
+                    <div key={o.codigo} className="flex items-center justify-between gap-2 text-xs rounded-md border px-2 py-1.5">
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{o.nombre || o.codigo}</p>
+                        <p className="text-muted-foreground truncate">{o.institucion || '—'}</p>
+                      </div>
+                      {o.monto_competidor != null && (
+                        <span className="font-mono text-muted-foreground shrink-0">{formatCompact(o.monto_competidor)}</span>
+                      )}
                     </div>
                   ))}
                 </div>
