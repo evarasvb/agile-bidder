@@ -9,10 +9,12 @@ import { ReportHero } from "@/components/reportes/ReportHero";
 import { formatCurrency, formatCompact, formatNumber, exportToCSV } from "@/hooks/useReportes";
 import { useBIStats, useTopProveedores, useProveedorDetalle, rangoDePreset, type BIProveedor, type PeriodoPreset } from "@/hooks/useBI";
 import { PeriodoSelector } from "@/components/reportes/PeriodoSelector";
+import { EstudioCompetidorDialog } from "@/components/reportes/EstudioCompetidorDialog";
 
 export default function ReporteCompetidores() {
   const [search, setSearch] = useState("");
   const [sel, setSel] = useState<BIProveedor | null>(null);
+  const [estudioAbierto, setEstudioAbierto] = useState(false);
   const [preset, setPreset] = useState<PeriodoPreset>("total");
   const periodo = rangoDePreset(preset);
 
@@ -105,16 +107,21 @@ export default function ReporteCompetidores() {
             </Card>
           ) : (
             <div key={sel.proveedor} className="space-y-4 animate-slide-in">
-              <div>
-                <h2 className="text-lg font-bold leading-tight">{sel.proveedor}</h2>
-                <p className="text-sm text-muted-foreground">
-                  {formatCompact(sel.monto_total)} · {(sel.share ?? 0).toFixed(1)}% del mercado · {formatNumber(sel.compradores)} clientes
-                </p>
-                {periodo && (
-                  <p className="text-xs text-muted-foreground/70 mt-1">
-                    El desglose de productos y clientes es histórico total (no filtrado por período).
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold leading-tight">{sel.proveedor}</h2>
+                  <p className="text-sm text-muted-foreground">
+                    {formatCompact(sel.monto_total)} · {(sel.share ?? 0).toFixed(1)}% del mercado · {formatNumber(sel.compradores)} clientes
                   </p>
-                )}
+                  {periodo && (
+                    <p className="text-xs text-muted-foreground/70 mt-1">
+                      El desglose de productos y clientes es histórico total (no filtrado por período).
+                    </p>
+                  )}
+                </div>
+                <Button size="sm" variant="outline" className="shrink-0" onClick={() => setEstudioAbierto(true)}>
+                  <Target className="h-4 w-4 mr-1.5" /> Modo estudio
+                </Button>
               </div>
               <Card className="border-border/50 shadow-sm">
                 <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Package className="h-4 w-4" /> Sus productos fuertes</CardTitle></CardHeader>
@@ -152,6 +159,8 @@ export default function ReporteCompetidores() {
           )}
         </div>
       </div>
+
+      <EstudioCompetidorDialog nombre={sel?.proveedor ?? null} open={estudioAbierto} onOpenChange={setEstudioAbierto} />
     </div>
   );
 }
